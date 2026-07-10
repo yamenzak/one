@@ -12,11 +12,17 @@ interface Billing {
   ledger: { delta: number; reason: string; at: number }[];
 }
 
+interface AiUsage {
+  usage: { feature: string; calls: number; credits: number }[];
+}
+
 export function Business() {
   const [billing, setBilling] = useState<Billing | null>(null);
+  const [aiUsage, setAiUsage] = useState<AiUsage["usage"]>([]);
 
   useEffect(() => {
     void api.get<Billing>("/api/billing").then(setBilling);
+    void api.get<AiUsage>("/api/settings/ai-usage").then((r) => setAiUsage(r.usage)).catch(() => undefined);
   }, []);
 
   if (!billing) return <Skeleton className="m-4 h-64" />;
@@ -41,6 +47,22 @@ export function Business() {
         unit="available"
         chip={<Chip tone="neutral">1 credit = $0.001</Chip>}
       />
+
+      {aiUsage.length > 0 && (
+        <Card>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-fg-muted">AI usage — last 30 days</h2>
+          <div className="space-y-2 text-sm">
+            {aiUsage.map((u) => (
+              <div key={u.feature} className="flex items-center justify-between">
+                <span className="text-fg-muted">{u.feature.replace(/-/g, " ")}</span>
+                <span className="numeral">
+                  {u.credits.toLocaleString()} cr <span className="text-fg-muted">· {u.calls}×</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-fg-muted">Credit packs</h2>

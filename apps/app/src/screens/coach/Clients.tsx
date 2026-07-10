@@ -13,6 +13,7 @@ import { Eat } from "../client/Eat.js";
 import { Progress } from "../client/Progress.js";
 import { CoachPlans } from "./CoachPlans.js";
 import { GoalManager } from "./GoalManager.js";
+import { ClientManage } from "./ClientManage.js";
 
 export interface ClientSummary {
   id: string;
@@ -113,7 +114,7 @@ export function Clients() {
   );
 }
 
-const DETAIL_TABS = ["Today", "Plans", "Goals", "Progress"] as const;
+const DETAIL_TABS = ["Today", "Plans", "Goals", "Progress", "Manage"] as const;
 type DetailTab = (typeof DETAIL_TABS)[number];
 
 function ClientDetail({ client, onBack }: { client: ClientSummary; onBack: () => void }) {
@@ -144,6 +145,7 @@ function ClientDetail({ client, onBack }: { client: ClientSummary; onBack: () =>
       {tab === "Plans" && <CoachPlans clientId={client.id} />}
       {tab === "Goals" && <GoalManager clientId={client.id} />}
       {tab === "Progress" && <Progress clientId={client.id} />}
+      {tab === "Manage" && <ClientManage clientId={client.id} />}
     </div>
   );
 }

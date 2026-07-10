@@ -150,6 +150,93 @@ export const aiRoutes = new Hono<AppEnv>()
     return c.json({ draft: cleaned, credits: result.credits, mocked: result.mocked });
   })
 
+  /** Meal Plan Draft: targets + preferences → meal options (trainer). */
+  .post("/ai/draft-meal", async (c) => {
+    const who = requireTenant(c)!;
+    const role = c.get("role");
+    if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    const parsed = z.object({ clientId: z.string(), instructions: z.string().max(2000).default("") }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, parsed.data.clientId);
+    if ("response" in access) return access.response;
+    const goal = await c.env.DB.prepare("SELECT targets_json FROM client_goals WHERE client_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(access.client.id).first<{ targets_json: string | null }>();
+    const targets = parseJson<Record<string, number>>(goal?.targets_json, {});
+    const intake = parseJson<Record<string, unknown>>(access.client.intake_json, {});
+
+    const result = await generate(c.env, {
+      tenantId: who.tenantId,
+      actorUserId: who.userId,
+      clientId: access.client.id,
+      feature: "draft-meal",
+      task: "text",
+      system: `You are a nutrition coach drafting a day of meal options. Reply with ONLY JSON: {"mealOptions":[{"mealType":"breakfast"|"lunch"|"dinner"|"snack","mealName":string,"isFree":false,"foods":[]}]}. Honor the calorie/macro targets and dietary approach. Foods arrays may be empty (the coach fills exact items) — focus on meal names + types that hit the targets. No commentary.`,
+      prompt: `TARGETS: ${JSON.stringify(targets)}\nINTAKE: ${JSON.stringify(intake)}\n${parsed.data.instructions}`,
+      maxOutputTokens: 1536,
+      mock: () => JSON.stringify({ mealOptions: [{ mealType: "breakfast", mealName: "Oats, whey & berries", isFree: false, foods: [] }, { mealType: "lunch", mealName: "Chicken, rice & greens", isFree: false, foods: [] }, { mealType: "dinner", mealName: "Salmon, potato & salad", isFree: false, foods: [] }] }),
+    });
+    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    const draft = extractJson<{ mealOptions: unknown[] }>(result.output);
+    if (!draft?.mealOptions) return c.json({ error: "could not parse" }, 422);
+    return c.json({ draft: { customMealTypes: [], ...draft }, credits: result.credits, mocked: result.mocked });
+  })
+
+  /** Check-in Summarizer: recent check-ins → digest + suggested reply (trainer). */
+  .post("/ai/summarize-checkins", async (c) => {
+    const who = requireTenant(c)!;
+    const role = c.get("role");
+    if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    const parsed = z.object({ clientId: z.string() }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, parsed.data.clientId);
+    if ("response" in access) return access.response;
+    const rows = await c.env.DB.prepare("SELECT date_local, weight_kg, mood, energy, stress, sleep_hours, notes FROM check_ins WHERE client_id = ? ORDER BY date_local DESC LIMIT 14").bind(access.client.id).all();
+    if ((rows.results ?? []).length === 0) return c.json({ error: "no check-ins yet" }, 404);
+
+    const result = await generate(c.env, {
+      tenantId: who.tenantId,
+      actorUserId: who.userId,
+      clientId: access.client.id,
+      feature: "summarize-checkins",
+      task: "text-small",
+      system: `You are a coaching assistant. Summarize a client's recent check-ins for their trainer in 2-3 sentences: adherence, trends, and any red flags. Then draft a short, warm 1-2 sentence reply to the client. Reply as JSON: {"summary":string,"suggestedReply":string}. No medical advice.`,
+      prompt: JSON.stringify(rows.results),
+      maxOutputTokens: 400,
+      mock: () => JSON.stringify({ summary: `${access.client.display_name} checked in ${(rows.results ?? []).length} times recently. Mood and sleep look steady; weight trending as expected.`, suggestedReply: "Great consistency this week — keep the sleep dialed in and let's push the next session." }),
+    });
+    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    const out = extractJson<{ summary: string; suggestedReply: string }>(result.output);
+    if (!out) return c.json({ error: "could not parse" }, 422);
+    return c.json({ ...out, credits: result.credits, mocked: result.mocked });
+  })
+
+  /** Progress Narrative: aggregates → readable recap (client or trainer). */
+  .post("/ai/narrative", async (c) => {
+    const who = requireTenant(c)!;
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    const parsed = z.object({ clientId: z.string(), stats: z.record(z.string(), z.unknown()) }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, parsed.data.clientId);
+    if ("response" in access) return access.response;
+    const result = await generate(c.env, {
+      tenantId: who.tenantId,
+      actorUserId: who.userId,
+      clientId: access.client.id,
+      feature: "narrative",
+      task: "text-small",
+      system: `Turn these fitness stats into a warm, motivating 3-4 sentence recap for the client. Concrete, honest, encouraging. Plain text only.`,
+      prompt: JSON.stringify(parsed.data.stats),
+      maxOutputTokens: 300,
+      mock: () => `You've been remarkably consistent this month. Your logging streak and steady weight trend show the habits are sticking — that's the hard part. Keep the momentum, and let's build on this next phase.`,
+    });
+    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    return c.json({ narrative: result.output.trim(), credits: result.credits, mocked: result.mocked });
+  })
+
   /** Insight feedback (SPEC §8.11) — the 👍/👎 eval signal. */
   .post("/ai/feedback", async (c) => {
     const who = requireTenant(c)!;

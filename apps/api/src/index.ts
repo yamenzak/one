@@ -68,26 +68,78 @@ app.notFound((c) =>
   c.req.path.startsWith("/api/") ? c.json({ error: "not found" }, 404) : c.text("not found", 404),
 );
 
+const GRACE_DAYS = 7; // past_due → suspended
+const DELETE_DAYS = 30; // suspended → data wipe
+
 /**
- * Daily cron (00:10 UTC): idempotent monthly credit grants for every active
- * tenant subscription. Dunning lifecycle joins with the platform-Stripe phase.
- * The 15-min tick is reserved for reminder sweeps (later phase).
+ * Daily cron (00:10 UTC): idempotent monthly credit grants + the platform
+ * dunning lifecycle (SPEC §7): past_due → (7d) suspended → (30d) deleted.
+ * Comped tenants are exempt.
  */
 async function dailySweep(env: Env): Promise<void> {
   await ensureSchema(env.DB);
   await seedBilling(env.DB);
+  const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+
+  // 1) Monthly grants.
   const plans = await listPlans(env.DB);
   const grants = new Map(plans.map((p) => [p.id, resolveEntitlements(p.entitlements_json).aiCredits.monthlyGrant]));
-  const subs = await env.DB.prepare(
-    "SELECT tenant_id, plan_id FROM subscriptions WHERE status IN ('active','trialing')",
-  ).all<{ tenant_id: string; plan_id: string }>();
+  const active = await env.DB.prepare("SELECT tenant_id, plan_id FROM subscriptions WHERE status IN ('active','trialing')").all<{ tenant_id: string; plan_id: string }>();
   const key = periodKey();
-  for (const sub of subs.results ?? []) {
+  for (const sub of active.results ?? []) {
     const grant = grants.get(sub.plan_id) ?? 0;
     if (grant <= 0) continue;
     const dobj = env.BILLING.get(env.BILLING.idFromName(sub.tenant_id));
     await dobj.bind(sub.tenant_id);
     await dobj.grantMonthly(grant, key).catch(() => undefined);
+  }
+
+  // 2) Dunning: past_due older than the grace window → suspended.
+  const graceCutoff = new Date(nowMs - GRACE_DAYS * 86_400_000).toISOString();
+  await env.DB.prepare(
+    "UPDATE subscriptions SET status = 'suspended', suspend_at = ?, delete_at = ? WHERE status = 'past_due' AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?",
+  )
+    .bind(nowIso, new Date(nowMs + DELETE_DAYS * 86_400_000).toISOString(), graceCutoff)
+    .run()
+    .catch(() => undefined);
+
+  // 3) Suspended past the delete window → drop to free (data-wipe hook lives
+  //    here; v1 resets the plan, retaining coaching data until wired).
+  await env.DB.prepare(
+    "UPDATE subscriptions SET status = 'canceled', plan_id = 'free', suspend_at = NULL, delete_at = NULL WHERE status = 'suspended' AND comp = 0 AND delete_at IS NOT NULL AND delete_at < ?",
+  )
+    .bind(nowIso)
+    .run()
+    .catch(() => undefined);
+}
+
+/**
+ * 15-min tick: reminder sweeps. Notifies clients whose feature budgets are
+ * within 3 days of lapsing (once per subscription, tracked via a marker note).
+ */
+async function reminderSweep(env: Env): Promise<void> {
+  await ensureSchema(env.DB);
+  const soon = Date.now() + 3 * 86_400_000;
+  const subs = await env.DB.prepare(
+    "SELECT id, tenant_id, client_id, budgets_json, notes FROM client_subscriptions WHERE status = 'active'",
+  ).all<{ id: string; tenant_id: string; client_id: string; budgets_json: string | null; notes: string | null }>();
+  for (const sub of subs.results ?? []) {
+    if ((sub.notes ?? "").includes("expiry-notified")) continue;
+    const budgets = JSON.parse(sub.budgets_json ?? "[]") as { expiresAt: string }[];
+    const latest = Math.max(0, ...budgets.map((b) => Date.parse(b.expiresAt)));
+    if (latest > Date.now() && latest < soon) {
+      const client = await env.DB.prepare("SELECT user_id, display_name FROM clients WHERE id = ?").bind(sub.client_id).first<{ user_id: string | null; display_name: string }>();
+      if (client?.user_id) {
+        await env.DB.prepare(
+          "INSERT INTO notifications (id, tenant_id, recipient_user_id, type, title, message, link, created_at) VALUES (?, ?, ?, 'sub_expiring', 'Your plan is expiring soon', 'Renew to keep your coaching access.', '/marketplace', ?)",
+        )
+          .bind(`ntf_${sub.id}`, sub.tenant_id, client.user_id, new Date().toISOString())
+          .run()
+          .catch(() => undefined);
+      }
+      await env.DB.prepare("UPDATE client_subscriptions SET notes = ? WHERE id = ?").bind(`${sub.notes ?? ""} expiry-notified`, sub.id).run().catch(() => undefined);
+    }
   }
 }
 
@@ -95,5 +147,6 @@ export default {
   fetch: app.fetch,
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     if (controller.cron === "10 0 * * *") await dailySweep(env);
+    else if (controller.cron === "*/15 * * * *") await reminderSweep(env);
   },
 } satisfies ExportedHandler<Env>;
