@@ -168,6 +168,82 @@ describe("credits + AI metering", () => {
   });
 });
 
+describe("commerce + redemption", () => {
+  it("redeeming an unknown code 404s without leaking (no oracle)", async () => {
+    const { client } = (await (
+      await SELF.fetch("http://x/api/clients", {
+        method: "POST",
+        headers: { "content-type": "application/json", ...auth(ownerCookie) },
+        body: JSON.stringify({ displayName: "RedeemTest" }),
+      })
+    ).json()) as { client: { id: string } };
+    const res = await SELF.fetch("http://x/api/redeem", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ clientId: client.id, code: "NOPE1234" }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("a redemption code adds queued days to a client", async () => {
+    const { client } = (await (
+      await SELF.fetch("http://x/api/clients", {
+        method: "POST",
+        headers: { "content-type": "application/json", ...auth(ownerCookie) },
+        body: JSON.stringify({ displayName: "RedeemTest2" }),
+      })
+    ).json()) as { client: { id: string } };
+    await SELF.fetch("http://x/api/redemption-codes", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ code: "WELCOME10", daysToAdd: 10, targetFeature: "all", maxUses: 5 }),
+    });
+    const res = await SELF.fetch("http://x/api/redeem", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ clientId: client.id, code: "welcome10" }),
+    });
+    expect(res.status).toBe(200);
+    const subs = (await (await SELF.fetch(`http://x/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number }[] };
+    expect(subs.subscriptions[0]!.daysRemaining).toBe(10);
+  });
+});
+
+describe("content hub", () => {
+  it("a published public article shows on the tenant marketplace (public lane)", async () => {
+    const created = await SELF.fetch("http://x/api/resources", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ type: "article", title: "Warm up right", audience: "public", bodyMd: "# Hi" }),
+    });
+    const { id } = (await created.json()) as { id: string };
+    await SELF.fetch(`http://x/api/resources/${id}/publish`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ status: "published" }),
+    });
+    // The marketplace is a PUBLIC route (no auth) — the owner's slug is studio-one.
+    const mkt = await SELF.fetch("http://x/api/marketplace/studio-one");
+    expect(mkt.status).toBe(200);
+    const body = (await mkt.json()) as { posts: { title: string }[] };
+    expect(body.posts.some((p) => p.title === "Warm up right")).toBe(true);
+  });
+});
+
+describe("reports", () => {
+  it("retention radar flags a client with no activity", async () => {
+    await SELF.fetch("http://x/api/clients", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ displayName: "GhostClient" }),
+    });
+    const res = await SELF.fetch("http://x/api/reports/retention", { headers: auth(ownerCookie) });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { atRisk: { name: string }[] };
+    expect(body.atRisk.some((r) => r.name === "GhostClient")).toBe(true);
+  });
+});
+
 describe("access economy", () => {
   it("granting a package twice queues budgets, never sums", async () => {
     const { client } = (await (
