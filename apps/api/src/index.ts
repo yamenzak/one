@@ -28,6 +28,8 @@ import { healthRoutes } from "./health-routes.js";
 import { contentHubRoutes, marketplaceRoutes } from "./content-routes.js";
 import { reportRoutes } from "./report-routes.js";
 import { settingsRoutes } from "./settings-routes.js";
+import { externalRoutes } from "./external-routes.js";
+import { stripeRoutes, stripeAdminRoutes } from "./stripe-routes.js";
 import type { Env } from "./env.js";
 
 export { TenantBillingDO } from "./billing-do.js";
@@ -58,6 +60,9 @@ app.route("/api", contentHubRoutes);
 app.route("/api", marketplaceRoutes);
 app.route("/api", reportRoutes);
 app.route("/api", settingsRoutes);
+app.route("/api", externalRoutes);
+app.route("/api", stripeRoutes);
+app.route("/api", stripeAdminRoutes);
 
 app.notFound((c) =>
   c.req.path.startsWith("/api/") ? c.json({ error: "not found" }, 404) : c.text("not found", 404),

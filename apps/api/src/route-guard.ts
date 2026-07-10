@@ -56,8 +56,9 @@ function permissionFor(method: string, path: string): Record<string, string[]> |
   }
 
   // Libraries: exercises + foods. Any member reads; staff writes. Food CREATE
-  // stays open to clients (barcode auto-import) — handler marks unverified.
-  if (path === "/api/foods" && method === "POST") return null;
+  // and import stay open to clients (barcode/scan auto-import) — handler marks
+  // client-created rows unverified. Exercise import is staff-only (handler).
+  if ((path === "/api/foods" || path === "/api/foods/import") && method === "POST") return null;
   if (path.startsWith("/api/exercises") || path.startsWith("/api/foods")) {
     return read ? null : { library: [method === "POST" ? "create" : writeVerb] };
   }
@@ -109,6 +110,11 @@ function permissionFor(method: string, path: string): Record<string, string[]> |
 
   // AI suite.
   if (path.startsWith("/api/ai/")) return { ai: ["use"] };
+
+  // Connect: onboarding + checkout. Onboarding is owner (billing:manage);
+  // client-package checkout is a purchase (any member, row-scoped in handler).
+  if (path === "/api/connect/onboard") return { billing: ["manage"] };
+  if (path === "/api/connect/checkout") return null;
 
   // Billing: reads for owner surface, mutations need billing:manage.
   if (path.startsWith("/api/billing")) return isGet ? { billing: ["read"] } : { billing: ["manage"] };
