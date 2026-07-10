@@ -5,7 +5,7 @@
  * can flip to Train mode = the client nav pointed at their own record.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppBar, BottomTabs, Button, NavRail, Sheet, type TabDef } from "@mossa/ui";
 import { useSession, useActiveClientId } from "./session.js";
 import { api } from "./api.js";
@@ -19,6 +19,7 @@ import { Business } from "./screens/coach/Business.js";
 import { Library } from "./screens/coach/Library.js";
 import { Settings } from "./screens/Settings.js";
 import { Wellness } from "./screens/client/Wellness.js";
+import { Onboarding } from "./screens/client/Onboarding.js";
 
 const CLIENT_TABS: TabDef[] = [
   { key: "today", label: "Today", icon: "☀️" },
@@ -49,6 +50,24 @@ export function Shell() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [overlay, setOverlay] = useState<"settings" | "wellness" | null>(null);
   const current = tabs.some((t) => t.key === tab) ? tab : "today";
+
+  // Onboarding gate: a client on their own surface who hasn't done intake.
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
+  const gateClientId = active.role === "client" ? active.clientId : null;
+  useEffect(() => {
+    if (!gateClientId) {
+      setNeedsOnboarding(false);
+      return;
+    }
+    void api
+      .get<{ client: { onboardingComplete: boolean } }>(`/api/clients/${gateClientId}`)
+      .then((r) => setNeedsOnboarding(!r.client.onboardingComplete))
+      .catch(() => setNeedsOnboarding(false));
+  }, [gateClientId]);
+
+  if (gateClientId && needsOnboarding) {
+    return <Onboarding clientId={gateClientId} displayName={ctx!.user.name || "there"} onDone={() => setNeedsOnboarding(false)} />;
+  }
 
   if (overlay === "settings") return <Settings onBack={() => setOverlay(null)} />;
   if (overlay === "wellness" && clientId) return <Wellness clientId={clientId} onBack={() => setOverlay(null)} />;

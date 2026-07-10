@@ -111,6 +111,9 @@ function permissionFor(method: string, path: string): Record<string, string[]> |
   // AI suite.
   if (path.startsWith("/api/ai/")) return { ai: ["use"] };
 
+  // Media: any authenticated member; tenant isolation enforced in the handler.
+  if (path.startsWith("/api/media")) return null;
+
   // Connect: onboarding + checkout. Onboarding is owner (billing:manage);
   // client-package checkout is a purchase (any member, row-scoped in handler).
   if (path === "/api/connect/onboard") return { billing: ["manage"] };

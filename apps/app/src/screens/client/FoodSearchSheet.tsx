@@ -75,6 +75,34 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
     }
   };
 
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  // ✦ Natural-language logging: "2 eggs, toast and an apple" → diary entries.
+  const naturalLog = async () => {
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      const r = await api.post<{ entries: { label: string; mealType: string; calories: number; proteinG: number; carbsG: number; fatG: number }[] }>(
+        "/api/ai/parse-food",
+        { clientId, text: q },
+      );
+      for (const e of r.entries) {
+        await api.post("/api/logs/food", {
+          clientId,
+          data: { date: todayLocal(), mealType: e.mealType || meal, label: e.label, calories: e.calories, proteinG: e.proteinG, carbsG: e.carbsG, fatG: e.fatG },
+        });
+      }
+      onLogged();
+      onClose();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "AI logging failed";
+      setAiError(msg.includes("aiSuite") ? "AI isn't on your studio's plan yet." : msg.includes("insufficient") ? "Studio is out of AI credits." : "Couldn't parse that — try search instead.");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
   const barcode = async () => {
     const code = prompt("Enter barcode digits");
     if (!code) return;
@@ -161,12 +189,16 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
     <Sheet open onClose={onClose} title="Add food">
       <div className="space-y-3">
         <Field label="Search foods" icon="🔍" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <SuggestionChip onClick={barcode}>📷 Barcode</SuggestionChip>
           <SuggestionChip onClick={() => void searchExternal()} disabled={q.length < 2}>
             {searching ? "Searching…" : "🌐 Search web"}
           </SuggestionChip>
+          <SuggestionChip onClick={() => void naturalLog()} disabled={q.length < 3 || aiBusy}>
+            {aiBusy ? "Parsing…" : "✦ Log this"}
+          </SuggestionChip>
         </div>
+        {aiError && <p className="text-sm text-warn">{aiError}</p>}
         <div className="max-h-80 space-y-1 overflow-y-auto">
           {local.map((f) => (
             <FoodRow key={f.id} food={f} badge="library" onPick={() => setSelected(f)} />

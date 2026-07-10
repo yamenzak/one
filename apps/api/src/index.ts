@@ -30,6 +30,7 @@ import { reportRoutes } from "./report-routes.js";
 import { settingsRoutes } from "./settings-routes.js";
 import { externalRoutes } from "./external-routes.js";
 import { stripeRoutes, stripeAdminRoutes } from "./stripe-routes.js";
+import { mediaRoutes } from "./media-routes.js";
 import type { Env } from "./env.js";
 
 export { TenantBillingDO } from "./billing-do.js";
@@ -63,6 +64,7 @@ app.route("/api", settingsRoutes);
 app.route("/api", externalRoutes);
 app.route("/api", stripeRoutes);
 app.route("/api", stripeAdminRoutes);
+app.route("/api", mediaRoutes);
 
 app.notFound((c) =>
   c.req.path.startsWith("/api/") ? c.json({ error: "not found" }, 404) : c.text("not found", 404),
