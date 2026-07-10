@@ -1,0 +1,76 @@
+{
+  // Mossa edge API — Workers + TenantBillingDO. One worker serves the
+  // role-adaptive app (static assets) AND the API at the same origin, so the
+  // Better Auth session cookie is same-origin — no CORS/credentials juggling
+  // (SPEC §3). KV/D1/R2 ids below are placeholders; local `wrangler dev`
+  // simulates everything. Real ids only needed for a remote deploy.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mossa",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // Serve the built app SPA from the edge; the Worker runs first for the API
+  // surface, SPA fallback for client-side routes. Build the app before
+  // deploying: `pnpm --filter @mossa/app build`.
+  "assets": {
+    "directory": "../app/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/health"]
+  },
+
+  // Single-level host under 4dl.app → covered by the zone's *.4dl.app
+  // Universal SSL cert. One origin serves every role; passkeys are bound here.
+  "routes": [{ "pattern": "mossa.4dl.app", "custom_domain": true }],
+
+  // 15-min tick: reminder/notification sweeps. Daily 00:10 UTC: monthly credit
+  // grants + platform dunning lifecycle (SPEC §3). No domain cron — client
+  // subscription expiry is derived at read time.
+  "triggers": { "crons": ["*/15 * * * *", "10 0 * * *"] },
+
+  "vars": {
+    // Platform super-admin allowlist (separate axis from tenant RBAC).
+    "ADMIN_EMAILS": "zakhouryamen@gmail.com",
+    // Public origin Better Auth derives callbacks/cookies from (prod).
+    "BETTER_AUTH_URL": "https://mossa.4dl.app"
+    // BETTER_AUTH_SECRET is a wrangler secret (openssl rand -base64 32).
+  },
+
+  // Workers AI — the AI suite's default lane (SPEC §6). Commented out because
+  // `wrangler dev` requires Cloudflare credentials for the (remote-only) AI
+  // binding; env.AI is optional and the deterministic mock covers local dev.
+  // UNCOMMENT before the first remote deploy.
+  // "ai": { "binding": "AI" },
+
+  "durable_objects": {
+    "bindings": [{ "name": "BILLING", "class_name": "TenantBillingDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TenantBillingDO"] }],
+
+  "kv_namespaces": [
+    // External food/exercise API response cache + short-lived tokens.
+    { "binding": "CACHE", "id": "mossa-cache-placeholder-id-000000000" }
+  ],
+
+  "d1_databases": [
+    // Everything relational: Better Auth, tenants' coaching data, billing
+    // mirrors. Local wrangler dev simulates this; the id is a placeholder.
+    { "binding": "DB", "database_name": "mossa", "database_id": "00000000-0000-0000-0000-000000000000" }
+  ],
+
+  "r2_buckets": [
+    // Media library: exercise media, food images, progress photos (private,
+    // served via authed proxy), lab uploads, avatars, AI assets.
+    { "binding": "MEDIA", "bucket_name": "mossa-media" }
+  ],
+
+  "analytics_engine_datasets": [
+    // Product analytics (logs written, AI calls, active clients).
+    { "binding": "USAGE", "dataset": "mossa_usage" }
+  ],
+
+  // Cloudflare Email Sending (transactional: OTP codes, invites, notices).
+  // Until the sender domain is onboarded the mailer falls back to a dev mock.
+  "send_email": [{ "name": "EMAIL" }]
+}

@@ -1,0 +1,328 @@
+/**
+ * Clients & roster (SPEC §2, §8.1) — the client record store plus THE
+ * row-level access check every coaching route goes through:
+ *
+ *   requireClientAccess(c, clientId):
+ *     owner / assistant → tenant match
+ *     trainer           → client_trainers must link them (the ByShujaa fix)
+ *     client            → clients.user_id must be them
+ */
+
+import { Hono } from "hono";
+import { z } from "zod";
+import { type AppEnv, type AppContext, requireTenant } from "./auth-context.js";
+import { newId, nowIso } from "./ids.js";
+import { parseJson, j } from "./db.js";
+
+export interface ClientRow {
+  id: string;
+  tenant_id: string;
+  user_id: string | null;
+  display_name: string;
+  email: string | null;
+  status: string;
+  gender: string | null;
+  date_of_birth: string | null;
+  height_cm: number | null;
+  timezone: string | null;
+  weight_unit: string;
+  length_unit: string;
+  volume_unit: string;
+  intake_json: string | null;
+  dashboard_prefs_json: string | null;
+  onboarding_complete: number;
+  created_at: string;
+  archived_at: string | null;
+}
+
+export async function getClient(db: D1Database, tenantId: string, clientId: string): Promise<ClientRow | null> {
+  return db
+    .prepare("SELECT * FROM clients WHERE id = ? AND tenant_id = ?")
+    .bind(clientId, tenantId)
+    .first<ClientRow>();
+}
+
+/** The client record linked to a user in a tenant (their "Train" persona). */
+export async function clientForUser(db: D1Database, tenantId: string, userId: string): Promise<ClientRow | null> {
+  return db
+    .prepare("SELECT * FROM clients WHERE tenant_id = ? AND user_id = ? AND status != 'archived'")
+    .bind(tenantId, userId)
+    .first<ClientRow>();
+}
+
+export async function isAssignedTrainer(
+  db: D1Database,
+  tenantId: string,
+  clientId: string,
+  trainerUserId: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare("SELECT 1 AS x FROM client_trainers WHERE tenant_id = ? AND client_id = ? AND trainer_user_id = ?")
+    .bind(tenantId, clientId, trainerUserId)
+    .first<{ x: number }>();
+  return Boolean(row);
+}
+
+/**
+ * THE row-level guard. Returns the client row when the caller may act on it,
+ * or a Response (401/403/404) to short-circuit with.
+ */
+export async function requireClientAccess(
+  c: AppContext,
+  clientId: string,
+): Promise<{ client: ClientRow } | { response: Response }> {
+  const who = requireTenant(c);
+  if (!who) return { response: c.json({ error: "unauthenticated" }, 401) };
+  const client = await getClient(c.env.DB, who.tenantId, clientId);
+  if (!client) return { response: c.json({ error: "not found" }, 404) };
+
+  const role = c.get("role");
+  if (role === "owner" || role === "assistant") return { client };
+  if (role === "trainer") {
+    if (await isAssignedTrainer(c.env.DB, who.tenantId, clientId, who.userId)) return { client };
+    // A trainer may also BE this client (their own linked record).
+    if (client.user_id === who.userId) return { client };
+    return { response: c.json({ error: "forbidden" }, 403) };
+  }
+  if (role === "client") {
+    if (client.user_id === who.userId) return { client };
+    return { response: c.json({ error: "forbidden" }, 403) };
+  }
+  return { response: c.json({ error: "forbidden" }, 403) };
+}
+
+/** Roster scope: which client ids the caller may see. */
+export async function visibleClientIds(c: AppContext): Promise<string[] | "all"> {
+  const who = requireTenant(c);
+  if (!who) return [];
+  const role = c.get("role");
+  if (role === "owner" || role === "assistant") return "all";
+  if (role === "trainer") {
+    const rows = await c.env.DB.prepare(
+      "SELECT client_id FROM client_trainers WHERE tenant_id = ? AND trainer_user_id = ?",
+    )
+      .bind(who.tenantId, who.userId)
+      .all<{ client_id: string }>();
+    const ids = (rows.results ?? []).map((r) => r.client_id);
+    const own = await clientForUser(c.env.DB, who.tenantId, who.userId);
+    if (own && !ids.includes(own.id)) ids.push(own.id);
+    return ids;
+  }
+  const own = await clientForUser(c.env.DB, who.tenantId, who.userId);
+  return own ? [own.id] : [];
+}
+
+const CreateClient = z.object({
+  displayName: z.string().min(1).max(80),
+  email: z.string().email().nullish(),
+  gender: z.enum(["male", "female"]).nullish(),
+  dateOfBirth: z.string().nullish(),
+  heightCm: z.number().positive().nullish(),
+  timezone: z.string().max(60).nullish(),
+});
+
+const UpdateClient = CreateClient.partial().extend({
+  weightUnit: z.enum(["kg", "lbs"]).optional(),
+  lengthUnit: z.enum(["cm", "in"]).optional(),
+  volumeUnit: z.enum(["ml", "oz"]).optional(),
+  intake: z.record(z.string(), z.unknown()).optional(),
+  dashboardPrefs: z.record(z.string(), z.unknown()).optional(),
+  onboardingComplete: z.boolean().optional(),
+});
+
+function clientView(row: ClientRow) {
+  return {
+    id: row.id,
+    displayName: row.display_name,
+    email: row.email,
+    status: row.status,
+    gender: row.gender,
+    dateOfBirth: row.date_of_birth,
+    heightCm: row.height_cm,
+    timezone: row.timezone,
+    units: { weight: row.weight_unit, length: row.length_unit, volume: row.volume_unit },
+    intake: parseJson<Record<string, unknown>>(row.intake_json, {}),
+    dashboardPrefs: parseJson<Record<string, unknown>>(row.dashboard_prefs_json, {}),
+    onboardingComplete: Boolean(row.onboarding_complete),
+    hasLogin: Boolean(row.user_id),
+    createdAt: row.created_at,
+  };
+}
+
+export const clientRoutes = new Hono<AppEnv>()
+  // Roster — scoped by role.
+  .get("/clients", async (c) => {
+    const who = requireTenant(c)!;
+    const scope = await visibleClientIds(c);
+    if (scope !== "all" && scope.length === 0) return c.json({ clients: [] });
+    const where =
+      scope === "all"
+        ? "tenant_id = ? AND status != 'archived'"
+        : `tenant_id = ? AND status != 'archived' AND id IN (${scope.map(() => "?").join(",")})`;
+    const binds = scope === "all" ? [who.tenantId] : [who.tenantId, ...scope];
+    const rows = await c.env.DB.prepare(`SELECT * FROM clients WHERE ${where} ORDER BY display_name`)
+      .bind(...binds)
+      .all<ClientRow>();
+    return c.json({ clients: (rows.results ?? []).map(clientView) });
+  })
+
+  .post("/clients", async (c) => {
+    const who = requireTenant(c)!;
+    const body = CreateClient.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body" }, 400);
+    const id = newId("cli");
+    await c.env.DB.prepare(
+      `INSERT INTO clients (id, tenant_id, display_name, email, gender, date_of_birth, height_cm, timezone, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        id,
+        who.tenantId,
+        body.data.displayName,
+        body.data.email ?? null,
+        body.data.gender ?? null,
+        body.data.dateOfBirth ?? null,
+        body.data.heightCm ?? null,
+        body.data.timezone ?? null,
+        nowIso(),
+      )
+      .run();
+    // Creating trainer auto-assigns themself (owner too — they coach by default).
+    const role = c.get("role");
+    if (role === "trainer" || role === "owner") {
+      await c.env.DB.prepare(
+        "INSERT OR IGNORE INTO client_trainers (client_id, trainer_user_id, tenant_id, is_primary, created_at) VALUES (?, ?, ?, 1, ?)",
+      )
+        .bind(id, who.userId, who.tenantId, nowIso())
+        .run();
+    }
+    const row = await getClient(c.env.DB, who.tenantId, id);
+    return c.json({ client: clientView(row!) }, 201);
+  })
+
+  // "Create my client record" — the trainer-trains-themself tap (SPEC §2).
+  .post("/clients/self", async (c) => {
+    const who = requireTenant(c)!;
+    const existing = await clientForUser(c.env.DB, who.tenantId, who.userId);
+    if (existing) return c.json({ client: clientView(existing) });
+    const user = c.get("user")!;
+    const id = newId("cli");
+    await c.env.DB.prepare(
+      "INSERT INTO clients (id, tenant_id, user_id, display_name, email, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+    )
+      .bind(id, who.tenantId, who.userId, user.name || user.email.split("@")[0], user.email, nowIso())
+      .run();
+    await c.env.DB.prepare(
+      "INSERT OR IGNORE INTO client_trainers (client_id, trainer_user_id, tenant_id, is_primary, created_at) VALUES (?, ?, ?, 1, ?)",
+    )
+      .bind(id, who.userId, who.tenantId, nowIso())
+      .run();
+    const row = await getClient(c.env.DB, who.tenantId, id);
+    return c.json({ client: clientView(row!) }, 201);
+  })
+
+  .get("/clients/:id", async (c) => {
+    const access = await requireClientAccess(c, c.req.param("id"));
+    if ("response" in access) return access.response;
+    return c.json({ client: clientView(access.client) });
+  })
+
+  .patch("/clients/:id", async (c) => {
+    const access = await requireClientAccess(c, c.req.param("id"));
+    if ("response" in access) return access.response;
+    const body = UpdateClient.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body" }, 400);
+    const d = body.data;
+    const cur = access.client;
+    await c.env.DB.prepare(
+      `UPDATE clients SET display_name = ?, email = ?, gender = ?, date_of_birth = ?, height_cm = ?, timezone = ?,
+        weight_unit = ?, length_unit = ?, volume_unit = ?, intake_json = ?, dashboard_prefs_json = ?, onboarding_complete = ?
+       WHERE id = ? AND tenant_id = ?`,
+    )
+      .bind(
+        d.displayName ?? cur.display_name,
+        d.email !== undefined ? d.email : cur.email,
+        d.gender !== undefined ? d.gender : cur.gender,
+        d.dateOfBirth !== undefined ? d.dateOfBirth : cur.date_of_birth,
+        d.heightCm !== undefined ? d.heightCm : cur.height_cm,
+        d.timezone !== undefined ? d.timezone : cur.timezone,
+        d.weightUnit ?? cur.weight_unit,
+        d.lengthUnit ?? cur.length_unit,
+        d.volumeUnit ?? cur.volume_unit,
+        d.intake !== undefined ? j(d.intake) : cur.intake_json,
+        d.dashboardPrefs !== undefined ? j(d.dashboardPrefs) : cur.dashboard_prefs_json,
+        d.onboardingComplete !== undefined ? (d.onboardingComplete ? 1 : 0) : cur.onboarding_complete,
+        cur.id,
+        cur.tenant_id,
+      )
+      .run();
+    const row = await getClient(c.env.DB, cur.tenant_id, cur.id);
+    return c.json({ client: clientView(row!) });
+  })
+
+  .post("/clients/:id/archive", async (c) => {
+    const access = await requireClientAccess(c, c.req.param("id"));
+    if ("response" in access) return access.response;
+    await c.env.DB.prepare("UPDATE clients SET status = 'archived', archived_at = ? WHERE id = ?")
+      .bind(nowIso(), access.client.id)
+      .run();
+    return c.json({ ok: true });
+  })
+
+  // Trainer assignment (many-to-many, is_primary flag).
+  .get("/clients/:id/trainers", async (c) => {
+    const access = await requireClientAccess(c, c.req.param("id"));
+    if ("response" in access) return access.response;
+    const rows = await c.env.DB.prepare(
+      `SELECT ct.trainer_user_id, ct.is_primary, u.name, u.email FROM client_trainers ct
+       LEFT JOIN "user" u ON u.id = ct.trainer_user_id WHERE ct.client_id = ? AND ct.tenant_id = ?`,
+    )
+      .bind(access.client.id, access.client.tenant_id)
+      .all<{ trainer_user_id: string; is_primary: number; name: string | null; email: string | null }>();
+    return c.json({
+      trainers: (rows.results ?? []).map((r) => ({
+        userId: r.trainer_user_id,
+        isPrimary: Boolean(r.is_primary),
+        name: r.name,
+        email: r.email,
+      })),
+    });
+  })
+
+  .post("/clients/:id/trainers", async (c) => {
+    const access = await requireClientAccess(c, c.req.param("id"));
+    if ("response" in access) return access.response;
+    const body = z
+      .object({ trainerUserId: z.string().min(1), isPrimary: z.boolean().default(false) })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body" }, 400);
+    // The target must be a staff member of this tenant.
+    const member = await c.env.DB.prepare(
+      'SELECT role FROM "member" WHERE organizationId = ? AND userId = ?',
+    )
+      .bind(access.client.tenant_id, body.data.trainerUserId)
+      .first<{ role: string }>();
+    if (!member || member.role === "client") return c.json({ error: "not a staff member" }, 400);
+    if (body.data.isPrimary) {
+      await c.env.DB.prepare("UPDATE client_trainers SET is_primary = 0 WHERE client_id = ?")
+        .bind(access.client.id)
+        .run();
+    }
+    await c.env.DB.prepare(
+      "INSERT OR REPLACE INTO client_trainers (client_id, trainer_user_id, tenant_id, is_primary, created_at) VALUES (?, ?, ?, ?, ?)",
+    )
+      .bind(access.client.id, body.data.trainerUserId, access.client.tenant_id, body.data.isPrimary ? 1 : 0, nowIso())
+      .run();
+    return c.json({ ok: true });
+  })
+
+  .delete("/clients/:id/trainers/:trainerUserId", async (c) => {
+    const access = await requireClientAccess(c, c.req.param("id"));
+    if ("response" in access) return access.response;
+    await c.env.DB.prepare(
+      "DELETE FROM client_trainers WHERE client_id = ? AND trainer_user_id = ? AND tenant_id = ?",
+    )
+      .bind(access.client.id, c.req.param("trainerUserId"), access.client.tenant_id)
+      .run();
+    return c.json({ ok: true });
+  });
