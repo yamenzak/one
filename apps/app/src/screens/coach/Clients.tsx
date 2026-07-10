@@ -11,6 +11,8 @@ import { Today } from "../client/Today.js";
 import { Train } from "../client/Train.js";
 import { Eat } from "../client/Eat.js";
 import { Progress } from "../client/Progress.js";
+import { CoachPlans } from "./CoachPlans.js";
+import { GoalManager } from "./GoalManager.js";
 
 export interface ClientSummary {
   id: string;
@@ -111,7 +113,7 @@ export function Clients() {
   );
 }
 
-const DETAIL_TABS = ["Today", "Train", "Eat", "Progress"] as const;
+const DETAIL_TABS = ["Today", "Plans", "Goals", "Progress"] as const;
 type DetailTab = (typeof DETAIL_TABS)[number];
 
 function ClientDetail({ client, onBack }: { client: ClientSummary; onBack: () => void }) {
@@ -137,10 +139,10 @@ function ClientDetail({ client, onBack }: { client: ClientSummary; onBack: () =>
           ))}
         </div>
       </div>
-      {/* THE keystone: the same client surfaces, scoped to this client. */}
+      {/* THE keystone: the same client surfaces + coach-only editing tabs. */}
       {tab === "Today" && <Today clientId={client.id} />}
-      {tab === "Train" && <Train clientId={client.id} />}
-      {tab === "Eat" && <Eat clientId={client.id} />}
+      {tab === "Plans" && <CoachPlans clientId={client.id} />}
+      {tab === "Goals" && <GoalManager clientId={client.id} />}
       {tab === "Progress" && <Progress clientId={client.id} />}
     </div>
   );

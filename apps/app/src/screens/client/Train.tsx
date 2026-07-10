@@ -1,8 +1,9 @@
-/** Train tab: today's plan days + quick-start (player lands next phase). */
+/** Train tab: plan overview → workout player. */
 
 import { useEffect, useState } from "react";
 import { Card, Chip, Skeleton, SubCard } from "@mossa/ui";
 import { api } from "../../api.js";
+import { WorkoutPlayer } from "./WorkoutPlayer.js";
 
 interface Plan {
   id: string;
@@ -13,11 +14,13 @@ interface Plan {
 
 export function Train({ clientId }: { clientId: string }) {
   const [plans, setPlans] = useState<Plan[] | null>(null);
+  const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
     void api.get<{ plans: Plan[] }>(`/api/workout-plans?clientId=${clientId}`).then((r) => setPlans(r.plans));
   }, [clientId]);
 
+  if (playing) return <WorkoutPlayer clientId={clientId} />;
   if (!plans) return <Skeleton className="m-4 h-64" />;
   const published = plans.find((p) => p.status === "published");
 
@@ -34,22 +37,23 @@ export function Train({ clientId }: { clientId: string }) {
         </Card>
       ) : (
         <>
-          <Card>
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">{published.name}</h2>
-              <Chip tone="good">Active plan</Chip>
-            </div>
-          </Card>
-          <div className="space-y-3">
+          <button onClick={() => setPlaying(true)} className="w-full text-left">
+            <Card>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">{published.name}</h2>
+                <Chip tone="good">Start ▶</Chip>
+              </div>
+              <p className="mt-1 text-sm text-fg-muted">{published.body.days.length} training days — tap to open the player</p>
+            </Card>
+          </button>
+          <div className="space-y-2">
             {published.body.days.map((day, i) => (
               <SubCard key={i} className="flex items-center justify-between bg-surface-1">
                 <div>
                   <div className="font-semibold">{day.name || `Day ${i + 1}`}</div>
-                  <div className="text-sm text-fg-muted">
-                    {day.isRestDay ? "Rest day" : `${day.blocks?.length ?? 0} blocks`}
-                  </div>
+                  <div className="text-sm text-fg-muted">{day.isRestDay ? "Rest day" : `${day.blocks?.length ?? 0} blocks`}</div>
                 </div>
-                {day.isRestDay ? <Chip>😴 Rest</Chip> : <Chip tone="activity">▶ Start</Chip>}
+                {day.isRestDay ? <Chip>😴 Rest</Chip> : <Chip tone="activity">▶</Chip>}
               </SubCard>
             ))}
           </div>

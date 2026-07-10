@@ -16,6 +16,7 @@ import { Progress } from "./screens/client/Progress.js";
 import { CoachToday } from "./screens/coach/CoachToday.js";
 import { Clients } from "./screens/coach/Clients.js";
 import { Business } from "./screens/coach/Business.js";
+import { Library } from "./screens/coach/Library.js";
 
 const CLIENT_TABS: TabDef[] = [
   { key: "today", label: "Today", icon: "☀️" },
@@ -99,11 +100,7 @@ export function Shell() {
           <>
             {current === "today" && <CoachToday />}
             {current === "clients" && <Clients />}
-            {current === "library" && (
-              <div className="mx-auto max-w-xl p-6 text-center text-fg-muted">
-                📚 Library — exercises, foods, templates, and the content hub land in the next phase.
-              </div>
-            )}
+            {current === "library" && <Library />}
             {current === "business" && <Business />}
           </>
         )}
