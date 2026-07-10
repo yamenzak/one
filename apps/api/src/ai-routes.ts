@@ -73,6 +73,8 @@ export const aiRoutes = new Hono<AppEnv>()
     if ("response" in access) return access.response;
 
     // Ground the model in the real library + the client's intake.
+    const { seedExercises } = await import("./exercise-seed.js");
+    await seedExercises(c.env.DB);
     const library = await c.env.DB.prepare(
       "SELECT id, name, muscle_groups, equipment FROM exercises WHERE active = 1 AND (tenant_id IS NULL OR tenant_id = ?) LIMIT 120",
     )

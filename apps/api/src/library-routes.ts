@@ -9,6 +9,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { newId, nowIso } from "./ids.js";
+import { seedExercises } from "./exercise-seed.js";
 
 const CreateExercise = z.object({
   name: z.string().min(1).max(120),
@@ -47,6 +48,7 @@ export const libraryRoutes = new Hono<AppEnv>()
   // ── Exercises ──────────────────────────────────────────────────────────────
   .get("/exercises", async (c) => {
     const who = requireTenant(c)!;
+    await seedExercises(c.env.DB);
     const q = (c.req.query("q") ?? "").trim().toLowerCase();
     const muscle = c.req.query("muscle");
     let sql =
