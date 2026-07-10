@@ -1,0 +1,25 @@
+{
+  "name": "@mossa/protocol",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Wire schemas + API types shared between the api worker and the app: plan bodies, log payloads, context/me shapes.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@mossa/domain": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
