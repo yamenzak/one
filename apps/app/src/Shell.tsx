@@ -20,6 +20,7 @@ import { Library } from "./screens/coach/Library.js";
 import { Settings } from "./screens/Settings.js";
 import { Wellness } from "./screens/client/Wellness.js";
 import { Onboarding } from "./screens/client/Onboarding.js";
+import { Shop } from "./screens/client/Shop.js";
 
 const CLIENT_TABS: TabDef[] = [
   { key: "today", label: "Today", icon: "☀️" },
@@ -48,7 +49,7 @@ export function Shell() {
 
   const [tab, setTab] = useState("today");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [overlay, setOverlay] = useState<"settings" | "wellness" | null>(null);
+  const [overlay, setOverlay] = useState<"settings" | "wellness" | "shop" | null>(null);
   const current = tabs.some((t) => t.key === tab) ? tab : "today";
 
   // Onboarding gate: a client on their own surface who hasn't done intake.
@@ -71,6 +72,7 @@ export function Shell() {
 
   if (overlay === "settings") return <Settings onBack={() => setOverlay(null)} />;
   if (overlay === "wellness" && clientId) return <Wellness clientId={clientId} onBack={() => setOverlay(null)} />;
+  if (overlay === "shop" && clientId) return <Shop clientId={clientId} onBack={() => setOverlay(null)} />;
 
   const enterTrainMode = async () => {
     if (!active.clientId) {
@@ -168,9 +170,14 @@ export function Shell() {
 
           <div className="space-y-1">
             {clientSurface && clientId && (
-              <button onClick={() => (setOverlay("wellness"), setMenuOpen(false))} className="flex w-full items-center gap-3 rounded-2xl px-2 py-3 text-left hover:bg-surface-2">
-                <span className="text-xl">🌿</span> Wellness &amp; supplements
-              </button>
+              <>
+                <button onClick={() => (setOverlay("wellness"), setMenuOpen(false))} className="flex w-full items-center gap-3 rounded-2xl px-2 py-3 text-left hover:bg-surface-2">
+                  <span className="text-xl">🌿</span> Wellness &amp; supplements
+                </button>
+                <button onClick={() => (setOverlay("shop"), setMenuOpen(false))} className="flex w-full items-center gap-3 rounded-2xl px-2 py-3 text-left hover:bg-surface-2">
+                  <span className="text-xl">🎟️</span> Plans &amp; access
+                </button>
+              </>
             )}
             <button onClick={() => (setOverlay("settings"), setMenuOpen(false))} className="flex w-full items-center gap-3 rounded-2xl px-2 py-3 text-left hover:bg-surface-2">
               <span className="text-xl">⚙️</span> Settings &amp; passkeys

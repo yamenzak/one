@@ -103,6 +103,37 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
     }
   };
 
+  // ✦ Snap-a-Meal: upload the photo, then estimate + log the entries.
+  const snapMeal = async (photo: File) => {
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", photo);
+      fd.append("purpose", "meal-snap");
+      const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
+      const { key } = (await up.json()) as { key?: string };
+      if (!key) throw new Error("upload failed");
+      const r = await api.post<{ entries: { label: string; mealType: string; calories: number; proteinG: number; carbsG: number; fatG: number }[] }>(
+        "/api/ai/snap-meal",
+        { clientId, imageKey: key, hint: q },
+      );
+      for (const e of r.entries) {
+        await api.post("/api/logs/food", {
+          clientId,
+          data: { date: todayLocal(), mealType: e.mealType || meal, label: e.label, calories: e.calories, proteinG: e.proteinG, carbsG: e.carbsG, fatG: e.fatG },
+        });
+      }
+      onLogged();
+      onClose();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      setAiError(msg.includes("aiSuite") ? "AI isn't on your studio's plan yet." : "Couldn't read that photo — try search.");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
   const barcode = async () => {
     const code = prompt("Enter barcode digits");
     if (!code) return;
@@ -197,6 +228,10 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
           <SuggestionChip onClick={() => void naturalLog()} disabled={q.length < 3 || aiBusy}>
             {aiBusy ? "Parsing…" : "✦ Log this"}
           </SuggestionChip>
+          <label className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-full bg-surface-2 px-4 text-sm font-medium text-fg hover:bg-surface-3">
+            {aiBusy ? "Reading…" : "✦ 📷 Snap"}
+            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void snapMeal(e.target.files[0])} />
+          </label>
         </div>
         {aiError && <p className="text-sm text-warn">{aiError}</p>}
         <div className="max-h-80 space-y-1 overflow-y-auto">

@@ -42,6 +42,7 @@ export function WorkoutPlayer({ clientId }: { clientId: string }) {
   const [session, setSession] = useState<Map<string, LoggedSet[]>>(new Map());
   const [dayIndex, setDayIndex] = useState<number | null>(null);
   const [logSlot, setLogSlot] = useState<{ blockIndex: number; slotIndex: number; slot: ExerciseSlot } | null>(null);
+  const [swapSlot, setSwapSlot] = useState<{ blockIndex: number; slotIndex: number; exerciseId: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const date = todayLocal();
 
@@ -189,7 +190,12 @@ export function WorkoutPlayer({ clientId }: { clientId: string }) {
                     {logged}/{slot.sets.length} sets · {slot.measurementMode}
                   </div>
                 </div>
-                <Button onClick={() => setLogSlot({ blockIndex, slotIndex, slot })}>{logged >= slot.sets.length ? "✓" : "Log"}</Button>
+                <div className="flex gap-2">
+                  <button onClick={() => setSwapSlot({ blockIndex, slotIndex, exerciseId: slot.exerciseId })} className="text-xs text-fg-muted" aria-label="Request swap">
+                    ⇄
+                  </button>
+                  <Button onClick={() => setLogSlot({ blockIndex, slotIndex, slot })}>{logged >= slot.sets.length ? "✓" : "Log"}</Button>
+                </div>
               </SubCard>
             );
           })}
@@ -211,7 +217,95 @@ export function WorkoutPlayer({ clientId }: { clientId: string }) {
           onSave={(set) => saveSet(logSlot.blockIndex, logSlot.slotIndex, logSlot.slot.exerciseId, set)}
         />
       )}
+
+      {swapSlot && (
+        <SwapDrawer
+          clientId={clientId}
+          planId={plan.id}
+          dayIndex={dayIndex}
+          coords={swapSlot}
+          library={[...exercises.values()]}
+          currentName={exercises.get(swapSlot.exerciseId)?.name ?? "Exercise"}
+          onClose={() => setSwapSlot(null)}
+          onDone={(m) => {
+            setSwapSlot(null);
+            setToast(m);
+            setTimeout(() => setToast(null), 3000);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function SwapDrawer({
+  clientId,
+  planId,
+  dayIndex,
+  coords,
+  library,
+  currentName,
+  onClose,
+  onDone,
+}: {
+  clientId: string;
+  planId: string;
+  dayIndex: number;
+  coords: { blockIndex: number; slotIndex: number; exerciseId: string };
+  library: ExerciseLite[];
+  currentName: string;
+  onClose: () => void;
+  onDone: (msg: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [reason, setReason] = useState("");
+  const [picked, setPicked] = useState<ExerciseLite | null>(null);
+  const filtered = library.filter((e) => e.id !== coords.exerciseId && e.name.toLowerCase().includes(q.toLowerCase())).slice(0, 20);
+
+  const submit = async () => {
+    if (!picked) return;
+    const r = await api.post<{ autoApproved: boolean }>("/api/swaps", {
+      clientId,
+      workoutPlanId: planId,
+      dayIndex,
+      blockIndex: coords.blockIndex,
+      slotIndex: coords.slotIndex,
+      currentExerciseId: coords.exerciseId,
+      suggestedExerciseId: picked.id,
+      reason: reason || null,
+    });
+    onDone(r.autoApproved ? "✓ Swapped — it was a listed alternative." : "Swap request sent to your coach.");
+  };
+
+  return (
+    <Sheet open onClose={onClose} title={`Swap ${currentName}`}>
+      <div className="space-y-3">
+        {!picked ? (
+          <>
+            <Field label="Replace with" icon="🔍" value={q} onChange={(e) => setQ(e.target.value)} />
+            <div className="max-h-72 space-y-1 overflow-y-auto">
+              {filtered.map((e) => (
+                <button key={e.id} onClick={() => setPicked(e)} className="w-full rounded-2xl px-3 py-3 text-left hover:bg-surface-2">
+                  {e.name}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="rounded-2xl bg-surface-2 p-3">
+              <div className="text-sm text-fg-muted">Swap to</div>
+              <div className="font-semibold">{picked.name}</div>
+            </div>
+            <Field label="Reason (optional)" icon="💬" value={reason} onChange={(e) => setReason(e.target.value)} />
+            <div className="flex gap-3">
+              <Button variant="ghost" onClick={() => setPicked(null)}>Back</Button>
+              <Button size="lg" className="flex-1" onClick={() => void submit()}>Request swap</Button>
+            </div>
+          </>
+        )}
+      </div>
+    </Sheet>
   );
 }
 

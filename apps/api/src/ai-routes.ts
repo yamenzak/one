@@ -150,6 +150,45 @@ export const aiRoutes = new Hono<AppEnv>()
     return c.json({ draft: cleaned, credits: result.credits, mocked: result.mocked });
   })
 
+  /**
+   * Snap-a-Meal (SPEC §6): a photo (R2 key) → estimated food entries the
+   * client confirms. Vision routing (Gemini) lands with the model-catalog
+   * expansion; the metered path + mock are here now so the client flow works
+   * end-to-end and the credits accounting is real.
+   */
+  .post("/ai/snap-meal", async (c) => {
+    const who = requireTenant(c)!;
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    const parsed = z.object({ clientId: z.string(), imageKey: z.string().max(300), hint: z.string().max(200).default("") }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, parsed.data.clientId);
+    if ("response" in access) return access.response;
+    // The image must be a same-tenant R2 object.
+    if (!parsed.data.imageKey.startsWith(`t/${who.tenantId}/`)) return c.json({ error: "invalid image" }, 400);
+
+    const result = await generate(c.env, {
+      tenantId: who.tenantId,
+      actorUserId: who.userId,
+      clientId: access.client.id,
+      feature: "snap-meal",
+      task: "text", // vision model swaps in with the catalog expansion
+      system: PARSE_FOOD_SYSTEM,
+      prompt: `A photo of a meal${parsed.data.hint ? ` (${parsed.data.hint})` : ""}. Identify the foods and estimate portions + macros as the JSON array.`,
+      maxOutputTokens: 512,
+      mock: () =>
+        JSON.stringify([
+          { label: "Grilled chicken breast", mealType: "lunch", calories: 280, proteinG: 52, carbsG: 0, fatG: 6, quantity: 170, unit: "g" },
+          { label: "Cooked rice", mealType: "lunch", calories: 260, proteinG: 5, carbsG: 57, fatG: 1, quantity: 200, unit: "g" },
+          { label: "Mixed salad", mealType: "lunch", calories: 60, proteinG: 2, carbsG: 8, fatG: 3, quantity: 100, unit: "g" },
+        ]),
+    });
+    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    const entries = extractJson<unknown[]>(result.output);
+    if (!entries || !Array.isArray(entries)) return c.json({ error: "could not read the photo" }, 422);
+    return c.json({ entries, credits: result.credits, mocked: result.mocked });
+  })
+
   /** Meal Plan Draft: targets + preferences → meal options (trainer). */
   .post("/ai/draft-meal", async (c) => {
     const who = requireTenant(c)!;

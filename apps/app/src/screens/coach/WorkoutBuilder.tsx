@@ -111,6 +111,17 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
         <button onClick={() => (mutate((d) => d.push(emptyDay(`Day ${days.length + 1}`))), setDayIdx(days.length))} className="rounded-full bg-surface-2 px-4 py-2 text-sm text-fg-muted">
           ＋ Day
         </button>
+        {day && (
+          <button
+            onClick={() => {
+              mutate((d) => d.splice(dayIdx + 1, 0, { ...structuredClone(d[dayIdx]!), name: `${d[dayIdx]!.name || `Day ${dayIdx + 1}`} (copy)` }));
+              setDayIdx(dayIdx + 1);
+            }}
+            className="rounded-full bg-surface-2 px-4 py-2 text-sm text-fg-muted"
+          >
+            ⧉ Duplicate
+          </button>
+        )}
       </div>
 
       {days.length === 0 ? (
