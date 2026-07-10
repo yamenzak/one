@@ -17,6 +17,8 @@ import { CoachToday } from "./screens/coach/CoachToday.js";
 import { Clients } from "./screens/coach/Clients.js";
 import { Business } from "./screens/coach/Business.js";
 import { Library } from "./screens/coach/Library.js";
+import { Settings } from "./screens/Settings.js";
+import { Wellness } from "./screens/client/Wellness.js";
 
 const CLIENT_TABS: TabDef[] = [
   { key: "today", label: "Today", icon: "☀️" },
@@ -45,7 +47,11 @@ export function Shell() {
 
   const [tab, setTab] = useState("today");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [overlay, setOverlay] = useState<"settings" | "wellness" | null>(null);
   const current = tabs.some((t) => t.key === tab) ? tab : "today";
+
+  if (overlay === "settings") return <Settings onBack={() => setOverlay(null)} />;
+  if (overlay === "wellness" && clientId) return <Wellness clientId={clientId} onBack={() => setOverlay(null)} />;
 
   const enterTrainMode = async () => {
     if (!active.clientId) {
@@ -141,19 +147,15 @@ export function Shell() {
             </div>
           )}
 
-          <div>
-            <div className="mb-2 text-sm font-semibold text-good">Appearance</div>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                const next = document.documentElement.dataset.theme === "light" ? "" : "light";
-                if (next) document.documentElement.dataset.theme = next;
-                else delete document.documentElement.dataset.theme;
-                localStorage.setItem("mossa-theme", next || "dark");
-              }}
-            >
-              🌓 Toggle theme
-            </Button>
+          <div className="space-y-1">
+            {clientSurface && clientId && (
+              <button onClick={() => (setOverlay("wellness"), setMenuOpen(false))} className="flex w-full items-center gap-3 rounded-2xl px-2 py-3 text-left hover:bg-surface-2">
+                <span className="text-xl">🌿</span> Wellness &amp; supplements
+              </button>
+            )}
+            <button onClick={() => (setOverlay("settings"), setMenuOpen(false))} className="flex w-full items-center gap-3 rounded-2xl px-2 py-3 text-left hover:bg-surface-2">
+              <span className="text-xl">⚙️</span> Settings &amp; passkeys
+            </button>
           </div>
 
           <Button variant="outline" className="w-full" onClick={() => void signOut().then(() => location.reload())}>

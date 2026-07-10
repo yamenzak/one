@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Skeleton } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
-import { LogSheet } from "./LogSheet.js";
+import { FoodSearchSheet } from "./FoodSearchSheet.js";
 
 interface Entry {
   id: string;
@@ -67,7 +67,7 @@ export function Eat({ clientId }: { clientId: string }) {
       <Button size="lg" className="w-full" onClick={() => setLogOpen(true)}>
         ＋ Log food
       </Button>
-      <LogSheet open={logOpen} onClose={() => setLogOpen(false)} clientId={clientId} onLogged={() => void load()} />
+      {logOpen && <FoodSearchSheet clientId={clientId} onClose={() => setLogOpen(false)} onLogged={() => void load()} />}
     </div>
   );
 }
