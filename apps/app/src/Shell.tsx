@@ -21,6 +21,7 @@ import { Settings } from "./screens/Settings.js";
 import { Wellness } from "./screens/client/Wellness.js";
 import { Onboarding } from "./screens/client/Onboarding.js";
 import { Shop } from "./screens/client/Shop.js";
+import { AdminConsole } from "./screens/admin/AdminConsole.js";
 
 const CLIENT_TABS: TabDef[] = [
   { key: "today", label: "Today", icon: "☀️" },
@@ -49,7 +50,7 @@ export function Shell() {
 
   const [tab, setTab] = useState("today");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [overlay, setOverlay] = useState<"settings" | "wellness" | "shop" | null>(null);
+  const [overlay, setOverlay] = useState<"settings" | "wellness" | "shop" | "admin" | null>(null);
   const current = tabs.some((t) => t.key === tab) ? tab : "today";
 
   // Onboarding gate: a client on their own surface who hasn't done intake.
@@ -73,6 +74,7 @@ export function Shell() {
   if (overlay === "settings") return <Settings onBack={() => setOverlay(null)} />;
   if (overlay === "wellness" && clientId) return <Wellness clientId={clientId} onBack={() => setOverlay(null)} />;
   if (overlay === "shop" && clientId) return <Shop clientId={clientId} onBack={() => setOverlay(null)} />;
+  if (overlay === "admin") return <AdminConsole onBack={() => setOverlay(null)} />;
 
   const enterTrainMode = async () => {
     if (!active.clientId) {
@@ -182,6 +184,11 @@ export function Shell() {
             <button onClick={() => (setOverlay("settings"), setMenuOpen(false))} className="flex w-full items-center gap-3 rounded-2xl px-2 py-3 text-left hover:bg-surface-2">
               <span className="text-xl">⚙️</span> Settings &amp; passkeys
             </button>
+            {ctx!.isPlatformAdmin && (
+              <button onClick={() => (setOverlay("admin"), setMenuOpen(false))} className="flex w-full items-center gap-3 rounded-2xl px-2 py-3 text-left hover:bg-surface-2">
+                <span className="text-xl">🛠️</span> Platform admin
+              </button>
+            )}
           </div>
 
           <Button variant="outline" className="w-full" onClick={() => void signOut().then(() => location.reload())}>
