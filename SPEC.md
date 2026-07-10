@@ -9,7 +9,9 @@
 > the Scena platform stack. Scena proved the platform patterns; ByShujaa proved the domain.
 > Mossa = Scena's architecture × ByShujaa's domain, both improved.
 >
-> Status: SPEC v1 — 2026-07-10.
+> Status: SPEC v1 — 2026-07-10. **Implementation: foundation → AI suite,
+> commerce, content, reports, and media all built and tested (64 tests green);
+> see CLAUDE.md "Status" and the git history for what's live vs. pending.**
 
 ---
 
