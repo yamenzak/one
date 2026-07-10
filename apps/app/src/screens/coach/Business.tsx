@@ -1,8 +1,10 @@
 /** Owner Business tab: plan + credits balance + packs (Stripe rails next). */
 
 import { useEffect, useState } from "react";
-import { Card, Chip, Skeleton, StatCard } from "@mossa/ui";
+import { Card, Chip, Skeleton, StatCard, SuggestionChip } from "@mossa/ui";
 import { api } from "../../api.js";
+import { Staff } from "./Staff.js";
+import { Packages } from "./Packages.js";
 
 interface Billing {
   subscription: { planId: string; planName: string; status: string; comp: boolean };
@@ -16,7 +18,27 @@ interface AiUsage {
   usage: { feature: string; calls: number; credits: number }[];
 }
 
+type Tab = "overview" | "packages" | "staff";
+
 export function Business() {
+  const [tab, setTab] = useState<Tab>("overview");
+  return (
+    <div>
+      <div className="mx-auto flex max-w-xl gap-2 p-4 pb-0">
+        {(["overview", "packages", "staff"] as Tab[]).map((t) => (
+          <SuggestionChip key={t} selected={tab === t} onClick={() => setTab(t)}>
+            {t[0]!.toUpperCase() + t.slice(1)}
+          </SuggestionChip>
+        ))}
+      </div>
+      {tab === "overview" && <Overview />}
+      {tab === "packages" && <Packages />}
+      {tab === "staff" && <Staff />}
+    </div>
+  );
+}
+
+function Overview() {
   const [billing, setBilling] = useState<Billing | null>(null);
   const [aiUsage, setAiUsage] = useState<AiUsage["usage"]>([]);
 

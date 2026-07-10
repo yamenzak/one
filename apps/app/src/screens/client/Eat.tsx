@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Skeleton } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
+import { MealPlanDrawer } from "./MealPlanDrawer.js";
 
 interface Entry {
   id: string;
@@ -16,6 +17,7 @@ interface Entry {
 export function Eat({ clientId }: { clientId: string }) {
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [logOpen, setLogOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
   const date = todayLocal();
 
   const load = useCallback(async () => {
@@ -64,10 +66,16 @@ export function Eat({ clientId }: { clientId: string }) {
           </Card>
         ))
       )}
-      <Button size="lg" className="w-full" onClick={() => setLogOpen(true)}>
-        ＋ Log food
-      </Button>
+      <div className="flex gap-3">
+        <Button size="lg" className="flex-1" onClick={() => setLogOpen(true)}>
+          ＋ Log food
+        </Button>
+        <Button size="lg" variant="tonal" className="flex-1" onClick={() => setPlanOpen(true)}>
+          📋 My plan
+        </Button>
+      </div>
       {logOpen && <FoodSearchSheet clientId={clientId} onClose={() => setLogOpen(false)} onLogged={() => void load()} />}
+      {planOpen && <MealPlanDrawer clientId={clientId} onClose={() => setPlanOpen(false)} onLogged={() => void load()} />}
     </div>
   );
 }

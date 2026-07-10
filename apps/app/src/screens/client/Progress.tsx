@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { currentStreak } from "@mossa/domain";
-import { Chip, Skeleton, Sparkline, StatCard, WeekDots } from "@mossa/ui";
+import { Button, Card, Chip, Skeleton, Sparkline, StatCard, WeekDots } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 
 interface Measurement {
@@ -50,7 +50,10 @@ export function Progress({ clientId }: { clientId: string }) {
 
   return (
     <div className="mx-auto max-w-xl space-y-4 p-4 pb-28">
-      <h1 className="text-2xl font-bold">Progress</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Progress</h1>
+        <NarrativeButton clientId={clientId} streak={streak} weights={weights.length} />
+      </div>
 
       <StatCard
         label="Check-in streak"
@@ -75,5 +78,42 @@ export function Progress({ clientId }: { clientId: string }) {
         chart={bfs.length >= 2 ? <Sparkline values={bfs.map((b) => b.body_fat_percent!)} tone="sleep" /> : undefined}
       />
     </div>
+  );
+}
+
+function NarrativeButton({ clientId, streak, weights }: { clientId: string; streak: number; weights: number }) {
+  const [text, setText] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const run = async () => {
+    setBusy(true);
+    setOpen(true);
+    try {
+      const r = await api.post<{ narrative: string }>("/api/ai/narrative", {
+        clientId,
+        stats: { checkInStreak: streak, weightEntries: weights },
+      });
+      setText(r.narrative);
+    } catch {
+      setText("AI recap isn't available on your studio's plan.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <Button variant="tonal" onClick={() => void run()}>✦ Recap</Button>
+      {open && (
+        <Card className="fixed inset-x-4 bottom-24 z-40 mx-auto max-w-lg shadow-lg">
+          <div className="flex items-start gap-2">
+            <span className="text-primary">✦</span>
+            <p className="flex-1 text-sm">{busy ? "Writing your recap…" : text}</p>
+            <button onClick={() => setOpen(false)} className="text-fg-muted">✕</button>
+          </div>
+        </Card>
+      )}
+    </>
   );
 }
