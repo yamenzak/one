@@ -1,0 +1,92 @@
+/**
+ * Mossa design tokens (DESIGN.md §2.1) — Tailwind v4 @theme, CSS-first.
+ * Dark-first tonal surface ladder; light theme flips via [data-theme="light"].
+ * Components never use raw palette colors — only these roles.
+ */
+
+@theme {
+  /* Tonal surface ladder (dark default) */
+  --color-bg: #0b0c0e;
+  --color-surface-1: #16181b;
+  --color-surface-2: #1e2126;
+  --color-surface-3: #262a30;
+  --color-fg: #e8eaed;
+  --color-fg-muted: #9aa0a6;
+
+  /* Primary action (tonal, not saturated) */
+  --color-primary: #a8c7fa;
+  --color-primary-container: #1b3a57;
+  --color-on-primary-container: #d6e3ff;
+
+  /* Domain accents — container/on-container tonal pairs */
+  --color-activity: #6dd3c2;
+  --color-activity-container: #0f3d36;
+  --color-nutrition: #ffb870;
+  --color-nutrition-container: #4a2e0e;
+  --color-sleep: #c5a8ff;
+  --color-sleep-container: #372a54;
+  --color-cardio: #8ab4f8;
+  --color-cardio-container: #1e3a5f;
+  --color-hydration: #7fd8e8;
+  --color-hydration-container: #103d46;
+
+  /* Status chips */
+  --color-good: #6dd58c;
+  --color-good-container: #123f26;
+  --color-warn: #fdd663;
+  --color-warn-container: #4a3a08;
+  --color-bad: #f28b82;
+  --color-bad-container: #4e1512;
+
+  --radius-card: 1.75rem;
+  --radius-field: 1rem;
+
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Light theme: same 3-step tonal ladder, flipped. */
+:root[data-theme="light"] {
+  --color-bg: #f3f5f9;
+  --color-surface-1: #ffffff;
+  --color-surface-2: #eef1f6;
+  --color-surface-3: #e3e8ef;
+  --color-fg: #1b1d21;
+  --color-fg-muted: #5f6368;
+
+  --color-primary: #1a5dc8;
+  --color-primary-container: #d6e3ff;
+  --color-on-primary-container: #0b3060;
+
+  --color-activity: #0d7a68;
+  --color-activity-container: #c7f5ec;
+  --color-nutrition: #a05a10;
+  --color-nutrition-container: #ffe4c7;
+  --color-sleep: #6a44c0;
+  --color-sleep-container: #e9ddff;
+  --color-cardio: #175bbb;
+  --color-cardio-container: #dbe7ff;
+  --color-hydration: #0c6a7d;
+  --color-hydration-container: #d0f2f9;
+
+  --color-good: #146c33;
+  --color-good-container: #c9f2d6;
+  --color-warn: #7a5c00;
+  --color-warn-container: #ffefb8;
+  --color-bad: #a5231b;
+  --color-bad-container: #ffdcd8;
+}
+
+/* Base */
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Every numeral in the system is tabular. */
+.numeral {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}

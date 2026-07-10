@@ -1,0 +1,35 @@
+{
+  "name": "@mossa/app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The Mossa app — ONE role-adaptive PWA for clients, trainers, owners, and platform admin (DESIGN.md §5).",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "clean": "rm -rf .turbo dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@fontsource/figtree": "^5.2.8",
+    "@mossa/domain": "workspace:*",
+    "@mossa/protocol": "workspace:*",
+    "@mossa/ui": "workspace:*",
+    "clsx": "^2.1.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.5.2",
+    "tailwindcss": "^4.3.2",
+    "typescript": "^5.9.3",
+    "vite": "^6.3.4",
+    "vitest": "^3.2.4"
+  }
+}
