@@ -22,6 +22,8 @@ import { planRoutes } from "./plan-routes.js";
 import { logRoutes } from "./log-routes.js";
 import { libraryRoutes } from "./library-routes.js";
 import { goalRoutes } from "./goal-routes.js";
+import { commerceRoutes } from "./commerce-routes.js";
+import { aiRoutes } from "./ai-routes.js";
 import type { Env } from "./env.js";
 
 export { TenantBillingDO } from "./billing-do.js";
@@ -45,6 +47,8 @@ app.route("/api", planRoutes);
 app.route("/api", logRoutes);
 app.route("/api", libraryRoutes);
 app.route("/api", goalRoutes);
+app.route("/api", commerceRoutes);
+app.route("/api", aiRoutes);
 
 app.notFound((c) =>
   c.req.path.startsWith("/api/") ? c.json({ error: "not found" }, 404) : c.text("not found", 404),
