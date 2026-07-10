@@ -1,9 +1,10 @@
-/** Coach: workout plans for a client — list, create, open the builder. */
+/** Coach: workout + meal plans for a client — list, create, open the builder. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Chip, Field, Sheet, Skeleton } from "@mossa/ui";
+import { Button, Card, Chip, Field, Sheet, Skeleton, SuggestionChip } from "@mossa/ui";
 import { api } from "../../api.js";
 import { WorkoutBuilder } from "./WorkoutBuilder.js";
+import { MealBuilder } from "./MealBuilder.js";
 
 interface Plan {
   id: string;
@@ -12,40 +13,54 @@ interface Plan {
   publishedAt: string | null;
 }
 
+type Kind = "workout" | "meal";
+
 export function CoachPlans({ clientId }: { clientId: string }) {
+  const [kind, setKind] = useState<Kind>("workout");
   const [plans, setPlans] = useState<Plan[] | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
 
+  const endpoint = kind === "workout" ? "workout-plans" : "meal-plans";
+
   const load = useCallback(async () => {
-    const r = await api.get<{ plans: Plan[] }>(`/api/workout-plans?clientId=${clientId}`);
+    const r = await api.get<{ plans: Plan[] }>(`/api/${endpoint}?clientId=${clientId}`);
     setPlans(r.plans);
-  }, [clientId]);
+  }, [clientId, endpoint]);
 
   useEffect(() => {
+    setPlans(null);
     void load();
   }, [load]);
 
   const create = async () => {
-    const r = await api.post<{ plan: Plan }>("/api/workout-plans", { clientId, name });
+    const r = await api.post<{ plan: Plan }>(`/api/${endpoint}`, { clientId, name });
     setCreateOpen(false);
     setName("");
     setEditing(r.plan.id);
   };
 
-  if (editing) return <WorkoutBuilder planId={editing} onBack={() => (setEditing(null), void load())} />;
-  if (!plans) return <Skeleton className="m-4 h-64" />;
+  if (editing) {
+    const back = () => (setEditing(null), void load());
+    return kind === "workout" ? <WorkoutBuilder planId={editing} onBack={back} /> : <MealBuilder planId={editing} onBack={back} />;
+  }
 
   return (
     <div className="mx-auto max-w-xl space-y-3 p-4 pb-28">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Workout plans</h2>
-        <Button onClick={() => setCreateOpen(true)}>＋ New plan</Button>
+      <div className="flex gap-2">
+        <SuggestionChip selected={kind === "workout"} onClick={() => setKind("workout")}>🏋️ Workout</SuggestionChip>
+        <SuggestionChip selected={kind === "meal"} onClick={() => setKind("meal")}>🍽️ Meal</SuggestionChip>
       </div>
-      {plans.length === 0 ? (
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold capitalize">{kind} plans</h2>
+        <Button onClick={() => setCreateOpen(true)}>＋ New</Button>
+      </div>
+      {!plans ? (
+        <Skeleton className="h-64" />
+      ) : plans.length === 0 ? (
         <Card className="text-center text-sm text-fg-muted">
-          No plans yet. Create one and build it block by block — or use ✦ AI draft inside the builder.
+          No {kind} plans yet. Create one and build it{kind === "workout" ? " — or use ✦ AI draft in the builder." : "."}
         </Card>
       ) : (
         plans.map((p) => (
@@ -58,12 +73,10 @@ export function CoachPlans({ clientId }: { clientId: string }) {
           </button>
         ))
       )}
-      <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title="New workout plan">
+      <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title={`New ${kind} plan`}>
         <div className="space-y-4">
-          <Field label="Plan name" icon="🏋️" value={name} onChange={(e) => setName(e.target.value)} placeholder="Push Pull Legs" />
-          <Button size="lg" className="w-full" disabled={name.trim().length < 2} onClick={() => void create()}>
-            Create & build
-          </Button>
+          <Field label="Plan name" icon={kind === "workout" ? "🏋️" : "🍽️"} value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "workout" ? "Push Pull Legs" : "Cutting Plan"} />
+          <Button size="lg" className="w-full" disabled={name.trim().length < 2} onClick={() => void create()}>Create &amp; build</Button>
         </div>
       </Sheet>
     </div>
