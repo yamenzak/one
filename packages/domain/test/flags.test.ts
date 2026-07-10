@@ -1,0 +1,100 @@
+import { describe, expect, it } from "vitest";
+import { FREE_ENTITLEMENTS, mergeOverrides, resolveEntitlements, checkDowngrade } from "../src/entitlements.js";
+import { DEFAULT_CLIENT_FLAGS, resolveClientFlags } from "../src/clientFlags.js";
+import { grantSatisfies, resolvePermissions, sanitizePermissions, ROLE_PRESETS } from "../src/perms.js";
+import type { Budget } from "../src/budgets.js";
+
+const NOW = "2026-07-10T12:00:00.000Z";
+const days = (n: number) => new Date(Date.parse(NOW) + n * 86_400_000).toISOString();
+
+const paidEnt = resolveEntitlements(
+  JSON.stringify({
+    quotas: { staffSeats: 4, activeClients: 100, templates: -1, storageMb: 25_000 },
+    features: { commerce: true, aiSuite: true, bfCamera: true, supplementsLabs: true, frontDesk: true, branding: true },
+    aiCredits: { monthlyGrant: 2500 },
+  }),
+);
+
+describe("entitlements", () => {
+  it("resolves onto the free baseline; bad json = free", () => {
+    expect(resolveEntitlements(null)).toEqual(FREE_ENTITLEMENTS);
+    expect(resolveEntitlements("{nope")).toEqual(FREE_ENTITLEMENTS);
+    expect(paidEnt.features.aiSuite).toBe(true);
+    expect(paidEnt.features.integrations).toBe(false); // inherited from baseline
+  });
+
+  it("per-tenant overrides layer on top", () => {
+    const gifted = mergeOverrides(FREE_ENTITLEMENTS, JSON.stringify({ aiCredits: { monthlyGrant: 500 } }));
+    expect(gifted.aiCredits.monthlyGrant).toBe(500);
+    expect(gifted.quotas.activeClients).toBe(3);
+  });
+
+  it("downgrade is compliance-gated with -1 = unlimited", () => {
+    const usage = { staffSeats: 3, activeClients: 50, templates: 80, storageMb: 100, activeCommerceSubs: 2 };
+    const r = checkDowngrade(usage, FREE_ENTITLEMENTS);
+    expect(r.eligible).toBe(false);
+    expect(r.violations.some((v) => v.type === "feature" && v.resource === "commerce")).toBe(true);
+    const rUnlimited = checkDowngrade({ ...usage, activeCommerceSubs: 0, staffSeats: 1, activeClients: 2, storageMb: 10, templates: 80 }, {
+      ...FREE_ENTITLEMENTS,
+      quotas: { ...FREE_ENTITLEMENTS.quotas, templates: -1 },
+    });
+    expect(rUnlimited.eligible).toBe(true);
+  });
+});
+
+describe("client flags resolver", () => {
+  it("defaults are permissive except fasting", () => {
+    const f = resolveClientFlags({ entitlements: paidEnt, nowIso: NOW });
+    expect(f.canLogOwnFood).toBe(true);
+    expect(f.canTrackFasting).toBe(false);
+  });
+
+  it("budget gating forces workout/meal flags off when lapsed", () => {
+    const lapsedWorkout: Budget[] = [
+      { feature: "workout", daysTotal: 30, startedAt: days(-40), expiresAt: days(-10) },
+      { feature: "meal", daysTotal: 30, startedAt: days(-10), expiresAt: days(20) },
+    ];
+    const f = resolveClientFlags({ entitlements: paidEnt, budgets: lapsedWorkout, nowIso: NOW });
+    expect(f.canRequestExerciseSwap).toBe(false);
+    expect(f.canViewExerciseReport).toBe(false);
+    expect(f.canEditMealPlan).toBe(true); // meal budget alive
+  });
+
+  it("tenant entitlements are the outer bound (no aiSuite -> no client AI)", () => {
+    const f = resolveClientFlags({ entitlements: FREE_ENTITLEMENTS, nowIso: NOW });
+    expect(f.canUseAi).toBe(false);
+  });
+
+  it("subscription overrides beat package defaults", () => {
+    const f = resolveClientFlags({
+      packageFlags: { canLogOwnFood: false },
+      subscriptionFlags: { canLogOwnFood: true },
+      entitlements: paidEnt,
+      nowIso: NOW,
+    });
+    expect(f.canLogOwnFood).toBe(true);
+    // Unknown keys are ignored, defaults intact elsewhere.
+    expect(f.showMacroBreakdown).toBe(DEFAULT_CLIENT_FLAGS.showMacroBreakdown);
+  });
+});
+
+describe("permissions", () => {
+  it("role presets: trainer can publish plans, client cannot", () => {
+    expect(grantSatisfies(ROLE_PRESETS.trainer!, { plan: ["publish"] })).toBe(true);
+    expect(grantSatisfies(ROLE_PRESETS.client!, { plan: ["publish"] })).toBe(false);
+    expect(grantSatisfies(ROLE_PRESETS.owner!, { billing: ["manage"] })).toBe(true);
+    expect(grantSatisfies(ROLE_PRESETS.trainer!, { billing: ["read"] })).toBe(false);
+  });
+
+  it("custom grants sanitize to the catalog and beat role presets", () => {
+    const g = sanitizePermissions({ billing: ["read", "hack"], bogus: ["x"] });
+    expect(g).toEqual({ billing: ["read"] });
+    const effective = resolvePermissions("trainer", JSON.stringify({ client: ["read"] }));
+    expect(grantSatisfies(effective, { plan: ["update"] })).toBe(false); // custom grant replaced preset
+  });
+
+  it("falls back to client preset on junk", () => {
+    const effective = resolvePermissions("nonsense", "{broken");
+    expect(effective).toEqual(ROLE_PRESETS.client);
+  });
+});
