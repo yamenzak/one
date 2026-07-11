@@ -1,10 +1,10 @@
 /** Eat tab — the nutrition diary: intake vs target, meals, per-entry macros. */
 
 import { useCallback, useEffect, useState } from "react";
-import { fmtEnergy, fmtVolume, volumeLabel, volumeDisplayToMl, kcalToDisplay } from "@mossa/domain";
+import { fmtEnergy, fmtVolume, volumeDisplayToMl, kcalToDisplay } from "@mossa/domain";
 import {
-  Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MacroInline, MetricChip, METRICS, toneSoft, Page, Stagger, EmptyState,
-  Plus, ClipboardList, Utensils, Croissant, Soup, Apple, Dumbbell, Droplet, Flame, Trash2, type LucideIcon,
+  Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MacroInline, MetricChip, ProgressRing, METRICS, toneSoft, Page, Stagger, EmptyState,
+  Plus, ClipboardList, Utensils, Croissant, Soup, Apple, Dumbbell, Droplet, Beef, Camera, Trash2, type LucideIcon,
 } from "@mossa/ui";
 import type { UnitPrefs } from "@mossa/domain";
 import { api, todayLocal } from "../../api.js";
@@ -36,6 +36,7 @@ export function Eat({ clientId }: { clientId: string }) {
   const [waterMl, setWaterMl] = useState(0);
   const [logMeal, setLogMeal] = useState<string | undefined>(undefined);
   const [logOpen, setLogOpen] = useState(false);
+  const [logCamera, setLogCamera] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
   const [edit, setEdit] = useState<Entry | null>(null);
   const units = useUnits();
@@ -60,7 +61,7 @@ export function Eat({ clientId }: { clientId: string }) {
     await api.post("/api/logs/water", { clientId, data: { date, amountMl: ml } });
   };
 
-  const openLog = (meal?: string) => { setLogMeal(meal); setLogOpen(true); };
+  const openLog = (meal?: string, camera = false) => { setLogMeal(meal); setLogCamera(camera); setLogOpen(true); };
 
   if (!entries) return <Skeleton className="m-4 h-64" />;
 
@@ -69,35 +70,35 @@ export function Eat({ clientId }: { clientId: string }) {
   const meals = [...MEAL_ORDER.filter((m) => byMeal.has(m)), ...[...byMeal.keys()].filter((m) => !MEAL_ORDER.includes(m))];
   const sum = (f: (e: Entry) => number) => entries.reduce((n, e) => n + (f(e) || 0), 0);
   const total = sum((e) => e.calories);
+  const proteinTotal = Math.round(sum((e) => e.protein_g));
+  const proteinTarget = targets?.targetProteinG ?? 0;
   const calTarget = targets?.targetCalories ?? 0;
   const pct = calTarget > 0 ? total / calTarget : 0;
   const remaining = calTarget - total;
+  const waterPct = Math.min(100, Math.max(3, (waterMl / waterTarget) * 100));
 
   return (
-    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+    <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       <h1 className="text-2xl font-bold tracking-tight">Eat</h1>
 
-      {/* Intake vs target */}
+      {/* Hero — today's intake, the visual anchor */}
       <Stagger>
-        <Card className="space-y-3">
-          <div className="flex items-end justify-between">
-            <div>
-              <div className="text-sm text-muted-foreground">Today's intake</div>
-              <div className="numeral mt-0.5 text-3xl font-bold leading-none">
-                {fmtEnergy(total, units)}
-                {calTarget > 0 && <span className="ml-1.5 text-base font-medium text-muted-foreground">of {fmtEnergy(calTarget, units)}</span>}
+        <Card className="relative overflow-hidden">
+          <div className="pointer-events-none absolute -right-12 -top-12 size-40 rounded-full bg-calories/10 blur-2xl" />
+          <div className="relative flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-xs font-medium uppercase tracking-wide text-calories">Today's intake</div>
+              <div className="numeral mt-1.5 text-3xl font-bold leading-none">{fmtEnergy(total, units)}</div>
+              <div className="mt-1.5 text-sm text-muted-foreground">
+                {calTarget > 0 ? (remaining >= 0 ? `${fmtEnergy(remaining, units)} left` : `${fmtEnergy(-remaining, units)} over`) : "Log your meals to track intake"}
               </div>
             </div>
             {calTarget > 0 && (
-              <MetricChip metric="calories" value={remaining >= 0 ? `${fmtEnergy(remaining, units, false)} left` : `${fmtEnergy(-remaining, units, false)} over`} />
+              <ProgressRing size={92} strokeWidth={9} tone={remaining < 0 ? "danger" : "calories"} progress={pct} value={`${Math.round(pct * 100)}%`} className="shrink-0" />
             )}
           </div>
-          {calTarget > 0 && (
-            <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
-              <div className={`h-full rounded-full transition-all ${remaining < 0 ? "bg-danger" : "bg-calories"}`} style={{ width: `${Math.min(100, Math.max(2, pct * 100))}%` }} />
-            </div>
-          )}
           <MacroBar
+            className="relative mt-4"
             proteinG={sum((e) => e.protein_g)}
             carbsG={sum((e) => e.carbs_g)}
             fatG={sum((e) => e.fat_g)}
@@ -106,68 +107,88 @@ export function Eat({ clientId }: { clientId: string }) {
         </Card>
       </Stagger>
 
-      {/* Hydration */}
-      <Stagger>
-        <Card className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5"><IconBadge icon={Droplet} tone="hydration" size="sm" /><span className="font-semibold">Hydration</span></div>
-            <span className="numeral text-sm font-semibold text-hydration">{fmtVolume(waterMl, units)}<span className="font-medium text-muted-foreground"> / {fmtVolume(waterTarget, units)}</span></span>
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
-            <div className="h-full rounded-full bg-hydration transition-all" style={{ width: `${Math.min(100, Math.max(2, (waterMl / waterTarget) * 100))}%` }} />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {waterPresets.map((v) => <Chip key={v} onClick={() => void addWater(v)}>+{v} {volumeLabel(units)}</Chip>)}
-          </div>
-        </Card>
-      </Stagger>
-
-      {entries.length === 0 ? (
-        <EmptyState icon={Utensils} title="Nothing logged today" description="Log your first meal — search, barcode, snap a photo, or your plan." action={<Button onClick={() => openLog()}><Plus /> Log food</Button>} />
-      ) : (
-        <Stagger className="space-y-3">
-          {meals.map((meal) => {
-            const list = byMeal.get(meal)!;
-            const meta = metaFor(meal);
-            const mealCal = list.reduce((n, e) => n + e.calories, 0);
-            return (
-              <Card key={meal} className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5"><IconBadge icon={meta.icon} tone="nutrition" size="sm" /><span className="font-semibold">{meta.label}</span></div>
-                  <span className="numeral text-sm font-semibold text-calories">{fmtEnergy(mealCal, units)}</span>
-                </div>
-                <div className="divide-y divide-border/40">
-                  {list.map((e) => (
-                    <button key={e.id} onClick={() => setEdit(e)} className="flex w-full items-center gap-3 py-2.5 text-left transition-colors active:opacity-70">
-                      <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2">
-                        {e.image_url ? <img src={e.image_url} alt="" className="size-full object-cover" /> : <Utensils className="size-4 text-muted-foreground" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm">{e.label ?? "Food"}</div>
-                        <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                          {e.quantity ? <span className="numeral shrink-0">{Math.round(e.quantity)} {e.unit ?? "g"}</span> : null}
-                          <MacroInline proteinG={e.protein_g} carbsG={e.carbs_g} fatG={e.fat_g} className="text-[0.7rem]" />
-                        </div>
-                      </div>
-                      <span className="numeral shrink-0 text-sm">{fmtEnergy(e.calories, units)}</span>
-                    </button>
-                  ))}
-                </div>
-                <button onClick={() => openLog(meal)} className="pt-0.5 text-xs font-semibold text-primary">+ Add to {meta.label.toLowerCase()}</button>
-              </Card>
-            );
-          })}
-        </Stagger>
-      )}
-
-      {week && <WeekStrip week={week} />}
-
-      <div className="flex gap-3">
-        <Button size="lg" className="flex-1" onClick={() => openLog()}><Plus /> Log food</Button>
-        <Button size="lg" variant="tonal" className="flex-1" onClick={() => setPlanOpen(true)}><ClipboardList /> My plan</Button>
+      {/* Primary actions — directly available */}
+      <div className="flex flex-wrap gap-2">
+        <Chip icon={Plus} selected onClick={() => openLog()}>Log food</Chip>
+        <Chip icon={Camera} onClick={() => openLog(undefined, true)}>Snap a meal</Chip>
+        <Chip icon={ClipboardList} onClick={() => setPlanOpen(true)}>My plan</Chip>
       </div>
 
-      {logOpen && <FoodSearchSheet clientId={clientId} mealType={logMeal} onClose={() => setLogOpen(false)} onLogged={() => void load()} />}
+      {/* Today — hydration + protein at a glance */}
+      <section className="space-y-2">
+        <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-2.5 rounded-2xl bg-card p-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground"><Droplet className="size-4 text-hydration" /><span>Water</span></div>
+            <div className="numeral text-[1.6rem] font-semibold leading-none">{fmtVolume(waterMl, units)}<span className="ml-1 text-sm font-medium text-muted-foreground">/ {fmtVolume(waterTarget, units)}</span></div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-hydration transition-all" style={{ width: `${waterPct}%` }} /></div>
+            <div className="flex gap-1.5">
+              {waterPresets.map((v) => <button key={v} onClick={() => void addWater(v)} className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-transform active:scale-95 ${toneSoft.hydration}`}>+{v}</button>)}
+            </div>
+          </div>
+          <div className="flex flex-col gap-2.5 rounded-2xl bg-card p-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground"><Beef className="size-4 text-protein" /><span>Protein</span></div>
+            <div className="numeral text-[1.6rem] font-semibold leading-none">{proteinTotal}<span className="ml-1 text-sm font-medium text-muted-foreground">{proteinTarget > 0 ? `/ ${proteinTarget} g` : "g"}</span></div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">{proteinTarget > 0 && <div className="h-full rounded-full bg-protein transition-all" style={{ width: `${Math.min(100, Math.max(3, (proteinTotal / proteinTarget) * 100))}%` }} />}</div>
+            <div className="text-xs text-muted-foreground">{proteinTarget > 0 ? (proteinTotal >= proteinTarget ? "Goal reached" : `${proteinTarget - proteinTotal} g to go`) : "No target set"}</div>
+          </div>
+        </div>
+      </section>
+
+      {/* Today's meals */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today's meals</h3>
+          {entries.length > 0 && <button onClick={() => openLog()} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><Plus /> Log</button>}
+        </div>
+        {entries.length === 0 ? (
+          <EmptyState icon={Utensils} title="Nothing logged today" description="Log your first meal — search, barcode, snap a photo, or your plan." action={<Button onClick={() => openLog()}><Plus /> Log food</Button>} />
+        ) : (
+          <Stagger className="space-y-3">
+            {meals.map((meal) => {
+              const list = byMeal.get(meal)!;
+              const meta = metaFor(meal);
+              const mealCal = list.reduce((n, e) => n + e.calories, 0);
+              return (
+                <Card key={meal} className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5"><IconBadge icon={meta.icon} tone="nutrition" size="sm" /><span className="font-semibold">{meta.label}</span></div>
+                    <span className="numeral text-sm font-semibold text-calories">{fmtEnergy(mealCal, units)}</span>
+                  </div>
+                  <div className="divide-y divide-border/40">
+                    {list.map((e) => (
+                      <button key={e.id} onClick={() => setEdit(e)} className="flex w-full items-center gap-3 py-2.5 text-left transition-colors active:opacity-70">
+                        <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2">
+                          {e.image_url ? <img src={e.image_url} alt="" className="size-full object-cover" /> : <Utensils className="size-4 text-muted-foreground" />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm">{e.label ?? "Food"}</div>
+                          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                            {e.quantity ? <span className="numeral shrink-0">{Math.round(e.quantity)} {e.unit ?? "g"}</span> : null}
+                            <MacroInline proteinG={e.protein_g} carbsG={e.carbs_g} fatG={e.fat_g} className="text-[0.7rem]" />
+                          </div>
+                        </div>
+                        <span className="numeral shrink-0 text-sm">{fmtEnergy(e.calories, units)}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={() => openLog(meal)} className="pt-0.5 text-xs font-semibold text-primary">+ Add to {meta.label.toLowerCase()}</button>
+                </Card>
+              );
+            })}
+          </Stagger>
+        )}
+      </section>
+
+      {/* This week */}
+      {week && (
+        <section className="space-y-2">
+          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">This week</h3>
+          <WeekStrip week={week} />
+        </section>
+      )}
+
+      {logOpen && <FoodSearchSheet clientId={clientId} mealType={logMeal} autoCamera={logCamera} onClose={() => setLogOpen(false)} onLogged={() => void load()} />}
       {planOpen && <MealPlanDrawer clientId={clientId} onClose={() => setPlanOpen(false)} onLogged={() => void load()} />}
       {edit && <EditEntrySheet entry={edit} clientId={clientId} units={units} onClose={() => setEdit(null)} onSaved={() => void load()} />}
     </Page>
@@ -191,10 +212,7 @@ function WeekStrip({ week }: { week: Week }) {
 
   return (
     <Card className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5"><IconBadge icon={Flame} tone="calories" size="sm" /><span className="font-semibold">This week</span></div>
-        {streak > 0 && <MetricChip metric="streak" value={`${streak}d streak`} />}
-      </div>
+      {streak > 0 && <div className="flex justify-end"><MetricChip metric="streak" value={`${streak}d streak`} /></div>}
       <div>
         <div className="relative flex h-11 items-end gap-1.5">
           {ct ? <div className="pointer-events-none absolute inset-x-0 border-t border-dashed border-foreground/25" style={{ bottom: `${(ct / max) * 44}px` }} /> : null}

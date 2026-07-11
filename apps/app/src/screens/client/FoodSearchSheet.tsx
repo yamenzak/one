@@ -3,7 +3,7 @@
  * quick entry, and ✦ AI (natural-language + snap-a-meal).
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fmtEnergy, kcalToDisplay, type UnitPrefs } from "@mossa/domain";
 import { Button, Field, Sheet, Chip, Badge, Switch, SegmentedControl, MacroInline, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, Utensils } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
@@ -33,7 +33,8 @@ const micros = (f: Food) => ({
   potassiumMg: pick(f.potassium_mg, f.potassiumMg), calciumMg: pick(f.calcium_mg, f.calciumMg), ironMg: pick(f.iron_mg, f.ironMg),
 });
 
-export function FoodSearchSheet({ clientId, mealType, onClose, onLogged, onPick }: { clientId?: string; mealType?: string; onClose: () => void; onLogged?: () => void; onPick?: (foodId: string, name: string) => void }) {
+export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLogged, onPick }: { clientId?: string; mealType?: string; autoCamera?: boolean; onClose: () => void; onLogged?: () => void; onPick?: (foodId: string, name: string) => void }) {
+  const snapInputRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
   const [local, setLocal] = useState<Food[]>([]);
   const [external, setExternal] = useState<Food[]>([]);
@@ -77,6 +78,8 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged, onPick 
     if (webAlso) void searchExternal(1);
   }, [q, webAlso, searchExternal]);
   useEffect(() => { const t = setTimeout(() => void search(), 300); return () => clearTimeout(t); }, [search]);
+  // "Snap a meal" entry point — open the camera picker as soon as the sheet mounts.
+  useEffect(() => { if (autoCamera) snapInputRef.current?.click(); }, [autoCamera]);
 
   const matchesFilter = (f: Food) => filter === "all" || (filter === "branded" ? !!f.brand : !f.brand);
 
@@ -177,7 +180,7 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged, onPick 
           {!onPick && (
             <label className="grid size-9 cursor-pointer place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]" aria-label="Snap a meal">
               {aiBusy ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Camera />}
-              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void snapMeal(e.target.files[0])} />
+              <input ref={snapInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void snapMeal(e.target.files[0])} />
             </label>
           )}
           <button onClick={() => setEditor({})} className="grid size-9 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]" aria-label="Add manually"><PencilLine /></button>
