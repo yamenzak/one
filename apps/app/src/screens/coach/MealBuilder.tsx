@@ -4,9 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy } from "@mossa/domain";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, Search, ArrowLeft, Plus, Sparkles, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, ArrowLeft, Plus, Sparkles, X } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
+import { FoodSearchSheet } from "../client/FoodSearchSheet.js";
 
 interface Plan { id: string; clientId: string; name: string; status: string; body: MealBody; targetGoal?: { targets?: Record<string, number> | null } | null }
 interface FoodRow { id: string; name: string; serving_size: number; calories: number; protein_g: number; carbs_g: number; fat_g: number }
@@ -119,7 +120,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
         </div>
       </div>
 
-      {foodPicker && <FoodPicker onClose={() => setFoodPicker(null)} onPick={(id, name) => { mutate((d) => d[foodPicker.optIdx]!.foods.push({ foodId: id, quantity: 100, unit: "g" })); setNames((p) => new Map(p).set(id, name)); setFoodPicker(null); }} />}
+      {foodPicker && <FoodSearchSheet onClose={() => setFoodPicker(null)} onPick={(id, name) => { mutate((d) => d[foodPicker.optIdx]!.foods.push({ foodId: id, quantity: 100, unit: "g" })); setNames((p) => new Map(p).set(id, name)); setFoodPicker(null); }} />}
       {aiOpen && <AiMealSheet onClose={() => setAiOpen(false)} onRun={runAi} />}
     </div>
   );
@@ -139,14 +140,3 @@ function AiMealSheet({ onClose, onRun }: { onClose: () => void; onRun: (i: strin
   );
 }
 
-function FoodPicker({ onClose, onPick }: { onClose: () => void; onPick: (id: string, name: string) => void }) {
-  const [q, setQ] = useState("");
-  const [results, setResults] = useState<{ id: string; name: string }[]>([]);
-  useEffect(() => { const t = setTimeout(() => void api.get<{ foods: { id: string; name: string }[] }>(`/api/foods?q=${encodeURIComponent(q)}`).then((r) => setResults(r.foods)), 200); return () => clearTimeout(t); }, [q]);
-  return (
-    <Sheet open onClose={onClose} title="Add food">
-      <Field label="Search" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} className="mb-3" />
-      <div className="max-h-80 space-y-1 overflow-y-auto">{results.map((f) => <button key={f.id} onClick={() => onPick(f.id, f.name)} className="w-full rounded-xl px-3 py-3 text-left transition-colors hover:bg-secondary">{f.name}</button>)}</div>
-    </Sheet>
-  );
-}

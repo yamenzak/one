@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Field, Sheet, Chip, Badge, SegmentedControl, MacroInline, cn, toneSoft, METRICS, Search, Barcode, Sparkles, Camera, Utensils } from "@mossa/ui";
+import { Button, Field, Sheet, Chip, Badge, Switch, SegmentedControl, MacroInline, cn, toneSoft, METRICS, Search, Barcode, Camera, Utensils } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { BarcodeScanner } from "./BarcodeScanner.js";
 
@@ -28,7 +28,7 @@ const micros = (f: Food) => ({
   potassiumMg: pick(f.potassium_mg, f.potassiumMg), calciumMg: pick(f.calcium_mg, f.calciumMg), ironMg: pick(f.iron_mg, f.ironMg),
 });
 
-export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { clientId: string; mealType?: string; onClose: () => void; onLogged: () => void }) {
+export function FoodSearchSheet({ clientId, mealType, onClose, onLogged, onPick }: { clientId?: string; mealType?: string; onClose: () => void; onLogged?: () => void; onPick?: (foodId: string, name: string) => void }) {
   const [q, setQ] = useState("");
   const [local, setLocal] = useState<Food[]>([]);
   const [external, setExternal] = useState<Food[]>([]);
@@ -39,18 +39,13 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
   const [extPage, setExtPage] = useState(0);
   const [extMore, setExtMore] = useState(false);
   const [filter, setFilter] = useState<"all" | "whole" | "branded">("all");
+  const [webAlso, setWebAlso] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
 
-  const search = useCallback(async () => {
-    if (q.trim().length < 2) { setLocal([]); setExternal([]); setExtPage(0); return; }
-    setLocal((await api.get<{ foods: Food[] }>(`/api/foods?q=${encodeURIComponent(q)}`)).foods);
-    setExternal([]); setExtPage(0); setExtMore(false);
-  }, [q]);
-  useEffect(() => { const t = setTimeout(() => void search(), 250); return () => clearTimeout(t); }, [search]);
-
-  const searchExternal = async (page = 1) => {
+  const searchExternal = useCallback(async (page = 1) => {
+    if (q.trim().length < 2) return;
     setSearching(true);
     try {
       const res = (await api.get<{ foods: Food[] }>(`/api/foods/search-external?q=${encodeURIComponent(q)}&page=${page}`)).foods;
@@ -62,37 +57,46 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
       setExtPage(page);
       setExtMore(res.length >= 10);
     } finally { setSearching(false); }
-  };
+  }, [q]);
+
+  const search = useCallback(async () => {
+    if (q.trim().length < 2) { setLocal([]); setExternal([]); setExtPage(0); return; }
+    setLocal((await api.get<{ foods: Food[] }>(`/api/foods?q=${encodeURIComponent(q)}`)).foods);
+    setExternal([]); setExtPage(0); setExtMore(false);
+    if (webAlso) void searchExternal(1);
+  }, [q, webAlso, searchExternal]);
+  useEffect(() => { const t = setTimeout(() => void search(), 300); return () => clearTimeout(t); }, [search]);
 
   const matchesFilter = (f: Food) => filter === "all" || (filter === "branded" ? !!f.brand : !f.brand);
+
+  /** Import an external food (or return an existing local id). */
+  const importFood = async (f: Food): Promise<string | undefined> => {
+    if (f.id) return f.id;
+    if (!f.source) return undefined;
+    return (await api.post<{ id: string }>("/api/foods/import", { name: f.name, brand: f.brand ?? null, description: f.description ?? null, ...norm(f), ...micros(f), imageUrl: f.image_url ?? f.imageUrl ?? null, source: f.source, sourceId: f.sourceId, barcode: f.barcode ?? null })).id;
+  };
+
+  // Pick mode (plan building): choosing a row imports + returns the id, no logging.
+  const pickFood = async (f: Food) => { const id = await importFood(f); if (id && onPick) { onPick(id, f.name); onClose(); } };
+  const rowClick = (f: Food) => (onPick ? void pickFood(f) : setSelected(f));
 
   const lookupBarcode = async (code: string) => {
     setScanOpen(false);
     let r = await api.get<{ food: Food | null }>(`/api/foods/barcode?code=${code}`);
     if (!r.food) r = await api.get<{ food: Food | null }>(`/api/foods/barcode-external?code=${code}`);
-    if (r.food) setSelected(r.food); else setAiError("No product matched that barcode.");
+    if (r.food) rowClick(r.food); else setAiError("No product matched that barcode.");
   };
 
   const log = async () => {
     if (!selected) return;
-    let foodId = selected.id;
-    if (!foodId && selected.source) foodId = (await api.post<{ id: string }>("/api/foods/import", { name: selected.name, brand: selected.brand ?? null, description: selected.description ?? null, ...norm(selected), ...micros(selected), imageUrl: selected.image_url ?? selected.imageUrl ?? null, source: selected.source, sourceId: selected.sourceId, barcode: selected.barcode ?? null })).id;
+    const foodId = await importFood(selected);
     const n = norm(selected);
     const factor = Number(quantity) / n.servingSize;
     await api.post("/api/logs/food", { clientId, data: { date: todayLocal(), mealType: meal, foodId: foodId ?? null, label: selected.name, quantity: Number(quantity), unit: n.servingUnit, calories: Math.round(n.calories * factor), proteinG: Math.round(n.proteinG * factor), carbsG: Math.round(n.carbsG * factor), fatG: Math.round(n.fatG * factor) } });
-    onLogged(); onClose();
+    onLogged?.(); onClose();
   };
 
   const aiErr = (e: unknown) => { const m = e instanceof Error ? e.message : ""; setAiError(m.includes("aiSuite") ? "AI isn't on your studio's plan yet." : m.includes("insufficient") ? "Studio is out of AI credits." : "Couldn't parse that — try search."); };
-
-  const naturalLog = async () => {
-    setAiBusy(true); setAiError(null);
-    try {
-      const r = await api.post<{ entries: { label: string; mealType: string; calories: number; proteinG: number; carbsG: number; fatG: number }[] }>("/api/ai/parse-food", { clientId, text: q });
-      for (const e of r.entries) await api.post("/api/logs/food", { clientId, data: { date: todayLocal(), mealType: e.mealType || meal, label: e.label, calories: e.calories, proteinG: e.proteinG, carbsG: e.carbsG, fatG: e.fatG } });
-      onLogged(); onClose();
-    } catch (e) { aiErr(e); } finally { setAiBusy(false); }
-  };
 
   const snapMeal = async (photo: File) => {
     setAiBusy(true); setAiError(null);
@@ -103,7 +107,7 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
       if (!key) throw new Error("upload failed");
       const r = await api.post<{ entries: { label: string; mealType: string; calories: number; proteinG: number; carbsG: number; fatG: number }[] }>("/api/ai/snap-meal", { clientId, imageKey: key, hint: q });
       for (const e of r.entries) await api.post("/api/logs/food", { clientId, data: { date: todayLocal(), mealType: e.mealType || meal, label: e.label, calories: e.calories, proteinG: e.proteinG, carbsG: e.carbsG, fatG: e.fatG } });
-      onLogged(); onClose();
+      onLogged?.(); onClose();
     } catch (e) { aiErr(e); } finally { setAiBusy(false); }
   };
 
@@ -145,35 +149,45 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
   }
 
   return (
-    <Sheet open onClose={onClose} title="Add food">
+    <Sheet
+      open
+      onClose={onClose}
+      title="Add food"
+      titleAction={
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setScanOpen(true)} className="grid size-9 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]" aria-label="Scan barcode"><Barcode /></button>
+          {!onPick && (
+            <label className="grid size-9 cursor-pointer place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]" aria-label="Snap a meal">
+              {aiBusy ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Camera />}
+              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void snapMeal(e.target.files[0])} />
+            </label>
+          )}
+        </div>
+      }
+    >
       <div className="space-y-3">
         <Field label="Search foods" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-        <div className="flex flex-wrap gap-2">
-          <Chip icon={Barcode} onClick={() => setScanOpen(true)}>Barcode</Chip>
-          <Chip icon={Search} onClick={() => void searchExternal(1)} disabled={q.length < 2}>{searching ? "Searching…" : "Web"}</Chip>
-          <Chip icon={Sparkles} onClick={() => void naturalLog()} disabled={q.length < 3 || aiBusy}>{aiBusy ? "Parsing…" : "Log this"}</Chip>
-          <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full bg-secondary px-4 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4">
-            <Camera /> {aiBusy ? "Reading…" : "Snap"}
-            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void snapMeal(e.target.files[0])} />
-          </label>
+        <div className="flex items-center justify-between gap-3">
+          <SegmentedControl
+            options={[{ value: "all", label: "All" }, { value: "whole", label: "Whole" }, { value: "branded", label: "Branded" }]}
+            value={filter}
+            onChange={setFilter}
+          />
+          <label className="flex shrink-0 items-center gap-2 text-xs font-medium text-muted-foreground">Web<Switch checked={webAlso} onCheckedChange={(v) => { setWebAlso(v); if (v) void searchExternal(1); }} /></label>
         </div>
-        <SegmentedControl
-          options={[{ value: "all", label: "All" }, { value: "whole", label: "Whole" }, { value: "branded", label: "Branded" }]}
-          value={filter}
-          onChange={setFilter}
-        />
         {aiError && <p className="text-sm text-warning">{aiError}</p>}
         <div className="max-h-80 space-y-1 overflow-y-auto">
-          {local.filter(matchesFilter).map((f) => <FoodRow key={f.id} food={f} badge="library" onPick={() => setSelected(f)} />)}
-          {external.filter(matchesFilter).map((f, i) => <FoodRow key={`ext-${i}`} food={f} badge="web" onPick={() => setSelected(f)} />)}
-          {q.length >= 2 && local.filter(matchesFilter).length === 0 && external.filter(matchesFilter).length === 0 && !searching && (
-            <p className="p-4 text-center text-sm text-muted-foreground">{extPage === 0 ? "Nothing local — try Web." : "No matches for this filter."}</p>
+          {local.filter(matchesFilter).map((f) => <FoodRow key={f.id} food={f} badge="library" onPick={() => rowClick(f)} />)}
+          {external.filter(matchesFilter).map((f, i) => <FoodRow key={`ext-${i}`} food={f} badge="web" onPick={() => rowClick(f)} />)}
+          {searching && external.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Searching the web…</p>}
+          {q.length >= 2 && !searching && local.filter(matchesFilter).length === 0 && external.filter(matchesFilter).length === 0 && (
+            <p className="p-4 text-center text-sm text-muted-foreground">{extPage === 0 && !webAlso ? "Nothing in your library — turn on Web." : "No matches."}</p>
           )}
           {extPage > 0 && extMore && (
             <Button variant="ghost" className="w-full" disabled={searching} onClick={() => void searchExternal(extPage + 1)}>{searching ? "Loading…" : "Load more results"}</Button>
           )}
-          {extPage === 0 && (local.length > 0 || q.length >= 2) && !searching && (
-            <button onClick={() => void searchExternal(1)} disabled={q.length < 2} className="w-full rounded-xl px-3 py-2.5 text-center text-sm font-medium text-primary disabled:opacity-40">Can't find it? Search the web →</button>
+          {!webAlso && extPage === 0 && q.length >= 2 && !searching && (
+            <button onClick={() => void searchExternal(1)} className="w-full rounded-xl px-3 py-2.5 text-center text-sm font-medium text-primary">Can't find it? Search the web →</button>
           )}
         </div>
       </div>

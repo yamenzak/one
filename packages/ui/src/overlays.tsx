@@ -54,7 +54,7 @@ export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.Close;
 
 // ── Sheet (bottom drawer, drag-to-dismiss) ──────────────────────────────────
-export function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title?: string; children: ReactNode }) {
+export function Sheet({ open, onClose, title, titleAction, children }: { open: boolean; onClose: () => void; title?: string; titleAction?: ReactNode; children: ReactNode }) {
   return (
     <Drawer.Root open={open} onOpenChange={(o) => !o && onClose()} repositionInputs={false}>
       <Drawer.Portal>
@@ -62,8 +62,10 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
         <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92vh] max-w-xl flex-col rounded-t-3xl border-t border-border/60 bg-popover outline-none">
           <div className="mx-auto mt-3 h-1.5 w-10 shrink-0 rounded-full bg-surface-3" />
           <div className="overflow-y-auto px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4">
-            {title && <Drawer.Title className="mb-4 text-xl font-semibold tracking-tight">{title}</Drawer.Title>}
-            {!title && <Drawer.Title className="sr-only">Sheet</Drawer.Title>}
+            <div className={cn("flex items-center justify-between gap-3", (title || titleAction) && "mb-4")}>
+              <Drawer.Title className={cn("text-xl font-semibold tracking-tight", !title && "sr-only")}>{title ?? "Sheet"}</Drawer.Title>
+              {titleAction}
+            </div>
             {children}
           </div>
         </Drawer.Content>

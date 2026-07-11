@@ -16,13 +16,18 @@ import { tenantIntegrations, providerReady, type Integrations } from "./integrat
 import { newId, nowIso } from "./ids.js";
 
 const CACHE_TTL = 60 * 60 * 24; // 1 day
+const CV = "v2"; // cache-key version — bump to invalidate poisoned entries
+const UA = "Mossa/1.0 (https://mossa.4dl.app; coaching platform)";
 const r1 = (n: unknown): number => (typeof n === "number" && isFinite(n) ? Math.round(n * 10) / 10 : 0);
 
+/** Cache a fetcher's result — but NEVER cache empty/failed results (so a
+ *  provider hiccup doesn't poison the key for a whole day). */
 async function cachedJson<T>(kv: KVNamespace, key: string, fetcher: () => Promise<T>): Promise<T> {
-  const hit = await kv.get(key, "json").catch(() => null);
+  const hit = await kv.get(`${CV}:${key}`, "json").catch(() => null);
   if (hit) return hit as T;
   const fresh = await fetcher();
-  await kv.put(key, JSON.stringify(fresh), { expirationTtl: CACHE_TTL }).catch(() => undefined);
+  const empty = fresh == null || (Array.isArray(fresh) && fresh.length === 0);
+  if (!empty) await kv.put(`${CV}:${key}`, JSON.stringify(fresh), { expirationTtl: CACHE_TTL }).catch(() => undefined);
   return fresh;
 }
 
@@ -90,14 +95,14 @@ function normalizeOff(p: OffProduct): NormFood | null {
 
 async function searchOff(q: string, page = 1): Promise<NormFood[]> {
   const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&page=${page}&fields=id,product_name,generic_name,brands,nutriments,image_small_url,code`;
-  const res = await fetch(url, { headers: { "User-Agent": "Mossa/1.0 (coaching)" } }).catch(() => null);
+  const res = await fetch(url, { headers: { "User-Agent": UA } }).catch(() => null);
   if (!res?.ok) return [];
   const data = (await res.json()) as { products?: OffProduct[] };
   return (data.products ?? []).map(normalizeOff).filter((f): f is NormFood => f !== null);
 }
 
 async function barcodeOff(code: string): Promise<NormFood | null> {
-  const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(code)}.json`, { headers: { "User-Agent": "Mossa/1.0 (coaching)" } }).catch(() => null);
+  const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(code)}.json`, { headers: { "User-Agent": UA } }).catch(() => null);
   if (!res?.ok) return null;
   const data = (await res.json()) as { status?: number; product?: OffProduct };
   if (data.status !== 1 || !data.product) return null;
