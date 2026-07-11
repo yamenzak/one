@@ -38,7 +38,7 @@ export function BottomTabs({ tabs, active, onSelect }: { tabs: TabDef[]; active:
               onClick={() => onSelect(t.key)}
               aria-current={on ? "page" : undefined}
               className={cn(
-                "relative flex items-center gap-2 rounded-full px-3.5 py-2.5 transition-colors duration-200",
+                "relative flex items-center gap-1.5 rounded-full px-3 py-2.5 transition-colors duration-200",
                 on ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
