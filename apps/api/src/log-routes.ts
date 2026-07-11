@@ -204,6 +204,35 @@ export const logRoutes = new Hono<AppEnv>()
     return c.json({ ok: true, id }, 201);
   })
 
+  .patch("/logs/food/:id", async (c) => {
+    const parsed = z
+      .object({
+        clientId: z.string(),
+        mealType: z.string().min(1).max(40).optional(),
+        quantity: z.number().positive().nullish(),
+        unit: z.string().max(20).optional(),
+        calories: z.number().min(0).optional(),
+        proteinG: z.number().min(0).optional(),
+        carbsG: z.number().min(0).optional(),
+        fatG: z.number().min(0).optional(),
+      })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, parsed.data.clientId);
+    if ("response" in access) return access.response;
+    const d = parsed.data;
+    const map: Record<string, unknown> = {
+      meal_type: d.mealType, quantity: d.quantity, unit: d.unit,
+      calories: d.calories, protein_g: d.proteinG, carbs_g: d.carbsG, fat_g: d.fatG,
+    };
+    const sets = Object.entries(map).filter(([, v]) => v !== undefined);
+    if (!sets.length) return c.json({ ok: true });
+    await c.env.DB.prepare(`UPDATE food_entries SET ${sets.map(([k]) => `${k} = ?`).join(", ")} WHERE id = ? AND client_id = ?`)
+      .bind(...sets.map(([, v]) => v), c.req.param("id"), access.client.id)
+      .run();
+    return c.json({ ok: true });
+  })
+
   .delete("/logs/food/:id", async (c) => {
     const clientId = c.req.query("clientId");
     if (!clientId) return c.json({ error: "clientId required" }, 400);

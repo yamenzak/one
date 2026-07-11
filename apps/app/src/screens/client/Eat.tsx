@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { fmtEnergy } from "@mossa/domain";
 import {
-  Button, Card, Skeleton, IconBadge, MacroBar, MacroInline, MetricChip, Page, Stagger, EmptyState,
+  Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MacroInline, MetricChip, METRICS, toneSoft, Page, Stagger, EmptyState,
   Plus, ClipboardList, Utensils, Croissant, Soup, Apple, Dumbbell, Trash2, type LucideIcon,
 } from "@mossa/ui";
+import type { UnitPrefs } from "@mossa/domain";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
@@ -32,6 +33,7 @@ export function Eat({ clientId }: { clientId: string }) {
   const [logMeal, setLogMeal] = useState<string | undefined>(undefined);
   const [logOpen, setLogOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
+  const [edit, setEdit] = useState<Entry | null>(null);
   const units = useUnits();
   const date = todayLocal();
 
@@ -44,7 +46,6 @@ export function Eat({ clientId }: { clientId: string }) {
   }, [clientId, date]);
   useEffect(() => void load(), [load]);
 
-  const del = async (id: string) => { await api.del(`/api/logs/food/${id}?clientId=${clientId}`); await load(); };
   const openLog = (meal?: string) => { setLogMeal(meal); setLogOpen(true); };
 
   if (!entries) return <Skeleton className="m-4 h-64" />;
@@ -107,7 +108,7 @@ export function Eat({ clientId }: { clientId: string }) {
                 </div>
                 <div className="divide-y divide-border/40">
                   {list.map((e) => (
-                    <div key={e.id} className="flex items-center gap-3 py-2.5">
+                    <button key={e.id} onClick={() => setEdit(e)} className="flex w-full items-center gap-3 py-2.5 text-left transition-colors active:opacity-70">
                       <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2">
                         {e.image_url ? <img src={e.image_url} alt="" className="size-full object-cover" /> : <Utensils className="size-4 text-muted-foreground" />}
                       </div>
@@ -119,8 +120,7 @@ export function Eat({ clientId }: { clientId: string }) {
                         </div>
                       </div>
                       <span className="numeral shrink-0 text-sm">{fmtEnergy(e.calories, units)}</span>
-                      <button onClick={() => void del(e.id)} className="shrink-0 text-muted-foreground/50 transition-colors hover:text-danger [&_svg]:size-4" aria-label="Delete"><Trash2 /></button>
-                    </div>
+                    </button>
                   ))}
                 </div>
                 <button onClick={() => openLog(meal)} className="pt-0.5 text-xs font-semibold text-primary">+ Add to {meta.label.toLowerCase()}</button>
@@ -137,6 +137,59 @@ export function Eat({ clientId }: { clientId: string }) {
 
       {logOpen && <FoodSearchSheet clientId={clientId} mealType={logMeal} onClose={() => setLogOpen(false)} onLogged={() => void load()} />}
       {planOpen && <MealPlanDrawer clientId={clientId} onClose={() => setPlanOpen(false)} onLogged={() => void load()} />}
+      {edit && <EditEntrySheet entry={edit} clientId={clientId} units={units} onClose={() => setEdit(null)} onSaved={() => void load()} />}
     </Page>
+  );
+}
+
+const EDIT_MEALS = ["breakfast", "lunch", "dinner", "snack", "pre_workout", "post_workout"];
+
+function EditEntrySheet({ entry, clientId, units, onClose, onSaved }: { entry: Entry; clientId: string; units: UnitPrefs; onClose: () => void; onSaved: () => void }) {
+  const [qty, setQty] = useState(entry.quantity != null ? String(entry.quantity) : "");
+  const [meal, setMeal] = useState(entry.meal_type);
+  const [busy, setBusy] = useState(false);
+  const scalable = entry.quantity != null && entry.quantity > 0;
+  const factor = scalable && qty ? Number(qty) / entry.quantity! : 1;
+  const s = (v: number) => Math.round(v * factor);
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const body: Record<string, unknown> = { clientId, mealType: meal };
+      if (scalable && qty) { body.quantity = Number(qty); body.calories = s(entry.calories); body.proteinG = s(entry.protein_g); body.carbsG = s(entry.carbs_g); body.fatG = s(entry.fat_g); }
+      await api.patch(`/api/logs/food/${entry.id}`, body);
+      onSaved(); onClose();
+    } finally { setBusy(false); }
+  };
+  const remove = async () => { setBusy(true); try { await api.del(`/api/logs/food/${entry.id}?clientId=${clientId}`); onSaved(); onClose(); } finally { setBusy(false); } };
+
+  return (
+    <Sheet open onClose={onClose} title={entry.label ?? "Edit food"}>
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-surface-2">
+            {entry.image_url ? <img src={entry.image_url} alt="" className="size-full object-cover" /> : <Utensils className="size-5 text-muted-foreground" />}
+          </div>
+          <div className="grid grid-cols-4 gap-2 flex-1">
+            {([["calories", entry.calories], ["protein", entry.protein_g], ["carbs", entry.carbs_g], ["fat", entry.fat_g]] as const).map(([m, v]) => {
+              const M = METRICS[m];
+              return <div key={m} className={`flex flex-col items-center gap-0.5 rounded-lg py-1.5 ${toneSoft[M.tone]}`}><M.icon className="size-3.5" /><span className="numeral text-sm font-semibold leading-none">{s(v)}</span></div>;
+            })}
+          </div>
+        </div>
+
+        {scalable && <Field label={`Quantity (${entry.unit ?? "g"})`} inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d.]/g, ""))} />}
+
+        <div>
+          <div className="mb-1.5 text-sm text-muted-foreground">Meal</div>
+          <div className="flex flex-wrap gap-2">{EDIT_MEALS.map((m) => <Chip key={m} selected={meal === m} onClick={() => setMeal(m)}>{metaFor(m).label}</Chip>)}</div>
+        </div>
+
+        <div className="flex gap-3">
+          <Button variant="ghost" className="text-danger" disabled={busy} onClick={() => void remove()}><Trash2 /> Delete</Button>
+          <Button size="lg" className="flex-1" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</Button>
+        </div>
+      </div>
+    </Sheet>
   );
 }
