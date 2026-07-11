@@ -275,6 +275,59 @@ export const logRoutes = new Hono<AppEnv>()
     return c.json({ entries: rows.results ?? [] });
   })
 
+  // ── Weekly nutrition strip: 7-day per-day calories/protein/water + targets. ─
+  .get("/logs/nutrition/week", async (c) => {
+    const clientId = c.req.query("clientId");
+    const date = c.req.query("date");
+    if (!clientId || !date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return c.json({ error: "clientId + date required" }, 400);
+    const access = await requireClientAccess(c, clientId);
+    if ("response" in access) return access.response;
+    const db = c.env.DB;
+
+    // 7 local dates ending at `date` (inclusive), oldest first.
+    const endMs = Date.parse(`${date}T00:00:00Z`);
+    const days: string[] = [];
+    for (let i = 6; i >= 0; i--) days.push(new Date(endMs - i * 86_400_000).toISOString().slice(0, 10));
+    const start = days[0]!;
+
+    const [food, water, goal] = await Promise.all([
+      db
+        .prepare("SELECT date_local, COALESCE(SUM(calories),0) AS calories, COALESCE(SUM(protein_g),0) AS protein FROM food_entries WHERE client_id = ? AND date_local >= ? AND date_local <= ? GROUP BY date_local")
+        .bind(clientId, start, date)
+        .all<{ date_local: string; calories: number; protein: number }>(),
+      db
+        .prepare("SELECT date_local, total_ml FROM water_logs WHERE client_id = ? AND date_local >= ? AND date_local <= ?")
+        .bind(clientId, start, date)
+        .all<{ date_local: string; total_ml: number }>(),
+      db
+        .prepare("SELECT targets_json FROM client_goals WHERE client_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1")
+        .bind(clientId)
+        .first<{ targets_json: string | null }>(),
+    ]);
+
+    const foodByDay = new Map((food.results ?? []).map((r) => [r.date_local, r]));
+    const waterByDay = new Map((water.results ?? []).map((r) => [r.date_local, r.total_ml]));
+    const targets = parseJson<{ targetCalories?: number; targetProteinG?: number; targetWaterMl?: number }>(goal?.targets_json, {});
+
+    return c.json({
+      days: days.map((d) => {
+        const f = foodByDay.get(d);
+        return {
+          date: d,
+          calories: Math.round(f?.calories ?? 0),
+          proteinG: Math.round(f?.protein ?? 0),
+          waterMl: waterByDay.get(d) ?? 0,
+          logged: Boolean(f),
+        };
+      }),
+      targets: {
+        calories: targets.targetCalories ?? null,
+        proteinG: targets.targetProteinG ?? null,
+        waterMl: targets.targetWaterMl ?? null,
+      },
+    });
+  })
+
   // ── Water / sleep / mood: per-day upserts. ─────────────────────────────────
   .post("/logs/water", async (c) => {
     const parsed = withClient(LogWater).safeParse(await c.req.json().catch(() => null));

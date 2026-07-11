@@ -1,10 +1,10 @@
 /** Eat tab — the nutrition diary: intake vs target, meals, per-entry macros. */
 
 import { useCallback, useEffect, useState } from "react";
-import { fmtEnergy } from "@mossa/domain";
+import { fmtEnergy, fmtVolume, volumeLabel, volumeDisplayToMl } from "@mossa/domain";
 import {
   Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MacroInline, MetricChip, METRICS, toneSoft, Page, Stagger, EmptyState,
-  Plus, ClipboardList, Utensils, Croissant, Soup, Apple, Dumbbell, Trash2, type LucideIcon,
+  Plus, ClipboardList, Utensils, Croissant, Soup, Apple, Dumbbell, Droplet, Flame, Trash2, type LucideIcon,
 } from "@mossa/ui";
 import type { UnitPrefs } from "@mossa/domain";
 import { api, todayLocal } from "../../api.js";
@@ -13,7 +13,9 @@ import { FoodSearchSheet } from "./FoodSearchSheet.js";
 import { MealPlanDrawer } from "./MealPlanDrawer.js";
 
 interface Entry { id: string; meal_type: string; label: string | null; calories: number; protein_g: number; carbs_g: number; fat_g: number; quantity: number | null; unit: string | null; image_url: string | null }
-interface Targets { targetCalories?: number; targetProteinG?: number; targetCarbsG?: number; targetFatG?: number }
+interface Targets { targetCalories?: number; targetProteinG?: number; targetCarbsG?: number; targetFatG?: number; targetWaterMl?: number }
+interface WeekDay { date: string; calories: number; proteinG: number; waterMl: number; logged: boolean }
+interface Week { days: WeekDay[]; targets: { calories: number | null; proteinG: number | null; waterMl: number | null } }
 
 const MEAL_META: Record<string, { label: string; icon: LucideIcon }> = {
   breakfast: { label: "Breakfast", icon: Croissant },
@@ -30,6 +32,8 @@ const metaFor = (m: string) => MEAL_META[m] ?? { label: m.replace(/_/g, " ").rep
 export function Eat({ clientId }: { clientId: string }) {
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [targets, setTargets] = useState<Targets | null>(null);
+  const [week, setWeek] = useState<Week | null>(null);
+  const [waterMl, setWaterMl] = useState(0);
   const [logMeal, setLogMeal] = useState<string | undefined>(undefined);
   const [logOpen, setLogOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
@@ -38,13 +42,23 @@ export function Eat({ clientId }: { clientId: string }) {
   const date = todayLocal();
 
   const load = useCallback(async () => {
-    const [e, today] = await Promise.all([
+    const [e, today, wk] = await Promise.all([
       api.get<{ entries: Entry[] }>(`/api/logs/food?clientId=${clientId}&date=${date}`),
       api.get<{ goal: { targets: Targets | null } | null }>(`/api/today?clientId=${clientId}&date=${date}`),
+      api.get<Week>(`/api/logs/nutrition/week?clientId=${clientId}&date=${date}`),
     ]);
     setEntries(e.entries); setTargets(today.goal?.targets ?? null);
+    setWeek(wk); setWaterMl(wk.days[wk.days.length - 1]?.waterMl ?? 0);
   }, [clientId, date]);
   useEffect(() => void load(), [load]);
+
+  const waterTarget = targets?.targetWaterMl ?? week?.targets.waterMl ?? 2500;
+  const waterPresets = units.volume === "oz" ? [8, 12, 16] : [250, 500, 750];
+  const addWater = async (displayAmount: number) => {
+    const ml = Math.round(volumeDisplayToMl(displayAmount, units));
+    setWaterMl((w) => w + ml);
+    await api.post("/api/logs/water", { clientId, data: { date, amountMl: ml } });
+  };
 
   const openLog = (meal?: string) => { setLogMeal(meal); setLogOpen(true); };
 
@@ -92,6 +106,22 @@ export function Eat({ clientId }: { clientId: string }) {
         </Card>
       </Stagger>
 
+      {/* Hydration */}
+      <Stagger>
+        <Card className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5"><IconBadge icon={Droplet} tone="hydration" size="sm" /><span className="font-semibold">Hydration</span></div>
+            <span className="numeral text-sm font-semibold text-hydration">{fmtVolume(waterMl, units)}<span className="font-medium text-muted-foreground"> / {fmtVolume(waterTarget, units)}</span></span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
+            <div className="h-full rounded-full bg-hydration transition-all" style={{ width: `${Math.min(100, Math.max(2, (waterMl / waterTarget) * 100))}%` }} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {waterPresets.map((v) => <Chip key={v} onClick={() => void addWater(v)}>+{v} {volumeLabel(units)}</Chip>)}
+          </div>
+        </Card>
+      </Stagger>
+
       {entries.length === 0 ? (
         <EmptyState icon={Utensils} title="Nothing logged today" description="Log your first meal — search, barcode, snap a photo, or your plan." action={<Button onClick={() => openLog()}><Plus /> Log food</Button>} />
       ) : (
@@ -130,6 +160,8 @@ export function Eat({ clientId }: { clientId: string }) {
         </Stagger>
       )}
 
+      {week && <WeekStrip week={week} />}
+
       <div className="flex gap-3">
         <Button size="lg" className="flex-1" onClick={() => openLog()}><Plus /> Log food</Button>
         <Button size="lg" variant="tonal" className="flex-1" onClick={() => setPlanOpen(true)}><ClipboardList /> My plan</Button>
@@ -139,6 +171,64 @@ export function Eat({ clientId }: { clientId: string }) {
       {planOpen && <MealPlanDrawer clientId={clientId} onClose={() => setPlanOpen(false)} onLogged={() => void load()} />}
       {edit && <EditEntrySheet entry={edit} clientId={clientId} units={units} onClose={() => setEdit(null)} onSaved={() => void load()} />}
     </Page>
+  );
+}
+
+const DOW = ["S", "M", "T", "W", "T", "F", "S"];
+
+/** Compact 7-day nutrition reflection: calorie-adherence bars + streak/on-target/protein. */
+function WeekStrip({ week }: { week: Week }) {
+  const days = week.days;
+  if (!days.some((d) => d.logged)) return null;
+  const ct = week.targets.calories;
+  const pt = week.targets.proteinG;
+  const logged = days.filter((d) => d.logged);
+  const onTarget = ct ? days.filter((d) => d.logged && d.calories >= ct * 0.85 && d.calories <= ct * 1.15).length : logged.length;
+  const avgProtein = logged.length ? Math.round(logged.reduce((n, d) => n + d.proteinG, 0) / logged.length) : 0;
+  let streak = 0;
+  for (let i = days.length - 1; i >= 0; i--) { if (days[i]!.logged) streak++; else break; }
+  const max = Math.max(ct ?? 0, ...days.map((d) => d.calories), 1);
+
+  return (
+    <Card className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5"><IconBadge icon={Flame} tone="calories" size="sm" /><span className="font-semibold">This week</span></div>
+        {streak > 0 && <MetricChip metric="streak" value={`${streak}d streak`} />}
+      </div>
+      <div>
+        <div className="relative flex h-11 items-end gap-1.5">
+          {ct ? <div className="pointer-events-none absolute inset-x-0 border-t border-dashed border-foreground/25" style={{ bottom: `${(ct / max) * 44}px` }} /> : null}
+          {days.map((d, i) => {
+            const over = ct ? d.calories > ct * 1.15 : false;
+            const today = i === days.length - 1;
+            return (
+              <div key={d.date} className="flex flex-1 justify-center">
+                <div
+                  className={`w-full max-w-6 rounded-md transition-all ${!d.logged ? "bg-surface-2" : over ? "bg-danger" : "bg-calories"} ${today ? "ring-2 ring-calories/30" : ""}`}
+                  style={{ height: d.logged ? Math.max(4, (d.calories / max) * 44) : 4, opacity: d.logged ? 1 : 0.6 }}
+                />
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-1.5 flex gap-1.5">
+          {days.map((d, i) => (
+            <span key={d.date} className={`flex-1 text-center text-[0.65rem] ${i === days.length - 1 ? "font-bold text-foreground" : "text-muted-foreground"}`}>{DOW[new Date(`${d.date}T00:00:00Z`).getUTCDay()]}</span>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center justify-around border-t border-border/50 pt-3 text-center">
+        <div>
+          <div className="numeral text-lg font-bold leading-none">{onTarget}<span className="text-sm font-medium text-muted-foreground">/7</span></div>
+          <div className="mt-1 text-[0.7rem] text-muted-foreground">{ct ? "on target" : "days logged"}</div>
+        </div>
+        <div className="h-8 w-px bg-border/50" />
+        <div>
+          <div className="numeral text-lg font-bold leading-none text-protein">{avgProtein}<span className="text-sm font-medium text-muted-foreground"> g</span></div>
+          <div className="mt-1 text-[0.7rem] text-muted-foreground">avg protein{pt ? ` / ${pt}` : ""}</div>
+        </div>
+      </div>
+    </Card>
   );
 }
 

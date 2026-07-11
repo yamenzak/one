@@ -365,6 +365,43 @@ describe("activities feed (Train tab)", () => {
   });
 });
 
+describe("weekly nutrition strip (Eat tab)", () => {
+  it("buckets 7-day calories/protein/water per day and stays tenant-scoped", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", {
+      method: "POST", headers: H, body: JSON.stringify({ displayName: "WeekTest" }),
+    })).json()) as { client: { id: string } };
+    // Log food + water on the window end date.
+    await SELF.fetch("http://x/api/logs/food", {
+      method: "POST", headers: H,
+      body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-11", mealType: "lunch", label: "Chicken", calories: 500, proteinG: 40, carbsG: 30, fatG: 12 } }),
+    });
+    await SELF.fetch("http://x/api/logs/water", {
+      method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-11", amountMl: 750 } }),
+    });
+    // Log food on an earlier day inside the window.
+    await SELF.fetch("http://x/api/logs/food", {
+      method: "POST", headers: H,
+      body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-08", mealType: "dinner", label: "Salmon", calories: 620, proteinG: 45, carbsG: 10, fatG: 30 } }),
+    });
+
+    const week = (await (await SELF.fetch(`http://x/api/logs/nutrition/week?clientId=${client.id}&date=2026-07-11`, { headers: auth(ownerCookie) })).json()) as {
+      days: { date: string; calories: number; proteinG: number; waterMl: number; logged: boolean }[];
+    };
+    expect(week.days.length).toBe(7);
+    expect(week.days[0]!.date).toBe("2026-07-05");
+    expect(week.days[6]!.date).toBe("2026-07-11");
+    const last = week.days[6]!;
+    expect(last.calories).toBe(500);
+    expect(last.proteinG).toBe(40);
+    expect(last.waterMl).toBe(750);
+    expect(last.logged).toBe(true);
+    expect(week.days.filter((d) => d.logged).length).toBe(2);
+    // Another tenant is denied.
+    expect((await SELF.fetch(`http://x/api/logs/nutrition/week?clientId=${client.id}&date=2026-07-11`, { headers: auth(otherCookie) })).status).toBe(404);
+  });
+});
+
 describe("exercise swaps + alternatives (SPEC §8.3)", () => {
   it("bound alternatives auto-apply; open requests wait for the coach's pick", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
