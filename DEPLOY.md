@@ -12,13 +12,23 @@ Dashboard → My Profile → API Tokens → Create Token → **Edit Cloudflare W
 template, then add permissions: **D1 Edit**, **Workers KV Storage Edit**,
 **Workers R2 Storage Edit**. Scope it to your account (FOURDEGREE LABS).
 
-### 2. Store the three repo secrets
+### 2. Store the two repo secrets (for the deploy workflow)
 ```sh
 gh secret set CLOUDFLARE_API_TOKEN  --repo yamenzak/mossa    # paste the token
 gh secret set CLOUDFLARE_ACCOUNT_ID --repo yamenzak/mossa    # your account id
-gh secret set BETTER_AUTH_SECRET    --repo yamenzak/mossa    # openssl rand -base64 32
 ```
 (Each prompts for the value on stdin. Or add `--body "<value>"`.)
+
+### 2b. Set the auth secret ONCE on the worker (not per-deploy)
+Better Auth signs session cookies with this; **the deploy workflow deliberately
+does not touch it**, because re-putting it every deploy would invalidate all
+sessions and force everyone to re-auth. Set it once — it persists across
+deploys:
+```sh
+cd apps/api && openssl rand -base64 32 | pnpm exec wrangler secret put BETTER_AUTH_SECRET
+```
+(Already done for the current `mossa` worker. Only re-run to rotate the key —
+which intentionally logs everyone out.)
 
 ### 3. Provision the D1 / KV / R2 resources
 GitHub → **Actions → "Provision Cloudflare resources" → Run workflow**. It

@@ -37,6 +37,11 @@ jobs:
 
       - run: pnpm turbo run typecheck test
 
+      # NOTE: we deliberately do NOT set secrets here. Worker secrets persist
+      # across `wrangler deploy`, so re-putting BETTER_AUTH_SECRET every deploy
+      # would rewrite Better Auth's cookie-signing key and invalidate all
+      # sessions (forced re-auth). It's set once with `wrangler secret put`
+      # (see DEPLOY.md). Deploys only ship code — sessions + passkeys survive.
       - name: Deploy api worker
         uses: cloudflare/wrangler-action@v3
         with:
@@ -44,10 +49,6 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/api
           command: deploy
-          secrets: |
-            BETTER_AUTH_SECRET
-        env:
-          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
 
       - name: Build + deploy www
         uses: cloudflare/wrangler-action@v3
