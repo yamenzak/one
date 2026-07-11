@@ -37,11 +37,10 @@
     // BETTER_AUTH_SECRET is a wrangler secret (openssl rand -base64 32).
   },
 
-  // Workers AI — the AI suite's default lane (SPEC §6). Commented out because
-  // `wrangler dev` requires Cloudflare credentials for the (remote-only) AI
-  // binding; env.AI is optional and the deterministic mock covers local dev.
-  // UNCOMMENT before the first remote deploy.
-  // "ai": { "binding": "AI" },
+  // Workers AI — the AI suite's default lane (SPEC §6). env.AI is optional; the
+  // deterministic mock covers local dev without credentials. For a fully
+  // credential-free `wrangler dev` you can re-comment this line.
+  "ai": { "binding": "AI" },
 
   "durable_objects": {
     "bindings": [{ "name": "BILLING", "class_name": "TenantBillingDO" }]
@@ -50,13 +49,13 @@
 
   "kv_namespaces": [
     // External food/exercise API response cache + short-lived tokens.
-    { "binding": "CACHE", "id": "mossa-cache-placeholder-id-000000000" }
+    { "binding": "CACHE", "id": "d45cc2d0725d4d9aab13c247f2a27e1a" }
   ],
 
   "d1_databases": [
     // Everything relational: Better Auth, tenants' coaching data, billing
-    // mirrors. Local wrangler dev simulates this; the id is a placeholder.
-    { "binding": "DB", "database_name": "mossa", "database_id": "00000000-0000-0000-0000-000000000000" }
+    // mirrors. Local wrangler dev simulates this.
+    { "binding": "DB", "database_name": "mossa", "database_id": "7705a554-6bde-4223-83d4-f9b8de5bb223" }
   ],
 
   "r2_buckets": [
