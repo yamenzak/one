@@ -72,6 +72,12 @@ importers:
       '@mossa/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@zxing/browser':
+        specifier: ^0.2.1
+        version: 0.2.1(@zxing/library@0.23.0)
+      '@zxing/library':
+        specifier: ^0.23.0
+        version: 0.23.0
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -2103,6 +2109,18 @@ packages:
   '@vitest/utils@3.2.7':
     resolution: {integrity: sha512-x6BDOd7dyo3PFLY3I9/HJ25X/6OurhGXk2/B9gOZNPF7XDVjeBK4k01lQE5uvDpbuheErh91qYuE1E2OEjK3Rw==}
 
+  '@zxing/browser@0.2.1':
+    resolution: {integrity: sha512-92pVfVDUXbc15xu9vIEmhNyqIEASMEkDF92CwT6T+7sg2EHXJRktH9CQKoQSXe51UtbNsj+Fm09H/JBWHMs/Sw==}
+    peerDependencies:
+      '@zxing/library': ^0.23.0
+
+  '@zxing/library@0.23.0':
+    resolution: {integrity: sha512-6fkkoFwP8CHxl6ugnPsj74PLJgX2iRv5zczGAyt5OBzQgxFhuhF0NCEc4t4OvSr8xAv2MRLlI0Iu9ZGDZQ2urA==}
+    engines: {node: '>= 24.0.0'}
+
+  '@zxing/text-encoding@0.9.0':
+    resolution: {integrity: sha512-U/4aVJ2mxI0aDNI8Uq0wEhMgY+u4CNtEb0om3+y3+niDAsoTCOB33UF0sxpzqzdqXLqmvc+vZyAt4O8pPdfkwA==}
+
   acorn-walk@8.3.2:
     resolution: {integrity: sha512-cjkyv4OtNCIeqhHrfS81QWXoCBPExR/J62oyEqepVw8WaQeSqpW2uhuLPh1m9eWhDuOo/jUXVTlifvesOWp/4A==}
     engines: {node: '>=0.4.0'}
@@ -2735,6 +2753,10 @@ packages:
 
   tinyspy@4.0.4:
     resolution: {integrity: sha512-azl+t0z7pw/z958Gy9svOTuzqIk6xq+NSheJzn5MMWtWTFywIacg2wUlzKFGtt3cthx0r2SxMK0yzJOR0IES7Q==}
+    engines: {node: '>=14.0.0'}
+
+  ts-custom-error@3.3.1:
+    resolution: {integrity: sha512-5OX1tzOjxWEgsr/YEUWSuPrQ00deKLh6D7OTWcvNHm12/7QPyRh8SYpyWvA4IZv8H/+GQWQEh/kwo95Q9OVW1A==}
     engines: {node: '>=14.0.0'}
 
   tslib@1.14.1:
@@ -4526,6 +4548,21 @@ snapshots:
       loupe: 3.2.1
       tinyrainbow: 2.0.0
 
+  '@zxing/browser@0.2.1(@zxing/library@0.23.0)':
+    dependencies:
+      '@zxing/library': 0.23.0
+    optionalDependencies:
+      '@zxing/text-encoding': 0.9.0
+
+  '@zxing/library@0.23.0':
+    dependencies:
+      ts-custom-error: 3.3.1
+    optionalDependencies:
+      '@zxing/text-encoding': 0.9.0
+
+  '@zxing/text-encoding@0.9.0':
+    optional: true
+
   acorn-walk@8.3.2: {}
 
   acorn@8.14.0: {}
@@ -5136,6 +5173,8 @@ snapshots:
   tinyrainbow@2.0.0: {}
 
   tinyspy@4.0.4: {}
+
+  ts-custom-error@3.3.1: {}
 
   tslib@1.14.1: {}
 

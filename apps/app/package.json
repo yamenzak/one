@@ -17,6 +17,8 @@
     "@mossa/domain": "workspace:*",
     "@mossa/protocol": "workspace:*",
     "@mossa/ui": "workspace:*",
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
     "clsx": "^2.1.1",
     "motion": "^12.42.2",
     "react": "^19.2.0",
