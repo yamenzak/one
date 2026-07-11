@@ -6,12 +6,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { WorkoutBody, WorkoutDay, ExerciseSlot } from "@mossa/protocol";
-import { detectPrs, recommendNextDay, type ExerciseBests } from "@mossa/domain";
+import { detectPrs, recommendNextDay, displayToKg, weightLabel, fmtWeight, type ExerciseBests } from "@mossa/domain";
 import {
   Button, Card, Badge, Field, Sheet, Skeleton, SubCard, ProgressRing, EmptyState,
   ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, ChevronRight, Check,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
+import { useUnits } from "../../units.js";
 
 interface PublishedPlan { id: string; name: string; body: WorkoutBody }
 interface LoggedSet { setIndex: number; reps?: number | null; weightKg?: number | null; durationSeconds?: number | null; effortLabel?: "easy" | "perfect" | "hard" | null; completed: boolean }
@@ -27,6 +28,7 @@ export function WorkoutPlayer({ clientId }: { clientId: string }) {
   const [swapSlot, setSwapSlot] = useState<{ blockIndex: number; slotIndex: number; exerciseId: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [bests, setBests] = useState<Map<string, ExerciseBests>>(new Map());
+  const units = useUnits();
   const date = todayLocal();
 
   const load = useCallback(async () => {
@@ -98,7 +100,7 @@ export function WorkoutPlayer({ clientId }: { clientId: string }) {
     const b = bests.get(exerciseId) ?? { prWeightKg: null, prReps: null, prDurationSeconds: null, bestE1Rm: null };
     const { bests: nb, broke } = detectPrs(b, set);
     setBests(new Map(bests).set(exerciseId, nb));
-    if (broke.includes("weight")) { setToast(`New weight PR — ${set.weightKg} kg`); navigator.vibrate?.([30, 40, 60]); setTimeout(() => setToast(null), 3000); }
+    if (broke.includes("weight")) { setToast(`New weight PR — ${fmtWeight(set.weightKg, units)}`); navigator.vibrate?.([30, 40, 60]); setTimeout(() => setToast(null), 3000); }
     else if (broke.includes("reps")) { setToast(`Rep PR — ${set.reps} reps`); setTimeout(() => setToast(null), 3000); }
   };
 
@@ -159,6 +161,7 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
   const [weight, setWeight] = useState("");
   const [effort, setEffort] = useState<"easy" | "perfect" | "hard" | null>(null);
   const [restLeft, setRestLeft] = useState<number | null>(null);
+  const units = useUnits();
   const prescribed = slot.sets[Math.min(setIndex, slot.sets.length - 1)];
 
   useEffect(() => {
@@ -168,7 +171,7 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
   }, [restLeft]);
 
   const save = async () => {
-    await onSave({ setIndex, reps: reps ? Number(reps) : prescribed?.reps ?? null, weightKg: weight ? Number(weight) : null, effortLabel: effort, completed: true });
+    await onSave({ setIndex, reps: reps ? Number(reps) : prescribed?.reps ?? null, weightKg: weight ? Math.round(displayToKg(Number(weight), units) * 100) / 100 : null, effortLabel: effort, completed: true });
     setSetIndex((i) => i + 1); setReps(""); setWeight(""); setEffort(null); setRestLeft(prescribed?.restAfterSec ?? 60);
   };
 
@@ -181,7 +184,7 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
         )}
         <div className="flex gap-3">
           <Field label="Reps" inputMode="numeric" value={reps} onChange={(e) => setReps(e.target.value.replace(/\D/g, ""))} className="flex-1" />
-          <Field label="Weight (kg)" inputMode="decimal" value={weight} onChange={(e) => setWeight(e.target.value)} className="flex-1" />
+          <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={weight} onChange={(e) => setWeight(e.target.value)} className="flex-1" />
         </div>
         <div>
           <div className="mb-2 text-sm text-muted-foreground">How did it feel?</div>

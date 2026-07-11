@@ -41,6 +41,7 @@ export const settingsRoutes = new Hono<AppEnv>()
             radius: z.number().min(0.2).max(2).nullish(),
             defaultMode: z.enum(["dark", "light"]).nullish(),
             logoUrl: z.string().max(500).nullish(),
+            iconUrl: z.string().max(500).nullish(),
             tokens: z.object({ light: tokenMap.nullish(), dark: tokenMap.nullish() }).nullish(),
             // Legacy fields kept for backward compatibility.
             accent: z.string().nullish(),

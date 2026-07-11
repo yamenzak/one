@@ -13,10 +13,12 @@ import {
   type PersonaRefRole,
 } from "./context-helpers.js";
 import type { PersonaRef, SessionContext } from "@mossa/protocol";
+import { resolveUnits, type UnitPrefs } from "@mossa/domain";
 import { type AppEnv, isPlatformAdmin, requireTenant } from "./auth-context.js";
 import { clientForUser } from "./clients.js";
 import { tenantEntitlements, seedBilling } from "./billing-store.js";
-import { parseJson } from "./db.js";
+import { parseJson, j } from "./db.js";
+import { nowIso } from "./ids.js";
 
 export const contextRoutes = new Hono<AppEnv>()
   .get("/me", (c) => {
@@ -115,8 +117,13 @@ export const contextRoutes = new Hono<AppEnv>()
       branding = parseJson<SessionContext["branding"]>(row?.branding_json ?? null, null);
     }
 
+    const prefRow = await c.env.DB.prepare("SELECT units_json FROM user_prefs WHERE user_id = ?")
+      .bind(user.id)
+      .first<{ units_json: string | null }>();
+    const units = resolveUnits(parseJson(prefRow?.units_json ?? null, null));
+
     const ctx: SessionContext = {
-      user: { id: user.id, email: user.email, name: user.name ?? null },
+      user: { id: user.id, email: user.email, name: user.name ?? null, units },
       personas,
       active,
       mode: "coach", // the app decides coach/train client-side; server default
@@ -167,4 +174,28 @@ export const contextRoutes = new Hono<AppEnv>()
       .bind(c.req.param("id"), who.userId)
       .run();
     return c.json({ ok: true });
+  })
+
+  // Personal unit preferences (cross-tenant) — any signed-in user.
+  .patch("/me/units", async (c) => {
+    const user = c.get("user");
+    if (!user) return c.json({ error: "unauthenticated" }, 401);
+    const parsed = z
+      .object({
+        weight: z.enum(["kg", "lb"]).optional(),
+        height: z.enum(["cm", "ft_in"]).optional(),
+        length: z.enum(["cm", "in"]).optional(),
+        volume: z.enum(["ml", "oz"]).optional(),
+        distance: z.enum(["km", "mi"]).optional(),
+        energy: z.enum(["kcal", "kJ"]).optional(),
+      })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const row = await c.env.DB.prepare("SELECT units_json FROM user_prefs WHERE user_id = ?").bind(user.id).first<{ units_json: string | null }>();
+    const merged = resolveUnits({ ...parseJson<Partial<UnitPrefs>>(row?.units_json ?? null, {}), ...parsed.data });
+    const now = nowIso();
+    await c.env.DB.prepare("INSERT INTO user_prefs (user_id, units_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET units_json = ?, updated_at = ?")
+      .bind(user.id, j(merged), now, j(merged), now)
+      .run();
+    return c.json({ units: merged });
   });

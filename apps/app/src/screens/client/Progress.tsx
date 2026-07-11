@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { currentStreak, longestStreak, consistencyPct, wellnessIndex, averageRating, presetRange, type RangePreset } from "@mossa/domain";
+import { currentStreak, longestStreak, consistencyPct, wellnessIndex, averageRating, presetRange, kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, type RangePreset } from "@mossa/domain";
 import { Button, Card, Badge, Skeleton, Sparkline, StatCard, WeekDots, SegmentedControl, Page, Stagger, METRICS, Gauge, HeartPulse, Sparkles, X } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
+import { useUnits } from "../../units.js";
 
 interface Measurement { date_local: string; weight_kg: number | null; body_fat_percent: number | null; waist_cm: number | null }
 interface CheckIn { date_local: string; mood: number | null; energy: number | null; stress: number | null; sleep_quality: number | null; sleep_hours: number | null }
@@ -14,6 +15,7 @@ export function Progress({ clientId }: { clientId: string }) {
   const [checkIns, setCheckIns] = useState<CheckIn[] | null>(null);
   const [tab, setTab] = useState<"overview" | "body" | "wellness">("overview");
   const [range, setRange] = useState<RangePreset>("30d");
+  const units = useUnits();
 
   useEffect(() => {
     void api.get<{ measurements: Measurement[] }>(`/api/measurements?clientId=${clientId}`).then((r) => setMeasurements(r.measurements));
@@ -55,15 +57,15 @@ export function Progress({ clientId }: { clientId: string }) {
         <Stagger className="space-y-4">
           <StatCard label="Check-in streak" icon={METRICS.streak.icon} tone={METRICS.streak.tone} value={streak} unit={streak === 1 ? "day" : "days"} badge={<Badge tone="neutral">best {longestStreak(loggedDays)}</Badge>} chart={<WeekDots days={weekFlags} todayIndex={(new Date(today).getDay() + 6) % 7} />} />
           <StatCard label="Consistency" icon={Gauge} tone="activity" value={consistencyPct(loggedDays, start, today)} unit="%" />
-          <StatCard label={METRICS.weight.label} icon={METRICS.weight.icon} tone={METRICS.weight.tone} value={weights.at(-1)?.weight_kg?.toFixed(1) ?? "—"} unit="kg" chart={weights.length >= 2 ? <Sparkline values={weights.map((w) => w.weight_kg!)} tone={METRICS.weight.tone} /> : undefined} />
+          <StatCard label={METRICS.weight.label} icon={METRICS.weight.icon} tone={METRICS.weight.tone} value={weights.at(-1)?.weight_kg != null ? kgToDisplay(weights.at(-1)!.weight_kg!, units).toFixed(1) : "—"} unit={weightLabel(units)} chart={weights.length >= 2 ? <Sparkline values={weights.map((w) => kgToDisplay(w.weight_kg!, units))} tone={METRICS.weight.tone} /> : undefined} />
         </Stagger>
       )}
 
       {tab === "body" && (
         <Stagger className="space-y-4">
-          <StatCard label={METRICS.weight.label} icon={METRICS.weight.icon} tone={METRICS.weight.tone} value={weights.at(-1)?.weight_kg?.toFixed(1) ?? "—"} unit="kg" chart={weights.length >= 2 ? <Sparkline values={weights.map((w) => w.weight_kg!)} tone={METRICS.weight.tone} /> : undefined} />
+          <StatCard label={METRICS.weight.label} icon={METRICS.weight.icon} tone={METRICS.weight.tone} value={weights.at(-1)?.weight_kg != null ? kgToDisplay(weights.at(-1)!.weight_kg!, units).toFixed(1) : "—"} unit={weightLabel(units)} chart={weights.length >= 2 ? <Sparkline values={weights.map((w) => kgToDisplay(w.weight_kg!, units))} tone={METRICS.weight.tone} /> : undefined} />
           <StatCard label={METRICS.bodyFat.label} icon={METRICS.bodyFat.icon} tone={METRICS.bodyFat.tone} value={bfs.at(-1)?.body_fat_percent?.toFixed(1) ?? "—"} unit="%" chart={bfs.length >= 2 ? <Sparkline values={bfs.map((b) => b.body_fat_percent!)} tone={METRICS.bodyFat.tone} /> : undefined} />
-          <StatCard label={METRICS.waist.label} icon={METRICS.waist.icon} tone={METRICS.waist.tone} value={waists.at(-1)?.waist_cm?.toFixed(1) ?? "—"} unit="cm" chart={waists.length >= 2 ? <Sparkline values={waists.map((w) => w.waist_cm!)} tone={METRICS.waist.tone} /> : undefined} />
+          <StatCard label={METRICS.waist.label} icon={METRICS.waist.icon} tone={METRICS.waist.tone} value={waists.at(-1)?.waist_cm != null ? cmToLengthDisplay(waists.at(-1)!.waist_cm!, units).toFixed(1) : "—"} unit={lengthLabel(units)} chart={waists.length >= 2 ? <Sparkline values={waists.map((w) => cmToLengthDisplay(w.waist_cm!, units))} tone={METRICS.waist.tone} /> : undefined} />
         </Stagger>
       )}
 

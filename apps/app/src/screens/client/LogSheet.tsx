@@ -5,13 +5,14 @@
  */
 
 import { useState } from "react";
-import { ACTIVITIES } from "@mossa/domain";
+import { ACTIVITIES, weightLabel, lengthLabel, volumeLabel, displayToKg, lengthDisplayToCm, volumeDisplayToMl } from "@mossa/domain";
 import {
   Button, Field, Textarea, Sheet, Chip, IconBadge, Switch,
   Utensils, Footprints, Droplet, Weight, Ruler, Bed, Smile, ClipboardList, Camera, Angry, Frown, Meh, Laugh,
   type LucideIcon, type Tone,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
+import { useUnits } from "../../units.js";
 
 type LogKind = "food" | "activity" | "water" | "weight" | "body" | "sleep" | "mood" | "checkin";
 const CHIPS: { kind: LogKind; label: string; icon: LucideIcon; tone: Tone }[] = [
@@ -49,8 +50,13 @@ export function LogSheet({ open, onClose, clientId, onLogged }: { open: boolean;
   const [activityKey, setActivityKey] = useState("walking");
   const [photos, setPhotos] = useState<{ key: string; consentToFeature: boolean }[]>([]);
   const date = todayLocal();
+  const units = useUnits();
   const num = (k: string) => (f[k] ? Number(f[k]) : undefined);
   const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const kg = (k: string) => { const v = num(k); return v != null ? round2(displayToKg(v, units)) : undefined; };
+  const cm = (k: string) => { const v = num(k); return v != null ? round2(lengthDisplayToCm(v, units)) : undefined; };
+  const waterPresets = units.volume === "oz" ? [8, 12, 16, 24] : [250, 500, 750, 1000];
 
   const close = () => { setKind(null); setF({}); setRatings({ mood: null, energy: null, stress: null, sleepQ: null }); setPhotos([]); onClose(); };
 
@@ -64,14 +70,14 @@ export function LogSheet({ open, onClose, clientId, onLogged }: { open: boolean;
   const submit = async () => {
     setBusy(true);
     try {
-      if (kind === "water") await api.post("/api/logs/water", { clientId, data: { date, amountMl: num("amount") } });
-      else if (kind === "weight") await api.post("/api/measurements", { clientId, data: { date, weightKg: num("amount") } });
-      else if (kind === "body") await api.post("/api/measurements", { clientId, data: { date, weightKg: num("weight"), bodyFatPercent: num("bf"), neckCm: num("neck"), waistCm: num("waist"), hipsCm: num("hips"), chestCm: num("chest") } });
+      if (kind === "water") await api.post("/api/logs/water", { clientId, data: { date, amountMl: num("amount") != null ? Math.round(volumeDisplayToMl(num("amount")!, units)) : undefined } });
+      else if (kind === "weight") await api.post("/api/measurements", { clientId, data: { date, weightKg: kg("amount") } });
+      else if (kind === "body") await api.post("/api/measurements", { clientId, data: { date, weightKg: kg("weight"), bodyFatPercent: num("bf"), neckCm: cm("neck"), waistCm: cm("waist"), hipsCm: cm("hips"), chestCm: cm("chest") } });
       else if (kind === "food") await api.post("/api/logs/food", { clientId, data: { date, mealType: "snack", label: f.label || "Quick entry", calories: num("calories") ?? 0 } });
       else if (kind === "activity") await api.post("/api/logs/activity", { clientId, data: { date, activityKey, label: ACTIVITIES.find((a) => a.key === activityKey)?.label, durationMin: num("duration") ?? 0, avgHrBpm: num("hr") ?? null, caloriesBurned: num("kcal") ?? null } });
       else if (kind === "sleep") await api.post("/api/logs/sleep", { clientId, data: { date, durationMinutes: Math.round((num("hours") ?? 0) * 60), quality: ratings.sleepQ ?? undefined, notes: f.notes || undefined } });
       else if (kind === "mood") await api.post("/api/logs/mood", { clientId, data: { date, mood: ratings.mood ?? undefined, energy: ratings.energy ?? undefined, stress: ratings.stress ?? undefined, notes: f.notes || undefined } });
-      else if (kind === "checkin") await api.post("/api/check-ins", { clientId, data: { date, weightKg: num("weight"), mood: ratings.mood ?? undefined, energy: ratings.energy ?? undefined, stress: ratings.stress ?? undefined, sleepHours: num("sleepHours"), stepsCount: num("steps"), notes: f.notes || undefined, progressPhotos: photos.length ? photos : undefined } });
+      else if (kind === "checkin") await api.post("/api/check-ins", { clientId, data: { date, weightKg: kg("weight"), mood: ratings.mood ?? undefined, energy: ratings.energy ?? undefined, stress: ratings.stress ?? undefined, sleepHours: num("sleepHours"), stepsCount: num("steps"), notes: f.notes || undefined, progressPhotos: photos.length ? photos : undefined } });
       onLogged();
       close();
     } finally { setBusy(false); }
@@ -92,22 +98,22 @@ export function LogSheet({ open, onClose, clientId, onLogged }: { open: boolean;
         <div className="space-y-4">
           {kind === "water" && (<>
             <h2 className="text-lg font-semibold">Log water</h2>
-            <div className="flex flex-wrap gap-2">{[250, 500, 750, 1000].map((ml) => <Chip key={ml} selected={f.amount === String(ml)} onClick={() => set("amount", String(ml))}>{ml} ml</Chip>)}</div>
-            <Field label="Amount (ml)" icon={Droplet} inputMode="numeric" value={f.amount ?? ""} onChange={(e) => set("amount", e.target.value.replace(/\D/g, ""))} />
+            <div className="flex flex-wrap gap-2">{waterPresets.map((v) => <Chip key={v} selected={f.amount === String(v)} onClick={() => set("amount", String(v))}>{v} {volumeLabel(units)}</Chip>)}</div>
+            <Field label={`Amount (${volumeLabel(units)})`} icon={Droplet} inputMode="numeric" value={f.amount ?? ""} onChange={(e) => set("amount", e.target.value.replace(/\D/g, ""))} />
           </>)}
           {kind === "weight" && (<>
             <h2 className="text-lg font-semibold">Log weight</h2>
-            <Field label="Weight (kg)" icon={Weight} inputMode="decimal" value={f.amount ?? ""} onChange={(e) => set("amount", e.target.value)} />
+            <Field label={`Weight (${weightLabel(units)})`} icon={Weight} inputMode="decimal" value={f.amount ?? ""} onChange={(e) => set("amount", e.target.value)} />
           </>)}
           {kind === "body" && (<>
             <h2 className="text-lg font-semibold">Body measurements</h2>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Weight (kg)" inputMode="decimal" value={f.weight ?? ""} onChange={(e) => set("weight", e.target.value)} />
+              <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={f.weight ?? ""} onChange={(e) => set("weight", e.target.value)} />
               <Field label="Body fat %" inputMode="decimal" value={f.bf ?? ""} onChange={(e) => set("bf", e.target.value)} />
-              <Field label="Neck (cm)" inputMode="decimal" value={f.neck ?? ""} onChange={(e) => set("neck", e.target.value)} />
-              <Field label="Waist (cm)" inputMode="decimal" value={f.waist ?? ""} onChange={(e) => set("waist", e.target.value)} />
-              <Field label="Hips (cm)" inputMode="decimal" value={f.hips ?? ""} onChange={(e) => set("hips", e.target.value)} />
-              <Field label="Chest (cm)" inputMode="decimal" value={f.chest ?? ""} onChange={(e) => set("chest", e.target.value)} />
+              <Field label={`Neck (${lengthLabel(units)})`} inputMode="decimal" value={f.neck ?? ""} onChange={(e) => set("neck", e.target.value)} />
+              <Field label={`Waist (${lengthLabel(units)})`} inputMode="decimal" value={f.waist ?? ""} onChange={(e) => set("waist", e.target.value)} />
+              <Field label={`Hips (${lengthLabel(units)})`} inputMode="decimal" value={f.hips ?? ""} onChange={(e) => set("hips", e.target.value)} />
+              <Field label={`Chest (${lengthLabel(units)})`} inputMode="decimal" value={f.chest ?? ""} onChange={(e) => set("chest", e.target.value)} />
             </div>
           </>)}
           {kind === "food" && (<>
@@ -138,7 +144,7 @@ export function LogSheet({ open, onClose, clientId, onLogged }: { open: boolean;
           {kind === "checkin" && (<>
             <h2 className="text-lg font-semibold">Daily check-in</h2>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Weight (kg)" inputMode="decimal" value={f.weight ?? ""} onChange={(e) => set("weight", e.target.value)} />
+              <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={f.weight ?? ""} onChange={(e) => set("weight", e.target.value)} />
               <Field label="Sleep (hrs)" inputMode="decimal" value={f.sleepHours ?? ""} onChange={(e) => set("sleepHours", e.target.value)} />
               <Field label="Steps" inputMode="numeric" value={f.steps ?? ""} onChange={(e) => set("steps", e.target.value.replace(/\D/g, ""))} />
             </div>

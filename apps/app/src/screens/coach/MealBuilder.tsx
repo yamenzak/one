@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
+import { fmtEnergy } from "@mossa/domain";
 import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, Search, ArrowLeft, Plus, Sparkles, X } from "@mossa/ui";
 import { api } from "../../api.js";
+import { useUnits } from "../../units.js";
 
 interface Plan { id: string; clientId: string; name: string; status: string; body: MealBody; targetGoal?: { targets?: Record<string, number> | null } | null }
 interface FoodRow { id: string; name: string; serving_size: number; calories: number; protein_g: number; carbs_g: number; fat_g: number }
@@ -19,6 +21,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [foodPicker, setFoodPicker] = useState<{ optIdx: number } | null>(null);
+  const units = useUnits();
   const [aiOpen, setAiOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -57,7 +60,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
       {targets?.targetCalories ? (
         <Card className="flex items-center justify-between py-3 text-sm">
           <span className="text-muted-foreground">Daily target</span>
-          <span className="numeral font-medium">{targets.targetCalories} kcal · P{targets.targetProteinG ?? "—"} C{targets.targetCarbsG ?? "—"} F{targets.targetFatG ?? "—"}</span>
+          <span className="numeral font-medium">{fmtEnergy(targets.targetCalories, units)} · P{targets.targetProteinG ?? "—"} C{targets.targetCarbsG ?? "—"} F{targets.targetFatG ?? "—"}</span>
         </Card>
       ) : null}
 
@@ -85,7 +88,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     <button onClick={() => mutate((d) => { d[idx]!.isFree = !d[idx]!.isFree; if (d[idx]!.isFree) d[idx]!.foods = []; })} className={`rounded-full px-3 py-1 ${opt.isFree ? "bg-nutrition-soft text-nutrition" : "bg-surface-3 text-muted-foreground"}`}>Free meal</button>
-                    <span className="numeral ml-auto flex items-center gap-2"><span className="text-calories">{t.calories} kcal</span><MacroInline proteinG={t.proteinG} carbsG={t.carbsG} fatG={t.fatG} /></span>
+                    <span className="numeral ml-auto flex items-center gap-2"><span className="text-calories">{fmtEnergy(t.calories, units)}</span><MacroInline proteinG={t.proteinG} carbsG={t.carbsG} fatG={t.fatG} /></span>
                   </div>
                   {opt.isFree ? (
                     <input type="number" placeholder="Max calories" value={opt.freeMealMaxCalories ?? ""} onChange={(e) => mutate((d) => (d[idx]!.freeMealMaxCalories = e.target.value ? Number(e.target.value) : null))} className="w-full rounded-lg bg-surface-3 px-3 py-2 text-sm outline-none" />

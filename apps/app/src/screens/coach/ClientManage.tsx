@@ -5,8 +5,10 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
 import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SubCard, Chip, Page, Stagger, IconBadge, EmptyState, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X } from "@mossa/ui";
 import { api } from "../../api.js";
+import { useUnits } from "../../units.js";
 
 interface Sub { id: string; status: string; daysRemaining: number; packageId: string | null }
 interface Pkg { id: string; name: string }
@@ -131,6 +133,7 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
   const [summary, setSummary] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const units = useUnits();
   const summarize = async () => {
     setBusy(true);
     try {
@@ -152,7 +155,7 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
         <SubCard key={c.id} className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium">{new Date(c.date_local).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}</span>
-            <span className="numeral text-xs text-muted-foreground">{c.weight_kg ? `${c.weight_kg}kg · ` : ""}{c.sleep_hours ? `${c.sleep_hours}h sleep` : ""}</span>
+            <span className="numeral text-xs text-muted-foreground">{c.weight_kg ? `${fmtWeight(c.weight_kg, units)} · ` : ""}{c.sleep_hours ? `${c.sleep_hours}h sleep` : ""}</span>
           </div>
           {c.notes && <p className="text-sm text-muted-foreground">{c.notes}</p>}
           {c.trainer_feedback ? <div className="rounded-lg bg-primary/10 px-3 py-2 text-xs text-primary">You replied: {c.trainer_feedback}</div> : (
@@ -262,9 +265,10 @@ interface Report {
 function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => void }) {
   const [range, setRange] = useState<"7d" | "30d" | "90d">("30d");
   const [report, setReport] = useState<Report | null>(null);
+  const units = useUnits();
   useEffect(() => { setReport(null); const today = new Date().toISOString().slice(0, 10); void api.get<Report>(`/api/reports/client/${clientId}?range=${range}&today=${today}`).then(setReport); }, [clientId, range]);
   const weight = report?.weightSeries ?? [];
-  const wDelta = weight.length >= 2 ? Math.round((weight.at(-1)!.kg - weight[0]!.kg) * 10) / 10 : null;
+  const wDelta = weight.length >= 2 ? Math.round((kgToDisplay(weight.at(-1)!.kg, units) - kgToDisplay(weight[0]!.kg, units)) * 10) / 10 : null;
   return (
     <Sheet open onClose={onClose} title="Client report">
       <div className="mb-3 flex gap-2">{(["7d", "30d", "90d"] as const).map((r) => <Chip key={r} selected={range === r} onClick={() => setRange(r)}>{r}</Chip>)}</div>
@@ -276,7 +280,7 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
             <Metric label="Streak" value={report.compliance.currentStreak} />
             <Metric label="Consistency" value={`${report.compliance.checkInConsistencyPct}%`} />
             <Metric label="Cal adherence" value={report.compliance.calorieAdherencePct != null ? `${report.compliance.calorieAdherencePct}%` : "—"} />
-            <Metric label="Weight Δ" value={wDelta != null ? `${wDelta > 0 ? "+" : ""}${wDelta}kg` : "—"} />
+            <Metric label="Weight Δ" value={wDelta != null ? `${wDelta > 0 ? "+" : ""}${wDelta} ${weightLabel(units)}` : "—"} />
             <Metric label="Avg mood" value={report.averages.mood ?? "—"} />
             <Metric label="Avg sleep" value={report.averages.sleepHours != null ? `${report.averages.sleepHours}h` : "—"} />
             <Metric label="Tonnage" value={`${Math.round(report.totalTonnage / 1000)}t`} />
@@ -284,7 +288,7 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
           {report.prs.length > 0 && (
             <Card className="space-y-1.5">
               <h3 className="text-sm font-semibold">Top lifts (est. 1RM)</h3>
-              {report.prs.slice(0, 8).map((p) => <div key={p.exerciseId} className="flex items-center justify-between text-sm"><span className="truncate text-muted-foreground">{p.exerciseId}</span><span className="numeral font-medium">{Math.round(p.e1rm)}kg</span></div>)}
+              {report.prs.slice(0, 8).map((p) => <div key={p.exerciseId} className="flex items-center justify-between text-sm"><span className="truncate text-muted-foreground">{p.exerciseId}</span><span className="numeral font-medium">{Math.round(kgToDisplay(p.e1rm, units))} {weightLabel(units)}</span></div>)}
             </Card>
           )}
         </div>

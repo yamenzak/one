@@ -27,6 +27,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyBranding(branding);
   }, [branding]);
 
+  // Point the browser-tab favicon at the tenant's app icon.
+  useEffect(() => {
+    if (typeof document === "undefined" || !branding?.iconUrl) return;
+    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
+    const prev = link.href;
+    link.href = branding.iconUrl;
+    return () => { if (link) link.href = prev; };
+  }, [branding?.iconUrl]);
+
   // Apply mode.
   useEffect(() => {
     applyMode(mode);

@@ -1,8 +1,10 @@
 /** Eat tab — today's diary grouped by meal, with search/barcode + meal plan. */
 
 import { useCallback, useEffect, useState } from "react";
+import { fmtEnergy } from "@mossa/domain";
 import { Button, Card, Skeleton, MacroBar, MetricChip, Page, Stagger, EmptyState, Plus, ClipboardList, Utensils, Trash2 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
+import { useUnits } from "../../units.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
 import { MealPlanDrawer } from "./MealPlanDrawer.js";
 
@@ -12,6 +14,7 @@ export function Eat({ clientId }: { clientId: string }) {
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [logOpen, setLogOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
+  const units = useUnits();
   const date = todayLocal();
 
   const load = useCallback(async () => {
@@ -32,7 +35,7 @@ export function Eat({ clientId }: { clientId: string }) {
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Eat</h1>
-        <MetricChip metric="calories" value={`${Math.round(total)} kcal`} />
+        <MetricChip metric="calories" value={fmtEnergy(total, units)} />
       </div>
 
       {entries.length > 0 && (
@@ -51,7 +54,7 @@ export function Eat({ clientId }: { clientId: string }) {
               {list.map((e) => (
                 <div key={e.id} className="group flex items-center justify-between gap-2 border-t border-border/40 pt-2 first:border-0 first:pt-0">
                   <span className="min-w-0 flex-1 truncate text-sm">{e.label ?? "Food"}</span>
-                  <span className="numeral text-sm text-muted-foreground">{Math.round(e.calories)} kcal</span>
+                  <span className="numeral text-sm text-muted-foreground">{fmtEnergy(e.calories, units)}</span>
                   <button onClick={() => void del(e.id)} className="text-muted-foreground opacity-60 transition-colors hover:text-danger [&_svg]:size-4" aria-label="Delete"><Trash2 /></button>
                 </div>
               ))}

@@ -3,7 +3,7 @@
  * from: who am I, which tenant, which persona, what am I entitled to.
  */
 
-import type { ClientFlags, Entitlements, Grant, TenantRole } from "@mossa/domain";
+import type { ClientFlags, Entitlements, Grant, TenantRole, UnitPrefs } from "@mossa/domain";
 
 export interface PersonaRef {
   tenantId: string;
@@ -22,12 +22,13 @@ export interface TenantBranding {
   radius?: number | null;
   defaultMode?: "dark" | "light" | null;
   logoUrl?: string | null;
+  iconUrl?: string | null;
   /** Granular per-mode CSS-variable overrides (e.g. a pasted shadcn theme). */
   tokens?: { light?: Record<string, string> | null; dark?: Record<string, string> | null } | null;
 }
 
 export interface SessionContext {
-  user: { id: string; email: string; name: string | null };
+  user: { id: string; email: string; name: string | null; units: UnitPrefs };
   /** Every (tenant, role) pair the user holds — feeds the context switcher. */
   personas: PersonaRef[];
   /** The active persona (null until one is chosen). */

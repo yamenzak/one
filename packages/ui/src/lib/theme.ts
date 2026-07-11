@@ -44,7 +44,10 @@ export interface Branding {
   radius?: number | null;
   /** Tenant's default mode; the user can still toggle. */
   defaultMode?: ThemeMode | null;
+  /** Wide wordmark/logo (app bar). */
   logoUrl?: string | null;
+  /** Square app icon/mark (nav rail, favicon). */
+  iconUrl?: string | null;
   /** Granular token overrides (e.g. from a pasted shadcn theme). */
   tokens?: BrandTokens | null;
 }
@@ -285,6 +288,32 @@ function rgbToOklchHex(hex: string) {
 const ok = (l: number, c: number, h: number) => `oklch(${r2(clamp(l, 0, 1))} ${r2(Math.max(0, c))} ${r2(((h % 360) + 360) % 360)})`;
 const contrastFg = (l: number, h: number) => (l > 0.62 ? ok(0.2, 0.02, h) : ok(0.99, 0.01, h));
 
+// Canonical macro hues (see tokens.css) — nudged toward the brand so they feel
+// part of one palette while staying distinct from each other.
+const MACRO_SPEC: { name: string; hue: number; c: number; dL: number; lL: number }[] = [
+  { name: "calories", hue: 45, c: 0.16, dL: 0.78, lL: 0.6 },
+  { name: "protein", hue: 350, c: 0.16, dL: 0.72, lL: 0.58 },
+  { name: "carbs", hue: 90, c: 0.15, dL: 0.82, lL: 0.66 },
+  { name: "fat", hue: 275, c: 0.14, dL: 0.7, lL: 0.55 },
+];
+const hueDelta = (a: number, b: number) => (((b - a + 540) % 360) - 180);
+
+/** Derive the macro tokens (+ soft) for both modes, tinted toward the brand. */
+function deriveMacros(brandHue: number, brandC: number): { light: Record<string, string>; dark: Record<string, string> } {
+  const vivid = clamp(brandC / 0.15, 0.7, 1.15);
+  const light: Record<string, string> = {};
+  const dark: Record<string, string> = {};
+  for (const m of MACRO_SPEC) {
+    const h = m.hue + hueDelta(m.hue, brandHue) * 0.12; // 12% pull toward brand
+    const c = m.c * vivid;
+    dark[`--${m.name}`] = ok(m.dL, c, h);
+    dark[`--${m.name}-soft`] = ok(0.35, c * 0.42, h);
+    light[`--${m.name}`] = ok(m.lL, c, h);
+    light[`--${m.name}-soft`] = ok(0.94, c * 0.4, h);
+  }
+  return { light, dark };
+}
+
 /** Neutral-surface hue + chroma multiplier from a tint preset + the brand hue. */
 export type NeutralTint = "brand" | "gray" | "cool" | "warm";
 function neutralTint(kind: NeutralTint, brandHue: number): { hue: number; c: number } {
@@ -333,6 +362,9 @@ export function deriveTokens(input: { primary: string; neutral?: NeutralTint }):
     "--accent": ok(0.275, 0.008 * nc, nH), "--accent-foreground": ok(0.975, 0.003 * nc, nH),
     "--border": ok(0.3, 0.008 * nc, nH), "--input": ok(0.3, 0.008 * nc, nH), "--ring": pDark,
   };
+  const macros = deriveMacros(p.h, pC);
+  Object.assign(light, macros.light);
+  Object.assign(dark, macros.dark);
   return { light, dark };
 }
 

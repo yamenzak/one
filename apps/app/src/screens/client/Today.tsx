@@ -3,12 +3,13 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { currentStreak } from "@mossa/domain";
+import { currentStreak, fmtVolume, kcalToDisplay, energyLabel, weightLabel, kgToDisplay, type UnitPrefs } from "@mossa/domain";
 import {
   Button, Card, SubCard, Skeleton, ProgressRing, MetricPill, MacroBar, InsightCard, WavyDivider, Badge,
   Page, Stagger, METRICS, toneVar, Plus, Play, PencilLine, Flame, Trophy, ClipboardList, Dumbbell, FlaskConical, type Tone,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
+import { useUnits } from "../../units.js";
 import { LogSheet } from "./LogSheet.js";
 
 export interface TodayBundle {
@@ -28,6 +29,7 @@ export interface TodayBundle {
 export function Today({ clientId, onStart }: { clientId: string; onStart?: () => void }) {
   const [data, setData] = useState<TodayBundle | null>(null);
   const [logOpen, setLogOpen] = useState(false);
+  const units = useUnits();
   const date = todayLocal();
 
   const load = useCallback(async () => {
@@ -57,14 +59,14 @@ export function Today({ clientId, onStart }: { clientId: string; onStart?: () =>
           progress={calTarget > 0 ? net / calTarget : 0.001}
           size={188}
           tone="calories"
-          label={METRICS.calories.label}
-          value={Math.max(0, Math.round(net)).toLocaleString()}
-          sublabel={calTarget > 0 ? `of ${calTarget.toLocaleString()}` : "set a goal"}
+          label={units.energy === "kJ" ? "Energy" : METRICS.calories.label}
+          value={kcalToDisplay(Math.max(0, net), units).toLocaleString()}
+          sublabel={calTarget > 0 ? `of ${kcalToDisplay(calTarget, units).toLocaleString()} ${energyLabel(units)}` : "set a goal"}
         />
         <div className="flex min-w-0 flex-1 flex-col gap-2.5">
           <MetricPill icon={METRICS.protein.icon} label={METRICS.protein.label} tone={METRICS.protein.tone} value={`${data.nutrition.proteinG} g`} progress={targets?.targetProteinG ? data.nutrition.proteinG / targets.targetProteinG : undefined} />
-          <MetricPill icon={METRICS.water.icon} label={METRICS.water.label} tone={METRICS.water.tone} value={`${(data.waterMl / 1000).toFixed(1)} L`} progress={data.waterMl / waterTarget} />
-          <MetricPill icon={METRICS.burned.icon} label={METRICS.burned.label} tone={METRICS.burned.tone} value={`${data.burnedKcal.toLocaleString()}`} />
+          <MetricPill icon={METRICS.water.icon} label={METRICS.water.label} tone={METRICS.water.tone} value={fmtVolume(data.waterMl, units)} progress={data.waterMl / waterTarget} />
+          <MetricPill icon={METRICS.burned.icon} label={METRICS.burned.label} tone={METRICS.burned.tone} value={kcalToDisplay(data.burnedKcal, units).toLocaleString()} />
         </div>
       </Stagger>
 
@@ -92,7 +94,7 @@ export function Today({ clientId, onStart }: { clientId: string; onStart?: () =>
       {/* Home widgets */}
       <Stagger className="grid grid-cols-3 gap-2.5">
         <Widget icon={METRICS.streak.icon} tone={METRICS.streak.tone} value={data.checkInDates ? currentStreak(new Set(data.checkInDates), date) : 0} label="Day streak" />
-        <Widget icon={METRICS.weight.icon} tone={METRICS.weight.tone} value={weightDelta(data.weightSeries)} label="7-day kg" />
+        <Widget icon={METRICS.weight.icon} tone={METRICS.weight.tone} value={weightDelta(data.weightSeries, units)} label={`7-day ${weightLabel(units)}`} />
         <Widget icon={FlaskConical} tone="cardio" value={data.pendingLabs ?? 0} label="Labs due" />
       </Stagger>
 
@@ -149,12 +151,12 @@ function Widget({ icon: Icon, tone, value, label }: { icon: typeof Flame; tone: 
   );
 }
 
-function weightDelta(series?: { kg: number; date: string }[]): string {
+function weightDelta(series: { kg: number; date: string }[] | undefined, units: UnitPrefs): string {
   if (!series || series.length < 2) return "—";
   const last = series[series.length - 1]!;
   const target = Date.parse(last.date) - 7 * 86400000;
   let ref = series[0]!;
   for (const p of series) if (Math.abs(Date.parse(p.date) - target) < Math.abs(Date.parse(ref.date) - target)) ref = p;
-  const d = Math.round((last.kg - ref.kg) * 10) / 10;
+  const d = Math.round((kgToDisplay(last.kg, units) - kgToDisplay(ref.kg, units)) * 10) / 10;
   return `${d > 0 ? "+" : ""}${d}`;
 }

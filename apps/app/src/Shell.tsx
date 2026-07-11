@@ -194,7 +194,7 @@ export function Shell() {
         tabs={tabs}
         active={current}
         onSelect={setTab}
-        brand={ctx!.branding?.logoUrl ? <img src={ctx!.branding.logoUrl} alt={active.tenantName} className="size-full object-cover" /> : active.tenantName.charAt(0).toUpperCase()}
+        brand={ctx!.branding?.iconUrl ? <img src={ctx!.branding.iconUrl} alt={active.tenantName} className="size-full object-cover" /> : active.tenantName.charAt(0).toUpperCase()}
       />
     </div>
   );

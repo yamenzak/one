@@ -5,11 +5,12 @@
 
 import { Fragment, useEffect, useState } from "react";
 import {
-  Button, Card, Badge, Chip, Switch, Textarea, Skeleton, SettingsList, Page, Stagger,
+  Button, Card, Badge, Chip, Switch, Textarea, Skeleton, SegmentedControl, SettingsList, Page, Stagger,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss,
   KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft,
   type Branding, type BrandTokens, type NeutralTint,
 } from "@mossa/ui";
+import { resolveUnits } from "@mossa/domain";
 import { useSession } from "../session.js";
 import { useTheme } from "../theme.js";
 import { api } from "../api.js";
@@ -68,6 +69,10 @@ export function Settings({ onBack }: { onBack: () => void }) {
         </Stagger>
       )}
 
+      <Stagger>
+        <UnitsSection />
+      </Stagger>
+
       {isOwner && (
         <Stagger>
           <StudioControls />
@@ -83,6 +88,36 @@ export function Settings({ onBack }: { onBack: () => void }) {
         />
       </Stagger>
     </Page>
+  );
+}
+
+const UNIT_ROWS: { key: string; label: string; options: { value: string; label: string }[] }[] = [
+  { key: "weight", label: "Weight", options: [{ value: "kg", label: "kg" }, { value: "lb", label: "lb" }] },
+  { key: "height", label: "Height", options: [{ value: "cm", label: "cm" }, { value: "ft_in", label: "ft / in" }] },
+  { key: "length", label: "Body measurements", options: [{ value: "cm", label: "cm" }, { value: "in", label: "in" }] },
+  { key: "volume", label: "Fluids", options: [{ value: "ml", label: "ml" }, { value: "oz", label: "oz" }] },
+  { key: "distance", label: "Distance", options: [{ value: "km", label: "km" }, { value: "mi", label: "mi" }] },
+  { key: "energy", label: "Energy", options: [{ value: "kcal", label: "kcal" }, { value: "kJ", label: "kJ" }] },
+];
+
+function UnitsSection() {
+  const { ctx, refresh } = useSession();
+  const units = resolveUnits(ctx?.user.units) as unknown as Record<string, string>;
+  const [busy, setBusy] = useState(false);
+  const set = async (patch: Record<string, string>) => { setBusy(true); try { await api.patch("/api/me/units", patch); await refresh(); } finally { setBusy(false); } };
+  return (
+    <section>
+      <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Units</h3>
+      <Card className="space-y-3">
+        <p className="text-sm text-muted-foreground">Mix and match freely — these apply everywhere you see numbers, for you only.</p>
+        {UNIT_ROWS.map((r) => (
+          <div key={r.key} className="flex items-center justify-between gap-3">
+            <span className="text-sm">{r.label}</span>
+            <SegmentedControl options={r.options} value={units[r.key]!} onChange={(v) => void set({ [r.key]: v })} className={busy ? "pointer-events-none opacity-70" : ""} />
+          </div>
+        ))}
+      </Card>
+    </section>
   );
 }
 
@@ -158,24 +193,25 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
   const [neutral, setNeutral] = useState<NeutralTint>("brand");
   const [radius, setRadius] = useState(initial?.radius ?? 0.95);
   const [logoUrl, setLogoUrl] = useState<string | null>(initial?.logoUrl ?? null);
+  const [iconUrl, setIconUrl] = useState<string | null>(initial?.iconUrl ?? null);
   const [advanced, setAdvanced] = useState(false);
   const [themeCss, setThemeCss] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   // Live-preview whenever the tokens or radius change (logo isn't a token).
-  useEffect(() => { onPreview({ tokens, radius, logoUrl }); }, [JSON.stringify(tokens), radius]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { onPreview({ tokens, radius, logoUrl, iconUrl }); }, [JSON.stringify(tokens), radius]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Generate a full palette from one color (the smart path).
   const generate = (color: string, tint: NeutralTint = neutral) => { setSeed(color); setNeutral(tint); setTokens(deriveTokens({ primary: color, neutral: tint })); };
 
-  const uploadLogo = async (file: File) => {
+  const uploadAsset = async (file: File, setter: (url: string) => void) => {
     setMsg(null);
-    const fd = new FormData(); fd.append("file", file); fd.append("purpose", "logo");
+    const fd = new FormData(); fd.append("file", file); fd.append("purpose", "brand");
     const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
-    if (!up.ok) { setMsg("Logo upload failed."); return; }
+    if (!up.ok) { setMsg("Upload failed."); return; }
     const { key } = (await up.json()) as { key?: string };
-    if (key) setLogoUrl(`/api/media/${key}`);
+    if (key) setter(`/api/media/${key}`);
   };
 
   const extractFromLogo = () => {
@@ -204,7 +240,7 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
   const save = async () => {
     setSaving(true);
     // Tokens carry everything now — null out legacy preset/primary fields.
-    try { await api.patch("/api/settings", { branding: { tokens, radius, logoUrl, preset: null, primary: null, primaryForeground: null } }); onSaved(); setMsg("Branding saved."); }
+    try { await api.patch("/api/settings", { branding: { tokens, radius, logoUrl, iconUrl, preset: null, primary: null, primaryForeground: null } }); onSaved(); setMsg("Branding saved."); }
     finally { setSaving(false); }
   };
 
@@ -216,19 +252,36 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
       <Card className="space-y-5">
         <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Palette /></div><div><div className="font-medium">Theme</div><div className="text-sm text-muted-foreground">Pick one color — the whole app themes itself, light and dark.</div></div></div>
 
-        {/* Logo */}
+        {/* Logo (wide wordmark, shown in the app bar) */}
         <div className="space-y-2">
-          <div className="text-sm font-medium">Logo</div>
+          <div className="text-sm font-medium">Logo <span className="font-normal text-muted-foreground">— app bar</span></div>
           <div className="flex items-center gap-3">
-            <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/60 bg-surface-2">
-              {logoUrl ? <img src={logoUrl} alt="Logo" className="max-h-14 max-w-14 object-contain" /> : <ImageIcon className="size-5 text-muted-foreground" />}
+            <div className="grid h-16 w-24 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/60 bg-surface-2">
+              {logoUrl ? <img src={logoUrl} alt="Logo" className="max-h-14 max-w-22 object-contain" /> : <ImageIcon className="size-5 text-muted-foreground" />}
             </div>
             <div className="flex flex-1 flex-wrap gap-2">
               <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
-                <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadLogo(e.target.files[0])} />
+                <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAsset(e.target.files[0], setLogoUrl)} />
               </label>
               <Button size="sm" variant="secondary" disabled={!logoUrl} onClick={extractFromLogo}><Wand2 /> Theme from logo</Button>
               {logoUrl && <Button size="icon" variant="secondary" aria-label="Remove logo" onClick={() => setLogoUrl(null)}><Trash2 /></Button>}
+            </div>
+          </div>
+        </div>
+
+        {/* App icon (square mark, shown in the nav rail + browser tab) */}
+        <div className="space-y-2">
+          <div className="text-sm font-medium">App icon <span className="font-normal text-muted-foreground">— square, nav + tab</span></div>
+          <div className="flex items-center gap-3">
+            <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/60 bg-surface-2">
+              {iconUrl ? <img src={iconUrl} alt="App icon" className="size-full object-cover" /> : <ImageIcon className="size-5 text-muted-foreground" />}
+            </div>
+            <div className="flex flex-1 flex-wrap gap-2">
+              <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
+                <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAsset(e.target.files[0], setIconUrl)} />
+              </label>
+              {iconUrl && <Button size="sm" variant="secondary" disabled={!iconUrl} onClick={() => { const img = new Image(); img.onload = () => { const p = extractPalette(img); if (p) { generate(p.primary); setMsg("Palette generated from your icon."); } }; img.src = iconUrl; }}><Wand2 /> Theme from icon</Button>}
+              {iconUrl && <Button size="icon" variant="secondary" aria-label="Remove icon" onClick={() => setIconUrl(null)}><Trash2 /></Button>}
             </div>
           </div>
         </div>

@@ -1,8 +1,10 @@
 /** Wellness — water, fasting timer, supplement tap-log, lab tests. */
 
 import { useCallback, useEffect, useState } from "react";
+import { fmtVolume, volumeLabel, volumeDisplayToMl } from "@mossa/domain";
 import { Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
+import { useUnits } from "../../units.js";
 
 interface Supplement { id: string; name: string; dose: string | null; kind: string; schedule: { slot: string }[] }
 interface Lab { id: string; display_name: string; status: string; due_by: string | null }
@@ -17,6 +19,8 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack: () =>
   const [sessions, setSessions] = useState<Session[]>([]);
   const [waterMl, setWaterMl] = useState(0);
   const [loading, setLoading] = useState(true);
+  const units = useUnits();
+  const waterPresets = units.volume === "oz" ? [8, 12, 16] : [250, 500, 750];
   const date = todayLocal();
 
   const load = useCallback(async () => {
@@ -32,7 +36,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack: () =>
   }, [clientId, date]);
   useEffect(() => void load(), [load]);
 
-  const addWater = async (ml: number) => { await api.post("/api/logs/water", { clientId, data: { date, amountMl: ml } }); setWaterMl((w) => w + ml); };
+  const addWater = async (displayAmount: number) => { const ml = Math.round(volumeDisplayToMl(displayAmount, units)); await api.post("/api/logs/water", { clientId, data: { date, amountMl: ml } }); setWaterMl((w) => w + ml); };
   const toggleSupp = async (id: string, slot: string) => {
     const key = `${id}:${slot}`;
     const r = await api.post<{ taken: boolean }>(`/api/supplements/${id}/log`, { clientId, date, slot });
@@ -63,9 +67,9 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack: () =>
         <Card>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5"><IconBadge icon={Droplet} tone="hydration" size="sm" /><h2 className="font-semibold">Water</h2></div>
-            <span className="numeral font-semibold text-hydration">{(waterMl / 1000).toFixed(1)} L</span>
+            <span className="numeral font-semibold text-hydration">{fmtVolume(waterMl, units)}</span>
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">{[250, 500, 750].map((ml) => <Chip key={ml} onClick={() => void addWater(ml)}>+{ml} ml</Chip>)}</div>
+          <div className="mt-3 flex flex-wrap gap-2">{waterPresets.map((v) => <Chip key={v} onClick={() => void addWater(v)}>+{v} {volumeLabel(units)}</Chip>)}</div>
         </Card>
       </Stagger>
 

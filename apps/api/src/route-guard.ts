@@ -140,8 +140,9 @@ export const routeGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
     return next();
   }
 
-  // /api/context works for any signed-in user, even before a tenant is chosen.
-  if (path === "/api/context" || path === "/api/context/switch") {
+  // /api/context + personal /api/me/* work for any signed-in user, even before
+  // a tenant is chosen (unit prefs, etc. are personal, not tenant-scoped).
+  if (path === "/api/context" || path === "/api/context/switch" || path.startsWith("/api/me/")) {
     if (!c.get("user")) return c.json({ error: "unauthenticated" }, 401);
     return next();
   }
