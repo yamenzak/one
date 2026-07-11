@@ -1,0 +1,40 @@
+name: Provision Cloudflare resources (one-time)
+
+# Run this ONCE (Actions tab → "Provision…" → Run workflow) to create the D1
+# database, KV namespace, and R2 bucket the api worker binds to. It prints the
+# ids in the run log — paste them into apps/api/wrangler.jsonc, commit, and the
+# Deploy workflow will then succeed. Safe to re-run (creates are idempotent-ish;
+# "already exists" errors are ignored and the ids are listed at the end).
+on:
+  workflow_dispatch:
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Create resources (ignore "already exists")
+        working-directory: apps/api
+        run: |
+          pnpm exec wrangler d1 create mossa || true
+          pnpm exec wrangler kv namespace create CACHE || true
+          pnpm exec wrangler r2 bucket create mossa-media || true
+      - name: List ids to paste into wrangler.jsonc
+        working-directory: apps/api
+        run: |
+          echo "## Paste these into apps/api/wrangler.jsonc" >> "$GITHUB_STEP_SUMMARY"
+          echo '### D1 (database_id)' >> "$GITHUB_STEP_SUMMARY"
+          pnpm exec wrangler d1 list --json >> "$GITHUB_STEP_SUMMARY" || true
+          echo '### KV (id for binding CACHE)' >> "$GITHUB_STEP_SUMMARY"
+          pnpm exec wrangler kv namespace list >> "$GITHUB_STEP_SUMMARY" || true

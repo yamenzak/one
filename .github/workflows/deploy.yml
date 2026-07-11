@@ -1,0 +1,64 @@
+name: Deploy
+
+# Every push to main (and manual runs) typechecks, tests, builds the app, and
+# deploys the api worker + www to Cloudflare. Requires three repo secrets:
+#   CLOUDFLARE_API_TOKEN   — token with Workers/D1/KV/R2 edit permissions
+#   CLOUDFLARE_ACCOUNT_ID  — your Cloudflare account id
+#   BETTER_AUTH_SECRET     — openssl rand -base64 32 (pushed to the worker as a secret)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Build the SPA first — the api worker serves apps/app/dist, and the
+      # integration tests need it present for the assets binding.
+      - run: pnpm --filter @mossa/app build
+
+      - run: pnpm turbo run typecheck test
+
+      # The Workers AI binding is commented out for frictionless local dev
+      # (wrangler dev needs credentials for it). Enable it only for deploy.
+      - name: Enable Workers AI binding
+        run: sed -i 's#// "ai": { "binding": "AI" }#"ai": { "binding": "AI" }#' apps/api/wrangler.jsonc
+
+      - name: Deploy api worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/api
+          command: deploy
+          secrets: |
+            BETTER_AUTH_SECRET
+        env:
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+
+      - name: Build + deploy www
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/www
+          command: deploy
+          preCommands: node build.mjs
