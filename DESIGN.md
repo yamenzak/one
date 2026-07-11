@@ -1,10 +1,50 @@
 # MOSSA DESIGN.md — UI System
 
-> Source of truth for Mossa's interface. Derived from the Google Health redesign
-> (reference screenshots in `docs/google-health-ui/`), rebuilt on **shadcn/ui + Tailwind v4 +
-> Radix**. One design system, one app, three roles (client / trainer / owner+admin) — §5.
->
-> The bar: *"a 70-year-old can use it."* Every screen decision below serves that.
+> Source of truth for Mossa's interface. One design system, one app, three roles
+> (client / trainer / owner+admin) — §5. The bar: *premium, alive, and a
+> 70-year-old can use it.*
+
+## Design System v2 (current — shipped) ✅
+
+The implemented system (`packages/ui`), a ground-up premium rebuild:
+
+- **Tokens** (`src/tokens.css`) — a shadcn-compatible palette in **oklch**,
+  dark-first (`:root`) with a light theme (`:root[data-theme="light"]`). Full
+  shadcn variable set (background/card/popover/primary/secondary/muted/accent/
+  destructive/border/input/ring) **plus** fitness domain accents (activity /
+  nutrition / sleep / cardio / hydration, each with a `-soft` container) and
+  status (success/warning/danger). `@theme inline` maps them to Tailwind
+  utilities so `bg-primary`, `text-muted-foreground`, `rounded-xl` follow the
+  live theme. Radius scale, elevation + brand-glow shadows, tabular numerals,
+  subtle scrollbars, reduced-motion support.
+- **Tenant theming** (`src/lib/theme.ts`, SPEC §7) — **9 brand presets** +
+  custom primary/radius. `applyBranding()` overrides the `--primary` / `--ring`
+  / `--radius` CSS vars at runtime; branding flows through `/api/context` to
+  every role and `ThemeProvider` applies it at boot. Owners get a **live-preview
+  branding editor** in Settings (preset grid + radius slider → `PATCH
+  /api/settings`). This re-skins the whole app for a studio's clients.
+- **Icons** (`src/lib/icons.tsx`) — a curated **lucide-react** registry.
+  **Zero emoji anywhere** in the product.
+- **Motion** (`src/lib/motion.tsx`, built on `motion`) — `fadeUp` / `stagger` /
+  `popIn` variants; `Page` / `Stagger` / `Pressable` wrappers; spring-driven
+  layout indicators (`layoutId`) for tab bar, nav rail, and segmented controls;
+  ring stroke draw-in, sparkline path draw, week-dot pop, toast spring.
+- **Primitives** (CVA) — `Button` (default/tonal/secondary/outline/ghost/
+  destructive × sm/default/lg/icon), `Card`, `Badge`, `Chip`, `Input`/`Field`/
+  `Textarea`, `Switch`, `Skeleton`, `Spinner`, `IconBadge`, `SectionTitle`.
+- **Overlays** (radix + vaul) — `Dialog`, `Sheet` (drag-to-dismiss bottom
+  drawer), `DropdownMenu`, `Tabs`, animated `SegmentedControl`, `Select`,
+  `Tooltip`, `Avatar` — all animated via data-state keyframes.
+- **Identity/viz** — animated `ProgressRing` (gradient stroke draw-in),
+  `TargetRing`, `MetricPill` (two-tone progress fill), `StatCard`, `Sparkline`
+  (area + line draw), `MiniBars`, `WeekDots`.
+- **Shell** — `AppBar` (blur), `BottomTabs` / `NavRail` (spring active pill),
+  `InsightCard` timeline feed with 👍/👎 (lucide), `WavyDivider`, `SettingsList`,
+  `EmptyState`.
+
+Build: vendor code-split (react/motion/radix/icons chunks); app code ~34 KB
+gzip. The original Google-Health-derived concept that seeded this is preserved
+below for reference.
 
 ---
 
