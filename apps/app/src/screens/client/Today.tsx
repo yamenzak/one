@@ -3,9 +3,10 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { currentStreak } from "@mossa/domain";
 import {
-  Button, Card, SubCard, Skeleton, ProgressRing, MetricPill, InsightCard, WavyDivider,
-  Page, Stagger, Plus, Play, PencilLine, Zap, Droplet, Flame, Trophy, ClipboardList, Dumbbell,
+  Button, Card, SubCard, Skeleton, ProgressRing, MetricPill, InsightCard, WavyDivider, Badge,
+  Page, Stagger, Plus, Play, PencilLine, Zap, Droplet, Flame, Trophy, ClipboardList, Dumbbell, FlaskConical, TrendingUp,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { LogSheet } from "./LogSheet.js";
@@ -19,9 +20,12 @@ export interface TodayBundle {
   checkedIn: boolean;
   goal: { targets: Record<string, number> | null; weeklyLoadTarget: number | null } | null;
   publishedWorkoutPlan: { id: string; name: string; body: { days: { name: string; isRestDay?: boolean }[] } } | null;
+  checkInDates?: string[];
+  pendingLabs?: number;
+  weightSeries?: { kg: number; date: string }[];
 }
 
-export function Today({ clientId }: { clientId: string }) {
+export function Today({ clientId, onStart }: { clientId: string; onStart?: () => void }) {
   const [data, setData] = useState<TodayBundle | null>(null);
   const [logOpen, setLogOpen] = useState(false);
   const date = todayLocal();
@@ -68,12 +72,19 @@ export function Today({ clientId }: { clientId: string }) {
         <Button size="lg" className="flex-1" onClick={() => setLogOpen(true)}>
           <Plus /> Log
         </Button>
-        <Button size="lg" variant="tonal" className="flex-1">
+        <Button size="lg" variant="tonal" className="flex-1" onClick={onStart} disabled={!data.publishedWorkoutPlan}>
           <Play /> Start
         </Button>
         <Button size="icon" variant="secondary" aria-label="Customize">
           <PencilLine />
         </Button>
+      </Stagger>
+
+      {/* Home widgets */}
+      <Stagger className="grid grid-cols-3 gap-2.5">
+        <Widget icon={Flame} tone="nutrition" value={data.checkInDates ? currentStreak(new Set(data.checkInDates), date) : 0} label="Day streak" />
+        <Widget icon={TrendingUp} tone="activity" value={weightDelta(data.weightSeries)} label="7-day kg" />
+        <Widget icon={FlaskConical} tone="cardio" value={data.pendingLabs ?? 0} label="Labs due" />
       </Stagger>
 
       <Stagger>
@@ -117,4 +128,25 @@ export function Today({ clientId }: { clientId: string }) {
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} clientId={clientId} onLogged={() => void load()} />
     </Page>
   );
+}
+
+const TONE_TEXT = { nutrition: "text-nutrition", activity: "text-activity", cardio: "text-cardio" } as const;
+function Widget({ icon: Icon, tone, value, label }: { icon: typeof Flame; tone: keyof typeof TONE_TEXT; value: number | string; label: string }) {
+  return (
+    <Card className="flex flex-col items-center gap-1 p-3 text-center">
+      <Icon className={`size-4 ${TONE_TEXT[tone]}`} />
+      <div className="numeral text-xl font-semibold">{value}</div>
+      <div className="text-[0.65rem] text-muted-foreground">{label}</div>
+    </Card>
+  );
+}
+
+function weightDelta(series?: { kg: number; date: string }[]): string {
+  if (!series || series.length < 2) return "—";
+  const last = series[series.length - 1]!;
+  const target = Date.parse(last.date) - 7 * 86400000;
+  let ref = series[0]!;
+  for (const p of series) if (Math.abs(Date.parse(p.date) - target) < Math.abs(Date.parse(ref.date) - target)) ref = p;
+  const d = Math.round((last.kg - ref.kg) * 10) / 10;
+  return `${d > 0 ? "+" : ""}${d}`;
 }

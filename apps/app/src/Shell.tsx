@@ -24,7 +24,10 @@ import { Settings } from "./screens/Settings.js";
 import { Wellness } from "./screens/client/Wellness.js";
 import { Onboarding } from "./screens/client/Onboarding.js";
 import { Shop } from "./screens/client/Shop.js";
+import { Explore } from "./screens/client/Explore.js";
 import { AdminConsole } from "./screens/admin/AdminConsole.js";
+import { NotificationBell } from "./NotificationBell.js";
+import { BookOpen } from "@mossa/ui";
 
 const CLIENT_TABS: TabDef[] = [
   { key: "today", label: "Today", icon: Home },
@@ -53,7 +56,7 @@ export function Shell() {
   }, [clientSurface, active.role]);
 
   const [tab, setTab] = useState("today");
-  const [overlay, setOverlay] = useState<"settings" | "wellness" | "shop" | "admin" | null>(null);
+  const [overlay, setOverlay] = useState<"settings" | "wellness" | "shop" | "admin" | "explore" | null>(null);
   const current = tabs.some((t) => t.key === tab) ? tab : "today";
 
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
@@ -67,6 +70,7 @@ export function Shell() {
   if (overlay === "settings") return <Settings onBack={() => setOverlay(null)} />;
   if (overlay === "wellness" && clientId) return <Wellness clientId={clientId} onBack={() => setOverlay(null)} />;
   if (overlay === "shop" && clientId) return <Shop clientId={clientId} onBack={() => setOverlay(null)} />;
+  if (overlay === "explore" && clientId) return <Explore clientId={clientId} onBack={() => setOverlay(null)} />;
   if (overlay === "admin") return <AdminConsole onBack={() => setOverlay(null)} />;
 
   const enterTrainMode = async () => {
@@ -93,6 +97,8 @@ export function Shell() {
         }
         title={<span className="truncate">{active.tenantName}</span>}
         trailing={
+          <>
+          <NotificationBell />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="rounded-full outline-none ring-ring focus-visible:ring-2" aria-label="Account">
@@ -115,6 +121,9 @@ export function Shell() {
               )}
               {clientSurface && clientId && (
                 <>
+                  <DropdownMenuItem onSelect={() => setOverlay("explore")}>
+                    <BookOpen /> Explore
+                  </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setOverlay("wellness")}>
                     <HeartPulse /> Wellness &amp; supplements
                   </DropdownMenuItem>
@@ -140,13 +149,14 @@ export function Shell() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </>
         }
       />
 
       <main>
         {clientSurface && clientId ? (
           <>
-            {current === "today" && <Today clientId={clientId} />}
+            {current === "today" && <Today clientId={clientId} onStart={() => setTab("train")} />}
             {current === "train" && <Train clientId={clientId} />}
             {current === "eat" && <Eat clientId={clientId} />}
             {current === "progress" && <Progress clientId={clientId} />}

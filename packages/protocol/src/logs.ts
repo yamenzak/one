@@ -56,7 +56,7 @@ export const LogFoodEntry = z.object({
   proteinG: z.number().min(0).default(0),
   carbsG: z.number().min(0).default(0),
   fatG: z.number().min(0).default(0),
-  source: z.enum(["self_logged", "prescribed", "ai_suggested"]).default("self_logged"),
+  source: z.enum(["self_logged", "prescribed", "ai_suggested", "free_meal"]).default("self_logged"),
   mealPlanId: z.string().nullish(),
   mealOptionIndex: z.number().int().min(0).nullish(),
 });

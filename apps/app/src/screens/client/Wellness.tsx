@@ -1,31 +1,34 @@
 /** Wellness — water, fasting timer, supplement tap-log, lab tests. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, ArrowLeft, Droplet, Timer, Pill, FlaskConical, Check } from "@mossa/ui";
+import { Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 
 interface Supplement { id: string; name: string; dose: string | null; kind: string; schedule: { slot: string }[] }
 interface Lab { id: string; display_name: string; status: string; due_by: string | null }
 interface Fast { activeFast: { started_at: string; target_hours: number } | null; recentFasts: { duration_minutes: number; target_hours: number }[] }
+interface Session { id: string; scheduled_at: string; duration_minutes: number; status: string }
 
 export function Wellness({ clientId, onBack }: { clientId: string; onBack: () => void }) {
   const [supps, setSupps] = useState<Supplement[]>([]);
   const [taken, setTaken] = useState<Set<string>>(new Set());
   const [labs, setLabs] = useState<Lab[]>([]);
   const [fast, setFast] = useState<Fast | null>(null);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [waterMl, setWaterMl] = useState(0);
   const [loading, setLoading] = useState(true);
   const date = todayLocal();
 
   const load = useCallback(async () => {
-    const [s, sl, l, f, today] = await Promise.all([
+    const [s, sl, l, f, sess, today] = await Promise.all([
       api.get<{ supplements: Supplement[] }>(`/api/supplements?clientId=${clientId}`),
       api.get<{ taken: { supplement_id: string; slot: string }[] }>(`/api/supplements/logs?clientId=${clientId}&date=${date}`),
       api.get<{ labs: Lab[] }>(`/api/labs?clientId=${clientId}`),
       api.get<Fast>(`/api/fasting?clientId=${clientId}`),
+      api.get<{ sessions: Session[] }>(`/api/sessions?clientId=${clientId}`).catch(() => ({ sessions: [] })),
       api.get<{ waterMl: number }>(`/api/today?clientId=${clientId}&date=${date}`),
     ]);
-    setSupps(s.supplements); setTaken(new Set(sl.taken.map((t) => `${t.supplement_id}:${t.slot}`))); setLabs(l.labs); setFast(f); setWaterMl(today.waterMl); setLoading(false);
+    setSupps(s.supplements); setTaken(new Set(sl.taken.map((t) => `${t.supplement_id}:${t.slot}`))); setLabs(l.labs); setFast(f); setSessions(sess.sessions); setWaterMl(today.waterMl); setLoading(false);
   }, [clientId, date]);
   useEffect(() => void load(), [load]);
 
@@ -129,6 +132,20 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack: () =>
                 ) : (
                   <Badge tone={l.status === "reviewed" ? "success" : l.status === "uploaded" ? "cardio" : "warning"}>{l.status}</Badge>
                 )}
+              </div>
+            ))}
+          </Card>
+        </Stagger>
+      )}
+
+      {sessions.length > 0 && (
+        <Stagger>
+          <Card className="space-y-3">
+            <div className="flex items-center gap-2.5"><IconBadge icon={Calendar} tone="activity" size="sm" /><h2 className="font-semibold">Sessions</h2></div>
+            {sessions.slice(0, 6).map((s) => (
+              <div key={s.id} className="flex items-center justify-between gap-2">
+                <div className="min-w-0"><div className="truncate text-sm">{new Date(s.scheduled_at).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div><div className="text-xs text-muted-foreground">{s.duration_minutes} min</div></div>
+                <Badge tone={s.status === "completed" ? "success" : s.status === "scheduled" ? "activity" : s.status === "no_show" ? "danger" : "neutral"}>{s.status.replace("_", " ")}</Badge>
               </div>
             ))}
           </Card>
