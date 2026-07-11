@@ -3,25 +3,27 @@
 import { useCallback, useEffect, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, Search, ArrowLeft, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, Search, ArrowLeft, Plus, Sparkles, X } from "@mossa/ui";
 import { api } from "../../api.js";
 
-interface Plan { id: string; clientId: string; name: string; status: string; body: MealBody }
+interface Plan { id: string; clientId: string; name: string; status: string; body: MealBody; targetGoal?: { targets?: Record<string, number> | null } | null }
 interface FoodRow { id: string; name: string; serving_size: number; calories: number; protein_g: number; carbs_g: number; fat_g: number }
-const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack", "pre_workout", "post_workout"];
+const BUILTIN_TYPES = ["breakfast", "lunch", "dinner", "snack", "pre_workout", "post_workout"];
 
 export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => void }) {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [options, setOptions] = useState<MealOption[]>([]);
+  const [customTypes, setCustomTypes] = useState<{ label: string }[]>([]);
   const [foods, setFoods] = useState<Map<string, FoodLike>>(new Map());
   const [names, setNames] = useState<Map<string, string>>(new Map());
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [foodPicker, setFoodPicker] = useState<{ optIdx: number } | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
 
   const load = useCallback(async () => {
     const [p, f] = await Promise.all([api.get<{ plan: Plan }>(`/api/meal-plans/${planId}`), api.get<{ foods: FoodRow[] }>("/api/foods")]);
-    setPlan(p.plan); setOptions(p.plan.body.mealOptions ?? []);
+    setPlan(p.plan); setOptions(p.plan.body.mealOptions ?? []); setCustomTypes(p.plan.body.customMealTypes ?? []);
     setFoods(new Map(f.foods.map((x) => [x.id, { id: x.id, servingSize: x.serving_size, caloriesPerServing: x.calories, proteinG: x.protein_g, carbsG: x.carbs_g, fatG: x.fat_g }])));
     setNames(new Map(f.foods.map((x) => [x.id, x.name])));
   }, [planId]);
@@ -29,12 +31,20 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const nameOf = useCallback((id: string) => names.get(id) ?? "Food", [names]);
 
   const mutate = (fn: (d: MealOption[]) => void) => { const next = structuredClone(options); fn(next); setOptions(next); setDirty(true); };
-  const save = async () => { setSaving(true); try { await api.patch(`/api/meal-plans/${planId}`, { body: { customMealTypes: [], mealOptions: options } }); setDirty(false); } finally { setSaving(false); } };
+  const save = async () => { setSaving(true); try { await api.patch(`/api/meal-plans/${planId}`, { body: { customMealTypes: customTypes, mealOptions: options } }); setDirty(false); } finally { setSaving(false); } };
   const publish = async () => { await save(); await api.post(`/api/meal-plans/${planId}/publish`); await load(); };
+  const addCustomType = () => { const label = prompt("New meal type name")?.trim(); if (label && !customTypes.some((t) => t.label === label)) { setCustomTypes((p) => [...p, { label }]); setDirty(true); } };
+  const runAi = async (instructions: string) => {
+    if (!plan) return;
+    const res = await api.post<{ draft: MealBody }>("/api/ai/draft-meal", { clientId: plan.clientId, instructions });
+    setOptions((prev) => [...prev, ...(res.draft.mealOptions ?? [])]); setDirty(true); setAiOpen(false);
+  };
 
   if (!plan) return <Skeleton className="m-4 h-96" />;
   const byType = new Map<string, { opt: MealOption; idx: number }[]>();
   options.forEach((opt, idx) => byType.set(opt.mealType, [...(byType.get(opt.mealType) ?? []), { opt, idx }]));
+  const targets = plan.targetGoal?.targets ?? null;
+  const allTypes = [...BUILTIN_TYPES, ...customTypes.map((t) => t.label)];
 
   return (
     <div className="mx-auto max-w-xl space-y-4 p-4 pb-32">
@@ -44,7 +54,19 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
         <Badge tone={plan.status === "published" ? "success" : "neutral"}>{plan.status}</Badge>
       </div>
 
-      {MEAL_TYPES.map((type) => {
+      {targets?.targetCalories ? (
+        <Card className="flex items-center justify-between py-3 text-sm">
+          <span className="text-muted-foreground">Daily target</span>
+          <span className="numeral font-medium">{targets.targetCalories} kcal · P{targets.targetProteinG ?? "—"} C{targets.targetCarbsG ?? "—"} F{targets.targetFatG ?? "—"}</span>
+        </Card>
+      ) : null}
+
+      <div className="flex gap-2">
+        <Button variant="tonal" className="flex-1" onClick={() => setAiOpen(true)}><Sparkles /> AI meal draft</Button>
+        <Button variant="secondary" onClick={addCustomType}><Plus /> Meal type</Button>
+      </div>
+
+      {allTypes.map((type) => {
         const opts = byType.get(type) ?? [];
         return (
           <Card key={type} className="space-y-3">
@@ -95,7 +117,22 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
       </div>
 
       {foodPicker && <FoodPicker onClose={() => setFoodPicker(null)} onPick={(id, name) => { mutate((d) => d[foodPicker.optIdx]!.foods.push({ foodId: id, quantity: 100, unit: "g" })); setNames((p) => new Map(p).set(id, name)); setFoodPicker(null); }} />}
+      {aiOpen && <AiMealSheet onClose={() => setAiOpen(false)} onRun={runAi} />}
     </div>
+  );
+}
+
+function AiMealSheet({ onClose, onRun }: { onClose: () => void; onRun: (i: string) => Promise<void> }) {
+  const [instructions, setInstructions] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <Sheet open onClose={onClose} title="AI meal draft">
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">Drafts meal options from this client's targets and intake. You'll fill exact foods and review before publishing.</p>
+        <Field label="Instructions (optional)" icon={Sparkles} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="e.g. high-protein, no dairy, 4 meals" />
+        <Button size="lg" className="w-full" disabled={busy} onClick={async () => { setBusy(true); try { await onRun(instructions); } finally { setBusy(false); } }}>{busy ? "Drafting…" : "Generate options"}</Button>
+      </div>
+    </Sheet>
   );
 }
 

@@ -1,24 +1,37 @@
 /**
- * Workout plan builder — days → blocks → slots → sets. Exercise picker, block
- * types, weight modes, draft/publish, ✦ AI Plan Draft, duplicate-day.
+ * Workout plan builder — days → blocks → slots → sets. Full set richness
+ * (all weight modes, rpe/rir/tempo/rest, measurement modes), block config
+ * (rounds/rests), exercise picker, draft/publish, ✦ AI draft, duplicate-day,
+ * export-to-template.
  */
 
 import { useCallback, useEffect, useState } from "react";
-import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode } from "@mossa/protocol";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, X } from "@mossa/ui";
+import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@mossa/protocol";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, Save, X } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Plan { id: string; clientId: string; name: string; status: string; body: WorkoutBody }
 interface ExerciseLite { id: string; name: string; muscle_groups?: string | null }
 
-const WEIGHT_MODES: { value: WeightMode; label: string }[] = [
-  { value: "unspecified", label: "Client picks" }, { value: "absolute", label: "Set weight" }, { value: "bodyweight", label: "Bodyweight" }, { value: "percent_1rm", label: "% 1RM" }, { value: "previous_plus", label: "Prev + kg" },
+const WEIGHT_MODES: { value: WeightMode; label: string; unit?: string }[] = [
+  { value: "unspecified", label: "Client picks" },
+  { value: "absolute", label: "Set weight", unit: "kg" },
+  { value: "bodyweight", label: "Bodyweight" },
+  { value: "percent_1rm", label: "% 1RM", unit: "%" },
+  { value: "previous_plus", label: "Prev + kg", unit: "+kg" },
+  { value: "previous_times", label: "Prev × mult", unit: "×" },
+  { value: "dropset", label: "Dropset from", unit: "kg" },
 ];
+const MEASURE_MODES: { value: MeasurementMode; label: string }[] = [
+  { value: "reps", label: "Reps" }, { value: "time", label: "Time" }, { value: "distance", label: "Distance" }, { value: "reps_in_time", label: "Reps in time" },
+];
+const SET_TYPES = ["warmup", "working", "amrap"] as const;
+
 const emptySet = (): WorkoutSet => ({ setType: "working", weightMode: "unspecified", restAfterSec: 90, reps: 10 });
 const emptySlot = (exerciseId: string): ExerciseSlot => ({ exerciseId, measurementMode: "reps", sets: [emptySet(), emptySet(), emptySet()] });
 const emptyBlock = (): WorkoutBlock => ({ type: "single", slots: [] });
 const emptyDay = (name: string): WorkoutDay => ({ name, isRestDay: false, blocks: [] });
-const selectCls = "rounded-lg bg-surface-3 px-2.5 py-1.5 text-sm outline-none";
+const inputCls = "rounded-lg bg-surface-3 px-2.5 py-1.5 text-sm outline-none ring-ring focus:ring-2";
 
 export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () => void }) {
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -29,6 +42,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   const [library, setLibrary] = useState<ExerciseLite[]>([]);
   const [picker, setPicker] = useState<{ blockIdx: number } | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const load = useCallback(async () => {
     const [p, ex] = await Promise.all([api.get<{ plan: Plan }>(`/api/workout-plans/${planId}`), api.get<{ exercises: ExerciseLite[] }>("/api/exercises")]);
@@ -43,6 +57,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
 
   if (!plan) return <Skeleton className="m-4 h-96" />;
   const day = days[dayIdx];
+  const nameOf = (id: string) => library.find((e) => e.id === id)?.name ?? "Exercise";
 
   return (
     <div className="mx-auto max-w-xl space-y-4 p-4 pb-32">
@@ -50,6 +65,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
         <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
         <h1 className="flex-1 truncate text-xl font-bold tracking-tight">{plan.name}</h1>
         <Badge tone={plan.status === "published" ? "success" : "neutral"}>{plan.status}</Badge>
+        <Button size="icon" variant="secondary" aria-label="Save as template" onClick={() => setExportOpen(true)}><Save /></Button>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -77,15 +93,26 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                 </select>
                 <button onClick={() => mutate((d) => d[dayIdx]!.blocks.splice(blockIdx, 1))} className="grid size-8 place-items-center rounded-full text-danger hover:bg-danger-soft [&_svg]:size-4"><Trash2 /></button>
               </div>
+
+              {block.type !== "single" && (
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <label className="flex flex-col gap-1 text-muted-foreground">Rounds<input type="number" value={block.rounds ?? ""} placeholder="1" onChange={(e) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.rounds = e.target.value ? Number(e.target.value) : null))} className={inputCls} /></label>
+                  <label className="flex flex-col gap-1 text-muted-foreground">Rest/exercise<input type="number" value={block.restBetweenExercisesSec ?? ""} placeholder="s" onChange={(e) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.restBetweenExercisesSec = e.target.value ? Number(e.target.value) : null))} className={inputCls} /></label>
+                  <label className="flex flex-col gap-1 text-muted-foreground">Rest/round<input type="number" value={block.restBetweenRoundsSec ?? ""} placeholder="s" onChange={(e) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.restBetweenRoundsSec = e.target.value ? Number(e.target.value) : null))} className={inputCls} /></label>
+                </div>
+              )}
+
               {block.slots.map((slot, slotIdx) => (
                 <SubCard key={slotIdx} className="space-y-2">
-                  <div className="flex items-center justify-between"><span className="font-medium">{library.find((e) => e.id === slot.exerciseId)?.name ?? "Exercise"}</span><button onClick={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots.splice(slotIdx, 1))} className="text-muted-foreground hover:text-danger [&_svg]:size-4"><X /></button></div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 flex-1 truncate font-medium">{nameOf(slot.exerciseId)}</span>
+                    <select value={slot.measurementMode} onChange={(e) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.measurementMode = e.target.value as MeasurementMode))} className="rounded-lg bg-surface-3 px-2 py-1 text-xs outline-none">{MEASURE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select>
+                    <button onClick={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots.splice(slotIdx, 1))} className="text-muted-foreground hover:text-danger [&_svg]:size-4"><X /></button>
+                  </div>
                   {slot.sets.map((set, setIdx) => (
-                    <div key={setIdx} className="flex items-center gap-2 text-sm">
-                      <span className="w-8 text-muted-foreground">#{setIdx + 1}</span>
-                      <input type="number" placeholder="reps" value={set.reps ?? ""} onChange={(e) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.sets[setIdx]!.reps = e.target.value ? Number(e.target.value) : null))} className={`${selectCls} w-16`} />
-                      <select value={set.weightMode} onChange={(e) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.sets[setIdx]!.weightMode = e.target.value as WeightMode))} className={`${selectCls} flex-1`}>{WEIGHT_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select>
-                    </div>
+                    <SetRow key={setIdx} set={set} index={setIdx} mode={slot.measurementMode}
+                      onPatch={(p) => mutate((d) => Object.assign(d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.sets[setIdx]!, p))}
+                      onRemove={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.sets.splice(setIdx, 1))} />
                   ))}
                   <button onClick={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.sets.push(emptySet()))} className="text-xs font-medium text-primary">+ Set</button>
                 </SubCard>
@@ -112,6 +139,55 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
 
       {picker && <ExercisePicker library={library} onClose={() => setPicker(null)} onPick={(id) => { mutate((d) => d[dayIdx]!.blocks[picker.blockIdx]!.slots.push(emptySlot(id))); setPicker(null); }} />}
       {aiOpen && <AiDraftSheet onClose={() => setAiOpen(false)} onRun={runAi} />}
+      {exportOpen && <ExportTemplateSheet body={{ days }} defaultName={plan.name} onClose={() => setExportOpen(false)} />}
+    </div>
+  );
+}
+
+function SetRow({ set, index, mode, onPatch, onRemove }: { set: WorkoutSet; index: number; mode: MeasurementMode; onPatch: (p: Partial<WorkoutSet>) => void; onRemove: () => void }) {
+  const [open, setOpen] = useState(false);
+  const wm = WEIGHT_MODES.find((m) => m.value === set.weightMode);
+  const num = (v: string) => (v ? Number(v) : null);
+  return (
+    <div className="rounded-xl bg-surface-3/40 p-2">
+      <div className="flex items-center gap-1.5 text-sm">
+        <button onClick={() => setOpen((o) => !o)} className="w-6 shrink-0 text-muted-foreground"><ChevronRight className={`size-3.5 transition-transform ${open ? "rotate-90" : ""}`} /></button>
+        <span className="w-4 shrink-0 text-xs text-muted-foreground">{index + 1}</span>
+        {mode === "reps" || mode === "reps_in_time" ? (
+          <input type="number" placeholder="reps" value={set.reps ?? ""} onChange={(e) => onPatch({ reps: num(e.target.value) })} className={`${inputCls} w-14`} />
+        ) : mode === "time" ? (
+          <input type="number" placeholder="sec" value={set.timeSec ?? ""} onChange={(e) => onPatch({ timeSec: num(e.target.value) })} className={`${inputCls} w-14`} />
+        ) : (
+          <input type="number" placeholder="m" value={set.distanceM ?? ""} onChange={(e) => onPatch({ distanceM: num(e.target.value) })} className={`${inputCls} w-14`} />
+        )}
+        <select value={set.weightMode} onChange={(e) => onPatch({ weightMode: e.target.value as WeightMode })} className={`${inputCls} min-w-0 flex-1`}>{WEIGHT_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select>
+        {wm?.unit && wm.value !== "bodyweight" && wm.value !== "unspecified" && (
+          <input type="number" placeholder={wm.unit} value={set.weightMode === "percent_1rm" ? (set.percent1rm ?? "") : (set.weightValue ?? "")} onChange={(e) => onPatch(set.weightMode === "percent_1rm" ? { percent1rm: num(e.target.value) } : { weightValue: num(e.target.value) })} className={`${inputCls} w-16`} />
+        )}
+        <button onClick={onRemove} className="text-muted-foreground hover:text-danger [&_svg]:size-3.5"><X /></button>
+      </div>
+      {open && (
+        <div className="mt-2 grid grid-cols-2 gap-2 pl-6 text-xs sm:grid-cols-4">
+          <label className="flex flex-col gap-1 text-muted-foreground">Type
+            <select value={set.setType} onChange={(e) => onPatch({ setType: e.target.value as WorkoutSet["setType"] })} className={inputCls}>{SET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select>
+          </label>
+          <label className="flex flex-col gap-1 text-muted-foreground">RPE
+            <input type="number" min={1} max={10} value={set.rpe ?? ""} onChange={(e) => onPatch({ rpe: num(e.target.value) })} className={inputCls} />
+          </label>
+          <label className="flex flex-col gap-1 text-muted-foreground">RIR
+            <input type="number" min={0} max={10} value={set.rir ?? ""} onChange={(e) => onPatch({ rir: num(e.target.value) })} className={inputCls} />
+          </label>
+          <label className="flex flex-col gap-1 text-muted-foreground">Rest s
+            <input type="number" value={set.restAfterSec ?? ""} onChange={(e) => onPatch({ restAfterSec: num(e.target.value) })} className={inputCls} />
+          </label>
+          <label className="col-span-2 flex flex-col gap-1 text-muted-foreground sm:col-span-2">Tempo
+            <input value={set.tempo ?? ""} placeholder="3-1-1-0" onChange={(e) => onPatch({ tempo: e.target.value || null })} className={inputCls} />
+          </label>
+          <label className="col-span-2 flex flex-col gap-1 text-muted-foreground sm:col-span-2">Notes
+            <input value={set.notes ?? ""} onChange={(e) => onPatch({ notes: e.target.value || null })} className={inputCls} />
+          </label>
+        </div>
+      )}
     </div>
   );
 }
@@ -124,6 +200,7 @@ function ExercisePicker({ library, onClose, onPick }: { library: ExerciseLite[];
       <Field label="Search" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} className="mb-3" />
       <div className="max-h-96 space-y-1 overflow-y-auto">
         {filtered.map((e) => <button key={e.id} onClick={() => onPick(e.id)} className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition-colors hover:bg-secondary"><span>{e.name}</span><span className="text-xs text-muted-foreground">{(e.muscle_groups ?? "").split(",")[0]}</span></button>)}
+        {filtered.length === 0 && <p className="px-3 py-6 text-center text-sm text-muted-foreground">No exercises. Add some in Library.</p>}
       </div>
     </Sheet>
   );
@@ -139,6 +216,32 @@ function AiDraftSheet({ onClose, onRun }: { onClose: () => void; onRun: (i: stri
         <Field label="Instructions (optional)" icon={Sparkles} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="e.g. 4-day upper/lower, dumbbells only" />
         <Button size="lg" className="w-full" disabled={busy} onClick={async () => { setBusy(true); try { await onRun(instructions); } finally { setBusy(false); } }}>{busy ? "Drafting…" : "Generate draft"}</Button>
       </div>
+    </Sheet>
+  );
+}
+
+function ExportTemplateSheet({ body, defaultName, onClose }: { body: WorkoutBody; defaultName: string; onClose: () => void }) {
+  const [name, setName] = useState(defaultName);
+  const [shared, setShared] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try { await api.post("/api/workout-templates", { name, visibility: shared ? "tenant" : "private", body, stripWeights: true }); setDone(true); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Sheet open onClose={onClose} title="Save as template">
+      {done ? (
+        <EmptyState icon={Save} title="Saved to your library" description="Client-specific loads were stripped so it's reusable." action={<Button onClick={onClose}>Done</Button>} />
+      ) : (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Copies this plan's structure into a reusable template. Absolute and dropset weights are cleared.</p>
+          <Field label="Template name" value={name} onChange={(e) => setName(e.target.value)} />
+          <label className="flex items-center justify-between rounded-xl bg-secondary px-4 py-3 text-sm"><span>Share with the whole team</span><input type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} className="size-4 accent-(--color-primary)" /></label>
+          <Button size="lg" className="w-full" disabled={busy || !name.trim()} onClick={() => void run()}>{busy ? "Saving…" : "Save template"}</Button>
+        </div>
+      )}
     </Sheet>
   );
 }
