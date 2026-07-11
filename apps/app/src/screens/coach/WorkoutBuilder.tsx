@@ -7,11 +7,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@mossa/protocol";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, Save, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, Save, X } from "@mossa/ui";
 import { api } from "../../api.js";
+import { ExerciseThumb, ExerciseMeta, splitList, pretty, type ExerciseInfo } from "../exercise.js";
 
 interface Plan { id: string; clientId: string; name: string; status: string; body: WorkoutBody }
-interface ExerciseLite { id: string; name: string; muscle_groups?: string | null }
+type ExerciseLite = ExerciseInfo;
 
 const WEIGHT_MODES: { value: WeightMode; label: string; unit?: string }[] = [
   { value: "unspecified", label: "Client picks" },
@@ -85,7 +86,8 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
 
   if (!plan) return <Skeleton className="m-4 h-96" />;
   const day = days[dayIdx];
-  const nameOf = (id: string) => library.find((e) => e.id === id)?.name ?? "Exercise";
+  const exOf = (id: string) => library.find((e) => e.id === id);
+  const nameOf = (id: string) => exOf(id)?.name ?? "Exercise";
 
   return (
     <div className="mx-auto max-w-xl space-y-4 p-4 pb-32">
@@ -133,7 +135,8 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
 
               {block.slots.map((slot, slotIdx) => (
                 <SubCard key={slotIdx} className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <ExerciseThumb thumb={exOf(slot.exerciseId)?.thumb_url} size={34} />
                     <span className="min-w-0 flex-1 truncate font-medium">{nameOf(slot.exerciseId)}</span>
                     <select value={slot.measurementMode} onChange={(e) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.measurementMode = e.target.value as MeasurementMode))} className="rounded-lg bg-surface-3 px-2 py-1 text-xs outline-none">{MEASURE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select>
                     <button onClick={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots.splice(slotIdx, 1))} className="text-muted-foreground hover:text-danger [&_svg]:size-4"><X /></button>
@@ -251,13 +254,49 @@ function SetRow({ set, index, mode, onPatch, onRemove }: { set: WorkoutSet; inde
 
 function ExercisePicker({ library, onClose, onPick }: { library: ExerciseLite[]; onClose: () => void; onPick: (id: string) => void }) {
   const [q, setQ] = useState("");
-  const filtered = library.filter((e) => e.name.toLowerCase().includes(q.toLowerCase())).slice(0, 40);
+  const [muscle, setMuscle] = useState<string | null>(null);
+  const [equip, setEquip] = useState<string | null>(null);
+
+  // Filter options derived from the loaded library (most common first).
+  const opts = (get: (e: ExerciseLite) => string[]) => {
+    const count = new Map<string, number>();
+    for (const e of library) for (const v of get(e)) count.set(v, (count.get(v) ?? 0) + 1);
+    return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([v]) => v).slice(0, 8);
+  };
+  const muscles = opts((e) => splitList(e.muscle_groups));
+  const equipment = opts((e) => splitList(e.equipment));
+
+  const filtered = library.filter((e) =>
+    e.name.toLowerCase().includes(q.toLowerCase()) &&
+    (!muscle || splitList(e.muscle_groups).concat(splitList(e.secondary_muscle_groups)).includes(muscle)) &&
+    (!equip || splitList(e.equipment).includes(equip)),
+  ).slice(0, 80);
+
   return (
     <Sheet open onClose={onClose} title="Add exercise">
       <Field label="Search" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} className="mb-3" />
+      {muscles.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {muscles.map((m) => <Chip key={m} selected={muscle === m} onClick={() => setMuscle(muscle === m ? null : m)}>{pretty(m)}</Chip>)}
+        </div>
+      )}
+      {equipment.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {equipment.map((eq) => <Chip key={eq} selected={equip === eq} onClick={() => setEquip(equip === eq ? null : eq)}>{pretty(eq)}</Chip>)}
+        </div>
+      )}
       <div className="max-h-96 space-y-1 overflow-y-auto">
-        {filtered.map((e) => <button key={e.id} onClick={() => onPick(e.id)} className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition-colors hover:bg-secondary"><span>{e.name}</span><span className="text-xs text-muted-foreground">{(e.muscle_groups ?? "").split(",")[0]}</span></button>)}
-        {filtered.length === 0 && <p className="px-3 py-6 text-center text-sm text-muted-foreground">No exercises. Add some in Library.</p>}
+        {filtered.map((e) => (
+          <button key={e.id} onClick={() => onPick(e.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary">
+            <ExerciseThumb thumb={e.thumb_url} size={40} />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium">{e.name}</div>
+              <ExerciseMeta ex={e} className="text-xs text-muted-foreground" />
+            </div>
+            {e.difficulty && <Badge tone="neutral">{e.difficulty}</Badge>}
+          </button>
+        ))}
+        {filtered.length === 0 && <p className="px-3 py-6 text-center text-sm text-muted-foreground">No matches. Add exercises in Library.</p>}
       </div>
     </Sheet>
   );

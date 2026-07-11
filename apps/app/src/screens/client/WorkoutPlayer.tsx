@@ -6,18 +6,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot } from "@mossa/protocol";
-import { detectPrs, recommendNextDay, displayToKg, weightLabel, fmtWeight, type ExerciseBests } from "@mossa/domain";
+import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, type ExerciseBests } from "@mossa/domain";
 import {
   Button, Card, Badge, Field, Sheet, Skeleton, SubCard, ProgressRing, EmptyState,
   ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, ChevronRight, Check,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
+import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
 
 interface PublishedPlan { id: string; name: string; body: WorkoutBody }
 interface LoggedSet { setIndex: number; reps?: number | null; weightKg?: number | null; durationSeconds?: number | null; effortLabel?: "easy" | "perfect" | "hard" | null; completed: boolean }
 interface SessionEntry { blockIndex: number; slotIndex: number; exerciseId: string; sets: LoggedSet[] }
-interface ExerciseLite { id: string; name: string }
+type ExerciseLite = ExerciseInfo;
 
 export function WorkoutPlayer({ clientId, initialDay }: { clientId: string; initialDay?: number }) {
   const [plan, setPlan] = useState<PublishedPlan | null>(null);
@@ -148,15 +149,17 @@ export function WorkoutPlayer({ clientId, initialDay }: { clientId: string; init
             <Card key={blockIndex} className="space-y-3">
               <div className="flex items-center gap-2"><Badge tone="activity">{blockLabel(block.type)}</Badge></div>
               {block.slots.map((slot, slotIndex) => {
+                const ex = exercises.get(slot.exerciseId);
                 const logged = session.get(`${blockIndex}:${slotIndex}`)?.filter((s) => s.completed).length ?? 0;
                 const done = logged >= slot.sets.length;
                 return (
-                  <SubCard key={slotIndex} className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium">{exercises.get(slot.exerciseId)?.name ?? "Exercise"}</div>
-                      <div className="text-sm text-muted-foreground">{logged}/{slot.sets.length} sets · {slot.measurementMode}</div>
+                  <SubCard key={slotIndex} className="flex items-center gap-3">
+                    <ExerciseThumb thumb={ex?.thumb_url} size={44} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium">{ex?.name ?? "Exercise"}</div>
+                      <div className="text-sm text-muted-foreground">{ex ? <ExerciseMeta ex={ex} className="after:mx-1 after:content-['·']" /> : null}{logged}/{slot.sets.length} sets</div>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex shrink-0 items-center gap-1.5">
                       <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
                       <Button size="sm" variant={done ? "secondary" : "default"} onClick={() => setLogSlot({ blockIndex, slotIndex, slot })}>{done ? <Check /> : "Log"}</Button>
                     </div>
@@ -172,15 +175,19 @@ export function WorkoutPlayer({ clientId, initialDay }: { clientId: string; init
         return (
           <Card key={blockIndex} className="space-y-3">
             <div className="flex items-center gap-2"><Badge tone="activity">{blockLabel(block.type)}</Badge><span className="text-sm text-muted-foreground">{roundsDone}/{rounds} rounds</span></div>
-            {block.slots.map((slot, slotIndex) => (
-              <SubCard key={slotIndex} className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium">{exercises.get(slot.exerciseId)?.name ?? "Exercise"}</div>
-                  <div className="text-sm text-muted-foreground">{slot.sets[0]?.reps ? `${slot.sets[0].reps} reps` : slot.measurementMode}</div>
-                </div>
-                <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
-              </SubCard>
-            ))}
+            {block.slots.map((slot, slotIndex) => {
+              const ex = exercises.get(slot.exerciseId);
+              return (
+                <SubCard key={slotIndex} className="flex items-center gap-3">
+                  <ExerciseThumb thumb={ex?.thumb_url} size={44} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-medium">{ex?.name ?? "Exercise"}</div>
+                    <div className="text-sm text-muted-foreground">{ex ? <ExerciseMeta ex={ex} className="after:mx-1 after:content-['·']" /> : null}{slot.sets[0]?.reps ? `${slot.sets[0].reps} reps` : slot.measurementMode}</div>
+                  </div>
+                  <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
+                </SubCard>
+              );
+            })}
             <Button className="w-full" variant={blockDone ? "secondary" : "default"} disabled={blockDone} onClick={() => setRoundBlock({ blockIndex, block, roundIndex: roundsDone })}>
               {blockDone ? <><Check /> Rounds complete</> : `Log round ${roundsDone + 1} of ${rounds}`}
             </Button>
@@ -210,13 +217,15 @@ export function WorkoutPlayer({ clientId, initialDay }: { clientId: string; init
 }
 
 function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: ExerciseSlot; exerciseName: string; logged: LoggedSet[]; onClose: () => void; onSave: (s: LoggedSet) => Promise<void> }) {
-  const [setIndex, setSetIndex] = useState(logged.filter((s) => s.completed).length);
+  const units = useUnits();
+  const completed = logged.filter((s) => s.completed).sort((a, b) => a.setIndex - b.setIndex);
+  const [setIndex, setSetIndex] = useState(completed.length);
   const [reps, setReps] = useState("");
   const [weight, setWeight] = useState("");
   const [effort, setEffort] = useState<"easy" | "perfect" | "hard" | null>(null);
   const [restLeft, setRestLeft] = useState<number | null>(null);
-  const units = useUnits();
   const prescribed = slot.sets[Math.min(setIndex, slot.sets.length - 1)];
+  const editing = completed.some((s) => s.setIndex === setIndex);
 
   useEffect(() => {
     if (restLeft === null || restLeft <= 0) return;
@@ -224,15 +233,38 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
     return () => clearInterval(t);
   }, [restLeft]);
 
-  const save = async () => {
-    await onSave({ setIndex, reps: reps ? Number(reps) : prescribed?.reps ?? null, weightKg: weight ? Math.round(displayToKg(Number(weight), units) * 100) / 100 : null, effortLabel: effort, completed: true });
-    setSetIndex((i) => i + 1); setReps(""); setWeight(""); setEffort(null); setRestLeft(prescribed?.restAfterSec ?? 60);
+  // Tap a logged set to pull it back into the inputs and correct it.
+  const edit = (s: LoggedSet) => {
+    setSetIndex(s.setIndex);
+    setReps(s.reps != null ? String(s.reps) : "");
+    setWeight(s.weightKg != null ? String(kgToDisplay(s.weightKg, units)) : "");
+    setEffort(s.effortLabel ?? null);
+    setRestLeft(null);
   };
+
+  const save = async () => {
+    const wasEditing = editing;
+    await onSave({ setIndex, reps: reps ? Number(reps) : prescribed?.reps ?? null, weightKg: weight ? Math.round(displayToKg(Number(weight), units) * 100) / 100 : null, effortLabel: effort, completed: true });
+    setReps(""); setWeight(""); setEffort(null);
+    if (wasEditing) { setSetIndex(completed.length); setRestLeft(null); }
+    else { setSetIndex((i) => i + 1); setRestLeft(prescribed?.restAfterSec ?? 60); }
+  };
+
+  const canLog = editing || setIndex < slot.sets.length;
 
   return (
     <Sheet open onClose={onClose} title={exerciseName}>
       <div className="space-y-4">
-        <div className="text-sm text-muted-foreground">Set {setIndex + 1} of {slot.sets.length}{prescribed?.reps ? ` · target ${prescribed.reps} reps` : ""}</div>
+        {completed.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {completed.map((s) => (
+              <button key={s.setIndex} onClick={() => edit(s)} className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${s.setIndex === setIndex ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:bg-surface-3"}`}>
+                {s.reps ?? "–"}{s.weightKg != null ? ` · ${fmtWeight(s.weightKg, units)}` : ""}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="text-sm text-muted-foreground">{editing ? `Editing set ${setIndex + 1}` : `Set ${setIndex + 1} of ${slot.sets.length}`}{prescribed?.reps ? ` · target ${prescribed.reps} reps` : ""}</div>
         {restLeft !== null && restLeft > 0 && (
           <div className="flex items-center justify-center gap-2 rounded-2xl bg-cardio-soft px-4 py-3 font-semibold text-cardio"><Timer className="size-4" /> Rest {restLeft}s</div>
         )}
@@ -248,7 +280,7 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
             ))}
           </div>
         </div>
-        <Button size="lg" className="w-full" onClick={() => void save()} disabled={setIndex >= slot.sets.length}>{setIndex >= slot.sets.length ? "All sets logged" : "Log set"}</Button>
+        <Button size="lg" className="w-full" onClick={() => void save()} disabled={!canLog}>{editing ? `Update set ${setIndex + 1}` : setIndex >= slot.sets.length ? "All sets logged" : "Log set"}</Button>
       </div>
     </Sheet>
   );
@@ -294,9 +326,10 @@ function RoundLogDrawer({ block, roundIndex, exercises, onClose, onSave }: { blo
           const v = vals[si] ?? { reps: "", weight: "" };
           return (
             <SubCard key={si} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="font-medium">{exercises.get(slot.exerciseId)?.name ?? "Exercise"}</div>
-                {prescribed?.reps ? <span className="text-xs text-muted-foreground">target {prescribed.reps} reps</span> : null}
+              <div className="flex items-center gap-2.5">
+                <ExerciseThumb thumb={exercises.get(slot.exerciseId)?.thumb_url} size={36} />
+                <div className="min-w-0 flex-1 truncate font-medium">{exercises.get(slot.exerciseId)?.name ?? "Exercise"}</div>
+                {prescribed?.reps ? <span className="shrink-0 text-xs text-muted-foreground">target {prescribed.reps} reps</span> : null}
               </div>
               <div className="flex gap-3">
                 <Field label="Reps" inputMode="numeric" value={v.reps} onChange={(e) => setV(si, { reps: e.target.value.replace(/\D/g, "") })} className="flex-1" />
@@ -330,13 +363,19 @@ function SwapDrawer({ clientId, planId, dayIndex, coords, library, currentName, 
           <Field label="Replace with" value={q} onChange={(e) => setQ(e.target.value)} />
           <div className="max-h-72 space-y-1 overflow-y-auto">
             {filtered.map((e) => (
-              <button key={e.id} onClick={() => setPicked(e)} className="w-full rounded-xl px-3 py-3 text-left transition-colors hover:bg-secondary">{e.name}</button>
+              <button key={e.id} onClick={() => setPicked(e)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary">
+                <ExerciseThumb thumb={e.thumb_url} size={38} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{e.name}</div>
+                  <ExerciseMeta ex={e} className="text-xs text-muted-foreground" />
+                </div>
+              </button>
             ))}
           </div>
         </div>
       ) : (
         <div className="space-y-4">
-          <SubCard><div className="text-sm text-muted-foreground">Swap to</div><div className="font-semibold">{picked.name}</div></SubCard>
+          <SubCard className="flex items-center gap-3"><ExerciseThumb thumb={picked.thumb_url} size={44} /><div><div className="text-sm text-muted-foreground">Swap to</div><div className="font-semibold">{picked.name}</div></div></SubCard>
           <Field label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} />
           <div className="flex gap-3">
             <Button variant="ghost" onClick={() => setPicked(null)}>Back</Button>

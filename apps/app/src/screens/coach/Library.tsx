@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, MacroInline, Search, Plus, Globe, Trash2, Dumbbell, Utensils, LayoutGrid, PencilLine } from "@mossa/ui";
 import { api } from "../../api.js";
 import { FoodEditor } from "../client/FoodEditor.js";
+import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
 
 type Tab = "exercises" | "foods" | "templates" | "content";
 
@@ -21,7 +22,7 @@ export function Library() {
   );
 }
 
-interface ExerciseRow { id: string; name: string; muscle_groups: string | null; source?: string }
+type ExerciseRow = ExerciseInfo & { source?: string };
 function Exercises() {
   const [q, setQ] = useState("");
   const [items, setItems] = useState<ExerciseRow[] | null>(null);
@@ -38,9 +39,10 @@ function Exercises() {
       </div>
       {!items ? <Skeleton className="h-40" /> : items.length === 0 ? <EmptyState icon={Dumbbell} title="No matches" /> : (
         <Stagger className="space-y-1">{items.map((e) => (
-          <Card key={e.id} className="flex items-center justify-between py-3">
-            <div className="min-w-0"><span className="truncate">{e.name}</span></div>
-            <div className="flex items-center gap-2"><span className="text-xs text-muted-foreground">{(e.muscle_groups ?? "").split(",")[0]}</span>{e.source && e.source !== "custom" && <Badge tone="neutral">{e.source}</Badge>}</div>
+          <Card key={e.id} className="flex items-center gap-3 py-3">
+            <ExerciseThumb thumb={e.thumb_url} size={40} />
+            <div className="min-w-0 flex-1"><div className="truncate font-medium">{e.name}</div><ExerciseMeta ex={e} className="text-xs text-muted-foreground" /></div>
+            {e.source && e.source !== "custom" && <Badge tone="neutral">{e.source}</Badge>}
           </Card>
         ))}</Stagger>
       )}
