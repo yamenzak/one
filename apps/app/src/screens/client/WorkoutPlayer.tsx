@@ -19,11 +19,11 @@ interface LoggedSet { setIndex: number; reps?: number | null; weightKg?: number 
 interface SessionEntry { blockIndex: number; slotIndex: number; exerciseId: string; sets: LoggedSet[] }
 interface ExerciseLite { id: string; name: string }
 
-export function WorkoutPlayer({ clientId }: { clientId: string }) {
+export function WorkoutPlayer({ clientId, initialDay }: { clientId: string; initialDay?: number }) {
   const [plan, setPlan] = useState<PublishedPlan | null>(null);
   const [exercises, setExercises] = useState<Map<string, ExerciseLite>>(new Map());
   const [session, setSession] = useState<Map<string, LoggedSet[]>>(new Map());
-  const [dayIndex, setDayIndex] = useState<number | null>(null);
+  const [dayIndex, setDayIndex] = useState<number | null>(initialDay ?? null);
   const [logSlot, setLogSlot] = useState<{ blockIndex: number; slotIndex: number; slot: ExerciseSlot } | null>(null);
   const [swapSlot, setSwapSlot] = useState<{ blockIndex: number; slotIndex: number; exerciseId: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
