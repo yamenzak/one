@@ -88,8 +88,8 @@ function normalizeOff(p: OffProduct): NormFood | null {
   };
 }
 
-async function searchOff(q: string): Promise<NormFood[]> {
-  const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&fields=id,product_name,generic_name,brands,nutriments,image_small_url,code`;
+async function searchOff(q: string, page = 1): Promise<NormFood[]> {
+  const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&page=${page}&fields=id,product_name,generic_name,brands,nutriments,image_small_url,code`;
   const res = await fetch(url, { headers: { "User-Agent": "Mossa/1.0 (coaching)" } }).catch(() => null);
   if (!res?.ok) return [];
   const data = (await res.json()) as { products?: OffProduct[] };
@@ -105,8 +105,8 @@ async function barcodeOff(code: string): Promise<NormFood | null> {
 }
 
 // ── USDA FoodData Central (API key) ──────────────────────────────────────────
-async function searchUsda(q: string, apiKey: string): Promise<NormFood[]> {
-  const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(q)}&pageSize=15`;
+async function searchUsda(q: string, apiKey: string, page = 1): Promise<NormFood[]> {
+  const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(q)}&pageSize=15&pageNumber=${page}`;
   const res = await fetch(url).catch(() => null);
   if (!res?.ok) return [];
   const data = (await res.json()) as { foods?: { fdcId?: number; description?: string; brandOwner?: string; gtinUpc?: string; foodNutrients?: { nutrientNumber?: string; value?: number }[] }[] };
@@ -241,13 +241,14 @@ async function searchExerciseDb(q: string, rapidApiKey: string): Promise<NormExe
 }
 
 // ── Fan-out helpers ──────────────────────────────────────────────────────────
-async function searchFoodProviders(kv: KVNamespace, cfg: Integrations, q: string): Promise<NormFood[]> {
+async function searchFoodProviders(kv: KVNamespace, cfg: Integrations, q: string, page = 1): Promise<NormFood[]> {
   const tasks: Promise<NormFood[]>[] = [];
   const ql = q.toLowerCase();
-  if (providerReady(cfg, "openfoodfacts")) tasks.push(cachedJson(kv, `off:search:${ql}`, () => searchOff(q)));
-  if (providerReady(cfg, "usda")) tasks.push(cachedJson(kv, `usda:search:${ql}`, () => searchUsda(q, String(cfg.usda?.apiKey ?? ""))));
-  if (providerReady(cfg, "nutritionix")) tasks.push(searchNutritionix(q, String(cfg.nutritionix?.appId ?? ""), String(cfg.nutritionix?.appKey ?? "")).catch(() => []));
-  if (providerReady(cfg, "fatsecret")) tasks.push(searchFatSecret(kv, q, String(cfg.fatsecret?.clientId ?? ""), String(cfg.fatsecret?.clientSecret ?? "")).catch(() => []));
+  if (providerReady(cfg, "openfoodfacts")) tasks.push(cachedJson(kv, `off:search:${ql}:${page}`, () => searchOff(q, page)));
+  if (providerReady(cfg, "usda")) tasks.push(cachedJson(kv, `usda:search:${ql}:${page}`, () => searchUsda(q, String(cfg.usda?.apiKey ?? ""), page)));
+  // The instant/keyword providers don't page — only include them on the first page.
+  if (page === 1 && providerReady(cfg, "nutritionix")) tasks.push(searchNutritionix(q, String(cfg.nutritionix?.appId ?? ""), String(cfg.nutritionix?.appKey ?? "")).catch(() => []));
+  if (page === 1 && providerReady(cfg, "fatsecret")) tasks.push(searchFatSecret(kv, q, String(cfg.fatsecret?.clientId ?? ""), String(cfg.fatsecret?.clientSecret ?? "")).catch(() => []));
   const settled = await Promise.allSettled(tasks);
   return mergeFoods(settled.map((s) => (s.status === "fulfilled" ? s.value : [])));
 }
@@ -276,8 +277,9 @@ export const externalRoutes = new Hono<AppEnv>()
     if (!ent.features.externalSearch) return c.json({ error: "externalSearch not in your plan" }, 403);
     const q = (c.req.query("q") ?? "").trim();
     if (q.length < 2) return c.json({ foods: [] });
+    const page = Math.max(1, Math.min(20, Number(c.req.query("page") ?? "1") || 1));
     const cfg = await tenantIntegrations(c.env.DB, who.tenantId);
-    return c.json({ foods: await searchFoodProviders(c.env.CACHE, cfg, q) });
+    return c.json({ foods: await searchFoodProviders(c.env.CACHE, cfg, q, page) });
   })
 
   .post("/foods/import", async (c) => {

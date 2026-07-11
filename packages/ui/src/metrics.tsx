@@ -91,14 +91,19 @@ export function MetricChip({ metric, value, className }: { metric: MetricKey; va
   );
 }
 
-/** Compact inline macros — "P32 C40 F12", each in its metric color. */
+/** Compact inline macros — a colored icon + grams for protein/carbs/fat. */
 export function MacroInline({ proteinG, carbsG, fatG, className }: { proteinG: number; carbsG: number; fatG: number; className?: string }) {
   const grams = { protein: proteinG, carbs: carbsG, fat: fatG };
   return (
-    <span className={cn("numeral inline-flex gap-2 font-medium", className)}>
-      {MACRO_KEYS.map((k) => (
-        <span key={k} className={toneText[METRICS[k].tone]}>{METRICS[k].short}{Math.round(grams[k])}</span>
-      ))}
+    <span className={cn("numeral inline-flex items-center gap-2 font-medium", className)}>
+      {MACRO_KEYS.map((k) => {
+        const M = METRICS[k];
+        return (
+          <span key={k} className={cn("inline-flex items-center gap-1", toneText[M.tone])}>
+            <M.icon className="size-3.5" />{Math.round(grams[k])}
+          </span>
+        );
+      })}
     </span>
   );
 }

@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Field, Sheet, Chip, Badge, MacroInline, cn, toneSoft, METRICS, Search, Barcode, Sparkles, Camera, Utensils } from "@mossa/ui";
+import { Button, Field, Sheet, Chip, Badge, SegmentedControl, MacroInline, cn, toneSoft, METRICS, Search, Barcode, Sparkles, Camera, Utensils } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { BarcodeScanner } from "./BarcodeScanner.js";
 
@@ -36,17 +36,35 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
   const [meal, setMeal] = useState(mealType ?? "snack");
   const [quantity, setQuantity] = useState("100");
   const [searching, setSearching] = useState(false);
+  const [extPage, setExtPage] = useState(0);
+  const [extMore, setExtMore] = useState(false);
+  const [filter, setFilter] = useState<"all" | "whole" | "branded">("all");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
 
   const search = useCallback(async () => {
-    if (q.trim().length < 2) { setLocal([]); setExternal([]); return; }
+    if (q.trim().length < 2) { setLocal([]); setExternal([]); setExtPage(0); return; }
     setLocal((await api.get<{ foods: Food[] }>(`/api/foods?q=${encodeURIComponent(q)}`)).foods);
+    setExternal([]); setExtPage(0); setExtMore(false);
   }, [q]);
   useEffect(() => { const t = setTimeout(() => void search(), 250); return () => clearTimeout(t); }, [search]);
 
-  const searchExternal = async () => { setSearching(true); try { setExternal((await api.get<{ foods: Food[] }>(`/api/foods/search-external?q=${encodeURIComponent(q)}`)).foods); } finally { setSearching(false); } };
+  const searchExternal = async (page = 1) => {
+    setSearching(true);
+    try {
+      const res = (await api.get<{ foods: Food[] }>(`/api/foods/search-external?q=${encodeURIComponent(q)}&page=${page}`)).foods;
+      setExternal((prev) => {
+        if (page === 1) return res;
+        const seen = new Set(prev.map((f) => `${f.source}:${f.sourceId ?? f.name}`));
+        return [...prev, ...res.filter((f) => !seen.has(`${f.source}:${f.sourceId ?? f.name}`))];
+      });
+      setExtPage(page);
+      setExtMore(res.length >= 10);
+    } finally { setSearching(false); }
+  };
+
+  const matchesFilter = (f: Food) => filter === "all" || (filter === "branded" ? !!f.brand : !f.brand);
 
   const lookupBarcode = async (code: string) => {
     setScanOpen(false);
@@ -132,18 +150,31 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
         <Field label="Search foods" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
         <div className="flex flex-wrap gap-2">
           <Chip icon={Barcode} onClick={() => setScanOpen(true)}>Barcode</Chip>
-          <Chip icon={Search} onClick={() => void searchExternal()} disabled={q.length < 2}>{searching ? "Searching…" : "Web"}</Chip>
+          <Chip icon={Search} onClick={() => void searchExternal(1)} disabled={q.length < 2}>{searching ? "Searching…" : "Web"}</Chip>
           <Chip icon={Sparkles} onClick={() => void naturalLog()} disabled={q.length < 3 || aiBusy}>{aiBusy ? "Parsing…" : "Log this"}</Chip>
           <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full bg-secondary px-4 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4">
             <Camera /> {aiBusy ? "Reading…" : "Snap"}
             <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void snapMeal(e.target.files[0])} />
           </label>
         </div>
+        <SegmentedControl
+          options={[{ value: "all", label: "All" }, { value: "whole", label: "Whole" }, { value: "branded", label: "Branded" }]}
+          value={filter}
+          onChange={setFilter}
+        />
         {aiError && <p className="text-sm text-warning">{aiError}</p>}
         <div className="max-h-80 space-y-1 overflow-y-auto">
-          {local.map((f) => <FoodRow key={f.id} food={f} badge="library" onPick={() => setSelected(f)} />)}
-          {external.map((f, i) => <FoodRow key={`ext-${i}`} food={f} badge="web" onPick={() => setSelected(f)} />)}
-          {q.length >= 2 && local.length === 0 && external.length === 0 && !searching && <p className="p-4 text-center text-sm text-muted-foreground">Nothing local — try Web.</p>}
+          {local.filter(matchesFilter).map((f) => <FoodRow key={f.id} food={f} badge="library" onPick={() => setSelected(f)} />)}
+          {external.filter(matchesFilter).map((f, i) => <FoodRow key={`ext-${i}`} food={f} badge="web" onPick={() => setSelected(f)} />)}
+          {q.length >= 2 && local.filter(matchesFilter).length === 0 && external.filter(matchesFilter).length === 0 && !searching && (
+            <p className="p-4 text-center text-sm text-muted-foreground">{extPage === 0 ? "Nothing local — try Web." : "No matches for this filter."}</p>
+          )}
+          {extPage > 0 && extMore && (
+            <Button variant="ghost" className="w-full" disabled={searching} onClick={() => void searchExternal(extPage + 1)}>{searching ? "Loading…" : "Load more results"}</Button>
+          )}
+          {extPage === 0 && (local.length > 0 || q.length >= 2) && !searching && (
+            <button onClick={() => void searchExternal(1)} disabled={q.length < 2} className="w-full rounded-xl px-3 py-2.5 text-center text-sm font-medium text-primary disabled:opacity-40">Can't find it? Search the web →</button>
+          )}
         </div>
       </div>
       {scanOpen && <BarcodeScanner onDetected={(code) => void lookupBarcode(code)} onClose={() => setScanOpen(false)} />}
