@@ -67,3 +67,39 @@ export async function listPasskeys(): Promise<{ id: string; name: string | null;
   const r = await api.get<{ passkeys?: { id: string; name: string | null; createdAt: string }[] }>("/api/auth/passkey/list-user-passkeys").catch(() => ({ passkeys: [] }));
   return r.passkeys ?? [];
 }
+
+interface RequestOptionsJSON {
+  challenge: string;
+  allowCredentials?: { id: string; type: string; transports?: string[] }[];
+  rpId?: string;
+  userVerification?: string;
+  timeout?: number;
+}
+
+/** Sign in with an existing passkey (WebAuthn get ceremony). */
+export async function signInWithPasskey(): Promise<void> {
+  const options = await api.post<RequestOptionsJSON>("/api/auth/passkey/generate-authenticate-options", {});
+  const publicKey: PublicKeyCredentialRequestOptions = {
+    challenge: b64urlToBuf(options.challenge),
+    rpId: options.rpId,
+    userVerification: (options.userVerification as UserVerificationRequirement) ?? "preferred",
+    timeout: options.timeout,
+    allowCredentials: options.allowCredentials?.map((c) => ({ id: b64urlToBuf(c.id), type: "public-key" as const, transports: c.transports as AuthenticatorTransport[] | undefined })),
+  };
+  const cred = (await navigator.credentials.get({ publicKey })) as PublicKeyCredential | null;
+  if (!cred) throw new Error("passkey sign-in cancelled");
+  const resp = cred.response as AuthenticatorAssertionResponse;
+  await api.post("/api/auth/passkey/verify-authentication", {
+    response: {
+      id: cred.id,
+      rawId: bufToB64url(cred.rawId),
+      type: cred.type,
+      response: {
+        clientDataJSON: bufToB64url(resp.clientDataJSON),
+        authenticatorData: bufToB64url(resp.authenticatorData),
+        signature: bufToB64url(resp.signature),
+        userHandle: resp.userHandle ? bufToB64url(resp.userHandle) : undefined,
+      },
+    },
+  });
+}

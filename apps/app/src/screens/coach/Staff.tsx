@@ -37,7 +37,7 @@ export function Staff() {
       <Stagger className="space-y-2">
         {members.filter((m) => m.role !== "client").map((m) => (
           <Card key={m.userId} className="flex items-center gap-3">
-            <Avatar name={m.name || m.email || "?"} className="size-10" />
+            <Avatar name={m.name || m.email || "?"} seed={m.email ?? m.userId} className="size-10" />
             <div className="min-w-0 flex-1"><div className="truncate font-medium">{m.name || m.email}</div><div className="truncate text-xs text-muted-foreground">{m.email}</div></div>
             <div className="w-32"><Select value={m.role} onChange={(v) => void changeRole(m.userId, v)} options={ROLES} /></div>
           </Card>

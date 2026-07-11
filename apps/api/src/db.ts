@@ -51,7 +51,7 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "CREATE INDEX IF NOT EXISTS idx_authlogs_email ON auth_logs(email, at);",
 
           // ── Tenancy domain: clients & staff scoping (SPEC §2) ──────────────
-          "CREATE TABLE IF NOT EXISTS clients (id TEXT PRIMARY KEY, tenant_id TEXT, user_id TEXT, display_name TEXT, email TEXT, status TEXT DEFAULT 'active', gender TEXT, date_of_birth TEXT, height_cm REAL, timezone TEXT, weight_unit TEXT DEFAULT 'kg', length_unit TEXT DEFAULT 'cm', volume_unit TEXT DEFAULT 'ml', intake_json TEXT, dashboard_prefs_json TEXT, onboarding_complete INTEGER DEFAULT 0, created_at TEXT, archived_at TEXT);",
+          "CREATE TABLE IF NOT EXISTS clients (id TEXT PRIMARY KEY, tenant_id TEXT, user_id TEXT, display_name TEXT, email TEXT, status TEXT DEFAULT 'active', gender TEXT, date_of_birth TEXT, height_cm REAL, timezone TEXT, weight_unit TEXT DEFAULT 'kg', length_unit TEXT DEFAULT 'cm', volume_unit TEXT DEFAULT 'ml', intake_json TEXT, dashboard_prefs_json TEXT, onboarding_complete INTEGER DEFAULT 0, avatar_url TEXT, avatar_seed TEXT, created_at TEXT, archived_at TEXT);",
           "CREATE INDEX IF NOT EXISTS idx_clients_tenant ON clients(tenant_id, status);",
           "CREATE INDEX IF NOT EXISTS idx_clients_user ON clients(user_id);",
           "CREATE TABLE IF NOT EXISTS client_trainers (client_id TEXT, trainer_user_id TEXT, tenant_id TEXT, is_primary INTEGER DEFAULT 0, created_at TEXT, PRIMARY KEY (client_id, trainer_user_id));",
@@ -110,6 +110,9 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "CREATE INDEX IF NOT EXISTS idx_csubs_client ON client_subscriptions(client_id, status);",
           "CREATE TABLE IF NOT EXISTS redemption_codes (id TEXT PRIMARY KEY, tenant_id TEXT, code TEXT, days_to_add INTEGER, target_feature TEXT DEFAULT 'all', max_uses INTEGER DEFAULT 1, used_count INTEGER DEFAULT 0, used_by_json TEXT, expires_at TEXT, active INTEGER DEFAULT 1, created_by TEXT, created_at TEXT);",
           "CREATE UNIQUE INDEX IF NOT EXISTS idx_redemption_code ON redemption_codes(tenant_id, code);",
+          // Promo codes = Stripe checkout discounts (distinct from redemption day top-ups).
+          "CREATE TABLE IF NOT EXISTS promo_codes (id TEXT PRIMARY KEY, tenant_id TEXT, code TEXT, discount_type TEXT DEFAULT 'percent', percent_off INTEGER, amount_off_cents INTEGER, restricted_package_id TEXT, max_redemptions INTEGER, redemption_count INTEGER DEFAULT 0, expires_at TEXT, active INTEGER DEFAULT 1, stripe_coupon_id TEXT, stripe_promo_id TEXT, created_by TEXT, created_at TEXT);",
+          "CREATE UNIQUE INDEX IF NOT EXISTS idx_promo_code ON promo_codes(tenant_id, code);",
           "CREATE TABLE IF NOT EXISTS addon_types (id TEXT PRIMARY KEY, tenant_id TEXT, slug TEXT, label TEXT, kind TEXT DEFAULT 'consultation', duration_minutes INTEGER, standalone_price_cents INTEGER, active INTEGER DEFAULT 1);",
           "CREATE TABLE IF NOT EXISTS trainer_sessions (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, trainer_user_id TEXT, subscription_id TEXT, addon_type_id TEXT, scheduled_at TEXT, duration_minutes INTEGER, status TEXT DEFAULT 'scheduled', completed_at TEXT, notes TEXT, created_at TEXT);",
 
@@ -123,7 +126,15 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "CREATE TABLE IF NOT EXISTS tenant_settings (tenant_id TEXT PRIMARY KEY, branding_json TEXT, ai_toggles_json TEXT, marketplace_json TEXT, stripe_account_id TEXT, updated_at TEXT);",
         ].join(" "),
       )
-      .then(() => undefined)
+      .then(async () => {
+        // Best-effort column migrations for tables that predate a column.
+        // Each is harmless (and errors ignored) once the column exists.
+        const alters = [
+          "ALTER TABLE clients ADD COLUMN avatar_url TEXT",
+          "ALTER TABLE clients ADD COLUMN avatar_seed TEXT",
+        ];
+        for (const sql of alters) await db.exec(sql).catch(() => undefined);
+      })
       .catch((err) => {
         schemaReady = null; // allow retry on next request
         throw err;

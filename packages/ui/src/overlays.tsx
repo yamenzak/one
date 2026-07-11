@@ -205,16 +205,17 @@ export function Tooltip({ content, children }: { content: ReactNode; children: R
 }
 
 // ── Avatar ───────────────────────────────────────────────────────────────────
-export function Avatar({ name, src, className }: { name: string; src?: string | null; className?: string }) {
-  const initials = name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+/** DiceBear v9 generated avatar URL for a seed (deterministic, no upload). */
+export function dicebearUrl(seed: string, style = "thumbs"): string {
+  return `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}&radius=50&backgroundType=gradientLinear`;
+}
+
+export function Avatar({ name, src, seed, className }: { name: string; src?: string | null; seed?: string | null; className?: string }) {
+  const initials = name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  const imageSrc = src || (seed ? dicebearUrl(seed) : null);
   return (
     <AvatarPrimitive.Root className={cn("grid size-10 place-items-center overflow-hidden rounded-full bg-primary/15 text-sm font-semibold text-primary", className)}>
-      {src && <AvatarPrimitive.Image src={src} className="size-full object-cover" />}
+      {imageSrc && <AvatarPrimitive.Image src={imageSrc} className="size-full object-cover" />}
       <AvatarPrimitive.Fallback>{initials}</AvatarPrimitive.Fallback>
     </AvatarPrimitive.Root>
   );

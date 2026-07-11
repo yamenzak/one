@@ -7,6 +7,7 @@ import { motion } from "motion/react";
 import { Button, Card, Field, Mail, KeyRound, ArrowRight, Sparkles } from "@mossa/ui";
 import { api } from "../api.js";
 import { useSession } from "../session.js";
+import { passkeySupported, signInWithPasskey } from "../passkey.js";
 
 export function Login() {
   const { refresh } = useSession();
@@ -66,10 +67,18 @@ export function Login() {
                 <h2 className="text-xl font-semibold tracking-tight">Sign in</h2>
                 <p className="mt-1 text-sm text-muted-foreground">We'll email you a 6-digit code.</p>
               </div>
-              <Field label="Email" icon={Mail} type="email" autoComplete="email" value={email} placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && email.includes("@") && void sendCode()} />
+              <Field label="Email" icon={Mail} type="email" autoComplete="email webauthn" value={email} placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && email.includes("@") && void sendCode()} />
               <Button size="lg" className="w-full" disabled={!email.includes("@") || busy} onClick={() => void sendCode()}>
                 {busy ? "Sending…" : "Email me a code"} {!busy && <ArrowRight />}
               </Button>
+              {passkeySupported() && (
+                <button
+                  className="flex w-full items-center justify-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  onClick={async () => { setError(null); try { await signInWithPasskey(); await refresh(); } catch { setError("No passkey found on this device."); } }}
+                >
+                  <KeyRound className="size-4" /> Sign in with a passkey
+                </button>
+              )}
             </>
           ) : (
             <>

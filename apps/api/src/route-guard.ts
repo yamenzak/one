@@ -97,7 +97,7 @@ function permissionFor(method: string, path: string): Record<string, string[]> |
 
   // Commerce (packages, codes). Purchases/redeem are client actions -> null.
   if (path === "/api/redeem") return null;
-  if (path.startsWith("/api/packages") || path.startsWith("/api/redemption-codes") || path.startsWith("/api/addon-types")) {
+  if (path.startsWith("/api/packages") || path.startsWith("/api/redemption-codes") || path.startsWith("/api/addon-types") || path.startsWith("/api/promo-codes")) {
     return read ? { package: ["read"] } : { package: [method === "POST" ? "create" : writeVerb] };
   }
 

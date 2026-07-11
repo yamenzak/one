@@ -12,7 +12,7 @@ import { CoachPlans } from "./CoachPlans.js";
 import { GoalManager } from "./GoalManager.js";
 import { ClientManage } from "./ClientManage.js";
 
-export interface ClientSummary { id: string; displayName: string; email: string | null; status: string; hasLogin: boolean }
+export interface ClientSummary { id: string; displayName: string; email: string | null; status: string; hasLogin: boolean; avatarUrl?: string | null; avatarSeed?: string | null }
 
 export function Clients() {
   const [clients, setClients] = useState<ClientSummary[] | null>(null);
@@ -46,7 +46,7 @@ export function Clients() {
         <Stagger className="space-y-2">
           {clients.map((c) => (
             <Card key={c.id} interactive onClick={() => setSelected(c)} className="flex items-center gap-3.5 py-3.5">
-              <Avatar name={c.displayName} className="size-11" />
+              <Avatar name={c.displayName} src={c.avatarUrl} seed={c.avatarSeed ?? c.id} className="size-11" />
               <div className="min-w-0 flex-1">
                 <div className="truncate font-semibold">{c.displayName}</div>
                 <div className="truncate text-sm text-muted-foreground">{c.email ?? "no email"}</div>
@@ -84,7 +84,7 @@ function ClientDetail({ client, onBack }: { client: ClientSummary; onBack: () =>
       <div className="sticky top-16 z-20 space-y-3 border-b border-border/40 bg-background/80 px-4 pb-3 pt-3 backdrop-blur-xl">
         <div className="mx-auto flex max-w-xl items-center gap-3">
           <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
-          <Avatar name={client.displayName} className="size-10" />
+          <Avatar name={client.displayName} src={client.avatarUrl} seed={client.avatarSeed ?? client.id} className="size-10" />
           <div className="min-w-0 flex-1">
             <div className="truncate font-semibold">{client.displayName}</div>
             <div className="text-xs text-muted-foreground">Coach view</div>

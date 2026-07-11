@@ -31,6 +31,8 @@ export interface ClientRow {
   intake_json: string | null;
   dashboard_prefs_json: string | null;
   onboarding_complete: number;
+  avatar_url: string | null;
+  avatar_seed: string | null;
   created_at: string;
   archived_at: string | null;
 }
@@ -145,6 +147,8 @@ function clientView(row: ClientRow) {
     dashboardPrefs: parseJson<Record<string, unknown>>(row.dashboard_prefs_json, {}),
     onboardingComplete: Boolean(row.onboarding_complete),
     hasLogin: Boolean(row.user_id),
+    avatarUrl: row.avatar_url,
+    avatarSeed: row.avatar_seed,
     createdAt: row.created_at,
   };
 }
@@ -324,5 +328,22 @@ export const clientRoutes = new Hono<AppEnv>()
     )
       .bind(access.client.id, c.req.param("trainerUserId"), access.client.tenant_id)
       .run();
+    return c.json({ ok: true });
+  })
+
+  // Avatar: shuffle the DiceBear seed, or persist an uploaded avatar (R2 key).
+  .post("/clients/:id/avatar", async (c) => {
+    const access = await requireClientAccess(c, c.req.param("id"));
+    if ("response" in access) return access.response;
+    const body = z
+      .object({ seed: z.string().max(40).nullish(), avatarUrl: z.string().max(300).nullish() })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body" }, 400);
+    if (body.data.avatarUrl !== undefined) {
+      await c.env.DB.prepare("UPDATE clients SET avatar_url = ?, avatar_seed = NULL WHERE id = ?").bind(body.data.avatarUrl, access.client.id).run();
+    } else {
+      const seed = body.data.seed ?? Math.random().toString(36).slice(2, 10);
+      await c.env.DB.prepare("UPDATE clients SET avatar_seed = ?, avatar_url = NULL WHERE id = ?").bind(seed, access.client.id).run();
+    }
     return c.json({ ok: true });
   });
