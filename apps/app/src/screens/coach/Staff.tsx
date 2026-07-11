@@ -1,10 +1,11 @@
-/** Staff management — roster, role changes, email invite. */
+/** Staff management — roster, role changes, custom permission grants, invite. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Field, Sheet, Skeleton, Avatar, Select, Chip, Page, Stagger, Mail, Plus } from "@mossa/ui";
+import { PERMISSION_CATALOG } from "@mossa/domain";
+import { Button, Card, Field, Sheet, Skeleton, Avatar, Select, Chip, Page, Stagger, Mail, ShieldCheck, Plus } from "@mossa/ui";
 import { api } from "../../api.js";
 
-interface Member { userId: string; role: string; name: string | null; email: string | null }
+interface Member { userId: string; role: string; name: string | null; email: string | null; customGrant?: Record<string, string[]> | null }
 const ROLES = [
   { value: "owner", label: "Owner" }, { value: "trainer", label: "Trainer" }, { value: "assistant", label: "Assistant" }, { value: "client", label: "Client" },
 ];
@@ -15,6 +16,7 @@ export function Staff() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"trainer" | "assistant">("trainer");
   const [msg, setMsg] = useState<string | null>(null);
+  const [permMember, setPermMember] = useState<Member | null>(null);
 
   const load = useCallback(async () => setMembers((await api.get<{ members: Member[] }>("/api/members")).members), []);
   useEffect(() => void load(), [load]);
@@ -38,7 +40,8 @@ export function Staff() {
         {members.filter((m) => m.role !== "client").map((m) => (
           <Card key={m.userId} className="flex items-center gap-3">
             <Avatar name={m.name || m.email || "?"} seed={m.email ?? m.userId} className="size-10" />
-            <div className="min-w-0 flex-1"><div className="truncate font-medium">{m.name || m.email}</div><div className="truncate text-xs text-muted-foreground">{m.email}</div></div>
+            <div className="min-w-0 flex-1"><div className="truncate font-medium">{m.name || m.email}</div><div className="truncate text-xs text-muted-foreground">{m.customGrant ? "Custom access" : m.email}</div></div>
+            {m.role !== "owner" && <Button size="icon" variant="secondary" aria-label="Permissions" onClick={() => setPermMember(m)}><ShieldCheck /></Button>}
             <div className="w-32"><Select value={m.role} onChange={(v) => void changeRole(m.userId, v)} options={ROLES} /></div>
           </Card>
         ))}
@@ -53,6 +56,41 @@ export function Staff() {
           <p className="text-xs text-muted-foreground">They sign in with a code — no password to set.</p>
         </div>
       </Sheet>
+
+      {permMember && <PermissionSheet member={permMember} onClose={() => setPermMember(null)} onSaved={() => { setPermMember(null); void load(); }} />}
     </Page>
+  );
+}
+
+function PermissionSheet({ member, onClose, onSaved }: { member: Member; onClose: () => void; onSaved: () => void }) {
+  const [grant, setGrant] = useState<Record<string, string[]>>(() => structuredClone(member.customGrant ?? {}));
+  const [busy, setBusy] = useState(false);
+  const toggle = (res: string, action: string) => setGrant((g) => {
+    const cur = new Set(g[res] ?? []);
+    cur.has(action) ? cur.delete(action) : cur.add(action);
+    const next = { ...g };
+    if (cur.size) next[res] = [...cur]; else delete next[res];
+    return next;
+  });
+  const save = async () => {
+    setBusy(true);
+    try { await api.patch(`/api/members/${member.userId}/permissions`, { permissions: Object.keys(grant).length ? grant : null }); onSaved(); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Sheet open onClose={onClose} title={`Access — ${member.name || member.email}`}>
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">Override the role's defaults with a custom grant. Clear everything to fall back to the {member.role} role.</p>
+        <div className="max-h-[55vh] space-y-3 overflow-y-auto">
+          {Object.entries(PERMISSION_CATALOG).map(([res, actions]) => (
+            <div key={res}>
+              <div className="mb-1.5 text-sm font-medium capitalize">{res}</div>
+              <div className="flex flex-wrap gap-2">{actions.map((a) => <Chip key={a} selected={(grant[res] ?? []).includes(a)} onClick={() => toggle(res, a)}>{a}</Chip>)}</div>
+            </div>
+          ))}
+        </div>
+        <Button size="lg" className="w-full" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save access"}</Button>
+      </div>
+    </Sheet>
   );
 }

@@ -4,11 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Badge, Field, Select, Skeleton, Page, Stagger, Target } from "@mossa/ui";
 import { api } from "../../api.js";
 
-interface Goal { id: string; label: string; status: string; targets: Record<string, number> | null; created_at: string }
+interface Goal { id: string; label: string; status: string; targets: Record<string, number> | null; notes?: string | null; created_at: string }
 
 export function GoalManager({ clientId }: { clientId: string }) {
   const [goals, setGoals] = useState<Goal[] | null>(null);
-  const [form, setForm] = useState({ label: "", gender: "male" as "male" | "female", ageYears: "", heightCm: "", weightKg: "", activityLevel: "moderate", primaryGoal: "maintain", dietaryApproach: "balanced" });
+  const [form, setForm] = useState({ label: "", gender: "male" as "male" | "female", ageYears: "", heightCm: "", weightKg: "", activityLevel: "moderate", primaryGoal: "maintain", dietaryApproach: "balanced", weightMin: "", weightMax: "", notes: "" });
   const [busy, setBusy] = useState(false);
   const [derivation, setDerivation] = useState<Record<string, unknown> | null>(null);
 
@@ -18,13 +18,15 @@ export function GoalManager({ clientId }: { clientId: string }) {
   const create = async () => {
     setBusy(true);
     try {
-      const res = await api.post<{ derivation: Record<string, unknown> }>("/api/goals", { clientId, label: form.label || "New phase", calculator: { gender: form.gender, ageYears: Number(form.ageYears), heightCm: Number(form.heightCm), weightKg: Number(form.weightKg), activityLevel: form.activityLevel, primaryGoal: form.primaryGoal, dietaryApproach: form.dietaryApproach } });
-      setDerivation(res.derivation); await load();
+      const ranges = (form.weightMin || form.weightMax) ? { weightKg: { min: form.weightMin ? Number(form.weightMin) : null, max: form.weightMax ? Number(form.weightMax) : null } } : undefined;
+      const res = await api.post<{ derivation: Record<string, unknown> }>("/api/goals", { clientId, label: form.label || "New phase", notes: form.notes || undefined, ranges, calculator: { gender: form.gender, ageYears: Number(form.ageYears), heightCm: Number(form.heightCm), weightKg: Number(form.weightKg), activityLevel: form.activityLevel, primaryGoal: form.primaryGoal, dietaryApproach: form.dietaryApproach } });
+      setDerivation(res.derivation); setForm((f) => ({ ...f, label: "", notes: "", weightMin: "", weightMax: "" })); await load();
     } catch { /* validation surfaces via disabled */ } finally { setBusy(false); }
   };
 
   if (!goals) return <Skeleton className="m-4 h-64" />;
   const active = goals.find((g) => g.status === "active");
+  const history = goals.filter((g) => g.status !== "active");
   const valid = form.ageYears && form.heightCm && form.weightKg;
 
   return (
@@ -55,10 +57,29 @@ export function GoalManager({ clientId }: { clientId: string }) {
           <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Activity level</label><Select value={form.activityLevel} onChange={(v) => setForm({ ...form, activityLevel: v })} options={[{ value: "sedentary", label: "Sedentary" }, { value: "light", label: "Lightly active" }, { value: "moderate", label: "Moderately active" }, { value: "very_active", label: "Very active" }]} /></div>
           <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Primary goal</label><Select value={form.primaryGoal} onChange={(v) => setForm({ ...form, primaryGoal: v })} options={[{ value: "lose_weight", label: "Lose weight" }, { value: "maintain", label: "Maintain" }, { value: "build_muscle", label: "Build muscle" }, { value: "improve_fitness", label: "Improve fitness" }]} /></div>
           <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Dietary approach</label><Select value={form.dietaryApproach} onChange={(v) => setForm({ ...form, dietaryApproach: v })} options={[{ value: "balanced", label: "Balanced" }, { value: "high_protein", label: "High protein" }, { value: "low_carb", label: "Low carb" }, { value: "keto", label: "Keto" }, { value: "vegan", label: "Vegan" }, { value: "vegetarian", label: "Vegetarian" }]} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Weight range min (kg)" inputMode="decimal" value={form.weightMin} onChange={(e) => setForm({ ...form, weightMin: e.target.value })} />
+            <Field label="Weight range max (kg)" inputMode="decimal" value={form.weightMax} onChange={(e) => setForm({ ...form, weightMax: e.target.value })} />
+          </div>
+          <Field label="Notes (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Context for this phase" />
           <Button size="lg" className="w-full" disabled={!valid || busy} onClick={() => void create()}>{busy ? "Calculating…" : "Set goal + calculate targets"}</Button>
           {derivation && <p className="text-xs text-muted-foreground">{String(derivation.bmrFormula)} · BMR {String(derivation.bmr)} · TDEE {String(derivation.tdee)} kcal</p>}
         </Card>
       </Stagger>
+
+      {history.length > 0 && (
+        <Stagger>
+          <Card className="space-y-2">
+            <h2 className="text-lg font-semibold">Goal history</h2>
+            {history.map((g) => (
+              <div key={g.id} className="flex items-center justify-between gap-2 border-t border-border/40 pt-2 first:border-0 first:pt-0">
+                <div className="min-w-0"><div className="truncate text-sm font-medium">{g.label}</div><div className="numeral text-xs text-muted-foreground">{g.targets?.targetCalories ?? "—"} kcal · {new Date(g.created_at).toLocaleDateString()}</div></div>
+                <Badge tone="neutral">{g.status}</Badge>
+              </div>
+            ))}
+          </Card>
+        </Stagger>
+      )}
     </Page>
   );
 }
