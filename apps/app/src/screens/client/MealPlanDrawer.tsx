@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy } from "@mossa/domain";
-import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, Utensils, ShoppingCart, Plus, Minus } from "@mossa/ui";
+import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, Utensils, ShoppingCart, Plus, Minus, ChevronDown } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 
@@ -32,12 +32,25 @@ function FoodThumb({ src, size = 38 }: { src?: string | null; size?: number }) {
   );
 }
 
+/** Thin protein/carbs/fat proportion bar — premium macro glance, tiny footprint. */
+function MacroSplitBar({ p, c, f }: { p: number; c: number; f: number }) {
+  const total = p + c + f || 1;
+  return (
+    <div className="flex h-1.5 overflow-hidden rounded-full bg-surface-3">
+      <span className="bg-protein" style={{ width: `${(p / total) * 100}%` }} />
+      <span className="bg-carbs" style={{ width: `${(c / total) * 100}%` }} />
+      <span className="bg-fat" style={{ width: `${(f / total) * 100}%` }} />
+    </div>
+  );
+}
+
 export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: string; onClose: () => void; onLogged: () => void }) {
   const [plan, setPlan] = useState<Plan | null | undefined>(undefined);
   const [foods, setFoods] = useState<Map<string, FoodRow>>(new Map());
   const [logging, setLogging] = useState<number | null>(null);
   const [view, setView] = useState<"options" | "grocery">("options");
   const [counts, setCounts] = useState<Record<number, number>>({});
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
   const units = useUnits();
 
   const load = useCallback(async () => {
@@ -122,7 +135,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
 
           {view === "options" ? (
             groups.length === 0 ? <EmptyState icon={Utensils} title="No options yet" /> : groups.map(([type, opts]) => (
-              <div key={type} className="space-y-2.5">
+              <div key={type} className="space-y-1.5">
                 <div className="flex items-center gap-2 px-1">
                   <span className="grid size-6 place-items-center rounded-lg bg-nutrition-soft text-nutrition [&_svg]:size-3.5"><Utensils /></span>
                   <span className="text-sm font-semibold">{mealLabel(type)}</span>
@@ -136,61 +149,70 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                     ["Cholesterol", mi.cholesterolMg, "mg"], ["Potassium", mi.potassiumMg, "mg"], ["Calcium", mi.calciumMg, "mg"], ["Iron", mi.ironMg, "mg"],
                   ];
                   const hasMicros = microRows.some(([, v]) => v > 0);
+                  const expanded = openIdx === index;
+                  const thumbs = opt.foods.map((mf) => foods.get(mf.foodId)?.image_url).filter(Boolean).slice(0, 1);
                   return (
-                    <Card key={index} className="space-y-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="truncate font-semibold">{opt.mealName || (opt.isFree ? "Free meal" : `Option ${index + 1}`)}</div>
-                          {opt.notes && <div className="truncate text-xs text-muted-foreground">{opt.notes}</div>}
-                        </div>
+                    <Card key={index} className="space-y-2.5 p-3">
+                      {/* Compact header — tap to expand; Log is its own target. */}
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => !opt.isFree && setOpenIdx(expanded ? null : index)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                          <FoodThumb src={opt.isFree ? null : thumbs[0]} size={40} />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold">{opt.mealName || (opt.isFree ? "Free meal" : `Option ${index + 1}`)}</div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span className="numeral shrink-0 text-calories">{opt.isFree ? `≤ ${opt.freeMealMaxCalories != null ? fmtEnergy(opt.freeMealMaxCalories, units) : "—"}` : fmtEnergy(t.calories, units)}</span>
+                              {!opt.isFree && <MacroInline proteinG={t.proteinG} carbsG={t.carbsG} fatG={t.fatG} className="shrink-0 text-[0.7rem]" />}
+                            </div>
+                          </div>
+                          {!opt.isFree && <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-180")} />}
+                        </button>
                         <Button size="sm" variant={opt.isFree ? "tonal" : "default"} disabled={logging === index} onClick={() => void logOption(opt, index)}>{logging === index ? "…" : "Log"}</Button>
                       </div>
 
-                      {opt.isFree ? (
-                        <div className="rounded-xl bg-nutrition-soft/60 p-3 text-sm text-nutrition">Any meal up to <span className="numeral font-semibold">{opt.freeMealMaxCalories != null ? fmtEnergy(opt.freeMealMaxCalories, units) : "—"}</span>.</div>
-                      ) : (
-                        <>
+                      {!opt.isFree && <MacroSplitBar p={t.proteinG} c={t.carbsG} f={t.fatG} />}
+
+                      {expanded && !opt.isFree && (
+                        <div className="space-y-2.5 pt-0.5">
                           <div className="grid grid-cols-4 gap-2">
                             {MACRO_TILES.map(([metric, key]) => {
                               const M = METRICS[metric];
                               return (
-                                <div key={metric} className={cn("flex flex-col items-center gap-1 rounded-xl p-2.5", toneSoft[M.tone])}>
+                                <div key={metric} className={cn("flex flex-col items-center gap-1 rounded-xl p-2", toneSoft[M.tone])}>
                                   <M.icon className="size-4" />
-                                  <div className="numeral text-lg font-semibold leading-none">{Math.round(t[key])}</div>
+                                  <div className="numeral text-base font-semibold leading-none">{Math.round(t[key])}</div>
                                 </div>
                               );
                             })}
                           </div>
-
                           {opt.foods.length > 0 && (
                             <div className="space-y-1">
                               {opt.foods.map((mf, k) => {
                                 const { f, factor } = contrib(mf);
                                 return (
                                   <div key={k} className="flex items-center gap-3 rounded-xl bg-surface-2 px-2 py-1.5">
-                                    <FoodThumb src={f?.image_url} />
+                                    <FoodThumb src={f?.image_url} size={34} />
                                     <div className="min-w-0 flex-1">
-                                      <div className="truncate text-sm font-medium">{f?.name ?? "Food"}</div>
+                                      <div className="truncate text-sm">{f?.name ?? "Food"}</div>
                                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                         <span className="numeral shrink-0">{Math.round(mf.quantity)} {mf.unit}</span>
                                         <span className="numeral shrink-0 text-calories">{Math.round((f?.calories ?? 0) * factor)} kcal</span>
-                                        <MacroInline proteinG={Math.round((f?.protein_g ?? 0) * factor)} carbsG={Math.round((f?.carbs_g ?? 0) * factor)} fatG={Math.round((f?.fat_g ?? 0) * factor)} className="shrink-0 text-[0.7rem]" />
                                       </div>
                                     </div>
+                                    <MacroInline proteinG={Math.round((f?.protein_g ?? 0) * factor)} carbsG={Math.round((f?.carbs_g ?? 0) * factor)} fatG={Math.round((f?.fat_g ?? 0) * factor)} className="shrink-0 text-[0.7rem]" />
                                   </div>
                                 );
                               })}
                             </div>
                           )}
-
+                          {opt.notes && <p className="text-xs text-muted-foreground">{opt.notes}</p>}
                           {hasMicros && (
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-xl bg-surface-2 p-3 text-sm">
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-xl bg-surface-2 p-3 text-xs">
                               {microRows.filter(([, v]) => v > 0).map(([l, v, u]) => (
                                 <div key={l} className="flex items-center justify-between"><span className="text-muted-foreground">{l}</span><span className="numeral">{Math.round(v * 10) / 10} {u}</span></div>
                               ))}
                             </div>
                           )}
-                        </>
+                        </div>
                       )}
                     </Card>
                   );
