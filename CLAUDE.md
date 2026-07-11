@@ -78,7 +78,10 @@ in `wrangler.jsonc` because `wrangler dev` requires credentials for it —
 ## Status
 
 Foundation through AI suite + commerce + content + reports + media are built and
-tested (64 tests). Not yet built: passkey autofill on the login screen, wearable
-import (Health Connect), the Snap-a-Meal vision endpoint (NL logging exists),
-InboxDO real-time push (polling in place), and richer plan-editor affordances
-(copy-week, superset round logging UI). See SPEC §13 for the phase map.
+tested (77 tests). Recently added: **tenant custom domains** (Cloudflare for
+SaaS, white-label per domain — SPEC §14.1), **passkey autofill** on login
+(WebAuthn conditional UI), and the **vision suite** (Snap-a-Meal + Label Reader)
+on a real Gemini provider path (mock lane in dev). Not yet built: wearable
+import (Health Connect), InboxDO real-time push (polling in place), and richer
+plan-editor affordances (copy-week, superset round logging UI). See SPEC §13 for
+the phase map.

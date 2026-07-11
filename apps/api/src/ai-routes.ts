@@ -26,6 +26,10 @@ const PARSE_FOOD_SYSTEM = `You turn casual food descriptions into structured dia
 Reply with ONLY a JSON array. Each item: {"label": string, "mealType": "breakfast"|"lunch"|"dinner"|"snack", "calories": number, "proteinG": number, "carbsG": number, "fatG": number, "quantity": number|null, "unit": string|null}.
 Estimate sensible macros for typical portions. No commentary.`;
 
+const LABEL_SYSTEM = `You read a nutrition-facts label from a photo.
+Reply with ONLY a JSON object: {"name": string, "brand": string|null, "servingSize": number, "servingUnit": string, "calories": number, "proteinG": number, "carbsG": number, "fatG": number, "fiberG": number, "sugarG": number, "sodiumMg": number, "saturatedFatG": number, "cholesterolMg": number, "potassiumMg": number, "calciumMg": number, "ironMg": number}.
+All values are PER SERVING (convert if the panel is per 100g). Grams for macros, mg for sodium/cholesterol/potassium/calcium/iron. Use the product name if visible, else a short descriptive name. No commentary.`;
+
 const DRAFT_PLAN_SYSTEM = `You are a certified strength coach drafting a workout plan.
 Reply with ONLY JSON matching: {"days": [{"name": string, "isRestDay": boolean, "blocks": [{"type": "single"|"superset"|"circuit"|"hiit", "rounds": number|null, "slots": [{"exerciseId": string, "measurementMode": "reps"|"time", "sets": [{"setType": "warmup"|"working", "reps": number|null, "weightMode": "unspecified"|"bodyweight", "restAfterSec": number}]}]}]}]}.
 Use ONLY exercise ids from the provided library list. 3-6 sets per exercise, sensible rest. Respect injuries, equipment, experience, and available days. No commentary.`;
@@ -201,6 +205,39 @@ export const aiRoutes = new Hono<AppEnv>()
     const entries = extractJson<unknown[]>(result.output);
     if (!entries || !Array.isArray(entries)) return c.json({ error: "could not read the photo" }, 422);
     return c.json({ entries, credits: result.credits, mocked: result.mocked });
+  })
+
+  /**
+   * Label Reader (SPEC §6): photo of a nutrition-facts panel → per-serving
+   * macros → a Food shape the caller confirms + saves. The barcode-miss
+   * fallback. Not client-scoped (staff also use it to build the library).
+   */
+  .post("/ai/label-reader", async (c) => {
+    const who = requireTenant(c)!;
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    const parsed = z.object({ imageKey: z.string().max(300) }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    if (!parsed.data.imageKey.startsWith(`t/${who.tenantId}/`)) return c.json({ error: "invalid image" }, 400);
+    const obj = await c.env.MEDIA.get(parsed.data.imageKey);
+    if (!obj) return c.json({ error: "image not found" }, 404);
+    const image = { data: toBase64(await obj.arrayBuffer()), mimeType: obj.httpMetadata?.contentType ?? "image/jpeg" };
+
+    const result = await generate(c.env, {
+      tenantId: who.tenantId,
+      actorUserId: who.userId,
+      feature: "label-reader",
+      task: "vision",
+      image,
+      system: LABEL_SYSTEM,
+      prompt: "Read this nutrition-facts label. Return the single JSON food object, values per serving.",
+      maxOutputTokens: 400,
+      mock: () => JSON.stringify({ name: "Granola bar", brand: "Acme", servingSize: 40, servingUnit: "g", calories: 180, proteinG: 4, carbsG: 27, fatG: 6, fiberG: 3, sugarG: 12, sodiumMg: 95, saturatedFatG: 2, cholesterolMg: 0, potassiumMg: 90, calciumMg: 20, ironMg: 1 }),
+    });
+    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    const food = extractJson<Record<string, unknown>>(result.output);
+    if (!food || typeof food !== "object" || typeof food.name !== "string") return c.json({ error: "could not read the label" }, 422);
+    return c.json({ food, credits: result.credits, mocked: result.mocked });
   })
 
   /** Meal Plan Draft: targets + preferences → meal options (trainer). */

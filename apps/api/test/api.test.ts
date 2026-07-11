@@ -195,6 +195,16 @@ describe("credits + AI metering", () => {
       body: JSON.stringify({ clientId: client.id, imageKey: "t/other-tenant/meal-snap/x.jpg" }),
     });
     expect(bad.status).toBe(400);
+
+    // Label Reader — same vision lane, returns a single per-serving Food shape.
+    const label = await SELF.fetch("http://x/api/ai/label-reader", {
+      method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ imageKey: key }),
+    });
+    expect(label.status).toBe(200);
+    const labelOut = (await label.json()) as { food: { name: string; calories: number }; mocked: boolean };
+    expect(labelOut.food.name.length).toBeGreaterThan(0);
+    expect(labelOut.food.calories).toBeGreaterThan(0);
   });
 });
 

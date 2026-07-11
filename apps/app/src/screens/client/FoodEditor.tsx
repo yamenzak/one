@@ -6,8 +6,9 @@
  */
 
 import { useEffect, useState } from "react";
-import { Button, Field, Sheet, Chip, cn, toneSoft, METRICS, Utensils, Barcode, Camera, ChevronDown } from "@mossa/ui";
+import { Button, Field, Sheet, Chip, cn, toneSoft, METRICS, Utensils, Barcode, Camera, ChevronDown, Sparkles } from "@mossa/ui";
 import { api } from "../../api.js";
+import { useSession } from "../../session.js";
 
 export interface EditableFood {
   id?: string;
@@ -54,13 +55,44 @@ export function FoodEditor({
   onClose: () => void;
   onSaved: (food: EditableFood) => void;
 }) {
+  const { ctx } = useSession();
+  const aiSuite = !!ctx?.entitlements?.features?.aiSuite;
   const [f, setF] = useState(() => toForm(initial as EditableFood));
   const [loading, setLoading] = useState(!!foodId);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanErr, setScanErr] = useState<string | null>(null);
   const [showMicros, setShowMicros] = useState(false);
   const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }));
   const dec = (v: string) => v.replace(/[^\d.]/g, "");
+
+  // Label Reader (SPEC §6): photograph the nutrition panel → auto-fill fields.
+  const scanLabel = async (file: File) => {
+    setScanning(true); setScanErr(null);
+    try {
+      const fd = new FormData(); fd.append("file", file); fd.append("purpose", "label");
+      const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
+      const { key } = (await up.json()) as { key?: string };
+      if (!key) throw new Error("upload failed");
+      const r = await api.post<{ food: Record<string, unknown> }>("/api/ai/label-reader", { imageKey: key });
+      const g = r.food;
+      const str = (v: unknown) => (v == null ? "" : String(v));
+      setF((p) => ({
+        ...p,
+        name: p.name || str(g.name), brand: p.brand || str(g.brand),
+        serving: g.servingSize != null ? str(g.servingSize) : p.serving, unit: str(g.servingUnit) || p.unit,
+        cal: str(g.calories), p: str(g.proteinG), c: str(g.carbsG), ft: str(g.fatG),
+        fiber: str(g.fiberG), sugar: str(g.sugarG), satFat: str(g.saturatedFatG), sodium: str(g.sodiumMg),
+        cholesterol: str(g.cholesterolMg), potassium: str(g.potassiumMg), calcium: str(g.calciumMg), iron: str(g.ironMg),
+        image: p.image || `/api/media/${key}`,
+      }));
+      setShowMicros(true);
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "";
+      setScanErr(m.includes("insufficient") ? "Studio is out of AI credits." : "Couldn't read that label — enter it by hand.");
+    } finally { setScanning(false); }
+  };
 
   // Load the existing row when editing (so micros/brand/photo prefill).
   useEffect(() => {
@@ -114,6 +146,18 @@ export function FoodEditor({
               <Field label="Name" icon={Utensils} value={f.name} onChange={(e) => set("name", e.target.value)} autoFocus />
             </div>
           </div>
+
+          {/* Label Reader — photograph the nutrition panel to auto-fill. */}
+          {aiSuite && (
+            <div>
+              <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary/15 px-3.5 text-sm font-medium text-primary transition-colors hover:bg-primary/25 [&_svg]:size-4">
+                {scanning ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Sparkles />}
+                {scanning ? "Reading label…" : "Scan nutrition label"}
+                <input type="file" accept="image/*" capture="environment" className="hidden" disabled={scanning} onChange={(e) => e.target.files?.[0] && void scanLabel(e.target.files[0])} />
+              </label>
+              {scanErr && <p className="mt-1.5 text-sm text-warning">{scanErr}</p>}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Brand" value={f.brand} onChange={(e) => set("brand", e.target.value)} placeholder="Optional" />
             <Field label="Barcode" icon={Barcode} inputMode="numeric" value={f.barcode} onChange={(e) => set("barcode", dec(e.target.value))} placeholder="Optional" />
