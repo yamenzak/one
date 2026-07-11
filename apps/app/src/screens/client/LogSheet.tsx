@@ -13,6 +13,7 @@ import {
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
+import { FoodSearchSheet } from "./FoodSearchSheet.js";
 
 type LogKind = "food" | "activity" | "water" | "weight" | "body" | "sleep" | "mood" | "checkin";
 const CHIPS: { kind: LogKind; label: string; icon: LucideIcon; tone: Tone }[] = [
@@ -44,6 +45,7 @@ function Rating({ label, value, onChange }: { label: string; value: number | nul
 
 export function LogSheet({ open, onClose, clientId, onLogged }: { open: boolean; onClose: () => void; clientId: string; onLogged: () => void }) {
   const [kind, setKind] = useState<LogKind | null>(null);
+  const [foodMode, setFoodMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [f, setF] = useState<Record<string, string>>({});
   const [ratings, setRatings] = useState<{ mood: number | null; energy: number | null; stress: number | null; sleepQ: number | null }>({ mood: null, energy: null, stress: null, sleepQ: null });
@@ -58,7 +60,7 @@ export function LogSheet({ open, onClose, clientId, onLogged }: { open: boolean;
   const cm = (k: string) => { const v = num(k); return v != null ? round2(lengthDisplayToCm(v, units)) : undefined; };
   const waterPresets = units.volume === "oz" ? [8, 12, 16, 24] : [250, 500, 750, 1000];
 
-  const close = () => { setKind(null); setF({}); setRatings({ mood: null, energy: null, stress: null, sleepQ: null }); setPhotos([]); onClose(); };
+  const close = () => { setKind(null); setFoodMode(false); setF({}); setRatings({ mood: null, energy: null, stress: null, sleepQ: null }); setPhotos([]); onClose(); };
 
   const uploadPhoto = async (file: File) => {
     const fd = new FormData(); fd.append("file", file); fd.append("purpose", "progress");
@@ -73,7 +75,6 @@ export function LogSheet({ open, onClose, clientId, onLogged }: { open: boolean;
       if (kind === "water") await api.post("/api/logs/water", { clientId, data: { date, amountMl: num("amount") != null ? Math.round(volumeDisplayToMl(num("amount")!, units)) : undefined } });
       else if (kind === "weight") await api.post("/api/measurements", { clientId, data: { date, weightKg: kg("amount") } });
       else if (kind === "body") await api.post("/api/measurements", { clientId, data: { date, weightKg: kg("weight"), bodyFatPercent: num("bf"), neckCm: cm("neck"), waistCm: cm("waist"), hipsCm: cm("hips"), chestCm: cm("chest") } });
-      else if (kind === "food") await api.post("/api/logs/food", { clientId, data: { date, mealType: "snack", label: f.label || "Quick entry", calories: num("calories") ?? 0 } });
       else if (kind === "activity") await api.post("/api/logs/activity", { clientId, data: { date, activityKey, label: ACTIVITIES.find((a) => a.key === activityKey)?.label, durationMin: num("duration") ?? 0, avgHrBpm: num("hr") ?? null, caloriesBurned: num("kcal") ?? null } });
       else if (kind === "sleep") await api.post("/api/logs/sleep", { clientId, data: { date, durationMinutes: Math.round((num("hours") ?? 0) * 60), quality: ratings.sleepQ ?? undefined, notes: f.notes || undefined } });
       else if (kind === "mood") await api.post("/api/logs/mood", { clientId, data: { date, mood: ratings.mood ?? undefined, energy: ratings.energy ?? undefined, stress: ratings.stress ?? undefined, notes: f.notes || undefined } });
@@ -83,12 +84,17 @@ export function LogSheet({ open, onClose, clientId, onLogged }: { open: boolean;
     } finally { setBusy(false); }
   };
 
+  // Food logging is the full search/barcode/AI experience — identical to the Eat tab.
+  if (open && foodMode) {
+    return <FoodSearchSheet clientId={clientId} onClose={close} onLogged={onLogged} />;
+  }
+
   return (
     <Sheet open={open} onClose={close} title={kind ? undefined : "Log"}>
       {!kind ? (
         <div className="grid grid-cols-2 gap-3 pb-2">
           {CHIPS.map((c) => (
-            <button key={c.kind} onClick={() => setKind(c.kind)} className="flex items-center gap-3 rounded-2xl bg-surface-2 p-4 text-left transition-all hover:bg-surface-3 active:scale-[0.98]">
+            <button key={c.kind} onClick={() => (c.kind === "food" ? setFoodMode(true) : setKind(c.kind))} className="flex items-center gap-3 rounded-2xl bg-surface-2 p-4 text-left transition-all hover:bg-surface-3 active:scale-[0.98]">
               <IconBadge icon={c.icon} tone={c.tone} size="sm" />
               <span className="font-medium">{c.label}</span>
             </button>
@@ -115,11 +121,6 @@ export function LogSheet({ open, onClose, clientId, onLogged }: { open: boolean;
               <Field label={`Hips (${lengthLabel(units)})`} inputMode="decimal" value={f.hips ?? ""} onChange={(e) => set("hips", e.target.value)} />
               <Field label={`Chest (${lengthLabel(units)})`} inputMode="decimal" value={f.chest ?? ""} onChange={(e) => set("chest", e.target.value)} />
             </div>
-          </>)}
-          {kind === "food" && (<>
-            <h2 className="text-lg font-semibold">Quick food entry</h2>
-            <Field label="What did you eat?" icon={Utensils} value={f.label ?? ""} onChange={(e) => set("label", e.target.value)} />
-            <Field label="Calories" inputMode="numeric" value={f.calories ?? ""} onChange={(e) => set("calories", e.target.value.replace(/\D/g, ""))} hint="Search + barcode live on the Eat tab." />
           </>)}
           {kind === "activity" && (<>
             <h2 className="text-lg font-semibold">Log activity</h2>

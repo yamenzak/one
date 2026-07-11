@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Field, Sheet, Chip, cn, toneSoft, METRICS, Search, Barcode, Sparkles, Camera } from "@mossa/ui";
+import { Button, Field, Sheet, Chip, Badge, MacroInline, cn, toneSoft, METRICS, Search, Barcode, Sparkles, Camera, Utensils } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { BarcodeScanner } from "./BarcodeScanner.js";
 
@@ -152,16 +152,22 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
 }
 
 function FoodRow({ food, badge, onPick }: { food: Food; badge: string; onPick: () => void }) {
+  const img = food.image_url ?? food.imageUrl;
+  const n = norm(food);
   return (
-    <button onClick={onPick} className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition-colors hover:bg-secondary">
-      <div className="min-w-0">
-        <div className="truncate">{food.name}</div>
-        {food.brand && <div className="truncate text-xs text-muted-foreground">{food.brand}</div>}
+    <button onClick={onPick} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary">
+      <div className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2">
+        {img ? <img src={img} alt="" className="size-full object-cover" /> : <Utensils className="size-4 text-muted-foreground" />}
       </div>
-      <div className="ml-2 shrink-0 text-right">
-        <div className="numeral text-sm">{Math.round(food.calories)} kcal</div>
-        <div className="text-[0.6rem] uppercase text-muted-foreground">{badge}</div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm">{food.name}</div>
+        <div className="flex items-center gap-2 truncate text-xs text-muted-foreground">
+          {food.brand && <span className="truncate">{food.brand}</span>}
+          <span className="numeral shrink-0 text-calories">{Math.round(n.calories)} kcal</span>
+          <MacroInline proteinG={n.proteinG} carbsG={n.carbsG} fatG={n.fatG} className="shrink-0 text-[0.7rem]" />
+        </div>
       </div>
+      <Badge tone={badge === "web" ? "cardio" : "neutral"}>{badge}</Badge>
     </button>
   );
 }
