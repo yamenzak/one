@@ -45,7 +45,11 @@ export async function sendEmail(
   if (cfg.provider === "disabled") return { ok: false, error: "email disabled" };
   if (cfg.provider === "cloudflare" && binding) {
     try {
-      await binding.send({ to: msg.to, from: bareAddress(cfg.from), subject: msg.subject, html: msg.html, text: msg.text });
+      // Cloudflare's send_email binding takes an EmailMessage with a raw MIME
+      // body — NOT a plain object. Build proper MIME and send that.
+      const { EmailMessage } = await import("cloudflare:email");
+      const raw = buildMime({ from: cfg.from, to: msg.to, subject: msg.subject, html: msg.html, text: msg.text });
+      await binding.send(new EmailMessage(bareAddress(cfg.from), msg.to, raw));
       return { ok: true };
     } catch (err) {
       console.warn("email send failed", err);
@@ -55,6 +59,44 @@ export async function sendEmail(
   // Mock: log so devs can read the OTP from `wrangler dev` output.
   console.log(`[mail:mock] to=${msg.to} subject="${msg.subject}" text="${msg.text ?? ""}"`);
   return { ok: true, mocked: true };
+}
+
+/** RFC 5322 message. Multipart when both html + text are present. */
+function buildMime(m: { from: string; to: string; subject: string; html?: string; text?: string }): string {
+  const date = new Date().toUTCString();
+  const domain = bareAddress(m.from).split("@")[1] ?? "mossa";
+  const messageId = `<${crypto.randomUUID()}@${domain}>`;
+  const base = [
+    `From: ${m.from}`,
+    `To: ${m.to}`,
+    `Subject: ${m.subject}`,
+    `Message-ID: ${messageId}`,
+    `Date: ${date}`,
+    `MIME-Version: 1.0`,
+  ];
+  if (m.html && m.text) {
+    const boundary = `b_${crypto.randomUUID().replace(/-/g, "")}`;
+    return [
+      ...base,
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      ``,
+      `--${boundary}`,
+      `Content-Type: text/plain; charset="utf-8"`,
+      `Content-Transfer-Encoding: quoted-printable`,
+      ``,
+      m.text,
+      ``,
+      `--${boundary}`,
+      `Content-Type: text/html; charset="utf-8"`,
+      `Content-Transfer-Encoding: quoted-printable`,
+      ``,
+      m.html,
+      ``,
+      `--${boundary}--`,
+      ``,
+    ].join("\r\n");
+  }
+  return [...base, `Content-Type: text/html; charset="utf-8"`, ``, m.html ?? m.text ?? ""].join("\r\n");
 }
 
 export function emailShell(heading: string, bodyHtml: string): string {

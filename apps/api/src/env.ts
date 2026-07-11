@@ -28,13 +28,7 @@ export interface Env {
   EMAIL?: SendEmailBinding;
 }
 
-/** Minimal shape of Cloudflare's `send_email` binding. */
+/** Cloudflare's `send_email` binding — takes an EmailMessage (cloudflare:email). */
 export interface SendEmailBinding {
-  send(message: {
-    to: string;
-    from: string;
-    subject: string;
-    html?: string;
-    text?: string;
-  }): Promise<{ messageId?: string } | void>;
+  send(message: unknown): Promise<void>;
 }
