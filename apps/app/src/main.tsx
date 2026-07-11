@@ -1,32 +1,46 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { AnimatePresence, motion } from "motion/react";
 import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
+import { ThemeProvider } from "./theme.js";
 import { Login } from "./screens/Login.js";
 import { Start } from "./screens/Start.js";
 import { Shell } from "./Shell.js";
-import { Skeleton } from "@mossa/ui";
+import { Spinner } from "@mossa/ui";
+
+function BootSplash() {
+  return (
+    <div className="grid min-h-dvh place-items-center">
+      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-4">
+        <div className="grid size-16 place-items-center rounded-3xl bg-primary text-2xl font-black text-primary-foreground">M</div>
+        <Spinner />
+      </motion.div>
+    </div>
+  );
+}
 
 function App() {
   const { loading, ctx } = useSession();
-  if (loading) {
-    return (
-      <div className="mx-auto max-w-xl space-y-4 p-6">
-        <Skeleton className="h-14" />
-        <Skeleton className="h-56" />
-        <Skeleton className="h-40" />
-      </div>
-    );
-  }
-  if (!ctx) return <Login />;
-  if (!ctx.active) return <Start />;
-  return <Shell />;
+  const screen = loading ? "boot" : !ctx ? "login" : !ctx.active ? "start" : "shell";
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div key={screen} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+        {screen === "boot" && <BootSplash />}
+        {screen === "login" && <Login />}
+        {screen === "start" && <Start />}
+        {screen === "shell" && <Shell />}
+      </motion.div>
+    </AnimatePresence>
+  );
 }
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <SessionProvider>
-      <App />
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
     </SessionProvider>
   </StrictMode>,
 );

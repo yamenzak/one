@@ -12,5 +12,19 @@ export default defineConfig({
       "/health": "http://localhost:8787",
     },
   },
-  build: { sourcemap: true },
+  build: {
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("/react-dom/") || id.includes("/react/") || id.includes("/scheduler/")) return "react";
+          if (id.includes("/motion") || id.includes("/framer-motion")) return "motion";
+          if (id.includes("/@radix-ui/") || id.includes("/vaul/")) return "radix";
+          if (id.includes("/lucide-react/")) return "icons";
+          return "vendor";
+        },
+      },
+    },
+  },
 });

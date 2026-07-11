@@ -1,92 +1,255 @@
 /**
- * Mossa design tokens (DESIGN.md §2.1) — Tailwind v4 @theme, CSS-first.
- * Dark-first tonal surface ladder; light theme flips via [data-theme="light"].
- * Components never use raw palette colors — only these roles.
+ * Mossa design tokens — a premium, shadcn-compatible system in oklch.
+ *
+ * Dark-first (`:root`), with a light theme under `:root[data-theme="light"]`.
+ * The brand primary + radius are runtime-overridable so each tenant can theme
+ * the app for their clients (see lib/theme.ts). `@theme inline` maps the CSS
+ * vars to Tailwind utilities so `bg-primary`, `text-muted-foreground`,
+ * `rounded-xl`, etc. all follow the live theme.
  */
 
-@theme {
-  /* Tonal surface ladder (dark default) */
-  --color-bg: #0b0c0e;
-  --color-surface-1: #16181b;
-  --color-surface-2: #1e2126;
-  --color-surface-3: #262a30;
-  --color-fg: #e8eaed;
-  --color-fg-muted: #9aa0a6;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 
-  /* Primary action (tonal, not saturated) */
-  --color-primary: #a8c7fa;
-  --color-primary-container: #1b3a57;
-  --color-on-primary-container: #d6e3ff;
+  /* Domain accents (fitness viz) */
+  --color-activity: var(--activity);
+  --color-activity-soft: var(--activity-soft);
+  --color-nutrition: var(--nutrition);
+  --color-nutrition-soft: var(--nutrition-soft);
+  --color-sleep: var(--sleep);
+  --color-sleep-soft: var(--sleep-soft);
+  --color-cardio: var(--cardio);
+  --color-cardio-soft: var(--cardio-soft);
+  --color-hydration: var(--hydration);
+  --color-hydration-soft: var(--hydration-soft);
 
-  /* Domain accents — container/on-container tonal pairs */
-  --color-activity: #6dd3c2;
-  --color-activity-container: #0f3d36;
-  --color-nutrition: #ffb870;
-  --color-nutrition-container: #4a2e0e;
-  --color-sleep: #c5a8ff;
-  --color-sleep-container: #372a54;
-  --color-cardio: #8ab4f8;
-  --color-cardio-container: #1e3a5f;
-  --color-hydration: #7fd8e8;
-  --color-hydration-container: #103d46;
+  /* Status */
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
 
-  /* Status chips */
-  --color-good: #6dd58c;
-  --color-good-container: #123f26;
-  --color-warn: #fdd663;
-  --color-warn-container: #4a3a08;
-  --color-bad: #f28b82;
-  --color-bad-container: #4e1512;
-
-  --radius-card: 1.75rem;
-  --radius-field: 1rem;
+  --radius-xs: calc(var(--radius) - 6px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 10px);
+  --radius-3xl: calc(var(--radius) + 18px);
 
   --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.3);
+  --shadow-md: 0 4px 16px -4px oklch(0 0 0 / 0.4);
+  --shadow-lg: 0 12px 40px -8px oklch(0 0 0 / 0.5);
+  --shadow-glow: 0 0 0 1px oklch(from var(--primary) l c h / 0.15), 0 8px 30px -6px oklch(from var(--primary) l c h / 0.35);
 }
 
-/* Light theme: same 3-step tonal ladder, flipped. */
+:root {
+  color-scheme: dark;
+  --radius: 0.95rem;
+
+  --background: oklch(0.165 0.006 285);
+  --foreground: oklch(0.975 0.003 285);
+  --card: oklch(0.202 0.006 285);
+  --card-foreground: oklch(0.975 0.003 285);
+  --surface-2: oklch(0.235 0.007 285);
+  --surface-3: oklch(0.275 0.008 285);
+  --popover: oklch(0.21 0.006 285);
+  --popover-foreground: oklch(0.975 0.003 285);
+
+  --primary: oklch(0.74 0.15 164);
+  --primary-foreground: oklch(0.17 0.03 164);
+  --secondary: oklch(0.245 0.007 285);
+  --secondary-foreground: oklch(0.975 0.003 285);
+  --muted: oklch(0.245 0.007 285);
+  --muted-foreground: oklch(0.7 0.012 285);
+  --accent: oklch(0.275 0.008 285);
+  --accent-foreground: oklch(0.975 0.003 285);
+  --destructive: oklch(0.62 0.2 24);
+  --destructive-foreground: oklch(0.98 0.01 24);
+
+  --border: oklch(0.3 0.008 285 / 0.55);
+  --input: oklch(0.3 0.008 285);
+  --ring: oklch(0.74 0.15 164);
+
+  --activity: oklch(0.78 0.13 164);
+  --activity-soft: oklch(0.34 0.06 164);
+  --nutrition: oklch(0.8 0.13 68);
+  --nutrition-soft: oklch(0.36 0.06 68);
+  --sleep: oklch(0.74 0.12 300);
+  --sleep-soft: oklch(0.34 0.06 300);
+  --cardio: oklch(0.74 0.13 250);
+  --cardio-soft: oklch(0.34 0.06 250);
+  --hydration: oklch(0.78 0.1 214);
+  --hydration-soft: oklch(0.34 0.05 214);
+
+  --success: oklch(0.76 0.14 158);
+  --success-soft: oklch(0.34 0.06 158);
+  --warning: oklch(0.82 0.13 88);
+  --warning-soft: oklch(0.36 0.06 88);
+  --danger: oklch(0.66 0.19 24);
+  --danger-soft: oklch(0.34 0.08 24);
+}
+
 :root[data-theme="light"] {
-  --color-bg: #f3f5f9;
-  --color-surface-1: #ffffff;
-  --color-surface-2: #eef1f6;
-  --color-surface-3: #e3e8ef;
-  --color-fg: #1b1d21;
-  --color-fg-muted: #5f6368;
+  color-scheme: light;
 
-  --color-primary: #1a5dc8;
-  --color-primary-container: #d6e3ff;
-  --color-on-primary-container: #0b3060;
+  --background: oklch(0.985 0.002 285);
+  --foreground: oklch(0.2 0.01 285);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.01 285);
+  --surface-2: oklch(0.965 0.003 285);
+  --surface-3: oklch(0.94 0.004 285);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.01 285);
 
-  --color-activity: #0d7a68;
-  --color-activity-container: #c7f5ec;
-  --color-nutrition: #a05a10;
-  --color-nutrition-container: #ffe4c7;
-  --color-sleep: #6a44c0;
-  --color-sleep-container: #e9ddff;
-  --color-cardio: #175bbb;
-  --color-cardio-container: #dbe7ff;
-  --color-hydration: #0c6a7d;
-  --color-hydration-container: #d0f2f9;
+  --primary: oklch(0.62 0.14 164);
+  --primary-foreground: oklch(0.99 0.01 164);
+  --secondary: oklch(0.955 0.004 285);
+  --secondary-foreground: oklch(0.24 0.01 285);
+  --muted: oklch(0.955 0.004 285);
+  --muted-foreground: oklch(0.5 0.012 285);
+  --accent: oklch(0.94 0.005 285);
+  --accent-foreground: oklch(0.24 0.01 285);
+  --destructive: oklch(0.58 0.2 24);
+  --destructive-foreground: oklch(0.99 0.01 24);
 
-  --color-good: #146c33;
-  --color-good-container: #c9f2d6;
-  --color-warn: #7a5c00;
-  --color-warn-container: #ffefb8;
-  --color-bad: #a5231b;
-  --color-bad-container: #ffdcd8;
+  --border: oklch(0.9 0.005 285);
+  --input: oklch(0.9 0.005 285);
+  --ring: oklch(0.62 0.14 164);
+
+  --activity: oklch(0.58 0.13 164);
+  --activity-soft: oklch(0.93 0.05 164);
+  --nutrition: oklch(0.62 0.14 62);
+  --nutrition-soft: oklch(0.94 0.06 68);
+  --sleep: oklch(0.55 0.15 300);
+  --sleep-soft: oklch(0.94 0.05 300);
+  --cardio: oklch(0.55 0.16 250);
+  --cardio-soft: oklch(0.94 0.05 250);
+  --hydration: oklch(0.58 0.12 214);
+  --hydration-soft: oklch(0.94 0.05 214);
+
+  --success: oklch(0.58 0.15 158);
+  --success-soft: oklch(0.93 0.06 158);
+  --warning: oklch(0.7 0.14 78);
+  --warning-soft: oklch(0.95 0.08 88);
+  --danger: oklch(0.58 0.2 24);
+  --danger-soft: oklch(0.95 0.06 24);
 }
 
-/* Base */
+* {
+  border-color: var(--border);
+}
+
 html,
 body {
-  background: var(--color-bg);
-  color: var(--color-fg);
+  background: var(--background);
+  color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Every numeral in the system is tabular. */
+/* Tabular, tightened numerals for metrics. */
 .numeral {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+}
+
+/* Subtle scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-3) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: 999px;
+}
+
+/* Overlay animations (radix data-state driven). */
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes content-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes content-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

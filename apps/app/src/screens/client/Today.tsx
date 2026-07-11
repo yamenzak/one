@@ -1,11 +1,12 @@
 /**
- * Client Today (DESIGN.md §3): hero calorie ring + domain pills, Log/Start
- * action row, timeline feed. Scoped by clientId — the same component renders
- * for the client themself AND inside the trainer's client detail.
+ * Client Today — hero ring + metric pills, action row, timeline feed.
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, InsightCard, MetricPill, ProgressRing, Skeleton, SubCard, WavyDivider } from "@mossa/ui";
+import {
+  Button, Card, SubCard, Skeleton, ProgressRing, MetricPill, InsightCard, WavyDivider,
+  Page, Stagger, Plus, Play, PencilLine, Zap, Droplet, Flame, Trophy, ClipboardList, Dumbbell,
+} from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { LogSheet } from "./LogSheet.js";
 
@@ -26,20 +27,16 @@ export function Today({ clientId }: { clientId: string }) {
   const date = todayLocal();
 
   const load = useCallback(async () => {
-    const bundle = await api.get<TodayBundle>(`/api/today?clientId=${clientId}&date=${date}`);
-    setData(bundle);
+    setData(await api.get<TodayBundle>(`/api/today?clientId=${clientId}&date=${date}`));
   }, [clientId, date]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => void load(), [load]);
 
   if (!data) {
     return (
-      <div className="space-y-4 p-4">
-        <Skeleton className="h-56" />
+      <div className="mx-auto max-w-xl space-y-4 p-4">
+        <Skeleton className="h-52" />
         <Skeleton className="h-14" />
-        <Skeleton className="h-40" />
+        <Skeleton className="h-36" />
       </div>
     );
   }
@@ -50,76 +47,74 @@ export function Today({ clientId }: { clientId: string }) {
   const waterTarget = targets?.targetWaterMl ?? 2500;
 
   return (
-    <div className="mx-auto max-w-xl space-y-5 p-4 pb-28">
-      {/* Hero: ring + pills */}
-      <div className="flex items-center gap-4">
+    <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+      <Stagger className="flex items-center gap-4">
         <ProgressRing
-          progress={calTarget > 0 ? net / calTarget : 0}
-          size={190}
+          progress={calTarget > 0 ? net / calTarget : 0.001}
+          size={188}
           tone="nutrition"
-          value={<span>{Math.max(0, Math.round(net)).toLocaleString()}</span>}
-          arcLabelTop="Calories"
-          arcLabelBottom={calTarget > 0 ? `of ${calTarget.toLocaleString()}` : "no target yet"}
+          label="Calories"
+          value={Math.max(0, Math.round(net)).toLocaleString()}
+          sublabel={calTarget > 0 ? `of ${calTarget.toLocaleString()}` : "set a goal"}
         />
         <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-          <MetricPill icon="🥩" label="Protein" tone="activity" value={`${data.nutrition.proteinG} g`} progress={targets?.targetProteinG ? data.nutrition.proteinG / targets.targetProteinG : undefined} />
-          <MetricPill icon="💧" label="Water" tone="hydration" value={`${(data.waterMl / 1000).toFixed(1)} L`} progress={data.waterMl / waterTarget} />
-          <MetricPill icon="🔥" label="Burned" tone="cardio" value={`${data.burnedKcal.toLocaleString()} kcal`} />
+          <MetricPill icon={Zap} label="Protein" tone="activity" value={`${data.nutrition.proteinG} g`} progress={targets?.targetProteinG ? data.nutrition.proteinG / targets.targetProteinG : undefined} />
+          <MetricPill icon={Droplet} label="Water" tone="hydration" value={`${(data.waterMl / 1000).toFixed(1)} L`} progress={data.waterMl / waterTarget} />
+          <MetricPill icon={Flame} label="Burned" tone="cardio" value={`${data.burnedKcal.toLocaleString()}`} />
         </div>
-      </div>
+      </Stagger>
 
-      {/* Action row */}
-      <div className="flex items-center gap-3">
+      <Stagger className="flex items-center gap-2.5">
         <Button size="lg" className="flex-1" onClick={() => setLogOpen(true)}>
-          ＋ Log
+          <Plus /> Log
         </Button>
-        <Button size="lg" className="flex-1" variant="tonal">
-          🏃 Start
+        <Button size="lg" variant="tonal" className="flex-1">
+          <Play /> Start
         </Button>
-        <Button variant="circle" aria-label="Customize">
-          ✏️
+        <Button size="icon" variant="secondary" aria-label="Customize">
+          <PencilLine />
         </Button>
-      </div>
+      </Stagger>
 
-      {/* Feed */}
-      <div>
+      <Stagger>
         {!data.checkedIn && (
           <InsightCard timestamp="Today" title="Check in" ai>
             <SubCard>
-              <p className="text-sm text-fg-muted">
-                A 30-second check-in keeps your coach in the loop — weight, mood, sleep.
-              </p>
+              <p className="text-sm text-muted-foreground">A 30-second check-in keeps your coach in the loop — weight, mood, sleep.</p>
               <Button className="mt-3" onClick={() => setLogOpen(true)}>
-                Check in now
+                <ClipboardList /> Check in now
               </Button>
             </SubCard>
           </InsightCard>
         )}
         {data.workout.loggedSets > 0 && (
           <InsightCard timestamp="Today" title="Workout logged">
-            <SubCard>
-              <div className="text-sm text-fg-muted">Sets completed</div>
-              <div className="numeral text-4xl font-semibold">{data.workout.loggedSets}</div>
+            <SubCard className="flex items-center gap-3">
+              <div className="grid size-11 place-items-center rounded-xl bg-activity-soft text-activity [&_svg]:size-5">
+                <Trophy />
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">Sets completed</div>
+                <div className="numeral text-2xl font-semibold">{data.workout.loggedSets}</div>
+              </div>
             </SubCard>
           </InsightCard>
         )}
         {data.publishedWorkoutPlan && (
           <InsightCard timestamp="Your plan" title={data.publishedWorkoutPlan.name}>
-            <SubCard>
-              <p className="text-sm text-fg-muted">
-                {data.publishedWorkoutPlan.body.days.length} training days — head to Train to start
-                today's session.
-              </p>
+            <SubCard className="flex items-center gap-3">
+              <div className="grid size-11 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-5">
+                <Dumbbell />
+              </div>
+              <p className="text-sm text-muted-foreground">{data.publishedWorkoutPlan.body.days.length} training days — head to Train to start today's session.</p>
             </SubCard>
           </InsightCard>
         )}
         <WavyDivider label="Yesterday" />
-        <Card className="text-center text-sm text-fg-muted">
-          Your history feed grows here as you log.
-        </Card>
-      </div>
+        <Card className="text-center text-sm text-muted-foreground">Your history grows here as you log.</Card>
+      </Stagger>
 
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} clientId={clientId} onLogged={() => void load()} />
-    </div>
+    </Page>
   );
 }

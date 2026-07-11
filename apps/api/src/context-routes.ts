@@ -107,6 +107,14 @@ export const contextRoutes = new Hono<AppEnv>()
       }
     }
 
+    let branding = null;
+    if (active) {
+      const row = await c.env.DB.prepare("SELECT branding_json FROM tenant_settings WHERE tenant_id = ?")
+        .bind(active.tenantId)
+        .first<{ branding_json: string | null }>();
+      branding = parseJson<SessionContext["branding"]>(row?.branding_json ?? null, null);
+    }
+
     const ctx: SessionContext = {
       user: { id: user.id, email: user.email, name: user.name ?? null },
       personas,
@@ -115,6 +123,7 @@ export const contextRoutes = new Hono<AppEnv>()
       perms: c.get("perms") ?? {},
       entitlements: entitlements ?? (await tenantEntitlements(c.env.DB, "___none___")),
       clientFlags,
+      branding,
       isPlatformAdmin: isPlatformAdmin(c),
     };
     return c.json(ctx);

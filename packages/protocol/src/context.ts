@@ -14,6 +14,16 @@ export interface PersonaRef {
   clientId: string | null;
 }
 
+/** Tenant branding for theming the app (SPEC §7); applied at boot. */
+export interface TenantBranding {
+  preset?: string | null;
+  primary?: string | null;
+  primaryForeground?: string | null;
+  radius?: number | null;
+  defaultMode?: "dark" | "light" | null;
+  logoUrl?: string | null;
+}
+
 export interface SessionContext {
   user: { id: string; email: string; name: string | null };
   /** Every (tenant, role) pair the user holds — feeds the context switcher. */
@@ -26,6 +36,8 @@ export interface SessionContext {
   entitlements: Entitlements;
   /** Resolved flags for the active client persona (train mode / client role). */
   clientFlags: ClientFlags | null;
+  /** Active tenant's branding for theming (null before a tenant is chosen). */
+  branding: TenantBranding | null;
   isPlatformAdmin: boolean;
 }
 

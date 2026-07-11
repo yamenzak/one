@@ -18,6 +18,7 @@
     "@mossa/protocol": "workspace:*",
     "@mossa/ui": "workspace:*",
     "clsx": "^2.1.1",
+    "motion": "^12.42.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.4"

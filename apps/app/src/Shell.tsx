@@ -1,13 +1,16 @@
 /**
- * The role-adaptive shell (DESIGN.md §5): one app, one page grammar, nav by
- * persona + mode. Client → Today/Train/Eat/Progress. Staff (coach mode) →
- * Today/Clients/Library/Business(owner). Staff with a linked client record
- * can flip to Train mode = the client nav pointed at their own record.
+ * Role-adaptive shell (DESIGN.md §5) — one app, nav by persona + mode. Premium
+ * app bar + animated tab bar / nav rail + account dropdown. Overlays for
+ * settings, wellness, shop, admin.
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { AppBar, BottomTabs, Button, NavRail, Sheet, type TabDef } from "@mossa/ui";
+import {
+  AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
+  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, type TabDef,
+} from "@mossa/ui";
 import { useSession, useActiveClientId } from "./session.js";
+import { useTheme } from "./theme.js";
 import { api } from "./api.js";
 import { Today } from "./screens/client/Today.js";
 import { Train } from "./screens/client/Train.js";
@@ -24,14 +27,15 @@ import { Shop } from "./screens/client/Shop.js";
 import { AdminConsole } from "./screens/admin/AdminConsole.js";
 
 const CLIENT_TABS: TabDef[] = [
-  { key: "today", label: "Today", icon: "☀️" },
-  { key: "train", label: "Train", icon: "🏃" },
-  { key: "eat", label: "Eat", icon: "🍽️" },
-  { key: "progress", label: "Progress", icon: "📈" },
+  { key: "today", label: "Today", icon: Home },
+  { key: "train", label: "Train", icon: Dumbbell },
+  { key: "eat", label: "Eat", icon: Utensils },
+  { key: "progress", label: "Progress", icon: LineChart },
 ];
 
 export function Shell() {
   const { ctx, mode, setMode, switchTenant, signOut, refresh } = useSession();
+  const { mode: themeMode, toggleMode } = useTheme();
   const clientId = useActiveClientId();
   const active = ctx!.active!;
   const isStaff = active.role !== "client";
@@ -40,37 +44,26 @@ export function Shell() {
   const tabs = useMemo<TabDef[]>(() => {
     if (clientSurface) return CLIENT_TABS;
     const t: TabDef[] = [
-      { key: "today", label: "Today", icon: "☀️" },
-      { key: "clients", label: "Clients", icon: "🤝" },
-      { key: "library", label: "Library", icon: "📚" },
+      { key: "today", label: "Today", icon: Home },
+      { key: "clients", label: "Clients", icon: Users },
+      { key: "library", label: "Library", icon: LayoutGrid },
     ];
-    if (active.role === "owner") t.push({ key: "business", label: "Business", icon: "💼" });
+    if (active.role === "owner") t.push({ key: "business", label: "Business", icon: Wallet });
     return t;
   }, [clientSurface, active.role]);
 
   const [tab, setTab] = useState("today");
-  const [menuOpen, setMenuOpen] = useState(false);
   const [overlay, setOverlay] = useState<"settings" | "wellness" | "shop" | "admin" | null>(null);
   const current = tabs.some((t) => t.key === tab) ? tab : "today";
 
-  // Onboarding gate: a client on their own surface who hasn't done intake.
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
   const gateClientId = active.role === "client" ? active.clientId : null;
   useEffect(() => {
-    if (!gateClientId) {
-      setNeedsOnboarding(false);
-      return;
-    }
-    void api
-      .get<{ client: { onboardingComplete: boolean } }>(`/api/clients/${gateClientId}`)
-      .then((r) => setNeedsOnboarding(!r.client.onboardingComplete))
-      .catch(() => setNeedsOnboarding(false));
+    if (!gateClientId) return setNeedsOnboarding(false);
+    void api.get<{ client: { onboardingComplete: boolean } }>(`/api/clients/${gateClientId}`).then((r) => setNeedsOnboarding(!r.client.onboardingComplete)).catch(() => setNeedsOnboarding(false));
   }, [gateClientId]);
 
-  if (gateClientId && needsOnboarding) {
-    return <Onboarding clientId={gateClientId} displayName={ctx!.user.name || "there"} onDone={() => setNeedsOnboarding(false)} />;
-  }
-
+  if (gateClientId && needsOnboarding) return <Onboarding clientId={gateClientId} displayName={ctx!.user.name || "there"} onDone={() => setNeedsOnboarding(false)} />;
   if (overlay === "settings") return <Settings onBack={() => setOverlay(null)} />;
   if (overlay === "wellness" && clientId) return <Wellness clientId={clientId} onBack={() => setOverlay(null)} />;
   if (overlay === "shop" && clientId) return <Shop clientId={clientId} onBack={() => setOverlay(null)} />;
@@ -83,33 +76,70 @@ export function Shell() {
     }
     setMode("train");
     setTab("today");
-    setMenuOpen(false);
   };
 
   return (
-    <div className="min-h-dvh md:pl-20">
+    <div className="min-h-dvh pb-20 md:pb-0 md:pl-24">
       <AppBar
         leading={
           isStaff ? (
-            <button
-              onClick={() => setMenuOpen(true)}
-              className="rounded-full bg-surface-2 px-3 py-1.5 text-xs font-semibold text-fg-muted"
-            >
-              {clientSurface ? "🏃 Train mode" : "🎓 Coach mode"}
+            <button onClick={clientSurface ? () => (setMode("coach"), setTab("today")) : () => void enterTrainMode()} className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-surface-3">
+              <ArrowLeftRight className="size-3.5" />
+              {clientSurface ? "Train mode" : "Coach mode"}
             </button>
           ) : (
-            <span className="px-1 text-sm font-semibold text-fg-muted">{active.tenantName}</span>
+            <span className="truncate px-1 text-sm font-semibold">{active.tenantName}</span>
           )
         }
-        title={active.tenantName}
+        title={<span className="truncate">{active.tenantName}</span>}
         trailing={
-          <button
-            onClick={() => setMenuOpen(true)}
-            className="grid size-10 place-items-center rounded-full bg-activity-container font-bold text-activity"
-            aria-label="Account"
-          >
-            {(ctx!.user.name || ctx!.user.email).slice(0, 1).toUpperCase()}
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="rounded-full outline-none ring-ring focus-visible:ring-2" aria-label="Account">
+                <Avatar name={ctx!.user.name || ctx!.user.email} className="size-9" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuLabel>{ctx!.user.email}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {ctx!.personas.length > 1 && (
+                <>
+                  {ctx!.personas.map((p) => (
+                    <DropdownMenuItem key={p.tenantId} onSelect={() => void switchTenant(p.tenantId)}>
+                      <Store /> {p.tenantName}
+                      {p.tenantId === active.tenantId && <Check className="ml-auto size-4 text-primary" />}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              {clientSurface && clientId && (
+                <>
+                  <DropdownMenuItem onSelect={() => setOverlay("wellness")}>
+                    <HeartPulse /> Wellness &amp; supplements
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setOverlay("shop")}>
+                    <Store /> Plans &amp; access
+                  </DropdownMenuItem>
+                </>
+              )}
+              <DropdownMenuItem onSelect={() => setOverlay("settings")}>
+                <SettingsIcon /> Settings &amp; passkeys
+              </DropdownMenuItem>
+              {ctx!.isPlatformAdmin && (
+                <DropdownMenuItem onSelect={() => setOverlay("admin")}>
+                  <ShieldCheck /> Platform admin
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onSelect={toggleMode}>
+                {themeMode === "dark" ? <Sun /> : <Moon />} {themeMode === "dark" ? "Light mode" : "Dark mode"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem destructive onSelect={() => void signOut().then(() => location.reload())}>
+                <LogOut /> Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
 
@@ -122,8 +152,11 @@ export function Shell() {
             {current === "progress" && <Progress clientId={clientId} />}
           </>
         ) : clientSurface ? (
-          <div className="p-6 text-center text-fg-muted">
-            No client record linked yet — open the menu and tap "Train mode" to create yours.
+          <div className="p-8 text-center text-muted-foreground">
+            No client record yet.
+            <Button className="mt-4" onClick={() => void enterTrainMode()}>
+              Create my training space
+            </Button>
           </div>
         ) : (
           <>
@@ -137,65 +170,6 @@ export function Shell() {
 
       <BottomTabs tabs={tabs} active={current} onSelect={setTab} />
       <NavRail tabs={tabs} active={current} onSelect={setTab} />
-
-      {/* Account / persona sheet */}
-      <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="Account">
-        <div className="space-y-4">
-          <div className="text-sm text-fg-muted">{ctx!.user.email}</div>
-
-          {isStaff && (
-            <div className="flex gap-2">
-              <Button variant={!clientSurface ? "tonal" : "ghost"} className="flex-1" onClick={() => (setMode("coach"), setTab("today"), setMenuOpen(false))}>
-                🎓 Coach
-              </Button>
-              <Button variant={clientSurface ? "tonal" : "ghost"} className="flex-1" onClick={() => void enterTrainMode()}>
-                🏃 Train
-              </Button>
-            </div>
-          )}
-
-          {ctx!.personas.length > 1 && (
-            <div>
-              <div className="mb-2 text-sm font-semibold text-good">Workspaces</div>
-              {ctx!.personas.map((p) => (
-                <button
-                  key={p.tenantId}
-                  onClick={() => void switchTenant(p.tenantId).then(() => setMenuOpen(false))}
-                  className="flex w-full items-center justify-between rounded-2xl px-2 py-3 text-left hover:bg-surface-2"
-                >
-                  <span>{p.tenantName}</span>
-                  <span className="text-xs text-fg-muted">{p.role}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="space-y-1">
-            {clientSurface && clientId && (
-              <>
-                <button onClick={() => (setOverlay("wellness"), setMenuOpen(false))} className="flex w-full items-center gap-3 rounded-2xl px-2 py-3 text-left hover:bg-surface-2">
-                  <span className="text-xl">🌿</span> Wellness &amp; supplements
-                </button>
-                <button onClick={() => (setOverlay("shop"), setMenuOpen(false))} className="flex w-full items-center gap-3 rounded-2xl px-2 py-3 text-left hover:bg-surface-2">
-                  <span className="text-xl">🎟️</span> Plans &amp; access
-                </button>
-              </>
-            )}
-            <button onClick={() => (setOverlay("settings"), setMenuOpen(false))} className="flex w-full items-center gap-3 rounded-2xl px-2 py-3 text-left hover:bg-surface-2">
-              <span className="text-xl">⚙️</span> Settings &amp; passkeys
-            </button>
-            {ctx!.isPlatformAdmin && (
-              <button onClick={() => (setOverlay("admin"), setMenuOpen(false))} className="flex w-full items-center gap-3 rounded-2xl px-2 py-3 text-left hover:bg-surface-2">
-                <span className="text-xl">🛠️</span> Platform admin
-              </button>
-            )}
-          </div>
-
-          <Button variant="outline" className="w-full" onClick={() => void signOut().then(() => location.reload())}>
-            Sign out
-          </Button>
-        </div>
-      </Sheet>
     </div>
   );
 }

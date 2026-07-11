@@ -1,208 +1,133 @@
 /**
- * App shell components (DESIGN.md §1.11, §4): AppBar, BottomTabs / NavRail,
- * bottom Sheet, WavyDivider, TimelineFeed, SettingsList.
+ * App shell — AppBar, BottomTabs / NavRail (animated indicator), TimelineFeed /
+ * InsightCard, WavyDivider, SettingsList, EmptyState. Icon-based, animated.
  */
 
-import { clsx } from "clsx";
-import { useEffect, type ReactNode } from "react";
-
-interface AppBarProps {
-  leading?: ReactNode;
-  title?: ReactNode;
-  trailing?: ReactNode;
-}
-
-export function AppBar({ leading, title, trailing }: AppBarProps) {
-  return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between bg-bg/90 px-4 backdrop-blur">
-      <div className="flex min-w-0 items-center gap-2">{leading}</div>
-      <div className="absolute left-1/2 -translate-x-1/2 text-lg font-medium text-fg-muted">{title}</div>
-      <div className="flex items-center gap-2">{trailing}</div>
-    </header>
-  );
-}
+import { motion } from "motion/react";
+import type { ReactNode } from "react";
+import { cn } from "./lib/utils.js";
+import { Sparkles, ThumbsDown, ThumbsUp, type LucideIcon } from "./lib/icons.js";
 
 export interface TabDef {
   key: string;
   label: string;
-  icon: ReactNode;
+  icon: LucideIcon;
 }
 
-interface TabsProps {
-  tabs: TabDef[];
-  active: string;
-  onSelect: (key: string) => void;
-}
-
-/** Bottom tab bar (mobile) — active tab gets the filled pill. */
-export function BottomTabs({ tabs, active, onSelect }: TabsProps) {
+export function AppBar({ leading, title, trailing }: { leading?: ReactNode; title?: ReactNode; trailing?: ReactNode }) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 flex items-stretch justify-around bg-surface-1/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-      {tabs.map((t) => (
-        <button
-          key={t.key}
-          onClick={() => onSelect(t.key)}
-          className="flex flex-1 flex-col items-center gap-1 py-2.5"
-          aria-current={active === t.key ? "page" : undefined}
-        >
-          <span
-            className={clsx(
-              "grid h-8 w-14 place-items-center rounded-full text-lg transition-colors",
-              active === t.key ? "bg-primary-container text-on-primary-container" : "text-fg-muted",
-            )}
-          >
-            {t.icon}
-          </span>
-          <span className={clsx("text-xs", active === t.key ? "font-semibold text-primary" : "text-fg-muted")}>
-            {t.label}
-          </span>
-        </button>
-      ))}
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-border/40 bg-background/80 px-4 backdrop-blur-xl">
+      <div className="flex min-w-0 flex-1 items-center gap-2">{leading}</div>
+      {title && <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-base font-semibold">{title}</div>}
+      <div className="flex items-center gap-1.5">{trailing}</div>
+    </header>
+  );
+}
+
+export function BottomTabs({ tabs, active, onSelect }: { tabs: TabDef[]; active: string; onSelect: (k: string) => void }) {
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border/40 bg-background/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
+      <div className="mx-auto flex max-w-xl items-stretch justify-around">
+        {tabs.map((t) => {
+          const on = active === t.key;
+          return (
+            <button key={t.key} onClick={() => onSelect(t.key)} className="relative flex flex-1 flex-col items-center gap-1 py-2.5" aria-current={on ? "page" : undefined}>
+              <span className="relative grid h-8 w-14 place-items-center">
+                {on && <motion.span layoutId="tab-pill" transition={{ type: "spring", stiffness: 400, damping: 32 }} className="absolute inset-0 rounded-full bg-primary/15" />}
+                <t.icon className={cn("relative size-[1.3rem] transition-colors", on ? "text-primary" : "text-muted-foreground")} strokeWidth={on ? 2.4 : 2} />
+              </span>
+              <span className={cn("text-[0.68rem] font-medium transition-colors", on ? "text-primary" : "text-muted-foreground")}>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
     </nav>
   );
 }
 
-/** Left nav rail (≥ md) — same tabs, desktop density. */
-export function NavRail({ tabs, active, onSelect, footer }: TabsProps & { footer?: ReactNode }) {
+export function NavRail({ tabs, active, onSelect, footer, brand }: { tabs: TabDef[]; active: string; onSelect: (k: string) => void; footer?: ReactNode; brand?: ReactNode }) {
   return (
-    <nav className="fixed inset-y-0 left-0 z-30 hidden w-20 flex-col items-center gap-2 bg-surface-1 py-6 md:flex">
-      <div className="mb-4 text-2xl font-black text-primary">M</div>
-      {tabs.map((t) => (
-        <button
-          key={t.key}
-          onClick={() => onSelect(t.key)}
-          className="flex w-full flex-col items-center gap-1 py-2"
-          aria-current={active === t.key ? "page" : undefined}
-        >
-          <span
-            className={clsx(
-              "grid h-8 w-14 place-items-center rounded-full text-lg",
-              active === t.key ? "bg-primary-container text-on-primary-container" : "text-fg-muted",
-            )}
-          >
-            {t.icon}
-          </span>
-          <span className={clsx("text-[11px]", active === t.key ? "font-semibold text-primary" : "text-fg-muted")}>
-            {t.label}
-          </span>
-        </button>
-      ))}
+    <nav className="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col items-center gap-1 border-r border-border/40 bg-card/50 py-6 backdrop-blur-xl md:flex">
+      <div className="mb-5 grid size-11 place-items-center rounded-2xl bg-primary text-lg font-black text-primary-foreground">{brand ?? "M"}</div>
+      {tabs.map((t) => {
+        const on = active === t.key;
+        return (
+          <button key={t.key} onClick={() => onSelect(t.key)} className="relative flex w-full flex-col items-center gap-1 py-2.5" aria-current={on ? "page" : undefined}>
+            <span className="relative grid h-9 w-16 place-items-center">
+              {on && <motion.span layoutId="rail-pill" transition={{ type: "spring", stiffness: 400, damping: 32 }} className="absolute inset-0 rounded-2xl bg-primary/15" />}
+              <t.icon className={cn("relative size-[1.35rem] transition-colors", on ? "text-primary" : "text-muted-foreground")} strokeWidth={on ? 2.4 : 2} />
+            </span>
+            <span className={cn("text-[0.66rem] font-medium", on ? "text-primary" : "text-muted-foreground")}>{t.label}</span>
+          </button>
+        );
+      })}
       <div className="mt-auto">{footer}</div>
     </nav>
   );
 }
 
-interface SheetProps {
-  open: boolean;
-  onClose: () => void;
-  title?: string;
-  children: ReactNode;
-}
-
-/** Bottom sheet with grabber (mobile) / centered dialog (desktop). */
-export function Sheet({ open, onClose, title, children }: SheetProps) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
+// ── Timeline feed ────────────────────────────────────────────────────────────
+export function InsightCard({ timestamp, title, ai, tone, children, onFeedback }: { timestamp: string; title: string; ai?: boolean; tone?: "default" | "primary"; children?: ReactNode; onFeedback?: (v: 1 | -1) => void }) {
   return (
-    <div className="fixed inset-0 z-50" role="dialog" aria-modal>
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-[2rem] bg-surface-1 p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] md:inset-auto md:left-1/2 md:top-1/2 md:w-full md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-[--radius-card]">
-        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-surface-3 md:hidden" />
-        {title && <h2 className="mb-4 text-xl font-semibold">{title}</h2>}
-        {children}
+    <motion.article initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.4 }} className="py-3">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        {ai && <Sparkles className="size-4 text-primary" />}
+        <span>{timestamp}</span>
       </div>
-    </div>
+      <h3 className={cn("mt-1 text-xl font-semibold tracking-tight", tone === "primary" ? "text-foreground" : "text-foreground")}>{title}</h3>
+      {children && <div className="mt-3">{children}</div>}
+      {onFeedback && (
+        <div className="mt-3 flex items-center gap-1">
+          <button onClick={() => onFeedback(1)} className="grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-success" aria-label="Helpful">
+            <ThumbsUp className="size-4" />
+          </button>
+          <button onClick={() => onFeedback(-1)} className="grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-danger" aria-label="Not helpful">
+            <ThumbsDown className="size-4" />
+          </button>
+        </div>
+      )}
+    </motion.article>
   );
 }
 
-/** Whimsical wavy day divider for the timeline feed. */
 export function WavyDivider({ label }: { label: string }) {
   const wave = (
-    <svg viewBox="0 0 120 8" className="h-2 w-full text-fg-muted/30" preserveAspectRatio="none" aria-hidden>
-      <path
-        d="M0 4 Q 7.5 0, 15 4 T 30 4 T 45 4 T 60 4 T 75 4 T 90 4 T 105 4 T 120 4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
+    <svg viewBox="0 0 120 8" className="h-2 w-full text-border" preserveAspectRatio="none" aria-hidden>
+      <path d="M0 4 Q 7.5 0, 15 4 T 30 4 T 45 4 T 60 4 T 75 4 T 90 4 T 105 4 T 120 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
   return (
     <div className="my-6 flex items-center gap-4">
       <div className="flex-1">{wave}</div>
-      <span className="shrink-0 text-lg text-fg-muted">{label}</span>
+      <span className="shrink-0 text-sm font-medium text-muted-foreground">{label}</span>
       <div className="flex-1">{wave}</div>
     </div>
   );
 }
 
-interface InsightCardProps {
-  timestamp: string;
-  title: string;
-  ai?: boolean;
-  children?: ReactNode;
-  onFeedback?: (vote: 1 | -1) => void;
-}
-
-/** Timeline feed event: ✦ timestamp, title, sub-card, 👍/👎. */
-export function InsightCard({ timestamp, title, ai, children, onFeedback }: InsightCardProps) {
-  return (
-    <article className="py-3">
-      <div className="flex items-center gap-2 text-sm text-fg-muted">
-        {ai && <span className="text-primary">✦</span>}
-        <span>{timestamp}</span>
-      </div>
-      <h3 className="mt-1 text-2xl font-semibold text-fg-muted">{title}</h3>
-      {children && <div className="mt-3">{children}</div>}
-      {onFeedback && (
-        <div className="mt-3 flex items-center gap-4 text-fg-muted">
-          <button onClick={() => onFeedback(1)} className="text-lg hover:text-fg" aria-label="Helpful">
-            👍
-          </button>
-          <button onClick={() => onFeedback(-1)} className="text-lg hover:text-fg" aria-label="Not helpful">
-            👎
-          </button>
-        </div>
-      )}
-    </article>
-  );
-}
-
-interface SettingsRow {
-  icon: ReactNode;
+// ── Settings list ────────────────────────────────────────────────────────────
+export interface SettingsRow {
+  icon: LucideIcon;
   label: string;
   onClick?: () => void;
   trailing?: ReactNode;
+  destructive?: boolean;
 }
-
-interface SettingsSection {
-  header: string;
-  rows: SettingsRow[];
-}
-
-/** Flat settings list: accent section headers, icon rows, zero card chrome. */
-export function SettingsList({ sections }: { sections: SettingsSection[] }) {
+export function SettingsList({ sections }: { sections: { header: string; rows: SettingsRow[] }[] }) {
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       {sections.map((s) => (
         <section key={s.header}>
-          <h3 className="mb-3 text-sm font-semibold text-good">{s.header}</h3>
-          <div className="space-y-1">
-            {s.rows.map((r) => (
+          <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{s.header}</h3>
+          <div className="overflow-hidden rounded-2xl border border-border/60 bg-card">
+            {s.rows.map((r, i) => (
               <button
                 key={r.label}
                 onClick={r.onClick}
-                className="flex w-full items-center gap-4 rounded-2xl px-2 py-3 text-left hover:bg-surface-1"
+                className={cn("flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-secondary [&_svg]:size-[1.2rem]", i > 0 && "border-t border-border/50", r.destructive ? "text-danger" : "text-foreground")}
               >
-                <span className="text-xl text-fg-muted">{r.icon}</span>
-                <span className="flex-1 text-lg">{r.label}</span>
+                <r.icon className={r.destructive ? "text-danger" : "text-muted-foreground"} />
+                <span className="flex-1 font-medium">{r.label}</span>
                 {r.trailing}
               </button>
             ))}
@@ -210,5 +135,19 @@ export function SettingsList({ sections }: { sections: SettingsSection[] }) {
         </section>
       ))}
     </div>
+  );
+}
+
+// ── Empty state ──────────────────────────────────────────────────────────────
+export function EmptyState({ icon: Icon, title, description, action }: { icon: LucideIcon; title: string; description?: string; action?: ReactNode }) {
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center rounded-2xl border border-dashed border-border bg-card/40 px-6 py-12 text-center">
+      <div className="grid size-14 place-items-center rounded-2xl bg-secondary text-muted-foreground [&_svg]:size-7">
+        <Icon />
+      </div>
+      <h3 className="mt-4 text-lg font-semibold">{title}</h3>
+      {description && <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">{description}</p>}
+      {action && <div className="mt-5">{action}</div>}
+    </motion.div>
   );
 }
