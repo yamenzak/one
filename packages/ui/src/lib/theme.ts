@@ -62,12 +62,28 @@ export const EDITABLE_TOKENS: { var: string; label: string }[] = [
   { var: "--border", label: "Border" },
 ];
 
-/** shadcn token names we accept from a pasted theme (they map 1:1 to ours). */
-const SHADCN_TOKENS = new Set([
-  "background", "foreground", "card", "card-foreground", "popover", "popover-foreground",
-  "primary", "primary-foreground", "secondary", "secondary-foreground", "muted", "muted-foreground",
-  "accent", "accent-foreground", "destructive", "destructive-foreground", "border", "input", "ring",
-]);
+/**
+ * App-specific tokens a pasted theme won't define, and where to source them from
+ * so the whole app re-skins even when the theme only sets the standard set. Each
+ * target derives from the first source token present.
+ */
+const DERIVED_TOKENS: [target: string, sources: string[]][] = [
+  ["--surface-2", ["--muted", "--secondary", "--accent", "--card"]],
+  ["--surface-3", ["--accent", "--secondary", "--muted", "--card"]],
+  ["--popover", ["--card"]],
+  ["--card-foreground", ["--foreground"]],
+  ["--popover-foreground", ["--foreground"]],
+  ["--secondary-foreground", ["--foreground"]],
+  ["--accent-foreground", ["--foreground"]],
+];
+
+function fillDerived(map: Record<string, string>): Record<string, string> {
+  for (const [target, sources] of DERIVED_TOKENS) {
+    if (map[target]) continue;
+    for (const s of sources) if (map[s]) { map[target] = map[s]; break; }
+  }
+  return map;
+}
 
 export function presetById(id: string | null | undefined): BrandPreset | undefined {
   return BRAND_PRESETS.find((p) => p.id === id);
@@ -226,13 +242,15 @@ export function extractPalette(img: HTMLImageElement): { primary: string; primar
 }
 
 /**
- * Parse a pasted shadcn theme (CSS) into per-mode token maps. Understands both
- * modern oklch values (`--background: oklch(1 0 0);`) and legacy HSL triplets
- * (`--background: 0 0% 100%;`, wrapped into `hsl(...)`). shadcn's `:root` is the
- * LIGHT theme and `.dark` is dark — we map them to our light/dark buckets.
+ * Parse a pasted theme (CSS) into per-mode token maps. Accepts EVERY `--*`
+ * custom property (only color/radius tokens actually take effect via the token
+ * layer, so extras are harmless), understands both modern oklch values
+ * (`--background: oklch(1 0 0);`) and legacy HSL triplets (`--background: 0 0%
+ * 100%;`, wrapped into `hsl(...)`), and fills app-specific surface tokens so the
+ * whole app re-skins. Convention: `:root` is the LIGHT theme, `.dark` is dark.
  * Returns tokens plus an optional radius (rem) pulled out of `--radius`.
  */
-export function parseShadcnTheme(css: string): { tokens: BrandTokens; radius: number | null } {
+export function parseThemeCss(css: string): { tokens: BrandTokens; radius: number | null } {
   const grab = (selectorNames: string[]): Record<string, string> => {
     for (const name of selectorNames) {
       const re = new RegExp(`${name.replace(/[.[\]"=]/g, "\\$&")}\\s*\\{([^}]*)\\}`, "i");
@@ -241,7 +259,9 @@ export function parseShadcnTheme(css: string): { tokens: BrandTokens; radius: nu
     }
     return {};
   };
-  const rootDecls = grab([":root", "html"]);
+  // A bare token dump with no selector is treated as the light/root block.
+  const hasSelector = /\{/.test(css);
+  const rootDecls = hasSelector ? grab([":root", "html"]) : parseDecls(css);
   const darkDecls = grab([".dark", '[data-theme="dark"]', ':root[data-theme="dark"]']);
 
   let radius: number | null = null;
@@ -250,15 +270,13 @@ export function parseShadcnTheme(css: string): { tokens: BrandTokens; radius: nu
     for (const [k, raw] of Object.entries(decls)) {
       const name = k.replace(/^--/, "");
       if (name === "radius") { const n = parseFloat(raw); if (!Number.isNaN(n) && raw.includes("rem")) radius = n; continue; }
-      if (!SHADCN_TOKENS.has(name)) continue;
       out[`--${name}`] = normalizeColor(raw);
     }
-    return out;
+    return fillDerived(out);
   };
 
-  // shadcn :root = light, .dark = dark. If no .dark block, fall back to :root for both.
   const light = pick(rootDecls);
-  const dark = Object.keys(darkDecls).length ? pick(darkDecls) : light;
+  const dark = Object.keys(darkDecls).length ? pick(darkDecls) : { ...light };
   return { tokens: { light, dark }, radius };
 }
 

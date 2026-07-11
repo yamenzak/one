@@ -24,19 +24,36 @@ export function AppBar({ leading, title, trailing }: { leading?: ReactNode; titl
   );
 }
 
+const navSpring = { type: "spring" as const, stiffness: 420, damping: 34 };
+
 export function BottomTabs({ tabs, active, onSelect }: { tabs: TabDef[]; active: string; onSelect: (k: string) => void }) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border/40 bg-background/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
-      <div className="mx-auto flex max-w-xl items-stretch justify-around">
+    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.7rem)] md:hidden">
+      <div className="pointer-events-auto flex max-w-full items-center gap-0.5 rounded-full border border-border/60 bg-card/75 p-1.5 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] backdrop-blur-2xl">
         {tabs.map((t) => {
           const on = active === t.key;
           return (
-            <button key={t.key} onClick={() => onSelect(t.key)} className="relative flex flex-1 flex-col items-center gap-1 py-2.5" aria-current={on ? "page" : undefined}>
-              <span className="relative grid h-8 w-14 place-items-center">
-                {on && <motion.span layoutId="tab-pill" transition={{ type: "spring", stiffness: 400, damping: 32 }} className="absolute inset-0 rounded-full bg-primary/15" />}
-                <t.icon className={cn("relative size-[1.3rem] transition-colors", on ? "text-primary" : "text-muted-foreground")} strokeWidth={on ? 2.4 : 2} />
-              </span>
-              <span className={cn("text-[0.68rem] font-medium transition-colors", on ? "text-primary" : "text-muted-foreground")}>{t.label}</span>
+            <button
+              key={t.key}
+              onClick={() => onSelect(t.key)}
+              aria-current={on ? "page" : undefined}
+              className={cn(
+                "relative flex items-center gap-2 rounded-full px-3.5 py-2.5 transition-colors duration-200",
+                on ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {on && <motion.span layoutId="tab-pill" transition={navSpring} className="absolute inset-0 rounded-full bg-primary" />}
+              <t.icon className="relative size-[1.25rem]" strokeWidth={on ? 2.4 : 2} />
+              {on && (
+                <motion.span
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: "auto" }}
+                  transition={{ duration: 0.2 }}
+                  className="relative overflow-hidden whitespace-nowrap text-sm font-semibold"
+                >
+                  {t.label}
+                </motion.span>
+              )}
             </button>
           );
         })}
@@ -47,21 +64,30 @@ export function BottomTabs({ tabs, active, onSelect }: { tabs: TabDef[]; active:
 
 export function NavRail({ tabs, active, onSelect, footer, brand }: { tabs: TabDef[]; active: string; onSelect: (k: string) => void; footer?: ReactNode; brand?: ReactNode }) {
   return (
-    <nav className="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col items-center gap-1 border-r border-border/40 bg-card/50 py-6 backdrop-blur-xl md:flex">
-      <div className="mb-5 grid size-11 place-items-center rounded-2xl bg-primary text-lg font-black text-primary-foreground">{brand ?? "M"}</div>
-      {tabs.map((t) => {
-        const on = active === t.key;
-        return (
-          <button key={t.key} onClick={() => onSelect(t.key)} className="relative flex w-full flex-col items-center gap-1 py-2.5" aria-current={on ? "page" : undefined}>
-            <span className="relative grid h-9 w-16 place-items-center">
-              {on && <motion.span layoutId="rail-pill" transition={{ type: "spring", stiffness: 400, damping: 32 }} className="absolute inset-0 rounded-2xl bg-primary/15" />}
-              <t.icon className={cn("relative size-[1.35rem] transition-colors", on ? "text-primary" : "text-muted-foreground")} strokeWidth={on ? 2.4 : 2} />
-            </span>
-            <span className={cn("text-[0.66rem] font-medium", on ? "text-primary" : "text-muted-foreground")}>{t.label}</span>
-          </button>
-        );
-      })}
-      <div className="mt-auto">{footer}</div>
+    <nav className="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col items-center border-r border-border/40 bg-card/40 py-6 backdrop-blur-xl md:flex">
+      <div className="mb-6 grid size-11 place-items-center overflow-hidden rounded-2xl bg-primary text-lg font-black text-primary-foreground">{brand ?? "M"}</div>
+      <div className="flex w-full flex-1 flex-col items-center gap-1.5 px-3">
+        {tabs.map((t) => {
+          const on = active === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => onSelect(t.key)}
+              aria-current={on ? "page" : undefined}
+              className="group relative flex w-full flex-col items-center gap-1 rounded-2xl py-2.5 transition-colors"
+            >
+              {on && <motion.span layoutId="rail-pill" transition={navSpring} className="absolute inset-0 rounded-2xl bg-primary/12" />}
+              {on && <motion.span layoutId="rail-bar" transition={navSpring} className="absolute -left-3 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-primary" />}
+              <t.icon
+                className={cn("relative size-[1.35rem] transition-colors", on ? "text-primary" : "text-muted-foreground group-hover:text-foreground")}
+                strokeWidth={on ? 2.4 : 2}
+              />
+              <span className={cn("relative text-[0.66rem] font-medium transition-colors", on ? "text-primary" : "text-muted-foreground group-hover:text-foreground")}>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {footer && <div className="mt-auto">{footer}</div>}
     </nav>
   );
 }

@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import {
   Button, Card, Badge, Switch, Textarea, Skeleton, SettingsList, Page, Stagger,
-  BRAND_PRESETS, EDITABLE_TOKENS, extractPalette, foregroundFor, hexToOklchString, oklchStringToHex, parseShadcnTheme,
+  BRAND_PRESETS, EDITABLE_TOKENS, extractPalette, foregroundFor, hexToOklchString, oklchStringToHex, parseThemeCss,
   KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, type Branding,
 } from "@mossa/ui";
 import { useSession } from "../session.js";
@@ -148,7 +148,7 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
   const [logoUrl, setLogoUrl] = useState<string | null>(initial?.logoUrl ?? null);
   const [tokens, setTokens] = useState<{ light?: Record<string, string> | null; dark?: Record<string, string> | null }>(initial?.tokens ?? {});
   const [advanced, setAdvanced] = useState(false);
-  const [shadcn, setShadcn] = useState("");
+  const [themeCss, setThemeCss] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -176,12 +176,12 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
     img.src = logoUrl;
   };
 
-  const applyShadcn = () => {
-    const { tokens: t, radius: r } = parseShadcnTheme(shadcn);
+  const applyThemeCss = () => {
+    const { tokens: t, radius: r } = parseThemeCss(themeCss);
     if (!Object.keys(t.light ?? {}).length && !Object.keys(t.dark ?? {}).length) { setMsg("No theme tokens found in that CSS."); return; }
     setTokens((prev) => ({ light: { ...prev.light, ...t.light }, dark: { ...prev.dark, ...t.dark } }));
     if (r != null) setRadius(r);
-    setShadcn(""); setMsg("shadcn theme applied.");
+    setThemeCss(""); setMsg("Theme applied — save to keep it.");
   };
 
   const tokenHex = (v: string): string => {
@@ -265,10 +265,11 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
               ))}
             </div>
             <div className="space-y-2">
-              <div className="text-sm font-medium">Paste a shadcn theme</div>
-              <Textarea rows={4} value={shadcn} onChange={(e) => setShadcn(e.target.value)} placeholder={":root { --primary: oklch(0.6 0.2 250); ... }\n.dark { --primary: ...; ... }"} className="font-mono text-xs" />
+              <div className="text-sm font-medium">Paste a theme</div>
+              <p className="text-xs text-muted-foreground">Drop in any CSS token set (<code className="rounded bg-surface-2 px-1">:root</code> for light, <code className="rounded bg-surface-2 px-1">.dark</code> for dark). Every token maps straight through — the whole app re-skins.</p>
+              <Textarea rows={4} value={themeCss} onChange={(e) => setThemeCss(e.target.value)} placeholder={":root { --primary: oklch(0.6 0.2 250); --background: oklch(1 0 0); ... }\n.dark { --primary: ...; --background: ...; ... }"} className="font-mono text-xs" />
               <div className="flex gap-2">
-                <Button size="sm" variant="secondary" disabled={!shadcn.trim()} onClick={applyShadcn}>Apply theme</Button>
+                <Button size="sm" variant="secondary" disabled={!themeCss.trim()} onClick={applyThemeCss}>Apply theme</Button>
                 {(tokens.light || tokens.dark) && <Button size="sm" variant="ghost" onClick={() => { setTokens({}); setMsg("Custom tokens cleared."); }}>Clear tokens</Button>}
               </div>
             </div>
