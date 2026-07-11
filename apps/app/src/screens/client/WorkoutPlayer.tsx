@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import type { WorkoutBody, WorkoutDay, ExerciseSlot } from "@mossa/protocol";
+import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot } from "@mossa/protocol";
 import { detectPrs, recommendNextDay, displayToKg, weightLabel, fmtWeight, type ExerciseBests } from "@mossa/domain";
 import {
   Button, Card, Badge, Field, Sheet, Skeleton, SubCard, ProgressRing, EmptyState,
@@ -25,6 +25,7 @@ export function WorkoutPlayer({ clientId, initialDay }: { clientId: string; init
   const [session, setSession] = useState<Map<string, LoggedSet[]>>(new Map());
   const [dayIndex, setDayIndex] = useState<number | null>(initialDay ?? null);
   const [logSlot, setLogSlot] = useState<{ blockIndex: number; slotIndex: number; slot: ExerciseSlot } | null>(null);
+  const [roundBlock, setRoundBlock] = useState<{ blockIndex: number; block: WorkoutBlock; roundIndex: number } | null>(null);
   const [swapSlot, setSwapSlot] = useState<{ blockIndex: number; slotIndex: number; exerciseId: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [bests, setBests] = useState<Map<string, ExerciseBests>>(new Map());
@@ -104,6 +105,32 @@ export function WorkoutPlayer({ clientId, initialDay }: { clientId: string; init
     else if (broke.includes("reps")) { setToast(`Rep PR — ${set.reps} reps`); setTimeout(() => setToast(null), 3000); }
   };
 
+  // Superset/circuit/hiit: log every exercise of one round together. Persist each
+  // slot's set, then update session + PRs once so the round applies atomically.
+  const saveRound = async (blockIndex: number, roundIndex: number, entries: { slotIndex: number; exerciseId: string; set: LoggedSet }[]) => {
+    for (const e of entries) {
+      await api.post("/api/logs/workout-sets", { clientId, data: { date, workoutPlanId: plan.id, planDayIndex: dayIndex, blockIndex, slotIndex: e.slotIndex, exerciseId: e.exerciseId, sets: [e.set] } });
+    }
+    const nextSession = new Map(session);
+    for (const e of entries) {
+      const key = `${blockIndex}:${e.slotIndex}`;
+      const cur = nextSession.get(key) ?? [];
+      nextSession.set(key, cur.filter((s) => s.setIndex !== e.set.setIndex).concat(e.set).sort((a, b) => a.setIndex - b.setIndex));
+    }
+    setSession(nextSession);
+    const nextBests = new Map(bests);
+    let pr: string | null = null;
+    for (const e of entries) {
+      const b = nextBests.get(e.exerciseId) ?? { prWeightKg: null, prReps: null, prDurationSeconds: null, bestE1Rm: null };
+      const { bests: nb, broke } = detectPrs(b, e.set);
+      nextBests.set(e.exerciseId, nb);
+      if (broke.includes("weight")) pr = `New weight PR — ${fmtWeight(e.set.weightKg, units)}`;
+      else if (!pr && broke.includes("reps")) pr = `Rep PR — ${e.set.reps} reps`;
+    }
+    setBests(nextBests);
+    if (pr) { setToast(pr); navigator.vibrate?.([30, 40, 60]); setTimeout(() => setToast(null), 3000); }
+  };
+
   return (
     <div className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <div className="flex items-center gap-3">
@@ -112,30 +139,54 @@ export function WorkoutPlayer({ clientId, initialDay }: { clientId: string; init
         <ProgressRing progress={totalSets ? loggedSets / totalSets : 0} size={52} strokeWidth={6} tone="activity" value={<span className="text-sm">{loggedSets}</span>} />
       </div>
 
-      {day.blocks.map((block, blockIndex) => (
-        <Card key={blockIndex} className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Badge tone="activity">{blockLabel(block.type)}</Badge>
-            {block.rounds && <span className="text-sm text-muted-foreground">{block.rounds} rounds</span>}
-          </div>
-          {block.slots.map((slot, slotIndex) => {
-            const logged = session.get(`${blockIndex}:${slotIndex}`)?.filter((s) => s.completed).length ?? 0;
-            const done = logged >= slot.sets.length;
-            return (
+      {day.blocks.map((block, blockIndex) => {
+        // Singles log set-by-set per exercise; supersets/circuits/HIIT log a
+        // whole round (one set of every exercise) at a time.
+        const rounds = block.type === "single" ? null : block.rounds ?? 1;
+        if (rounds === null) {
+          return (
+            <Card key={blockIndex} className="space-y-3">
+              <div className="flex items-center gap-2"><Badge tone="activity">{blockLabel(block.type)}</Badge></div>
+              {block.slots.map((slot, slotIndex) => {
+                const logged = session.get(`${blockIndex}:${slotIndex}`)?.filter((s) => s.completed).length ?? 0;
+                const done = logged >= slot.sets.length;
+                return (
+                  <SubCard key={slotIndex} className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{exercises.get(slot.exerciseId)?.name ?? "Exercise"}</div>
+                      <div className="text-sm text-muted-foreground">{logged}/{slot.sets.length} sets · {slot.measurementMode}</div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
+                      <Button size="sm" variant={done ? "secondary" : "default"} onClick={() => setLogSlot({ blockIndex, slotIndex, slot })}>{done ? <Check /> : "Log"}</Button>
+                    </div>
+                  </SubCard>
+                );
+              })}
+            </Card>
+          );
+        }
+        // Completed rounds = the fewest completed sets across the block's slots.
+        const roundsDone = block.slots.length ? Math.min(...block.slots.map((_, si) => session.get(`${blockIndex}:${si}`)?.filter((s) => s.completed).length ?? 0)) : 0;
+        const blockDone = roundsDone >= rounds;
+        return (
+          <Card key={blockIndex} className="space-y-3">
+            <div className="flex items-center gap-2"><Badge tone="activity">{blockLabel(block.type)}</Badge><span className="text-sm text-muted-foreground">{roundsDone}/{rounds} rounds</span></div>
+            {block.slots.map((slot, slotIndex) => (
               <SubCard key={slotIndex} className="flex items-center justify-between">
                 <div>
                   <div className="font-medium">{exercises.get(slot.exerciseId)?.name ?? "Exercise"}</div>
-                  <div className="text-sm text-muted-foreground">{logged}/{slot.sets.length} sets · {slot.measurementMode}</div>
+                  <div className="text-sm text-muted-foreground">{slot.sets[0]?.reps ? `${slot.sets[0].reps} reps` : slot.measurementMode}</div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
-                  <Button size="sm" variant={done ? "secondary" : "default"} onClick={() => setLogSlot({ blockIndex, slotIndex, slot })}>{done ? <Check /> : "Log"}</Button>
-                </div>
+                <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
               </SubCard>
-            );
-          })}
-        </Card>
-      ))}
+            ))}
+            <Button className="w-full" variant={blockDone ? "secondary" : "default"} disabled={blockDone} onClick={() => setRoundBlock({ blockIndex, block, roundIndex: roundsDone })}>
+              {blockDone ? <><Check /> Rounds complete</> : `Log round ${roundsDone + 1} of ${rounds}`}
+            </Button>
+          </Card>
+        );
+      })}
 
       <AnimatePresence>
         {toast && (
@@ -147,6 +198,9 @@ export function WorkoutPlayer({ clientId, initialDay }: { clientId: string; init
 
       {logSlot && (
         <SetLogDrawer slot={logSlot.slot} exerciseName={exercises.get(logSlot.slot.exerciseId)?.name ?? "Exercise"} logged={session.get(`${logSlot.blockIndex}:${logSlot.slotIndex}`) ?? []} onClose={() => setLogSlot(null)} onSave={(s) => saveSet(logSlot.blockIndex, logSlot.slotIndex, logSlot.slot.exerciseId, s)} />
+      )}
+      {roundBlock && (
+        <RoundLogDrawer block={roundBlock.block} roundIndex={roundBlock.roundIndex} exercises={exercises} onClose={() => setRoundBlock(null)} onSave={(entries) => saveRound(roundBlock.blockIndex, roundBlock.roundIndex, entries)} />
       )}
       {swapSlot && (
         <SwapDrawer clientId={clientId} planId={plan.id} dayIndex={dayIndex} coords={swapSlot} library={[...exercises.values()]} currentName={exercises.get(swapSlot.exerciseId)?.name ?? "Exercise"} onClose={() => setSwapSlot(null)} onDone={(m) => { setSwapSlot(null); setToast(m); setTimeout(() => setToast(null), 3000); }} />
@@ -195,6 +249,63 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
           </div>
         </div>
         <Button size="lg" className="w-full" onClick={() => void save()} disabled={setIndex >= slot.sets.length}>{setIndex >= slot.sets.length ? "All sets logged" : "Log set"}</Button>
+      </div>
+    </Sheet>
+  );
+}
+
+/** Round-grouped logging for supersets/circuits/HIIT: one set of every exercise. */
+function RoundLogDrawer({ block, roundIndex, exercises, onClose, onSave }: { block: WorkoutBlock; roundIndex: number; exercises: Map<string, ExerciseLite>; onClose: () => void; onSave: (entries: { slotIndex: number; exerciseId: string; set: LoggedSet }[]) => Promise<void> }) {
+  const [vals, setVals] = useState<Record<number, { reps: string; weight: string }>>({});
+  const [busy, setBusy] = useState(false);
+  const units = useUnits();
+  const rounds = block.rounds ?? 1;
+  const setV = (si: number, patch: Partial<{ reps: string; weight: string }>) => setVals((v) => ({ ...v, [si]: { reps: "", weight: "", ...v[si], ...patch } }));
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const entries = block.slots.map((slot, si) => {
+        const prescribed = slot.sets[Math.min(roundIndex, slot.sets.length - 1)];
+        const v = vals[si] ?? { reps: "", weight: "" };
+        return {
+          slotIndex: si,
+          exerciseId: slot.exerciseId,
+          set: {
+            setIndex: roundIndex,
+            reps: v.reps ? Number(v.reps) : prescribed?.reps ?? null,
+            weightKg: v.weight ? Math.round(displayToKg(Number(v.weight), units) * 100) / 100 : null,
+            effortLabel: null,
+            completed: true,
+          } as LoggedSet,
+        };
+      });
+      await onSave(entries);
+      onClose();
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <Sheet open onClose={onClose} title={`Round ${roundIndex + 1} of ${rounds}`}>
+      <div className="space-y-3">
+        <div className="text-sm text-muted-foreground">Log one set of each — then rest and come back for the next round.</div>
+        {block.slots.map((slot, si) => {
+          const prescribed = slot.sets[Math.min(roundIndex, slot.sets.length - 1)];
+          const v = vals[si] ?? { reps: "", weight: "" };
+          return (
+            <SubCard key={si} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="font-medium">{exercises.get(slot.exerciseId)?.name ?? "Exercise"}</div>
+                {prescribed?.reps ? <span className="text-xs text-muted-foreground">target {prescribed.reps} reps</span> : null}
+              </div>
+              <div className="flex gap-3">
+                <Field label="Reps" inputMode="numeric" value={v.reps} onChange={(e) => setV(si, { reps: e.target.value.replace(/\D/g, "") })} className="flex-1" />
+                <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={v.weight} onChange={(e) => setV(si, { weight: e.target.value })} className="flex-1" />
+              </div>
+            </SubCard>
+          );
+        })}
+        <Button size="lg" className="w-full" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Complete round"}</Button>
       </div>
     </Sheet>
   );
