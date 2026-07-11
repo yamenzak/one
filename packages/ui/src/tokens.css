@@ -31,6 +31,16 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  /* Metric coding (macros) */
+  --color-calories: var(--calories);
+  --color-calories-soft: var(--calories-soft);
+  --color-protein: var(--protein);
+  --color-protein-soft: var(--protein-soft);
+  --color-carbs: var(--carbs);
+  --color-carbs-soft: var(--carbs-soft);
+  --color-fat: var(--fat);
+  --color-fat-soft: var(--fat-soft);
+
   /* Domain accents (fitness viz) */
   --color-activity: var(--activity);
   --color-activity-soft: var(--activity-soft);
@@ -95,6 +105,15 @@
   --input: oklch(0.3 0.008 285);
   --ring: oklch(0.74 0.15 164);
 
+  --calories: oklch(0.78 0.16 45);
+  --calories-soft: oklch(0.35 0.07 45);
+  --protein: oklch(0.72 0.16 350);
+  --protein-soft: oklch(0.34 0.07 350);
+  --carbs: oklch(0.82 0.15 90);
+  --carbs-soft: oklch(0.36 0.06 90);
+  --fat: oklch(0.7 0.14 275);
+  --fat-soft: oklch(0.34 0.06 275);
+
   --activity: oklch(0.78 0.13 164);
   --activity-soft: oklch(0.34 0.06 164);
   --nutrition: oklch(0.8 0.13 68);
@@ -140,6 +159,15 @@
   --border: oklch(0.9 0.005 285);
   --input: oklch(0.9 0.005 285);
   --ring: oklch(0.62 0.14 164);
+
+  --calories: oklch(0.6 0.15 45);
+  --calories-soft: oklch(0.94 0.06 45);
+  --protein: oklch(0.58 0.16 350);
+  --protein-soft: oklch(0.94 0.05 350);
+  --carbs: oklch(0.66 0.14 90);
+  --carbs-soft: oklch(0.95 0.07 90);
+  --fat: oklch(0.55 0.16 275);
+  --fat-soft: oklch(0.94 0.05 275);
 
   --activity: oklch(0.58 0.13 164);
   --activity-soft: oklch(0.93 0.05 164);

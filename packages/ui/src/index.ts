@@ -1,6 +1,7 @@
 export * from "./lib/utils.js";
 export * from "./lib/theme.js";
 export * from "./lib/icons.js";
+export * from "./lib/metric-coding.js";
 export * from "./lib/motion.js";
 export * from "./primitives.js";
 export * from "./overlays.js";

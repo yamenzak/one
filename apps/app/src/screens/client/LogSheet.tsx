@@ -16,10 +16,10 @@ import { api, todayLocal } from "../../api.js";
 type LogKind = "food" | "activity" | "water" | "weight" | "body" | "sleep" | "mood" | "checkin";
 const CHIPS: { kind: LogKind; label: string; icon: LucideIcon; tone: Tone }[] = [
   { kind: "food", label: "Food", icon: Utensils, tone: "nutrition" },
-  { kind: "activity", label: "Activity", icon: Footprints, tone: "cardio" },
+  { kind: "activity", label: "Activity", icon: Footprints, tone: "activity" },
   { kind: "water", label: "Water", icon: Droplet, tone: "hydration" },
-  { kind: "weight", label: "Weight", icon: Weight, tone: "activity" },
-  { kind: "body", label: "Body", icon: Ruler, tone: "activity" },
+  { kind: "weight", label: "Weight", icon: Weight, tone: "cardio" },
+  { kind: "body", label: "Body", icon: Ruler, tone: "cardio" },
   { kind: "sleep", label: "Sleep", icon: Bed, tone: "sleep" },
   { kind: "mood", label: "Mood", icon: Smile, tone: "nutrition" },
   { kind: "checkin", label: "Check-in", icon: ClipboardList, tone: "primary" },
@@ -82,7 +82,7 @@ export function LogSheet({ open, onClose, clientId, onLogged }: { open: boolean;
       {!kind ? (
         <div className="grid grid-cols-2 gap-3 pb-2">
           {CHIPS.map((c) => (
-            <button key={c.kind} onClick={() => setKind(c.kind)} className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-4 text-left transition-all hover:border-border active:scale-[0.98]">
+            <button key={c.kind} onClick={() => setKind(c.kind)} className="flex items-center gap-3 rounded-2xl bg-surface-2 p-4 text-left transition-all hover:bg-surface-3 active:scale-[0.98]">
               <IconBadge icon={c.icon} tone={c.tone} size="sm" />
               <span className="font-medium">{c.label}</span>
             </button>

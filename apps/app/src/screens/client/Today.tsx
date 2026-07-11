@@ -5,8 +5,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { currentStreak } from "@mossa/domain";
 import {
-  Button, Card, SubCard, Skeleton, ProgressRing, MetricPill, InsightCard, WavyDivider, Badge,
-  Page, Stagger, Plus, Play, PencilLine, Zap, Droplet, Flame, Trophy, ClipboardList, Dumbbell, FlaskConical, TrendingUp,
+  Button, Card, SubCard, Skeleton, ProgressRing, MetricPill, MacroBar, InsightCard, WavyDivider, Badge,
+  Page, Stagger, METRICS, toneVar, Plus, Play, PencilLine, Flame, Trophy, ClipboardList, Dumbbell, FlaskConical, type Tone,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { LogSheet } from "./LogSheet.js";
@@ -56,16 +56,25 @@ export function Today({ clientId, onStart }: { clientId: string; onStart?: () =>
         <ProgressRing
           progress={calTarget > 0 ? net / calTarget : 0.001}
           size={188}
-          tone="nutrition"
-          label="Calories"
+          tone="calories"
+          label={METRICS.calories.label}
           value={Math.max(0, Math.round(net)).toLocaleString()}
           sublabel={calTarget > 0 ? `of ${calTarget.toLocaleString()}` : "set a goal"}
         />
         <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-          <MetricPill icon={Zap} label="Protein" tone="activity" value={`${data.nutrition.proteinG} g`} progress={targets?.targetProteinG ? data.nutrition.proteinG / targets.targetProteinG : undefined} />
-          <MetricPill icon={Droplet} label="Water" tone="hydration" value={`${(data.waterMl / 1000).toFixed(1)} L`} progress={data.waterMl / waterTarget} />
-          <MetricPill icon={Flame} label="Burned" tone="cardio" value={`${data.burnedKcal.toLocaleString()}`} />
+          <MetricPill icon={METRICS.protein.icon} label={METRICS.protein.label} tone={METRICS.protein.tone} value={`${data.nutrition.proteinG} g`} progress={targets?.targetProteinG ? data.nutrition.proteinG / targets.targetProteinG : undefined} />
+          <MetricPill icon={METRICS.water.icon} label={METRICS.water.label} tone={METRICS.water.tone} value={`${(data.waterMl / 1000).toFixed(1)} L`} progress={data.waterMl / waterTarget} />
+          <MetricPill icon={METRICS.burned.icon} label={METRICS.burned.label} tone={METRICS.burned.tone} value={`${data.burnedKcal.toLocaleString()}`} />
         </div>
+      </Stagger>
+
+      <Stagger>
+        <MacroBar
+          proteinG={data.nutrition.proteinG}
+          carbsG={data.nutrition.carbsG}
+          fatG={data.nutrition.fatG}
+          targets={targets ? { proteinG: targets.targetProteinG, carbsG: targets.targetCarbsG, fatG: targets.targetFatG } : null}
+        />
       </Stagger>
 
       <Stagger className="flex items-center gap-2.5">
@@ -82,8 +91,8 @@ export function Today({ clientId, onStart }: { clientId: string; onStart?: () =>
 
       {/* Home widgets */}
       <Stagger className="grid grid-cols-3 gap-2.5">
-        <Widget icon={Flame} tone="nutrition" value={data.checkInDates ? currentStreak(new Set(data.checkInDates), date) : 0} label="Day streak" />
-        <Widget icon={TrendingUp} tone="activity" value={weightDelta(data.weightSeries)} label="7-day kg" />
+        <Widget icon={METRICS.streak.icon} tone={METRICS.streak.tone} value={data.checkInDates ? currentStreak(new Set(data.checkInDates), date) : 0} label="Day streak" />
+        <Widget icon={METRICS.weight.icon} tone={METRICS.weight.tone} value={weightDelta(data.weightSeries)} label="7-day kg" />
         <Widget icon={FlaskConical} tone="cardio" value={data.pendingLabs ?? 0} label="Labs due" />
       </Stagger>
 
@@ -130,11 +139,10 @@ export function Today({ clientId, onStart }: { clientId: string; onStart?: () =>
   );
 }
 
-const TONE_TEXT = { nutrition: "text-nutrition", activity: "text-activity", cardio: "text-cardio" } as const;
-function Widget({ icon: Icon, tone, value, label }: { icon: typeof Flame; tone: keyof typeof TONE_TEXT; value: number | string; label: string }) {
+function Widget({ icon: Icon, tone, value, label }: { icon: typeof Flame; tone: Tone; value: number | string; label: string }) {
   return (
     <Card className="flex flex-col items-center gap-1 p-3 text-center">
-      <Icon className={`size-4 ${TONE_TEXT[tone]}`} />
+      <Icon className="size-4" style={{ color: toneVar[tone] }} />
       <div className="numeral text-xl font-semibold">{value}</div>
       <div className="text-[0.65rem] text-muted-foreground">{label}</div>
     </Card>

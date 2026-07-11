@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
-import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, Utensils, ShoppingCart } from "@mossa/ui";
+import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, Utensils, ShoppingCart } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 
 interface Plan { id: string; name: string; status: string; body: MealBody }
@@ -73,7 +73,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                 <div className="min-w-0">
                   <div className="text-xs uppercase text-muted-foreground">{opt.mealType.replace("_", " ")}</div>
                   <div className="truncate font-medium">{opt.mealName || (opt.isFree ? "Free meal" : "Meal")}</div>
-                  <div className="numeral text-xs text-muted-foreground">{opt.isFree ? `≤${opt.freeMealMaxCalories ?? "—"} kcal` : `${t.calories} kcal · P${t.proteinG}`}</div>
+                  <div className="numeral text-xs text-muted-foreground">{opt.isFree ? `≤${opt.freeMealMaxCalories ?? "—"} kcal` : <><span className="text-calories">{t.calories} kcal</span> · <MacroInline proteinG={t.proteinG} carbsG={t.carbsG} fatG={t.fatG} /></>}</div>
                 </div>
                 <Button size="sm" variant={opt.isFree ? "tonal" : "default"} disabled={logging === i} onClick={() => void logOption(opt, i)}>{logging === i ? "…" : "Log"}</Button>
               </Card>

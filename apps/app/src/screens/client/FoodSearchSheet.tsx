@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Field, Sheet, Chip, Search, Barcode, Sparkles, Camera } from "@mossa/ui";
+import { Button, Field, Sheet, Chip, cn, toneSoft, METRICS, Search, Barcode, Sparkles, Camera } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { BarcodeScanner } from "./BarcodeScanner.js";
 
@@ -89,8 +89,8 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
           <div className="flex flex-wrap gap-2">{MEALS.map((m) => <Chip key={m} selected={meal === m} onClick={() => setMeal(m)}>{m}</Chip>)}</div>
           <Field label={`Quantity (${n.servingUnit})`} inputMode="numeric" value={quantity} onChange={(e) => setQuantity(e.target.value.replace(/[^\d.]/g, ""))} />
           <div className="grid grid-cols-4 gap-2 text-center">
-            {([["kcal", n.calories], ["P", n.proteinG], ["C", n.carbsG], ["F", n.fatG]] as const).map(([l, v]) => (
-              <div key={l} className="rounded-xl bg-secondary p-2.5"><div className="numeral text-lg font-semibold">{Math.round(v * factor)}</div><div className="text-xs text-muted-foreground">{l}</div></div>
+            {([["calories", "kcal", n.calories], ["protein", "P", n.proteinG], ["carbs", "C", n.carbsG], ["fat", "F", n.fatG]] as const).map(([metric, l, v]) => (
+              <div key={l} className={cn("rounded-xl p-2.5", toneSoft[METRICS[metric].tone])}><div className="numeral text-lg font-semibold">{Math.round(v * factor)}</div><div className="text-xs font-medium opacity-70">{l}</div></div>
             ))}
           </div>
           <div className="flex gap-3"><Button variant="ghost" onClick={() => setSelected(null)}>Back</Button><Button size="lg" className="flex-1" onClick={() => void log()}>Log it</Button></div>

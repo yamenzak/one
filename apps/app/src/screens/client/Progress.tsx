@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { currentStreak, longestStreak, consistencyPct, wellnessIndex, averageRating, presetRange, type RangePreset } from "@mossa/domain";
-import { Button, Card, Badge, Skeleton, Sparkline, StatCard, WeekDots, SegmentedControl, Page, Stagger, Flame, Weight, Gauge, Ruler, HeartPulse, Sparkles, X } from "@mossa/ui";
+import { Button, Card, Badge, Skeleton, Sparkline, StatCard, WeekDots, SegmentedControl, Page, Stagger, METRICS, Gauge, HeartPulse, Sparkles, X } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 
 interface Measurement { date_local: string; weight_kg: number | null; body_fat_percent: number | null; waist_cm: number | null }
@@ -53,25 +53,25 @@ export function Progress({ clientId }: { clientId: string }) {
 
       {tab === "overview" && (
         <Stagger className="space-y-4">
-          <StatCard label="Check-in streak" icon={Flame} tone="nutrition" value={streak} unit={streak === 1 ? "day" : "days"} badge={<Badge tone="neutral">best {longestStreak(loggedDays)}</Badge>} chart={<WeekDots days={weekFlags} todayIndex={(new Date(today).getDay() + 6) % 7} />} />
+          <StatCard label="Check-in streak" icon={METRICS.streak.icon} tone={METRICS.streak.tone} value={streak} unit={streak === 1 ? "day" : "days"} badge={<Badge tone="neutral">best {longestStreak(loggedDays)}</Badge>} chart={<WeekDots days={weekFlags} todayIndex={(new Date(today).getDay() + 6) % 7} />} />
           <StatCard label="Consistency" icon={Gauge} tone="activity" value={consistencyPct(loggedDays, start, today)} unit="%" />
-          <StatCard label="Weight" icon={Weight} tone="activity" value={weights.at(-1)?.weight_kg?.toFixed(1) ?? "—"} unit="kg" chart={weights.length >= 2 ? <Sparkline values={weights.map((w) => w.weight_kg!)} tone="activity" /> : undefined} />
+          <StatCard label={METRICS.weight.label} icon={METRICS.weight.icon} tone={METRICS.weight.tone} value={weights.at(-1)?.weight_kg?.toFixed(1) ?? "—"} unit="kg" chart={weights.length >= 2 ? <Sparkline values={weights.map((w) => w.weight_kg!)} tone={METRICS.weight.tone} /> : undefined} />
         </Stagger>
       )}
 
       {tab === "body" && (
         <Stagger className="space-y-4">
-          <StatCard label="Weight" icon={Weight} tone="activity" value={weights.at(-1)?.weight_kg?.toFixed(1) ?? "—"} unit="kg" chart={weights.length >= 2 ? <Sparkline values={weights.map((w) => w.weight_kg!)} tone="activity" /> : undefined} />
-          <StatCard label="Body fat" icon={Gauge} tone="sleep" value={bfs.at(-1)?.body_fat_percent?.toFixed(1) ?? "—"} unit="%" chart={bfs.length >= 2 ? <Sparkline values={bfs.map((b) => b.body_fat_percent!)} tone="sleep" /> : undefined} />
-          <StatCard label="Waist" icon={Ruler} tone="nutrition" value={waists.at(-1)?.waist_cm?.toFixed(1) ?? "—"} unit="cm" chart={waists.length >= 2 ? <Sparkline values={waists.map((w) => w.waist_cm!)} tone="nutrition" /> : undefined} />
+          <StatCard label={METRICS.weight.label} icon={METRICS.weight.icon} tone={METRICS.weight.tone} value={weights.at(-1)?.weight_kg?.toFixed(1) ?? "—"} unit="kg" chart={weights.length >= 2 ? <Sparkline values={weights.map((w) => w.weight_kg!)} tone={METRICS.weight.tone} /> : undefined} />
+          <StatCard label={METRICS.bodyFat.label} icon={METRICS.bodyFat.icon} tone={METRICS.bodyFat.tone} value={bfs.at(-1)?.body_fat_percent?.toFixed(1) ?? "—"} unit="%" chart={bfs.length >= 2 ? <Sparkline values={bfs.map((b) => b.body_fat_percent!)} tone={METRICS.bodyFat.tone} /> : undefined} />
+          <StatCard label={METRICS.waist.label} icon={METRICS.waist.icon} tone={METRICS.waist.tone} value={waists.at(-1)?.waist_cm?.toFixed(1) ?? "—"} unit="cm" chart={waists.length >= 2 ? <Sparkline values={waists.map((w) => w.waist_cm!)} tone={METRICS.waist.tone} /> : undefined} />
         </Stagger>
       )}
 
       {tab === "wellness" && (
         <Stagger className="space-y-4">
           <StatCard label="Wellness index" icon={HeartPulse} tone="cardio" value={wi != null ? wi.toFixed(1) : "—"} unit="/5" badge={wi != null ? <Badge tone={wi >= 3.5 ? "success" : wi >= 2.5 ? "warning" : "danger"}>{wi >= 3.5 ? "Thriving" : wi >= 2.5 ? "Steady" : "Watch"}</Badge> : undefined} />
-          <StatCard label="Avg mood" tone="nutrition" value={averageRating(cis.map((c) => c.mood)) ?? "—"} unit="/5" />
-          <StatCard label="Avg sleep" tone="sleep" value={avg(cis.map((c) => c.sleep_hours))?.toFixed(1) ?? "—"} unit="hrs" />
+          <StatCard label="Avg mood" icon={METRICS.mood.icon} tone={METRICS.mood.tone} value={averageRating(cis.map((c) => c.mood)) ?? "—"} unit="/5" />
+          <StatCard label="Avg sleep" icon={METRICS.sleep.icon} tone={METRICS.sleep.tone} value={avg(cis.map((c) => c.sleep_hours))?.toFixed(1) ?? "—"} unit="hrs" />
         </Stagger>
       )}
     </Page>

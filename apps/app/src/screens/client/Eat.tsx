@@ -1,12 +1,12 @@
 /** Eat tab — today's diary grouped by meal, with search/barcode + meal plan. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Skeleton, Page, Stagger, EmptyState, Plus, ClipboardList, Utensils, Trash2 } from "@mossa/ui";
+import { Button, Card, Skeleton, MacroBar, MetricChip, Page, Stagger, EmptyState, Plus, ClipboardList, Utensils, Trash2 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
 import { MealPlanDrawer } from "./MealPlanDrawer.js";
 
-interface Entry { id: string; meal_type: string; label: string | null; calories: number; protein_g: number }
+interface Entry { id: string; meal_type: string; label: string | null; calories: number; protein_g: number; carbs_g: number; fat_g: number }
 
 export function Eat({ clientId }: { clientId: string }) {
   const [entries, setEntries] = useState<Entry[] | null>(null);
@@ -25,14 +25,21 @@ export function Eat({ clientId }: { clientId: string }) {
 
   const byMeal = new Map<string, Entry[]>();
   for (const e of entries) byMeal.set(e.meal_type, [...(byMeal.get(e.meal_type) ?? []), e]);
-  const total = entries.reduce((n, e) => n + e.calories, 0);
+  const sum = (f: (e: Entry) => number) => entries.reduce((n, e) => n + (f(e) || 0), 0);
+  const total = sum((e) => e.calories);
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Eat</h1>
-        <div className="numeral rounded-full bg-nutrition-soft px-3 py-1 text-sm font-semibold text-nutrition">{Math.round(total)} kcal</div>
+        <MetricChip metric="calories" value={`${Math.round(total)} kcal`} />
       </div>
+
+      {entries.length > 0 && (
+        <Stagger>
+          <MacroBar proteinG={sum((e) => e.protein_g)} carbsG={sum((e) => e.carbs_g)} fatG={sum((e) => e.fat_g)} />
+        </Stagger>
+      )}
 
       {entries.length === 0 ? (
         <EmptyState icon={Utensils} title="Nothing logged today" description="Log your first meal — search, barcode, or your plan." action={<Button onClick={() => setLogOpen(true)}><Plus /> Log food</Button>} />

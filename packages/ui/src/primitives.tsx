@@ -18,7 +18,10 @@ import {
 import { cn } from "./lib/utils.js";
 import type { LucideIcon } from "./lib/icons.js";
 
-export type Tone = "activity" | "nutrition" | "sleep" | "cardio" | "hydration" | "success" | "warning" | "danger" | "primary" | "neutral";
+export type Tone =
+  | "activity" | "nutrition" | "sleep" | "cardio" | "hydration"
+  | "calories" | "protein" | "carbs" | "fat"
+  | "success" | "warning" | "danger" | "primary" | "neutral";
 
 export const toneText: Record<Tone, string> = {
   activity: "text-activity",
@@ -26,6 +29,10 @@ export const toneText: Record<Tone, string> = {
   sleep: "text-sleep",
   cardio: "text-cardio",
   hydration: "text-hydration",
+  calories: "text-calories",
+  protein: "text-protein",
+  carbs: "text-carbs",
+  fat: "text-fat",
   success: "text-success",
   warning: "text-warning",
   danger: "text-danger",
@@ -39,6 +46,10 @@ export const toneSoft: Record<Tone, string> = {
   sleep: "bg-sleep-soft text-sleep",
   cardio: "bg-cardio-soft text-cardio",
   hydration: "bg-hydration-soft text-hydration",
+  calories: "bg-calories-soft text-calories",
+  protein: "bg-protein-soft text-protein",
+  carbs: "bg-carbs-soft text-carbs",
+  fat: "bg-fat-soft text-fat",
   success: "bg-success-soft text-success",
   warning: "bg-warning-soft text-warning",
   danger: "bg-danger-soft text-danger",
@@ -52,6 +63,10 @@ export const toneVar: Record<Tone, string> = {
   sleep: "var(--sleep)",
   cardio: "var(--cardio)",
   hydration: "var(--hydration)",
+  calories: "var(--calories)",
+  protein: "var(--protein)",
+  carbs: "var(--carbs)",
+  fat: "var(--fat)",
   success: "var(--success)",
   warning: "var(--warning)",
   danger: "var(--danger)",

@@ -1,10 +1,19 @@
 /** Goal manager — TDEE calculator → server-derived targets with derivation. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Select, Skeleton, Page, Stagger, Target } from "@mossa/ui";
+import { Button, Card, Badge, Field, Select, Skeleton, Page, Stagger, METRICS, toneVar, Target, type MetricKey } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Goal { id: string; label: string; status: string; targets: Record<string, number> | null; notes?: string | null; created_at: string }
+
+const TARGET_ROWS: { metric: MetricKey; field: string }[] = [
+  { metric: "calories", field: "targetCalories" },
+  { metric: "protein", field: "targetProteinG" },
+  { metric: "carbs", field: "targetCarbsG" },
+  { metric: "fat", field: "targetFatG" },
+  { metric: "water", field: "targetWaterMl" },
+  { metric: "fiber", field: "targetFiberG" },
+];
 
 export function GoalManager({ clientId }: { clientId: string }) {
   const [goals, setGoals] = useState<Goal[] | null>(null);
@@ -36,9 +45,16 @@ export function GoalManager({ clientId }: { clientId: string }) {
           <Card>
             <div className="flex items-center justify-between"><div className="flex items-center gap-2"><Target className="size-4 text-primary" /><h2 className="text-lg font-semibold">{active.label}</h2></div><Badge tone="success">Active</Badge></div>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {[["Calories", active.targets.targetCalories, "kcal"], ["Protein", active.targets.targetProteinG, "g"], ["Carbs", active.targets.targetCarbsG, "g"], ["Fat", active.targets.targetFatG, "g"], ["Water", active.targets.targetWaterMl, "ml"], ["Fiber", active.targets.targetFiberG, "g"]].map(([l, v, u]) => (
-                <div key={l as string} className="rounded-xl bg-secondary p-3"><div className="text-xs text-muted-foreground">{l}</div><div className="numeral text-xl font-semibold">{(v as number) ?? "—"}<span className="ml-1 text-xs text-muted-foreground">{u}</span></div></div>
-              ))}
+              {TARGET_ROWS.map(({ metric, field }) => {
+                const m = METRICS[metric];
+                const v = active.targets![field];
+                return (
+                  <div key={metric} className="rounded-xl bg-secondary p-3">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><m.icon className="size-3.5" style={{ color: toneVar[m.tone] }} /> {m.label}</div>
+                    <div className="numeral mt-0.5 text-xl font-semibold">{v ?? "—"}<span className="ml-1 text-xs text-muted-foreground">{m.unit}</span></div>
+                  </div>
+                );
+              })}
             </div>
           </Card>
         </Stagger>
