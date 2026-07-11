@@ -61,7 +61,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
       {targets?.targetCalories ? (
         <Card className="flex items-center justify-between py-3 text-sm">
           <span className="text-muted-foreground">Daily target</span>
-          <span className="numeral font-medium">{fmtEnergy(targets.targetCalories, units)} · P{targets.targetProteinG ?? "—"} C{targets.targetCarbsG ?? "—"} F{targets.targetFatG ?? "—"}</span>
+          <span className="numeral flex items-center gap-2 font-medium"><span className="text-calories">{fmtEnergy(targets.targetCalories, units)}</span><MacroInline proteinG={targets.targetProteinG ?? 0} carbsG={targets.targetCarbsG ?? 0} fatG={targets.targetFatG ?? 0} /></span>
         </Card>
       ) : null}
 

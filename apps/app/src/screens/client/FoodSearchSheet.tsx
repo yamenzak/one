@@ -130,10 +130,16 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged, onPick 
           </div>
           <div className="flex flex-wrap gap-2">{MEALS.map((m) => <Chip key={m} selected={meal === m} onClick={() => setMeal(m)}>{m}</Chip>)}</div>
           <Field label={`Quantity (${n.servingUnit})`} inputMode="numeric" value={quantity} onChange={(e) => setQuantity(e.target.value.replace(/[^\d.]/g, ""))} />
-          <div className="grid grid-cols-4 gap-2 text-center">
-            {([["calories", "kcal", n.calories], ["protein", "P", n.proteinG], ["carbs", "C", n.carbsG], ["fat", "F", n.fatG]] as const).map(([metric, l, v]) => (
-              <div key={l} className={cn("rounded-xl p-2.5", toneSoft[METRICS[metric].tone])}><div className="numeral text-lg font-semibold">{Math.round(v * factor)}</div><div className="text-xs font-medium opacity-70">{l}</div></div>
-            ))}
+          <div className="grid grid-cols-4 gap-2">
+            {([["calories", n.calories], ["protein", n.proteinG], ["carbs", n.carbsG], ["fat", n.fatG]] as const).map(([metric, v]) => {
+              const M = METRICS[metric];
+              return (
+                <div key={metric} className={cn("flex flex-col items-center gap-1 rounded-xl p-2.5", toneSoft[M.tone])}>
+                  <M.icon className="size-4" />
+                  <div className="numeral text-lg font-semibold leading-none">{Math.round(v * factor)}</div>
+                </div>
+              );
+            })}
           </div>
           {hasMicros && (
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-xl bg-surface-2 p-3 text-sm">
