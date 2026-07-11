@@ -365,6 +365,35 @@ describe("activities feed (Train tab)", () => {
   });
 });
 
+describe("exercise swaps + alternatives (SPEC §8.3)", () => {
+  it("bound alternatives auto-apply; open requests wait for the coach's pick", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const mkEx = async (name: string) => ((await (await SELF.fetch("http://x/api/exercises", { method: "POST", headers: H, body: JSON.stringify({ name, visibility: "tenant" }) })).json()) as { id: string }).id;
+    const a = await mkEx("Barbell Bench Press");
+    const b = await mkEx("Dumbbell Bench Press");
+
+    // Bind A↔B and read it back (two-way).
+    expect((await SELF.fetch(`http://x/api/exercises/${a}/alternatives`, { method: "POST", headers: H, body: JSON.stringify({ exerciseId: b }) })).status).toBe(201);
+    const altsOfB = (await (await SELF.fetch(`http://x/api/exercises/${b}/alternatives`, { headers: auth(ownerCookie) })).json()) as { alternatives: { id: string }[] };
+    expect(altsOfB.alternatives.map((x) => x.id)).toContain(a);
+
+    const client = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "SwapClient" }) })).json()) as { client: { id: string } }).client;
+    const swap = (body: Record<string, unknown>) => SELF.fetch("http://x/api/swaps", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, workoutPlanId: "wp1", dayIndex: 0, blockIndex: 0, slotIndex: 0, currentExerciseId: a, ...body }) });
+
+    // Picking a bound alternative auto-approves.
+    const auto = (await (await swap({ suggestedExerciseId: b })).json()) as { autoApproved: boolean };
+    expect(auto.autoApproved).toBe(true);
+
+    // An open request (no target) stays pending for the coach.
+    const open = (await (await swap({ slotIndex: 1, reason: "shoulder pain" })).json()) as { id: string; autoApproved: boolean };
+    expect(open.autoApproved).toBe(false);
+
+    // Approving an open request with no replacement is rejected; with one, it applies.
+    expect((await SELF.fetch(`http://x/api/swaps/${open.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ status: "approved" }) })).status).toBe(400);
+    expect((await SELF.fetch(`http://x/api/swaps/${open.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ status: "approved", replacementExerciseId: b }) })).status).toBe(200);
+  });
+});
+
 describe("inbox — real-time notification WS", () => {
   it("requires a signed-in user, then expects a websocket upgrade", async () => {
     // Unauthenticated → 401 from the guard's user-only lane.

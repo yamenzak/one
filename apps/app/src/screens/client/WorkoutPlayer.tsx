@@ -218,7 +218,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
         <RoundLogDrawer block={roundBlock.block} roundIndex={roundBlock.roundIndex} exercises={exercises} onClose={() => setRoundBlock(null)} onSave={(entries) => saveRound(roundBlock.blockIndex, roundBlock.roundIndex, entries)} />
       )}
       {swapSlot && (
-        <SwapDrawer clientId={clientId} planId={plan.id} dayIndex={dayIndex} coords={swapSlot} library={[...exercises.values()]} currentName={exercises.get(swapSlot.exerciseId)?.name ?? "Exercise"} onClose={() => setSwapSlot(null)} onDone={(m) => { setSwapSlot(null); setToast(m); setTimeout(() => setToast(null), 3000); }} />
+        <SwapDrawer clientId={clientId} planId={plan.id} dayIndex={dayIndex} coords={swapSlot} currentName={exercises.get(swapSlot.exerciseId)?.name ?? "Exercise"} onClose={() => setSwapSlot(null)} onDone={(m) => { setSwapSlot(null); void load(); setToast(m); setTimeout(() => setToast(null), 3000); }} />
       )}
       {detailSlot && <ExerciseDetailSheet ex={exercises.get(detailSlot.exerciseId)} slot={detailSlot} onClose={() => setDetailSlot(null)} />}
     </div>
@@ -410,45 +410,58 @@ function RoundLogDrawer({ block, roundIndex, exercises, onClose, onSave }: { blo
   );
 }
 
-function SwapDrawer({ clientId, planId, dayIndex, coords, library, currentName, onClose, onDone }: { clientId: string; planId: string; dayIndex: number; coords: { blockIndex: number; slotIndex: number; exerciseId: string }; library: ExerciseLite[]; currentName: string; onClose: () => void; onDone: (m: string) => void }) {
-  const [q, setQ] = useState("");
+/**
+ * Swap sheet (SPEC §8.3): bound alternatives swap instantly (no approval); for
+ * anything else the client just asks and the coach picks the replacement.
+ */
+function SwapDrawer({ clientId, planId, dayIndex, coords, currentName, onClose, onDone }: { clientId: string; planId: string; dayIndex: number; coords: { blockIndex: number; slotIndex: number; exerciseId: string }; currentName: string; onClose: () => void; onDone: (m: string) => void }) {
+  const [alts, setAlts] = useState<ExerciseInfo[] | null>(null);
   const [reason, setReason] = useState("");
-  const [picked, setPicked] = useState<ExerciseLite | null>(null);
-  const filtered = library.filter((e) => e.id !== coords.exerciseId && e.name.toLowerCase().includes(q.toLowerCase())).slice(0, 20);
+  const [busy, setBusy] = useState(false);
 
-  const submit = async () => {
-    if (!picked) return;
-    const r = await api.post<{ autoApproved: boolean }>("/api/swaps", { clientId, workoutPlanId: planId, dayIndex, blockIndex: coords.blockIndex, slotIndex: coords.slotIndex, currentExerciseId: coords.exerciseId, suggestedExerciseId: picked.id, reason: reason || null });
-    onDone(r.autoApproved ? "Swapped — a listed alternative" : "Swap request sent to your coach");
+  useEffect(() => {
+    void api.get<{ alternatives: ExerciseInfo[] }>(`/api/exercises/${coords.exerciseId}/alternatives`).then((r) => setAlts(r.alternatives)).catch(() => setAlts([]));
+  }, [coords.exerciseId]);
+
+  const post = (body: Record<string, unknown>) => api.post<{ autoApproved: boolean }>("/api/swaps", { clientId, workoutPlanId: planId, dayIndex, blockIndex: coords.blockIndex, slotIndex: coords.slotIndex, currentExerciseId: coords.exerciseId, ...body });
+
+  const swapTo = async (alt: ExerciseInfo) => {
+    setBusy(true);
+    try { await post({ suggestedExerciseId: alt.id }); onDone(`Swapped to ${alt.name}`); } finally { setBusy(false); }
+  };
+  const request = async () => {
+    setBusy(true);
+    try { await post({ reason: reason || null }); onDone("Swap request sent to your coach"); } finally { setBusy(false); }
   };
 
   return (
     <Sheet open onClose={onClose} title={`Swap ${currentName}`}>
-      {!picked ? (
-        <div className="space-y-3">
-          <Field label="Replace with" value={q} onChange={(e) => setQ(e.target.value)} />
-          <div className="max-h-72 space-y-1 overflow-y-auto">
-            {filtered.map((e) => (
-              <button key={e.id} onClick={() => setPicked(e)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary">
-                <ExerciseThumb thumb={e.thumb_url} size={38} />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{e.name}</div>
-                  <ExerciseMeta ex={e} className="text-xs text-muted-foreground" />
-                </div>
-              </button>
-            ))}
+      <div className="space-y-4">
+        {alts === null ? (
+          <Skeleton className="h-24" />
+        ) : alts.length > 0 ? (
+          <div>
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Instant swaps — coach-approved alternatives</div>
+            <div className="space-y-1">
+              {alts.map((e) => (
+                <button key={e.id} disabled={busy} onClick={() => void swapTo(e)} className="flex w-full items-center gap-3 rounded-xl bg-surface-2 px-2.5 py-2 text-left transition-colors hover:bg-surface-3 disabled:opacity-50">
+                  <ExerciseThumb thumb={e.thumb_url} size={40} />
+                  <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{e.name}</div><ExerciseMeta ex={e} className="text-xs text-muted-foreground" /></div>
+                  <ArrowLeftRight className="size-4 shrink-0 text-activity" />
+                </button>
+              ))}
+            </div>
           </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No instant alternatives set for this exercise.</p>
+        )}
+
+        <div className="border-t border-border/50 pt-4">
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ask your coach</div>
+          <Field label="Why swap? (optional)" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. shoulder pain, no cable machine" />
+          <Button variant="outline" className="mt-3 w-full" disabled={busy} onClick={() => void request()}>Request a swap — coach will choose</Button>
         </div>
-      ) : (
-        <div className="space-y-4">
-          <SubCard className="flex items-center gap-3"><ExerciseThumb thumb={picked.thumb_url} size={44} /><div><div className="text-sm text-muted-foreground">Swap to</div><div className="font-semibold">{picked.name}</div></div></SubCard>
-          <Field label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} />
-          <div className="flex gap-3">
-            <Button variant="ghost" onClick={() => setPicked(null)}>Back</Button>
-            <Button size="lg" className="flex-1" onClick={() => void submit()}>Request swap</Button>
-          </div>
-        </div>
-      )}
+      </div>
     </Sheet>
   );
 }

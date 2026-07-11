@@ -147,6 +147,8 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "ALTER TABLE foods ADD COLUMN calcium_mg REAL DEFAULT 0",
           "ALTER TABLE foods ADD COLUMN iron_mg REAL DEFAULT 0",
           "ALTER TABLE foods ADD COLUMN description TEXT",
+          // Exercise alternatives are per-tenant (a studio's own swap map).
+          "ALTER TABLE exercise_alternatives ADD COLUMN tenant_id TEXT",
           // Food ownership visibility (SPEC §8): tenant (shared) | private
           // (creator only). Platform-seed rows stay tenant_id NULL = global.
           "ALTER TABLE foods ADD COLUMN visibility TEXT DEFAULT 'tenant'",

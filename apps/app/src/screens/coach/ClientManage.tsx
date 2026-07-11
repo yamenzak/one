@@ -9,10 +9,11 @@ import { fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
 import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SubCard, Chip, Page, Stagger, IconBadge, EmptyState, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
+import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
 
 interface Sub { id: string; status: string; daysRemaining: number; packageId: string | null }
 interface Pkg { id: string; name: string }
-interface Swap { id: string; reason: string | null; status: string }
+interface Swap { id: string; reason: string | null; status: string; day_index: number | null; current_exercise_id: string | null; suggested_exercise_id: string | null }
 interface Lab { id: string; display_name: string; status: string; client_notes?: string | null; file_key?: string | null }
 interface Supp { id: string; name: string; dose: string | null; kind: string; status: string }
 interface CheckIn { id: string; date_local: string; mood: number | null; sleep_hours: number | null; weight_kg: number | null; notes: string | null; trainer_feedback: string | null }
@@ -29,22 +30,24 @@ export function ClientManage({ clientId }: { clientId: string }) {
   const [labOpen, setLabOpen] = useState(false);
   const [reviewLab, setReviewLab] = useState<Lab | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  const [exercises, setExercises] = useState<ExerciseInfo[]>([]);
 
   const load = useCallback(async () => {
-    const [s, p, sw, l, su, ci] = await Promise.all([
+    const [s, p, sw, l, su, ci, ex] = await Promise.all([
       api.get<{ subscriptions: Sub[] }>(`/api/subscriptions?clientId=${clientId}`),
       api.get<{ packages: Pkg[] }>("/api/packages"),
       api.get<{ swaps: Swap[] }>(`/api/swaps?clientId=${clientId}`),
       api.get<{ labs: Lab[] }>(`/api/labs?clientId=${clientId}`),
       api.get<{ supplements: Supp[] }>(`/api/supplements?clientId=${clientId}`),
       api.get<{ checkIns: CheckIn[] }>(`/api/check-ins?clientId=${clientId}`),
+      api.get<{ exercises: ExerciseInfo[] }>("/api/exercises"),
     ]);
-    setSubs(s.subscriptions); setPackages(p.packages); setSwaps(sw.swaps); setLabs(l.labs); setSupps(su.supplements); setCheckIns(ci.checkIns);
+    setSubs(s.subscriptions); setPackages(p.packages); setSwaps(sw.swaps); setLabs(l.labs); setSupps(su.supplements); setCheckIns(ci.checkIns); setExercises(ex.exercises);
   }, [clientId]);
   useEffect(() => void load(), [load]);
 
   const grant = async (packageId: string) => { await api.post("/api/subscriptions/grant", { clientId, packageId }); setGrantOpen(false); await load(); };
-  const resolveSwap = async (id: string, status: "approved" | "rejected") => { await api.patch(`/api/swaps/${id}`, { status }); await load(); };
+  const resolveSwap = async (id: string, status: "approved" | "rejected", replacementExerciseId?: string) => { await api.patch(`/api/swaps/${id}`, { status, replacementExerciseId }); await load(); };
   const discontinueSupp = async (id: string) => { await api.patch(`/api/supplements/${id}`, { status: "discontinued" }); await load(); };
 
   if (!subs) return <Skeleton className="m-4 h-64" />;
@@ -69,13 +72,8 @@ export function ClientManage({ clientId }: { clientId: string }) {
       {pending.length > 0 && (
         <Stagger>
           <Card className="space-y-3">
-            <div className="flex items-center gap-2.5"><IconBadge icon={ArrowLeftRight} tone="cardio" size="sm" /><h2 className="font-semibold">Swap requests</h2></div>
-            {pending.map((s) => (
-              <div key={s.id} className="rounded-xl bg-surface-2 p-3">
-                <div className="text-sm">{s.reason || "Exercise swap requested"}</div>
-                <div className="mt-2 flex gap-2"><Button size="sm" className="flex-1" onClick={() => void resolveSwap(s.id, "approved")}><Check /> Approve</Button><Button size="sm" variant="outline" className="flex-1" onClick={() => void resolveSwap(s.id, "rejected")}><X /> Reject</Button></div>
-              </div>
-            ))}
+            <div className="flex items-center gap-2.5"><IconBadge icon={ArrowLeftRight} tone="cardio" size="sm" /><h2 className="font-semibold">Swap requests</h2><Badge tone="cardio">{pending.length}</Badge></div>
+            {pending.map((s) => <SwapResolver key={s.id} swap={s} exercises={exercises} onResolve={resolveSwap} />)}
           </Card>
         </Stagger>
       )}
@@ -126,6 +124,47 @@ export function ClientManage({ clientId }: { clientId: string }) {
       {reviewLab && <ReviewLabSheet lab={reviewLab} onClose={() => setReviewLab(null)} onDone={() => { setReviewLab(null); void load(); }} />}
       {reportOpen && <ReportSheet clientId={clientId} onClose={() => setReportOpen(false)} />}
     </Page>
+  );
+}
+
+/** Resolve one swap: shows which exercise + day, and picks the replacement. */
+function SwapResolver({ swap, exercises, onResolve }: { swap: Swap; exercises: ExerciseInfo[]; onResolve: (id: string, status: "approved" | "rejected", replacementExerciseId?: string) => Promise<void> }) {
+  const exMap = new Map(exercises.map((e) => [e.id, e]));
+  const current = swap.current_exercise_id ? exMap.get(swap.current_exercise_id) : undefined;
+  const [choice, setChoice] = useState<ExerciseInfo | null>(swap.suggested_exercise_id ? exMap.get(swap.suggested_exercise_id) ?? null : null);
+  const [picking, setPicking] = useState(false);
+  const [q, setQ] = useState("");
+  const filtered = exercises.filter((e) => e.id !== swap.current_exercise_id && e.name.toLowerCase().includes(q.toLowerCase())).slice(0, 20);
+  return (
+    <div className="space-y-2.5 rounded-xl bg-surface-2 p-3">
+      <div className="text-sm">Swap <span className="font-semibold">{current?.name ?? "an exercise"}</span>{typeof swap.day_index === "number" ? <span className="text-muted-foreground"> · Day {swap.day_index + 1}</span> : null}</div>
+      {swap.reason && <div className="text-xs italic text-muted-foreground">“{swap.reason}”</div>}
+      {choice ? (
+        <SubCard className="flex items-center gap-2.5 py-2">
+          <ExerciseThumb thumb={choice.thumb_url} size={34} />
+          <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">→ {choice.name}</div><ExerciseMeta ex={choice} className="text-xs text-muted-foreground" /></div>
+          <button onClick={() => { setChoice(null); setPicking(true); }} className="shrink-0 text-xs font-medium text-primary">Change</button>
+        </SubCard>
+      ) : picking ? (
+        <div className="space-y-1">
+          <Field label="Replacement" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+          <div className="max-h-48 space-y-1 overflow-y-auto">
+            {filtered.map((e) => (
+              <button key={e.id} onClick={() => { setChoice(e); setPicking(false); setQ(""); }} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-surface-3">
+                <ExerciseThumb thumb={e.thumb_url} size={32} />
+                <div className="min-w-0 flex-1 truncate text-sm">{e.name}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <Button size="sm" variant="secondary" className="w-full" onClick={() => setPicking(true)}>Choose replacement</Button>
+      )}
+      <div className="flex gap-2">
+        <Button size="sm" className="flex-1" disabled={!choice} onClick={() => void onResolve(swap.id, "approved", choice?.id)}><Check /> Approve</Button>
+        <Button size="sm" variant="outline" className="flex-1" onClick={() => void onResolve(swap.id, "rejected")}><X /> Reject</Button>
+      </div>
+    </div>
   );
 }
 

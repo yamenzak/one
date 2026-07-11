@@ -1,7 +1,7 @@
 /** Coach Library — exercises (create + web import), foods, templates, content. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, MacroInline, Search, Plus, Globe, Trash2, Dumbbell, Utensils, LayoutGrid, PencilLine } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, MacroInline, Search, Plus, Globe, Trash2, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight } from "@mossa/ui";
 import { api } from "../../api.js";
 import { FoodEditor } from "../client/FoodEditor.js";
 import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
@@ -28,6 +28,7 @@ function Exercises() {
   const [items, setItems] = useState<ExerciseRow[] | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [webOpen, setWebOpen] = useState(false);
+  const [altFor, setAltFor] = useState<ExerciseRow | null>(null);
   const load = useCallback(async () => setItems((await api.get<{ exercises: ExerciseRow[] }>(`/api/exercises?q=${encodeURIComponent(q)}`)).exercises), [q]);
   useEffect(() => { const t = setTimeout(() => void load(), 200); return () => clearTimeout(t); }, [load]);
   return (
@@ -39,15 +40,16 @@ function Exercises() {
       </div>
       {!items ? <Skeleton className="h-40" /> : items.length === 0 ? <EmptyState icon={Dumbbell} title="No matches" /> : (
         <Stagger className="space-y-1">{items.map((e) => (
-          <Card key={e.id} className="flex items-center gap-3 py-3">
+          <button key={e.id} onClick={() => setAltFor(e)} className="flex w-full items-center gap-3 rounded-2xl bg-card px-4 py-3 text-left transition-colors hover:bg-surface-2">
             <ExerciseThumb thumb={e.thumb_url} size={40} />
             <div className="min-w-0 flex-1"><div className="truncate font-medium">{e.name}</div><ExerciseMeta ex={e} className="text-xs text-muted-foreground" /></div>
-            {e.source && e.source !== "custom" && <Badge tone="neutral">{e.source}</Badge>}
-          </Card>
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs text-muted-foreground [&_svg]:size-3.5"><ArrowLeftRight /> Alternatives</span>
+          </button>
         ))}</Stagger>
       )}
       {createOpen && <CreateExerciseSheet onClose={() => setCreateOpen(false)} onDone={() => { setCreateOpen(false); void load(); }} />}
       {webOpen && <WebExerciseSheet onClose={() => setWebOpen(false)} onImported={() => void load()} />}
+      {altFor && <AlternativesSheet exercise={altFor} onClose={() => setAltFor(null)} />}
     </div>
   );
 }
@@ -77,6 +79,51 @@ function CreateExerciseSheet({ onClose, onDone }: { onClose: () => void; onDone:
 }
 
 interface WebExercise { name: string; muscleGroups: string[]; secondaryMuscleGroups?: string[]; equipment: string[]; instructions?: string | null; category?: string | null; force?: string | null; difficulty?: string | null; source: string; sourceId: string; imageUrl: string | null }
+/** Bind an exercise's alternatives (SPEC §8.3) — two-way, instant client swaps. */
+function AlternativesSheet({ exercise, onClose }: { exercise: ExerciseInfo; onClose: () => void }) {
+  const [alts, setAlts] = useState<ExerciseInfo[] | null>(null);
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<ExerciseInfo[]>([]);
+  const load = useCallback(async () => setAlts((await api.get<{ alternatives: ExerciseInfo[] }>(`/api/exercises/${exercise.id}/alternatives`)).alternatives), [exercise.id]);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (q.trim().length < 2) { setResults([]); return; }
+    const t = setTimeout(async () => setResults((await api.get<{ exercises: ExerciseInfo[] }>(`/api/exercises?q=${encodeURIComponent(q)}`)).exercises.filter((e) => e.id !== exercise.id)), 200);
+    return () => clearTimeout(t);
+  }, [q, exercise.id]);
+  const add = async (id: string) => { await api.post(`/api/exercises/${exercise.id}/alternatives`, { exerciseId: id }); setQ(""); setResults([]); await load(); };
+  const remove = async (id: string) => { await api.del(`/api/exercises/${exercise.id}/alternatives/${id}`); await load(); };
+  const altIds = new Set((alts ?? []).map((a) => a.id));
+  return (
+    <Sheet open onClose={onClose} title={`Alternatives · ${exercise.name}`}>
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">Bound alternatives let clients swap instantly — no approval. Binding is two-way.</p>
+        {!alts ? <Skeleton className="h-20" /> : alts.length === 0 ? <p className="text-sm text-muted-foreground">No alternatives yet.</p> : (
+          <div className="space-y-1">{alts.map((a) => (
+            <div key={a.id} className="flex items-center gap-3 rounded-xl bg-surface-2 px-2.5 py-2">
+              <ExerciseThumb thumb={a.thumb_url} size={36} />
+              <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{a.name}</div><ExerciseMeta ex={a} className="text-xs text-muted-foreground" /></div>
+              <button onClick={() => void remove(a.id)} aria-label="Remove" className="text-muted-foreground hover:text-danger [&_svg]:size-4"><Trash2 /></button>
+            </div>
+          ))}</div>
+        )}
+        <div className="border-t border-border/50 pt-3">
+          <Field label="Add an alternative" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
+          <div className="mt-1 max-h-56 space-y-1 overflow-y-auto">
+            {results.filter((e) => !altIds.has(e.id)).map((e) => (
+              <button key={e.id} onClick={() => void add(e.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-secondary">
+                <ExerciseThumb thumb={e.thumb_url} size={34} />
+                <div className="min-w-0 flex-1 truncate text-sm">{e.name}</div>
+                <Plus className="size-4 shrink-0 text-primary" />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
 export function WebExerciseSheet({ onClose, onImported, onPicked }: { onClose: () => void; onImported?: () => void; onPicked?: (id: string) => void }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<WebExercise[] | null>(null);

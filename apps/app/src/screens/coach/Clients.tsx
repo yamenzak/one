@@ -22,8 +22,12 @@ export function Clients() {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const [pending, setPending] = useState<Set<string>>(new Set());
   const load = useCallback(async () => { setClients((await api.get<{ clients: ClientSummary[] }>("/api/clients")).clients); }, []);
   useEffect(() => void load(), [load]);
+  useEffect(() => {
+    void api.get<{ swaps: { client_id: string }[] }>("/api/swaps").then((r) => setPending(new Set(r.swaps.map((s) => s.client_id)))).catch(() => undefined);
+  }, []);
 
   const create = async () => {
     setBusy(true);
@@ -48,10 +52,10 @@ export function Clients() {
             <Card key={c.id} interactive onClick={() => setSelected(c)} className="flex items-center gap-3.5 py-3.5">
               <Avatar name={c.displayName} src={c.avatarUrl} seed={c.avatarSeed ?? c.id} className="size-11" />
               <div className="min-w-0 flex-1">
-                <div className="truncate font-semibold">{c.displayName}</div>
+                <div className="flex items-center gap-2 truncate font-semibold">{c.displayName}{pending.has(c.id) && <span className="size-2 shrink-0 rounded-full bg-cardio" title="Needs action" />}</div>
                 <div className="truncate text-sm text-muted-foreground">{c.email ?? "no email"}</div>
               </div>
-              {c.hasLogin ? <Badge tone="success">Active</Badge> : <Badge tone="neutral">Invited</Badge>}
+              {pending.has(c.id) ? <Badge tone="cardio">Swap</Badge> : c.hasLogin ? <Badge tone="success">Active</Badge> : <Badge tone="neutral">Invited</Badge>}
             </Card>
           ))}
         </Stagger>

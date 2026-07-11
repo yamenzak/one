@@ -157,6 +157,42 @@ export const libraryRoutes = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
 
+  // ── Exercise alternatives (SPEC §8.3) — a tenant's swap map. Binding A↔B is
+  // bidirectional; a client swapping to a bound alternative auto-applies (no
+  // approval). Any member reads (the client swap sheet needs them); staff writes.
+  .get("/exercises/:id/alternatives", async (c) => {
+    const who = requireTenant(c)!;
+    const id = c.req.param("id");
+    const rows = await c.env.DB.prepare(
+      `SELECT e.* FROM exercise_alternatives a
+       JOIN exercises e ON e.id = CASE WHEN a.exercise_a = ? THEN a.exercise_b ELSE a.exercise_a END
+       WHERE (a.exercise_a = ? OR a.exercise_b = ?) AND (a.tenant_id = ? OR a.tenant_id IS NULL) AND e.active = 1
+       ORDER BY e.name`,
+    )
+      .bind(id, id, id, who.tenantId)
+      .all();
+    return c.json({ alternatives: rows.results ?? [] });
+  })
+  .post("/exercises/:id/alternatives", async (c) => {
+    const who = requireTenant(c)!;
+    const id = c.req.param("id");
+    const body = z.object({ exerciseId: z.string() }).safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body" }, 400);
+    const other = body.data.exerciseId;
+    if (other === id) return c.json({ error: "an exercise can't be its own alternative" }, 400);
+    const [a, b] = id < other ? [id, other] : [other, id]; // stable ordered pair
+    await c.env.DB.prepare("INSERT OR IGNORE INTO exercise_alternatives (tenant_id, exercise_a, exercise_b) VALUES (?, ?, ?)").bind(who.tenantId, a, b).run();
+    return c.json({ ok: true }, 201);
+  })
+  .delete("/exercises/:id/alternatives/:otherId", async (c) => {
+    const who = requireTenant(c)!;
+    const id = c.req.param("id");
+    const other = c.req.param("otherId");
+    const [a, b] = id < other ? [id, other] : [other, id];
+    await c.env.DB.prepare("DELETE FROM exercise_alternatives WHERE exercise_a = ? AND exercise_b = ? AND (tenant_id = ? OR tenant_id IS NULL)").bind(a, b, who.tenantId).run();
+    return c.json({ ok: true });
+  })
+
   // ── Foods ──────────────────────────────────────────────────────────────────
   // Visibility (SPEC §8): platform seed (tenant_id NULL, global read-only) +
   // this tenant's rows. Private rows are only visible to their creator.

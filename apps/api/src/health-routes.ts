@@ -277,7 +277,9 @@ export const healthRoutes = new Hono<AppEnv>()
         blockIndex: z.number().int().min(0),
         slotIndex: z.number().int().min(0),
         currentExerciseId: z.string(),
-        suggestedExerciseId: z.string(),
+        // Optional: a bound alternative the client picked (auto-applies). Absent
+        // = an open request — the client just asks, the coach picks + approves.
+        suggestedExerciseId: z.string().nullish(),
         reason: z.string().max(500).nullish(),
       })
       .safeParse(await c.req.json().catch(() => null));
@@ -286,21 +288,23 @@ export const healthRoutes = new Hono<AppEnv>()
     if ("response" in access) return access.response;
     const d = parsed.data;
 
-    // Auto-approve when the suggestion is a listed alternative of the current.
-    const alt = await c.env.DB.prepare(
-      "SELECT 1 AS x FROM exercise_alternatives WHERE (exercise_a = ? AND exercise_b = ?) OR (exercise_a = ? AND exercise_b = ?)",
-    )
-      .bind(d.currentExerciseId, d.suggestedExerciseId, d.suggestedExerciseId, d.currentExerciseId)
-      .first();
+    // Auto-approve ONLY when the client picked a bound alternative (per tenant).
+    const alt = d.suggestedExerciseId
+      ? await c.env.DB.prepare(
+          "SELECT 1 AS x FROM exercise_alternatives WHERE ((exercise_a = ? AND exercise_b = ?) OR (exercise_a = ? AND exercise_b = ?)) AND (tenant_id = ? OR tenant_id IS NULL)",
+        )
+          .bind(d.currentExerciseId, d.suggestedExerciseId, d.suggestedExerciseId, d.currentExerciseId, access.client.tenant_id)
+          .first()
+      : null;
     const id = newId("swap");
     const autoApprove = Boolean(alt);
     await c.env.DB.prepare(
       `INSERT INTO swap_requests (id, tenant_id, client_id, workout_plan_id, day_index, block_index, slot_index, current_exercise_id, suggested_exercise_id, reason, status, created_at, resolved_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-      .bind(id, access.client.tenant_id, access.client.id, d.workoutPlanId, d.dayIndex, d.blockIndex, d.slotIndex, d.currentExerciseId, d.suggestedExerciseId, d.reason ?? null, autoApprove ? "approved" : "pending", nowIso(), autoApprove ? nowIso() : null)
+      .bind(id, access.client.tenant_id, access.client.id, d.workoutPlanId, d.dayIndex, d.blockIndex, d.slotIndex, d.currentExerciseId, d.suggestedExerciseId ?? null, d.reason ?? null, autoApprove ? "approved" : "pending", nowIso(), autoApprove ? nowIso() : null)
       .run();
-    if (autoApprove) await applySwap(c.env.DB, access.client.tenant_id, d);
+    if (autoApprove && d.suggestedExerciseId) await applySwap(c.env.DB, access.client.tenant_id, { ...d, suggestedExerciseId: d.suggestedExerciseId });
     else {
       const primary = await c.env.DB.prepare(
         "SELECT trainer_user_id FROM client_trainers WHERE client_id = ? ORDER BY is_primary DESC LIMIT 1",
@@ -324,24 +328,39 @@ export const healthRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     if (!staffOnly(c)) return c.json({ error: "forbidden" }, 403);
     const parsed = z
-      .object({ status: z.enum(["approved", "rejected"]), trainerNote: z.string().max(500).nullish() })
+      // `replacementExerciseId` = the coach's chosen replacement for an open
+      // request (or an override). Falls back to whatever the client suggested.
+      .object({ status: z.enum(["approved", "rejected"]), trainerNote: z.string().max(500).nullish(), replacementExerciseId: z.string().nullish() })
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const row = await c.env.DB.prepare("SELECT * FROM swap_requests WHERE id = ? AND tenant_id = ?")
       .bind(c.req.param("id"), who.tenantId)
-      .first<{ workout_plan_id: string; day_index: number; block_index: number; slot_index: number; current_exercise_id: string; suggested_exercise_id: string }>();
+      .first<{ client_id: string; workout_plan_id: string; day_index: number; block_index: number; slot_index: number; current_exercise_id: string; suggested_exercise_id: string | null }>();
     if (!row) return c.json({ error: "not found" }, 404);
-    await c.env.DB.prepare("UPDATE swap_requests SET status = ?, trainer_note = ?, resolved_by = ?, resolved_at = ? WHERE id = ?")
-      .bind(parsed.data.status, parsed.data.trainerNote ?? null, who.userId, nowIso(), c.req.param("id"))
+    const replacement = parsed.data.replacementExerciseId ?? row.suggested_exercise_id;
+    if (parsed.data.status === "approved" && !replacement) return c.json({ error: "choose a replacement exercise to approve" }, 400);
+    await c.env.DB.prepare("UPDATE swap_requests SET status = ?, trainer_note = ?, suggested_exercise_id = ?, resolved_by = ?, resolved_at = ? WHERE id = ?")
+      .bind(parsed.data.status, parsed.data.trainerNote ?? null, replacement, who.userId, nowIso(), c.req.param("id"))
       .run();
-    if (parsed.data.status === "approved") {
+    if (parsed.data.status === "approved" && replacement) {
       await applySwap(c.env.DB, who.tenantId, {
         workoutPlanId: row.workout_plan_id,
         dayIndex: row.day_index,
         blockIndex: row.block_index,
         slotIndex: row.slot_index,
-        suggestedExerciseId: row.suggested_exercise_id,
+        suggestedExerciseId: replacement,
       });
+      // Notify the client their swap was applied.
+      const client = await c.env.DB.prepare("SELECT user_id, display_name FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null; display_name: string }>();
+      if (client?.user_id) {
+        await c.env.DB.prepare(
+          "INSERT INTO notifications (id, tenant_id, recipient_user_id, type, title, message, link, created_at) VALUES (?, ?, ?, 'swap_approved', 'Your exercise swap was applied', '', '/train', ?)",
+        )
+          .bind(newId("ntf"), who.tenantId, client.user_id, nowIso())
+          .run()
+          .catch(() => undefined);
+        await notifyUser(c.env, client.user_id);
+      }
     }
     return c.json({ ok: true });
   });
