@@ -56,13 +56,24 @@ export function createAuth(env: Env, origin?: string) {
   // cookies stay non-Secure and callbacks point at the dev server.
   const isLocal = Boolean(origin && /^http:\/\/(localhost|127\.0\.0\.1)/.test(origin));
   const baseURL = (isLocal ? origin : env.BETTER_AUTH_URL || origin) || "http://localhost:8787";
+
+  // CSRF: Better Auth (esp. the org plugin) rejects POSTs whose Origin isn't
+  // trusted. In local dev the app runs on the Vite server (:5173) and proxies
+  // /api to this worker (:8787), so the browser Origin (:5173) differs from the
+  // worker origin — trust the common localhost dev origins. In production the
+  // app is served by the worker at one origin, so trusting that origin is right.
+  const trustedOrigins = isLocal
+    ? ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8787", "http://127.0.0.1:8787"]
+    : origin
+      ? [origin]
+      : undefined;
   return betterAuth({
     database: env.DB,
     baseURL,
     // Dev-only fallback keeps local `wrangler dev` frictionless; production
     // MUST set BETTER_AUTH_SECRET (wrangler secret put BETTER_AUTH_SECRET).
     secret: env.BETTER_AUTH_SECRET || "mossa-dev-insecure-secret-change-me",
-    trustedOrigins: origin ? [origin] : undefined,
+    trustedOrigins,
 
     // Passwordless-only: the email/password provider stays OFF.
     emailAndPassword: { enabled: false },
