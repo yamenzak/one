@@ -188,8 +188,10 @@ export const libraryRoutes = new Hono<AppEnv>()
     return c.json({ food: row ?? null, source: row ? "local" : null });
   })
 
-  // Single food (editor load). Seed rows are readable by any tenant.
-  .get("/foods/:id", async (c) => {
+  // Single food (editor load). Seed rows are readable by any tenant. The id
+  // pattern is constrained to real food ids (`food_…`) so this param route
+  // never shadows sibling static routes like /foods/search-external.
+  .get("/foods/:id{food_.+}", async (c) => {
     const who = requireTenant(c)!;
     const row = await c.env.DB.prepare(
       "SELECT * FROM foods WHERE id = ? AND active = 1 AND (tenant_id IS NULL OR tenant_id = ?)",

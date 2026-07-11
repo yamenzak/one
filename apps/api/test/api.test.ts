@@ -465,6 +465,15 @@ describe("foods — tenant isolation + copy-on-write", () => {
     expect(twoSees).toBe(404);
   });
 
+  it("the /foods/:id editor route does not shadow /foods/search-external (regression)", async () => {
+    // Before the id was constrained to `food_…`, this GET matched /foods/:id
+    // with id="search-external" and 404'd — silently killing web food search.
+    const res = await SELF.fetch("http://x/api/foods/search-external?q=banana", { headers: auth(ownerCookie) });
+    expect(res.status).not.toBe(404);
+    const body = (await res.json()) as { foods?: unknown[]; error?: string };
+    expect(body.error).not.toBe("not found");
+  });
+
   it("editing a platform-seed food forks a tenant copy (copy-on-write), leaving the seed intact", async () => {
     // Seed a global food (tenant_id NULL) directly, as the build-time seed would.
     await (env.DB as D1Database)
