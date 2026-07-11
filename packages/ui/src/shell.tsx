@@ -145,7 +145,7 @@ export function SettingsList({ sections }: { sections: { header: string; rows: S
       {sections.map((s) => (
         <section key={s.header}>
           <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{s.header}</h3>
-          <div className="overflow-hidden rounded-2xl border border-border/60 bg-card">
+          <div className="overflow-hidden rounded-2xl bg-card">
             {s.rows.map((r, i) => (
               <button
                 key={r.label}

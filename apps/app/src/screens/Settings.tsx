@@ -3,10 +3,10 @@
  * branding editor: pick a brand preset + radius that themes the app for clients.
  */
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, SettingsList, Page, Stagger,
-  BRAND_PRESETS, EDITABLE_TOKENS, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss,
+  BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss,
   KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft,
   type Branding, type BrandTokens, type NeutralTint,
 } from "@mossa/ui";
@@ -152,7 +152,6 @@ const hasTokens = (t: BrandTokens) => !!(Object.keys(t.light ?? {}).length || Ob
  * token afterwards. Everything writes into the same token maps.
  */
 function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | null; onPreview: (b: Branding | null) => void; onSaved: () => void }) {
-  const { mode } = useTheme();
   const seedFrom = (b: Branding | null) => b?.primary || BRAND_PRESETS.find((p) => p.id === b?.preset)?.primary || "oklch(0.74 0.15 164)";
   const [tokens, setTokens] = useState<BrandTokens>(() => (initial?.tokens && hasTokens(initial.tokens) ? initial.tokens : deriveTokens({ primary: seedFrom(initial) })));
   const [seed, setSeed] = useState<string>(seedFrom(initial));
@@ -196,8 +195,11 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
     setThemeCss(""); setMsg("Theme applied — save to keep it.");
   };
 
-  const tokenHex = (v: string): string => { const raw = tokens[mode]?.[v] ?? ""; return raw.startsWith("#") ? raw : oklchStringToHex(raw || "oklch(0.5 0 0)"); };
-  const setToken = (v: string, hex: string) => setTokens((t) => ({ ...t, [mode]: { ...(t[mode] ?? {}), [v]: hexToOklchString(hex) } }));
+  const setToken = (m: "light" | "dark", key: string, value: string) => setTokens((t) => {
+    const side = { ...(t[m] ?? {}) };
+    if (value.trim()) side[key] = value.trim(); else delete side[key];
+    return { ...t, [m]: side };
+  });
 
   const save = async () => {
     setSaving(true);
@@ -273,15 +275,8 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
         </button>
         {advanced && (
           <div className="space-y-4">
-            <p className="text-xs text-muted-foreground">Editing the <span className="font-medium capitalize text-foreground">{mode}</span> theme — toggle the app's theme (top bar) to edit the other.</p>
-            <div className="grid grid-cols-2 gap-2">
-              {EDITABLE_TOKENS.map((t) => (
-                <label key={t.var} className="flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2 text-sm">
-                  <span className="truncate text-muted-foreground">{t.label}</span>
-                  <input type="color" value={tokenHex(t.var)} onChange={(e) => setToken(t.var, e.target.value)} className="size-7 cursor-pointer rounded-md bg-transparent" />
-                </label>
-              ))}
-            </div>
+            <p className="text-xs text-muted-foreground">Every token, light and dark, side by side. A blank field falls back to the shipped default (shown as the placeholder). Type any CSS color — hex, <code className="rounded bg-surface-2 px-1">oklch()</code>, or <code className="rounded bg-surface-2 px-1">hsl()</code> — or use the swatch.</p>
+            <TokenGrid tokens={tokens} onSet={setToken} />
             <div className="space-y-2">
               <div className="text-sm font-medium">Paste a theme</div>
               <p className="text-xs text-muted-foreground">Drop in any CSS token set (<code className="rounded bg-surface-2 px-1">:root</code> for light, <code className="rounded bg-surface-2 px-1">.dark</code> for dark). Every token maps straight through — the whole app re-skins.</p>
@@ -298,5 +293,54 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
         <Button className="w-full" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save branding"}</Button>
       </Card>
     </section>
+  );
+}
+
+/** Full token grid — every token, light + dark side by side (scena-style). */
+function TokenGrid({ tokens, onSet }: { tokens: BrandTokens; onSet: (mode: "light" | "dark", key: string, value: string) => void }) {
+  return (
+    <div className="space-y-4">
+      {THEME_TOKEN_GROUPS.map((g) => (
+        <div key={g.label}>
+          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{g.label}</div>
+          <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1">
+            <span />
+            <span className="w-[5.5rem] text-center text-[10px] uppercase tracking-wider text-muted-foreground">Light</span>
+            <span className="w-[5.5rem] text-center text-[10px] uppercase tracking-wider text-muted-foreground">Dark</span>
+            {g.tokens.map((name) => {
+              const key = `--${name}`;
+              return (
+                <Fragment key={name}>
+                  <code className="truncate text-[11px] text-muted-foreground">{name}</code>
+                  <TokenCell mode="light" tokenKey={key} value={tokens.light?.[key] ?? ""} def={DEFAULT_TOKENS.light?.[key] ?? ""} onSet={onSet} />
+                  <TokenCell mode="dark" tokenKey={key} value={tokens.dark?.[key] ?? ""} def={DEFAULT_TOKENS.dark?.[key] ?? ""} onSet={onSet} />
+                </Fragment>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** One token cell — a native color swatch + a free-text CSS-color field. */
+function TokenCell({ mode, tokenKey, value, def, onSet }: { mode: "light" | "dark"; tokenKey: string; value: string; def: string; onSet: (mode: "light" | "dark", key: string, value: string) => void }) {
+  return (
+    <div className="flex w-[5.5rem] items-center gap-1 rounded-md border border-border/60 px-1.5 py-1">
+      <input
+        type="color"
+        value={colorToHex(value || def)}
+        onChange={(e) => onSet(mode, tokenKey, hexToOklchString(e.target.value))}
+        className="size-4 shrink-0 cursor-pointer rounded bg-transparent p-0"
+        aria-label={`${tokenKey} ${mode}`}
+      />
+      <input
+        value={value}
+        placeholder={def.replace(/oklch\(|\)/g, "")}
+        onChange={(e) => onSet(mode, tokenKey, e.target.value)}
+        className="w-full bg-transparent font-mono text-[10px] outline-none placeholder:text-muted-foreground/40"
+      />
+    </div>
   );
 }

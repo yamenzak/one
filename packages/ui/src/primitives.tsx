@@ -100,8 +100,8 @@ export const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & 
     <div
       ref={ref}
       className={cn(
-        "rounded-2xl border border-border/60 bg-card p-5 text-card-foreground",
-        interactive && "transition-all hover:border-border active:scale-[0.99] cursor-pointer",
+        "rounded-2xl bg-card p-5 text-card-foreground",
+        interactive && "transition-all hover:bg-surface-2 active:scale-[0.99] cursor-pointer",
         className,
       )}
       {...props}

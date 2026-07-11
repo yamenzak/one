@@ -49,18 +49,66 @@ export interface Branding {
   tokens?: BrandTokens | null;
 }
 
-/** The tokens the granular editor exposes — a curated, useful subset. */
-export const EDITABLE_TOKENS: { var: string; label: string }[] = [
-  { var: "--background", label: "Background" },
-  { var: "--foreground", label: "Text" },
-  { var: "--card", label: "Card" },
-  { var: "--primary", label: "Primary" },
-  { var: "--primary-foreground", label: "On primary" },
-  { var: "--secondary", label: "Secondary" },
-  { var: "--muted-foreground", label: "Muted text" },
-  { var: "--accent", label: "Accent" },
-  { var: "--border", label: "Border" },
+/** Every themeable token, grouped for the advanced editor (bare names). */
+export const THEME_TOKEN_GROUPS: { label: string; tokens: string[] }[] = [
+  { label: "Surfaces", tokens: ["background", "foreground", "card", "card-foreground", "surface-2", "surface-3", "popover", "popover-foreground"] },
+  { label: "Brand & UI", tokens: ["primary", "primary-foreground", "secondary", "secondary-foreground", "muted", "muted-foreground", "accent", "accent-foreground", "border", "input", "ring"] },
+  { label: "Status", tokens: ["destructive", "destructive-foreground", "success", "success-soft", "warning", "warning-soft", "danger", "danger-soft"] },
+  { label: "Activity accents", tokens: ["activity", "activity-soft", "nutrition", "nutrition-soft", "sleep", "sleep-soft", "cardio", "cardio-soft", "hydration", "hydration-soft"] },
 ];
+
+/** The shipped token values (mirrors tokens.css) — used for editor placeholders
+ *  + swatch defaults so a blank field visibly falls back to the default. */
+export const DEFAULT_TOKENS: BrandTokens = {
+  dark: {
+    "--background": "oklch(0.165 0.006 285)", "--foreground": "oklch(0.975 0.003 285)",
+    "--card": "oklch(0.202 0.006 285)", "--card-foreground": "oklch(0.975 0.003 285)",
+    "--surface-2": "oklch(0.235 0.007 285)", "--surface-3": "oklch(0.275 0.008 285)",
+    "--popover": "oklch(0.21 0.006 285)", "--popover-foreground": "oklch(0.975 0.003 285)",
+    "--primary": "oklch(0.74 0.15 164)", "--primary-foreground": "oklch(0.17 0.03 164)",
+    "--secondary": "oklch(0.245 0.007 285)", "--secondary-foreground": "oklch(0.975 0.003 285)",
+    "--muted": "oklch(0.245 0.007 285)", "--muted-foreground": "oklch(0.7 0.012 285)",
+    "--accent": "oklch(0.275 0.008 285)", "--accent-foreground": "oklch(0.975 0.003 285)",
+    "--border": "oklch(0.3 0.008 285 / 0.55)", "--input": "oklch(0.3 0.008 285)", "--ring": "oklch(0.74 0.15 164)",
+    "--destructive": "oklch(0.62 0.2 24)", "--destructive-foreground": "oklch(0.98 0.01 24)",
+    "--success": "oklch(0.76 0.14 158)", "--success-soft": "oklch(0.34 0.06 158)",
+    "--warning": "oklch(0.82 0.13 88)", "--warning-soft": "oklch(0.36 0.06 88)",
+    "--danger": "oklch(0.66 0.19 24)", "--danger-soft": "oklch(0.34 0.08 24)",
+    "--activity": "oklch(0.78 0.13 164)", "--activity-soft": "oklch(0.34 0.06 164)",
+    "--nutrition": "oklch(0.8 0.13 68)", "--nutrition-soft": "oklch(0.36 0.06 68)",
+    "--sleep": "oklch(0.74 0.12 300)", "--sleep-soft": "oklch(0.34 0.06 300)",
+    "--cardio": "oklch(0.74 0.13 250)", "--cardio-soft": "oklch(0.34 0.06 250)",
+    "--hydration": "oklch(0.78 0.1 214)", "--hydration-soft": "oklch(0.34 0.05 214)",
+  },
+  light: {
+    "--background": "oklch(0.985 0.002 285)", "--foreground": "oklch(0.2 0.01 285)",
+    "--card": "oklch(1 0 0)", "--card-foreground": "oklch(0.2 0.01 285)",
+    "--surface-2": "oklch(0.965 0.003 285)", "--surface-3": "oklch(0.94 0.004 285)",
+    "--popover": "oklch(1 0 0)", "--popover-foreground": "oklch(0.2 0.01 285)",
+    "--primary": "oklch(0.62 0.14 164)", "--primary-foreground": "oklch(0.99 0.01 164)",
+    "--secondary": "oklch(0.955 0.004 285)", "--secondary-foreground": "oklch(0.24 0.01 285)",
+    "--muted": "oklch(0.955 0.004 285)", "--muted-foreground": "oklch(0.5 0.012 285)",
+    "--accent": "oklch(0.94 0.005 285)", "--accent-foreground": "oklch(0.24 0.01 285)",
+    "--border": "oklch(0.9 0.005 285)", "--input": "oklch(0.9 0.005 285)", "--ring": "oklch(0.62 0.14 164)",
+    "--destructive": "oklch(0.58 0.2 24)", "--destructive-foreground": "oklch(0.99 0.01 24)",
+    "--success": "oklch(0.58 0.15 158)", "--success-soft": "oklch(0.93 0.06 158)",
+    "--warning": "oklch(0.7 0.14 78)", "--warning-soft": "oklch(0.95 0.08 88)",
+    "--danger": "oklch(0.58 0.2 24)", "--danger-soft": "oklch(0.95 0.06 24)",
+    "--activity": "oklch(0.58 0.13 164)", "--activity-soft": "oklch(0.93 0.05 164)",
+    "--nutrition": "oklch(0.62 0.14 62)", "--nutrition-soft": "oklch(0.94 0.06 68)",
+    "--sleep": "oklch(0.55 0.15 300)", "--sleep-soft": "oklch(0.94 0.05 300)",
+    "--cardio": "oklch(0.55 0.16 250)", "--cardio-soft": "oklch(0.94 0.05 250)",
+    "--hydration": "oklch(0.58 0.12 214)", "--hydration-soft": "oklch(0.94 0.05 214)",
+  },
+};
+
+/** Any CSS color string → an approximate #rrggbb for a native color input. */
+export function colorToHex(v: string | undefined): string {
+  const s = (v ?? "").trim();
+  if (s.startsWith("#")) { const h = s.slice(1); return `#${(h.length === 3 ? h.split("").map((x) => x + x).join("") : h.slice(0, 6)).padEnd(6, "0")}`; }
+  if (s.startsWith("oklch")) return oklchStringToHex(s);
+  return "#808080";
+}
 
 /**
  * App-specific tokens a pasted theme won't define, and where to source them from
