@@ -11,6 +11,7 @@ import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
+import { notifyUser } from "./inbox-do.js";
 
 const staffOnly = (c: { get: (k: "role") => string | null }) =>
   c.get("role") === "owner" || c.get("role") === "trainer";
@@ -179,6 +180,7 @@ export const healthRoutes = new Hono<AppEnv>()
         .bind(newId("ntf"), who.tenantId, access.client.user_id, "New lab test requested", d.displayName ?? d.type, nowIso())
         .run()
         .catch(() => undefined);
+      await notifyUser(c.env, access.client.user_id);
     }
     return c.json({ ok: true, id }, 201);
   })
@@ -209,6 +211,7 @@ export const healthRoutes = new Hono<AppEnv>()
         .bind(newId("ntf"), access.client.tenant_id, primary.trainer_user_id, `${access.client.display_name} uploaded a lab result`, `/clients/${access.client.id}`, nowIso())
         .run()
         .catch(() => undefined);
+      await notifyUser(c.env, primary.trainer_user_id);
     }
     return c.json({ ok: true });
   })
@@ -311,6 +314,7 @@ export const healthRoutes = new Hono<AppEnv>()
           .bind(newId("ntf"), access.client.tenant_id, primary.trainer_user_id, `${access.client.display_name} requested an exercise swap`, `/clients/${access.client.id}`, nowIso())
           .run()
           .catch(() => undefined);
+        await notifyUser(c.env, primary.trainer_user_id);
       }
     }
     return c.json({ ok: true, id, autoApproved: autoApprove }, 201);

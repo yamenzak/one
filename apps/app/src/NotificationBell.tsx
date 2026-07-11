@@ -13,10 +13,33 @@ export function NotificationBell() {
     try { setItems((await api.get<{ notifications: Notification[] }>("/api/notifications")).notifications); } catch { /* ignore */ }
   }, []);
 
+  // Real-time via the per-user InboxDO WebSocket; a slow poll stays as a
+  // backstop for missed pushes / dropped sockets (SPEC §8.10).
   useEffect(() => {
     void load();
-    const t = setInterval(() => void load(), 45000);
-    return () => clearInterval(t);
+    const poll = setInterval(() => void load(), 90000);
+    let ws: WebSocket | null = null;
+    let closed = false;
+    let retry = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const connect = () => {
+      if (closed) return;
+      try {
+        const proto = location.protocol === "https:" ? "wss" : "ws";
+        ws = new WebSocket(`${proto}://${location.host}/api/inbox/ws`);
+        ws.onopen = () => { retry = 0; };
+        ws.onmessage = () => void load();
+        ws.onclose = () => {
+          ws = null;
+          if (closed) return;
+          retry = Math.min(retry + 1, 6);
+          timer = setTimeout(connect, 1000 * 2 ** retry); // backoff, cap ~64s
+        };
+        ws.onerror = () => { try { ws?.close(); } catch { /* noop */ } };
+      } catch { /* fall back to the poll */ }
+    };
+    connect();
+    return () => { closed = true; clearInterval(poll); if (timer) clearTimeout(timer); try { ws?.close(); } catch { /* noop */ } };
   }, [load]);
 
   const unread = items.filter((n) => !n.read).length;

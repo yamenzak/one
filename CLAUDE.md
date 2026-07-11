@@ -81,7 +81,8 @@ Foundation through AI suite + commerce + content + reports + media are built and
 tested (77 tests). Recently added: **tenant custom domains** (Cloudflare for
 SaaS, white-label per domain — SPEC §14.1), **passkey autofill** on login
 (WebAuthn conditional UI), and the **vision suite** (Snap-a-Meal + Label Reader)
-on a real Gemini provider path (mock lane in dev). Not yet built: wearable
-import (Health Connect), InboxDO real-time push (polling in place), and richer
-plan-editor affordances (copy-week, superset round logging UI). See SPEC §13 for
-the phase map.
+on a real Gemini provider path (mock lane in dev), **InboxDO real-time
+notification push** (per-user WebSocket DO; the bell keeps a slow poll as a
+backstop), and richer **plan-editor affordances** (copy-week with progression,
+superset/circuit round-logging in the player). Not yet built: wearable import
+(Health Connect). See SPEC §13 for the phase map.

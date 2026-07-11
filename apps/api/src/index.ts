@@ -36,7 +36,10 @@ import { sessionRoutes, promoRoutes } from "./session-routes.js";
 import { domainRoutes, domainAdminRoutes } from "./domain-routes.js";
 import type { Env } from "./env.js";
 
+import { notifyUser } from "./inbox-do.js";
+
 export { TenantBillingDO } from "./billing-do.js";
+export { InboxDO } from "./inbox-do.js";
 
 const app = new Hono<AppEnv>();
 
@@ -148,6 +151,7 @@ async function reminderSweep(env: Env): Promise<void> {
           .bind(`ntf_${sub.id}`, sub.tenant_id, client.user_id, new Date().toISOString())
           .run()
           .catch(() => undefined);
+        await notifyUser(env, client.user_id);
       }
       await env.DB.prepare("UPDATE client_subscriptions SET notes = ? WHERE id = ?").bind(`${sub.notes ?? ""} expiry-notified`, sub.id).run().catch(() => undefined);
     }

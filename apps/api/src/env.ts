@@ -1,9 +1,12 @@
 import type { TenantBillingDO } from "./billing-do.js";
+import type { InboxDO } from "./inbox-do.js";
 
 /** Cloudflare bindings for the Mossa API Worker (SPEC §3). */
 export interface Env {
   /** One Durable Object per tenant — the single-threaded credit authority. */
   BILLING: DurableObjectNamespace<TenantBillingDO>;
+  /** One Durable Object per user — real-time notification push (WebSocket). */
+  INBOX: DurableObjectNamespace<InboxDO>;
   /** Relational source of truth: Better Auth + all tenant coaching data. */
   DB: D1Database;
   /** External-provider response cache + short-lived tokens. */

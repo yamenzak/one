@@ -347,6 +347,22 @@ describe("integrations settings", () => {
   });
 });
 
+describe("inbox — real-time notification WS", () => {
+  it("requires a signed-in user, then expects a websocket upgrade", async () => {
+    // Unauthenticated → 401 from the guard's user-only lane.
+    expect((await SELF.fetch("http://x/api/inbox/ws")).status).toBe(401);
+    // Authenticated but not a WS handshake → 426 Upgrade Required.
+    const res = await SELF.fetch("http://x/api/inbox/ws", { headers: auth(ownerCookie) });
+    expect(res.status).toBe(426);
+  });
+
+  it("InboxDO.push is a no-op with no open sockets (never throws)", async () => {
+    const stub = (env as unknown as { INBOX: DurableObjectNamespace }).INBOX;
+    const id = stub.idFromName("user-with-no-sockets");
+    await (stub.get(id) as unknown as { push: (p: unknown) => Promise<void> }).push({ type: "refresh" });
+  });
+});
+
 describe("custom domains (SPEC §14.1) — Host pins the tenant", () => {
   const HOST = "studio-one.example.com";
   let tenantId = "";

@@ -23,6 +23,7 @@ import { activityByKey, estimateBurnedCalories } from "@mossa/domain";
 import { type AppEnv } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
+import { notifyUser } from "./inbox-do.js";
 import { parseJson, j } from "./db.js";
 
 /** Every log payload arrives wrapped with the target clientId. */
@@ -428,6 +429,7 @@ export const logRoutes = new Hono<AppEnv>()
         )
         .run()
         .catch(() => undefined);
+      await notifyUser(c.env, primary.trainer_user_id);
     }
     return c.json({ ok: true, id }, 201);
   })
@@ -468,6 +470,7 @@ export const logRoutes = new Hono<AppEnv>()
         .bind(newId("ntf"), access.client.tenant_id, access.client.user_id, parsed.data.feedback.slice(0, 200), nowIso())
         .run()
         .catch(() => undefined);
+      await notifyUser(c.env, access.client.user_id);
     }
     return c.json({ ok: true });
   })

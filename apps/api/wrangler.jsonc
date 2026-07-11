@@ -43,9 +43,15 @@
   "ai": { "binding": "AI" },
 
   "durable_objects": {
-    "bindings": [{ "name": "BILLING", "class_name": "TenantBillingDO" }]
+    "bindings": [
+      { "name": "BILLING", "class_name": "TenantBillingDO" },
+      { "name": "INBOX", "class_name": "InboxDO" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TenantBillingDO"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["TenantBillingDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["InboxDO"] }
+  ],
 
   "kv_namespaces": [
     // External food/exercise API response cache + short-lived tokens.

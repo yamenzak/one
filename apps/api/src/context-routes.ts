@@ -173,6 +173,16 @@ export const contextRoutes = new Hono<AppEnv>()
     return c.json({ notifications: rows.results ?? [] });
   })
 
+  // Real-time notification push (SPEC §8.10): a per-user WebSocket via InboxDO.
+  // User-scoped (not tenant-scoped) — the bell is personal across tenancies.
+  .get("/inbox/ws", (c) => {
+    const user = c.get("user");
+    if (!user) return c.json({ error: "unauthenticated" }, 401);
+    if (c.req.header("Upgrade") !== "websocket") return c.json({ error: "expected websocket" }, 426);
+    const stub = c.env.INBOX.get(c.env.INBOX.idFromName(user.id));
+    return stub.fetch(c.req.raw);
+  })
+
   .post("/notifications/:id/read", async (c) => {
     const who = requireTenant(c);
     if (!who) return c.json({ error: "unauthenticated" }, 401);
