@@ -4,7 +4,11 @@
  */
 
 import { useEffect, useState } from "react";
-import { Button, Card, Badge, Switch, Skeleton, SettingsList, Page, Stagger, BRAND_PRESETS, KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Check, ArrowLeft, type Branding } from "@mossa/ui";
+import {
+  Button, Card, Badge, Switch, Textarea, Skeleton, SettingsList, Page, Stagger,
+  BRAND_PRESETS, EDITABLE_TOKENS, extractPalette, foregroundFor, hexToOklchString, oklchStringToHex, parseShadcnTheme,
+  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, type Branding,
+} from "@mossa/ui";
 import { useSession } from "../session.js";
 import { useTheme } from "../theme.js";
 import { api } from "../api.js";
@@ -136,36 +140,142 @@ function StudioControls() {
 }
 
 function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | null; onPreview: (b: Branding | null) => void; onSaved: () => void }) {
+  const { mode } = useTheme();
   const [preset, setPreset] = useState(initial?.preset ?? "emerald");
+  const [primary, setPrimary] = useState<string | null>(initial?.primary ?? null);
+  const [primaryFg, setPrimaryFg] = useState<string | null>(initial?.primaryForeground ?? null);
   const [radius, setRadius] = useState(initial?.radius ?? 0.95);
+  const [logoUrl, setLogoUrl] = useState<string | null>(initial?.logoUrl ?? null);
+  const [tokens, setTokens] = useState<{ light?: Record<string, string> | null; dark?: Record<string, string> | null }>(initial?.tokens ?? {});
+  const [advanced, setAdvanced] = useState(false);
+  const [shadcn, setShadcn] = useState("");
   const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
 
-  const apply = (nextPreset: string, nextRadius: number) => onPreview({ preset: nextPreset, radius: nextRadius });
+  const branding: Branding = { preset, primary, primaryForeground: primaryFg, radius, logoUrl, tokens };
+  // Live-preview whenever any themeable field changes (logo excluded — not a token).
+  useEffect(() => { onPreview(branding); }, [preset, primary, primaryFg, radius, JSON.stringify(tokens)]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pickPreset = (id: string) => { setPreset(id); setPrimary(null); setPrimaryFg(null); };
+
+  const uploadLogo = async (file: File) => {
+    setMsg(null);
+    const fd = new FormData(); fd.append("file", file); fd.append("purpose", "logo");
+    const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
+    if (!up.ok) { setMsg("Logo upload failed."); return; }
+    const { key } = (await up.json()) as { key?: string };
+    if (key) setLogoUrl(`/api/media/${key}`);
+  };
+
+  const extractFromLogo = () => {
+    if (!logoUrl) return;
+    setMsg("Reading your logo…");
+    const img = new Image();
+    img.onload = () => { const p = extractPalette(img); if (p) { setPrimary(p.primary); setPrimaryFg(p.primaryForeground); setMsg("Palette pulled from your logo."); } else setMsg("Couldn't find a strong color in that logo."); };
+    img.onerror = () => setMsg("Couldn't load the logo image.");
+    img.src = logoUrl;
+  };
+
+  const applyShadcn = () => {
+    const { tokens: t, radius: r } = parseShadcnTheme(shadcn);
+    if (!Object.keys(t.light ?? {}).length && !Object.keys(t.dark ?? {}).length) { setMsg("No theme tokens found in that CSS."); return; }
+    setTokens((prev) => ({ light: { ...prev.light, ...t.light }, dark: { ...prev.dark, ...t.dark } }));
+    if (r != null) setRadius(r);
+    setShadcn(""); setMsg("shadcn theme applied.");
+  };
+
+  const tokenHex = (v: string): string => {
+    const cur = tokens[mode]?.[v];
+    const raw = cur ?? (typeof document !== "undefined" ? getComputedStyle(document.documentElement).getPropertyValue(v).trim() : "");
+    return raw.startsWith("#") ? raw : oklchStringToHex(raw || "oklch(0.5 0 0)");
+  };
+  const setToken = (v: string, hex: string) => setTokens((t) => ({ ...t, [mode]: { ...(t[mode] ?? {}), [v]: hexToOklchString(hex) } }));
 
   const save = async () => {
     setSaving(true);
-    try { await api.patch("/api/settings", { branding: { preset, radius } }); onSaved(); }
+    try { await api.patch("/api/settings", { branding }); onSaved(); setMsg("Branding saved."); }
     finally { setSaving(false); }
   };
+
+  const primaryHex = primary ? oklchStringToHex(primary) : oklchStringToHex(BRAND_PRESETS.find((p) => p.id === preset)?.primary ?? "oklch(0.74 0.15 164)");
 
   return (
     <section>
       <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Branding</h3>
-      <Card className="space-y-4">
-        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Palette /></div><div><div className="font-medium">Theme</div><div className="text-sm text-muted-foreground">Applies to every client in your studio.</div></div></div>
+      <Card className="space-y-5">
+        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Palette /></div><div><div className="font-medium">Theme</div><div className="text-sm text-muted-foreground">Applies to every client in your studio, light and dark.</div></div></div>
+
+        {/* Logo */}
+        <div className="space-y-2">
+          <div className="text-sm font-medium">Logo</div>
+          <div className="flex items-center gap-3">
+            <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/60 bg-surface-2">
+              {logoUrl ? <img src={logoUrl} alt="Logo" className="max-h-14 max-w-14 object-contain" /> : <ImageIcon className="size-5 text-muted-foreground" />}
+            </div>
+            <div className="flex flex-1 flex-wrap gap-2">
+              <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
+                <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadLogo(e.target.files[0])} />
+              </label>
+              <Button size="sm" variant="secondary" disabled={!logoUrl} onClick={extractFromLogo}><Wand2 /> Extract palette</Button>
+              {logoUrl && <Button size="icon" variant="secondary" aria-label="Remove logo" onClick={() => setLogoUrl(null)}><Trash2 /></Button>}
+            </div>
+          </div>
+        </div>
+
+        {/* Presets */}
         <div className="grid grid-cols-3 gap-2">
           {BRAND_PRESETS.map((p) => (
-            <button key={p.id} onClick={() => { setPreset(p.id); apply(p.id, radius); }} className={`relative flex flex-col items-center gap-2 rounded-xl border p-3 transition-all active:scale-95 ${preset === p.id ? "border-primary" : "border-border/60"}`}>
+            <button key={p.id} onClick={() => pickPreset(p.id)} className={`relative flex flex-col items-center gap-2 rounded-xl border p-3 transition-all active:scale-95 ${preset === p.id && !primary ? "border-primary" : "border-border/60"}`}>
               <span className="size-7 rounded-full" style={{ background: p.primary }} />
               <span className="text-xs">{p.label}</span>
-              {preset === p.id && <Check className="absolute right-1.5 top-1.5 size-3.5 text-primary" strokeWidth={3} />}
+              {preset === p.id && !primary && <Check className="absolute right-1.5 top-1.5 size-3.5 text-primary" strokeWidth={3} />}
             </button>
           ))}
         </div>
+
+        {/* Custom primary */}
+        <label className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Primary color</span>
+          <span className="inline-flex items-center gap-2">
+            {primary && <button onClick={() => { setPrimary(null); setPrimaryFg(null); }} className="text-xs text-muted-foreground underline">reset</button>}
+            <input type="color" value={primaryHex} onChange={(e) => { const ok = hexToOklchString(e.target.value); setPrimary(ok); setPrimaryFg(foregroundFor(ok)); }} className="size-8 cursor-pointer rounded-lg bg-transparent" />
+          </span>
+        </label>
+
+        {/* Radius */}
         <div>
           <div className="mb-1.5 flex items-center justify-between text-sm"><span className="text-muted-foreground">Corner radius</span><span className="numeral">{radius.toFixed(2)}rem</span></div>
-          <input type="range" min={0.4} max={1.4} step={0.05} value={radius} onChange={(e) => { const r = Number(e.target.value); setRadius(r); apply(preset, r); }} className="w-full accent-primary" />
+          <input type="range" min={0.4} max={1.4} step={0.05} value={radius} onChange={(e) => setRadius(Number(e.target.value))} className="w-full accent-primary" />
         </div>
+
+        {/* Advanced */}
+        <button onClick={() => setAdvanced((a) => !a)} className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground">
+          <span>Advanced tokens</span>
+          <ChevronDown className={`size-4 transition-transform ${advanced ? "rotate-180" : ""}`} />
+        </button>
+        {advanced && (
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">Editing the <span className="font-medium capitalize text-foreground">{mode}</span> theme — toggle the app's theme to edit the other. Every token stays mode-aware.</p>
+            <div className="grid grid-cols-2 gap-2">
+              {EDITABLE_TOKENS.map((t) => (
+                <label key={t.var} className="flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2 text-sm">
+                  <span className="truncate text-muted-foreground">{t.label}</span>
+                  <input type="color" value={tokenHex(t.var)} onChange={(e) => setToken(t.var, e.target.value)} className="size-7 cursor-pointer rounded-md bg-transparent" />
+                </label>
+              ))}
+            </div>
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Paste a shadcn theme</div>
+              <Textarea rows={4} value={shadcn} onChange={(e) => setShadcn(e.target.value)} placeholder={":root { --primary: oklch(0.6 0.2 250); ... }\n.dark { --primary: ...; ... }"} className="font-mono text-xs" />
+              <div className="flex gap-2">
+                <Button size="sm" variant="secondary" disabled={!shadcn.trim()} onClick={applyShadcn}>Apply theme</Button>
+                {(tokens.light || tokens.dark) && <Button size="sm" variant="ghost" onClick={() => { setTokens({}); setMsg("Custom tokens cleared."); }}>Clear tokens</Button>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
         <Button className="w-full" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save branding"}</Button>
       </Card>
     </section>

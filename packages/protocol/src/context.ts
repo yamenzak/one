@@ -22,6 +22,8 @@ export interface TenantBranding {
   radius?: number | null;
   defaultMode?: "dark" | "light" | null;
   logoUrl?: string | null;
+  /** Granular per-mode CSS-variable overrides (e.g. a pasted shadcn theme). */
+  tokens?: { light?: Record<string, string> | null; dark?: Record<string, string> | null } | null;
 }
 
 export interface SessionContext {

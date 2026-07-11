@@ -86,16 +86,19 @@ export function Shell() {
     <div className="min-h-dvh pb-20 md:pb-0 md:pl-24">
       <AppBar
         leading={
-          isStaff ? (
-            <button onClick={clientSurface ? () => (setMode("coach"), setTab("today")) : () => void enterTrainMode()} className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-surface-3">
-              <ArrowLeftRight className="size-3.5" />
-              {clientSurface ? "Train mode" : "Coach mode"}
-            </button>
-          ) : (
-            <span className="truncate px-1 text-sm font-semibold">{active.tenantName}</span>
-          )
+          <div className="flex min-w-0 items-center gap-2">
+            {ctx!.branding?.logoUrl ? (
+              <img src={ctx!.branding.logoUrl} alt={active.tenantName} className="h-8 max-w-32 object-contain" />
+            ) : (
+              <span className="truncate text-base font-semibold tracking-tight">{active.tenantName}</span>
+            )}
+            {isStaff && (
+              <span className="hidden rounded-full bg-secondary px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground sm:inline">
+                {clientSurface ? "Train" : "Coach"}
+              </span>
+            )}
+          </div>
         }
-        title={<span className="truncate">{active.tenantName}</span>}
         trailing={
           <>
           <NotificationBell />
@@ -108,6 +111,14 @@ export function Shell() {
             <DropdownMenuContent>
               <DropdownMenuLabel>{ctx!.user.email}</DropdownMenuLabel>
               <DropdownMenuSeparator />
+              {isStaff && (
+                <>
+                  <DropdownMenuItem onSelect={clientSurface ? () => (setMode("coach"), setTab("today")) : () => void enterTrainMode()}>
+                    <ArrowLeftRight /> {clientSurface ? "Switch to Coach mode" : "Switch to Train mode"}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               {ctx!.personas.length > 1 && (
                 <>
                   {ctx!.personas.map((p) => (

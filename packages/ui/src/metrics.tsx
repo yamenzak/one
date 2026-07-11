@@ -59,7 +59,7 @@ export function StatCard({ label, value, unit, badge, chart, icon: Icon, tone = 
     <Comp
       onClick={onClick}
       whileTap={onClick ? { scale: 0.99 } : undefined}
-      className={cn("flex w-full items-center justify-between gap-4 rounded-2xl border border-border/60 bg-card p-5 text-left shadow-sm", className)}
+      className={cn("flex w-full items-center justify-between gap-4 rounded-2xl border border-border/60 bg-card p-5 text-left", className)}
     >
       <div className="min-w-0">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

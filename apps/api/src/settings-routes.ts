@@ -30,9 +30,23 @@ export const settingsRoutes = new Hono<AppEnv>()
 
   .patch("/settings", async (c) => {
     const who = requireTenant(c)!;
+    const tokenMap = z.record(z.string(), z.string().max(120));
     const parsed = z
       .object({
-        branding: z.object({ accent: z.string().nullish(), logoUrl: z.string().nullish(), welcome: z.string().max(300).nullish() }).optional(),
+        branding: z
+          .object({
+            preset: z.string().max(40).nullish(),
+            primary: z.string().max(120).nullish(),
+            primaryForeground: z.string().max(120).nullish(),
+            radius: z.number().min(0.2).max(2).nullish(),
+            defaultMode: z.enum(["dark", "light"]).nullish(),
+            logoUrl: z.string().max(500).nullish(),
+            tokens: z.object({ light: tokenMap.nullish(), dark: tokenMap.nullish() }).nullish(),
+            // Legacy fields kept for backward compatibility.
+            accent: z.string().nullish(),
+            welcome: z.string().max(300).nullish(),
+          })
+          .optional(),
         aiToggles: z.record(z.string(), z.boolean()).optional(),
         marketplace: z.object({ enabled: z.boolean().optional(), selfRegister: z.boolean().optional() }).optional(),
       })
