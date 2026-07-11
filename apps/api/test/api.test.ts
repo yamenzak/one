@@ -347,6 +347,24 @@ describe("integrations settings", () => {
   });
 });
 
+describe("activities feed (Train tab)", () => {
+  it("logs an activity and lists it back within a date range", async () => {
+    const { client } = (await (await SELF.fetch("http://x/api/clients", {
+      method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ displayName: "ActivityTest" }),
+    })).json()) as { client: { id: string } };
+    const log = await SELF.fetch("http://x/api/logs/activity", {
+      method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-01", activityKey: "running", durationMin: 30 } }),
+    });
+    expect([200, 201]).toContain(log.status);
+    const list = (await (await SELF.fetch(`http://x/api/logs/activities?clientId=${client.id}&from=2026-06-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as { activities: { activity_key: string; duration_min: number }[] };
+    expect(list.activities.length).toBeGreaterThan(0);
+    expect(list.activities[0]!.activity_key).toBe("running");
+    // Another tenant can't read this client's activities.
+    expect((await SELF.fetch(`http://x/api/logs/activities?clientId=${client.id}&from=2026-06-01&to=2026-07-31`, { headers: auth(otherCookie) })).status).toBe(404);
+  });
+});
+
 describe("inbox — real-time notification WS", () => {
   it("requires a signed-in user, then expects a websocket upgrade", async () => {
     // Unauthenticated → 401 from the guard's user-only lane.

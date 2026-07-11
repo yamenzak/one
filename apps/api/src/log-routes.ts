@@ -108,6 +108,22 @@ export const logRoutes = new Hono<AppEnv>()
     });
   })
 
+  // Recent free-form activities (for the Train tab's activity feed).
+  .get("/logs/activities", async (c) => {
+    const clientId = c.req.query("clientId");
+    const from = c.req.query("from");
+    const to = c.req.query("to");
+    if (!clientId) return c.json({ error: "clientId required" }, 400);
+    const access = await requireClientAccess(c, clientId);
+    if ("response" in access) return access.response;
+    const rows = await c.env.DB.prepare(
+      "SELECT id, date_local, activity_key, label, start_time, duration_min, avg_hr_bpm, calories FROM activity_logs WHERE client_id = ? AND date_local >= ? AND date_local <= ? ORDER BY date_local DESC, created_at DESC LIMIT 60",
+    )
+      .bind(clientId, from ?? "0000", to ?? "9999")
+      .all();
+    return c.json({ activities: rows.results ?? [] });
+  })
+
   // Wearable session-calories override (null/0 clears it).
   .post("/logs/session-calories", async (c) => {
     const parsed = z

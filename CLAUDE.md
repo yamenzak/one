@@ -84,5 +84,9 @@ SaaS, white-label per domain — SPEC §14.1), **passkey autofill** on login
 on a real Gemini provider path (mock lane in dev), **InboxDO real-time
 notification push** (per-user WebSocket DO; the bell keeps a slow poll as a
 backstop), and richer **plan-editor affordances** (copy-week with progression,
-superset/circuit round-logging in the player). Not yet built: wearable import
-(Health Connect). See SPEC §13 for the phase map.
+superset/circuit round-logging in the player), the **workout UI parity pass**
+(exercise thumbnails + rich rows + picker filters + edit-a-logged-set), and a
+**rebuilt Train tab** (quick-start chips, a real "this week" metrics grid —
+Training Load vs target, tonnage, active days, PRs from logged sessions — a
+recent-activity feed, and a browsable library grid). Not yet built: wearable
+import (Health Connect). See SPEC §13 for the phase map.

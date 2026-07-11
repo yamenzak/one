@@ -43,8 +43,8 @@ function Rating({ label, value, onChange }: { label: string; value: number | nul
   );
 }
 
-export function LogSheet({ open, onClose, clientId, onLogged }: { open: boolean; onClose: () => void; clientId: string; onLogged: () => void }) {
-  const [kind, setKind] = useState<LogKind | null>(null);
+export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { open: boolean; onClose: () => void; clientId: string; onLogged: () => void; initialKind?: LogKind }) {
+  const [kind, setKind] = useState<LogKind | null>(initialKind ?? null);
   const [foodMode, setFoodMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [f, setF] = useState<Record<string, string>>({});
