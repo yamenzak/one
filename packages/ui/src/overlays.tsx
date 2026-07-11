@@ -14,7 +14,7 @@ import { Drawer } from "vaul";
 import { motion } from "motion/react";
 import { Check, ChevronDown, X } from "./lib/icons.js";
 import { cn } from "./lib/utils.js";
-import { useId, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 const overlayCls =
   "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm data-[state=open]:animate-[overlay-in_0.2s_ease] data-[state=closed]:animate-[overlay-out_0.15s_ease]";
@@ -135,21 +135,48 @@ export function TabsTrigger({ value, children }: { value: string; children: Reac
 }
 export const TabsContent = TabsPrimitive.Content;
 
-/** Segmented control with a sliding motion indicator. */
+/** Segmented control with a sliding indicator.
+ *  The indicator is positioned from the *measured* geometry of the active
+ *  segment (a single absolutely-positioned pill), not Framer's `layoutId`
+ *  projection. Layout projection re-animates on ANY box change — including when
+ *  an ancestor (a drawer, an expanding accordion) grows — which made the pill
+ *  visibly fly across the container. Measuring keeps it inside the control, so
+ *  it only ever springs between its own segments. */
 export function SegmentedControl<T extends string>({ options, value, onChange, className }: { options: { value: T; label: ReactNode }[]; value: T; onChange: (v: T) => void; className?: string }) {
-  // Unique per instance — otherwise Framer's shared layout animates the pill
-  // BETWEEN separate controls on the same screen.
-  const layoutId = useId();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const btnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = btnRefs.current[value];
+      if (el) setPill({ left: el.offsetLeft, width: el.offsetWidth });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [value, options.length]);
+
   return (
-    <div className={cn("inline-flex items-center gap-1 rounded-full bg-secondary p-1", className)}>
+    <div ref={containerRef} className={cn("relative inline-flex items-center gap-1 rounded-full bg-secondary p-1", className)}>
+      {pill && (
+        <motion.span
+          aria-hidden
+          className="absolute inset-y-1 rounded-full bg-primary"
+          initial={false}
+          animate={{ left: pill.left, width: pill.width }}
+          transition={{ type: "spring", stiffness: 380, damping: 32 }}
+        />
+      )}
       {options.map((o) => (
         <button
           key={o.value}
+          ref={(el) => { btnRefs.current[o.value] = el; }}
           onClick={() => onChange(o.value)}
-          className={cn("relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors", value === o.value ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+          className={cn("relative z-10 rounded-full px-4 py-1.5 text-sm font-medium transition-colors", value === o.value ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
         >
-          {value === o.value && <motion.span layoutId={`seg-${layoutId}`} transition={{ type: "spring", stiffness: 380, damping: 32 }} className="absolute inset-0 rounded-full bg-primary" />}
-          <span className="relative z-10">{o.label}</span>
+          {o.label}
         </button>
       ))}
     </div>
