@@ -42,6 +42,12 @@ export interface SessionContext {
   /** Active tenant's branding for theming (null before a tenant is chosen). */
   branding: TenantBranding | null;
   isPlatformAdmin: boolean;
+  /**
+   * Set when the app is served on a tenant's custom domain (SPEC §14.1): the
+   * tenant pinned by the Host. The app hides cross-tenant switching here — the
+   * domain IS the tenant. Null on the neutral platform host.
+   */
+  hostTenantId: string | null;
 }
 
 export interface BillingSummary {

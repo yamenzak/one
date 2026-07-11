@@ -132,6 +132,7 @@ export const contextRoutes = new Hono<AppEnv>()
       clientFlags,
       branding,
       isPlatformAdmin: isPlatformAdmin(c),
+      hostTenantId: c.get("hostTenant")?.tenantId ?? null,
     };
     return c.json(ctx);
   })
@@ -143,6 +144,11 @@ export const contextRoutes = new Hono<AppEnv>()
     if (!user) return c.json({ error: "unauthenticated" }, 401);
     const body = z.object({ tenantId: z.string().min(1) }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
+    // On a custom domain the Host pins the tenant — no cross-tenant switching.
+    const hostTenant = c.get("hostTenant");
+    if (hostTenant && body.data.tenantId !== hostTenant.tenantId) {
+      return c.json({ error: "this domain is locked to one workspace" }, 409);
+    }
     const member = await c.env.DB.prepare(
       'SELECT 1 AS x FROM "member" WHERE organizationId = ? AND userId = ?',
     )

@@ -12,6 +12,7 @@ import type { Env } from "./env.js";
 import type { RoleName } from "./access.js";
 import { createAuth, type Auth } from "./auth.js";
 import { ensureSchema } from "./db.js";
+import { hostnameOf, resolveHostTenant, type HostTenant } from "./host-context.js";
 
 export interface AuthUser {
   id: string;
@@ -26,6 +27,13 @@ export interface AuthVars {
   tenantId: string | null;
   role: RoleName | null;
   perms: Grant | null;
+  /**
+   * The tenant this custom domain belongs to (SPEC §14.1), or null on the
+   * neutral platform host. When set, it — not the session — pins the tenant:
+   * only members of it get `tenantId`/role, so a stranger can't reach another
+   * tenant's data by pointing a session at the wrong domain.
+   */
+  hostTenant: HostTenant | null;
 }
 
 export type AppEnv = { Bindings: Env; Variables: AuthVars };
@@ -39,15 +47,24 @@ export const sessionMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   c.set("tenantId", null);
   c.set("role", null);
   c.set("perms", null);
+  c.set("hostTenant", null);
   // Better Auth's tables must exist before its handler touches D1. ensureSchema
   // is idempotent + cached per isolate.
   await ensureSchema(c.env.DB).catch(() => undefined);
+
+  // Host → tenant (custom domain). On the platform host this is null and the
+  // tenant comes from the session, exactly as before.
+  const hostTenant = await resolveHostTenant(c.env.DB, hostnameOf(c.req.url), c.env).catch(() => null);
+  c.set("hostTenant", hostTenant);
+
   try {
     const s = await auth.api.getSession({ headers: c.req.raw.headers });
     if (s?.user) {
       c.set("user", { id: s.user.id, email: s.user.email, name: s.user.name, image: s.user.image });
-      const orgId = (s.session as { activeOrganizationId?: string }).activeOrganizationId ?? null;
-      c.set("tenantId", orgId);
+      // On a custom domain the Host pins the tenant; elsewhere the session's
+      // active org decides. A stranger to the host tenant gets no tenant scope.
+      const sessionOrg = (s.session as { activeOrganizationId?: string }).activeOrganizationId ?? null;
+      const orgId = hostTenant ? hostTenant.tenantId : sessionOrg;
       if (orgId) {
         const row = await c.env.DB.prepare(
           'SELECT role, permissions_json FROM "member" WHERE organizationId = ? AND userId = ?',
@@ -56,9 +73,12 @@ export const sessionMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
           .first<{ role: string | null; permissions_json: string | null }>()
           .catch(() => null);
         if (row) {
+          c.set("tenantId", orgId);
           c.set("role", (row.role as RoleName) ?? null);
           c.set("perms", resolvePermissions(row.role, row.permissions_json));
         }
+        // hostTenant + non-member ⇒ leave tenantId null: signed in, but no
+        // access to this domain's tenant (they can still self-register/switch).
       }
     }
   } catch {

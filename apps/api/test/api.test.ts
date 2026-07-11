@@ -314,6 +314,58 @@ describe("integrations settings", () => {
   });
 });
 
+describe("custom domains (SPEC §14.1) — Host pins the tenant", () => {
+  const HOST = "studio-one.example.com";
+  let tenantId = "";
+
+  it("Host resolves the tenant, pins members to it, and locks out strangers", async () => {
+    // Studio One's tenant id, then map a custom hostname to it (as provisioning would).
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    tenantId = ctx.active.tenantId;
+    await (env.DB as D1Database)
+      .prepare("INSERT INTO tenant_domains (hostname, tenant_id, cf_hostname_id, status, created_at, updated_at) VALUES (?, ?, 'ch_test', 'active', '2026-01-01', '2026-01-01')")
+      .bind(HOST, tenantId)
+      .run();
+
+    // Public /api/host brands the login for whoever owns the domain — no auth.
+    const host = (await (await SELF.fetch(`http://${HOST}/api/host`)).json()) as { platform: boolean; tenant: { tenantId: string; name: string } | null };
+    expect(host.platform).toBe(false);
+    expect(host.tenant?.tenantId).toBe(tenantId);
+    expect(host.tenant?.name).toBe("Studio One");
+
+    // A member on this domain is scoped to it (active === host tenant, switching hidden).
+    const member = (await (await SELF.fetch(`http://${HOST}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } | null; hostTenantId: string | null };
+    expect(member.active?.tenantId).toBe(tenantId);
+    expect(member.hostTenantId).toBe(tenantId);
+
+    // A signed-in NON-member gets no tenant scope on this domain (can't reach data).
+    const stranger = (await (await SELF.fetch(`http://${HOST}/api/context`, { headers: auth(otherCookie) })).json()) as { active: unknown; hostTenantId: string | null };
+    expect(stranger.active).toBe(null);
+    expect(stranger.hostTenantId).toBe(tenantId);
+    // ...and a tenant-scoped write is rejected outright.
+    const write = await SELF.fetch(`http://${HOST}/api/clients`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...auth(otherCookie) },
+      body: JSON.stringify({ displayName: "Nope" }),
+    });
+    expect(write.status).toBe(401);
+
+    // Switching away from the domain's tenant is blocked (the domain IS the tenant).
+    const sw = await SELF.fetch(`http://${HOST}/api/context/switch`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ tenantId: "some-other-tenant" }),
+    });
+    expect(sw.status).toBe(409);
+  });
+
+  it("platform host resolves no tenant", async () => {
+    const host = (await (await SELF.fetch("http://localhost:8787/api/host")).json()) as { platform: boolean; tenant: unknown };
+    expect(host.platform).toBe(true);
+    expect(host.tenant).toBe(null);
+  });
+});
+
 describe("foods — tenant isolation + copy-on-write", () => {
   const mkFood = (over: Record<string, unknown>) => ({
     name: "Test Bar", calories: 200, proteinG: 10, source: "usda", sourceId: "SHARED-123", ...over,

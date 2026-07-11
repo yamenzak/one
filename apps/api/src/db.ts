@@ -126,6 +126,12 @@ export function ensureSchema(db: D1Database): Promise<void> {
 
           // ── Tenant settings (branding, AI toggles, marketplace, Connect) ───
           "CREATE TABLE IF NOT EXISTS tenant_settings (tenant_id TEXT PRIMARY KEY, branding_json TEXT, ai_toggles_json TEXT, marketplace_json TEXT, integrations_json TEXT, stripe_account_id TEXT, updated_at TEXT);",
+
+          // ── Custom domains (SPEC §14.1) — Cloudflare for SaaS white-label.
+          // Keyed by hostname for the Host→tenant lookup on every request. One
+          // row per tenant hostname; status/ssl mirror the CF custom hostname.
+          "CREATE TABLE IF NOT EXISTS tenant_domains (hostname TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, cf_hostname_id TEXT, status TEXT DEFAULT 'pending', ssl_status TEXT, verify_name TEXT, verify_value TEXT, cname_target TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
+          "CREATE INDEX IF NOT EXISTS idx_tenant_domains_tenant ON tenant_domains(tenant_id);",
         ].join(" "),
       )
       .then(async () => {

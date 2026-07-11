@@ -7,7 +7,7 @@ import { Fragment, useEffect, useState } from "react";
 import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, SegmentedControl, SettingsList, Page, Stagger,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss,
-  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft,
+  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus,
   type Branding, type BrandTokens, type NeutralTint,
 } from "@mossa/ui";
 import { resolveUnits } from "@mossa/domain";
@@ -76,6 +76,12 @@ export function Settings({ onBack }: { onBack: () => void }) {
       {isOwner && (
         <Stagger>
           <StudioControls />
+        </Stagger>
+      )}
+
+      {isOwner && (
+        <Stagger>
+          <DomainSection />
         </Stagger>
       )}
 
@@ -178,6 +184,102 @@ function StudioControls() {
         </Card>
       </section>
     </>
+  );
+}
+
+// ── Custom domain (SPEC §14.1) — Cloudflare for SaaS white-label ─────────────
+interface DomainInfo {
+  hostname: string;
+  status: string; // pending | active | error
+  sslStatus: string | null;
+  cname: { name: string; target: string | null };
+  txt: { name: string; value: string } | null;
+}
+
+function Copyable({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => { void navigator.clipboard?.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); }); };
+  return (
+    <div className="space-y-1">
+      <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</div>
+      <button onClick={copy} className="flex w-full items-center gap-2 rounded-lg bg-surface-3 px-2.5 py-2 text-left transition-colors hover:bg-surface-2">
+        <code className="min-w-0 flex-1 truncate font-mono text-xs">{value}</code>
+        {copied ? <Check className="size-3.5 shrink-0 text-good" /> : <Copy className="size-3.5 shrink-0 text-muted-foreground" />}
+      </button>
+    </div>
+  );
+}
+
+function DomainSection() {
+  const [domains, setDomains] = useState<DomainInfo[] | null>(null);
+  const [configured, setConfigured] = useState(true);
+  const [hostname, setHostname] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = async () => {
+    const r = await api.get<{ domains: DomainInfo[]; configured: boolean }>("/api/domains");
+    setDomains(r.domains); setConfigured(r.configured);
+  };
+  useEffect(() => { void load(); }, []);
+
+  const add = async () => {
+    setBusy(true); setErr(null);
+    try { await api.post("/api/domains", { hostname: hostname.trim().toLowerCase() }); setHostname(""); await load(); }
+    catch (e) { setErr(e instanceof Error ? e.message : "Couldn't add that domain."); }
+    finally { setBusy(false); }
+  };
+  const refresh = async (h: string) => { await api.post(`/api/domains/${encodeURIComponent(h)}/refresh`); await load(); };
+  const remove = async (h: string) => { await api.del(`/api/domains/${encodeURIComponent(h)}`); await load(); };
+
+  if (!domains) return <Skeleton className="h-32" />;
+  // Platform hasn't turned on Cloudflare for SaaS — hide the section entirely.
+  if (!configured && domains.length === 0) return null;
+
+  const tone = (s: string) => (s === "active" ? "success" : s === "error" ? "danger" : "warning");
+  const label = (s: string) => (s === "active" ? "Live" : s === "error" ? "Needs attention" : "Pending DNS");
+
+  return (
+    <section>
+      <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Custom domain</h3>
+      <Card className="space-y-4">
+        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Globe /></div><div><div className="font-medium">Your own domain</div><div className="text-sm text-muted-foreground">Run the app on your domain — e.g. train.yourgym.com.</div></div></div>
+
+        {domains.map((d) => (
+          <div key={d.hostname} className="space-y-3 rounded-xl bg-surface-2 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0"><div className="truncate font-medium">{d.hostname}</div><div className="text-xs text-muted-foreground">{d.status === "active" ? "Secured and serving." : "Add the records below at your DNS provider."}</div></div>
+              <Badge tone={tone(d.status)}>{label(d.status)}</Badge>
+            </div>
+            {d.status !== "active" && (
+              <div className="space-y-2.5">
+                {d.cname.target && <Copyable label="CNAME record — points your domain here" value={`${d.cname.name}  CNAME  ${d.cname.target}`} />}
+                {d.txt && <Copyable label="TXT record — proves ownership for the certificate" value={`${d.txt.name}  TXT  ${d.txt.value}`} />}
+              </div>
+            )}
+            <div className="flex gap-2">
+              {d.status === "active"
+                ? <Button size="sm" variant="secondary" onClick={() => window.open(`https://${d.hostname}`, "_blank")}><Globe /> Visit</Button>
+                : <Button size="sm" variant="secondary" onClick={() => void refresh(d.hostname)}>Check now</Button>}
+              <Button size="icon" variant="ghost" aria-label="Remove domain" onClick={() => void remove(d.hostname)}><Trash2 /></Button>
+            </div>
+          </div>
+        ))}
+
+        <div className="flex gap-2">
+          <input
+            value={hostname}
+            onChange={(e) => setHostname(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && hostname.includes(".") && void add()}
+            placeholder="train.yourgym.com"
+            className="w-full rounded-lg bg-surface-2 px-3 py-2 text-sm outline-none ring-ring focus:ring-2"
+          />
+          <Button size="sm" disabled={busy || !hostname.includes(".")} onClick={() => void add()}><Plus /> Add</Button>
+        </div>
+        {err && <p className="text-sm text-danger">{err}</p>}
+        <p className="text-xs text-muted-foreground">You'll sign in with a passkey again on the new domain (each domain keeps its own secure sign-in).</p>
+      </Card>
+    </section>
   );
 }
 

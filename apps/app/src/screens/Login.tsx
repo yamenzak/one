@@ -10,7 +10,10 @@ import { useSession } from "../session.js";
 import { passkeySupported, signInWithPasskey } from "../passkey.js";
 
 export function Login() {
-  const { refresh } = useSession();
+  const { refresh, host } = useSession();
+  const tenant = host?.tenant ?? null;
+  const brandName = tenant?.name ?? "Mossa";
+  const logoUrl = tenant?.branding?.logoUrl ?? null;
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -51,9 +54,13 @@ export function Login() {
       <div className="pointer-events-none absolute -top-32 left-1/2 size-72 -translate-x-1/2 rounded-full bg-primary/25 blur-[100px]" />
 
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="relative text-center">
-        <div className="mx-auto mb-5 grid size-16 place-items-center rounded-3xl bg-primary text-2xl font-black text-primary-foreground shadow-glow">M</div>
-        <h1 className="text-3xl font-bold tracking-tight">Mossa</h1>
-        <p className="mt-2 text-muted-foreground">Coaching, organized.</p>
+        {logoUrl ? (
+          <img src={logoUrl} alt={brandName} className="mx-auto mb-5 h-16 w-auto max-w-[70%] object-contain" />
+        ) : (
+          <div className="mx-auto mb-5 grid size-16 place-items-center rounded-3xl bg-primary text-2xl font-black text-primary-foreground shadow-glow">{brandName.charAt(0).toUpperCase()}</div>
+        )}
+        <h1 className="text-3xl font-bold tracking-tight">{brandName}</h1>
+        <p className="mt-2 text-muted-foreground">{tenant ? "Welcome back — sign in to continue." : "Coaching, organized."}</p>
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="relative">

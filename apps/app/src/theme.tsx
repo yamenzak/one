@@ -18,8 +18,10 @@ interface ThemeCtx {
 const Ctx = createContext<ThemeCtx | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const { ctx } = useSession();
-  const branding = (ctx?.branding ?? null) as Branding | null;
+  const { ctx, host } = useSession();
+  // Signed-in tenant branding wins; before sign-in on a custom domain, fall
+  // back to that domain's tenant so the login screen is already branded.
+  const branding = ((ctx?.branding ?? host?.tenant?.branding) ?? null) as Branding | null;
   const [mode, setMode] = useState<ThemeMode>(() => resolveMode(branding?.defaultMode));
 
   // Apply the tenant branding whenever it changes.

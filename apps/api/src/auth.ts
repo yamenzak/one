@@ -55,7 +55,12 @@ export function createAuth(env: Env, origin?: string) {
   // Local dev always wins: a localhost origin overrides the prod var so
   // cookies stay non-Secure and callbacks point at the dev server.
   const isLocal = Boolean(origin && /^http:\/\/(localhost|127\.0\.0\.1)/.test(origin));
-  const baseURL = (isLocal ? origin : env.BETTER_AUTH_URL || origin) || "http://localhost:8787";
+  // Model A (SPEC §14.1): the REQUEST origin drives baseURL — so on a tenant's
+  // custom domain the passkey RP id + cookies bind to that domain (each domain
+  // is its own WebAuthn RP). BETTER_AUTH_URL is only the fallback when there's
+  // no request context (e.g. background jobs). On the platform host the request
+  // origin equals BETTER_AUTH_URL, so nothing changes there.
+  const baseURL = origin || env.BETTER_AUTH_URL || "http://localhost:8787";
 
   // CSRF: Better Auth (esp. the org plugin) rejects POSTs whose Origin isn't
   // trusted. In local dev the app runs on the Vite server (:5173) and proxies

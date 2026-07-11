@@ -21,6 +21,8 @@ function isPublic(method: string, path: string): boolean {
   if (path.startsWith("/api/auth/")) return true;
   // Identity probe — session or null, lets the app bootstrap.
   if (path === "/api/me") return true;
+  // Which tenant owns this domain — pre-auth, brands the login screen.
+  if (isGet && path === "/api/host") return true;
   // Health + Stripe webhooks (signature-verified in their handlers).
   if (path === "/health") return true;
   if (path === "/api/stripe/webhook" || path === "/api/connect/webhook") return true;
@@ -124,6 +126,9 @@ function permissionFor(method: string, path: string): Record<string, string[]> |
 
   // Tenant settings.
   if (path.startsWith("/api/settings")) return isGet ? { settings: ["read"] } : { settings: ["manage"] };
+
+  // Custom domains — owner surface (settings:manage); handlers scope per tenant.
+  if (path.startsWith("/api/domains")) return { settings: ["manage"] };
 
   return null; // /api/context, /api/notifications, etc. — any member
 }

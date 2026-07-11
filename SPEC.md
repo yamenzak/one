@@ -200,8 +200,11 @@ bucketing — everywhere, including trainer reports (ByShujaa missed that one sp
   effectively never see a generic screen. The neutral `/login` remains; after OTP,
   membership lookup routes anyone to the right tenant regardless of which door they
   used — branding is cosmetic, never functional. Per-tenant PWA manifest (branded
-  install icon/name) is a parked enhancement; tenant custom domains stay deferred
-  (§14.1).
+  install icon/name) is a parked enhancement. **Superseded for custom domains
+  (§14.1, shipped):** a tenant on its own domain runs a per-domain auth origin
+  (Model A) — the Host pins the tenant and passkeys enroll per domain. The
+  single-origin story above still describes `mossa.4dl.app` and the `/t/<slug>`
+  fallback, which remain for tenants without a custom domain.
 - **RBAC** (`perms.ts`, pure): `{resource: action[]}` grants; `PERMISSION_CATALOG` over
   resources `client, plan, nutrition, tracking, supplement, lab, resource, session,
   package, member, report, billing, settings, ai`. `ROLE_PRESETS` for the four roles;
@@ -629,8 +632,17 @@ referenced entities; `source`/`source_id` on imported library rows.
 
 ## 14. Open Questions (decide before the relevant phase)
 
-1. Single origin `mossa.4dl.app` serves all roles (decided); tenants get vanity
-   subpaths (`/t/<slug>`) — custom tenant domains need SaaS-for-domains; defer.
+1. ~~Single origin `mossa.4dl.app` serves all roles; custom tenant domains
+   need SaaS-for-domains; defer.~~ **Decided + shipped (Model A, white-label per
+   domain):** tenants bring their own domain via **Cloudflare for SaaS** custom
+   hostnames (owner self-serves in Settings; CNAME + DCV TXT; auto-provisioned
+   cert). On a custom domain the **Host pins the tenant** (`host-context.ts`),
+   auth is per-domain (each domain its own WebAuthn RP + cookie jar), and only
+   members of that tenant get scope on it. `mossa.4dl.app` stays the neutral
+   host: generic entry, the `/t/<slug>` subpath fallback, and platform admin.
+   **Trade-off accepted:** because passkeys are origin-bound, one user in
+   multiple tenancies enrolls a passkey per domain (OTP is the bootstrap); the
+   cross-tenant switcher is hidden on custom domains. Setup: DEPLOY.md.
 2. Stripe Connect account type — spec says **Standard** (zero liability, tenant-owned);
    Express would give a more embedded feel but adds platform responsibility. Confirm.
 3. Do clients ever exist in two tenants with one email? (Spec says yes via memberships —

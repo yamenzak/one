@@ -119,7 +119,9 @@ export function Shell() {
                   <DropdownMenuSeparator />
                 </>
               )}
-              {ctx!.personas.length > 1 && (
+              {/* Cross-tenant switching is hidden on a custom domain — the
+                  domain IS the tenant (SPEC §14.1). */}
+              {ctx!.personas.length > 1 && !ctx!.hostTenantId && (
                 <>
                   {ctx!.personas.map((p) => (
                     <DropdownMenuItem key={p.tenantId} onSelect={() => void switchTenant(p.tenantId)}>

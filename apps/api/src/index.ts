@@ -33,6 +33,7 @@ import { stripeRoutes, stripeAdminRoutes } from "./stripe-routes.js";
 import { mediaRoutes } from "./media-routes.js";
 import { demoRoutes } from "./demo-routes.js";
 import { sessionRoutes, promoRoutes } from "./session-routes.js";
+import { domainRoutes, domainAdminRoutes } from "./domain-routes.js";
 import type { Env } from "./env.js";
 
 export { TenantBillingDO } from "./billing-do.js";
@@ -70,6 +71,8 @@ app.route("/api", mediaRoutes);
 app.route("/api", demoRoutes);
 app.route("/api", sessionRoutes);
 app.route("/api", promoRoutes);
+app.route("/api", domainRoutes);
+app.route("/api", domainAdminRoutes);
 
 app.notFound((c) =>
   c.req.path.startsWith("/api/") ? c.json({ error: "not found" }, 404) : c.text("not found", 404),

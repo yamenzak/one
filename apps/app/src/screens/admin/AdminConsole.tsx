@@ -1,20 +1,56 @@
 /** Platform admin console — tenants (comp/topup/seed), Stripe config. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Skeleton, SegmentedControl, Chip, Page, Stagger, ShieldCheck, Sparkles, ArrowLeft, KeyRound } from "@mossa/ui";
+import { Button, Card, Badge, Field, Skeleton, SegmentedControl, Chip, Page, Stagger, ShieldCheck, Sparkles, ArrowLeft, KeyRound, Globe } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Tenant { id: string; name: string; slug: string; plan_id: string | null; status: string | null; comp: number | null }
 const PLANS = ["free", "solo", "studio", "team"];
 
+type AdminTab = "tenants" | "stripe" | "domains";
+
 export function AdminConsole({ onBack }: { onBack: () => void }) {
-  const [tab, setTab] = useState<"tenants" | "stripe">("tenants");
+  const [tab, setTab] = useState<AdminTab>("tenants");
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <div className="flex items-center gap-3"><Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button><div className="flex items-center gap-2"><ShieldCheck className="size-5 text-primary" /><h1 className="text-xl font-bold tracking-tight">Platform admin</h1></div></div>
-      <SegmentedControl options={[{ value: "tenants", label: "Tenants" }, { value: "stripe", label: "Stripe" }]} value={tab} onChange={setTab} />
-      {tab === "tenants" ? <Tenants /> : <StripeConfig />}
+      <SegmentedControl options={[{ value: "tenants", label: "Tenants" }, { value: "stripe", label: "Stripe" }, { value: "domains", label: "Domains" }]} value={tab} onChange={setTab} />
+      {tab === "tenants" && <Tenants />}
+      {tab === "stripe" && <StripeConfig />}
+      {tab === "domains" && <DomainsConfig />}
     </Page>
+  );
+}
+
+/** Cloudflare for SaaS credentials — powers tenant custom domains (SPEC §14.1). */
+function DomainsConfig() {
+  const [status, setStatus] = useState<{ configured: boolean; zoneId: string | null; cnameTarget: string | null; tokenSet: boolean } | null>(null);
+  const [apiToken, setApiToken] = useState("");
+  const [zoneId, setZoneId] = useState("");
+  const [cnameTarget, setCnameTarget] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const load = () => void api.get<{ configured: boolean; zoneId: string | null; cnameTarget: string | null; tokenSet: boolean }>("/api/admin/domains/config").then((s) => { setStatus(s); setZoneId(s.zoneId ?? ""); setCnameTarget(s.cnameTarget ?? ""); }).catch(() => undefined);
+  useEffect(load, []);
+  const save = async () => {
+    const body: Record<string, string> = {};
+    if (apiToken) body.apiToken = apiToken;
+    if (zoneId) body.zoneId = zoneId;
+    if (cnameTarget) body.cnameTarget = cnameTarget;
+    await api.post("/api/admin/domains/config", body);
+    setApiToken(""); setMsg("Saved. Tenants can now add custom domains in Settings."); load();
+  };
+  return (
+    <Stagger>
+      <Card className="space-y-4">
+        <div className="flex items-center justify-between"><div className="flex items-center gap-2"><Globe className="size-5 text-primary" /><h2 className="font-semibold">Cloudflare for SaaS</h2></div><Badge tone={status?.configured ? "success" : "neutral"}>{status?.configured ? "enabled" : "off"}</Badge></div>
+        <p className="text-sm text-muted-foreground">A zone API token with <span className="font-medium">SSL and Certificates: Edit</span>, the SaaS-enabled zone id, and the CNAME target tenants point their domain at.</p>
+        <Field label={status?.tokenSet ? "API token — saved (blank keeps it)" : "API token"} icon={KeyRound} type="password" value={apiToken} onChange={(e) => setApiToken(e.target.value)} />
+        <Field label="Zone id" value={zoneId} onChange={(e) => setZoneId(e.target.value)} />
+        <Field label="CNAME target (e.g. ssl.mossa.4dl.app)" icon={Globe} value={cnameTarget} onChange={(e) => setCnameTarget(e.target.value)} />
+        <Button className="w-full" disabled={!apiToken && !zoneId && !cnameTarget} onClick={() => void save()}>Save</Button>
+        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+      </Card>
+    </Stagger>
   );
 }
 

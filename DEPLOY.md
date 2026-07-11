@@ -60,6 +60,41 @@ Email Sending, then set `email.provider = cloudflare` and `email.from` in the
 `app_config` table (admin console Stripe tab is the pattern; a small config UI
 can be added).
 
+## Custom domains (Cloudflare for SaaS) — tenant white-label
+
+Tenants can run the app on **their own domain** (e.g. `train.byshujaa.com`).
+Auth is per-domain (Model A, SPEC §14.1): each domain is its own WebAuthn RP and
+cookie jar, the Host header pins the tenant, and only members of that tenant get
+scope on it. The platform host (`mossa.4dl.app`) stays the neutral entry +
+`/t/<slug>` fallback + platform admin. No code change is needed to add a tenant —
+it's all runtime config + DNS.
+
+**One-time platform setup:**
+
+1. **Enable Cloudflare for SaaS** on the `4dl.app` zone (Dashboard → the zone →
+   SSL/TLS → Custom Hostnames → *Enable*). Set a **Fallback Origin** to a
+   proxied record that resolves to the `mossa` worker (e.g. create
+   `ssl.mossa.4dl.app` → CNAME `mossa.4dl.app`, orange-cloud on). This hostname
+   is what tenants CNAME to.
+2. **Create a scoped API token** — Dashboard → My Profile → API Tokens → Create
+   → permission **Zone · SSL and Certificates · Edit** on the `4dl.app` zone.
+3. **Enter the credentials in-app** — Platform admin → **Domains** tab: paste the
+   API token, the **Zone id** (zone overview page), and the **CNAME target**
+   (`ssl.mossa.4dl.app`). Stored in `app_config` (`cf.saas.*`), never in the
+   bundle.
+
+**Per-tenant flow (self-serve):** owner → Settings → **Custom domain** → enter
+their hostname → the app registers a CF custom hostname and shows the **CNAME**
++ **DCV TXT** records → owner adds them at their DNS → "Check now" polls until
+Cloudflare issues the cert → status flips to **Live** and the domain serves the
+tenant's branded app. Removing the domain deregisters the custom hostname.
+
+Notes: the worker itself is host-agnostic — it reads the `Host` header
+(`host-context.ts`) and needs no per-domain route. `BETTER_AUTH_URL` stays set to
+the platform origin (it identifies the neutral host); the request origin drives
+auth on custom domains. Because passkeys are origin-bound, a user in more than
+one tenancy enrolls a passkey per domain (OTP always works as the bootstrap).
+
 ## Notes
 - The Workers AI binding is commented out in `wrangler.jsonc` for
   credential-free local dev; the Deploy workflow uncomments it automatically.

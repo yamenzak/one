@@ -5,14 +5,22 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { SessionContext } from "@mossa/protocol";
+import type { SessionContext, TenantBranding } from "@mossa/protocol";
 import { api } from "./api.js";
 
 type Mode = "coach" | "train";
 
+/** Which tenant (if any) owns the domain the app is served on (SPEC §14.1). */
+export interface HostInfo {
+  platform: boolean;
+  tenant: { tenantId: string; name: string; slug: string; branding: TenantBranding | null } | null;
+}
+
 interface Session {
   loading: boolean;
   ctx: SessionContext | null;
+  /** Custom-domain tenant, resolved pre-auth. Null on the platform host. */
+  host: HostInfo | null;
   mode: Mode;
   setMode: (m: Mode) => void;
   refresh: () => Promise<void>;
@@ -24,6 +32,7 @@ const Ctx = createContext<Session | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [ctx, setCtx] = useState<SessionContext | null>(null);
+  const [host, setHost] = useState<HostInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [mode, setModeState] = useState<Mode>(() =>
     localStorage.getItem("mossa-mode") === "train" ? "train" : "coach",
@@ -38,6 +47,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Resolve the custom-domain tenant once, in parallel — it brands the login
+  // screen before any sign-in and never changes for the life of the page.
+  useEffect(() => {
+    void api.get<HostInfo>("/api/host").then(setHost).catch(() => setHost({ platform: true, tenant: null }));
   }, []);
 
   useEffect(() => {
@@ -63,8 +78,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ loading, ctx, mode, setMode, refresh, switchTenant, signOut }),
-    [loading, ctx, mode, setMode, refresh, switchTenant, signOut],
+    () => ({ loading, ctx, host, mode, setMode, refresh, switchTenant, signOut }),
+    [loading, ctx, host, mode, setMode, refresh, switchTenant, signOut],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
