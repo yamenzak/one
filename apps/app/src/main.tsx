@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
@@ -37,10 +38,12 @@ function App() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <SessionProvider>
-      <ThemeProvider>
-        <App />
-      </ThemeProvider>
-    </SessionProvider>
+    <BrowserRouter>
+      <SessionProvider>
+        <ThemeProvider>
+          <App />
+        </ThemeProvider>
+      </SessionProvider>
+    </BrowserRouter>
   </StrictMode>,
 );

@@ -1,13 +1,15 @@
 /**
- * Role-adaptive shell (DESIGN.md §5) — one app, nav by persona + mode. Premium
- * app bar + animated tab bar / nav rail + account dropdown. Overlays for
- * settings, wellness, shop, admin.
+ * Role-adaptive shell (DESIGN.md §5) — one app, nav by persona + mode, now
+ * URL-routed (React Router). Tabs + overlays are real routes so refresh and
+ * deep-links work: /today /train /eat /progress · /clients/:id/:tab · /library
+ * /business · /settings /wellness /shop /explore /admin.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Routes, Route, Navigate, Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
-  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, type TabDef,
+  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, type TabDef,
 } from "@mossa/ui";
 import { useSession, useActiveClientId } from "./session.js";
 import { useTheme } from "./theme.js";
@@ -17,7 +19,7 @@ import { Train } from "./screens/client/Train.js";
 import { Eat } from "./screens/client/Eat.js";
 import { Progress } from "./screens/client/Progress.js";
 import { CoachToday } from "./screens/coach/CoachToday.js";
-import { Clients } from "./screens/coach/Clients.js";
+import { Clients, ClientDetail } from "./screens/coach/Clients.js";
 import { Business } from "./screens/coach/Business.js";
 import { Library } from "./screens/coach/Library.js";
 import { Settings } from "./screens/Settings.js";
@@ -27,7 +29,6 @@ import { Shop } from "./screens/client/Shop.js";
 import { Explore } from "./screens/client/Explore.js";
 import { AdminConsole } from "./screens/admin/AdminConsole.js";
 import { NotificationBell } from "./NotificationBell.js";
-import { BookOpen } from "@mossa/ui";
 
 const CLIENT_TABS: TabDef[] = [
   { key: "today", label: "Today", icon: Home },
@@ -36,29 +37,16 @@ const CLIENT_TABS: TabDef[] = [
   { key: "progress", label: "Progress", icon: LineChart },
 ];
 
-export function Shell() {
-  const { ctx, mode, setMode, switchTenant, signOut, refresh } = useSession();
-  const { mode: themeMode, toggleMode } = useTheme();
-  const clientId = useActiveClientId();
+/** Am I currently looking at the client surface? (client role, or train mode.) */
+function useClientSurface(): boolean {
+  const { ctx, mode } = useSession();
   const active = ctx!.active!;
-  const isStaff = active.role !== "client";
-  const clientSurface = !isStaff || mode === "train";
+  return active.role !== "client" ? mode === "train" : true;
+}
 
-  const tabs = useMemo<TabDef[]>(() => {
-    if (clientSurface) return CLIENT_TABS;
-    const t: TabDef[] = [
-      { key: "today", label: "Today", icon: Home },
-      { key: "clients", label: "Clients", icon: Users },
-      { key: "library", label: "Library", icon: LayoutGrid },
-    ];
-    if (active.role === "owner") t.push({ key: "business", label: "Business", icon: Wallet });
-    return t;
-  }, [clientSurface, active.role]);
-
-  const [tab, setTab] = useState("today");
-  const [overlay, setOverlay] = useState<"settings" | "wellness" | "shop" | "admin" | "explore" | null>(null);
-  const current = tabs.some((t) => t.key === tab) ? tab : "today";
-
+export function Shell() {
+  const { ctx } = useSession();
+  const active = ctx!.active!;
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
   const gateClientId = active.role === "client" ? active.clientId : null;
   useEffect(() => {
@@ -67,19 +55,60 @@ export function Shell() {
   }, [gateClientId]);
 
   if (gateClientId && needsOnboarding) return <Onboarding clientId={gateClientId} displayName={ctx!.user.name || "there"} onDone={() => setNeedsOnboarding(false)} />;
-  if (overlay === "settings") return <Settings onBack={() => setOverlay(null)} />;
-  if (overlay === "wellness" && clientId) return <Wellness clientId={clientId} onBack={() => setOverlay(null)} />;
-  if (overlay === "shop" && clientId) return <Shop clientId={clientId} onBack={() => setOverlay(null)} />;
-  if (overlay === "explore" && clientId) return <Explore clientId={clientId} onBack={() => setOverlay(null)} />;
-  if (overlay === "admin") return <AdminConsole onBack={() => setOverlay(null)} />;
+
+  return (
+    <Routes>
+      {/* Full-screen surfaces (no tab chrome). */}
+      <Route path="/settings" element={<SettingsRoute />} />
+      <Route path="/wellness" element={<OverlayWithClient render={(cid, back) => <Wellness clientId={cid} onBack={back} />} />} />
+      <Route path="/shop" element={<OverlayWithClient render={(cid, back) => <Shop clientId={cid} onBack={back} />} />} />
+      <Route path="/explore" element={<OverlayWithClient render={(cid, back) => <Explore clientId={cid} onBack={back} />} />} />
+      <Route path="/admin" element={<AdminRoute />} />
+
+      {/* Tabbed app. */}
+      <Route element={<TabLayout />}>
+        <Route index element={<Navigate to="/today" replace />} />
+        <Route path="today" element={<TodayRoute />} />
+        <Route path="train" element={<ClientArea>{(cid) => <Train clientId={cid} />}</ClientArea>} />
+        <Route path="eat" element={<ClientArea>{(cid) => <Eat clientId={cid} />}</ClientArea>} />
+        <Route path="progress" element={<ClientArea>{(cid) => <Progress clientId={cid} />}</ClientArea>} />
+        <Route path="clients" element={<CoachArea><Clients /></CoachArea>} />
+        <Route path="clients/:clientId" element={<CoachArea><ClientDetail /></CoachArea>} />
+        <Route path="clients/:clientId/:subtab" element={<CoachArea><ClientDetail /></CoachArea>} />
+        <Route path="library" element={<CoachArea><Library /></CoachArea>} />
+        <Route path="business" element={<CoachArea><Business /></CoachArea>} />
+        <Route path="*" element={<Navigate to="/today" replace />} />
+      </Route>
+    </Routes>
+  );
+}
+
+/** The tab layout: app bar + routed content + bottom tabs / nav rail. */
+function TabLayout() {
+  const { ctx, mode, setMode, switchTenant, signOut, refresh } = useSession();
+  const { mode: themeMode, toggleMode } = useTheme();
+  const clientId = useActiveClientId();
+  const clientSurface = useClientSurface();
+  const nav = useNavigate();
+  const loc = useLocation();
+  const active = ctx!.active!;
+  const isStaff = active.role !== "client";
+
+  const tabs: TabDef[] = clientSurface
+    ? CLIENT_TABS
+    : [
+        { key: "today", label: "Today", icon: Home },
+        { key: "clients", label: "Clients", icon: Users },
+        { key: "library", label: "Library", icon: LayoutGrid },
+        ...(active.role === "owner" ? [{ key: "business", label: "Business", icon: Wallet } as TabDef] : []),
+      ];
+  const seg = loc.pathname.split("/")[1] || "today";
+  const current = tabs.some((t) => t.key === seg) ? seg : "today";
 
   const enterTrainMode = async () => {
-    if (!active.clientId) {
-      await api.post("/api/clients/self");
-      await refresh();
-    }
+    if (!active.clientId) { await api.post("/api/clients/self"); await refresh(); }
     setMode("train");
-    setTab("today");
+    nav("/today");
   };
 
   return (
@@ -101,103 +130,120 @@ export function Shell() {
         }
         trailing={
           <>
-          <NotificationBell />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="rounded-full outline-none ring-ring focus-visible:ring-2" aria-label="Account">
-                <Avatar name={ctx!.user.name || ctx!.user.email} seed={ctx!.user.email} className="size-9" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuLabel>{ctx!.user.email}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {isStaff && (
-                <>
-                  <DropdownMenuItem onSelect={clientSurface ? () => (setMode("coach"), setTab("today")) : () => void enterTrainMode()}>
-                    <ArrowLeftRight /> {clientSurface ? "Switch to Coach mode" : "Switch to Train mode"}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-              {/* Cross-tenant switching is hidden on a custom domain — the
-                  domain IS the tenant (SPEC §14.1). */}
-              {ctx!.personas.length > 1 && !ctx!.hostTenantId && (
-                <>
-                  {ctx!.personas.map((p) => (
-                    <DropdownMenuItem key={p.tenantId} onSelect={() => void switchTenant(p.tenantId)}>
-                      <Store /> {p.tenantName}
-                      {p.tenantId === active.tenantId && <Check className="ml-auto size-4 text-primary" />}
+            <NotificationBell />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="rounded-full outline-none ring-ring focus-visible:ring-2" aria-label="Account">
+                  <Avatar name={ctx!.user.name || ctx!.user.email} seed={ctx!.user.email} className="size-9" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuLabel>{ctx!.user.email}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {isStaff && (
+                  <>
+                    <DropdownMenuItem onSelect={clientSurface ? () => { setMode("coach"); nav("/today"); } : () => void enterTrainMode()}>
+                      <ArrowLeftRight /> {clientSurface ? "Switch to Coach mode" : "Switch to Train mode"}
                     </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuSeparator />
-                </>
-              )}
-              {clientSurface && clientId && (
-                <>
-                  <DropdownMenuItem onSelect={() => setOverlay("explore")}>
-                    <BookOpen /> Explore
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setOverlay("wellness")}>
-                    <HeartPulse /> Wellness &amp; supplements
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setOverlay("shop")}>
-                    <Store /> Plans &amp; access
-                  </DropdownMenuItem>
-                </>
-              )}
-              <DropdownMenuItem onSelect={() => setOverlay("settings")}>
-                <SettingsIcon /> Settings &amp; passkeys
-              </DropdownMenuItem>
-              {ctx!.isPlatformAdmin && (
-                <DropdownMenuItem onSelect={() => setOverlay("admin")}>
-                  <ShieldCheck /> Platform admin
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem onSelect={toggleMode}>
-                {themeMode === "dark" ? <Sun /> : <Moon />} {themeMode === "dark" ? "Light mode" : "Dark mode"}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem destructive onSelect={() => void signOut().then(() => location.reload())}>
-                <LogOut /> Sign out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                {ctx!.personas.length > 1 && !ctx!.hostTenantId && (
+                  <>
+                    {ctx!.personas.map((p) => (
+                      <DropdownMenuItem key={p.tenantId} onSelect={() => void switchTenant(p.tenantId)}>
+                        <Store /> {p.tenantName}
+                        {p.tenantId === active.tenantId && <Check className="ml-auto size-4 text-primary" />}
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                {clientSurface && clientId && (
+                  <>
+                    <DropdownMenuItem onSelect={() => nav("/explore")}><BookOpen /> Explore</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => nav("/wellness")}><HeartPulse /> Wellness &amp; supplements</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => nav("/shop")}><Store /> Plans &amp; access</DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuItem onSelect={() => nav("/settings")}><SettingsIcon /> Settings &amp; passkeys</DropdownMenuItem>
+                {ctx!.isPlatformAdmin && <DropdownMenuItem onSelect={() => nav("/admin")}><ShieldCheck /> Platform admin</DropdownMenuItem>}
+                <DropdownMenuItem onSelect={toggleMode}>{themeMode === "dark" ? <Sun /> : <Moon />} {themeMode === "dark" ? "Light mode" : "Dark mode"}</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem destructive onSelect={() => void signOut().then(() => location.reload())}><LogOut /> Sign out</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         }
       />
 
-      <main>
-        {clientSurface && clientId ? (
-          <>
-            {current === "today" && <Today clientId={clientId} onStart={() => setTab("train")} />}
-            {current === "train" && <Train clientId={clientId} />}
-            {current === "eat" && <Eat clientId={clientId} />}
-            {current === "progress" && <Progress clientId={clientId} />}
-          </>
-        ) : clientSurface ? (
-          <div className="p-8 text-center text-muted-foreground">
-            No client record yet.
-            <Button className="mt-4" onClick={() => void enterTrainMode()}>
-              Create my training space
-            </Button>
-          </div>
-        ) : (
-          <>
-            {current === "today" && <CoachToday />}
-            {current === "clients" && <Clients />}
-            {current === "library" && <Library />}
-            {current === "business" && <Business />}
-          </>
-        )}
-      </main>
+      <main><Outlet /></main>
 
-      <BottomTabs tabs={tabs} active={current} onSelect={setTab} />
-      <NavRail
-        tabs={tabs}
-        active={current}
-        onSelect={setTab}
-        brand={ctx!.branding?.iconUrl ? <img src={ctx!.branding.iconUrl} alt={active.tenantName} className="size-full object-cover" /> : active.tenantName.charAt(0).toUpperCase()}
-      />
+      <BottomTabs tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} />
+      <NavRail tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} brand={ctx!.branding?.iconUrl ? <img src={ctx!.branding.iconUrl} alt={active.tenantName} className="size-full object-cover" /> : active.tenantName.charAt(0).toUpperCase()} />
     </div>
   );
+}
+
+/** "Today" resolves to the coach inbox or the client home by surface. */
+function TodayRoute() {
+  const clientSurface = useClientSurface();
+  const clientId = useActiveClientId();
+  const nav = useNavigate();
+  if (!clientSurface) return <CoachToday />;
+  if (!clientId) return <NoClient />;
+  return <Today clientId={clientId} onStart={() => nav("/train")} />;
+}
+
+/** Guard: client-surface routes; redirect coaches, provision a training space. */
+function ClientArea({ children }: { children: (clientId: string) => ReactNode }) {
+  const clientSurface = useClientSurface();
+  const clientId = useActiveClientId();
+  if (!clientSurface) return <Navigate to="/today" replace />;
+  if (!clientId) return <NoClient />;
+  return <>{children(clientId)}</>;
+}
+
+/** Guard: coach-surface routes. */
+function CoachArea({ children }: { children: ReactNode }) {
+  const clientSurface = useClientSurface();
+  if (clientSurface) return <Navigate to="/today" replace />;
+  return <>{children}</>;
+}
+
+function NoClient() {
+  const { ctx, setMode, refresh } = useSession();
+  const nav = useNavigate();
+  const active = ctx!.active!;
+  const enter = async () => {
+    if (!active.clientId) { await api.post("/api/clients/self"); await refresh(); }
+    setMode("train");
+    nav("/today");
+  };
+  return (
+    <div className="p-8 text-center text-muted-foreground">
+      No client record yet.
+      <Button className="mt-4" onClick={() => void enter()}>Create my training space</Button>
+    </div>
+  );
+}
+
+function SettingsRoute() {
+  const nav = useNavigate();
+  return <Settings onBack={() => nav(-1)} />;
+}
+
+function AdminRoute() {
+  const { ctx } = useSession();
+  const nav = useNavigate();
+  if (!ctx!.isPlatformAdmin) return <Navigate to="/today" replace />;
+  return <AdminConsole onBack={() => nav(-1)} />;
+}
+
+/** Client-scoped full-screen overlays (wellness / shop / explore). */
+function OverlayWithClient({ render }: { render: (clientId: string, back: () => void) => ReactNode }) {
+  const clientId = useActiveClientId();
+  const nav = useNavigate();
+  if (!clientId) return <Navigate to="/today" replace />;
+  return <>{render(clientId, () => nav(-1))}</>;
 }

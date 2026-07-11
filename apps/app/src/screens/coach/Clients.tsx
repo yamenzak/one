@@ -4,6 +4,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button, Card, Badge, Field, Sheet, Skeleton, Avatar, SegmentedControl, Page, Stagger, EmptyState, Users, Mail, User, ArrowLeft, Plus } from "@mossa/ui";
 import { api } from "../../api.js";
 import { Today } from "../client/Today.js";
@@ -15,9 +16,9 @@ import { ClientManage } from "./ClientManage.js";
 export interface ClientSummary { id: string; displayName: string; email: string | null; status: string; hasLogin: boolean; avatarUrl?: string | null; avatarSeed?: string | null }
 
 export function Clients() {
+  const nav = useNavigate();
   const [clients, setClients] = useState<ClientSummary[] | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [selected, setSelected] = useState<ClientSummary | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -31,11 +32,9 @@ export function Clients() {
 
   const create = async () => {
     setBusy(true);
-    try { await api.post("/api/clients", { displayName: name, email: email || undefined }); setCreateOpen(false); setName(""); setEmail(""); await load(); }
+    try { const r = await api.post<{ client: { id: string } }>("/api/clients", { displayName: name, email: email || undefined }); setCreateOpen(false); setName(""); setEmail(""); await load(); nav(`/clients/${r.client.id}/today`); }
     finally { setBusy(false); }
   };
-
-  if (selected) return <ClientDetail client={selected} onBack={() => setSelected(null)} />;
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
@@ -49,7 +48,7 @@ export function Clients() {
       ) : (
         <Stagger className="space-y-2">
           {clients.map((c) => (
-            <Card key={c.id} interactive onClick={() => setSelected(c)} className="flex items-center gap-3.5 py-3.5">
+            <Card key={c.id} interactive onClick={() => nav(`/clients/${c.id}/today`)} className="flex items-center gap-3.5 py-3.5">
               <Avatar name={c.displayName} src={c.avatarUrl} seed={c.avatarSeed ?? c.id} className="size-11" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 truncate font-semibold">{c.displayName}{pending.has(c.id) && <span className="size-2 shrink-0 rounded-full bg-cardio" title="Needs action" />}</div>
@@ -81,28 +80,38 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]["value"];
 
-function ClientDetail({ client, onBack }: { client: ClientSummary; onBack: () => void }) {
-  const [tab, setTab] = useState<Tab>("today");
+/** Client detail — URL-routed at /clients/:clientId/:subtab. The detail IS the
+ *  client app scoped to that client, wrapped in coach chrome. */
+export function ClientDetail() {
+  const nav = useNavigate();
+  const { clientId, subtab } = useParams<{ clientId: string; subtab?: string }>();
+  const tab = (TABS.some((t) => t.value === subtab) ? subtab : "today") as Tab;
+  const [client, setClient] = useState<ClientSummary | null>(null);
+  useEffect(() => {
+    if (!clientId) return;
+    void api.get<{ client: ClientSummary }>(`/api/clients/${clientId}`).then((r) => setClient(r.client)).catch(() => setClient(null));
+  }, [clientId]);
+  if (!clientId) return null;
   return (
     <div>
       <div className="sticky top-16 z-20 space-y-3 border-b border-border/40 bg-background/80 px-4 pb-3 pt-3 backdrop-blur-xl">
         <div className="mx-auto flex max-w-xl items-center gap-3">
-          <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
-          <Avatar name={client.displayName} src={client.avatarUrl} seed={client.avatarSeed ?? client.id} className="size-10" />
+          <Button size="icon" variant="secondary" onClick={() => nav("/clients")}><ArrowLeft /></Button>
+          <Avatar name={client?.displayName ?? ""} src={client?.avatarUrl} seed={client?.avatarSeed ?? clientId} className="size-10" />
           <div className="min-w-0 flex-1">
-            <div className="truncate font-semibold">{client.displayName}</div>
+            <div className="truncate font-semibold">{client?.displayName ?? "…"}</div>
             <div className="text-xs text-muted-foreground">Coach view</div>
           </div>
         </div>
         <div className="mx-auto max-w-xl overflow-x-auto">
-          <SegmentedControl options={TABS.map((t) => ({ value: t.value, label: t.label }))} value={tab} onChange={setTab} />
+          <SegmentedControl options={TABS.map((t) => ({ value: t.value, label: t.label }))} value={tab} onChange={(v) => nav(`/clients/${clientId}/${v}`)} />
         </div>
       </div>
-      {tab === "today" && <Today clientId={client.id} />}
-      {tab === "plans" && <CoachPlans clientId={client.id} />}
-      {tab === "goals" && <GoalManager clientId={client.id} />}
-      {tab === "progress" && <Progress clientId={client.id} />}
-      {tab === "manage" && <ClientManage clientId={client.id} />}
+      {tab === "today" && <Today clientId={clientId} />}
+      {tab === "plans" && <CoachPlans clientId={clientId} />}
+      {tab === "goals" && <GoalManager clientId={clientId} />}
+      {tab === "progress" && <Progress clientId={clientId} />}
+      {tab === "manage" && <ClientManage clientId={clientId} />}
     </div>
   );
 }
