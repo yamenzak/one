@@ -5,9 +5,10 @@
 
 import { useEffect, useState } from "react";
 import {
-  Button, Card, Badge, Switch, Textarea, Skeleton, SettingsList, Page, Stagger,
-  BRAND_PRESETS, EDITABLE_TOKENS, extractPalette, foregroundFor, hexToOklchString, oklchStringToHex, parseThemeCss,
-  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, type Branding,
+  Button, Card, Badge, Chip, Switch, Textarea, Skeleton, SettingsList, Page, Stagger,
+  BRAND_PRESETS, EDITABLE_TOKENS, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss,
+  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft,
+  type Branding, type BrandTokens, type NeutralTint,
 } from "@mossa/ui";
 import { useSession } from "../session.js";
 import { useTheme } from "../theme.js";
@@ -139,24 +140,35 @@ function StudioControls() {
   );
 }
 
+const NEUTRALS: { id: NeutralTint; label: string }[] = [
+  { id: "brand", label: "Brand" }, { id: "gray", label: "Neutral" }, { id: "cool", label: "Cool" }, { id: "warm", label: "Warm" },
+];
+const hasTokens = (t: BrandTokens) => !!(Object.keys(t.light ?? {}).length || Object.keys(t.dark ?? {}).length);
+
+/**
+ * Branding editor — the tenant's tokens ARE the brand (single source of truth).
+ * Pick one color (preset, wheel, or extracted from the logo) and a full,
+ * coherent light+dark palette is generated; paste a theme or fine-tune any
+ * token afterwards. Everything writes into the same token maps.
+ */
 function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | null; onPreview: (b: Branding | null) => void; onSaved: () => void }) {
   const { mode } = useTheme();
-  const [preset, setPreset] = useState(initial?.preset ?? "emerald");
-  const [primary, setPrimary] = useState<string | null>(initial?.primary ?? null);
-  const [primaryFg, setPrimaryFg] = useState<string | null>(initial?.primaryForeground ?? null);
+  const seedFrom = (b: Branding | null) => b?.primary || BRAND_PRESETS.find((p) => p.id === b?.preset)?.primary || "oklch(0.74 0.15 164)";
+  const [tokens, setTokens] = useState<BrandTokens>(() => (initial?.tokens && hasTokens(initial.tokens) ? initial.tokens : deriveTokens({ primary: seedFrom(initial) })));
+  const [seed, setSeed] = useState<string>(seedFrom(initial));
+  const [neutral, setNeutral] = useState<NeutralTint>("brand");
   const [radius, setRadius] = useState(initial?.radius ?? 0.95);
   const [logoUrl, setLogoUrl] = useState<string | null>(initial?.logoUrl ?? null);
-  const [tokens, setTokens] = useState<{ light?: Record<string, string> | null; dark?: Record<string, string> | null }>(initial?.tokens ?? {});
   const [advanced, setAdvanced] = useState(false);
   const [themeCss, setThemeCss] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
-  const branding: Branding = { preset, primary, primaryForeground: primaryFg, radius, logoUrl, tokens };
-  // Live-preview whenever any themeable field changes (logo excluded — not a token).
-  useEffect(() => { onPreview(branding); }, [preset, primary, primaryFg, radius, JSON.stringify(tokens)]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Live-preview whenever the tokens or radius change (logo isn't a token).
+  useEffect(() => { onPreview({ tokens, radius, logoUrl }); }, [JSON.stringify(tokens), radius]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const pickPreset = (id: string) => { setPreset(id); setPrimary(null); setPrimaryFg(null); };
+  // Generate a full palette from one color (the smart path).
+  const generate = (color: string, tint: NeutralTint = neutral) => { setSeed(color); setNeutral(tint); setTokens(deriveTokens({ primary: color, neutral: tint })); };
 
   const uploadLogo = async (file: File) => {
     setMsg(null);
@@ -171,39 +183,36 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
     if (!logoUrl) return;
     setMsg("Reading your logo…");
     const img = new Image();
-    img.onload = () => { const p = extractPalette(img); if (p) { setPrimary(p.primary); setPrimaryFg(p.primaryForeground); setMsg("Palette pulled from your logo."); } else setMsg("Couldn't find a strong color in that logo."); };
+    img.onload = () => { const p = extractPalette(img); if (p) { generate(p.primary); setMsg("Palette generated from your logo."); } else setMsg("Couldn't find a strong color in that logo."); };
     img.onerror = () => setMsg("Couldn't load the logo image.");
     img.src = logoUrl;
   };
 
   const applyThemeCss = () => {
     const { tokens: t, radius: r } = parseThemeCss(themeCss);
-    if (!Object.keys(t.light ?? {}).length && !Object.keys(t.dark ?? {}).length) { setMsg("No theme tokens found in that CSS."); return; }
+    if (!hasTokens(t)) { setMsg("No theme tokens found in that CSS."); return; }
     setTokens((prev) => ({ light: { ...prev.light, ...t.light }, dark: { ...prev.dark, ...t.dark } }));
     if (r != null) setRadius(r);
     setThemeCss(""); setMsg("Theme applied — save to keep it.");
   };
 
-  const tokenHex = (v: string): string => {
-    const cur = tokens[mode]?.[v];
-    const raw = cur ?? (typeof document !== "undefined" ? getComputedStyle(document.documentElement).getPropertyValue(v).trim() : "");
-    return raw.startsWith("#") ? raw : oklchStringToHex(raw || "oklch(0.5 0 0)");
-  };
+  const tokenHex = (v: string): string => { const raw = tokens[mode]?.[v] ?? ""; return raw.startsWith("#") ? raw : oklchStringToHex(raw || "oklch(0.5 0 0)"); };
   const setToken = (v: string, hex: string) => setTokens((t) => ({ ...t, [mode]: { ...(t[mode] ?? {}), [v]: hexToOklchString(hex) } }));
 
   const save = async () => {
     setSaving(true);
-    try { await api.patch("/api/settings", { branding }); onSaved(); setMsg("Branding saved."); }
+    // Tokens carry everything now — null out legacy preset/primary fields.
+    try { await api.patch("/api/settings", { branding: { tokens, radius, logoUrl, preset: null, primary: null, primaryForeground: null } }); onSaved(); setMsg("Branding saved."); }
     finally { setSaving(false); }
   };
 
-  const primaryHex = primary ? oklchStringToHex(primary) : oklchStringToHex(BRAND_PRESETS.find((p) => p.id === preset)?.primary ?? "oklch(0.74 0.15 164)");
+  const seedHex = oklchStringToHex(seed.startsWith("#") ? hexToOklchString(seed) : seed);
 
   return (
     <section>
       <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Branding</h3>
       <Card className="space-y-5">
-        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Palette /></div><div><div className="font-medium">Theme</div><div className="text-sm text-muted-foreground">Applies to every client in your studio, light and dark.</div></div></div>
+        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Palette /></div><div><div className="font-medium">Theme</div><div className="text-sm text-muted-foreground">Pick one color — the whole app themes itself, light and dark.</div></div></div>
 
         {/* Logo */}
         <div className="space-y-2">
@@ -216,31 +225,40 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
               <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
                 <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadLogo(e.target.files[0])} />
               </label>
-              <Button size="sm" variant="secondary" disabled={!logoUrl} onClick={extractFromLogo}><Wand2 /> Extract palette</Button>
+              <Button size="sm" variant="secondary" disabled={!logoUrl} onClick={extractFromLogo}><Wand2 /> Theme from logo</Button>
               {logoUrl && <Button size="icon" variant="secondary" aria-label="Remove logo" onClick={() => setLogoUrl(null)}><Trash2 /></Button>}
             </div>
           </div>
         </div>
 
-        {/* Presets */}
-        <div className="grid grid-cols-3 gap-2">
-          {BRAND_PRESETS.map((p) => (
-            <button key={p.id} onClick={() => pickPreset(p.id)} className={`relative flex flex-col items-center gap-2 rounded-xl border p-3 transition-all active:scale-95 ${preset === p.id && !primary ? "border-primary" : "border-border/60"}`}>
-              <span className="size-7 rounded-full" style={{ background: p.primary }} />
-              <span className="text-xs">{p.label}</span>
-              {preset === p.id && !primary && <Check className="absolute right-1.5 top-1.5 size-3.5 text-primary" strokeWidth={3} />}
-            </button>
-          ))}
+        {/* Brand color — presets + wheel, each generates the full palette */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Brand color</span>
+            <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+              Custom
+              <input type="color" value={seedHex} onChange={(e) => generate(e.target.value)} className="size-7 cursor-pointer rounded-md bg-transparent" />
+            </label>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {BRAND_PRESETS.map((p) => {
+              const on = parseInt(oklchStringToHex(p.primary).slice(1), 16) === parseInt(seedHex.slice(1), 16);
+              return (
+                <button key={p.id} onClick={() => generate(p.primary)} className={`relative flex flex-col items-center gap-2 rounded-xl border p-3 transition-all active:scale-95 ${on ? "border-primary" : "border-border/60"}`}>
+                  <span className="size-7 rounded-full" style={{ background: p.primary }} />
+                  <span className="text-xs">{p.label}</span>
+                  {on && <Check className="absolute right-1.5 top-1.5 size-3.5 text-primary" strokeWidth={3} />}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Custom primary */}
-        <label className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Primary color</span>
-          <span className="inline-flex items-center gap-2">
-            {primary && <button onClick={() => { setPrimary(null); setPrimaryFg(null); }} className="text-xs text-muted-foreground underline">reset</button>}
-            <input type="color" value={primaryHex} onChange={(e) => { const ok = hexToOklchString(e.target.value); setPrimary(ok); setPrimaryFg(foregroundFor(ok)); }} className="size-8 cursor-pointer rounded-lg bg-transparent" />
-          </span>
-        </label>
+        {/* Neutral tint */}
+        <div className="space-y-1.5">
+          <span className="text-sm text-muted-foreground">Surface tint</span>
+          <div className="flex gap-2">{NEUTRALS.map((n) => <Chip key={n.id} selected={neutral === n.id} onClick={() => generate(seed, n.id)}>{n.label}</Chip>)}</div>
+        </div>
 
         {/* Radius */}
         <div>
@@ -250,12 +268,12 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
 
         {/* Advanced */}
         <button onClick={() => setAdvanced((a) => !a)} className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground">
-          <span>Advanced tokens</span>
+          <span>Fine-tune tokens</span>
           <ChevronDown className={`size-4 transition-transform ${advanced ? "rotate-180" : ""}`} />
         </button>
         {advanced && (
           <div className="space-y-4">
-            <p className="text-xs text-muted-foreground">Editing the <span className="font-medium capitalize text-foreground">{mode}</span> theme — toggle the app's theme to edit the other. Every token stays mode-aware.</p>
+            <p className="text-xs text-muted-foreground">Editing the <span className="font-medium capitalize text-foreground">{mode}</span> theme — toggle the app's theme (top bar) to edit the other.</p>
             <div className="grid grid-cols-2 gap-2">
               {EDITABLE_TOKENS.map((t) => (
                 <label key={t.var} className="flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2 text-sm">
@@ -270,7 +288,7 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
               <Textarea rows={4} value={themeCss} onChange={(e) => setThemeCss(e.target.value)} placeholder={":root { --primary: oklch(0.6 0.2 250); --background: oklch(1 0 0); ... }\n.dark { --primary: ...; --background: ...; ... }"} className="font-mono text-xs" />
               <div className="flex gap-2">
                 <Button size="sm" variant="secondary" disabled={!themeCss.trim()} onClick={applyThemeCss}>Apply theme</Button>
-                {(tokens.light || tokens.dark) && <Button size="sm" variant="ghost" onClick={() => { setTokens({}); setMsg("Custom tokens cleared."); }}>Clear tokens</Button>}
+                <Button size="sm" variant="ghost" onClick={() => generate(seed)}>Regenerate</Button>
               </div>
             </div>
           </div>

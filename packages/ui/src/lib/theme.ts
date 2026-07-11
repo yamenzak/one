@@ -200,6 +200,85 @@ export function foregroundFor(oklchOrHex: string): string {
   return l > 0.65 ? "oklch(0.2 0.02 285)" : "oklch(0.99 0.01 285)";
 }
 
+// ── Palette generator (one brand color → a full, coherent light+dark theme) ──
+
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+
+/** Read any `oklch(l c h)` or `#hex` color into OKLCH; null if unparseable. */
+export function parseColor(v: string | undefined | null): { l: number; c: number; h: number } | null {
+  if (!v) return null;
+  const s = v.trim();
+  const m = /oklch\(\s*([\d.]+%?)\s+([\d.]+%?)\s+([\d.]+)/i.exec(s);
+  if (m) {
+    const l = m[1]!.endsWith("%") ? parseFloat(m[1]!) / 100 : parseFloat(m[1]!);
+    const c = m[2]!.endsWith("%") ? (parseFloat(m[2]!) / 100) * 0.4 : parseFloat(m[2]!);
+    const h = parseFloat(m[3]!);
+    if ([l, c, h].every(Number.isFinite)) return { l, c, h };
+  }
+  if (s.startsWith("#")) { const { l, c, h } = rgbToOklchHex(s); return { l, c, h }; }
+  return null;
+}
+
+function rgbToOklchHex(hex: string) {
+  const m = hex.replace("#", "");
+  const full = m.length === 3 ? m.split("").map((x) => x + x).join("") : m;
+  return rgbToOklch(parseInt(full.slice(0, 2), 16), parseInt(full.slice(2, 4), 16), parseInt(full.slice(4, 6), 16));
+}
+
+const ok = (l: number, c: number, h: number) => `oklch(${r2(clamp(l, 0, 1))} ${r2(Math.max(0, c))} ${r2(((h % 360) + 360) % 360)})`;
+const contrastFg = (l: number, h: number) => (l > 0.62 ? ok(0.2, 0.02, h) : ok(0.99, 0.01, h));
+
+/** Neutral-surface hue + chroma multiplier from a tint preset + the brand hue. */
+export type NeutralTint = "brand" | "gray" | "cool" | "warm";
+function neutralTint(kind: NeutralTint, brandHue: number): { hue: number; c: number } {
+  switch (kind) {
+    case "gray": return { hue: brandHue, c: 0 };
+    case "cool": return { hue: 255, c: 1 };
+    case "warm": return { hue: 70, c: 1 };
+    default: return { hue: brandHue, c: 1 }; // "brand"
+  }
+}
+
+/**
+ * Generate a full, coherent Mossa token set (light + dark) from one brand color.
+ * The neutrals track Mossa's shipped lightness ramp, tinted toward the brand (or
+ * a chosen neutral). The produced tokens are authoritative and stay editable —
+ * this is a convenience generator, not a lock-in.
+ */
+export function deriveTokens(input: { primary: string; neutral?: NeutralTint }): BrandTokens {
+  const p = parseColor(input.primary) ?? { l: 0.74, c: 0.15, h: 164 };
+  const { hue: nH, c: nc } = neutralTint(input.neutral ?? "brand", p.h);
+  const pC = Math.min(p.c, 0.22);
+  const lightL = clamp(p.l, 0.5, 0.72);
+  const darkL = clamp(Math.max(p.l, 0.62), 0.6, 0.82);
+  const pLight = ok(lightL, pC, p.h);
+  const pDark = ok(darkL, pC, p.h);
+
+  const light: Record<string, string> = {
+    "--background": ok(0.985, 0.002 * nc, nH), "--foreground": ok(0.2, 0.01 * nc, nH),
+    "--card": ok(1, 0, nH), "--card-foreground": ok(0.2, 0.01 * nc, nH),
+    "--surface-2": ok(0.965, 0.003 * nc, nH), "--surface-3": ok(0.94, 0.004 * nc, nH),
+    "--popover": ok(1, 0, nH), "--popover-foreground": ok(0.2, 0.01 * nc, nH),
+    "--primary": pLight, "--primary-foreground": contrastFg(lightL, p.h),
+    "--secondary": ok(0.955, 0.004 * nc, nH), "--secondary-foreground": ok(0.24, 0.01 * nc, nH),
+    "--muted": ok(0.955, 0.004 * nc, nH), "--muted-foreground": ok(0.5, 0.012 * nc, nH),
+    "--accent": ok(0.94, 0.005 * nc, nH), "--accent-foreground": ok(0.24, 0.01 * nc, nH),
+    "--border": ok(0.9, 0.005 * nc, nH), "--input": ok(0.9, 0.005 * nc, nH), "--ring": pLight,
+  };
+  const dark: Record<string, string> = {
+    "--background": ok(0.165, 0.006 * nc, nH), "--foreground": ok(0.975, 0.003 * nc, nH),
+    "--card": ok(0.202, 0.006 * nc, nH), "--card-foreground": ok(0.975, 0.003 * nc, nH),
+    "--surface-2": ok(0.235, 0.007 * nc, nH), "--surface-3": ok(0.275, 0.008 * nc, nH),
+    "--popover": ok(0.21, 0.006 * nc, nH), "--popover-foreground": ok(0.975, 0.003 * nc, nH),
+    "--primary": pDark, "--primary-foreground": contrastFg(darkL, p.h),
+    "--secondary": ok(0.245, 0.007 * nc, nH), "--secondary-foreground": ok(0.975, 0.003 * nc, nH),
+    "--muted": ok(0.245, 0.007 * nc, nH), "--muted-foreground": ok(0.7, 0.012 * nc, nH),
+    "--accent": ok(0.275, 0.008 * nc, nH), "--accent-foreground": ok(0.975, 0.003 * nc, nH),
+    "--border": ok(0.3, 0.008 * nc, nH), "--input": ok(0.3, 0.008 * nc, nH), "--ring": pDark,
+  };
+  return { light, dark };
+}
+
 /**
  * Extract a dominant, vibrant color from a logo image and return a brand
  * primary (+ readable foreground). Samples a downscaled copy on a canvas and
