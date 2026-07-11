@@ -328,6 +328,82 @@ export const logRoutes = new Hono<AppEnv>()
     });
   })
 
+  // ── Activity history: a unified, date-bucketed timeline of everything a
+  //    client logged or that happened for them, across all surfaces. Powers the
+  //    Today feed (last N days) and the day-history browser. ──────────────────
+  .get("/activity-history", async (c) => {
+    const clientId = c.req.query("clientId");
+    const from = c.req.query("from");
+    const to = c.req.query("to");
+    if (!clientId || !from || !to) return c.json({ error: "clientId + from + to required" }, 400);
+    const access = await requireClientAccess(c, clientId);
+    if ("response" in access) return access.response;
+    const db = c.env.DB;
+    const cid = access.client.id;
+    const inRange = (day: string | null | undefined) => !!day && day >= from && day <= to;
+    const dayOf = (ts: string | null | undefined) => (ts ? ts.slice(0, 10) : null);
+
+    interface Ev { id: string; kind: string; date: string; at: string; title: string; subtitle: string | null; metric?: { unit: "energy" | "volume" | "weight"; value: number } }
+    const events: Ev[] = [];
+
+    const [food, water, workouts, activities, measures, checkins, sleeps, moods, fasts, swaps, labs, wPlans, mPlans] = await Promise.all([
+      db.prepare("SELECT date_local, meal_type, COUNT(*) AS n, COALESCE(SUM(calories),0) AS cal, MAX(created_at) AS at FROM food_entries WHERE client_id=? AND date_local>=? AND date_local<=? GROUP BY date_local, meal_type").bind(cid, from, to).all<{ date_local: string; meal_type: string; n: number; cal: number; at: string }>(),
+      db.prepare("SELECT date_local, total_ml, updated_at FROM water_logs WHERE client_id=? AND date_local>=? AND date_local<=? AND total_ml>0").bind(cid, from, to).all<{ date_local: string; total_ml: number; updated_at: string }>(),
+      db.prepare("SELECT date_local, entries_json, session_calories, updated_at, created_at FROM exercise_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, from, to).all<{ date_local: string; entries_json: string | null; session_calories: number | null; updated_at: string; created_at: string }>(),
+      db.prepare("SELECT id, date_local, activity_key, label, duration_min, avg_hr_bpm, calories, created_at FROM activity_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, from, to).all<{ id: string; date_local: string; activity_key: string | null; label: string | null; duration_min: number | null; avg_hr_bpm: number | null; calories: number | null; created_at: string }>(),
+      db.prepare("SELECT date_local, weight_kg, body_fat_percent, waist_cm, created_at FROM measurements WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, from, to).all<{ date_local: string; weight_kg: number | null; body_fat_percent: number | null; waist_cm: number | null; created_at: string }>(),
+      db.prepare("SELECT id, date_local, mood, energy, stress, sleep_hours, trainer_feedback, feedback_at, created_at FROM check_ins WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, from, to).all<{ id: string; date_local: string; mood: number | null; energy: number | null; stress: number | null; sleep_hours: number | null; trainer_feedback: string | null; feedback_at: string | null; created_at: string }>(),
+      db.prepare("SELECT date_local, duration_minutes, quality, updated_at FROM sleep_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, from, to).all<{ date_local: string; duration_minutes: number; quality: number | null; updated_at: string }>(),
+      db.prepare("SELECT date_local, mood, energy, stress, updated_at FROM mood_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, from, to).all<{ date_local: string; mood: number | null; energy: number | null; stress: number | null; updated_at: string }>(),
+      db.prepare("SELECT id, started_at, ended_at, duration_minutes, target_hours FROM fasting_sessions WHERE client_id=? ORDER BY started_at DESC LIMIT 40").bind(cid).all<{ id: string; started_at: string; ended_at: string | null; duration_minutes: number | null; target_hours: number | null }>(),
+      db.prepare("SELECT s.id, s.status, s.reason, s.trainer_note, s.created_at, s.resolved_at, ce.name AS current_name, se.name AS suggested_name FROM swap_requests s LEFT JOIN exercises ce ON ce.id=s.current_exercise_id LEFT JOIN exercises se ON se.id=s.suggested_exercise_id WHERE s.client_id=? ORDER BY s.created_at DESC LIMIT 60").bind(cid).all<{ id: string; status: string; reason: string | null; trainer_note: string | null; created_at: string; resolved_at: string | null; current_name: string | null; suggested_name: string | null }>(),
+      db.prepare("SELECT id, display_name, status, created_at, uploaded_at, reviewed_at FROM lab_tests WHERE client_id=? ORDER BY created_at DESC LIMIT 60").bind(cid).all<{ id: string; display_name: string; status: string; created_at: string; uploaded_at: string | null; reviewed_at: string | null }>(),
+      db.prepare("SELECT id, name, published_at FROM workout_plans WHERE client_id=? AND published_at IS NOT NULL ORDER BY published_at DESC LIMIT 30").bind(cid).all<{ id: string; name: string; published_at: string }>(),
+      db.prepare("SELECT id, name, published_at FROM meal_plans WHERE client_id=? AND published_at IS NOT NULL ORDER BY published_at DESC LIMIT 30").bind(cid).all<{ id: string; name: string; published_at: string }>(),
+    ]);
+
+    const mealLabel = (t: string) => ({ breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner", snack: "Snack", pre_workout: "Pre-workout", post_workout: "Post-workout", free: "Free meal" } as Record<string, string>)[t] ?? t.replace(/_/g, " ").replace(/^\w/, (x) => x.toUpperCase());
+    const dur = (min: number) => (min >= 60 ? `${Math.floor(min / 60)}h ${min % 60}m` : `${min}m`);
+    const atFor = (day: string, ts?: string | null) => (ts && ts.length >= 10 ? ts : `${day}T12:00:00.000Z`);
+
+    for (const f of food.results ?? []) events.push({ id: `food-${f.date_local}-${f.meal_type}`, kind: `food:${f.meal_type}`, date: f.date_local, at: atFor(f.date_local, f.at), title: mealLabel(f.meal_type), subtitle: `${f.n} item${f.n === 1 ? "" : "s"}`, metric: { unit: "energy", value: Math.round(f.cal) } });
+    for (const w of water.results ?? []) events.push({ id: `water-${w.date_local}`, kind: "water", date: w.date_local, at: atFor(w.date_local, w.updated_at), title: "Hydration", subtitle: null, metric: { unit: "volume", value: w.total_ml } });
+    for (const s of workouts.results ?? []) {
+      const entries = parseJson<SessionEntry[]>(s.entries_json, []);
+      const sets = entries.reduce((n, e) => n + e.sets.filter((x) => x.completed !== false).length, 0);
+      if (sets === 0) continue;
+      events.push({ id: `workout-${s.date_local}`, kind: "workout", date: s.date_local, at: atFor(s.date_local, s.updated_at || s.created_at), title: "Workout", subtitle: `${sets} set${sets === 1 ? "" : "s"}`, ...(s.session_calories && s.session_calories > 0 ? { metric: { unit: "energy" as const, value: s.session_calories } } : {}) });
+    }
+    for (const a of activities.results ?? []) events.push({ id: `act-${a.id}`, kind: "activity", date: a.date_local, at: atFor(a.date_local, a.created_at), title: a.label || (a.activity_key ?? "Activity").replace(/_/g, " "), subtitle: [a.duration_min ? dur(a.duration_min) : null, a.avg_hr_bpm ? `HR ${a.avg_hr_bpm}` : null].filter(Boolean).join(" · ") || null, ...(a.calories ? { metric: { unit: "energy" as const, value: a.calories } } : {}) });
+    for (const m of measures.results ?? []) { if (m.weight_kg == null && m.body_fat_percent == null && m.waist_cm == null) continue; events.push({ id: `meas-${m.date_local}`, kind: "measurement", date: m.date_local, at: atFor(m.date_local, m.created_at), title: "Body", subtitle: [m.body_fat_percent != null ? `${m.body_fat_percent}% bf` : null, m.waist_cm != null ? `waist ${m.waist_cm}` : null].filter(Boolean).join(" · ") || null, ...(m.weight_kg != null ? { metric: { unit: "weight" as const, value: m.weight_kg } } : {}) }); }
+    for (const ci of checkins.results ?? []) {
+      const parts = [ci.mood != null ? `mood ${ci.mood}/5` : null, ci.energy != null ? `energy ${ci.energy}/5` : null].filter(Boolean).join(" · ");
+      events.push({ id: `checkin-${ci.date_local}`, kind: "checkin", date: ci.date_local, at: atFor(ci.date_local, ci.created_at), title: "Check-in", subtitle: parts || "logged" });
+      if (ci.trainer_feedback && inRange(dayOf(ci.feedback_at))) events.push({ id: `fb-${ci.id}`, kind: "feedback", date: dayOf(ci.feedback_at)!, at: ci.feedback_at!, title: "Coach feedback", subtitle: ci.trainer_feedback.slice(0, 90) });
+    }
+    for (const s of sleeps.results ?? []) events.push({ id: `sleep-${s.date_local}`, kind: "sleep", date: s.date_local, at: atFor(s.date_local, s.updated_at), title: "Sleep", subtitle: [dur(s.duration_minutes), s.quality != null ? `quality ${s.quality}/5` : null].filter(Boolean).join(" · ") });
+    for (const m of moods.results ?? []) events.push({ id: `mood-${m.date_local}`, kind: "mood", date: m.date_local, at: atFor(m.date_local, m.updated_at), title: "Mood", subtitle: [m.mood != null ? `mood ${m.mood}/5` : null, m.energy != null ? `energy ${m.energy}/5` : null, m.stress != null ? `stress ${m.stress}/5` : null].filter(Boolean).join(" · ") || "logged" });
+    for (const f of fasts.results ?? []) {
+      if (f.ended_at && inRange(dayOf(f.ended_at))) events.push({ id: `fast-end-${f.id}`, kind: "fast", date: dayOf(f.ended_at)!, at: f.ended_at, title: "Fast complete", subtitle: [f.duration_minutes != null ? dur(f.duration_minutes) : null, f.target_hours ? `target ${f.target_hours}h` : null].filter(Boolean).join(" · ") || null });
+      else if (!f.ended_at && inRange(dayOf(f.started_at))) events.push({ id: `fast-start-${f.id}`, kind: "fast", date: dayOf(f.started_at)!, at: f.started_at, title: "Fast started", subtitle: f.target_hours ? `target ${f.target_hours}h` : null });
+    }
+    for (const s of swaps.results ?? []) {
+      const names = s.current_name ? `${s.current_name}${s.suggested_name ? ` → ${s.suggested_name}` : ""}` : null;
+      if (s.resolved_at && s.status !== "pending" && inRange(dayOf(s.resolved_at))) events.push({ id: `swap-res-${s.id}`, kind: "swap", date: dayOf(s.resolved_at)!, at: s.resolved_at, title: s.status === "approved" ? "Swap approved" : "Swap declined", subtitle: names || s.trainer_note || null });
+      else if (inRange(dayOf(s.created_at))) events.push({ id: `swap-req-${s.id}`, kind: "swap", date: dayOf(s.created_at)!, at: s.created_at, title: "Swap requested", subtitle: s.current_name ? `${s.current_name}${s.reason ? ` · ${s.reason}` : ""}` : s.reason || null });
+    }
+    for (const l of labs.results ?? []) {
+      if (l.reviewed_at && inRange(dayOf(l.reviewed_at))) events.push({ id: `lab-rev-${l.id}`, kind: "lab", date: dayOf(l.reviewed_at)!, at: l.reviewed_at, title: "Lab reviewed", subtitle: l.display_name });
+      else if (l.uploaded_at && inRange(dayOf(l.uploaded_at))) events.push({ id: `lab-up-${l.id}`, kind: "lab", date: dayOf(l.uploaded_at)!, at: l.uploaded_at, title: "Lab uploaded", subtitle: l.display_name });
+      else if (inRange(dayOf(l.created_at))) events.push({ id: `lab-req-${l.id}`, kind: "lab", date: dayOf(l.created_at)!, at: l.created_at, title: "Lab requested", subtitle: l.display_name });
+    }
+    for (const p of wPlans.results ?? []) if (inRange(dayOf(p.published_at))) events.push({ id: `wplan-${p.id}`, kind: "plan_workout", date: dayOf(p.published_at)!, at: p.published_at, title: "New workout plan", subtitle: p.name });
+    for (const p of mPlans.results ?? []) if (inRange(dayOf(p.published_at))) events.push({ id: `mplan-${p.id}`, kind: "plan_meal", date: dayOf(p.published_at)!, at: p.published_at, title: "New meal plan", subtitle: p.name });
+
+    events.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+    return c.json({ events });
+  })
+
   // ── Water / sleep / mood: per-day upserts. ─────────────────────────────────
   .post("/logs/water", async (c) => {
     const parsed = withClient(LogWater).safeParse(await c.req.json().catch(() => null));

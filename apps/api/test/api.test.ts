@@ -402,6 +402,35 @@ describe("weekly nutrition strip (Eat tab)", () => {
   });
 });
 
+describe("activity history feed", () => {
+  it("aggregates logs across surfaces into a dated timeline, tenant-scoped", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", {
+      method: "POST", headers: H, body: JSON.stringify({ displayName: "HistoryTest" }),
+    })).json()) as { client: { id: string } };
+    const d = "2026-07-10";
+    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, mealType: "lunch", label: "Chicken", calories: 500, proteinG: 40, carbsG: 30, fatG: 12 } }) });
+    await SELF.fetch("http://x/api/logs/water", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, amountMl: 750 } }) });
+    await SELF.fetch("http://x/api/logs/activity", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, activityKey: "running", durationMin: 30 } }) });
+    await SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, workoutPlanId: "wp-hist", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "ex1", sets: [{ setIndex: 0, reps: 8, weightKg: 50, completed: true }] } }) });
+
+    const feed = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2026-07-10`, { headers: auth(ownerCookie) })).json()) as { events: { kind: string; date: string; title: string; metric?: { unit: string; value: number } }[] };
+    const kinds = feed.events.map((e) => e.kind);
+    expect(kinds).toContain("food:lunch");
+    expect(kinds).toContain("water");
+    expect(kinds).toContain("activity");
+    expect(kinds).toContain("workout");
+    expect(feed.events.every((e) => e.date >= "2026-07-08" && e.date <= "2026-07-10")).toBe(true);
+    const food = feed.events.find((e) => e.kind === "food:lunch")!;
+    expect(food.metric).toMatchObject({ unit: "energy", value: 500 });
+    // Out-of-range window returns nothing.
+    const empty = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-06-01&to=2026-06-02`, { headers: auth(ownerCookie) })).json()) as { events: unknown[] };
+    expect(empty.events.length).toBe(0);
+    // Tenant isolation.
+    expect((await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2026-07-10`, { headers: auth(otherCookie) })).status).toBe(404);
+  });
+});
+
 describe("workout logging — measurement modes (SPEC §8.3)", () => {
   it("persists reps, time, and distance sets and reads them back per slot", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

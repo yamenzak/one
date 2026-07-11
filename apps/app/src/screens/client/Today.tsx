@@ -3,14 +3,25 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { currentStreak, fmtVolume, kcalToDisplay, energyLabel, weightLabel, kgToDisplay, type UnitPrefs } from "@mossa/domain";
+import { currentStreak, fmtVolume, fmtEnergy, fmtWeight, kcalToDisplay, energyLabel, weightLabel, kgToDisplay, type UnitPrefs } from "@mossa/domain";
 import {
-  Button, Card, SubCard, Skeleton, ProgressRing, MetricPill, MacroBar, InsightCard, WavyDivider, Badge,
-  Page, Stagger, METRICS, toneVar, Plus, Play, PencilLine, Flame, Trophy, ClipboardList, Dumbbell, FlaskConical, type Tone,
+  Button, Card, SubCard, Skeleton, ProgressRing, MetricPill, MacroBar, InsightCard, IconBadge, Sheet, EmptyState,
+  Page, Stagger, METRICS, toneVar, Plus, Play, PencilLine, Flame, ClipboardList, FlaskConical, History, Clock,
+  Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, ArrowLeftRight, Sparkles, Utensils, Croissant, Soup, Apple,
+  ChevronLeft, ChevronRight, type Tone, type LucideIcon,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { LogSheet } from "./LogSheet.js";
+
+export interface FeedEvent { id: string; kind: string; date: string; at: string; title: string; subtitle: string | null; metric?: { unit: "energy" | "volume" | "weight"; value: number } }
+
+/** N days back from a YYYY-MM-DD string. */
+const shiftDay = (date: string, delta: number): string => {
+  const d = new Date(`${date}T00:00:00`);
+  d.setDate(d.getDate() + delta);
+  return d.toISOString().slice(0, 10);
+};
 
 export interface TodayBundle {
   date: string;
@@ -28,12 +39,18 @@ export interface TodayBundle {
 
 export function Today({ clientId, onStart }: { clientId: string; onStart?: () => void }) {
   const [data, setData] = useState<TodayBundle | null>(null);
+  const [feed, setFeed] = useState<FeedEvent[] | null>(null);
   const [logOpen, setLogOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const units = useUnits();
   const date = todayLocal();
 
   const load = useCallback(async () => {
-    setData(await api.get<TodayBundle>(`/api/today?clientId=${clientId}&date=${date}`));
+    const [bundle, hist] = await Promise.all([
+      api.get<TodayBundle>(`/api/today?clientId=${clientId}&date=${date}`),
+      api.get<{ events: FeedEvent[] }>(`/api/activity-history?clientId=${clientId}&from=${shiftDay(date, -2)}&to=${date}`),
+    ]);
+    setData(bundle); setFeed(hist.events);
   }, [clientId, date]);
   useEffect(() => void load(), [load]);
 
@@ -98,8 +115,8 @@ export function Today({ clientId, onStart }: { clientId: string; onStart?: () =>
         <Widget icon={FlaskConical} tone="cardio" value={data.pendingLabs ?? 0} label="Labs due" />
       </Stagger>
 
-      <Stagger>
-        {!data.checkedIn && (
+      {!data.checkedIn && (
+        <Stagger>
           <InsightCard timestamp="Today" title="Check in" ai>
             <SubCard>
               <p className="text-sm text-muted-foreground">A 30-second check-in keeps your coach in the loop — weight, mood, sleep.</p>
@@ -108,36 +125,128 @@ export function Today({ clientId, onStart }: { clientId: string; onStart?: () =>
               </Button>
             </SubCard>
           </InsightCard>
+        </Stagger>
+      )}
+
+      {/* Recent activity — a live history of everything logged, last 3 days. */}
+      <Stagger className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent activity</h3>
+          <button onClick={() => setHistoryOpen(true)} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><History /> History</button>
+        </div>
+        {!feed ? (
+          <Skeleton className="h-32" />
+        ) : feed.length === 0 ? (
+          <Card className="text-center text-sm text-muted-foreground">Your history grows here as you log — meals, workouts, check-ins and more.</Card>
+        ) : (
+          groupByDay(feed).map(([day, evs]) => (
+            <div key={day}>
+              <div className="px-1 pb-1 pt-2 text-xs font-semibold text-muted-foreground">{dayLabel(day, date)}</div>
+              <Card className="divide-y divide-border/40 py-0.5">
+                {evs.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} />)}
+              </Card>
+            </div>
+          ))
         )}
-        {data.workout.loggedSets > 0 && (
-          <InsightCard timestamp="Today" title="Workout logged">
-            <SubCard className="flex items-center gap-3">
-              <div className="grid size-11 place-items-center rounded-xl bg-activity-soft text-activity [&_svg]:size-5">
-                <Trophy />
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Sets completed</div>
-                <div className="numeral text-2xl font-semibold">{data.workout.loggedSets}</div>
-              </div>
-            </SubCard>
-          </InsightCard>
-        )}
-        {data.publishedWorkoutPlan && (
-          <InsightCard timestamp="Your plan" title={data.publishedWorkoutPlan.name}>
-            <SubCard className="flex items-center gap-3">
-              <div className="grid size-11 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-5">
-                <Dumbbell />
-              </div>
-              <p className="text-sm text-muted-foreground">{data.publishedWorkoutPlan.body.days.length} training days — head to Train to start today's session.</p>
-            </SubCard>
-          </InsightCard>
-        )}
-        <WavyDivider label="Yesterday" />
-        <Card className="text-center text-sm text-muted-foreground">Your history grows here as you log.</Card>
       </Stagger>
 
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} clientId={clientId} onLogged={() => void load()} />
+      {historyOpen && <HistorySheet clientId={clientId} onClose={() => setHistoryOpen(false)} />}
     </Page>
+  );
+}
+
+// ── Activity feed: icon + tone per event kind ────────────────────────────────
+const FEED_META: Record<string, { icon: LucideIcon; tone: Tone }> = {
+  "food:breakfast": { icon: Croissant, tone: "nutrition" },
+  "food:lunch": { icon: Soup, tone: "nutrition" },
+  "food:dinner": { icon: Utensils, tone: "nutrition" },
+  "food:snack": { icon: Apple, tone: "nutrition" },
+  "food:pre_workout": { icon: Dumbbell, tone: "nutrition" },
+  "food:post_workout": { icon: Dumbbell, tone: "nutrition" },
+  "food:free": { icon: Utensils, tone: "nutrition" },
+  water: { icon: Droplet, tone: "hydration" },
+  workout: { icon: Dumbbell, tone: "activity" },
+  activity: { icon: Footprints, tone: "cardio" },
+  measurement: { icon: Weight, tone: "cardio" },
+  checkin: { icon: ClipboardList, tone: "nutrition" },
+  feedback: { icon: Sparkles, tone: "primary" },
+  sleep: { icon: Moon, tone: "sleep" },
+  mood: { icon: Smile, tone: "nutrition" },
+  fast: { icon: Timer, tone: "sleep" },
+  swap: { icon: ArrowLeftRight, tone: "activity" },
+  lab: { icon: FlaskConical, tone: "cardio" },
+  plan_workout: { icon: Dumbbell, tone: "primary" },
+  plan_meal: { icon: Utensils, tone: "primary" },
+};
+const metaFor = (kind: string) => FEED_META[kind] ?? { icon: Sparkles, tone: "neutral" as Tone };
+
+function formatMetric(metric: FeedEvent["metric"], units: UnitPrefs): string | null {
+  if (!metric) return null;
+  return metric.unit === "energy" ? fmtEnergy(metric.value, units) : metric.unit === "volume" ? fmtVolume(metric.value, units) : fmtWeight(metric.value, units);
+}
+
+/** Group a time-sorted (desc) event list into [day, events][] preserving order. */
+function groupByDay(events: FeedEvent[]): [string, FeedEvent[]][] {
+  const out: [string, FeedEvent[]][] = [];
+  for (const ev of events) {
+    const last = out[out.length - 1];
+    if (last && last[0] === ev.date) last[1].push(ev);
+    else out.push([ev.date, [ev]]);
+  }
+  return out;
+}
+
+function dayLabel(day: string, today: string): string {
+  if (day === today) return "Today";
+  if (day === shiftDay(today, -1)) return "Yesterday";
+  return new Date(`${day}T00:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+}
+
+function FeedRow({ ev, units }: { ev: FeedEvent; units: UnitPrefs }) {
+  const meta = metaFor(ev.kind);
+  const sub = [ev.subtitle, formatMetric(ev.metric, units)].filter(Boolean).join(" · ");
+  const time = new Date(ev.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return (
+    <div className="flex items-center gap-3 py-2.5">
+      <IconBadge icon={meta.icon} tone={meta.tone} size="sm" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">{ev.title}</div>
+        {sub && <div className="truncate text-xs text-muted-foreground">{sub}</div>}
+      </div>
+      <span className="shrink-0 text-[0.7rem] tabular-nums text-muted-foreground">{time}</span>
+    </div>
+  );
+}
+
+/** History browser — pick any past day and see its full timeline. */
+function HistorySheet({ clientId, onClose }: { clientId: string; onClose: () => void }) {
+  const units = useUnits();
+  const today = todayLocal();
+  const [day, setDay] = useState(shiftDay(today, -1));
+  const [events, setEvents] = useState<FeedEvent[] | null>(null);
+  useEffect(() => {
+    setEvents(null);
+    void api.get<{ events: FeedEvent[] }>(`/api/activity-history?clientId=${clientId}&from=${day}&to=${day}`).then((r) => setEvents(r.events));
+  }, [clientId, day]);
+  return (
+    <Sheet open onClose={onClose} title="History">
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setDay((d) => shiftDay(d, -1))} className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-4" aria-label="Previous day"><ChevronLeft /></button>
+          <input type="date" max={today} value={day} onChange={(e) => e.target.value && setDay(e.target.value)} className="flex-1 rounded-xl bg-surface-2 px-3 py-2.5 text-center text-sm outline-none [color-scheme:dark]" />
+          <button onClick={() => setDay((d) => (d < today ? shiftDay(d, 1) : d))} disabled={day >= today} className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40 [&_svg]:size-4" aria-label="Next day"><ChevronRight /></button>
+        </div>
+        <div className="text-center text-sm font-semibold text-muted-foreground">{dayLabel(day, today)}</div>
+        {!events ? (
+          <Skeleton className="h-40" />
+        ) : events.length === 0 ? (
+          <EmptyState icon={Clock} title="Nothing logged" description="No activity recorded on this day." />
+        ) : (
+          <Card className="divide-y divide-border/40 py-0.5">{events.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} />)}</Card>
+        )}
+      </div>
+    </Sheet>
   );
 }
 

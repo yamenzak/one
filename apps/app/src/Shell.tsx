@@ -38,6 +38,7 @@ const CLIENT_TABS: TabDef[] = [
   { key: "train", label: "Train", icon: Dumbbell },
   { key: "eat", label: "Eat", icon: Utensils },
   { key: "progress", label: "Progress", icon: LineChart },
+  { key: "wellness", label: "Wellness", icon: HeartPulse },
 ];
 
 /** Am I currently looking at the client surface? (client role, or train mode.) */
@@ -63,7 +64,6 @@ export function Shell() {
     <Routes>
       {/* Full-screen surfaces (no tab chrome). */}
       <Route path="/settings" element={<SettingsRoute />} />
-      <Route path="/wellness" element={<OverlayWithClient render={(cid, back) => <Wellness clientId={cid} onBack={back} />} />} />
       <Route path="/shop" element={<OverlayWithClient render={(cid, back) => <Shop clientId={cid} onBack={back} />} />} />
       <Route path="/explore" element={<OverlayWithClient render={(cid, back) => <Explore clientId={cid} onBack={back} />} />} />
       <Route path="/admin" element={<AdminRoute />} />
@@ -79,6 +79,7 @@ export function Shell() {
         <Route path="train/session/:day" element={<ClientArea>{(cid) => <TrainSessionRoute clientId={cid} />}</ClientArea>} />
         <Route path="eat" element={<ClientArea>{(cid) => <Eat clientId={cid} />}</ClientArea>} />
         <Route path="progress" element={<ClientArea>{(cid) => <Progress clientId={cid} />}</ClientArea>} />
+        <Route path="wellness" element={<ClientArea>{(cid) => <Wellness clientId={cid} />}</ClientArea>} />
         <Route path="clients" element={<CoachArea><Clients /></CoachArea>} />
         <Route path="clients/:clientId" element={<CoachArea><ClientDetail /></CoachArea>} />
         <Route path="clients/:clientId/:subtab" element={<CoachArea><ClientDetail /></CoachArea>} />
@@ -137,6 +138,11 @@ function TabLayout() {
         }
         trailing={
           <>
+            {clientSurface && clientId && (
+              <button onClick={() => nav("/explore")} className="grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" aria-label="Explore resources">
+                <BookOpen className="size-[1.15rem]" />
+              </button>
+            )}
             <NotificationBell />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -167,11 +173,7 @@ function TabLayout() {
                   </>
                 )}
                 {clientSurface && clientId && (
-                  <>
-                    <DropdownMenuItem onSelect={() => nav("/explore")}><BookOpen /> Explore</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => nav("/wellness")}><HeartPulse /> Wellness &amp; supplements</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => nav("/shop")}><Store /> Plans &amp; access</DropdownMenuItem>
-                  </>
+                  <DropdownMenuItem onSelect={() => nav("/shop")}><Store /> Plans &amp; access</DropdownMenuItem>
                 )}
                 <DropdownMenuItem onSelect={() => nav("/settings")}><SettingsIcon /> Settings &amp; passkeys</DropdownMenuItem>
                 {ctx!.isPlatformAdmin && <DropdownMenuItem onSelect={() => nav("/admin")}><ShieldCheck /> Platform admin</DropdownMenuItem>}

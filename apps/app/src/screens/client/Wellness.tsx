@@ -11,7 +11,7 @@ interface Lab { id: string; display_name: string; status: string; due_by: string
 interface Fast { activeFast: { started_at: string; target_hours: number } | null; recentFasts: { duration_minutes: number; target_hours: number }[] }
 interface Session { id: string; scheduled_at: string; duration_minutes: number; status: string }
 
-export function Wellness({ clientId, onBack }: { clientId: string; onBack: () => void }) {
+export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () => void }) {
   const [supps, setSupps] = useState<Supplement[]>([]);
   const [taken, setTaken] = useState<Set<string>>(new Set());
   const [labs, setLabs] = useState<Lab[]>([]);
@@ -59,8 +59,8 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack: () =>
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <div className="flex items-center gap-3">
-        <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
-        <h1 className="text-xl font-bold tracking-tight">Wellness</h1>
+        {onBack && <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>}
+        <h1 className={onBack ? "text-xl font-bold tracking-tight" : "text-2xl font-bold tracking-tight"}>Wellness</h1>
       </div>
 
       <Stagger>
