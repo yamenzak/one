@@ -43,6 +43,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   const [picker, setPicker] = useState<{ blockIdx: number } | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [copyWeekOpen, setCopyWeekOpen] = useState(false);
 
   const load = useCallback(async () => {
     const [p, ex] = await Promise.all([api.get<{ plan: Plan }>(`/api/workout-plans/${planId}`), api.get<{ exercises: ExerciseLite[] }>("/api/exercises")]);
@@ -54,6 +55,33 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   const save = async () => { setSaving(true); try { await api.patch(`/api/workout-plans/${planId}`, { body: { days } }); setDirty(false); } finally { setSaving(false); } };
   const publish = async () => { await save(); await api.post(`/api/workout-plans/${planId}/publish`); await load(); };
   const runAi = async (instructions: string) => { if (!plan) return; const res = await api.post<{ draft: WorkoutBody }>("/api/ai/draft-plan", { clientId: plan.clientId, instructions }); setDays(res.draft.days); setDirty(true); setAiOpen(false); };
+
+  // Copy week: duplicate every current day as a new mesocycle week, with an
+  // optional linear progression (reps / load / %1RM) applied to each set.
+  const copyWeek = (label: string, repBump: number, loadBump: number) => {
+    const start = days.length;
+    mutate((d) => {
+      const clones = d.map((day) => ({
+        ...structuredClone(day),
+        name: `${day.name || "Day"}${label ? ` · ${label}` : ""}`,
+        blocks: day.blocks.map((b) => ({
+          ...structuredClone(b),
+          slots: b.slots.map((s) => ({
+            ...structuredClone(s),
+            sets: s.sets.map((set) => ({
+              ...set,
+              reps: set.reps != null ? Math.max(1, set.reps + repBump) : set.reps,
+              weightValue: set.weightValue != null && (set.weightMode === "absolute" || set.weightMode === "dropset") ? Math.round((set.weightValue + loadBump) * 100) / 100 : set.weightValue,
+              percent1rm: set.percent1rm != null && set.weightMode === "percent_1rm" ? Math.min(100, set.percent1rm + loadBump) : set.percent1rm,
+            })),
+          })),
+        })),
+      }));
+      d.push(...clones);
+    });
+    setDayIdx(start);
+    setCopyWeekOpen(false);
+  };
 
   if (!plan) return <Skeleton className="m-4 h-96" />;
   const day = days[dayIdx];
@@ -72,6 +100,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
         {days.map((d, i) => <button key={i} onClick={() => setDayIdx(i)} className={`rounded-full px-4 py-2 text-sm transition-colors ${i === dayIdx ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>{d.name || `Day ${i + 1}`}</button>)}
         <button onClick={() => { mutate((d) => d.push(emptyDay(`Day ${days.length + 1}`))); setDayIdx(days.length); }} className="inline-flex items-center gap-1 rounded-full bg-secondary px-4 py-2 text-sm text-muted-foreground [&_svg]:size-4"><Plus /> Day</button>
         {day && <button onClick={() => { mutate((d) => d.splice(dayIdx + 1, 0, { ...structuredClone(d[dayIdx]!), name: `${d[dayIdx]!.name || `Day ${dayIdx + 1}`} (copy)` })); setDayIdx(dayIdx + 1); }} className="inline-flex items-center gap-1 rounded-full bg-secondary px-4 py-2 text-sm text-muted-foreground [&_svg]:size-4"><Copy /> Duplicate</button>}
+        {days.length > 0 && <button onClick={() => setCopyWeekOpen(true)} className="inline-flex items-center gap-1 rounded-full bg-secondary px-4 py-2 text-sm text-muted-foreground [&_svg]:size-4"><Copy /> Copy week</button>}
       </div>
 
       {days.length === 0 ? (
@@ -140,7 +169,35 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
       {picker && <ExercisePicker library={library} onClose={() => setPicker(null)} onPick={(id) => { mutate((d) => d[dayIdx]!.blocks[picker.blockIdx]!.slots.push(emptySlot(id))); setPicker(null); }} />}
       {aiOpen && <AiDraftSheet onClose={() => setAiOpen(false)} onRun={runAi} />}
       {exportOpen && <ExportTemplateSheet body={{ days }} defaultName={plan.name} onClose={() => setExportOpen(false)} />}
+      {copyWeekOpen && <CopyWeekSheet dayCount={days.length} onClose={() => setCopyWeekOpen(false)} onCopy={copyWeek} />}
     </div>
+  );
+}
+
+/**
+ * Copy week — duplicate the whole day-set as the next mesocycle week, with an
+ * optional linear progression baked into every set (reps / load / %1RM).
+ */
+function CopyWeekSheet({ dayCount, onClose, onCopy }: { dayCount: number; onClose: () => void; onCopy: (label: string, repBump: number, loadBump: number) => void }) {
+  const [label, setLabel] = useState("Week 2");
+  const [reps, setReps] = useState("0");
+  const [load, setLoad] = useState("0");
+  return (
+    <Sheet open onClose={onClose} title="Copy week">
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">Duplicates all {dayCount} {dayCount === 1 ? "day" : "days"} as a new week. A progression is added to every set that has that value — leave at 0 to copy as-is.</p>
+        <Field label="Week label (added to each day name)" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Week 2" />
+        <div className="space-y-1.5">
+          <div className="text-sm text-muted-foreground">Reps per set</div>
+          <SegmentedControl options={[{ value: "0", label: "Same" }, { value: "1", label: "+1" }, { value: "2", label: "+2" }]} value={reps} onChange={setReps} />
+        </div>
+        <div className="space-y-1.5">
+          <div className="text-sm text-muted-foreground">Load (kg on set weights, % on %1RM)</div>
+          <SegmentedControl options={[{ value: "0", label: "Same" }, { value: "2.5", label: "+2.5" }, { value: "5", label: "+5" }]} value={load} onChange={setLoad} />
+        </div>
+        <Button size="lg" className="w-full" onClick={() => onCopy(label.trim(), Number(reps), Number(load))}><Copy /> Copy {dayCount} {dayCount === 1 ? "day" : "days"}</Button>
+      </div>
+    </Sheet>
   );
 }
 
