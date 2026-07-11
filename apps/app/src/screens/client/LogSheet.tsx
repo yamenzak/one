@@ -1,49 +1,80 @@
 /**
- * Log sheet — bottom sheet with a chip grid → per-kind quick forms.
+ * Log sheet — the comprehensive quick-log surface. Chip grid → per-kind forms:
+ * food, activity (MET), water, weight, body (measurements + BF), sleep, mood,
+ * and a rich check-in with progress photos + consent.
  */
 
 import { useState } from "react";
-import { Button, Field, Sheet, Chip, IconBadge, Utensils, Droplet, Weight, ClipboardList, Smile, Angry, Frown, Meh, Laugh, type LucideIcon, type Tone } from "@mossa/ui";
+import { ACTIVITIES } from "@mossa/domain";
+import {
+  Button, Field, Textarea, Sheet, Chip, IconBadge, Switch,
+  Utensils, Footprints, Droplet, Weight, Ruler, Bed, Smile, ClipboardList, Camera, Angry, Frown, Meh, Laugh,
+  type LucideIcon, type Tone,
+} from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 
-type LogKind = "food" | "water" | "weight" | "checkin";
+type LogKind = "food" | "activity" | "water" | "weight" | "body" | "sleep" | "mood" | "checkin";
 const CHIPS: { kind: LogKind; label: string; icon: LucideIcon; tone: Tone }[] = [
   { kind: "food", label: "Food", icon: Utensils, tone: "nutrition" },
+  { kind: "activity", label: "Activity", icon: Footprints, tone: "cardio" },
   { kind: "water", label: "Water", icon: Droplet, tone: "hydration" },
   { kind: "weight", label: "Weight", icon: Weight, tone: "activity" },
-  { kind: "checkin", label: "Check-in", icon: ClipboardList, tone: "cardio" },
+  { kind: "body", label: "Body", icon: Ruler, tone: "activity" },
+  { kind: "sleep", label: "Sleep", icon: Bed, tone: "sleep" },
+  { kind: "mood", label: "Mood", icon: Smile, tone: "nutrition" },
+  { kind: "checkin", label: "Check-in", icon: ClipboardList, tone: "primary" },
 ];
+const MOOD_ICONS = [Angry, Frown, Meh, Smile, Laugh];
+
+function Rating({ label, value, onChange }: { label: string; value: number | null; onChange: (n: number) => void }) {
+  return (
+    <div>
+      <div className="mb-2 text-sm text-muted-foreground">{label}</div>
+      <div className="flex gap-2">
+        {MOOD_ICONS.map((Face, i) => (
+          <button key={i} onClick={() => onChange(i + 1)} className={`grid size-11 place-items-center rounded-full transition-all active:scale-90 [&_svg]:size-5 ${value === i + 1 ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+            <Face />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function LogSheet({ open, onClose, clientId, onLogged }: { open: boolean; onClose: () => void; clientId: string; onLogged: () => void }) {
   const [kind, setKind] = useState<LogKind | null>(null);
   const [busy, setBusy] = useState(false);
-  const [amount, setAmount] = useState("");
-  const [label, setLabel] = useState("");
-  const [calories, setCalories] = useState("");
-  const [mood, setMood] = useState<number | null>(null);
+  const [f, setF] = useState<Record<string, string>>({});
+  const [ratings, setRatings] = useState<{ mood: number | null; energy: number | null; stress: number | null; sleepQ: number | null }>({ mood: null, energy: null, stress: null, sleepQ: null });
+  const [activityKey, setActivityKey] = useState("walking");
+  const [photos, setPhotos] = useState<{ key: string; consentToFeature: boolean }[]>([]);
   const date = todayLocal();
+  const num = (k: string) => (f[k] ? Number(f[k]) : undefined);
+  const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
 
-  const close = () => {
-    setKind(null);
-    setAmount("");
-    setLabel("");
-    setCalories("");
-    setMood(null);
-    onClose();
+  const close = () => { setKind(null); setF({}); setRatings({ mood: null, energy: null, stress: null, sleepQ: null }); setPhotos([]); onClose(); };
+
+  const uploadPhoto = async (file: File) => {
+    const fd = new FormData(); fd.append("file", file); fd.append("purpose", "progress");
+    const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
+    const { key } = (await up.json()) as { key?: string };
+    if (key) setPhotos((p) => [...p, { key, consentToFeature: false }]);
   };
 
   const submit = async () => {
     setBusy(true);
     try {
-      if (kind === "water") await api.post("/api/logs/water", { clientId, data: { date, amountMl: Number(amount) } });
-      else if (kind === "weight") await api.post("/api/measurements", { clientId, data: { date, weightKg: Number(amount) } });
-      else if (kind === "food") await api.post("/api/logs/food", { clientId, data: { date, mealType: "snack", label: label || "Quick entry", calories: Number(calories) || 0 } });
-      else if (kind === "checkin") await api.post("/api/check-ins", { clientId, data: { date, weightKg: amount ? Number(amount) : undefined, mood: mood ?? undefined } });
+      if (kind === "water") await api.post("/api/logs/water", { clientId, data: { date, amountMl: num("amount") } });
+      else if (kind === "weight") await api.post("/api/measurements", { clientId, data: { date, weightKg: num("amount") } });
+      else if (kind === "body") await api.post("/api/measurements", { clientId, data: { date, weightKg: num("weight"), bodyFatPercent: num("bf"), neckCm: num("neck"), waistCm: num("waist"), hipsCm: num("hips"), chestCm: num("chest") } });
+      else if (kind === "food") await api.post("/api/logs/food", { clientId, data: { date, mealType: "snack", label: f.label || "Quick entry", calories: num("calories") ?? 0 } });
+      else if (kind === "activity") await api.post("/api/logs/activity", { clientId, data: { date, activityKey, label: ACTIVITIES.find((a) => a.key === activityKey)?.label, durationMin: num("duration") ?? 0, avgHrBpm: num("hr") ?? null, caloriesBurned: num("kcal") ?? null } });
+      else if (kind === "sleep") await api.post("/api/logs/sleep", { clientId, data: { date, durationMinutes: Math.round((num("hours") ?? 0) * 60), quality: ratings.sleepQ ?? undefined, notes: f.notes || undefined } });
+      else if (kind === "mood") await api.post("/api/logs/mood", { clientId, data: { date, mood: ratings.mood ?? undefined, energy: ratings.energy ?? undefined, stress: ratings.stress ?? undefined, notes: f.notes || undefined } });
+      else if (kind === "checkin") await api.post("/api/check-ins", { clientId, data: { date, weightKg: num("weight"), mood: ratings.mood ?? undefined, energy: ratings.energy ?? undefined, stress: ratings.stress ?? undefined, sleepHours: num("sleepHours"), stepsCount: num("steps"), notes: f.notes || undefined, progressPhotos: photos.length ? photos : undefined } });
       onLogged();
       close();
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   };
 
   return (
@@ -52,64 +83,86 @@ export function LogSheet({ open, onClose, clientId, onLogged }: { open: boolean;
         <div className="grid grid-cols-2 gap-3 pb-2">
           {CHIPS.map((c) => (
             <button key={c.kind} onClick={() => setKind(c.kind)} className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-4 text-left transition-all hover:border-border active:scale-[0.98]">
-              <IconBadge icon={c.icon} tone={c.tone} />
+              <IconBadge icon={c.icon} tone={c.tone} size="sm" />
               <span className="font-medium">{c.label}</span>
             </button>
           ))}
         </div>
       ) : (
         <div className="space-y-4">
-          {kind === "water" && (
-            <>
-              <h2 className="text-lg font-semibold">Log water</h2>
+          {kind === "water" && (<>
+            <h2 className="text-lg font-semibold">Log water</h2>
+            <div className="flex flex-wrap gap-2">{[250, 500, 750, 1000].map((ml) => <Chip key={ml} selected={f.amount === String(ml)} onClick={() => set("amount", String(ml))}>{ml} ml</Chip>)}</div>
+            <Field label="Amount (ml)" icon={Droplet} inputMode="numeric" value={f.amount ?? ""} onChange={(e) => set("amount", e.target.value.replace(/\D/g, ""))} />
+          </>)}
+          {kind === "weight" && (<>
+            <h2 className="text-lg font-semibold">Log weight</h2>
+            <Field label="Weight (kg)" icon={Weight} inputMode="decimal" value={f.amount ?? ""} onChange={(e) => set("amount", e.target.value)} />
+          </>)}
+          {kind === "body" && (<>
+            <h2 className="text-lg font-semibold">Body measurements</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Weight (kg)" inputMode="decimal" value={f.weight ?? ""} onChange={(e) => set("weight", e.target.value)} />
+              <Field label="Body fat %" inputMode="decimal" value={f.bf ?? ""} onChange={(e) => set("bf", e.target.value)} />
+              <Field label="Neck (cm)" inputMode="decimal" value={f.neck ?? ""} onChange={(e) => set("neck", e.target.value)} />
+              <Field label="Waist (cm)" inputMode="decimal" value={f.waist ?? ""} onChange={(e) => set("waist", e.target.value)} />
+              <Field label="Hips (cm)" inputMode="decimal" value={f.hips ?? ""} onChange={(e) => set("hips", e.target.value)} />
+              <Field label="Chest (cm)" inputMode="decimal" value={f.chest ?? ""} onChange={(e) => set("chest", e.target.value)} />
+            </div>
+          </>)}
+          {kind === "food" && (<>
+            <h2 className="text-lg font-semibold">Quick food entry</h2>
+            <Field label="What did you eat?" icon={Utensils} value={f.label ?? ""} onChange={(e) => set("label", e.target.value)} />
+            <Field label="Calories" inputMode="numeric" value={f.calories ?? ""} onChange={(e) => set("calories", e.target.value.replace(/\D/g, ""))} hint="Search + barcode live on the Eat tab." />
+          </>)}
+          {kind === "activity" && (<>
+            <h2 className="text-lg font-semibold">Log activity</h2>
+            <div className="flex flex-wrap gap-2">{ACTIVITIES.slice(0, 12).map((a) => <Chip key={a.key} selected={activityKey === a.key} onClick={() => setActivityKey(a.key)}>{a.label}</Chip>)}</div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Duration (min)" inputMode="numeric" value={f.duration ?? ""} onChange={(e) => set("duration", e.target.value.replace(/\D/g, ""))} />
+              <Field label="Avg HR (opt)" inputMode="numeric" value={f.hr ?? ""} onChange={(e) => set("hr", e.target.value.replace(/\D/g, ""))} />
+            </div>
+            <Field label="Calories (opt — else estimated)" inputMode="numeric" value={f.kcal ?? ""} onChange={(e) => set("kcal", e.target.value.replace(/\D/g, ""))} hint="Wearables are more accurate; leave blank to estimate from MET × weight." />
+          </>)}
+          {kind === "sleep" && (<>
+            <h2 className="text-lg font-semibold">Log sleep</h2>
+            <Field label="Hours slept" icon={Bed} inputMode="decimal" value={f.hours ?? ""} onChange={(e) => set("hours", e.target.value)} />
+            <Rating label="Quality" value={ratings.sleepQ} onChange={(n) => setRatings((r) => ({ ...r, sleepQ: n }))} />
+          </>)}
+          {kind === "mood" && (<>
+            <h2 className="text-lg font-semibold">Log mood</h2>
+            <Rating label="Mood" value={ratings.mood} onChange={(n) => setRatings((r) => ({ ...r, mood: n }))} />
+            <Rating label="Energy" value={ratings.energy} onChange={(n) => setRatings((r) => ({ ...r, energy: n }))} />
+            <Rating label="Stress" value={ratings.stress} onChange={(n) => setRatings((r) => ({ ...r, stress: n }))} />
+          </>)}
+          {kind === "checkin" && (<>
+            <h2 className="text-lg font-semibold">Daily check-in</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Weight (kg)" inputMode="decimal" value={f.weight ?? ""} onChange={(e) => set("weight", e.target.value)} />
+              <Field label="Sleep (hrs)" inputMode="decimal" value={f.sleepHours ?? ""} onChange={(e) => set("sleepHours", e.target.value)} />
+              <Field label="Steps" inputMode="numeric" value={f.steps ?? ""} onChange={(e) => set("steps", e.target.value.replace(/\D/g, ""))} />
+            </div>
+            <Rating label="Mood" value={ratings.mood} onChange={(n) => setRatings((r) => ({ ...r, mood: n }))} />
+            <Rating label="Energy" value={ratings.energy} onChange={(n) => setRatings((r) => ({ ...r, energy: n }))} />
+            <Rating label="Stress" value={ratings.stress} onChange={(n) => setRatings((r) => ({ ...r, stress: n }))} />
+            <Textarea rows={2} placeholder="Notes for your coach…" value={f.notes ?? ""} onChange={(e) => set("notes", e.target.value)} />
+            <div>
+              <div className="mb-2 flex items-center justify-between text-sm text-muted-foreground"><span>Progress photos</span></div>
               <div className="flex flex-wrap gap-2">
-                {[250, 500, 750, 1000].map((ml) => (
-                  <Chip key={ml} selected={amount === String(ml)} onClick={() => setAmount(String(ml))}>
-                    {ml} ml
-                  </Chip>
+                {photos.map((p, i) => (
+                  <div key={i} className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs">
+                    Photo {i + 1}
+                    <Switch checked={p.consentToFeature} onCheckedChange={(v) => setPhotos((arr) => arr.map((x, j) => (j === i ? { ...x, consentToFeature: v } : x)))} />
+                  </div>
                 ))}
+                <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3 text-xs [&_svg]:size-3.5"><Camera /> Add<input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadPhoto(e.target.files[0])} /></label>
               </div>
-              <Field label="Amount (ml)" icon={Droplet} inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} />
-            </>
-          )}
-          {kind === "weight" && (
-            <>
-              <h2 className="text-lg font-semibold">Log weight</h2>
-              <Field label="Weight (kg)" icon={Weight} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} hint="Stored metric; shown in your preferred unit." />
-            </>
-          )}
-          {kind === "food" && (
-            <>
-              <h2 className="text-lg font-semibold">Quick food entry</h2>
-              <Field label="What did you eat?" icon={Utensils} value={label} onChange={(e) => setLabel(e.target.value)} />
-              <Field label="Calories" icon={ClipboardList} inputMode="numeric" value={calories} onChange={(e) => setCalories(e.target.value.replace(/\D/g, ""))} hint="Search + barcode live on the Eat tab." />
-            </>
-          )}
-          {kind === "checkin" && (
-            <>
-              <h2 className="text-lg font-semibold">Daily check-in</h2>
-              <Field label="Weight (kg) — optional" icon={Weight} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
-              <div>
-                <div className="mb-2 flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Smile className="size-4" /> Mood
-                </div>
-                <div className="flex gap-2">
-                  {[Angry, Frown, Meh, Smile, Laugh].map((Face, i) => (
-                    <button key={i} onClick={() => setMood(i + 1)} className={`grid size-11 place-items-center rounded-full transition-all active:scale-90 [&_svg]:size-5 ${mood === i + 1 ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
-                      <Face />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
+              {photos.length > 0 && <p className="mt-1.5 text-xs text-muted-foreground">Photos are private. Toggle to allow featuring as a before/after.</p>}
+            </div>
+          </>)}
           <div className="flex gap-3 pt-1">
-            <Button variant="ghost" onClick={() => setKind(null)}>
-              Back
-            </Button>
-            <Button size="lg" className="flex-1" disabled={busy} onClick={() => void submit()}>
-              {busy ? "Saving…" : "Save"}
-            </Button>
+            <Button variant="ghost" onClick={() => setKind(null)}>Back</Button>
+            <Button size="lg" className="flex-1" disabled={busy} onClick={() => void submit()}>{busy ? "Saving…" : "Save"}</Button>
           </div>
         </div>
       )}

@@ -1,7 +1,7 @@
 /** Eat tab — today's diary grouped by meal, with search/barcode + meal plan. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Skeleton, Page, Stagger, EmptyState, Plus, ClipboardList, Utensils } from "@mossa/ui";
+import { Button, Card, Skeleton, Page, Stagger, EmptyState, Plus, ClipboardList, Utensils, Trash2 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
 import { MealPlanDrawer } from "./MealPlanDrawer.js";
@@ -18,6 +18,8 @@ export function Eat({ clientId }: { clientId: string }) {
     setEntries((await api.get<{ entries: Entry[] }>(`/api/logs/food?clientId=${clientId}&date=${date}`)).entries);
   }, [clientId, date]);
   useEffect(() => void load(), [load]);
+
+  const del = async (id: string) => { await api.del(`/api/logs/food/${id}?clientId=${clientId}`); await load(); };
 
   if (!entries) return <Skeleton className="m-4 h-64" />;
 
@@ -40,9 +42,10 @@ export function Eat({ clientId }: { clientId: string }) {
             <Card key={meal} className="space-y-2">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{meal.replace("_", " ")}</h2>
               {list.map((e) => (
-                <div key={e.id} className="flex items-center justify-between border-t border-border/40 pt-2 first:border-0 first:pt-0">
-                  <span className="text-sm">{e.label ?? "Food"}</span>
+                <div key={e.id} className="group flex items-center justify-between gap-2 border-t border-border/40 pt-2 first:border-0 first:pt-0">
+                  <span className="min-w-0 flex-1 truncate text-sm">{e.label ?? "Food"}</span>
                   <span className="numeral text-sm text-muted-foreground">{Math.round(e.calories)} kcal</span>
+                  <button onClick={() => void del(e.id)} className="text-muted-foreground opacity-60 transition-colors hover:text-danger [&_svg]:size-4" aria-label="Delete"><Trash2 /></button>
                 </div>
               ))}
             </Card>

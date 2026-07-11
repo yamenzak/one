@@ -94,6 +94,12 @@ export const LogMeasurement = z.object({
 });
 export type LogMeasurement = z.infer<typeof LogMeasurement>;
 
+export const ProgressPhoto = z.object({
+  key: z.string().max(300), // R2 key
+  label: z.string().max(40).nullish(),
+  consentToFeature: z.boolean().default(false),
+});
+
 export const SubmitCheckIn = z.object({
   date: LocalDate,
   weightKg: z.number().positive().nullish(),
@@ -105,6 +111,8 @@ export const SubmitCheckIn = z.object({
   waterMl: z.number().int().min(0).nullish(),
   stepsCount: z.number().int().min(0).nullish(),
   notes: z.string().max(2000).nullish(),
+  /** Progress photos (private R2 keys) with per-photo feature consent. */
+  progressPhotos: z.array(ProgressPhoto).nullish(),
 });
 export type SubmitCheckIn = z.infer<typeof SubmitCheckIn>;
 

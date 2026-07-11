@@ -348,25 +348,26 @@ export const logRoutes = new Hono<AppEnv>()
     )
       .bind(access.client.id, d.date)
       .first<{ id: string }>();
+    const photosJson = d.progressPhotos ? j(d.progressPhotos) : null;
     if (existing) {
       await c.env.DB.prepare(
-        "UPDATE check_ins SET weight_kg = ?, mood = ?, energy = ?, stress = ?, sleep_quality = ?, sleep_hours = ?, water_ml = ?, steps_count = ?, notes = ?, updated_at = ? WHERE id = ?",
+        "UPDATE check_ins SET weight_kg = ?, mood = ?, energy = ?, stress = ?, sleep_quality = ?, sleep_hours = ?, water_ml = ?, steps_count = ?, notes = ?, photos_json = COALESCE(?, photos_json), updated_at = ? WHERE id = ?",
       )
         .bind(
           d.weightKg ?? null, d.mood ?? null, d.energy ?? null, d.stress ?? null, d.sleepQuality ?? null,
-          d.sleepHours ?? null, d.waterMl ?? null, d.stepsCount ?? null, d.notes ?? null, nowIso(), existing.id,
+          d.sleepHours ?? null, d.waterMl ?? null, d.stepsCount ?? null, d.notes ?? null, photosJson, nowIso(), existing.id,
         )
         .run();
       return c.json({ ok: true, id: existing.id, updated: true });
     }
     const id = newId("chk");
     await c.env.DB.prepare(
-      "INSERT INTO check_ins (id, tenant_id, client_id, date_local, weight_kg, mood, energy, stress, sleep_quality, sleep_hours, water_ml, steps_count, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO check_ins (id, tenant_id, client_id, date_local, weight_kg, mood, energy, stress, sleep_quality, sleep_hours, water_ml, steps_count, notes, photos_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
       .bind(
         id, access.client.tenant_id, access.client.id, d.date, d.weightKg ?? null, d.mood ?? null,
         d.energy ?? null, d.stress ?? null, d.sleepQuality ?? null, d.sleepHours ?? null,
-        d.waterMl ?? null, d.stepsCount ?? null, d.notes ?? null, nowIso(), nowIso(),
+        d.waterMl ?? null, d.stepsCount ?? null, d.notes ?? null, photosJson, nowIso(), nowIso(),
       )
       .run();
     // Mirror weight into measurements so progress prefers the dedicated table.
@@ -534,7 +535,7 @@ export const logRoutes = new Hono<AppEnv>()
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
     const db = c.env.DB;
-    const [food, water, workout, activities, checkIn, goal, plans] = await Promise.all([
+    const [food, water, workout, activities, checkIn, goal, plans, checkInDates, pendingLabs, weights] = await Promise.all([
       db
         .prepare(
           "SELECT COALESCE(SUM(calories),0) AS calories, COALESCE(SUM(protein_g),0) AS protein, COALESCE(SUM(carbs_g),0) AS carbs, COALESCE(SUM(fat_g),0) AS fat FROM food_entries WHERE client_id = ? AND date_local = ?",
@@ -565,6 +566,18 @@ export const logRoutes = new Hono<AppEnv>()
         .prepare("SELECT id, name, status, published_at, body_json FROM workout_plans WHERE client_id = ? AND status = 'published' LIMIT 1")
         .bind(clientId)
         .all<{ id: string; name: string; status: string; published_at: string; body_json: string | null }>(),
+      db
+        .prepare("SELECT date_local FROM check_ins WHERE client_id = ? ORDER BY date_local DESC LIMIT 30")
+        .bind(clientId)
+        .all<{ date_local: string }>(),
+      db
+        .prepare("SELECT COUNT(*) AS n FROM lab_tests WHERE client_id = ? AND status IN ('requested','scheduled')")
+        .bind(clientId)
+        .first<{ n: number }>(),
+      db
+        .prepare("SELECT weight_kg, date_local FROM measurements WHERE client_id = ? AND weight_kg IS NOT NULL ORDER BY date_local DESC LIMIT 30")
+        .bind(clientId)
+        .all<{ weight_kg: number; date_local: string }>(),
     ]);
 
     const workoutSets = (workout.results ?? []).reduce((n, row) => {
@@ -596,5 +609,8 @@ export const logRoutes = new Hono<AppEnv>()
             body: parseJson(plans.results![0]!.body_json, { days: [] }),
           }
         : null,
+      checkInDates: (checkInDates.results ?? []).map((r) => r.date_local),
+      pendingLabs: pendingLabs?.n ?? 0,
+      weightSeries: (weights.results ?? []).map((r) => ({ kg: r.weight_kg, date: r.date_local })).reverse(),
     });
   });

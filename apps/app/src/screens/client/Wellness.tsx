@@ -35,10 +35,19 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack: () =>
     const r = await api.post<{ taken: boolean }>(`/api/supplements/${id}/log`, { clientId, date, slot });
     setTaken((p) => { const n = new Set(p); r.taken ? n.add(key) : n.delete(key); return n; });
   };
-  const toggleFast = async () => { await api.post("/api/fasting", { clientId, data: { action: fast?.activeFast ? "end" : "start", targetHours: 16 } }); await load(); };
+  const [fastTarget, setFastTarget] = useState(16);
+  const toggleFast = async () => { await api.post("/api/fasting", { clientId, data: { action: fast?.activeFast ? "end" : "start", targetHours: fastTarget } }); await load(); };
 
   if (loading) return <Skeleton className="m-4 h-96" />;
   const fastElapsed = fast?.activeFast ? Math.floor((Date.now() - Date.parse(fast.activeFast.started_at)) / 60000) : 0;
+  const fastHours = fastElapsed / 60;
+  const ZONES = [
+    { label: "Fed", max: 4, tone: "nutrition" as const },
+    { label: "Catabolic", max: 16, tone: "cardio" as const },
+    { label: "Fat burning", max: 24, tone: "activity" as const },
+    { label: "Ketosis", max: 72, tone: "sleep" as const },
+  ];
+  const zone = ZONES.find((z) => fastHours < z.max) ?? ZONES[ZONES.length - 1]!;
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
@@ -58,12 +67,32 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack: () =>
       </Stagger>
 
       <Stagger>
-        <Card>
+        <Card className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5"><IconBadge icon={Timer} tone="sleep" size="sm" /><h2 className="font-semibold">Fasting</h2></div>
-            {fast?.activeFast ? <Badge tone="sleep">{Math.floor(fastElapsed / 60)}h {fastElapsed % 60}m</Badge> : <Badge tone="neutral">Not fasting</Badge>}
+            {fast?.activeFast ? <Badge tone={zone.tone}>{Math.floor(fastElapsed / 60)}h {fastElapsed % 60}m · {zone.label}</Badge> : <Badge tone="neutral">Not fasting</Badge>}
           </div>
-          <Button className="mt-3 w-full" variant={fast?.activeFast ? "outline" : "tonal"} onClick={() => void toggleFast()}>{fast?.activeFast ? "End fast" : "Start 16h fast"}</Button>
+          {fast?.activeFast ? (
+            <>
+              <div className="h-2.5 overflow-hidden rounded-full bg-surface-2">
+                <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, (fastHours / fast.activeFast.target_hours) * 100)}%` }} />
+              </div>
+              <div className="text-xs text-muted-foreground">Target {fast.activeFast.target_hours}h · {zone.label} zone</div>
+            </>
+          ) : (
+            <div className="flex flex-wrap gap-2">{[16, 18, 20, 24].map((h) => <Chip key={h} selected={fastTarget === h} onClick={() => setFastTarget(h)}>{h}h</Chip>)}</div>
+          )}
+          <Button className="w-full" variant={fast?.activeFast ? "outline" : "tonal"} onClick={() => void toggleFast()}>{fast?.activeFast ? "End fast" : `Start ${fastTarget}h fast`}</Button>
+          {(fast?.recentFasts.length ?? 0) > 0 && (
+            <div className="space-y-1.5 pt-1">
+              {fast!.recentFasts.slice(0, 3).map((r, i) => (
+                <div key={i} className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{Math.floor(r.duration_minutes / 60)}h {r.duration_minutes % 60}m</span>
+                  {r.duration_minutes >= r.target_hours * 60 ? <Badge tone="success">Goal met</Badge> : <span>target {r.target_hours}h</span>}
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
       </Stagger>
 
@@ -91,9 +120,15 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack: () =>
           <Card className="space-y-3">
             <div className="flex items-center gap-2.5"><IconBadge icon={FlaskConical} tone="cardio" size="sm" /><h2 className="font-semibold">Lab tests</h2></div>
             {labs.map((l) => (
-              <div key={l.id} className="flex items-center justify-between">
-                <div><div>{l.display_name}</div>{l.due_by && <div className="text-xs text-muted-foreground">Due {new Date(l.due_by).toLocaleDateString()}</div>}</div>
-                <Badge tone={l.status === "reviewed" ? "success" : l.status === "uploaded" ? "cardio" : "warning"}>{l.status}</Badge>
+              <div key={l.id} className="flex items-center justify-between gap-2">
+                <div className="min-w-0"><div className="truncate">{l.display_name}</div>{l.due_by && <div className="text-xs text-muted-foreground">Due {new Date(l.due_by).toLocaleDateString()}</div>}</div>
+                {l.status === "requested" || l.status === "scheduled" ? (
+                  <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-primary/15 px-3 text-xs font-medium text-primary [&_svg]:size-3.5"><FlaskConical /> Upload
+                    <input type="file" accept="image/*,application/pdf" className="hidden" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; const fd = new FormData(); fd.append("file", file); fd.append("purpose", "lab"); const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd }); const { key } = (await up.json()) as { key?: string }; if (key) { await api.post(`/api/labs/${l.id}/upload`, { clientId, fileKey: key }); await load(); } }} />
+                  </label>
+                ) : (
+                  <Badge tone={l.status === "reviewed" ? "success" : l.status === "uploaded" ? "cardio" : "warning"}>{l.status}</Badge>
+                )}
               </div>
             ))}
           </Card>
