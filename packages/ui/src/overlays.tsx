@@ -14,7 +14,7 @@ import { Drawer } from "vaul";
 import { motion } from "motion/react";
 import { Check, ChevronDown, X } from "./lib/icons.js";
 import { cn } from "./lib/utils.js";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 const overlayCls =
   "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm data-[state=open]:animate-[overlay-in_0.2s_ease] data-[state=closed]:animate-[overlay-out_0.15s_ease]";
@@ -137,6 +137,9 @@ export const TabsContent = TabsPrimitive.Content;
 
 /** Segmented control with a sliding motion indicator. */
 export function SegmentedControl<T extends string>({ options, value, onChange, className }: { options: { value: T; label: ReactNode }[]; value: T; onChange: (v: T) => void; className?: string }) {
+  // Unique per instance — otherwise Framer's shared layout animates the pill
+  // BETWEEN separate controls on the same screen.
+  const layoutId = useId();
   return (
     <div className={cn("inline-flex items-center gap-1 rounded-full bg-secondary p-1", className)}>
       {options.map((o) => (
@@ -145,7 +148,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
           onClick={() => onChange(o.value)}
           className={cn("relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors", value === o.value ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
         >
-          {value === o.value && <motion.span layoutId="segmented-indicator" transition={{ type: "spring", stiffness: 380, damping: 32 }} className="absolute inset-0 rounded-full bg-primary" />}
+          {value === o.value && <motion.span layoutId={`seg-${layoutId}`} transition={{ type: "spring", stiffness: 380, damping: 32 }} className="absolute inset-0 rounded-full bg-primary" />}
           <span className="relative z-10">{o.label}</span>
         </button>
       ))}
