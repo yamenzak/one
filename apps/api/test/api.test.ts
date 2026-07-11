@@ -65,6 +65,13 @@ const auth = (cookies: string) => ({ Cookie: cookies, origin: ORIGIN });
 
 beforeAll(async () => {
   await ensureSchema(env.DB as D1Database);
+  // Force the AI mock lane. The wrangler.jsonc AI binding is present (for
+  // prod), so env.AI is truthy in Miniflare — but its .run() needs real
+  // Cloudflare auth. `ai.mock = on` makes generate() always use the mock so
+  // the metering path is exercised without a live model.
+  await (env.DB as D1Database)
+    .prepare("INSERT INTO app_config (key, value) VALUES ('ai.mock', 'on') ON CONFLICT(key) DO UPDATE SET value = 'on'")
+    .run();
   ownerCookie = await signInFlow("owner1@test.dev", "Studio One");
   otherCookie = await signInFlow("owner2@test.dev", "Studio Two");
 });
