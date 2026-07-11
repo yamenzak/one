@@ -25,6 +25,13 @@ describe("workout math", () => {
     // Same weight again: no re-fire.
     expect(detectPrs(bests, { weightKg: 102.5, reps: 5 }).broke).toEqual([]);
     expect(detectPrs(bests, { reps: 9 }).broke).toEqual(["reps"]);
+    // Duration (time-measured exercises like planks): first hold sets the bar,
+    // a longer hold breaks it, an equal/shorter one doesn't.
+    const d1 = detectPrs({ prWeightKg: null, prReps: null, prDurationSeconds: null, bestE1Rm: null }, { durationSeconds: 45, completed: true });
+    expect(d1.broke).toEqual(["duration"]);
+    expect(d1.bests.prDurationSeconds).toBe(45);
+    expect(detectPrs(d1.bests, { durationSeconds: 45 }).broke).toEqual([]);
+    expect(detectPrs(d1.bests, { durationSeconds: 60 }).broke).toEqual(["duration"]);
   });
 
   it("tonnage sums reps × kg over completed sets only", () => {

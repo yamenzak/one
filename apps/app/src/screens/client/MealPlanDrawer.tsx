@@ -51,11 +51,14 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   const [view, setView] = useState<"options" | "grocery">("options");
   const [counts, setCounts] = useState<Record<number, number>>({});
   const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const [openType, setOpenType] = useState<string | null>(null);
   const units = useUnits();
 
   const load = useCallback(async () => {
     const [pl, f] = await Promise.all([api.get<{ plans: Plan[] }>(`/api/meal-plans?clientId=${clientId}`), api.get<{ foods: FoodRow[] }>("/api/foods")]);
-    setPlan(pl.plans.find((p) => p.status === "published") ?? null);
+    const published = pl.plans.find((p) => p.status === "published") ?? null;
+    setPlan(published);
+    setOpenType(published?.body.mealOptions?.[0]?.mealType ?? null); // first meal type expanded
     setFoods(new Map(f.foods.map((x) => [x.id, x])));
   }, [clientId]);
   useEffect(() => void load(), [load]);
@@ -136,12 +139,13 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
           {view === "options" ? (
             groups.length === 0 ? <EmptyState icon={Utensils} title="No options yet" /> : groups.map(([type, opts]) => (
               <div key={type} className="space-y-1.5">
-                <div className="flex items-center gap-2 px-1">
+                <button onClick={() => setOpenType(openType === type ? null : type)} className="flex w-full items-center gap-2 px-1 text-left">
                   <span className="grid size-6 place-items-center rounded-lg bg-nutrition-soft text-nutrition [&_svg]:size-3.5"><Utensils /></span>
                   <span className="text-sm font-semibold">{mealLabel(type)}</span>
                   <span className="text-xs text-muted-foreground">{opts.length} option{opts.length === 1 ? "" : "s"}</span>
-                </div>
-                {opts.map(({ opt, index }) => {
+                  <ChevronDown className={cn("ml-auto size-4 shrink-0 text-muted-foreground transition-transform", openType === type && "rotate-180")} />
+                </button>
+                {openType === type && opts.map(({ opt, index }) => {
                   const t = optionMacroTotals(opt, foodMap);
                   const mi = microTotals(opt);
                   const microRows: [string, number, string][] = [

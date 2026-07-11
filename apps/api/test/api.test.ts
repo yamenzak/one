@@ -402,6 +402,36 @@ describe("weekly nutrition strip (Eat tab)", () => {
   });
 });
 
+describe("workout logging — measurement modes (SPEC §8.3)", () => {
+  it("persists reps, time, and distance sets and reads them back per slot", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", {
+      method: "POST", headers: H, body: JSON.stringify({ displayName: "WorkoutMeasure" }),
+    })).json()) as { client: { id: string } };
+    const base = { date: "2026-07-11", workoutPlanId: "wp-measure", planDayIndex: 0 };
+    const log = (data: Record<string, unknown>) => SELF.fetch("http://x/api/logs/workout-sets", {
+      method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { ...base, ...data } }),
+    });
+    // Slot 0 — reps + weight; slot 1 — time hold; slot 2 — distance.
+    expect((await log({ blockIndex: 0, slotIndex: 0, exerciseId: "ex-squat", sets: [{ setIndex: 0, reps: 8, weightKg: 60, completed: true }] })).status).toBe(200);
+    expect((await log({ blockIndex: 0, slotIndex: 1, exerciseId: "ex-plank", sets: [{ setIndex: 0, durationSeconds: 45, completed: true }] })).status).toBe(200);
+    expect((await log({ blockIndex: 0, slotIndex: 2, exerciseId: "ex-row", sets: [{ setIndex: 0, distanceM: 500, completed: true }] })).status).toBe(200);
+
+    const back = (await (await SELF.fetch(`http://x/api/logs/workout-sessions?clientId=${client.id}&from=2026-07-11&to=2026-07-11`, { headers: auth(ownerCookie) })).json()) as {
+      sessions: { entries: { slotIndex: number; exerciseId: string; sets: { reps?: number; weightKg?: number; durationSeconds?: number; distanceM?: number }[] }[] }[];
+    };
+    expect(back.sessions.length).toBe(1);
+    const entries = back.sessions[0]!.entries;
+    const bySlot = new Map(entries.map((e) => [e.slotIndex, e]));
+    expect(bySlot.get(0)!.sets[0]).toMatchObject({ reps: 8, weightKg: 60 });
+    expect(bySlot.get(1)!.sets[0]!.durationSeconds).toBe(45);
+    expect(bySlot.get(1)!.sets[0]!.reps ?? null).toBeNull();
+    expect(bySlot.get(2)!.sets[0]!.distanceM).toBe(500);
+    // Tenant isolation on the read.
+    expect((await SELF.fetch(`http://x/api/logs/workout-sessions?clientId=${client.id}&from=2026-07-11&to=2026-07-11`, { headers: auth(otherCookie) })).status).toBe(404);
+  });
+});
+
 describe("exercise swaps + alternatives (SPEC §8.3)", () => {
   it("bound alternatives auto-apply; open requests wait for the coach's pick", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

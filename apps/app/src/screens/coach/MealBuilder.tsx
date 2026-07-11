@@ -76,7 +76,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
           <Card key={type} className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold capitalize">{type.replace("_", " ")}</h2>
-              <button onClick={() => mutate((d) => d.push({ mealType: type, mealName: "", isFree: false, foods: [] }))} className="text-sm font-medium text-primary">+ Option</button>
+              <button onClick={() => mutate((d) => d.push({ mealType: type, mealName: `Option ${opts.length + 1}`, isFree: false, foods: [] }))} className="text-sm font-medium text-primary">+ Option</button>
             </div>
             {opts.length === 0 && <p className="text-sm text-muted-foreground">No options yet.</p>}
             {opts.map(({ opt, idx }) => {

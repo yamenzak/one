@@ -16,7 +16,7 @@ import { useUnits } from "../../units.js";
 import { ExerciseThumb, ExerciseMeta, splitList, pretty, type ExerciseInfo } from "../exercise.js";
 
 interface PublishedPlan { id: string; name: string; body: WorkoutBody }
-interface LoggedSet { setIndex: number; reps?: number | null; weightKg?: number | null; durationSeconds?: number | null; effortLabel?: "easy" | "perfect" | "hard" | null; completed: boolean }
+interface LoggedSet { setIndex: number; reps?: number | null; weightKg?: number | null; durationSeconds?: number | null; distanceM?: number | null; effortLabel?: "easy" | "perfect" | "hard" | null; completed: boolean }
 interface SessionEntry { blockIndex: number; slotIndex: number; exerciseId: string; sets: LoggedSet[] }
 type ExerciseLite = ExerciseInfo;
 
@@ -107,6 +107,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
     const { bests: nb, broke } = detectPrs(b, set);
     setBests(new Map(bests).set(exerciseId, nb));
     if (broke.includes("weight")) { setToast(`New weight PR — ${fmtWeight(set.weightKg, units)}`); navigator.vibrate?.([30, 40, 60]); setTimeout(() => setToast(null), 3000); }
+    else if (broke.includes("duration")) { setToast(`Time PR — ${fmtDuration(set.durationSeconds!)}`); navigator.vibrate?.([30, 40, 60]); setTimeout(() => setToast(null), 3000); }
     else if (broke.includes("reps")) { setToast(`Rep PR — ${set.reps} reps`); setTimeout(() => setToast(null), 3000); }
   };
 
@@ -130,6 +131,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
       const { bests: nb, broke } = detectPrs(b, e.set);
       nextBests.set(e.exerciseId, nb);
       if (broke.includes("weight")) pr = `New weight PR — ${fmtWeight(e.set.weightKg, units)}`;
+      else if (!pr && broke.includes("duration")) pr = `Time PR — ${fmtDuration(e.set.durationSeconds!)}`;
       else if (!pr && broke.includes("reps")) pr = `Rep PR — ${e.set.reps} reps`;
     }
     setBests(nextBests);
@@ -189,7 +191,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                     <ExerciseThumb thumb={ex?.thumb_url} size={44} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1 truncate font-medium">{ex?.name ?? "Exercise"}<Info className="size-3.5 shrink-0 text-muted-foreground" /></div>
-                      <div className="text-sm text-muted-foreground">{ex ? <ExerciseMeta ex={ex} className="after:mx-1 after:content-['·']" /> : null}{slot.sets[0]?.reps ? `${slot.sets[0].reps} reps` : slot.measurementMode}</div>
+                      <div className="text-sm text-muted-foreground">{ex ? <ExerciseMeta ex={ex} className="after:mx-1 after:content-['·']" /> : null}{measureSummary(slot)}</div>
                     </div>
                   </button>
                   <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
@@ -230,10 +232,8 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
 function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: ExerciseSlot; onClose: () => void }) {
   const units = useUnits();
   const chips = [...splitList(ex?.muscle_groups), ...splitList(ex?.equipment)].map(pretty);
-  const measure = slot.measurementMode === "reps" ? "reps" : slot.measurementMode === "time" ? "sec" : slot.measurementMode;
   const setLine = (s: WorkoutSet, i: number): string => {
-    const parts: string[] = [];
-    parts.push(s.reps != null ? `${s.reps} ${measure}` : measure);
+    const parts: string[] = [measurePart(s, slot.measurementMode)];
     const wm = s.weightMode;
     if (wm === "absolute" && s.weightValue != null) parts.push(`${fmtWeight(s.weightValue, units)}`);
     else if (wm === "percent_1rm" && s.percent1rm != null) parts.push(`${s.percent1rm}% 1RM`);
@@ -284,13 +284,17 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
 
 function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: ExerciseSlot; exerciseName: string; logged: LoggedSet[]; onClose: () => void; onSave: (s: LoggedSet) => Promise<void> }) {
   const units = useUnits();
+  const mode = slot.measurementMode;
   const completed = logged.filter((s) => s.completed).sort((a, b) => a.setIndex - b.setIndex);
   const [setIndex, setSetIndex] = useState(completed.length);
   const [reps, setReps] = useState("");
+  const [duration, setDuration] = useState("");
+  const [distance, setDistance] = useState("");
   const [weight, setWeight] = useState("");
   const [effort, setEffort] = useState<"easy" | "perfect" | "hard" | null>(null);
   const [restLeft, setRestLeft] = useState<number | null>(null);
   const prescribed = slot.sets[Math.min(setIndex, slot.sets.length - 1)];
+  const showWeight = prescribed?.weightMode !== "bodyweight";
   const editing = completed.some((s) => s.setIndex === setIndex);
 
   useEffect(() => {
@@ -303,6 +307,8 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
   const edit = (s: LoggedSet) => {
     setSetIndex(s.setIndex);
     setReps(s.reps != null ? String(s.reps) : "");
+    setDuration(s.durationSeconds != null ? String(s.durationSeconds) : "");
+    setDistance(s.distanceM != null ? String(s.distanceM) : "");
     setWeight(s.weightKg != null ? String(kgToDisplay(s.weightKg, units)) : "");
     setEffort(s.effortLabel ?? null);
     setRestLeft(null);
@@ -310,13 +316,22 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
 
   const save = async () => {
     const wasEditing = editing;
-    await onSave({ setIndex, reps: reps ? Number(reps) : prescribed?.reps ?? null, weightKg: weight ? Math.round(displayToKg(Number(weight), units) * 100) / 100 : null, effortLabel: effort, completed: true });
-    setReps(""); setWeight(""); setEffort(null);
+    await onSave({
+      setIndex,
+      reps: needsReps(mode) ? (reps ? Number(reps) : prescribed?.reps ?? null) : null,
+      durationSeconds: needsDuration(mode) ? (duration ? Number(duration) : prescribed?.timeSec ?? null) : null,
+      distanceM: needsDistance(mode) ? (distance ? Number(distance) : prescribed?.distanceM ?? null) : null,
+      weightKg: showWeight && weight ? Math.round(displayToKg(Number(weight), units) * 100) / 100 : null,
+      effortLabel: effort,
+      completed: true,
+    });
+    setReps(""); setDuration(""); setDistance(""); setWeight(""); setEffort(null);
     if (wasEditing) { setSetIndex(completed.length); setRestLeft(null); }
     else { setSetIndex((i) => i + 1); setRestLeft(prescribed?.restAfterSec ?? 60); }
   };
 
   const canLog = editing || setIndex < slot.sets.length;
+  const target = prescribed ? measurePart(prescribed, mode) : "";
 
   return (
     <Sheet open onClose={onClose} title={exerciseName}>
@@ -325,18 +340,20 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
           <div className="flex flex-wrap gap-1.5">
             {completed.map((s) => (
               <button key={s.setIndex} onClick={() => edit(s)} className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${s.setIndex === setIndex ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:bg-surface-3"}`}>
-                {s.reps ?? "–"}{s.weightKg != null ? ` · ${fmtWeight(s.weightKg, units)}` : ""}
+                {loggedLabel(s, units)}
               </button>
             ))}
           </div>
         )}
-        <div className="text-sm text-muted-foreground">{editing ? `Editing set ${setIndex + 1}` : `Set ${setIndex + 1} of ${slot.sets.length}`}{prescribed?.reps ? ` · target ${prescribed.reps} reps` : ""}</div>
+        <div className="text-sm text-muted-foreground">{editing ? `Editing set ${setIndex + 1}` : `Set ${setIndex + 1} of ${slot.sets.length}`}{target ? ` · target ${target}` : ""}</div>
         {restLeft !== null && restLeft > 0 && (
           <div className="flex items-center justify-center gap-2 rounded-2xl bg-cardio-soft px-4 py-3 font-semibold text-cardio"><Timer className="size-4" /> Rest {restLeft}s</div>
         )}
-        <div className="flex gap-3">
-          <Field label="Reps" inputMode="numeric" value={reps} onChange={(e) => setReps(e.target.value.replace(/\D/g, ""))} className="flex-1" />
-          <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={weight} onChange={(e) => setWeight(e.target.value)} className="flex-1" />
+        <div className="grid grid-cols-2 gap-3">
+          {needsReps(mode) && <Field label="Reps" inputMode="numeric" value={reps} onChange={(e) => setReps(e.target.value.replace(/\D/g, ""))} />}
+          {needsDuration(mode) && <Field label="Duration (sec)" inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value.replace(/\D/g, ""))} />}
+          {needsDistance(mode) && <Field label="Distance (m)" inputMode="numeric" value={distance} onChange={(e) => setDistance(e.target.value.replace(/\D/g, ""))} />}
+          {showWeight && <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={weight} onChange={(e) => setWeight(e.target.value)} />}
         </div>
         <div>
           <div className="mb-2 text-sm text-muted-foreground">How did it feel?</div>
@@ -354,25 +371,30 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
 
 /** Round-grouped logging for supersets/circuits/HIIT: one set of every exercise. */
 function RoundLogDrawer({ block, roundIndex, exercises, onClose, onSave }: { block: WorkoutBlock; roundIndex: number; exercises: Map<string, ExerciseLite>; onClose: () => void; onSave: (entries: { slotIndex: number; exerciseId: string; set: LoggedSet }[]) => Promise<void> }) {
-  const [vals, setVals] = useState<Record<number, { reps: string; weight: string }>>({});
+  type Vals = { reps: string; duration: string; distance: string; weight: string };
+  const [vals, setVals] = useState<Record<number, Vals>>({});
   const [busy, setBusy] = useState(false);
   const units = useUnits();
   const rounds = block.rounds ?? 1;
-  const setV = (si: number, patch: Partial<{ reps: string; weight: string }>) => setVals((v) => ({ ...v, [si]: { reps: "", weight: "", ...v[si], ...patch } }));
+  const setV = (si: number, patch: Partial<Vals>) => setVals((v) => ({ ...v, [si]: { reps: "", duration: "", distance: "", weight: "", ...v[si], ...patch } }));
 
   const save = async () => {
     setBusy(true);
     try {
       const entries = block.slots.map((slot, si) => {
+        const mode = slot.measurementMode;
         const prescribed = slot.sets[Math.min(roundIndex, slot.sets.length - 1)];
-        const v = vals[si] ?? { reps: "", weight: "" };
+        const v = vals[si] ?? { reps: "", duration: "", distance: "", weight: "" };
+        const showWeight = prescribed?.weightMode !== "bodyweight";
         return {
           slotIndex: si,
           exerciseId: slot.exerciseId,
           set: {
             setIndex: roundIndex,
-            reps: v.reps ? Number(v.reps) : prescribed?.reps ?? null,
-            weightKg: v.weight ? Math.round(displayToKg(Number(v.weight), units) * 100) / 100 : null,
+            reps: needsReps(mode) ? (v.reps ? Number(v.reps) : prescribed?.reps ?? null) : null,
+            durationSeconds: needsDuration(mode) ? (v.duration ? Number(v.duration) : prescribed?.timeSec ?? null) : null,
+            distanceM: needsDistance(mode) ? (v.distance ? Number(v.distance) : prescribed?.distanceM ?? null) : null,
+            weightKg: showWeight && v.weight ? Math.round(displayToKg(Number(v.weight), units) * 100) / 100 : null,
             effortLabel: null,
             completed: true,
           } as LoggedSet,
@@ -388,18 +410,23 @@ function RoundLogDrawer({ block, roundIndex, exercises, onClose, onSave }: { blo
       <div className="space-y-3">
         <div className="text-sm text-muted-foreground">Log one set of each — then rest and come back for the next round.</div>
         {block.slots.map((slot, si) => {
+          const mode = slot.measurementMode;
           const prescribed = slot.sets[Math.min(roundIndex, slot.sets.length - 1)];
-          const v = vals[si] ?? { reps: "", weight: "" };
+          const showWeight = prescribed?.weightMode !== "bodyweight";
+          const v = vals[si] ?? { reps: "", duration: "", distance: "", weight: "" };
+          const target = prescribed ? measurePart(prescribed, mode) : "";
           return (
             <SubCard key={si} className="space-y-2">
               <div className="flex items-center gap-2.5">
                 <ExerciseThumb thumb={exercises.get(slot.exerciseId)?.thumb_url} size={36} />
                 <div className="min-w-0 flex-1 truncate font-medium">{exercises.get(slot.exerciseId)?.name ?? "Exercise"}</div>
-                {prescribed?.reps ? <span className="shrink-0 text-xs text-muted-foreground">target {prescribed.reps} reps</span> : null}
+                {target ? <span className="shrink-0 text-xs text-muted-foreground">target {target}</span> : null}
               </div>
-              <div className="flex gap-3">
-                <Field label="Reps" inputMode="numeric" value={v.reps} onChange={(e) => setV(si, { reps: e.target.value.replace(/\D/g, "") })} className="flex-1" />
-                <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={v.weight} onChange={(e) => setV(si, { weight: e.target.value })} className="flex-1" />
+              <div className="grid grid-cols-2 gap-3">
+                {needsReps(mode) && <Field label="Reps" inputMode="numeric" value={v.reps} onChange={(e) => setV(si, { reps: e.target.value.replace(/\D/g, "") })} />}
+                {needsDuration(mode) && <Field label="Duration (sec)" inputMode="numeric" value={v.duration} onChange={(e) => setV(si, { duration: e.target.value.replace(/\D/g, "") })} />}
+                {needsDistance(mode) && <Field label="Distance (m)" inputMode="numeric" value={v.distance} onChange={(e) => setV(si, { distance: e.target.value.replace(/\D/g, "") })} />}
+                {showWeight && <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={v.weight} onChange={(e) => setV(si, { weight: e.target.value })} />}
               </div>
             </SubCard>
           );
@@ -470,6 +497,45 @@ function countSets(day: WorkoutDay): number {
   let n = 0;
   for (const block of day.blocks) { const rounds = block.type === "single" ? 1 : block.rounds ?? 1; for (const slot of block.slots) n += slot.sets.length * rounds; }
   return n;
+}
+
+// ── Measurement-mode helpers: the plan can measure a set by reps, time,
+//    distance, or reps-in-time — the UI reads/writes only the relevant fields.
+type MeasureMode = ExerciseSlot["measurementMode"];
+const needsReps = (m: MeasureMode) => m === "reps" || m === "reps_in_time";
+const needsDuration = (m: MeasureMode) => m === "time" || m === "reps_in_time";
+const needsDistance = (m: MeasureMode) => m === "distance";
+
+/** Seconds → "45s" or "1:30". */
+function fmtDuration(sec: number): string {
+  if (sec < 60) return `${sec}s`;
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+}
+
+/** The prescribed measure for a set, e.g. "10 reps", "30s", "500 m", "20 reps in 60s". */
+function measurePart(s: WorkoutSet, mode: MeasureMode): string {
+  const bits: string[] = [];
+  if (needsReps(mode)) bits.push(s.reps != null ? `${s.reps} reps` : "reps");
+  if (needsDuration(mode)) bits.push(s.timeSec != null ? fmtDuration(s.timeSec) : "time");
+  if (needsDistance(mode)) bits.push(s.distanceM != null ? `${s.distanceM} m` : "distance");
+  return bits.join(" in ");
+}
+
+/** Short slot prescription, e.g. "3 × 10 reps" / "4 × 30s" / "3 × 500 m". */
+function measureSummary(slot: ExerciseSlot): string {
+  const first = slot.sets[0];
+  if (!first) return needsDistance(slot.measurementMode) ? "distance" : needsDuration(slot.measurementMode) ? "time" : "reps";
+  return `${slot.sets.length} × ${measurePart(first, slot.measurementMode)}`;
+}
+
+/** What a logged set reads back as, e.g. "10 · 60 kg" / "45s" / "500m". */
+function loggedLabel(s: LoggedSet, units: Parameters<typeof fmtWeight>[1]): string {
+  const bits: string[] = [];
+  if (s.reps != null) bits.push(`${s.reps}`);
+  if (s.durationSeconds != null) bits.push(fmtDuration(s.durationSeconds));
+  if (s.distanceM != null) bits.push(`${s.distanceM}m`);
+  const measure = bits.join(" × ") || "–";
+  return s.weightKg != null ? `${measure} · ${fmtWeight(s.weightKg, units)}` : measure;
 }
 function blockLabel(type: string): string {
   return type === "single" ? "Exercise" : type === "hiit" ? "HIIT" : type[0]!.toUpperCase() + type.slice(1);

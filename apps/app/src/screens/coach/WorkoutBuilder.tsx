@@ -29,8 +29,19 @@ const MEASURE_MODES: { value: MeasurementMode; label: string }[] = [
 ];
 const SET_TYPES = ["warmup", "working", "amrap"] as const;
 
-const emptySet = (): WorkoutSet => ({ setType: "working", weightMode: "unspecified", restAfterSec: 90, reps: 10 });
-const emptySlot = (exerciseId: string): ExerciseSlot => ({ exerciseId, measurementMode: "reps", sets: [emptySet(), emptySet(), emptySet()] });
+const emptySetFor = (mode: MeasurementMode): WorkoutSet => ({
+  setType: "working", weightMode: "unspecified", restAfterSec: 90,
+  reps: mode === "reps" || mode === "reps_in_time" ? 10 : null,
+});
+const emptySlot = (exerciseId: string): ExerciseSlot => ({ exerciseId, measurementMode: "reps", sets: [emptySetFor("reps"), emptySetFor("reps"), emptySetFor("reps")] });
+
+/** Drop the measure fields that don't apply to a mode, so a set never carries
+ *  stale reps/time/distance after the coach switches how it's measured. */
+function normalizeSetForMode(set: WorkoutSet, mode: MeasurementMode): void {
+  if (mode !== "reps" && mode !== "reps_in_time") set.reps = null;
+  if (mode !== "time" && mode !== "reps_in_time") set.timeSec = null;
+  if (mode !== "distance") set.distanceM = null;
+}
 const emptyBlock = (): WorkoutBlock => ({ type: "single", slots: [] });
 const emptyDay = (name: string): WorkoutDay => ({ name, isRestDay: false, blocks: [] });
 const inputCls = "rounded-lg bg-surface-3 px-2.5 py-1.5 text-sm outline-none ring-ring focus:ring-2";
@@ -139,7 +150,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                   <div className="flex items-center gap-2">
                     <ExerciseThumb thumb={exOf(slot.exerciseId)?.thumb_url} size={34} />
                     <span className="min-w-0 flex-1 truncate font-medium">{nameOf(slot.exerciseId)}</span>
-                    <select value={slot.measurementMode} onChange={(e) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.measurementMode = e.target.value as MeasurementMode))} className="rounded-lg bg-surface-3 px-2 py-1 text-xs outline-none">{MEASURE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select>
+                    <select value={slot.measurementMode} onChange={(e) => { const nm = e.target.value as MeasurementMode; mutate((d) => { const sl = d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!; sl.measurementMode = nm; sl.sets.forEach((s) => normalizeSetForMode(s, nm)); }); }} className="rounded-lg bg-surface-3 px-2 py-1 text-xs outline-none">{MEASURE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select>
                     <button onClick={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots.splice(slotIdx, 1))} className="text-muted-foreground hover:text-danger [&_svg]:size-4"><X /></button>
                   </div>
                   {slot.sets.map((set, setIdx) => (
@@ -147,7 +158,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                       onPatch={(p) => mutate((d) => Object.assign(d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.sets[setIdx]!, p))}
                       onRemove={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.sets.splice(setIdx, 1))} />
                   ))}
-                  <button onClick={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.sets.push(emptySet()))} className="text-xs font-medium text-primary">+ Set</button>
+                  <button onClick={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.sets.push(emptySetFor(slot.measurementMode)))} className="text-xs font-medium text-primary">+ Set</button>
                 </SubCard>
               ))}
               <button onClick={() => setPicker({ blockIdx })} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-secondary py-2.5 text-sm text-muted-foreground [&_svg]:size-4"><Plus /> Add exercise</button>
@@ -214,11 +225,13 @@ function SetRow({ set, index, mode, onPatch, onRemove }: { set: WorkoutSet; inde
       <div className="flex items-center gap-1.5 text-sm">
         <button onClick={() => setOpen((o) => !o)} className="w-6 shrink-0 text-muted-foreground"><ChevronRight className={`size-3.5 transition-transform ${open ? "rotate-90" : ""}`} /></button>
         <span className="w-4 shrink-0 text-xs text-muted-foreground">{index + 1}</span>
-        {mode === "reps" || mode === "reps_in_time" ? (
+        {(mode === "reps" || mode === "reps_in_time") && (
           <input type="number" placeholder="reps" value={set.reps ?? ""} onChange={(e) => onPatch({ reps: num(e.target.value) })} className={`${inputCls} w-14`} />
-        ) : mode === "time" ? (
+        )}
+        {(mode === "time" || mode === "reps_in_time") && (
           <input type="number" placeholder="sec" value={set.timeSec ?? ""} onChange={(e) => onPatch({ timeSec: num(e.target.value) })} className={`${inputCls} w-14`} />
-        ) : (
+        )}
+        {mode === "distance" && (
           <input type="number" placeholder="m" value={set.distanceM ?? ""} onChange={(e) => onPatch({ distanceM: num(e.target.value) })} className={`${inputCls} w-14`} />
         )}
         <select value={set.weightMode} onChange={(e) => onPatch({ weightMode: e.target.value as WeightMode })} className={`${inputCls} min-w-0 flex-1`}>{WEIGHT_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select>
