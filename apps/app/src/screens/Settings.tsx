@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Button, Card, Badge, SettingsList, Page, Stagger, BRAND_PRESETS, KeyRound, Moon, Sun, LogOut, Palette, Check, ArrowLeft, type Branding } from "@mossa/ui";
+import { Button, Card, Badge, Switch, Skeleton, SettingsList, Page, Stagger, BRAND_PRESETS, KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Check, ArrowLeft, type Branding } from "@mossa/ui";
 import { useSession } from "../session.js";
 import { useTheme } from "../theme.js";
 import { api } from "../api.js";
@@ -63,6 +63,12 @@ export function Settings({ onBack }: { onBack: () => void }) {
         </Stagger>
       )}
 
+      {isOwner && (
+        <Stagger>
+          <StudioControls />
+        </Stagger>
+      )}
+
       <Stagger>
         <SettingsList
           sections={[
@@ -72,6 +78,60 @@ export function Settings({ onBack }: { onBack: () => void }) {
         />
       </Stagger>
     </Page>
+  );
+}
+
+const AI_FEATURES: { key: string; label: string; hint: string }[] = [
+  { key: "draft-plan", label: "AI workout drafts", hint: "Draft a plan from client intake" },
+  { key: "draft-meal", label: "AI meal drafts", hint: "Draft meal options from targets" },
+  { key: "narrative", label: "Progress recaps", hint: "Readable summaries for clients" },
+  { key: "summarize-checkins", label: "Check-in summaries", hint: "Digest recent check-ins" },
+  { key: "snap-meal", label: "Snap-a-meal", hint: "Estimate macros from a photo" },
+  { key: "nl-log", label: "Natural-language logging", hint: "Type meals in plain English" },
+];
+
+function StudioControls() {
+  const [aiToggles, setAiToggles] = useState<Record<string, boolean> | null>(null);
+  const [marketplace, setMarketplace] = useState<{ enabled?: boolean; selfRegister?: boolean }>({});
+  const [aiSuite, setAiSuite] = useState(false);
+
+  useEffect(() => {
+    void api.get<{ aiToggles: Record<string, boolean>; marketplace: { enabled?: boolean; selfRegister?: boolean }; entitlements: { features: { aiSuite?: boolean } } }>("/api/settings").then((r) => {
+      setAiToggles(r.aiToggles ?? {}); setMarketplace(r.marketplace ?? {}); setAiSuite(!!r.entitlements?.features?.aiSuite);
+    });
+  }, []);
+
+  const setAi = async (key: string, on: boolean) => { setAiToggles((t) => ({ ...(t ?? {}), [key]: on })); await api.patch("/api/settings", { aiToggles: { [key]: on } }); };
+  const setMarket = async (patch: { enabled?: boolean; selfRegister?: boolean }) => { setMarketplace((m) => ({ ...m, ...patch })); await api.patch("/api/settings", { marketplace: patch }); };
+
+  if (!aiToggles) return <Skeleton className="h-40" />;
+
+  return (
+    <>
+      {aiSuite && (
+        <section className="mb-6">
+          <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">AI features</h3>
+          <Card className="space-y-3">
+            <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Sparkles /></div><div><div className="font-medium">Assistant</div><div className="text-sm text-muted-foreground">Turn individual AI tools on or off for your studio.</div></div></div>
+            {AI_FEATURES.map((f) => (
+              <div key={f.key} className="flex items-center justify-between gap-3">
+                <div className="min-w-0"><div className="text-sm font-medium">{f.label}</div><div className="truncate text-xs text-muted-foreground">{f.hint}</div></div>
+                <Switch checked={aiToggles[f.key] !== false} onCheckedChange={(v) => void setAi(f.key, v)} />
+              </div>
+            ))}
+          </Card>
+        </section>
+      )}
+
+      <section>
+        <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Marketplace</h3>
+        <Card className="space-y-3">
+          <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Store /></div><div><div className="font-medium">Public storefront</div><div className="text-sm text-muted-foreground">A shareable page with your packages and blog.</div></div></div>
+          <div className="flex items-center justify-between"><span className="text-sm">Enable storefront</span><Switch checked={!!marketplace.enabled} onCheckedChange={(v) => void setMarket({ enabled: v })} /></div>
+          <div className="flex items-center justify-between"><span className="text-sm">Allow self sign-up</span><Switch checked={!!marketplace.selfRegister} onCheckedChange={(v) => void setMarket({ selfRegister: v })} /></div>
+        </Card>
+      </section>
+    </>
   );
 }
 

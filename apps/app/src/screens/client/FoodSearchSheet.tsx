@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button, Field, Sheet, Chip, Search, Barcode, Sparkles, Camera } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
+import { BarcodeScanner } from "./BarcodeScanner.js";
 
 interface Food {
   id?: string; name: string; brand?: string | null;
@@ -27,6 +28,7 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
   const [searching, setSearching] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
 
   const search = useCallback(async () => {
     if (q.trim().length < 2) { setLocal([]); setExternal([]); return; }
@@ -36,12 +38,11 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
 
   const searchExternal = async () => { setSearching(true); try { setExternal((await api.get<{ foods: Food[] }>(`/api/foods/search-external?q=${encodeURIComponent(q)}`)).foods); } finally { setSearching(false); } };
 
-  const barcode = async () => {
-    const code = prompt("Enter barcode digits");
-    if (!code) return;
+  const lookupBarcode = async (code: string) => {
+    setScanOpen(false);
     let r = await api.get<{ food: Food | null }>(`/api/foods/barcode?code=${code}`);
     if (!r.food) r = await api.get<{ food: Food | null }>(`/api/foods/barcode-external?code=${code}`);
-    if (r.food) setSelected(r.food); else alert("No product found.");
+    if (r.food) setSelected(r.food); else setAiError("No product matched that barcode.");
   };
 
   const log = async () => {
@@ -103,7 +104,7 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
       <div className="space-y-3">
         <Field label="Search foods" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
         <div className="flex flex-wrap gap-2">
-          <Chip icon={Barcode} onClick={barcode}>Barcode</Chip>
+          <Chip icon={Barcode} onClick={() => setScanOpen(true)}>Barcode</Chip>
           <Chip icon={Search} onClick={() => void searchExternal()} disabled={q.length < 2}>{searching ? "Searching…" : "Web"}</Chip>
           <Chip icon={Sparkles} onClick={() => void naturalLog()} disabled={q.length < 3 || aiBusy}>{aiBusy ? "Parsing…" : "Log this"}</Chip>
           <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full bg-secondary px-4 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4">
@@ -118,6 +119,7 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
           {q.length >= 2 && local.length === 0 && external.length === 0 && !searching && <p className="p-4 text-center text-sm text-muted-foreground">Nothing local — try Web.</p>}
         </div>
       </div>
+      {scanOpen && <BarcodeScanner onDetected={(code) => void lookupBarcode(code)} onClose={() => setScanOpen(false)} />}
     </Sheet>
   );
 }

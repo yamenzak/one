@@ -113,6 +113,18 @@ export type GenerateResult =
 const RUN_TIMEOUT_MS = 120_000;
 
 export async function generate(env: Env, input: GenerateInput): Promise<GenerateResult> {
+  // Owner AI feature toggles — a feature explicitly switched off is refused
+  // before any credit hold. Absent/true = allowed (opt-out, not opt-in).
+  const settings = await env.DB.prepare("SELECT ai_toggles_json FROM tenant_settings WHERE tenant_id = ?")
+    .bind(input.tenantId)
+    .first<{ ai_toggles_json: string | null }>();
+  if (settings?.ai_toggles_json) {
+    try {
+      const toggles = JSON.parse(settings.ai_toggles_json) as Record<string, boolean>;
+      if (toggles[input.feature] === false) return { ok: false, error: "unavailable" };
+    } catch { /* malformed toggles → allow */ }
+  }
+
   const model = await modelForTask(env.DB, input.task);
   if (!model) return { ok: false, error: "unavailable" };
   const rate = rateOf(model);
