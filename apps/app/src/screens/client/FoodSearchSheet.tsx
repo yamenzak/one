@@ -9,14 +9,24 @@ import { api, todayLocal } from "../../api.js";
 import { BarcodeScanner } from "./BarcodeScanner.js";
 
 interface Food {
-  id?: string; name: string; brand?: string | null;
+  id?: string; name: string; brand?: string | null; description?: string | null;
   serving_size?: number; servingSize?: number; serving_unit?: string; servingUnit?: string;
   calories: number; protein_g?: number; proteinG?: number; carbs_g?: number; carbsG?: number; fat_g?: number; fatG?: number;
-  source?: string; sourceId?: string; barcode?: string | null;
+  fiber_g?: number; fiberG?: number; sugar_g?: number; sugarG?: number; sodium_mg?: number; sodiumMg?: number;
+  saturated_fat_g?: number; saturatedFatG?: number; cholesterol_mg?: number; cholesterolMg?: number;
+  potassium_mg?: number; potassiumMg?: number; calcium_mg?: number; calciumMg?: number; iron_mg?: number; ironMg?: number;
+  source?: string; sourceId?: string; barcode?: string | null; image_url?: string | null; imageUrl?: string | null;
 }
 
 const MEALS = ["breakfast", "lunch", "dinner", "snack"] as const;
-const norm = (f: Food) => ({ servingSize: f.serving_size ?? f.servingSize ?? 100, servingUnit: f.serving_unit ?? f.servingUnit ?? "g", calories: f.calories, proteinG: f.protein_g ?? f.proteinG ?? 0, carbsG: f.carbs_g ?? f.carbsG ?? 0, fatG: f.fat_g ?? f.fatG ?? 0 });
+const pick = (a: number | undefined, b: number | undefined) => a ?? b ?? 0;
+const norm = (f: Food) => ({ servingSize: f.serving_size ?? f.servingSize ?? 100, servingUnit: f.serving_unit ?? f.servingUnit ?? "g", calories: f.calories, proteinG: pick(f.protein_g, f.proteinG), carbsG: pick(f.carbs_g, f.carbsG), fatG: pick(f.fat_g, f.fatG) });
+/** Full micro/macro map (metric) for import + the detail nutrition panel. */
+const micros = (f: Food) => ({
+  fiberG: pick(f.fiber_g, f.fiberG), sugarG: pick(f.sugar_g, f.sugarG), sodiumMg: pick(f.sodium_mg, f.sodiumMg),
+  saturatedFatG: pick(f.saturated_fat_g, f.saturatedFatG), cholesterolMg: pick(f.cholesterol_mg, f.cholesterolMg),
+  potassiumMg: pick(f.potassium_mg, f.potassiumMg), calciumMg: pick(f.calcium_mg, f.calciumMg), ironMg: pick(f.iron_mg, f.ironMg),
+});
 
 export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { clientId: string; mealType?: string; onClose: () => void; onLogged: () => void }) {
   const [q, setQ] = useState("");
@@ -48,7 +58,7 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
   const log = async () => {
     if (!selected) return;
     let foodId = selected.id;
-    if (!foodId && selected.source) foodId = (await api.post<{ id: string }>("/api/foods/import", { name: selected.name, brand: selected.brand ?? null, ...norm(selected), source: selected.source, sourceId: selected.sourceId, barcode: selected.barcode ?? null })).id;
+    if (!foodId && selected.source) foodId = (await api.post<{ id: string }>("/api/foods/import", { name: selected.name, brand: selected.brand ?? null, description: selected.description ?? null, ...norm(selected), ...micros(selected), imageUrl: selected.image_url ?? selected.imageUrl ?? null, source: selected.source, sourceId: selected.sourceId, barcode: selected.barcode ?? null })).id;
     const n = norm(selected);
     const factor = Number(quantity) / n.servingSize;
     await api.post("/api/logs/food", { clientId, data: { date: todayLocal(), mealType: meal, foodId: foodId ?? null, label: selected.name, quantity: Number(quantity), unit: n.servingUnit, calories: Math.round(n.calories * factor), proteinG: Math.round(n.proteinG * factor), carbsG: Math.round(n.carbsG * factor), fatG: Math.round(n.fatG * factor) } });
@@ -81,11 +91,21 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
 
   if (selected) {
     const n = norm(selected);
+    const mi = micros(selected);
     const factor = Number(quantity || "0") / n.servingSize;
+    const img = selected.image_url ?? selected.imageUrl;
+    const microRows: [string, number, string][] = [
+      ["Fiber", mi.fiberG, "g"], ["Sugar", mi.sugarG, "g"], ["Sat. fat", mi.saturatedFatG, "g"], ["Sodium", mi.sodiumMg, "mg"],
+      ["Cholesterol", mi.cholesterolMg, "mg"], ["Potassium", mi.potassiumMg, "mg"], ["Calcium", mi.calciumMg, "mg"], ["Iron", mi.ironMg, "mg"],
+    ];
+    const hasMicros = microRows.some(([, v]) => v > 0);
     return (
       <Sheet open onClose={() => setSelected(null)} title={selected.name}>
         <div className="space-y-4">
-          {selected.brand && <div className="text-sm text-muted-foreground">{selected.brand}</div>}
+          <div className="flex items-center gap-3">
+            {img && <img src={img} alt="" className="size-14 shrink-0 rounded-xl object-cover" />}
+            <div className="min-w-0">{selected.brand && <div className="truncate text-sm text-muted-foreground">{selected.brand}</div>}<div className="text-xs text-muted-foreground">per {n.servingSize} {n.servingUnit}</div></div>
+          </div>
           <div className="flex flex-wrap gap-2">{MEALS.map((m) => <Chip key={m} selected={meal === m} onClick={() => setMeal(m)}>{m}</Chip>)}</div>
           <Field label={`Quantity (${n.servingUnit})`} inputMode="numeric" value={quantity} onChange={(e) => setQuantity(e.target.value.replace(/[^\d.]/g, ""))} />
           <div className="grid grid-cols-4 gap-2 text-center">
@@ -93,6 +113,13 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged }: { cli
               <div key={l} className={cn("rounded-xl p-2.5", toneSoft[METRICS[metric].tone])}><div className="numeral text-lg font-semibold">{Math.round(v * factor)}</div><div className="text-xs font-medium opacity-70">{l}</div></div>
             ))}
           </div>
+          {hasMicros && (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-xl bg-surface-2 p-3 text-sm">
+              {microRows.filter(([, v]) => v > 0).map(([l, v, u]) => (
+                <div key={l} className="flex items-center justify-between"><span className="text-muted-foreground">{l}</span><span className="numeral">{Math.round(v * factor * 10) / 10} {u}</span></div>
+              ))}
+            </div>
+          )}
           <div className="flex gap-3"><Button variant="ghost" onClick={() => setSelected(null)}>Back</Button><Button size="lg" className="flex-1" onClick={() => void log()}>Log it</Button></div>
         </div>
       </Sheet>

@@ -73,7 +73,7 @@ function CreateExerciseSheet({ onClose, onDone }: { onClose: () => void; onDone:
   );
 }
 
-interface WebExercise { name: string; muscleGroups: string[]; equipment: string[]; source: string; sourceId: string; imageUrl: string | null }
+interface WebExercise { name: string; muscleGroups: string[]; secondaryMuscleGroups?: string[]; equipment: string[]; instructions?: string | null; category?: string | null; force?: string | null; difficulty?: string | null; source: string; sourceId: string; imageUrl: string | null }
 function WebExerciseSheet({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<WebExercise[] | null>(null);
@@ -89,7 +89,7 @@ function WebExerciseSheet({ onClose, onImported }: { onClose: () => void; onImpo
   }, [q]);
   const doImport = async (e: WebExercise) => {
     setImporting(e.sourceId);
-    try { await api.post("/api/exercises/import", { name: e.name, muscleGroups: e.muscleGroups, equipment: e.equipment, source: e.source, sourceId: e.sourceId }); onImported(); }
+    try { await api.post("/api/exercises/import", { name: e.name, muscleGroups: e.muscleGroups, secondaryMuscleGroups: e.secondaryMuscleGroups ?? [], equipment: e.equipment, instructions: e.instructions ?? null, category: e.category ?? null, force: e.force ?? null, difficulty: e.difficulty ?? null, imageUrl: e.imageUrl, source: e.source, sourceId: e.sourceId }); onImported(); }
     finally { setImporting(null); }
   };
   return (
@@ -100,7 +100,7 @@ function WebExerciseSheet({ onClose, onImported }: { onClose: () => void; onImpo
         {results?.map((e) => (
           <Card key={e.sourceId} className="flex items-center gap-3 py-2.5">
             {e.imageUrl && <img src={e.imageUrl} alt="" className="size-10 rounded-lg object-cover" />}
-            <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{e.name}</div><div className="truncate text-xs text-muted-foreground">{e.muscleGroups.join(", ") || "—"}</div></div>
+            <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{e.name}</div><div className="truncate text-xs text-muted-foreground">{[e.muscleGroups.join(", "), e.category].filter(Boolean).join(" · ") || "—"} · {e.source}</div></div>
             <Button size="sm" variant="secondary" disabled={importing === e.sourceId} onClick={() => void doImport(e)}>{importing === e.sourceId ? "…" : "Import"}</Button>
           </Card>
         ))}

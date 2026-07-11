@@ -286,3 +286,30 @@ describe("access economy", () => {
     expect(subs.subscriptions[0]!.budgets.length).toBe(2);
   });
 });
+
+describe("integrations settings", () => {
+  it("keyless providers default on; keys save masked (never returned)", async () => {
+    const before = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as {
+      integrations: Record<string, { enabled: boolean; ready: boolean; apiKeySet?: boolean }>;
+    };
+    // Open Food Facts + wger are keyless → default enabled + ready.
+    expect(before.integrations.openfoodfacts!.enabled).toBe(true);
+    expect(before.integrations.wger!.ready).toBe(true);
+    // USDA is keyed → not ready until a key is set.
+    expect(before.integrations.usda!.ready).toBe(false);
+
+    await SELF.fetch("http://x/api/settings", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ integrations: { usda: { enabled: true, apiKey: "secret-usda-key" } } }),
+    });
+
+    const res = await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) });
+    const raw = await res.text();
+    expect(raw).not.toContain("secret-usda-key"); // key never leaves the server
+    const after = JSON.parse(raw) as { integrations: Record<string, { enabled: boolean; ready: boolean; apiKeySet?: boolean }> };
+    expect(after.integrations.usda!.enabled).toBe(true);
+    expect(after.integrations.usda!.ready).toBe(true);
+    expect(after.integrations.usda!.apiKeySet).toBe(true);
+  });
+});

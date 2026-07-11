@@ -72,7 +72,7 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "CREATE TABLE IF NOT EXISTS swap_requests (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, workout_plan_id TEXT, day_index INTEGER, block_index INTEGER, slot_index INTEGER, current_exercise_id TEXT, suggested_exercise_id TEXT, reason TEXT, status TEXT DEFAULT 'pending', trainer_note TEXT, resolved_by TEXT, created_at TEXT, resolved_at TEXT);",
 
           // ── Nutrition system (SPEC §8.4) ───────────────────────────────────
-          "CREATE TABLE IF NOT EXISTS foods (id TEXT PRIMARY KEY, tenant_id TEXT, name TEXT, brand TEXT, barcode TEXT, serving_size REAL DEFAULT 100, serving_unit TEXT DEFAULT 'g', calories REAL DEFAULT 0, protein_g REAL DEFAULT 0, carbs_g REAL DEFAULT 0, fat_g REAL DEFAULT 0, fiber_g REAL DEFAULT 0, sugar_g REAL DEFAULT 0, sodium_mg REAL DEFAULT 0, image_url TEXT, source TEXT DEFAULT 'custom', source_id TEXT, verified INTEGER DEFAULT 0, active INTEGER DEFAULT 1, created_by TEXT, created_at TEXT);",
+          "CREATE TABLE IF NOT EXISTS foods (id TEXT PRIMARY KEY, tenant_id TEXT, name TEXT, brand TEXT, barcode TEXT, serving_size REAL DEFAULT 100, serving_unit TEXT DEFAULT 'g', calories REAL DEFAULT 0, protein_g REAL DEFAULT 0, carbs_g REAL DEFAULT 0, fat_g REAL DEFAULT 0, fiber_g REAL DEFAULT 0, sugar_g REAL DEFAULT 0, sodium_mg REAL DEFAULT 0, saturated_fat_g REAL DEFAULT 0, cholesterol_mg REAL DEFAULT 0, potassium_mg REAL DEFAULT 0, calcium_mg REAL DEFAULT 0, iron_mg REAL DEFAULT 0, description TEXT, image_url TEXT, source TEXT DEFAULT 'custom', source_id TEXT, verified INTEGER DEFAULT 0, active INTEGER DEFAULT 1, created_by TEXT, created_at TEXT);",
           "CREATE INDEX IF NOT EXISTS idx_foods_tenant ON foods(tenant_id, active);",
           "CREATE INDEX IF NOT EXISTS idx_foods_barcode ON foods(barcode);",
           "CREATE TABLE IF NOT EXISTS meal_plans (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, name TEXT, description TEXT, status TEXT DEFAULT 'draft', published_at TEXT, target_goal_json TEXT, body_json TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
@@ -125,7 +125,7 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "CREATE INDEX IF NOT EXISTS idx_notif_recipient ON notifications(recipient_user_id, read);",
 
           // ── Tenant settings (branding, AI toggles, marketplace, Connect) ───
-          "CREATE TABLE IF NOT EXISTS tenant_settings (tenant_id TEXT PRIMARY KEY, branding_json TEXT, ai_toggles_json TEXT, marketplace_json TEXT, stripe_account_id TEXT, updated_at TEXT);",
+          "CREATE TABLE IF NOT EXISTS tenant_settings (tenant_id TEXT PRIMARY KEY, branding_json TEXT, ai_toggles_json TEXT, marketplace_json TEXT, integrations_json TEXT, stripe_account_id TEXT, updated_at TEXT);",
         ].join(" "),
       )
       .then(async () => {
@@ -134,6 +134,15 @@ export function ensureSchema(db: D1Database): Promise<void> {
         const alters = [
           "ALTER TABLE clients ADD COLUMN avatar_url TEXT",
           "ALTER TABLE clients ADD COLUMN avatar_seed TEXT",
+          // Rich micronutrients on foods (ByShujaa parity).
+          "ALTER TABLE foods ADD COLUMN saturated_fat_g REAL DEFAULT 0",
+          "ALTER TABLE foods ADD COLUMN cholesterol_mg REAL DEFAULT 0",
+          "ALTER TABLE foods ADD COLUMN potassium_mg REAL DEFAULT 0",
+          "ALTER TABLE foods ADD COLUMN calcium_mg REAL DEFAULT 0",
+          "ALTER TABLE foods ADD COLUMN iron_mg REAL DEFAULT 0",
+          "ALTER TABLE foods ADD COLUMN description TEXT",
+          // Tenant integration settings (provider enable + API keys).
+          "ALTER TABLE tenant_settings ADD COLUMN integrations_json TEXT",
         ];
         for (const sql of alters) await db.exec(sql).catch(() => undefined);
       })

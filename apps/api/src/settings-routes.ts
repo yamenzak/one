@@ -11,18 +11,21 @@ import { type AppEnv, requireTenant } from "./auth-context.js";
 import { tenantEntitlements } from "./billing-store.js";
 import { nowIso, periodKey } from "./ids.js";
 import { parseJson, j } from "./db.js";
+import { PROVIDERS, resolveIntegrations, maskIntegrations } from "./integrations.js";
 
 export const settingsRoutes = new Hono<AppEnv>()
   .get("/settings", async (c) => {
     const who = requireTenant(c)!;
     const row = await c.env.DB.prepare("SELECT * FROM tenant_settings WHERE tenant_id = ?")
       .bind(who.tenantId)
-      .first<{ branding_json: string | null; ai_toggles_json: string | null; marketplace_json: string | null; stripe_account_id: string | null }>();
+      .first<{ branding_json: string | null; ai_toggles_json: string | null; marketplace_json: string | null; integrations_json: string | null; stripe_account_id: string | null }>();
     const ent = await tenantEntitlements(c.env.DB, who.tenantId);
     return c.json({
       branding: parseJson(row?.branding_json, { accent: null, logoUrl: null, welcome: null }),
       aiToggles: parseJson(row?.ai_toggles_json, {}),
       marketplace: parseJson(row?.marketplace_json, { enabled: false, selfRegister: false }),
+      integrations: maskIntegrations(resolveIntegrations(parseJson(row?.integrations_json ?? null, {}))),
+      integrationProviders: PROVIDERS,
       stripeConnected: Boolean(row?.stripe_account_id),
       entitlements: ent,
     });
@@ -50,6 +53,8 @@ export const settingsRoutes = new Hono<AppEnv>()
           .optional(),
         aiToggles: z.record(z.string(), z.boolean()).optional(),
         marketplace: z.object({ enabled: z.boolean().optional(), selfRegister: z.boolean().optional() }).optional(),
+        // Per-provider: { enabled?, <keyField>?: string }. Empty string clears a key.
+        integrations: z.record(z.string(), z.record(z.string(), z.union([z.boolean(), z.string().max(200)]))).optional(),
       })
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
@@ -61,17 +66,25 @@ export const settingsRoutes = new Hono<AppEnv>()
       if (!ent.features.branding) return c.json({ error: "branding not in your plan" }, 403);
     }
 
-    const existing = await c.env.DB.prepare("SELECT branding_json, ai_toggles_json, marketplace_json FROM tenant_settings WHERE tenant_id = ?")
+    const existing = await c.env.DB.prepare("SELECT branding_json, ai_toggles_json, marketplace_json, integrations_json FROM tenant_settings WHERE tenant_id = ?")
       .bind(who.tenantId)
-      .first<{ branding_json: string | null; ai_toggles_json: string | null; marketplace_json: string | null }>();
+      .first<{ branding_json: string | null; ai_toggles_json: string | null; marketplace_json: string | null; integrations_json: string | null }>();
     const branding = { ...parseJson(existing?.branding_json, {}), ...(d.branding ?? {}) };
     const aiToggles = { ...parseJson(existing?.ai_toggles_json, {}), ...(d.aiToggles ?? {}) };
     const marketplace = { ...parseJson(existing?.marketplace_json, {}), ...(d.marketplace ?? {}) };
 
+    // Merge integrations provider-by-provider so keys aren't clobbered.
+    const integrations = resolveIntegrations(parseJson(existing?.integrations_json ?? null, {})) as Record<string, Record<string, unknown>>;
+    if (d.integrations) {
+      for (const [pid, patch] of Object.entries(d.integrations)) {
+        integrations[pid] = { ...(integrations[pid] ?? {}), ...patch };
+      }
+    }
+
     await c.env.DB.prepare(
-      "INSERT INTO tenant_settings (tenant_id, branding_json, ai_toggles_json, marketplace_json, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(tenant_id) DO UPDATE SET branding_json = ?, ai_toggles_json = ?, marketplace_json = ?, updated_at = ?",
+      "INSERT INTO tenant_settings (tenant_id, branding_json, ai_toggles_json, marketplace_json, integrations_json, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(tenant_id) DO UPDATE SET branding_json = ?, ai_toggles_json = ?, marketplace_json = ?, integrations_json = ?, updated_at = ?",
     )
-      .bind(who.tenantId, j(branding), j(aiToggles), j(marketplace), nowIso(), j(branding), j(aiToggles), j(marketplace), nowIso())
+      .bind(who.tenantId, j(branding), j(aiToggles), j(marketplace), j(integrations), nowIso(), j(branding), j(aiToggles), j(marketplace), j(integrations), nowIso())
       .run();
     return c.json({ ok: true });
   })

@@ -7,7 +7,7 @@ import { Fragment, useEffect, useState } from "react";
 import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, SegmentedControl, SettingsList, Page, Stagger,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss,
-  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft,
+  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft,
   type Branding, type BrandTokens, type NeutralTint,
 } from "@mossa/ui";
 import { resolveUnits } from "@mossa/domain";
@@ -76,6 +76,12 @@ export function Settings({ onBack }: { onBack: () => void }) {
       {isOwner && (
         <Stagger>
           <StudioControls />
+        </Stagger>
+      )}
+
+      {isOwner && (
+        <Stagger>
+          <IntegrationsSection />
         </Stagger>
       )}
 
@@ -186,6 +192,80 @@ const hasTokens = (t: BrandTokens) => !!(Object.keys(t.light ?? {}).length || Ob
  * coherent light+dark palette is generated; paste a theme or fine-tune any
  * token afterwards. Everything writes into the same token maps.
  */
+interface ProviderMeta { id: string; label: string; category: "food" | "exercise"; keyless: boolean; keys: { field: string; label: string }[]; blurb: string }
+type MaskedProvider = { enabled: boolean; ready: boolean } & Record<string, boolean>;
+
+function IntegrationsSection() {
+  const [providers, setProviders] = useState<ProviderMeta[] | null>(null);
+  const [state, setState] = useState<Record<string, MaskedProvider>>({});
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [open, setOpen] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const load = async () => {
+    const r = await api.get<{ integrationProviders: ProviderMeta[]; integrations: Record<string, MaskedProvider> }>("/api/settings");
+    setProviders(r.integrationProviders); setState(r.integrations);
+  };
+  useEffect(() => { void load(); }, []);
+
+  const patch = async (id: string, patchObj: Record<string, string | boolean>) => { await api.patch("/api/settings", { integrations: { [id]: patchObj } }); await load(); };
+  const saveKeys = async (p: ProviderMeta) => {
+    const obj: Record<string, string> = {};
+    for (const k of p.keys) obj[k.field] = drafts[`${p.id}.${k.field}`] ?? "";
+    await patch(p.id, { ...obj, enabled: true });
+    setDrafts((d) => { const n = { ...d }; for (const k of p.keys) delete n[`${p.id}.${k.field}`]; return n; });
+    setOpen(null); setMsg(`${p.label} connected.`);
+  };
+
+  if (!providers) return <Skeleton className="h-40" />;
+  const groups: { key: "food" | "exercise"; label: string }[] = [{ key: "food", label: "Nutrition" }, { key: "exercise", label: "Exercises" }];
+
+  return (
+    <section>
+      <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Integrations</h3>
+      <Card className="space-y-4">
+        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Plug /></div><div><div className="font-medium">Data providers</div><div className="text-sm text-muted-foreground">Turn on sources so builders pull ready-made foods & exercises.</div></div></div>
+        {groups.map((g) => (
+          <div key={g.key} className="space-y-2">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{g.label}</div>
+            {providers.filter((p) => p.category === g.key).map((p) => {
+              const s = state[p.id];
+              const needsKeys = !p.keyless && s?.enabled && !s?.ready;
+              return (
+                <div key={p.id} className="rounded-xl bg-surface-2 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-sm font-medium">{p.label}{!p.keyless && (s?.ready ? <Badge tone="success">connected</Badge> : <Badge tone="neutral">key needed</Badge>)}</div>
+                      <div className="truncate text-xs text-muted-foreground">{p.blurb}</div>
+                    </div>
+                    <Switch checked={!!s?.enabled} onCheckedChange={(v) => { if (v && !p.keyless && !s?.ready) { setOpen(p.id); void patch(p.id, { enabled: true }); } else void patch(p.id, { enabled: v }); }} />
+                  </div>
+                  {!p.keyless && (open === p.id || needsKeys) && (
+                    <div className="mt-3 space-y-2 border-t border-border/50 pt-3">
+                      {p.keys.map((k) => (
+                        <input
+                          key={k.field}
+                          type="password"
+                          placeholder={s?.[`${k.field}Set`] ? `${k.label} — saved (leave blank to keep)` : k.label}
+                          value={drafts[`${p.id}.${k.field}`] ?? ""}
+                          onChange={(e) => setDrafts((d) => ({ ...d, [`${p.id}.${k.field}`]: e.target.value }))}
+                          className="w-full rounded-lg bg-surface-3 px-3 py-2 font-mono text-xs outline-none ring-ring focus:ring-2"
+                        />
+                      ))}
+                      <Button size="sm" onClick={() => void saveKeys(p)}>Save keys</Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+      </Card>
+    </section>
+  );
+}
+
 function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | null; onPreview: (b: Branding | null) => void; onSaved: () => void }) {
   const seedFrom = (b: Branding | null) => b?.primary || BRAND_PRESETS.find((p) => p.id === b?.preset)?.primary || "oklch(0.74 0.15 164)";
   const [tokens, setTokens] = useState<BrandTokens>(() => (initial?.tokens && hasTokens(initial.tokens) ? initial.tokens : deriveTokens({ primary: seedFrom(initial) })));
