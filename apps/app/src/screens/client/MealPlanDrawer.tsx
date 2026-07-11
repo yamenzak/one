@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
-import { fmtEnergy } from "@mossa/domain";
+import { fmtEnergy, kcalToDisplay } from "@mossa/domain";
 import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, Utensils, ShoppingCart, Plus, Minus, ChevronDown } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -179,7 +179,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                               return (
                                 <div key={metric} className={cn("flex flex-col items-center gap-1 rounded-xl p-2", toneSoft[M.tone])}>
                                   <M.icon className="size-4" />
-                                  <div className="numeral text-base font-semibold leading-none">{Math.round(t[key])}</div>
+                                  <div className="numeral text-base font-semibold leading-none">{metric === "calories" ? kcalToDisplay(t[key], units).toLocaleString() : Math.round(t[key])}</div>
                                 </div>
                               );
                             })}
@@ -195,7 +195,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                                       <div className="truncate text-sm">{f?.name ?? "Food"}</div>
                                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                         <span className="numeral shrink-0">{Math.round(mf.quantity)} {mf.unit}</span>
-                                        <span className="numeral shrink-0 text-calories">{Math.round((f?.calories ?? 0) * factor)} kcal</span>
+                                        <span className="numeral shrink-0 text-calories">{fmtEnergy((f?.calories ?? 0) * factor, units)}</span>
                                       </div>
                                     </div>
                                     <MacroInline proteinG={Math.round((f?.protein_g ?? 0) * factor)} carbsG={Math.round((f?.carbs_g ?? 0) * factor)} fatG={Math.round((f?.fat_g ?? 0) * factor)} className="shrink-0 text-[0.7rem]" />

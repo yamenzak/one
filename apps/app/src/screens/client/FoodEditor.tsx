@@ -6,9 +6,11 @@
  */
 
 import { useEffect, useState } from "react";
+import { kcalToDisplay, displayToKcal, energyLabel, type UnitPrefs } from "@mossa/domain";
 import { Button, Field, Sheet, Chip, cn, toneSoft, METRICS, Utensils, Barcode, Camera, ChevronDown, Sparkles } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
+import { useUnits } from "../../units.js";
 
 export interface EditableFood {
   id?: string;
@@ -32,11 +34,11 @@ const MICROS = [
 
 type MicroKey = (typeof MICROS)[number][0];
 
-function toForm(f?: EditableFood) {
+function toForm(f: EditableFood | undefined, units: UnitPrefs) {
   return {
     name: f?.name ?? "", brand: f?.brand ?? "", barcode: f?.barcode ?? "",
     serving: s(f?.serving_size ?? f?.servingSize) || "100", unit: f?.serving_unit ?? f?.servingUnit ?? "g",
-    cal: s(f?.calories), p: s(pick(f?.protein_g, f?.proteinG)), c: s(pick(f?.carbs_g, f?.carbsG)), ft: s(pick(f?.fat_g, f?.fatG)),
+    cal: f?.calories ? String(kcalToDisplay(f.calories, units)) : "", p: s(pick(f?.protein_g, f?.proteinG)), c: s(pick(f?.carbs_g, f?.carbsG)), ft: s(pick(f?.fat_g, f?.fatG)),
     fiber: s(pick(f?.fiber_g, f?.fiberG)), sugar: s(pick(f?.sugar_g, f?.sugarG)), satFat: s(pick(f?.saturated_fat_g, f?.saturatedFatG)),
     sodium: s(pick(f?.sodium_mg, f?.sodiumMg)), cholesterol: s(pick(f?.cholesterol_mg, f?.cholesterolMg)),
     potassium: s(pick(f?.potassium_mg, f?.potassiumMg)), calcium: s(pick(f?.calcium_mg, f?.calciumMg)), iron: s(pick(f?.iron_mg, f?.ironMg)),
@@ -56,8 +58,9 @@ export function FoodEditor({
   onSaved: (food: EditableFood) => void;
 }) {
   const { ctx } = useSession();
+  const units = useUnits();
   const aiSuite = !!ctx?.entitlements?.features?.aiSuite;
-  const [f, setF] = useState(() => toForm(initial as EditableFood));
+  const [f, setF] = useState(() => toForm(initial as EditableFood, units));
   const [loading, setLoading] = useState(!!foodId);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -82,7 +85,7 @@ export function FoodEditor({
         ...p,
         name: p.name || str(g.name), brand: p.brand || str(g.brand),
         serving: g.servingSize != null ? str(g.servingSize) : p.serving, unit: str(g.servingUnit) || p.unit,
-        cal: str(g.calories), p: str(g.proteinG), c: str(g.carbsG), ft: str(g.fatG),
+        cal: g.calories != null ? String(kcalToDisplay(Number(g.calories), units)) : "", p: str(g.proteinG), c: str(g.carbsG), ft: str(g.fatG),
         fiber: str(g.fiberG), sugar: str(g.sugarG), satFat: str(g.saturatedFatG), sodium: str(g.sodiumMg),
         cholesterol: str(g.cholesterolMg), potassium: str(g.potassiumMg), calcium: str(g.calciumMg), iron: str(g.ironMg),
         image: p.image || `/api/media/${key}`,
@@ -98,7 +101,7 @@ export function FoodEditor({
   useEffect(() => {
     if (!foodId) return;
     let alive = true;
-    void api.get<{ food: EditableFood }>(`/api/foods/${foodId}`).then((r) => { if (alive) { setF(toForm(r.food)); setLoading(false); } }).catch(() => alive && setLoading(false));
+    void api.get<{ food: EditableFood }>(`/api/foods/${foodId}`).then((r) => { if (alive) { setF(toForm(r.food, units)); setLoading(false); } }).catch(() => alive && setLoading(false));
     return () => { alive = false; };
   }, [foodId]);
 
@@ -118,7 +121,7 @@ export function FoodEditor({
       const body = {
         name: f.name.trim(), brand: f.brand.trim() || null, barcode: f.barcode.trim() || null,
         imageUrl: f.image || null, servingSize: num(f.serving) || 100, servingUnit: f.unit.trim() || "g",
-        calories: num(f.cal), proteinG: num(f.p), carbsG: num(f.c), fatG: num(f.ft),
+        calories: Math.round(displayToKcal(num(f.cal), units)), proteinG: num(f.p), carbsG: num(f.c), fatG: num(f.ft),
         fiberG: num(f.fiber), sugarG: num(f.sugar), saturatedFatG: num(f.satFat), sodiumMg: num(f.sodium),
         cholesterolMg: num(f.cholesterol), potassiumMg: num(f.potassium), calciumMg: num(f.calcium), ironMg: num(f.iron),
         visibility: f.visibility, source: "custom" as const,
@@ -169,7 +172,7 @@ export function FoodEditor({
 
           <div className="text-xs text-muted-foreground">Per serving:</div>
           <div className="grid grid-cols-4 gap-2">
-            {([["cal", "kcal", "calories"], ["p", "P", "protein"], ["c", "C", "carbs"], ["ft", "F", "fat"]] as const).map(([k, ph, metric]) => {
+            {([["cal", energyLabel(units), "calories"], ["p", "P", "protein"], ["c", "C", "carbs"], ["ft", "F", "fat"]] as const).map(([k, ph, metric]) => {
               const M = METRICS[metric];
               return (
                 <label key={k} className={cn("flex flex-col items-center gap-1 rounded-xl p-2", toneSoft[M.tone])}>

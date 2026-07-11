@@ -93,7 +93,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
           </div>
           <Field label="Notes (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Context for this phase" />
           <Button size="lg" className="w-full" disabled={!valid || busy} onClick={() => void create()}>{busy ? "Calculating…" : "Set goal + calculate targets"}</Button>
-          {derivation && <p className="text-xs text-muted-foreground">{String(derivation.bmrFormula)} · BMR {String(derivation.bmr)} · TDEE {String(derivation.tdee)} kcal</p>}
+          {derivation && <p className="text-xs text-muted-foreground">{String(derivation.bmrFormula)} · BMR {fmtEnergy(Number(derivation.bmr), units, false)} · TDEE {fmtEnergy(Number(derivation.tdee), units)}</p>}
         </Card>
       </Stagger>
 

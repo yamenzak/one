@@ -4,9 +4,11 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { fmtEnergy, kcalToDisplay, type UnitPrefs } from "@mossa/domain";
 import { Button, Field, Sheet, Chip, Badge, Switch, SegmentedControl, MacroInline, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, Utensils } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useSession } from "../../session.js";
+import { useUnits } from "../../units.js";
 import { BarcodeScanner } from "./BarcodeScanner.js";
 import { FoodEditor, type EditableFood } from "./FoodEditor.js";
 
@@ -50,6 +52,7 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged, onPick 
   // optionally prefilled (e.g. with a scanned-but-unmatched barcode).
   const [editor, setEditor] = useState<Partial<EditableFood> | null>(null);
   const { ctx } = useSession();
+  const units = useUnits();
   const isStaff = ctx?.active?.role !== undefined && ctx.active.role !== "client";
 
   const searchExternal = useCallback(async (page = 1) => {
@@ -145,7 +148,7 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged, onPick 
               return (
                 <div key={metric} className={cn("flex flex-col items-center gap-1 rounded-xl p-2.5", toneSoft[M.tone])}>
                   <M.icon className="size-4" />
-                  <div className="numeral text-lg font-semibold leading-none">{Math.round(v * factor)}</div>
+                  <div className="numeral text-lg font-semibold leading-none">{metric === "calories" ? kcalToDisplay(v * factor, units).toLocaleString() : Math.round(v * factor)}</div>
                 </div>
               );
             })}
@@ -193,8 +196,8 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged, onPick 
         </div>
         {aiError && <p className="text-sm text-warning">{aiError}</p>}
         <div className="max-h-80 space-y-1 overflow-y-auto">
-          {local.filter(matchesFilter).map((f) => <FoodRow key={f.id} food={f} badge="library" onPick={() => rowClick(f)} />)}
-          {external.filter(matchesFilter).map((f, i) => <FoodRow key={`ext-${i}`} food={f} badge="web" onPick={() => rowClick(f)} />)}
+          {local.filter(matchesFilter).map((f) => <FoodRow key={f.id} food={f} badge="library" units={units} onPick={() => rowClick(f)} />)}
+          {external.filter(matchesFilter).map((f, i) => <FoodRow key={`ext-${i}`} food={f} badge="web" units={units} onPick={() => rowClick(f)} />)}
           {searching && external.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Searching the web…</p>}
           {q.length >= 2 && !searching && local.filter(matchesFilter).length === 0 && external.filter(matchesFilter).length === 0 && (
             <p className="p-4 text-center text-sm text-muted-foreground">{extPage === 0 && !webAlso ? "Nothing in your library — turn on Web." : "No matches."}</p>
@@ -221,7 +224,7 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged, onPick 
   );
 }
 
-function FoodRow({ food, badge, onPick }: { food: Food; badge: string; onPick: () => void }) {
+function FoodRow({ food, badge, units, onPick }: { food: Food; badge: string; units: UnitPrefs; onPick: () => void }) {
   const img = food.image_url ?? food.imageUrl;
   const n = norm(food);
   return (
@@ -233,7 +236,7 @@ function FoodRow({ food, badge, onPick }: { food: Food; badge: string; onPick: (
         <div className="truncate text-sm">{food.name}</div>
         <div className="flex items-center gap-2 truncate text-xs text-muted-foreground">
           {food.brand && <span className="truncate">{food.brand}</span>}
-          <span className="numeral shrink-0 text-calories">{Math.round(n.calories)} kcal</span>
+          <span className="numeral shrink-0 text-calories">{fmtEnergy(n.calories, units)}</span>
           <MacroInline proteinG={n.proteinG} carbsG={n.carbsG} fatG={n.fatG} className="shrink-0 text-[0.7rem]" />
         </div>
       </div>

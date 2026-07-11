@@ -124,3 +124,6 @@ export function fmtEnergy(kcal: number | null | undefined, p: UnitPrefs, withUni
 
 /** Convert a metric kcal value to the display number only (no unit/locale). */
 export const kcalToDisplay = (kcal: number, p: UnitPrefs): number => (p.energy === "kJ" ? Math.round(kcal * KJ_PER_KCAL) : Math.round(kcal));
+
+/** Convert a display energy number (in the user's unit) back to metric kcal. */
+export const displayToKcal = (value: number, p: UnitPrefs): number => (p.energy === "kJ" ? value / KJ_PER_KCAL : value);

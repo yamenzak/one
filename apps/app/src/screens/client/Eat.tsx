@@ -1,7 +1,7 @@
 /** Eat tab — the nutrition diary: intake vs target, meals, per-entry macros. */
 
 import { useCallback, useEffect, useState } from "react";
-import { fmtEnergy, fmtVolume, volumeLabel, volumeDisplayToMl } from "@mossa/domain";
+import { fmtEnergy, fmtVolume, volumeLabel, volumeDisplayToMl, kcalToDisplay } from "@mossa/domain";
 import {
   Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MacroInline, MetricChip, METRICS, toneSoft, Page, Stagger, EmptyState,
   Plus, ClipboardList, Utensils, Croissant, Soup, Apple, Dumbbell, Droplet, Flame, Trash2, type LucideIcon,
@@ -263,7 +263,7 @@ function EditEntrySheet({ entry, clientId, units, onClose, onSaved }: { entry: E
           <div className="grid grid-cols-4 gap-2 flex-1">
             {([["calories", entry.calories], ["protein", entry.protein_g], ["carbs", entry.carbs_g], ["fat", entry.fat_g]] as const).map(([m, v]) => {
               const M = METRICS[m];
-              return <div key={m} className={`flex flex-col items-center gap-0.5 rounded-lg py-1.5 ${toneSoft[M.tone]}`}><M.icon className="size-3.5" /><span className="numeral text-sm font-semibold leading-none">{s(v)}</span></div>;
+              return <div key={m} className={`flex flex-col items-center gap-0.5 rounded-lg py-1.5 ${toneSoft[M.tone]}`}><M.icon className="size-3.5" /><span className="numeral text-sm font-semibold leading-none">{m === "calories" ? kcalToDisplay(s(v), units).toLocaleString() : s(v)}</span></div>;
             })}
           </div>
         </div>

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_UNITS, resolveUnits, cmToFeetInches, feetInchesToCm,
   fmtWeight, fmtHeight, fmtLength, fmtVolume, fmtDistance, fmtEnergy,
-  displayToKg, lengthDisplayToCm, volumeDisplayToMl, kgToDisplay, kcalToDisplay,
+  displayToKg, lengthDisplayToCm, volumeDisplayToMl, kgToDisplay, kcalToDisplay, displayToKcal,
 } from "../src/units.js";
 
 const M = DEFAULT_UNITS;
@@ -44,5 +44,9 @@ describe("units", () => {
     expect(volumeDisplayToMl(16, IMP)).toBeCloseTo(473.18, 1);
     expect(kcalToDisplay(2000, IMP)).toBe(8368);
     expect(displayToKg(70, M)).toBe(70);
+    // Energy display→metric: kJ users enter kJ, we store kcal; kcal users are identity.
+    expect(displayToKcal(8368, IMP)).toBeCloseTo(2000, 1);
+    expect(displayToKcal(2000, M)).toBe(2000);
+    expect(kcalToDisplay(displayToKcal(8368, IMP), IMP)).toBe(8368);
   });
 });

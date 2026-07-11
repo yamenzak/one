@@ -10,12 +10,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { prescribedSetsForDay, type WorkoutBody } from "@mossa/protocol";
-import { sessionTonnage, sessionLoad, epley1Rm, DEFAULT_WEEKLY_LOAD_TARGET, activityByKey } from "@mossa/domain";
+import { sessionTonnage, sessionLoad, epley1Rm, DEFAULT_WEEKLY_LOAD_TARGET, activityByKey, fmtEnergy, fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
 import {
   Card, Badge, Button, Chip, Skeleton, Page, Stagger, EmptyState, StatCard, WeekDots, Sparkline, MiniBars, IconBadge, Sheet,
   Dumbbell, Play, Moon, ChevronRight, Plus, Footprints, Flame, TrendingUp, Trophy, Heart, Activity,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
+import { useUnits } from "../../units.js";
 import { LogSheet } from "./LogSheet.js";
 import { ExerciseThumb, ExerciseMeta, pretty, type ExerciseInfo } from "../exercise.js";
 
@@ -48,6 +49,7 @@ export function Train({ clientId }: { clientId: string }) {
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [library, setLibrary] = useState<ExerciseInfo[]>([]);
   const nav = useNavigate();
+  const units = useUnits();
   const [activityOpen, setActivityOpen] = useState(false);
   const [browseCat, setBrowseCat] = useState<string | null>(null);
   const today = todayLocal();
@@ -121,13 +123,13 @@ export function Train({ clientId }: { clientId: string }) {
     for (const s of sessions) {
       const sets = s.entries.flatMap((e) => e.sets).filter((x) => x.completed);
       if (sets.length === 0) continue;
-      items.push({ id: s.id, date: s.date_local, title: "Workout", sub: `${sets.length} sets · ${sessionTonnage(sets).toLocaleString()} kg`, icon: Dumbbell, tone: "activity", load: sessionLoad({ sets }) });
+      items.push({ id: s.id, date: s.date_local, title: "Workout", sub: `${sets.length} sets · ${kgToDisplay(sessionTonnage(sets), units).toLocaleString()} ${weightLabel(units)}`, icon: Dumbbell, tone: "activity", load: sessionLoad({ sets }) });
     }
     for (const a of activities) {
-      items.push({ id: a.id, date: a.date_local, title: a.label || pretty(a.activity_key), sub: [a.duration_min ? `${a.duration_min} min` : null, a.calories ? `${a.calories} kcal` : null].filter(Boolean).join(" · ") || "Logged", icon: Footprints, tone: "cardio", load: sessionLoad({ cardio: [{ met: activityByKey(a.activity_key).met, durationMin: a.duration_min ?? 0 }] }) });
+      items.push({ id: a.id, date: a.date_local, title: a.label || pretty(a.activity_key), sub: [a.duration_min ? `${a.duration_min} min` : null, a.calories ? fmtEnergy(a.calories, units) : null].filter(Boolean).join(" · ") || "Logged", icon: Footprints, tone: "cardio", load: sessionLoad({ cardio: [{ met: activityByKey(a.activity_key).met, durationMin: a.duration_min ?? 0 }] }) });
     }
     return items.sort((x, y) => y.date.localeCompare(x.date)).slice(0, 6);
-  }, [sessions, activities]);
+  }, [sessions, activities, units]);
 
   const categories = useMemo(() => {
     const count = new Map<string, number>();
@@ -183,12 +185,12 @@ export function Train({ clientId }: { clientId: string }) {
             <StatCard stack label="Training load" value={week.weekLoad} unit={`/ ${DEFAULT_WEEKLY_LOAD_TARGET}`} icon={TrendingUp} tone="activity"
               badge={<Badge tone={week.weekLoad >= DEFAULT_WEEKLY_LOAD_TARGET ? "success" : "neutral"}>{week.weekLoad >= DEFAULT_WEEKLY_LOAD_TARGET ? "On target" : "Building"}</Badge>}
               chart={week.weekLoad > 0 ? <MiniBars values={week.dailyLoad} tone="activity" width={132} target={DEFAULT_WEEKLY_LOAD_TARGET / 7} /> : undefined} />
-            <StatCard stack label="Tonnage" value={week.weekTonnage.toLocaleString()} unit="kg" icon={Dumbbell} tone="activity"
-              chart={week.weekTonnage > 0 ? <Sparkline values={week.dailyTonnage} tone="activity" width={132} /> : undefined} />
+            <StatCard stack label="Tonnage" value={kgToDisplay(week.weekTonnage, units).toLocaleString()} unit={weightLabel(units)} icon={Dumbbell} tone="activity"
+              chart={week.weekTonnage > 0 ? <Sparkline values={week.dailyTonnage.map((v) => kgToDisplay(v, units))} tone="activity" width={132} /> : undefined} />
             <StatCard stack label="Active days" value={week.activeCount} unit="of 7" icon={Flame} tone="cardio"
               chart={<WeekDots days={week.active} todayIndex={6} tone="cardio" fill />} />
             <StatCard stack label="PRs this week" value={week.weekPRs} icon={Trophy} tone="nutrition"
-              badge={week.topE1 > 0 ? <Badge tone="neutral">best e1RM {week.topE1}kg</Badge> : undefined} />
+              badge={week.topE1 > 0 ? <Badge tone="neutral">best e1RM {fmtWeight(week.topE1, units)}</Badge> : undefined} />
           </div>
         </section>
       )}

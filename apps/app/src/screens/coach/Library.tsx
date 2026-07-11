@@ -1,8 +1,10 @@
 /** Coach Library — exercises (create + web import), foods, templates, content. */
 
 import { useCallback, useEffect, useState } from "react";
+import { fmtEnergy } from "@mossa/domain";
 import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, MacroInline, Search, Plus, Globe, Trash2, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight } from "@mossa/ui";
 import { api } from "../../api.js";
+import { useUnits } from "../../units.js";
 import { FoodEditor } from "../client/FoodEditor.js";
 import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
 
@@ -162,6 +164,7 @@ export function WebExerciseSheet({ onClose, onImported, onPicked }: { onClose: (
 
 interface FoodRow { id: string; name: string; calories: number; brand: string | null; tenant_id: string | null; visibility?: string | null; protein_g?: number; carbs_g?: number; fat_g?: number; image_url?: string | null }
 function Foods() {
+  const units = useUnits();
   const [q, setQ] = useState("");
   const [items, setItems] = useState<FoodRow[] | null>(null);
   // `null` = closed; `{}` = new; `{ id }` = edit that food.
@@ -181,7 +184,7 @@ function Foods() {
             <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2">{f.image_url ? <img src={f.image_url} alt="" className="size-full object-cover" /> : <Utensils className="size-4 text-muted-foreground" />}</div>
             <div className="min-w-0 flex-1">
               <div className="truncate font-medium">{f.name}{f.brand && <span className="ml-2 text-xs text-muted-foreground">{f.brand}</span>}</div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="numeral text-calories">{Math.round(f.calories)} kcal</span><MacroInline proteinG={f.protein_g ?? 0} carbsG={f.carbs_g ?? 0} fatG={f.fat_g ?? 0} className="text-[0.7rem]" /></div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="numeral text-calories">{fmtEnergy(f.calories, units)}</span><MacroInline proteinG={f.protein_g ?? 0} carbsG={f.carbs_g ?? 0} fatG={f.fat_g ?? 0} className="text-[0.7rem]" /></div>
             </div>
             <Badge tone={tag(f) === "seed" ? "cardio" : tag(f) === "private" ? "neutral" : "activity"}>{tag(f)}</Badge>
             <button onClick={() => setEditor({ id: f.id })} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground [&_svg]:size-4" aria-label="Edit food"><PencilLine /></button>

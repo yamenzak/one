@@ -5,7 +5,7 @@
  */
 
 import { useState } from "react";
-import { ACTIVITIES, weightLabel, lengthLabel, volumeLabel, displayToKg, lengthDisplayToCm, volumeDisplayToMl } from "@mossa/domain";
+import { ACTIVITIES, weightLabel, lengthLabel, volumeLabel, energyLabel, displayToKg, lengthDisplayToCm, volumeDisplayToMl, displayToKcal } from "@mossa/domain";
 import {
   Button, Field, Textarea, Sheet, Chip, IconBadge, Switch,
   Utensils, Footprints, Droplet, Weight, Ruler, Bed, Smile, ClipboardList, Camera, Angry, Frown, Meh, Laugh,
@@ -58,6 +58,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
   const round2 = (n: number) => Math.round(n * 100) / 100;
   const kg = (k: string) => { const v = num(k); return v != null ? round2(displayToKg(v, units)) : undefined; };
   const cm = (k: string) => { const v = num(k); return v != null ? round2(lengthDisplayToCm(v, units)) : undefined; };
+  const kcal = (k: string) => { const v = num(k); return v != null ? Math.round(displayToKcal(v, units)) : undefined; };
   const waterPresets = units.volume === "oz" ? [8, 12, 16, 24] : [250, 500, 750, 1000];
 
   const close = () => { setKind(null); setFoodMode(false); setF({}); setRatings({ mood: null, energy: null, stress: null, sleepQ: null }); setPhotos([]); onClose(); };
@@ -75,7 +76,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
       if (kind === "water") await api.post("/api/logs/water", { clientId, data: { date, amountMl: num("amount") != null ? Math.round(volumeDisplayToMl(num("amount")!, units)) : undefined } });
       else if (kind === "weight") await api.post("/api/measurements", { clientId, data: { date, weightKg: kg("amount") } });
       else if (kind === "body") await api.post("/api/measurements", { clientId, data: { date, weightKg: kg("weight"), bodyFatPercent: num("bf"), neckCm: cm("neck"), waistCm: cm("waist"), hipsCm: cm("hips"), chestCm: cm("chest") } });
-      else if (kind === "activity") await api.post("/api/logs/activity", { clientId, data: { date, activityKey, label: ACTIVITIES.find((a) => a.key === activityKey)?.label, durationMin: num("duration") ?? 0, avgHrBpm: num("hr") ?? null, caloriesBurned: num("kcal") ?? null } });
+      else if (kind === "activity") await api.post("/api/logs/activity", { clientId, data: { date, activityKey, label: ACTIVITIES.find((a) => a.key === activityKey)?.label, durationMin: num("duration") ?? 0, avgHrBpm: num("hr") ?? null, caloriesBurned: kcal("kcal") ?? null } });
       else if (kind === "sleep") await api.post("/api/logs/sleep", { clientId, data: { date, durationMinutes: Math.round((num("hours") ?? 0) * 60), quality: ratings.sleepQ ?? undefined, notes: f.notes || undefined } });
       else if (kind === "mood") await api.post("/api/logs/mood", { clientId, data: { date, mood: ratings.mood ?? undefined, energy: ratings.energy ?? undefined, stress: ratings.stress ?? undefined, notes: f.notes || undefined } });
       else if (kind === "checkin") await api.post("/api/check-ins", { clientId, data: { date, weightKg: kg("weight"), mood: ratings.mood ?? undefined, energy: ratings.energy ?? undefined, stress: ratings.stress ?? undefined, sleepHours: num("sleepHours"), stepsCount: num("steps"), notes: f.notes || undefined, progressPhotos: photos.length ? photos : undefined } });
@@ -129,7 +130,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
               <Field label="Duration (min)" inputMode="numeric" value={f.duration ?? ""} onChange={(e) => set("duration", e.target.value.replace(/\D/g, ""))} />
               <Field label="Avg HR (opt)" inputMode="numeric" value={f.hr ?? ""} onChange={(e) => set("hr", e.target.value.replace(/\D/g, ""))} />
             </div>
-            <Field label="Calories (opt — else estimated)" inputMode="numeric" value={f.kcal ?? ""} onChange={(e) => set("kcal", e.target.value.replace(/\D/g, ""))} hint="Wearables are more accurate; leave blank to estimate from MET × weight." />
+            <Field label={`Energy (${energyLabel(units)}, opt — else estimated)`} inputMode="numeric" value={f.kcal ?? ""} onChange={(e) => set("kcal", e.target.value.replace(/\D/g, ""))} hint="Wearables are more accurate; leave blank to estimate from MET × weight." />
           </>)}
           {kind === "sleep" && (<>
             <h2 className="text-lg font-semibold">Log sleep</h2>

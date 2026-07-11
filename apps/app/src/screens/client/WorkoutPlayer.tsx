@@ -238,7 +238,7 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
     if (wm === "absolute" && s.weightValue != null) parts.push(`${fmtWeight(s.weightValue, units)}`);
     else if (wm === "percent_1rm" && s.percent1rm != null) parts.push(`${s.percent1rm}% 1RM`);
     else if (wm === "bodyweight") parts.push("bodyweight");
-    else if (wm === "previous_plus" && s.weightValue != null) parts.push(`prev +${s.weightValue}kg`);
+    else if (wm === "previous_plus" && s.weightValue != null) parts.push(`prev +${fmtWeight(s.weightValue, units)}`);
     else if (wm === "previous_times" && s.weightValue != null) parts.push(`prev ×${s.weightValue}`);
     else if (wm === "dropset") parts.push("dropset");
     else parts.push("your choice");
