@@ -172,6 +172,29 @@ describe("credits + AI metering", () => {
     expect(out.credits).toBeGreaterThan(0);
     const after = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { balance: number } };
     expect(after.balance.balance).toBeLessThan(billing.balance.balance);
+
+    // Snap-a-Meal (vision) — upload a photo to R2, then the endpoint reads it
+    // and returns entries via the mock vision lane. Reuses the studio comp above.
+    const fd = new FormData();
+    fd.append("file", new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], { type: "image/jpeg" }), "meal.jpg");
+    fd.append("purpose", "meal-snap");
+    const up = await SELF.fetch("http://x/api/media/upload", { method: "POST", headers: auth(ownerCookie), body: fd });
+    const { key } = (await up.json()) as { key: string };
+    expect(key).toContain(`t/${ctx.active.tenantId}/`);
+    const snap = await SELF.fetch("http://x/api/ai/snap-meal", {
+      method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ clientId: client.id, imageKey: key, hint: "lunch" }),
+    });
+    expect(snap.status).toBe(200);
+    const snapOut = (await snap.json()) as { entries: unknown[]; mocked: boolean };
+    expect(snapOut.mocked).toBe(true);
+    expect(snapOut.entries.length).toBeGreaterThan(0);
+    // A key outside the caller's tenant prefix is rejected (no cross-tenant reads).
+    const bad = await SELF.fetch("http://x/api/ai/snap-meal", {
+      method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ clientId: client.id, imageKey: "t/other-tenant/meal-snap/x.jpg" }),
+    });
+    expect(bad.status).toBe(400);
   });
 });
 

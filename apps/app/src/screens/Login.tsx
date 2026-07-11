@@ -2,12 +2,12 @@
  * Sign in — 100% passwordless (email → OTP). Premium, animated, icon-based.
  */
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Button, Card, Field, Mail, KeyRound, ArrowRight, Sparkles } from "@mossa/ui";
 import { api } from "../api.js";
 import { useSession } from "../session.js";
-import { passkeySupported, signInWithPasskey } from "../passkey.js";
+import { passkeySupported, signInWithPasskey, conditionalPasskeyAvailable } from "../passkey.js";
 
 export function Login() {
   const { refresh, host } = useSession();
@@ -20,6 +20,20 @@ export function Login() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const otpRef = useRef<HTMLInputElement>(null);
+
+  // Passkey autofill (WebAuthn conditional UI): arm the browser to offer saved
+  // passkeys in the email field's autofill. Non-blocking; the modal button
+  // stays as the explicit path. Aborted on unmount so it never leaks.
+  useEffect(() => {
+    const ctl = new AbortController();
+    void conditionalPasskeyAvailable().then((ok) => {
+      if (!ok || ctl.signal.aborted) return;
+      signInWithPasskey({ conditional: true, signal: ctl.signal })
+        .then(() => refresh())
+        .catch(() => undefined); // user typed instead / dismissed autofill
+    });
+    return () => ctl.abort();
+  }, [refresh]);
 
   const sendCode = async () => {
     setBusy(true);

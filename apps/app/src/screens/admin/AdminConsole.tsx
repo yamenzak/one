@@ -7,18 +7,45 @@ import { api } from "../../api.js";
 interface Tenant { id: string; name: string; slug: string; plan_id: string | null; status: string | null; comp: number | null }
 const PLANS = ["free", "solo", "studio", "team"];
 
-type AdminTab = "tenants" | "stripe" | "domains";
+type AdminTab = "tenants" | "stripe" | "domains" | "ai";
 
 export function AdminConsole({ onBack }: { onBack: () => void }) {
   const [tab, setTab] = useState<AdminTab>("tenants");
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <div className="flex items-center gap-3"><Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button><div className="flex items-center gap-2"><ShieldCheck className="size-5 text-primary" /><h1 className="text-xl font-bold tracking-tight">Platform admin</h1></div></div>
-      <SegmentedControl options={[{ value: "tenants", label: "Tenants" }, { value: "stripe", label: "Stripe" }, { value: "domains", label: "Domains" }]} value={tab} onChange={setTab} />
+      <SegmentedControl options={[{ value: "tenants", label: "Tenants" }, { value: "stripe", label: "Stripe" }, { value: "ai", label: "AI" }, { value: "domains", label: "Domains" }]} value={tab} onChange={setTab} />
       {tab === "tenants" && <Tenants />}
       {tab === "stripe" && <StripeConfig />}
+      {tab === "ai" && <AiConfig />}
       {tab === "domains" && <DomainsConfig />}
     </Page>
+  );
+}
+
+/** AI provider config — the Gemini key that powers the vision suite (Snap-a-Meal). */
+function AiConfig() {
+  const [status, setStatus] = useState<{ geminiKeySet: boolean; mockMode: string } | null>(null);
+  const [geminiKey, setGeminiKey] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const load = () => void api.get<{ geminiKeySet: boolean; mockMode: string }>("/api/admin/ai/config").then(setStatus).catch(() => undefined);
+  useEffect(load, []);
+  const save = async () => { await api.post("/api/admin/ai/config", { geminiKey }); setGeminiKey(""); setMsg("Saved. Vision features now use Gemini."); load(); };
+  const setMock = async (mockMode: string) => { await api.post("/api/admin/ai/config", { mockMode }); load(); };
+  return (
+    <Stagger>
+      <Card className="space-y-4">
+        <div className="flex items-center justify-between"><div className="flex items-center gap-2"><Sparkles className="size-5 text-primary" /><h2 className="font-semibold">AI providers</h2></div><Badge tone={status?.geminiKeySet ? "success" : "neutral"}>{status?.geminiKeySet ? "Gemini on" : "mock only"}</Badge></div>
+        <p className="text-sm text-muted-foreground">A single Google AI Studio key powers vision (Snap-a-Meal, Label Reader, Menu Scout). Text still runs on Workers AI.</p>
+        <Field label={status?.geminiKeySet ? "Gemini API key — saved (blank keeps it)" : "Gemini API key"} icon={KeyRound} type="password" value={geminiKey} onChange={(e) => setGeminiKey(e.target.value)} />
+        <Button className="w-full" disabled={!geminiKey} onClick={() => void save()}>Save key</Button>
+        <div className="flex items-center justify-between border-t border-border/50 pt-3">
+          <div><div className="text-sm font-medium">Mock mode</div><div className="text-xs text-muted-foreground">Force deterministic offline outputs (dev/testing).</div></div>
+          <SegmentedControl options={[{ value: "auto", label: "Auto" }, { value: "on", label: "On" }, { value: "off", label: "Off" }]} value={status?.mockMode ?? "auto"} onChange={(v) => void setMock(v)} />
+        </div>
+        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+      </Card>
+    </Stagger>
   );
 }
 
@@ -44,6 +71,12 @@ function DomainsConfig() {
       <Card className="space-y-4">
         <div className="flex items-center justify-between"><div className="flex items-center gap-2"><Globe className="size-5 text-primary" /><h2 className="font-semibold">Cloudflare for SaaS</h2></div><Badge tone={status?.configured ? "success" : "neutral"}>{status?.configured ? "enabled" : "off"}</Badge></div>
         <p className="text-sm text-muted-foreground">A zone API token with <span className="font-medium">SSL and Certificates: Edit</span>, the SaaS-enabled zone id, and the CNAME target tenants point their domain at.</p>
+        {/* One-time dashboard setup that can't be done from code. */}
+        <ol className="space-y-1.5 rounded-xl bg-surface-2 p-3 text-xs text-muted-foreground">
+          <li><span className="font-medium text-foreground">1.</span> On the 4dl.app zone → SSL/TLS → Custom Hostnames → <span className="font-medium">Enable</span>, and set a Fallback Origin (e.g. <code className="rounded bg-surface-3 px-1">ssl.mossa.4dl.app</code> → CNAME <code className="rounded bg-surface-3 px-1">mossa.4dl.app</code>, proxied).</li>
+          <li><span className="font-medium text-foreground">2.</span> Create an API token scoped to that zone with <span className="font-medium">SSL and Certificates · Edit</span>.</li>
+          <li><span className="font-medium text-foreground">3.</span> Paste the token, zone id, and the CNAME target below. Full steps in DEPLOY.md.</li>
+        </ol>
         <Field label={status?.tokenSet ? "API token — saved (blank keeps it)" : "API token"} icon={KeyRound} type="password" value={apiToken} onChange={(e) => setApiToken(e.target.value)} />
         <Field label="Zone id" value={zoneId} onChange={(e) => setZoneId(e.target.value)} />
         <Field label="CNAME target (e.g. ssl.mossa.4dl.app)" icon={Globe} value={cnameTarget} onChange={(e) => setCnameTarget(e.target.value)} />

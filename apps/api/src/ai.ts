@@ -54,6 +54,20 @@ const DEFAULT_MODELS: Omit<AiModelRow, "enabled" | "is_default">[] = [
     unit_kind: null,
     markup: 3,
   },
+  {
+    // Gemini Flash — vision lane (Snap-a-Meal, Label Reader, Menu Scout). Rates
+    // are Google list prices expressed as neuron-equivalents (~$0.011/1k) so
+    // both providers meter identically (SPEC §6). ~$0.10/$0.40 per 1M tok.
+    id: "gemini-2.0-flash",
+    task: "vision",
+    label: "Gemini Flash (vision)",
+    provider: "google",
+    input_rate: 9_000,
+    output_rate: 36_000,
+    unit_rate: null,
+    unit_kind: null,
+    markup: 3,
+  },
 ];
 
 let modelsSeeded = false;
@@ -97,10 +111,12 @@ export interface GenerateInput {
   actorUserId: string;
   clientId?: string | null;
   feature: string;
-  task: "text" | "text-small";
+  task: "text" | "text-small" | "vision";
   system: string;
   prompt: string;
   maxOutputTokens?: number;
+  /** Inline image for vision tasks (base64 + mime), routed to a vision model. */
+  image?: { data: string; mimeType: string };
   /** Deterministic mock output builder for dev / `ai.mock = on`. */
   mock: () => string;
 }
@@ -111,6 +127,45 @@ export type GenerateResult =
   | { ok: false; error: "unavailable" };
 
 const RUN_TIMEOUT_MS = 120_000;
+
+function withTimeout<T>(p: Promise<T>): Promise<T> {
+  return Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), RUN_TIMEOUT_MS))]);
+}
+
+interface GeminiPart { text?: string }
+interface GeminiResponse {
+  candidates?: { content?: { parts?: GeminiPart[] } }[];
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+}
+
+/** Google AI Studio (Gemini) generateContent — text + optional inline image. */
+async function runGemini(
+  key: string,
+  modelId: string,
+  input: GenerateInput,
+): Promise<{ output: string; usage: Usage }> {
+  const parts: Record<string, unknown>[] = [{ text: input.prompt }];
+  if (input.image) parts.push({ inline_data: { mime_type: input.image.mimeType, data: input.image.data } });
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: input.system }] },
+        contents: [{ role: "user", parts }],
+        generationConfig: { maxOutputTokens: input.maxOutputTokens ?? 1024 },
+      }),
+    },
+  );
+  if (!res.ok) throw new Error(`gemini ${res.status}`);
+  const json = (await res.json()) as GeminiResponse;
+  const output = (json.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("");
+  return {
+    output,
+    usage: { inputTokens: json.usageMetadata?.promptTokenCount ?? 0, outputTokens: json.usageMetadata?.candidatesTokenCount ?? 0 },
+  };
+}
 
 export async function generate(env: Env, input: GenerateInput): Promise<GenerateResult> {
   // Owner AI feature toggles — a feature explicitly switched off is refused
@@ -131,7 +186,11 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
 
   const cfg = await getConfig(env.DB);
   const mockMode = cfg["ai.mock"] ?? "auto";
-  const useMock = mockMode === "on" || (mockMode !== "off" && !env.AI);
+  const isGoogle = model.provider === "google";
+  const geminiKey = cfg["google.gemini_key"];
+  // Real run needs the matching credential: Workers AI binding, or a Gemini key.
+  const canRunReal = isGoogle ? !!geminiKey : !!env.AI;
+  const useMock = mockMode === "on" || (mockMode !== "off" && !canRunReal);
 
   // Worst-case estimate for the hold: prompt tokens (~chars/4) in, cap out.
   const estUsage: Usage = {
@@ -155,6 +214,10 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
       output = input.mock();
       usage = { inputTokens: estUsage.inputTokens, outputTokens: Math.ceil(output.length / 4) };
       mocked = true;
+    } else if (isGoogle) {
+      const g = await withTimeout(runGemini(geminiKey!, model.id, input));
+      output = g.output;
+      usage = { inputTokens: g.usage.inputTokens ?? estUsage.inputTokens, outputTokens: g.usage.outputTokens ?? Math.ceil(output.length / 4) };
     } else {
       const run = env.AI!.run(model.id as Parameters<Ai["run"]>[0], {
         messages: [
@@ -163,10 +226,7 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
         ],
         max_tokens: input.maxOutputTokens ?? 1024,
       }) as Promise<{ response?: string; usage?: { prompt_tokens?: number; completion_tokens?: number } }>;
-      const result = await Promise.race([
-        run,
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), RUN_TIMEOUT_MS)),
-      ]);
+      const result = await withTimeout(run);
       output = result.response ?? "";
       usage = {
         inputTokens: result.usage?.prompt_tokens ?? estUsage.inputTokens,

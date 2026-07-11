@@ -7,11 +7,20 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { WorkoutBody } from "@mossa/protocol";
-import { type AppEnv, requireTenant } from "./auth-context.js";
+import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
-import { tenantEntitlements } from "./billing-store.js";
+import { tenantEntitlements, getConfig, setConfig } from "./billing-store.js";
 import { generate, extractJson } from "./ai.js";
 import { parseJson } from "./db.js";
+
+/** Base64-encode an ArrayBuffer in chunks (avoids arg-count blowups on big images). */
+function toBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let bin = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  return btoa(bin);
+}
 
 const PARSE_FOOD_SYSTEM = `You turn casual food descriptions into structured diary entries.
 Reply with ONLY a JSON array. Each item: {"label": string, "mealType": "breakfast"|"lunch"|"dinner"|"snack", "calories": number, "proteinG": number, "carbsG": number, "fatG": number, "quantity": number|null, "unit": string|null}.
@@ -166,13 +175,18 @@ export const aiRoutes = new Hono<AppEnv>()
     if ("response" in access) return access.response;
     // The image must be a same-tenant R2 object.
     if (!parsed.data.imageKey.startsWith(`t/${who.tenantId}/`)) return c.json({ error: "invalid image" }, 400);
+    // Load the photo for the vision model (mock lane ignores it).
+    const obj = await c.env.MEDIA.get(parsed.data.imageKey);
+    if (!obj) return c.json({ error: "image not found" }, 404);
+    const image = { data: toBase64(await obj.arrayBuffer()), mimeType: obj.httpMetadata?.contentType ?? "image/jpeg" };
 
     const result = await generate(c.env, {
       tenantId: who.tenantId,
       actorUserId: who.userId,
       clientId: access.client.id,
       feature: "snap-meal",
-      task: "text", // vision model swaps in with the catalog expansion
+      task: "vision", // Gemini Flash (vision) — real photo → foods + macros
+      image,
       system: PARSE_FOOD_SYSTEM,
       prompt: `A photo of a meal${parsed.data.hint ? ` (${parsed.data.hint})` : ""}. Identify the foods and estimate portions + macros as the JSON array.`,
       maxOutputTokens: 512,
@@ -288,5 +302,24 @@ export const aiRoutes = new Hono<AppEnv>()
     )
       .bind(`ifb_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, who.tenantId, who.userId, parsed.data.insightType, parsed.data.insightRef ?? null, parsed.data.vote, Date.now())
       .run();
+    return c.json({ ok: true });
+  });
+
+// ── Platform admin: AI provider config (Gemini key + mock mode) ──────────────
+export const aiAdminRoutes = new Hono<AppEnv>()
+  .get("/admin/ai/config", async (c) => {
+    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    const cfg = await getConfig(c.env.DB);
+    // Never echo the key — only whether it's set.
+    return c.json({ geminiKeySet: !!cfg["google.gemini_key"], mockMode: cfg["ai.mock"] ?? "auto" });
+  })
+  .post("/admin/ai/config", async (c) => {
+    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    const d = z
+      .object({ geminiKey: z.string().min(1).optional(), mockMode: z.enum(["auto", "on", "off"]).optional() })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!d.success) return c.json({ error: "invalid body" }, 400);
+    if (d.data.geminiKey) await setConfig(c.env.DB, "google.gemini_key", d.data.geminiKey.trim());
+    if (d.data.mockMode) await setConfig(c.env.DB, "ai.mock", d.data.mockMode);
     return c.json({ ok: true });
   });

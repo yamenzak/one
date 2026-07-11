@@ -9,6 +9,20 @@ import { api } from "./api.js";
 export const passkeySupported = (): boolean =>
   typeof window !== "undefined" && !!window.PublicKeyCredential;
 
+/**
+ * Conditional-UI (autofill) support — lets the browser surface passkeys in the
+ * email field's autofill dropdown (SPEC §4 "passkey autofill on the login
+ * screen"). Guarded because not every browser implements it.
+ */
+export async function conditionalPasskeyAvailable(): Promise<boolean> {
+  try {
+    const PK = window.PublicKeyCredential as unknown as { isConditionalMediationAvailable?: () => Promise<boolean> };
+    return passkeySupported() && typeof PK.isConditionalMediationAvailable === "function" && (await PK.isConditionalMediationAvailable());
+  } catch {
+    return false;
+  }
+}
+
 function bufToB64url(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
   let str = "";
@@ -76,8 +90,12 @@ interface RequestOptionsJSON {
   timeout?: number;
 }
 
-/** Sign in with an existing passkey (WebAuthn get ceremony). */
-export async function signInWithPasskey(): Promise<void> {
+/**
+ * Sign in with an existing passkey (WebAuthn get ceremony). With
+ * `conditional`, runs as autofill UI — non-modal, resolves only when the user
+ * picks a passkey from the field dropdown; pass an AbortSignal to cancel it.
+ */
+export async function signInWithPasskey(opts?: { conditional?: boolean; signal?: AbortSignal }): Promise<void> {
   const options = await api.post<RequestOptionsJSON>("/api/auth/passkey/generate-authenticate-options", {});
   const publicKey: PublicKeyCredentialRequestOptions = {
     challenge: b64urlToBuf(options.challenge),
@@ -86,7 +104,11 @@ export async function signInWithPasskey(): Promise<void> {
     timeout: options.timeout,
     allowCredentials: options.allowCredentials?.map((c) => ({ id: b64urlToBuf(c.id), type: "public-key" as const, transports: c.transports as AuthenticatorTransport[] | undefined })),
   };
-  const cred = (await navigator.credentials.get({ publicKey })) as PublicKeyCredential | null;
+  const cred = (await navigator.credentials.get({
+    publicKey,
+    ...(opts?.conditional ? { mediation: "conditional" as CredentialMediationRequirement } : {}),
+    signal: opts?.signal,
+  })) as PublicKeyCredential | null;
   if (!cred) throw new Error("passkey sign-in cancelled");
   const resp = cred.response as AuthenticatorAssertionResponse;
   await api.post("/api/auth/passkey/verify-authentication", {
