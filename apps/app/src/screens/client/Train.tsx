@@ -173,18 +173,18 @@ export function Train({ clientId }: { clientId: string }) {
       )}
 
       {/* Quick-start chips */}
-      <div className="flex flex-wrap gap-2">
+      <Stagger className="flex flex-wrap gap-2">
         {published && <Chip icon={Play} selected onClick={() => start()}>Start workout</Chip>}
         <Chip icon={Footprints} onClick={() => setActivityOpen(true)}>Log activity</Chip>
         {categories.length > 0 && <Chip icon={Dumbbell} onClick={() => setBrowseCat(categories[0]![0])}>Freestyle</Chip>}
         {plans.some((p) => p.status === "superseded") && <Chip icon={History} onClick={() => setHistOpen(true)}>Past plans</Chip>}
-      </div>
+      </Stagger>
 
       {/* This week — key metrics from real logs */}
       {hasData && (
         <section className="space-y-2">
           <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">This week</h3>
-          <div className="grid grid-cols-2 gap-3">
+          <Stagger className="grid grid-cols-2 gap-3">
             <StatCard stack label="Training load" value={week.weekLoad} unit={`/ ${DEFAULT_WEEKLY_LOAD_TARGET}`} icon={TrendingUp} tone="activity"
               badge={<Badge tone={week.weekLoad >= DEFAULT_WEEKLY_LOAD_TARGET ? "success" : "neutral"}>{week.weekLoad >= DEFAULT_WEEKLY_LOAD_TARGET ? "On target" : "Building"}</Badge>}
               chart={week.weekLoad > 0 ? <MiniBars values={week.dailyLoad} tone="activity" width={132} target={DEFAULT_WEEKLY_LOAD_TARGET / 7} /> : undefined} />
@@ -194,7 +194,7 @@ export function Train({ clientId }: { clientId: string }) {
               chart={<WeekDots days={week.active} todayIndex={6} tone="cardio" fill />} />
             <StatCard stack label="PRs this week" value={week.weekPRs} icon={Trophy} tone="nutrition"
               badge={week.topE1 > 0 ? <Badge tone="neutral">best e1RM {fmtWeight(week.topE1, units)}</Badge> : undefined} />
-          </div>
+          </Stagger>
         </section>
       )}
 

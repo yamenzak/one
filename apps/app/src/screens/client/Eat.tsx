@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { fmtEnergy, fmtVolume, volumeDisplayToMl, kcalToDisplay } from "@mossa/domain";
 import {
-  Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MacroInline, MetricChip, ProgressRing, METRICS, toneSoft, Page, Stagger, EmptyState,
+  Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MacroInline, MetricChip, ProgressRing, METRICS, toneSoft, Page, Stagger, EmptyState, motion,
   Plus, ClipboardList, Utensils, Croissant, Soup, Apple, Dumbbell, Droplet, Beef, Camera, History, Trash2, type LucideIcon,
 } from "@mossa/ui";
 import type { UnitPrefs } from "@mossa/domain";
@@ -113,32 +113,34 @@ export function Eat({ clientId }: { clientId: string }) {
       </Stagger>
 
       {/* Primary actions — directly available */}
-      <div className="flex flex-wrap gap-2">
+      <Stagger className="flex flex-wrap gap-2">
         <Chip icon={Plus} selected onClick={() => openLog()}>Log food</Chip>
         <Chip icon={Camera} onClick={() => openLog(undefined, true)}>Snap a meal</Chip>
         <Chip icon={ClipboardList} onClick={() => setPlanOpen(true)}>My plan</Chip>
         {hasPlanHistory && <Chip icon={History} onClick={() => setPlanHistOpen(true)}>Past plans</Chip>}
-      </div>
+      </Stagger>
 
       {/* Today — hydration + protein at a glance */}
       <section className="space-y-2">
         <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today</h3>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-2.5 rounded-2xl bg-card p-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground"><Droplet className="size-4 text-hydration" /><span>Water</span></div>
-            <div className="numeral text-[1.6rem] font-semibold leading-none">{fmtVolume(waterMl, units)}<span className="ml-1 text-sm font-medium text-muted-foreground">/ {fmtVolume(waterTarget, units)}</span></div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-hydration transition-all" style={{ width: `${waterPct}%` }} /></div>
-            <div className="flex gap-1.5">
+        <Stagger className="grid grid-cols-2 gap-3">
+          <div className="relative flex flex-col gap-2.5 overflow-hidden rounded-2xl bg-card p-4">
+            <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-hydration/10 blur-2xl" />
+            <div className="relative flex items-center gap-2 text-sm text-muted-foreground"><Droplet className="size-4 text-hydration" /><span>Water</span></div>
+            <div className="numeral relative text-[1.6rem] font-semibold leading-none">{fmtVolume(waterMl, units)}<span className="ml-1 text-sm font-medium text-muted-foreground">/ {fmtVolume(waterTarget, units)}</span></div>
+            <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-hydration transition-all duration-500" style={{ width: `${waterPct}%` }} /></div>
+            <div className="relative flex gap-1.5">
               {waterPresets.map((v) => <button key={v} onClick={() => void addWater(v)} className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-transform active:scale-95 ${toneSoft.hydration}`}>+{v}</button>)}
             </div>
           </div>
-          <div className="flex flex-col gap-2.5 rounded-2xl bg-card p-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground"><Beef className="size-4 text-protein" /><span>Protein</span></div>
-            <div className="numeral text-[1.6rem] font-semibold leading-none">{proteinTotal}<span className="ml-1 text-sm font-medium text-muted-foreground">{proteinTarget > 0 ? `/ ${proteinTarget} g` : "g"}</span></div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">{proteinTarget > 0 && <div className="h-full rounded-full bg-protein transition-all" style={{ width: `${Math.min(100, Math.max(3, (proteinTotal / proteinTarget) * 100))}%` }} />}</div>
-            <div className="text-xs text-muted-foreground">{proteinTarget > 0 ? (proteinTotal >= proteinTarget ? "Goal reached" : `${proteinTarget - proteinTotal} g to go`) : "No target set"}</div>
+          <div className="relative flex flex-col gap-2.5 overflow-hidden rounded-2xl bg-card p-4">
+            <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-protein/10 blur-2xl" />
+            <div className="relative flex items-center gap-2 text-sm text-muted-foreground"><Beef className="size-4 text-protein" /><span>Protein</span></div>
+            <div className="numeral relative text-[1.6rem] font-semibold leading-none">{proteinTotal}<span className="ml-1 text-sm font-medium text-muted-foreground">{proteinTarget > 0 ? `/ ${proteinTarget} g` : "g"}</span></div>
+            <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-surface-2">{proteinTarget > 0 && <div className="h-full rounded-full bg-protein transition-all duration-500" style={{ width: `${Math.min(100, Math.max(3, (proteinTotal / proteinTarget) * 100))}%` }} />}</div>
+            <div className="relative text-xs text-muted-foreground">{proteinTarget > 0 ? (proteinTotal >= proteinTarget ? "Goal reached" : `${proteinTarget - proteinTotal} g to go`) : "No target set"}</div>
           </div>
-        </div>
+        </Stagger>
       </section>
 
       {/* Today's meals */}
@@ -190,7 +192,7 @@ export function Eat({ clientId }: { clientId: string }) {
       {week && (
         <section className="space-y-2">
           <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">This week</h3>
-          <WeekStrip week={week} />
+          <Stagger><WeekStrip week={week} /></Stagger>
         </section>
       )}
 
@@ -226,11 +228,14 @@ function WeekStrip({ week }: { week: Week }) {
           {days.map((d, i) => {
             const over = ct ? d.calories > ct * 1.15 : false;
             const today = i === days.length - 1;
+            const h = d.logged ? Math.max(4, (d.calories / max) * 44) : 4;
             return (
               <div key={d.date} className="flex flex-1 justify-center">
-                <div
-                  className={`w-full max-w-6 rounded-md transition-all ${!d.logged ? "bg-surface-2" : over ? "bg-danger" : "bg-calories"} ${today ? "ring-2 ring-calories/30" : ""}`}
-                  style={{ height: d.logged ? Math.max(4, (d.calories / max) * 44) : 4, opacity: d.logged ? 1 : 0.6 }}
+                <motion.div
+                  initial={{ height: 4, opacity: 0 }}
+                  animate={{ height: h, opacity: d.logged ? 1 : 0.6 }}
+                  transition={{ delay: i * 0.04, type: "spring", stiffness: 300, damping: 26 }}
+                  className={`w-full max-w-6 rounded-md ${!d.logged ? "bg-surface-2" : over ? "bg-danger" : "bg-calories"} ${today ? "ring-2 ring-calories/30" : ""}`}
                 />
               </div>
             );
