@@ -182,14 +182,14 @@ export function Train({ clientId }: { clientId: string }) {
         <section className="space-y-2">
           <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">This week</h3>
           <div className="grid grid-cols-2 gap-3">
-            <StatCard label="Training load" value={week.weekLoad} unit={`/ ${DEFAULT_WEEKLY_LOAD_TARGET}`} icon={TrendingUp} tone="activity"
+            <StatCard stack label="Training load" value={week.weekLoad} unit={`/ ${DEFAULT_WEEKLY_LOAD_TARGET}`} icon={TrendingUp} tone="activity"
               badge={<Badge tone={week.weekLoad >= DEFAULT_WEEKLY_LOAD_TARGET ? "success" : "neutral"}>{week.weekLoad >= DEFAULT_WEEKLY_LOAD_TARGET ? "On target" : "Building"}</Badge>}
-              chart={<MiniBars values={week.dailyLoad} tone="activity" target={DEFAULT_WEEKLY_LOAD_TARGET / 7} />} />
-            <StatCard label="Tonnage" value={week.weekTonnage.toLocaleString()} unit="kg" icon={Dumbbell} tone="activity"
-              chart={<Sparkline values={week.dailyTonnage} tone="activity" />} />
-            <StatCard label="Active days" value={week.activeCount} unit="of 7" icon={Flame} tone="cardio"
-              chart={<WeekDots days={week.active} todayIndex={6} tone="cardio" />} />
-            <StatCard label="PRs this week" value={week.weekPRs} icon={Trophy} tone="nutrition"
+              chart={week.weekLoad > 0 ? <MiniBars values={week.dailyLoad} tone="activity" width={132} target={DEFAULT_WEEKLY_LOAD_TARGET / 7} /> : undefined} />
+            <StatCard stack label="Tonnage" value={week.weekTonnage.toLocaleString()} unit="kg" icon={Dumbbell} tone="activity"
+              chart={week.weekTonnage > 0 ? <Sparkline values={week.dailyTonnage} tone="activity" width={132} /> : undefined} />
+            <StatCard stack label="Active days" value={week.activeCount} unit="of 7" icon={Flame} tone="cardio"
+              chart={<WeekDots days={week.active} todayIndex={6} tone="cardio" fill />} />
+            <StatCard stack label="PRs this week" value={week.weekPRs} icon={Trophy} tone="nutrition"
               badge={week.topE1 > 0 ? <Badge tone="neutral">best e1RM {week.topE1}kg</Badge> : undefined} />
           </div>
         </section>

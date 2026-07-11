@@ -52,27 +52,37 @@ interface StatCardProps {
   tone?: Tone;
   onClick?: () => void;
   className?: string;
+  /** Chart below the value (full card width) instead of beside it — for
+   *  narrow / 2-up grid cards where a side chart would collide. */
+  stack?: boolean;
 }
 
-export function StatCard({ label, value, unit, badge, chart, icon: Icon, tone = "primary", onClick, className }: StatCardProps) {
+export function StatCard({ label, value, unit, badge, chart, icon: Icon, tone = "primary", onClick, className, stack }: StatCardProps) {
   const Comp = onClick ? motion.button : motion.div;
-  return (
-    <Comp
-      onClick={onClick}
-      whileTap={onClick ? { scale: 0.99 } : undefined}
-      className={cn("flex w-full items-center justify-between gap-4 rounded-2xl bg-card p-5 text-left", className)}
-    >
-      <div className="min-w-0">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          {Icon && <Icon className="size-4" style={{ color: toneVar[tone] }} />}
-          {label}
-        </div>
-        <div className="numeral mt-1.5 text-[2rem] font-semibold leading-none">
-          {value}
-          {unit && <span className="ml-1 text-base font-medium text-muted-foreground">{unit}</span>}
-        </div>
-        {badge && <div className="mt-3">{badge}</div>}
+  const head = (
+    <div className="min-w-0">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        {Icon && <Icon className="size-4 shrink-0" style={{ color: toneVar[tone] }} />}
+        <span className="truncate">{label}</span>
       </div>
+      <div className={cn("numeral mt-1.5 font-semibold leading-none", stack ? "text-[1.65rem]" : "text-[2rem]")}>
+        {value}
+        {unit && <span className="ml-1 text-base font-medium text-muted-foreground">{unit}</span>}
+      </div>
+      {badge && <div className={stack ? "mt-2" : "mt-3"}>{badge}</div>}
+    </div>
+  );
+  if (stack) {
+    return (
+      <Comp onClick={onClick} whileTap={onClick ? { scale: 0.99 } : undefined} className={cn("flex w-full flex-col gap-3 rounded-2xl bg-card p-4 text-left", className)}>
+        {head}
+        {chart && <div className="w-full overflow-hidden">{chart}</div>}
+      </Comp>
+    );
+  }
+  return (
+    <Comp onClick={onClick} whileTap={onClick ? { scale: 0.99 } : undefined} className={cn("flex w-full items-center justify-between gap-4 rounded-2xl bg-card p-5 text-left", className)}>
+      {head}
       {chart && <div className="shrink-0">{chart}</div>}
     </Comp>
   );
@@ -180,20 +190,20 @@ export function MiniBars({ values, width = 130, height = 52, tone = "activity", 
 
 // ── WeekDots ─────────────────────────────────────────────────────────────────
 const DAY_LETTERS = ["M", "T", "W", "T", "F", "S", "S"];
-export function WeekDots({ days, todayIndex, tone = "activity", className }: { days: boolean[]; todayIndex?: number; tone?: Tone; className?: string }) {
+export function WeekDots({ days, todayIndex, tone = "activity", className, fill }: { days: boolean[]; todayIndex?: number; tone?: Tone; className?: string; fill?: boolean }) {
   return (
-    <div className={cn("flex items-center gap-1.5", className)}>
+    <div className={cn(fill ? "flex w-full items-center justify-between" : "flex items-center gap-1.5", className)}>
       {DAY_LETTERS.map((letter, i) => (
-        <div key={i} className="flex flex-col items-center gap-1.5">
+        <div key={i} className="flex flex-col items-center gap-1">
           <motion.span
             initial={{ scale: 0.6, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: i * 0.03, type: "spring", stiffness: 400, damping: 22 }}
-            className={cn("grid size-7 place-items-center rounded-full text-[0.7rem] [&_svg]:size-3.5", days[i] ? toneSoft[tone] : "bg-surface-2 text-muted-foreground/40")}
+            className={cn("grid place-items-center rounded-full [&_svg]:size-3", fill ? "size-[1.15rem] text-[0.6rem]" : "size-7 text-[0.7rem]", days[i] ? toneSoft[tone] : "bg-surface-2 text-muted-foreground/40")}
           >
             {days[i] ? <Check strokeWidth={3} /> : ""}
           </motion.span>
-          <span className={cn("text-[0.65rem]", i === todayIndex ? "font-bold text-foreground" : "text-muted-foreground")}>{letter}</span>
+          <span className={cn(fill ? "text-[0.55rem]" : "text-[0.65rem]", i === todayIndex ? "font-bold text-foreground" : "text-muted-foreground")}>{letter}</span>
         </div>
       ))}
     </div>
