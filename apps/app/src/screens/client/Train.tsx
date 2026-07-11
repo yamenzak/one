@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { prescribedSetsForDay, type WorkoutBody } from "@mossa/protocol";
 import { sessionTonnage, sessionLoad, epley1Rm, DEFAULT_WEEKLY_LOAD_TARGET, activityByKey } from "@mossa/domain";
@@ -15,7 +16,6 @@ import {
   Dumbbell, Play, Moon, ChevronRight, Plus, Footprints, Flame, TrendingUp, Trophy, Heart, Activity,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
-import { WorkoutPlayer } from "./WorkoutPlayer.js";
 import { LogSheet } from "./LogSheet.js";
 import { ExerciseThumb, ExerciseMeta, pretty, type ExerciseInfo } from "../exercise.js";
 
@@ -47,8 +47,7 @@ export function Train({ clientId }: { clientId: string }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [library, setLibrary] = useState<ExerciseInfo[]>([]);
-  const [playing, setPlaying] = useState(false);
-  const [playDay, setPlayDay] = useState<number | undefined>(undefined);
+  const nav = useNavigate();
   const [activityOpen, setActivityOpen] = useState(false);
   const [browseCat, setBrowseCat] = useState<string | null>(null);
   const today = todayLocal();
@@ -139,9 +138,8 @@ export function Train({ clientId }: { clientId: string }) {
     return [...count.entries()].sort((a, b) => b[1] - a[1]);
   }, [library]);
 
-  const start = (day?: number) => { setPlayDay(day); setPlaying(true); };
+  const start = (day?: number) => nav(day != null ? `/train/session/${day}` : "/train/session");
 
-  if (playing) return <WorkoutPlayer clientId={clientId} initialDay={playDay} onExit={() => setPlaying(false)} />;
   if (!plans) return <Skeleton className="m-4 h-64" />;
   const published = plans.find((p) => p.status === "published");
   const hasData = week.activeCount > 0 || week.weekTonnage > 0 || recent.length > 0;

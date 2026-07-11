@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Routes, Route, Navigate, Outlet, useNavigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
   Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, type TabDef,
@@ -20,6 +20,9 @@ import { Eat } from "./screens/client/Eat.js";
 import { Progress } from "./screens/client/Progress.js";
 import { CoachToday } from "./screens/coach/CoachToday.js";
 import { Clients, ClientDetail } from "./screens/coach/Clients.js";
+import { WorkoutBuilder } from "./screens/coach/WorkoutBuilder.js";
+import { MealBuilder } from "./screens/coach/MealBuilder.js";
+import { WorkoutPlayer } from "./screens/client/WorkoutPlayer.js";
 import { Business } from "./screens/coach/Business.js";
 import { Library } from "./screens/coach/Library.js";
 import { Settings } from "./screens/Settings.js";
@@ -64,12 +67,16 @@ export function Shell() {
       <Route path="/shop" element={<OverlayWithClient render={(cid, back) => <Shop clientId={cid} onBack={back} />} />} />
       <Route path="/explore" element={<OverlayWithClient render={(cid, back) => <Explore clientId={cid} onBack={back} />} />} />
       <Route path="/admin" element={<AdminRoute />} />
+      {/* Plan builder — full-screen editor, its own bottom action bar. */}
+      <Route path="/clients/:clientId/plans/:planKind/:planId" element={<CoachArea><PlanBuilderRoute /></CoachArea>} />
 
       {/* Tabbed app. */}
       <Route element={<TabLayout />}>
         <Route index element={<Navigate to="/today" replace />} />
         <Route path="today" element={<TodayRoute />} />
         <Route path="train" element={<ClientArea>{(cid) => <Train clientId={cid} />}</ClientArea>} />
+        <Route path="train/session" element={<ClientArea>{(cid) => <TrainSessionRoute clientId={cid} />}</ClientArea>} />
+        <Route path="train/session/:day" element={<ClientArea>{(cid) => <TrainSessionRoute clientId={cid} />}</ClientArea>} />
         <Route path="eat" element={<ClientArea>{(cid) => <Eat clientId={cid} />}</ClientArea>} />
         <Route path="progress" element={<ClientArea>{(cid) => <Progress clientId={cid} />}</ClientArea>} />
         <Route path="clients" element={<CoachArea><Clients /></CoachArea>} />
@@ -246,4 +253,21 @@ function OverlayWithClient({ render }: { render: (clientId: string, back: () => 
   const nav = useNavigate();
   if (!clientId) return <Navigate to="/today" replace />;
   return <>{render(clientId, () => nav(-1))}</>;
+}
+
+/** Plan builder route — /clients/:id/plans/:kind/:planId. */
+function PlanBuilderRoute() {
+  const nav = useNavigate();
+  const { clientId, planKind, planId } = useParams<{ clientId: string; planKind: string; planId: string }>();
+  if (!clientId || !planId) return <Navigate to="/clients" replace />;
+  const back = () => nav(`/clients/${clientId}/plans`);
+  return planKind === "meal" ? <MealBuilder planId={planId} onBack={back} /> : <WorkoutBuilder planId={planId} onBack={back} />;
+}
+
+/** Workout player route — /train/session[/:day]. Sets persist server-side, so
+ *  refresh restores the session; onExit returns to the Train tab. */
+function TrainSessionRoute({ clientId }: { clientId: string }) {
+  const nav = useNavigate();
+  const { day } = useParams<{ day?: string }>();
+  return <WorkoutPlayer clientId={clientId} initialDay={day != null ? Number(day) : undefined} onExit={() => nav("/train")} />;
 }

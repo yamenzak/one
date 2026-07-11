@@ -1,37 +1,26 @@
 /** Coach: workout + meal plans for a client — list, create, open builder. */
 
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button, Card, Badge, Field, Sheet, Skeleton, SegmentedControl, Page, Stagger, EmptyState, Dumbbell, Utensils, Plus } from "@mossa/ui";
 import { api } from "../../api.js";
-import { WorkoutBuilder } from "./WorkoutBuilder.js";
-import { MealBuilder } from "./MealBuilder.js";
 
 interface Plan { id: string; name: string; status: string; publishedAt: string | null }
 type Kind = "workout" | "meal";
 
 export function CoachPlans({ clientId }: { clientId: string }) {
+  const nav = useNavigate();
   const [kind, setKind] = useState<Kind>("workout");
   const [plans, setPlans] = useState<Plan[] | null>(null);
-  const [editing, setEditing] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const endpoint = kind === "workout" ? "workout-plans" : "meal-plans";
+  const open = (planId: string) => nav(`/clients/${clientId}/plans/${kind}/${planId}`);
 
   const load = useCallback(async () => { setPlans((await api.get<{ plans: Plan[] }>(`/api/${endpoint}?clientId=${clientId}`)).plans); }, [clientId, endpoint]);
   useEffect(() => { setPlans(null); void load(); }, [load]);
 
-  const create = async () => { const r = await api.post<{ plan: Plan }>(`/api/${endpoint}`, { clientId, name }); setCreateOpen(false); setName(""); setEditing(r.plan.id); };
-
-  if (editing) {
-    const back = () => { setEditing(null); void load(); };
-    // Full-screen over the tab nav (z-40 > nav z-30) so the builder's own
-    // bottom action bar doesn't collide with the floating nav.
-    return (
-      <div className="fixed inset-0 z-40 overflow-y-auto bg-background">
-        {kind === "workout" ? <WorkoutBuilder planId={editing} onBack={back} /> : <MealBuilder planId={editing} onBack={back} />}
-      </div>
-    );
-  }
+  const create = async () => { const r = await api.post<{ plan: Plan }>(`/api/${endpoint}`, { clientId, name }); setCreateOpen(false); setName(""); open(r.plan.id); };
 
   return (
     <Page className="mx-auto max-w-xl space-y-3 p-4 pb-28">
@@ -45,7 +34,7 @@ export function CoachPlans({ clientId }: { clientId: string }) {
       ) : (
         <Stagger className="space-y-2">
           {plans.map((p) => (
-            <Card key={p.id} interactive onClick={() => setEditing(p.id)} className="flex items-center justify-between">
+            <Card key={p.id} interactive onClick={() => open(p.id)} className="flex items-center justify-between">
               <div><div className="font-semibold">{p.name}</div>{p.publishedAt && <div className="text-xs text-muted-foreground">Published {new Date(p.publishedAt).toLocaleDateString()}</div>}</div>
               <Badge tone={p.status === "published" ? "success" : p.status === "draft" ? "neutral" : "warning"}>{p.status}</Badge>
             </Card>
