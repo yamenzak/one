@@ -6,7 +6,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button, Field, Sheet, Chip, Badge, Switch, SegmentedControl, MacroInline, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, Utensils } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
+import { useSession } from "../../session.js";
 import { BarcodeScanner } from "./BarcodeScanner.js";
+import { FoodEditor, type EditableFood } from "./FoodEditor.js";
 
 interface Food {
   id?: string; name: string; brand?: string | null; description?: string | null;
@@ -44,7 +46,11 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged, onPick 
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
-  const [manualOpen, setManualOpen] = useState(false);
+  // Manual add / barcode-miss editor. `null` = closed; an object opens it,
+  // optionally prefilled (e.g. with a scanned-but-unmatched barcode).
+  const [editor, setEditor] = useState<Partial<EditableFood> | null>(null);
+  const { ctx } = useSession();
+  const isStaff = ctx?.active?.role !== undefined && ctx.active.role !== "client";
 
   const searchExternal = useCallback(async (page = 1) => {
     if (q.trim().length < 2) return;
@@ -86,7 +92,8 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged, onPick 
     setScanOpen(false);
     let r = await api.get<{ food: Food | null }>(`/api/foods/barcode?code=${code}`);
     if (!r.food) r = await api.get<{ food: Food | null }>(`/api/foods/barcode-external?code=${code}`);
-    if (r.food) rowClick(r.food); else setAiError("No product matched that barcode.");
+    // Miss → let them create it by hand (photo + details), barcode prefilled.
+    if (r.food) rowClick(r.food); else { setAiError(null); setEditor({ barcode: code }); }
   };
 
   const log = async () => {
@@ -170,7 +177,7 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged, onPick 
               <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void snapMeal(e.target.files[0])} />
             </label>
           )}
-          <button onClick={() => setManualOpen(true)} className="grid size-9 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]" aria-label="Add manually"><PencilLine /></button>
+          <button onClick={() => setEditor({})} className="grid size-9 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]" aria-label="Add manually"><PencilLine /></button>
         </div>
       }
     >
@@ -201,44 +208,15 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged, onPick 
         </div>
       </div>
       {scanOpen && <BarcodeScanner onDetected={(code) => void lookupBarcode(code)} onClose={() => setScanOpen(false)} />}
-      {manualOpen && <ManualFoodSheet onClose={() => setManualOpen(false)} onCreated={(food) => { setManualOpen(false); if (onPick) void pickFood(food); else setSelected(food); }} />}
-    </Sheet>
-  );
-}
-
-/** Enter a food by hand — creates it in the library, then flows into log/pick. */
-function ManualFoodSheet({ onClose, onCreated }: { onClose: () => void; onCreated: (food: Food) => void }) {
-  const [f, setF] = useState({ name: "", serving: "100", unit: "g", cal: "", p: "", c: "", ft: "" });
-  const [busy, setBusy] = useState(false);
-  const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }));
-  const num = (v: string) => (v ? Number(v) : 0);
-  const save = async () => {
-    setBusy(true);
-    try {
-      const body = { name: f.name.trim(), servingSize: num(f.serving) || 100, servingUnit: f.unit || "g", calories: num(f.cal), proteinG: num(f.p), carbsG: num(f.c), fatG: num(f.ft), source: "custom" };
-      const { id } = await api.post<{ id: string }>("/api/foods", body);
-      onCreated({ id, name: body.name, servingSize: body.servingSize, servingUnit: body.servingUnit, calories: body.calories, proteinG: body.proteinG, carbsG: body.carbsG, fatG: body.fatG, source: "custom", sourceId: id });
-    } finally { setBusy(false); }
-  };
-  return (
-    <Sheet open onClose={onClose} title="Add a food">
-      <div className="space-y-4">
-        <Field label="Name" icon={Utensils} value={f.name} onChange={(e) => set("name", e.target.value)} autoFocus />
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Serving size" inputMode="decimal" value={f.serving} onChange={(e) => set("serving", e.target.value.replace(/[^\d.]/g, ""))} />
-          <Field label="Unit" value={f.unit} onChange={(e) => set("unit", e.target.value)} placeholder="g / ml / piece" />
-        </div>
-        <div className="text-xs text-muted-foreground">Per serving:</div>
-        <div className="grid grid-cols-4 gap-2">
-          {([["cal", "kcal", "calories"], ["p", "P", "protein"], ["c", "C", "carbs"], ["ft", "F", "fat"]] as const).map(([k, ph, metric]) => (
-            <label key={k} className={cn("flex flex-col items-center gap-1 rounded-xl p-2", toneSoft[METRICS[metric].tone])}>
-              {(() => { const I = METRICS[metric].icon; return <I className="size-4" />; })()}
-              <input inputMode="decimal" value={f[k]} onChange={(e) => set(k, e.target.value.replace(/[^\d.]/g, ""))} placeholder={ph} className="w-full bg-transparent text-center text-sm font-semibold outline-none placeholder:font-normal placeholder:opacity-60" />
-            </label>
-          ))}
-        </div>
-        <Button size="lg" className="w-full" disabled={busy || f.name.trim().length < 2} onClick={() => void save()}>{busy ? "Adding…" : "Add food"}</Button>
-      </div>
+      {editor && (
+        <FoodEditor
+          initial={editor}
+          isStaff={isStaff}
+          title={editor.barcode ? "New product" : undefined}
+          onClose={() => setEditor(null)}
+          onSaved={(food) => { setEditor(null); if (onPick) void pickFood(food as Food); else setSelected(food as Food); }}
+        />
+      )}
     </Sheet>
   );
 }

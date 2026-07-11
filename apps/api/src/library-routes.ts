@@ -28,6 +28,8 @@ const CreateFood = z.object({
   name: z.string().min(1).max(160),
   brand: z.string().max(120).nullish(),
   barcode: z.string().max(40).nullish(),
+  description: z.string().max(2_000).nullish(),
+  imageUrl: z.string().max(400).nullish(),
   servingSize: z.number().positive().default(100),
   servingUnit: z.string().max(20).default("g"),
   calories: z.number().min(0),
@@ -37,12 +39,44 @@ const CreateFood = z.object({
   fiberG: z.number().min(0).default(0),
   sugarG: z.number().min(0).default(0),
   sodiumMg: z.number().min(0).default(0),
+  saturatedFatG: z.number().min(0).default(0),
+  cholesterolMg: z.number().min(0).default(0),
+  potassiumMg: z.number().min(0).default(0),
+  calciumMg: z.number().min(0).default(0),
+  ironMg: z.number().min(0).default(0),
+  visibility: z.enum(["private", "tenant"]).default("tenant"),
   source: z.string().max(30).default("custom"),
   sourceId: z.string().max(80).nullish(),
 });
 
 const slugify = (s: string): string =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+
+type FoodInput = z.infer<typeof CreateFood>;
+
+/** Insert a tenant-owned food row (staff rows land verified). Returns the id. */
+async function insertFood(
+  db: D1Database,
+  tenantId: string,
+  userId: string,
+  isStaff: boolean,
+  d: FoodInput,
+): Promise<string> {
+  const id = newId("food");
+  await db.prepare(
+    `INSERT INTO foods (id, tenant_id, name, brand, barcode, description, image_url, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g, sodium_mg, saturated_fat_g, cholesterol_mg, potassium_mg, calcium_mg, iron_mg, visibility, source, source_id, verified, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      id, tenantId, d.name, d.brand ?? null, d.barcode ?? null, d.description ?? null,
+      d.imageUrl ?? null, d.servingSize, d.servingUnit, d.calories, d.proteinG, d.carbsG,
+      d.fatG, d.fiberG, d.sugarG, d.sodiumMg, d.saturatedFatG, d.cholesterolMg, d.potassiumMg,
+      d.calciumMg, d.ironMg, d.visibility, d.source, d.sourceId ?? null, isStaff ? 1 : 0,
+      userId, nowIso(),
+    )
+    .run();
+  return id;
+}
 
 export const libraryRoutes = new Hono<AppEnv>()
   // ── Exercises ──────────────────────────────────────────────────────────────
@@ -124,11 +158,14 @@ export const libraryRoutes = new Hono<AppEnv>()
   })
 
   // ── Foods ──────────────────────────────────────────────────────────────────
+  // Visibility (SPEC §8): platform seed (tenant_id NULL, global read-only) +
+  // this tenant's rows. Private rows are only visible to their creator.
   .get("/foods", async (c) => {
     const who = requireTenant(c)!;
     const q = (c.req.query("q") ?? "").trim().toLowerCase();
-    let sql = "SELECT * FROM foods WHERE active = 1 AND (tenant_id IS NULL OR tenant_id = ?)";
-    const binds: unknown[] = [who.tenantId];
+    let sql =
+      "SELECT * FROM foods WHERE active = 1 AND (tenant_id IS NULL OR (tenant_id = ? AND (visibility <> 'private' OR created_by = ?)))";
+    const binds: unknown[] = [who.tenantId, who.userId];
     if (q) {
       sql += " AND LOWER(name) LIKE ?";
       binds.push(`%${q}%`);
@@ -144,88 +181,125 @@ export const libraryRoutes = new Hono<AppEnv>()
     const code = c.req.query("code");
     if (!code) return c.json({ error: "code required" }, 400);
     const row = await c.env.DB.prepare(
-      "SELECT * FROM foods WHERE barcode = ? AND active = 1 AND (tenant_id IS NULL OR tenant_id = ?) LIMIT 1",
+      "SELECT * FROM foods WHERE barcode = ? AND active = 1 AND (tenant_id IS NULL OR tenant_id = ?) ORDER BY tenant_id IS NULL LIMIT 1",
     )
       .bind(code, who.tenantId)
       .first();
     return c.json({ food: row ?? null, source: row ? "local" : null });
   })
 
-  // Clients may create (barcode/scan auto-import) — rows land unverified.
+  // Single food (editor load). Seed rows are readable by any tenant.
+  .get("/foods/:id", async (c) => {
+    const who = requireTenant(c)!;
+    const row = await c.env.DB.prepare(
+      "SELECT * FROM foods WHERE id = ? AND active = 1 AND (tenant_id IS NULL OR tenant_id = ?)",
+    )
+      .bind(c.req.param("id"), who.tenantId)
+      .first();
+    if (!row) return c.json({ error: "not found" }, 404);
+    return c.json({ food: row });
+  })
+
+  // Clients may create (barcode/scan auto-import) — client rows land unverified.
   .post("/foods", async (c) => {
     const who = requireTenant(c)!;
     const parsed = CreateFood.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const d = parsed.data;
-    // Dedup by (source, sourceId) — re-imports update + reactivate.
+    // Per-tenant dedup by (source, sourceId): a re-import updates THIS tenant's
+    // own copy — never another tenant's row, never the global seed.
     if (d.sourceId) {
       const existing = await c.env.DB.prepare(
-        "SELECT id FROM foods WHERE source = ? AND source_id = ?",
+        "SELECT id FROM foods WHERE source = ? AND source_id = ? AND tenant_id = ?",
       )
-        .bind(d.source, d.sourceId)
+        .bind(d.source, d.sourceId, who.tenantId)
         .first<{ id: string }>();
       if (existing) {
         await c.env.DB.prepare(
-          "UPDATE foods SET name = ?, brand = ?, barcode = ?, serving_size = ?, serving_unit = ?, calories = ?, protein_g = ?, carbs_g = ?, fat_g = ?, fiber_g = ?, sugar_g = ?, sodium_mg = ?, active = 1 WHERE id = ?",
+          "UPDATE foods SET name = ?, brand = ?, barcode = ?, description = ?, image_url = ?, serving_size = ?, serving_unit = ?, calories = ?, protein_g = ?, carbs_g = ?, fat_g = ?, fiber_g = ?, sugar_g = ?, sodium_mg = ?, saturated_fat_g = ?, cholesterol_mg = ?, potassium_mg = ?, calcium_mg = ?, iron_mg = ?, active = 1 WHERE id = ?",
         )
           .bind(
-            d.name, d.brand ?? null, d.barcode ?? null, d.servingSize, d.servingUnit, d.calories,
-            d.proteinG, d.carbsG, d.fatG, d.fiberG, d.sugarG, d.sodiumMg, existing.id,
+            d.name, d.brand ?? null, d.barcode ?? null, d.description ?? null, d.imageUrl ?? null,
+            d.servingSize, d.servingUnit, d.calories, d.proteinG, d.carbsG, d.fatG, d.fiberG,
+            d.sugarG, d.sodiumMg, d.saturatedFatG, d.cholesterolMg, d.potassiumMg, d.calciumMg,
+            d.ironMg, existing.id,
           )
           .run();
         return c.json({ ok: true, id: existing.id, imported: false });
       }
     }
-    const id = newId("food");
-    const isStaff = c.get("role") !== "client";
-    await c.env.DB.prepare(
-      `INSERT INTO foods (id, tenant_id, name, brand, barcode, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g, sodium_mg, source, source_id, verified, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-      .bind(
-        id, who.tenantId, d.name, d.brand ?? null, d.barcode ?? null, d.servingSize, d.servingUnit,
-        d.calories, d.proteinG, d.carbsG, d.fatG, d.fiberG, d.sugarG, d.sodiumMg,
-        d.source, d.sourceId ?? null, isStaff ? 1 : 0, who.userId, nowIso(),
-      )
-      .run();
+    const id = await insertFood(c.env.DB, who.tenantId, who.userId, c.get("role") !== "client", d);
     return c.json({ ok: true, id, imported: true }, 201);
   })
 
+  // Edit a food. Copy-on-write: editing a platform-seed food (or any row this
+  // tenant doesn't own) forks a tenant-owned copy and edits THAT — edits never
+  // mutate the shared seed or reach another tenant. Returns the effective id.
   .patch("/foods/:id", async (c) => {
     const who = requireTenant(c)!;
-    const row = await c.env.DB.prepare("SELECT id FROM foods WHERE id = ? AND tenant_id = ?")
+    const target = await c.env.DB.prepare(
+      "SELECT * FROM foods WHERE id = ? AND active = 1 AND (tenant_id IS NULL OR tenant_id = ?)",
+    )
       .bind(c.req.param("id"), who.tenantId)
-      .first();
-    if (!row) return c.json({ error: "not found" }, 404);
+      .first<Record<string, unknown>>();
+    if (!target) return c.json({ error: "not found" }, 404);
     const parsed = CreateFood.partial().safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const d = parsed.data;
+
+    // Fork the seed into an owned copy, applying the patch on top of it.
+    if (target.tenant_id === null) {
+      const isStaff = c.get("role") !== "client";
+      const forked = await insertFood(c.env.DB, who.tenantId, who.userId, isStaff, {
+        name: (d.name ?? target.name) as string,
+        brand: (d.brand ?? target.brand) as string | null,
+        barcode: (d.barcode ?? target.barcode) as string | null,
+        description: (d.description ?? target.description) as string | null,
+        imageUrl: (d.imageUrl ?? target.image_url) as string | null,
+        servingSize: (d.servingSize ?? target.serving_size) as number,
+        servingUnit: (d.servingUnit ?? target.serving_unit) as string,
+        calories: (d.calories ?? target.calories) as number,
+        proteinG: (d.proteinG ?? target.protein_g) as number,
+        carbsG: (d.carbsG ?? target.carbs_g) as number,
+        fatG: (d.fatG ?? target.fat_g) as number,
+        fiberG: (d.fiberG ?? target.fiber_g) as number,
+        sugarG: (d.sugarG ?? target.sugar_g) as number,
+        sodiumMg: (d.sodiumMg ?? target.sodium_mg) as number,
+        saturatedFatG: (d.saturatedFatG ?? target.saturated_fat_g) as number,
+        cholesterolMg: (d.cholesterolMg ?? target.cholesterol_mg) as number,
+        potassiumMg: (d.potassiumMg ?? target.potassium_mg) as number,
+        calciumMg: (d.calciumMg ?? target.calcium_mg) as number,
+        ironMg: (d.ironMg ?? target.iron_mg) as number,
+        visibility: d.visibility ?? "tenant",
+        // A forked custom copy — drop the shared source so it dedups per-tenant.
+        source: "custom",
+        sourceId: null,
+      });
+      return c.json({ ok: true, id: forked, forked: true });
+    }
+
     const map: Record<string, unknown> = {
-      name: d.name,
-      brand: d.brand,
-      barcode: d.barcode,
-      serving_size: d.servingSize,
-      serving_unit: d.servingUnit,
-      calories: d.calories,
-      protein_g: d.proteinG,
-      carbs_g: d.carbsG,
-      fat_g: d.fatG,
-      fiber_g: d.fiberG,
-      sugar_g: d.sugarG,
-      sodium_mg: d.sodiumMg,
+      name: d.name, brand: d.brand, barcode: d.barcode, description: d.description,
+      image_url: d.imageUrl, serving_size: d.servingSize, serving_unit: d.servingUnit,
+      calories: d.calories, protein_g: d.proteinG, carbs_g: d.carbsG, fat_g: d.fatG,
+      fiber_g: d.fiberG, sugar_g: d.sugarG, sodium_mg: d.sodiumMg,
+      saturated_fat_g: d.saturatedFatG, cholesterol_mg: d.cholesterolMg,
+      potassium_mg: d.potassiumMg, calcium_mg: d.calciumMg, iron_mg: d.ironMg,
+      visibility: d.visibility,
     };
     const sets = Object.entries(map).filter(([, v]) => v !== undefined);
-    if (sets.length === 0) return c.json({ ok: true });
+    if (sets.length === 0) return c.json({ ok: true, id: c.req.param("id") });
     await c.env.DB.prepare(
-      `UPDATE foods SET ${sets.map(([k]) => `${k} = ?`).join(", ")}, verified = 1 WHERE id = ?`,
+      `UPDATE foods SET ${sets.map(([k]) => `${k} = ?`).join(", ")}, verified = 1 WHERE id = ? AND tenant_id = ?`,
     )
-      .bind(...sets.map(([, v]) => v), c.req.param("id"))
+      .bind(...sets.map(([, v]) => v), c.req.param("id"), who.tenantId)
       .run();
-    return c.json({ ok: true });
+    return c.json({ ok: true, id: c.req.param("id") });
   })
 
   .delete("/foods/:id", async (c) => {
     const who = requireTenant(c)!;
+    // Only a tenant's own rows can be archived; the shared seed is untouchable.
     await c.env.DB.prepare("UPDATE foods SET active = 0 WHERE id = ? AND tenant_id = ?")
       .bind(c.req.param("id"), who.tenantId)
       .run();

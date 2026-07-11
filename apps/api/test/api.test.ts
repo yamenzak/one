@@ -313,3 +313,62 @@ describe("integrations settings", () => {
     expect(after.integrations.usda!.apiKeySet).toBe(true);
   });
 });
+
+describe("foods — tenant isolation + copy-on-write", () => {
+  const mkFood = (over: Record<string, unknown>) => ({
+    name: "Test Bar", calories: 200, proteinG: 10, source: "usda", sourceId: "SHARED-123", ...over,
+  });
+
+  it("re-importing the same (source, sourceId) from another tenant does not clobber the first", async () => {
+    // Studio One imports a food.
+    const a = (await (await SELF.fetch("http://x/api/foods", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify(mkFood({ name: "Owner1 Bar", calories: 200 })),
+    })).json()) as { id: string };
+
+    // Studio Two imports the SAME source/sourceId with different values.
+    const b = (await (await SELF.fetch("http://x/api/foods", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...auth(otherCookie) },
+      body: JSON.stringify(mkFood({ name: "Owner2 Bar", calories: 999 })),
+    })).json()) as { id: string };
+
+    // Distinct rows — each tenant owns its own copy.
+    expect(b.id).not.toBe(a.id);
+
+    // Studio One's food is unchanged and Studio Two can't see it.
+    const one = (await (await SELF.fetch("http://x/api/foods?q=owner1", { headers: auth(ownerCookie) })).json()) as { foods: { id: string; name: string; calories: number }[] };
+    const mine = one.foods.find((f) => f.id === a.id)!;
+    expect(mine.name).toBe("Owner1 Bar");
+    expect(mine.calories).toBe(200);
+    const twoSees = (await (await SELF.fetch(`http://x/api/foods/${a.id}`, { headers: auth(otherCookie) })).status);
+    expect(twoSees).toBe(404);
+  });
+
+  it("editing a platform-seed food forks a tenant copy (copy-on-write), leaving the seed intact", async () => {
+    // Seed a global food (tenant_id NULL) directly, as the build-time seed would.
+    await (env.DB as D1Database)
+      .prepare("INSERT INTO foods (id, tenant_id, name, calories, protein_g, visibility, source, verified, active, created_at) VALUES ('food_seed1', NULL, 'Seed Apple', 95, 0, 'tenant', 'seed', 1, 1, '2026-01-01')")
+      .run();
+
+    // Studio One edits it → server forks an owned copy.
+    const res = await SELF.fetch("http://x/api/foods/food_seed1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ calories: 120 }),
+    });
+    const out = (await res.json()) as { id: string; forked?: boolean };
+    expect(out.forked).toBe(true);
+    expect(out.id).not.toBe("food_seed1");
+
+    // The global seed row is untouched.
+    const seed = await (env.DB as D1Database).prepare("SELECT calories, tenant_id FROM foods WHERE id = 'food_seed1'").first<{ calories: number; tenant_id: string | null }>();
+    expect(seed!.calories).toBe(95);
+    expect(seed!.tenant_id).toBe(null);
+
+    // The fork carries the edit and belongs to Studio One.
+    const fork = await (env.DB as D1Database).prepare("SELECT calories FROM foods WHERE id = ?").bind(out.id).first<{ calories: number }>();
+    expect(fork!.calories).toBe(120);
+  });
+});

@@ -301,7 +301,9 @@ export const externalRoutes = new Hono<AppEnv>()
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const d = parsed.data;
-    const existing = await c.env.DB.prepare("SELECT id FROM foods WHERE source = ? AND source_id = ?").bind(d.source, d.sourceId).first<{ id: string }>();
+    // Per-tenant dedup: reuse only THIS tenant's own copy, never another
+    // tenant's row or the global seed.
+    const existing = await c.env.DB.prepare("SELECT id FROM foods WHERE source = ? AND source_id = ? AND tenant_id = ?").bind(d.source, d.sourceId, who.tenantId).first<{ id: string }>();
     if (existing) { await c.env.DB.prepare("UPDATE foods SET active = 1 WHERE id = ?").bind(existing.id).run(); return c.json({ ok: true, id: existing.id, imported: false }); }
     const id = newId("food");
     const isStaff = c.get("role") !== "client";
@@ -322,7 +324,9 @@ export const externalRoutes = new Hono<AppEnv>()
     if (!providerReady(cfg, "openfoodfacts")) return c.json({ food: null, source: null });
     const food = await cachedJson(c.env.CACHE, `off:barcode:${code}`, () => barcodeOff(code));
     if (!food) return c.json({ food: null, source: null });
-    const existing = await c.env.DB.prepare("SELECT * FROM foods WHERE source = 'openfoodfacts' AND source_id = ?").bind(food.sourceId).first();
+    // Per-tenant cache: this tenant's own imported copy (or the global seed),
+    // never another tenant's row.
+    const existing = await c.env.DB.prepare("SELECT * FROM foods WHERE source = 'openfoodfacts' AND source_id = ? AND (tenant_id IS NULL OR tenant_id = ?) ORDER BY tenant_id IS NULL LIMIT 1").bind(food.sourceId, who.tenantId).first();
     if (existing) return c.json({ food: existing, source: "openfoodfacts" });
     const id = newId("food");
     await c.env.DB.prepare(
