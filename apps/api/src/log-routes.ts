@@ -346,7 +346,7 @@ export const logRoutes = new Hono<AppEnv>()
     interface Ev { id: string; kind: string; date: string; at: string; title: string; subtitle: string | null; metric?: { unit: "energy" | "volume" | "weight"; value: number } }
     const events: Ev[] = [];
 
-    const [food, water, workouts, activities, measures, checkins, sleeps, moods, fasts, swaps, labs, wPlans, mPlans] = await Promise.all([
+    const [food, water, workouts, activities, measures, checkins, sleeps, moods, fasts, swaps, labs, wPlans, mPlans, supps] = await Promise.all([
       db.prepare("SELECT date_local, meal_type, COUNT(*) AS n, COALESCE(SUM(calories),0) AS cal, MAX(created_at) AS at FROM food_entries WHERE client_id=? AND date_local>=? AND date_local<=? GROUP BY date_local, meal_type").bind(cid, from, to).all<{ date_local: string; meal_type: string; n: number; cal: number; at: string }>(),
       db.prepare("SELECT date_local, total_ml, updated_at FROM water_logs WHERE client_id=? AND date_local>=? AND date_local<=? AND total_ml>0").bind(cid, from, to).all<{ date_local: string; total_ml: number; updated_at: string }>(),
       db.prepare("SELECT date_local, entries_json, session_calories, updated_at, created_at FROM exercise_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, from, to).all<{ date_local: string; entries_json: string | null; session_calories: number | null; updated_at: string; created_at: string }>(),
@@ -360,6 +360,7 @@ export const logRoutes = new Hono<AppEnv>()
       db.prepare("SELECT id, display_name, status, created_at, uploaded_at, reviewed_at FROM lab_tests WHERE client_id=? ORDER BY created_at DESC LIMIT 60").bind(cid).all<{ id: string; display_name: string; status: string; created_at: string; uploaded_at: string | null; reviewed_at: string | null }>(),
       db.prepare("SELECT id, name, published_at FROM workout_plans WHERE client_id=? AND published_at IS NOT NULL ORDER BY published_at DESC LIMIT 30").bind(cid).all<{ id: string; name: string; published_at: string }>(),
       db.prepare("SELECT id, name, published_at FROM meal_plans WHERE client_id=? AND published_at IS NOT NULL ORDER BY published_at DESC LIMIT 30").bind(cid).all<{ id: string; name: string; published_at: string }>(),
+      db.prepare("SELECT sl.date_local, sl.slot, sl.taken_at, s.name AS name FROM supplement_logs sl LEFT JOIN supplements s ON s.id=sl.supplement_id WHERE sl.client_id=? AND sl.date_local>=? AND sl.date_local<=?").bind(cid, from, to).all<{ date_local: string; slot: string; taken_at: string | null; name: string | null }>(),
     ]);
 
     const mealLabel = (t: string) => ({ breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner", snack: "Snack", pre_workout: "Pre-workout", post_workout: "Post-workout", free: "Free meal" } as Record<string, string>)[t] ?? t.replace(/_/g, " ").replace(/^\w/, (x) => x.toUpperCase());
@@ -399,6 +400,7 @@ export const logRoutes = new Hono<AppEnv>()
     }
     for (const p of wPlans.results ?? []) if (inRange(dayOf(p.published_at))) events.push({ id: `wplan-${p.id}`, kind: "plan_workout", date: dayOf(p.published_at)!, at: p.published_at, title: "New workout plan", subtitle: p.name });
     for (const p of mPlans.results ?? []) if (inRange(dayOf(p.published_at))) events.push({ id: `mplan-${p.id}`, kind: "plan_meal", date: dayOf(p.published_at)!, at: p.published_at, title: "New meal plan", subtitle: p.name });
+    for (const s of supps.results ?? []) events.push({ id: `supp-${s.date_local}-${s.name}-${s.slot}`, kind: "supplement", date: s.date_local, at: atFor(s.date_local, s.taken_at), title: s.name || "Supplement", subtitle: s.slot ? s.slot.replace(/_/g, " ") : "taken" });
 
     events.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
     return c.json({ events });

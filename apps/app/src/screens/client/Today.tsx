@@ -7,7 +7,7 @@ import { currentStreak, fmtVolume, fmtEnergy, fmtWeight, kcalToDisplay, energyLa
 import {
   Button, Card, SubCard, Skeleton, ProgressRing, MetricPill, MacroBar, InsightCard, IconBadge, Sheet, EmptyState,
   Page, Stagger, METRICS, toneVar, Plus, Play, PencilLine, Flame, ClipboardList, FlaskConical, History, Clock,
-  Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, ArrowLeftRight, Sparkles, Utensils, Croissant, Soup, Apple,
+  Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, Sparkles, Utensils, Croissant, Soup, Apple,
   ChevronLeft, ChevronRight, type Tone, type LucideIcon,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
@@ -174,6 +174,7 @@ const FEED_META: Record<string, { icon: LucideIcon; tone: Tone }> = {
   sleep: { icon: Moon, tone: "sleep" },
   mood: { icon: Smile, tone: "nutrition" },
   fast: { icon: Timer, tone: "sleep" },
+  supplement: { icon: Pill, tone: "activity" },
   swap: { icon: ArrowLeftRight, tone: "activity" },
   lab: { icon: FlaskConical, tone: "cardio" },
   plan_workout: { icon: Dumbbell, tone: "primary" },
