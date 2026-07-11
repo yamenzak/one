@@ -11,7 +11,7 @@ import { useUnits } from "../../units.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
 import { MealPlanDrawer } from "./MealPlanDrawer.js";
 
-interface Entry { id: string; meal_type: string; label: string | null; calories: number; protein_g: number; carbs_g: number; fat_g: number; quantity: number | null; unit: string | null }
+interface Entry { id: string; meal_type: string; label: string | null; calories: number; protein_g: number; carbs_g: number; fat_g: number; quantity: number | null; unit: string | null; image_url: string | null }
 interface Targets { targetCalories?: number; targetProteinG?: number; targetCarbsG?: number; targetFatG?: number }
 
 const MEAL_META: Record<string, { label: string; icon: LucideIcon }> = {
@@ -108,6 +108,9 @@ export function Eat({ clientId }: { clientId: string }) {
                 <div className="divide-y divide-border/40">
                   {list.map((e) => (
                     <div key={e.id} className="flex items-center gap-3 py-2.5">
+                      <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2">
+                        {e.image_url ? <img src={e.image_url} alt="" className="size-full object-cover" /> : <Utensils className="size-4 text-muted-foreground" />}
+                      </div>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm">{e.label ?? "Food"}</div>
                         <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">

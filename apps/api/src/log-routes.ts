@@ -222,7 +222,7 @@ export const logRoutes = new Hono<AppEnv>()
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
     const rows = await c.env.DB.prepare(
-      "SELECT * FROM food_entries WHERE client_id = ? AND date_local = ? ORDER BY created_at",
+      "SELECT fe.*, f.image_url AS image_url FROM food_entries fe LEFT JOIN foods f ON f.id = fe.food_id WHERE fe.client_id = ? AND fe.date_local = ? ORDER BY fe.created_at",
     )
       .bind(clientId, date)
       .all();
