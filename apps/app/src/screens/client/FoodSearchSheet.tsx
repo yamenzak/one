@@ -18,7 +18,8 @@ interface Food {
   source?: string; sourceId?: string; barcode?: string | null; image_url?: string | null; imageUrl?: string | null;
 }
 
-const MEALS = ["breakfast", "lunch", "dinner", "snack"] as const;
+const MEALS = ["breakfast", "lunch", "dinner", "snack", "pre_workout", "post_workout"] as const;
+const mealLabel = (m: string) => m.replace(/_/g, " ");
 const pick = (a: number | undefined, b: number | undefined) => a ?? b ?? 0;
 const norm = (f: Food) => ({ servingSize: f.serving_size ?? f.servingSize ?? 100, servingUnit: f.serving_unit ?? f.servingUnit ?? "g", calories: f.calories, proteinG: pick(f.protein_g, f.proteinG), carbsG: pick(f.carbs_g, f.carbsG), fatG: pick(f.fat_g, f.fatG) });
 /** Full micro/macro map (metric) for import + the detail nutrition panel. */
@@ -128,7 +129,7 @@ export function FoodSearchSheet({ clientId, mealType, onClose, onLogged, onPick 
             {img && <img src={img} alt="" className="size-14 shrink-0 rounded-xl object-cover" />}
             <div className="min-w-0">{selected.brand && <div className="truncate text-sm text-muted-foreground">{selected.brand}</div>}<div className="text-xs text-muted-foreground">per {n.servingSize} {n.servingUnit}</div></div>
           </div>
-          <div className="flex flex-wrap gap-2">{MEALS.map((m) => <Chip key={m} selected={meal === m} onClick={() => setMeal(m)}>{m}</Chip>)}</div>
+          <div className="flex flex-wrap gap-2">{MEALS.map((m) => <Chip key={m} selected={meal === m} onClick={() => setMeal(m)}>{mealLabel(m)}</Chip>)}</div>
           <Field label={`Quantity (${n.servingUnit})`} inputMode="numeric" value={quantity} onChange={(e) => setQuantity(e.target.value.replace(/[^\d.]/g, ""))} />
           <div className="grid grid-cols-4 gap-2">
             {([["calories", n.calories], ["protein", n.proteinG], ["carbs", n.carbsG], ["fat", n.fatG]] as const).map(([metric, v]) => {
