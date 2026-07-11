@@ -48,9 +48,11 @@ export function Progress({ clientId }: { clientId: string }) {
         <h1 className="text-2xl font-bold tracking-tight">Progress</h1>
         <NarrativeButton clientId={clientId} streak={streak} weights={weights.length} />
       </div>
-      <div className="flex items-center justify-between gap-2">
+      {/* Wrap so the range control drops to its own line on narrow screens
+          instead of overflowing the viewport. */}
+      <div className="flex flex-wrap items-center gap-2">
         <SegmentedControl options={[{ value: "overview", label: "Overview" }, { value: "body", label: "Body" }, { value: "wellness", label: "Wellness" }]} value={tab} onChange={setTab} />
-        <SegmentedControl options={[{ value: "7d", label: "7d" }, { value: "30d", label: "30d" }, { value: "90d", label: "90d" }]} value={range} onChange={setRange} />
+        <SegmentedControl className="ml-auto" options={[{ value: "7d", label: "7d" }, { value: "30d", label: "30d" }, { value: "90d", label: "90d" }]} value={range} onChange={setRange} />
       </div>
 
       {tab === "overview" && (

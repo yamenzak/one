@@ -141,7 +141,7 @@ export function Train({ clientId }: { clientId: string }) {
 
   const start = (day?: number) => { setPlayDay(day); setPlaying(true); };
 
-  if (playing) return <WorkoutPlayer clientId={clientId} initialDay={playDay} />;
+  if (playing) return <WorkoutPlayer clientId={clientId} initialDay={playDay} onExit={() => setPlaying(false)} />;
   if (!plans) return <Skeleton className="m-4 h-64" />;
   const published = plans.find((p) => p.status === "published");
   const hasData = week.activeCount > 0 || week.weekTonnage > 0 || recent.length > 0;

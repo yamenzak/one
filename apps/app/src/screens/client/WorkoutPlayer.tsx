@@ -5,22 +5,22 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot } from "@mossa/protocol";
+import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet } from "@mossa/protocol";
 import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, type ExerciseBests } from "@mossa/domain";
 import {
   Button, Card, Badge, Field, Sheet, Skeleton, SubCard, ProgressRing, EmptyState,
-  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, ChevronRight, Check,
+  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, ChevronRight, Check, Info, Play,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
-import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
+import { ExerciseThumb, ExerciseMeta, splitList, pretty, type ExerciseInfo } from "../exercise.js";
 
 interface PublishedPlan { id: string; name: string; body: WorkoutBody }
 interface LoggedSet { setIndex: number; reps?: number | null; weightKg?: number | null; durationSeconds?: number | null; effortLabel?: "easy" | "perfect" | "hard" | null; completed: boolean }
 interface SessionEntry { blockIndex: number; slotIndex: number; exerciseId: string; sets: LoggedSet[] }
 type ExerciseLite = ExerciseInfo;
 
-export function WorkoutPlayer({ clientId, initialDay }: { clientId: string; initialDay?: number }) {
+export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: string; initialDay?: number; onExit?: () => void }) {
   const [plan, setPlan] = useState<PublishedPlan | null>(null);
   const [exercises, setExercises] = useState<Map<string, ExerciseLite>>(new Map());
   const [session, setSession] = useState<Map<string, LoggedSet[]>>(new Map());
@@ -28,6 +28,7 @@ export function WorkoutPlayer({ clientId, initialDay }: { clientId: string; init
   const [logSlot, setLogSlot] = useState<{ blockIndex: number; slotIndex: number; slot: ExerciseSlot } | null>(null);
   const [roundBlock, setRoundBlock] = useState<{ blockIndex: number; block: WorkoutBlock; roundIndex: number } | null>(null);
   const [swapSlot, setSwapSlot] = useState<{ blockIndex: number; slotIndex: number; exerciseId: string } | null>(null);
+  const [detailSlot, setDetailSlot] = useState<ExerciseSlot | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [bests, setBests] = useState<Map<string, ExerciseBests>>(new Map());
   const units = useUnits();
@@ -71,7 +72,10 @@ export function WorkoutPlayer({ clientId, initialDay }: { clientId: string; init
   if (dayIndex === null) {
     return (
       <div className="mx-auto max-w-xl space-y-3 p-4 pb-28">
-        <h1 className="text-2xl font-bold tracking-tight">{plan.name}</h1>
+        <div className="flex items-center gap-3">
+          {onExit && <Button size="icon" variant="secondary" onClick={onExit} aria-label="Back"><ArrowLeft /></Button>}
+          <h1 className="text-2xl font-bold tracking-tight">{plan.name}</h1>
+        </div>
         {plan.body.days.map((day, i) => (
           <motion.button key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} onClick={() => !day.isRestDay && setDayIndex(i)} disabled={day.isRestDay} className="w-full disabled:opacity-60">
             <Card interactive={!day.isRestDay} className="flex items-center justify-between">
@@ -154,11 +158,13 @@ export function WorkoutPlayer({ clientId, initialDay }: { clientId: string; init
                 const done = logged >= slot.sets.length;
                 return (
                   <SubCard key={slotIndex} className="flex items-center gap-3">
-                    <ExerciseThumb thumb={ex?.thumb_url} size={44} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{ex?.name ?? "Exercise"}</div>
-                      <div className="text-sm text-muted-foreground">{ex ? <ExerciseMeta ex={ex} className="after:mx-1 after:content-['·']" /> : null}{logged}/{slot.sets.length} sets</div>
-                    </div>
+                    <button onClick={() => setDetailSlot(slot)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                      <ExerciseThumb thumb={ex?.thumb_url} size={44} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1 truncate font-medium">{ex?.name ?? "Exercise"}<Info className="size-3.5 shrink-0 text-muted-foreground" /></div>
+                        <div className="text-sm text-muted-foreground">{ex ? <ExerciseMeta ex={ex} className="after:mx-1 after:content-['·']" /> : null}{logged}/{slot.sets.length} sets</div>
+                      </div>
+                    </button>
                     <div className="flex shrink-0 items-center gap-1.5">
                       <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
                       <Button size="sm" variant={done ? "secondary" : "default"} onClick={() => setLogSlot({ blockIndex, slotIndex, slot })}>{done ? <Check /> : "Log"}</Button>
@@ -179,11 +185,13 @@ export function WorkoutPlayer({ clientId, initialDay }: { clientId: string; init
               const ex = exercises.get(slot.exerciseId);
               return (
                 <SubCard key={slotIndex} className="flex items-center gap-3">
-                  <ExerciseThumb thumb={ex?.thumb_url} size={44} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">{ex?.name ?? "Exercise"}</div>
-                    <div className="text-sm text-muted-foreground">{ex ? <ExerciseMeta ex={ex} className="after:mx-1 after:content-['·']" /> : null}{slot.sets[0]?.reps ? `${slot.sets[0].reps} reps` : slot.measurementMode}</div>
-                  </div>
+                  <button onClick={() => setDetailSlot(slot)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                    <ExerciseThumb thumb={ex?.thumb_url} size={44} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1 truncate font-medium">{ex?.name ?? "Exercise"}<Info className="size-3.5 shrink-0 text-muted-foreground" /></div>
+                      <div className="text-sm text-muted-foreground">{ex ? <ExerciseMeta ex={ex} className="after:mx-1 after:content-['·']" /> : null}{slot.sets[0]?.reps ? `${slot.sets[0].reps} reps` : slot.measurementMode}</div>
+                    </div>
+                  </button>
                   <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
                 </SubCard>
               );
@@ -212,7 +220,65 @@ export function WorkoutPlayer({ clientId, initialDay }: { clientId: string; init
       {swapSlot && (
         <SwapDrawer clientId={clientId} planId={plan.id} dayIndex={dayIndex} coords={swapSlot} library={[...exercises.values()]} currentName={exercises.get(swapSlot.exerciseId)?.name ?? "Exercise"} onClose={() => setSwapSlot(null)} onDone={(m) => { setSwapSlot(null); setToast(m); setTimeout(() => setToast(null), 3000); }} />
       )}
+      {detailSlot && <ExerciseDetailSheet ex={exercises.get(detailSlot.exerciseId)} slot={detailSlot} onClose={() => setDetailSlot(null)} />}
     </div>
+  );
+}
+
+/** Read-only exercise detail: how-to instructions + media + the trainer's
+ *  full prescription for this slot (SPEC §8.3 — client sees what's configured). */
+function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: ExerciseSlot; onClose: () => void }) {
+  const units = useUnits();
+  const chips = [...splitList(ex?.muscle_groups), ...splitList(ex?.equipment)].map(pretty);
+  const measure = slot.measurementMode === "reps" ? "reps" : slot.measurementMode === "time" ? "sec" : slot.measurementMode;
+  const setLine = (s: WorkoutSet, i: number): string => {
+    const parts: string[] = [];
+    parts.push(s.reps != null ? `${s.reps} ${measure}` : measure);
+    const wm = s.weightMode;
+    if (wm === "absolute" && s.weightValue != null) parts.push(`${fmtWeight(s.weightValue, units)}`);
+    else if (wm === "percent_1rm" && s.percent1rm != null) parts.push(`${s.percent1rm}% 1RM`);
+    else if (wm === "bodyweight") parts.push("bodyweight");
+    else if (wm === "previous_plus" && s.weightValue != null) parts.push(`prev +${s.weightValue}kg`);
+    else if (wm === "previous_times" && s.weightValue != null) parts.push(`prev ×${s.weightValue}`);
+    else if (wm === "dropset") parts.push("dropset");
+    else parts.push("your choice");
+    if (s.rpe != null) parts.push(`RPE ${s.rpe}`);
+    else if (s.rir != null) parts.push(`RIR ${s.rir}`);
+    if (s.tempo) parts.push(`tempo ${s.tempo}`);
+    if (s.restAfterSec) parts.push(`rest ${s.restAfterSec}s`);
+    return `Set ${i + 1} · ${parts.join(" · ")}`;
+  };
+  return (
+    <Sheet open onClose={onClose} title={ex?.name ?? "Exercise"}>
+      <div className="space-y-4">
+        {(ex?.thumb2_url || ex?.thumb_url) && (
+          <div className="flex gap-2">
+            {[ex.thumb_url, ex.thumb2_url].filter(Boolean).map((src, i) => <img key={i} src={src!} alt="" className="h-40 w-full flex-1 rounded-2xl object-cover" />)}
+          </div>
+        )}
+        {chips.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {ex?.difficulty && <Badge tone="neutral">{ex.difficulty}</Badge>}
+            {chips.map((c) => <Badge key={c} tone="activity">{c}</Badge>)}
+          </div>
+        )}
+        <div>
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prescribed</div>
+          <SubCard className="space-y-1">
+            {slot.sets.map((s, i) => <div key={i} className="text-sm">{setLine(s, i)}</div>)}
+          </SubCard>
+        </div>
+        {ex?.instructions_md ? (
+          <div>
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">How to</div>
+            <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">{ex.instructions_md.replace(/[#*_>`]/g, "")}</div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No instructions yet — ask your coach for cues.</p>
+        )}
+        {ex?.video_url && <a href={ex.video_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-primary [&_svg]:size-4"><Play /> Watch demo</a>}
+      </div>
+    </Sheet>
   );
 }
 

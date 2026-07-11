@@ -13,10 +13,12 @@ export interface ExerciseInfo {
   name: string;
   thumb_url?: string | null;
   thumb2_url?: string | null;
+  video_url?: string | null;
   muscle_groups?: string | null;
   secondary_muscle_groups?: string | null;
   equipment?: string | null;
   difficulty?: string | null;
+  instructions_md?: string | null;
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

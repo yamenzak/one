@@ -24,7 +24,13 @@ export function CoachPlans({ clientId }: { clientId: string }) {
 
   if (editing) {
     const back = () => { setEditing(null); void load(); };
-    return kind === "workout" ? <WorkoutBuilder planId={editing} onBack={back} /> : <MealBuilder planId={editing} onBack={back} />;
+    // Full-screen over the tab nav (z-40 > nav z-30) so the builder's own
+    // bottom action bar doesn't collide with the floating nav.
+    return (
+      <div className="fixed inset-0 z-40 overflow-y-auto bg-background">
+        {kind === "workout" ? <WorkoutBuilder planId={editing} onBack={back} /> : <MealBuilder planId={editing} onBack={back} />}
+      </div>
+    );
   }
 
   return (
