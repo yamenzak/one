@@ -37,11 +37,6 @@ jobs:
 
       - run: pnpm turbo run typecheck test
 
-      # The Workers AI binding is commented out for frictionless local dev
-      # (wrangler dev needs credentials for it). Enable it only for deploy.
-      - name: Enable Workers AI binding
-        run: sed -i 's#// "ai": { "binding": "AI" }#"ai": { "binding": "AI" }#' apps/api/wrangler.jsonc
-
       - name: Deploy api worker
         uses: cloudflare/wrangler-action@v3
         with:
