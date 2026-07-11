@@ -77,7 +77,7 @@ function CreateExerciseSheet({ onClose, onDone }: { onClose: () => void; onDone:
 }
 
 interface WebExercise { name: string; muscleGroups: string[]; secondaryMuscleGroups?: string[]; equipment: string[]; instructions?: string | null; category?: string | null; force?: string | null; difficulty?: string | null; source: string; sourceId: string; imageUrl: string | null }
-function WebExerciseSheet({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+export function WebExerciseSheet({ onClose, onImported, onPicked }: { onClose: () => void; onImported?: () => void; onPicked?: (id: string) => void }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<WebExercise[] | null>(null);
   const [importing, setImporting] = useState<string | null>(null);
@@ -92,7 +92,7 @@ function WebExerciseSheet({ onClose, onImported }: { onClose: () => void; onImpo
   }, [q]);
   const doImport = async (e: WebExercise) => {
     setImporting(e.sourceId);
-    try { await api.post("/api/exercises/import", { name: e.name, muscleGroups: e.muscleGroups, secondaryMuscleGroups: e.secondaryMuscleGroups ?? [], equipment: e.equipment, instructions: e.instructions ?? null, category: e.category ?? null, force: e.force ?? null, difficulty: e.difficulty ?? null, imageUrl: e.imageUrl, source: e.source, sourceId: e.sourceId }); onImported(); }
+    try { const r = await api.post<{ id: string }>("/api/exercises/import", { name: e.name, muscleGroups: e.muscleGroups, secondaryMuscleGroups: e.secondaryMuscleGroups ?? [], equipment: e.equipment, instructions: e.instructions ?? null, category: e.category ?? null, force: e.force ?? null, difficulty: e.difficulty ?? null, imageUrl: e.imageUrl, source: e.source, sourceId: e.sourceId }); onImported?.(); onPicked?.(r.id); }
     finally { setImporting(null); }
   };
   return (
