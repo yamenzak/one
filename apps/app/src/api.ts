@@ -4,8 +4,14 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** The full error response body — carries `detail`, `raw`, etc. for diagnosis. */
+    public body?: Record<string, unknown>,
   ) {
     super(message);
+  }
+  /** The raw model output the server echoed back on a parse failure, if any. */
+  get raw(): string | null {
+    return typeof this.body?.raw === "string" ? this.body.raw : null;
   }
 }
 
@@ -16,8 +22,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     headers: body !== undefined ? { "content-type": "application/json" } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  const data = (await res.json().catch(() => ({}))) as T & { error?: string; message?: string };
-  if (!res.ok) throw new ApiError(res.status, data.error ?? data.message ?? `HTTP ${res.status}`);
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string; message?: string; detail?: string };
+  if (!res.ok) throw new ApiError(res.status, data.error ?? data.message ?? `HTTP ${res.status}`, data as Record<string, unknown>);
   return data;
 }
 

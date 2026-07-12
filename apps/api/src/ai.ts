@@ -209,7 +209,7 @@ export interface GenerateInput {
 export type GenerateResult =
   | { ok: true; output: string; credits: number; mocked: boolean }
   | { ok: false; error: "insufficient_credits"; available: number; needed: number }
-  | { ok: false; error: "unavailable" };
+  | { ok: false; error: "unavailable"; detail?: string };
 
 const RUN_TIMEOUT_MS = 120_000;
 
@@ -243,8 +243,9 @@ async function runGemini(
       }),
     },
   );
-  if (!res.ok) throw new Error(`gemini ${res.status}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${(await res.text().catch(() => "")).slice(0, 300)}`);
   const json = (await res.json()) as GeminiResponse;
+  if (!json.candidates?.[0]) throw new Error(`no candidates ${JSON.stringify(json).slice(0, 200)}`);
   const output = (json.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("");
   return {
     output,
@@ -260,7 +261,7 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   // Enabled: per-feature config wins, then the legacy toggle map, else on.
   // A feature explicitly switched off is refused before any credit hold.
   const enabled = fcfg.enabled ?? toggles[input.feature] ?? true;
-  if (enabled === false) return { ok: false, error: "unavailable" };
+  if (enabled === false) return { ok: false, error: "unavailable", detail: `feature "${input.feature}" is turned off in AI settings` };
 
   // Model: a tenant's per-feature override (task-compatible) wins, else the
   // task default. Vision stays vision; text/text-small are interchangeable.
@@ -268,7 +269,7 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   let model: AiModelRow | null = null;
   if (fcfg.model) { const m = await modelById(env.DB, fcfg.model); if (m && compatible(m)) model = m; }
   if (!model) model = await modelForTask(env.DB, input.task);
-  if (!model) return { ok: false, error: "unavailable" };
+  if (!model) return { ok: false, error: "unavailable", detail: `no enabled model for task "${input.task}" — sync the model catalog in admin` };
   const rate = rateOf(model);
 
   // System prompt: a tenant override replaces the built-in default; a house or
@@ -332,8 +333,9 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
     }
   } catch (err) {
     await dobj.release(hold.hold);
-    await audit(env, input, model.id, 0, 0, false, String(err));
-    return { ok: false, error: "unavailable" };
+    const detail = `${model.provider}/${model.id}: ${err instanceof Error ? err.message : String(err)}`;
+    await audit(env, input, model.id, 0, 0, false, detail);
+    return { ok: false, error: "unavailable", detail };
   }
 
   const credits = creditsForUsage(usage, rate);
@@ -367,7 +369,7 @@ async function runGeminiImage(key: string, modelId: string, prompt: string): Pro
     `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`,
     { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseModalities: ["IMAGE"] } }) },
   );
-  if (!res.ok) throw new Error(`gemini-image ${res.status}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${(await res.text().catch(() => "")).slice(0, 300)}`);
   const json = (await res.json()) as GeminiImageResponse;
   const part = (json.candidates?.[0]?.content?.parts ?? []).find((p) => p.inlineData?.data);
   if (!part?.inlineData?.data) throw new Error("no image");

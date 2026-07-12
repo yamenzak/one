@@ -6,6 +6,7 @@ import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy } from "@mossa/domain";
 import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, Page, Stagger, ArrowLeft, Plus, Sparkles, Utensils, X } from "@mossa/ui";
 import { api } from "../../api.js";
+import { AiErrorBox } from "../../AiError.js";
 import { useUnits } from "../../units.js";
 import { FoodSearchSheet } from "../client/FoodSearchSheet.js";
 
@@ -139,12 +140,15 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
 function AiMealSheet({ onClose, onRun }: { onClose: () => void; onRun: (i: string) => Promise<void> }) {
   const [instructions, setInstructions] = useState("");
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<unknown>(null);
+  const run = async () => { setBusy(true); setErr(null); try { await onRun(instructions); } catch (e) { setErr(e); } finally { setBusy(false); } };
   return (
     <Sheet open onClose={onClose} title="AI meal draft">
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">Drafts meal options from this client's targets and intake. You'll fill exact foods and review before publishing.</p>
         <Field label="Instructions (optional)" icon={Sparkles} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="e.g. high-protein, no dairy, 4 meals" />
-        <Button size="lg" className="w-full" disabled={busy} onClick={async () => { setBusy(true); try { await onRun(instructions); } finally { setBusy(false); } }}>{busy ? "Drafting…" : "Generate options"}</Button>
+        <Button size="lg" className="w-full" disabled={busy} onClick={() => void run()}>{busy ? "Drafting…" : "Generate options"}</Button>
+        {err ? <AiErrorBox error={err} /> : null}
       </div>
     </Sheet>
   );

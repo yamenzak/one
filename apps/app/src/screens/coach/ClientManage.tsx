@@ -12,6 +12,7 @@ import { useUnits } from "../../units.js";
 import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
 import { checkInPhotos } from "../client/WellnessDetails.js";
 import { AiAvatar } from "../../AiAvatar.js";
+import { AiErrorBox } from "../../AiError.js";
 
 interface Sub { id: string; status: string; daysRemaining: number; packageId: string | null }
 interface Pkg { id: string; name: string }
@@ -188,15 +189,16 @@ function SwapResolver({ swap, exercises, onResolve }: { swap: Swap; exercises: E
 function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; checkIns: CheckIn[]; onFeedback: () => Promise<void> }) {
   const [summary, setSummary] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<unknown>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const units = useUnits();
   const summarize = async () => {
-    setBusy(true);
+    setBusy(true); setErr(null); setSummary(null);
     try {
       const r = await api.post<{ summary: string; suggestedReply: string }>("/api/ai/summarize-checkins", { clientId });
       setSummary(r.summary);
       if (checkIns[0]) setDraft((d) => ({ ...d, [checkIns[0]!.id]: r.suggestedReply }));
-    } catch { setSummary("AI summaries aren't enabled on this studio's plan."); }
+    } catch (e) { setErr(e); }
     finally { setBusy(false); }
   };
   const send = async (id: string) => { const fb = draft[id]?.trim(); if (!fb) return; await api.post(`/api/check-ins/${id}/feedback`, { clientId, feedback: fb }); setDraft((d) => ({ ...d, [id]: "" })); await onFeedback(); };
@@ -206,6 +208,7 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
         <div className="flex items-center gap-2.5"><IconBadge icon={ClipboardList} tone="nutrition" size="sm" /><h2 className="font-semibold">Check-ins</h2></div>
         <Button size="sm" variant="tonal" disabled={busy || checkIns.length === 0} onClick={() => void summarize()}><Sparkles /> {busy ? "…" : "Summarize"}</Button>
       </div>
+      {err ? <AiErrorBox error={err} /> : null}
       {summary && <SubCard className="flex items-start gap-2.5 text-sm"><AiAvatar className="size-7" /><p>{summary}</p></SubCard>}
       {checkIns.length === 0 ? <p className="text-sm text-muted-foreground">No check-ins yet.</p> : checkIns.slice(0, 5).map((c) => {
         const photos = checkInPhotos(c.photos_json);
@@ -261,12 +264,12 @@ interface SuppReco { name: string; dose: string; rationale: string; linkedMarker
 function SuggestSuppSheet({ clientId, onClose, onPrescribed }: { clientId: string; onClose: () => void; onPrescribed: () => Promise<void> }) {
   const [recos, setRecos] = useState<SuppReco[] | null>(null);
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [added, setAdded] = useState<Set<string>>(new Set());
   useEffect(() => {
     void api.post<{ recommendations: SuppReco[]; note: string }>("/api/ai/supplement-reco", { clientId })
       .then((r) => { setRecos(r.recommendations); setNote(r.note); })
-      .catch(() => setError("AI suggestions aren't available on this studio's plan."));
+      .catch((e) => setError(e));
   }, [clientId]);
   const prescribe = async (r: SuppReco) => {
     await api.post("/api/supplements", { clientId, name: r.name, dose: r.dose || undefined, kind: "other", schedule: [{ slot: "daily" }] });
@@ -277,7 +280,7 @@ function SuggestSuppSheet({ clientId, onClose, onPrescribed }: { clientId: strin
     <Sheet open onClose={onClose} title="Suggested supplements">
       <div className="space-y-3">
         <div className="flex items-center gap-2.5 rounded-xl bg-primary/10 p-2.5"><AiAvatar className="size-8" /><p className="text-xs text-muted-foreground">Evidence-based ideas from this client's reviewed labs, goal and current stack. Review before prescribing.</p></div>
-        {error ? <SubCard className="text-sm text-muted-foreground">{error}</SubCard> : !recos ? <Skeleton className="h-40" /> : recos.length === 0 ? <p className="text-sm text-muted-foreground">No suggestions right now.</p> : recos.map((r, i) => (
+        {error ? <AiErrorBox error={error} /> : !recos ? <Skeleton className="h-40" /> : recos.length === 0 ? <p className="text-sm text-muted-foreground">No suggestions right now.</p> : recos.map((r, i) => (
           <SubCard key={i} className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0"><span className="font-medium">{r.name}</span>{r.dose && <span className="ml-2 text-xs text-muted-foreground">{r.dose}</span>}</div>
@@ -323,13 +326,14 @@ function ReviewLabSheet({ clientId, lab, onClose, onDone }: { clientId: string; 
   const [feedback, setFeedback] = useState(lab.trainer_feedback ?? "");
   const [busy, setBusy] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const [extractErr, setExtractErr] = useState<unknown>(null);
   const fileUrl = lab.file_key ? `/api/media/${lab.file_key}` : null;
   const autofill = async () => {
-    setExtracting(true);
+    setExtracting(true); setExtractErr(null);
     try {
       const r = await api.post<{ values: { marker: string; value: string; unit?: string; flag?: string }[] }>("/api/ai/lab-extract", { clientId, labId: lab.id });
       if (r.values?.length) setValues(r.values.map((v) => ({ marker: v.marker, value: String(v.value), unit: v.unit ?? "", flag: (v.flag as LabValue["flag"]) ?? "normal" })));
-    } catch { /* leave manual entry */ }
+    } catch (e) { setExtractErr(e); }
     finally { setExtracting(false); }
   };
   const setRow = (i: number, p: Partial<LabValue>) => setValues((v) => v.map((r, idx) => (idx === i ? { ...r, ...p } : r)));
@@ -356,6 +360,7 @@ function ReviewLabSheet({ clientId, lab, onClose, onDone }: { clientId: string; 
         )}
         {lab.client_notes && <SubCard className="text-sm text-muted-foreground">Client note: {lab.client_notes}</SubCard>}
         {fileUrl && <Button size="sm" variant="tonal" className="w-full" disabled={extracting} onClick={() => void autofill()}><Sparkles /> {extracting ? "Reading report…" : "Auto-fill from report"}</Button>}
+        {extractErr ? <AiErrorBox error={extractErr} /> : null}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-muted-foreground">Values</label>
           {values.map((v, i) => (

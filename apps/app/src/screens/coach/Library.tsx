@@ -6,6 +6,7 @@ import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { AiAvatar } from "../../AiAvatar.js";
+import { AiErrorBox } from "../../AiError.js";
 import { FoodEditor } from "../client/FoodEditor.js";
 import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
 
@@ -236,7 +237,7 @@ function Content() {
   const [audience, setAudience] = useState<"public" | "clients" | "assigned">("clients");
   const [aiTopic, setAiTopic] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<unknown>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [coverBusy, setCoverBusy] = useState(false);
   const load = useCallback(async () => setItems((await api.get<{ resources: Resource[] }>("/api/resources")).resources), []);
@@ -244,9 +245,9 @@ function Content() {
   const reset = () => { setTitle(""); setSummary(""); setBody(""); setAiTopic(""); setAiError(null); setCoverUrl(null); };
   const create = async () => { const r = await api.post<{ id: string }>("/api/resources", { type: "article", title, summary: summary || undefined, bodyMd: body, coverUrl: coverUrl || undefined, audience }); await api.post(`/api/resources/${r.id}/publish`, { status: "published" }); setCreateOpen(false); reset(); await load(); };
   const genCover = async () => {
-    setCoverBusy(true);
+    setCoverBusy(true); setAiError(null);
     try { const r = await api.post<{ url: string }>("/api/ai/cover-image", { prompt: title || aiTopic }); setCoverUrl(r.url); }
-    catch { /* image gen unavailable */ }
+    catch (e) { setAiError(e); }
     finally { setCoverBusy(false); }
   };
   const draftAi = async () => {
@@ -254,7 +255,7 @@ function Content() {
     try {
       const r = await api.post<{ article: { title: string; summary: string; body: string } }>("/api/ai/article", { topic: aiTopic });
       setTitle(r.article.title); setSummary(r.article.summary ?? ""); setBody(r.article.body);
-    } catch { setAiError("AI drafting isn't available on this studio's plan."); }
+    } catch (e) { setAiError(e); }
     finally { setAiBusy(false); }
   };
   return (
@@ -271,8 +272,8 @@ function Content() {
               <input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="Topic — e.g. Sleep for muscle growth" className="min-w-0 flex-1 rounded-lg bg-surface-2 px-3 py-2 text-sm outline-none" />
               <Button size="sm" disabled={aiBusy || aiTopic.trim().length < 3} onClick={() => void draftAi()}>{aiBusy ? "Writing…" : "Draft"}</Button>
             </div>
-            {aiError && <p className="text-xs text-muted-foreground">{aiError}</p>}
           </div>
+          {aiError ? <AiErrorBox error={aiError} /> : null}
           <Field label="Title" icon={PencilLine} value={title} onChange={(e) => setTitle(e.target.value)} />
           <Field label="Summary" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="One-line teaser (optional)" />
           <div className="space-y-2">

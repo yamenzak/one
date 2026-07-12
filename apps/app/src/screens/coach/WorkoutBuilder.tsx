@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@mossa/protocol";
 import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, Save, X, Globe } from "@mossa/ui";
 import { api } from "../../api.js";
+import { AiErrorBox } from "../../AiError.js";
 import { ExerciseThumb, ExerciseMeta, splitList, pretty, type ExerciseInfo } from "../exercise.js";
 import { WebExerciseSheet } from "./Library.js";
 
@@ -356,12 +357,15 @@ function ExercisePicker({ library, onClose, onPick, reloadLibrary }: { library: 
 function AiDraftSheet({ onClose, onRun }: { onClose: () => void; onRun: (i: string) => Promise<void> }) {
   const [instructions, setInstructions] = useState("");
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<unknown>(null);
+  const run = async () => { setBusy(true); setErr(null); try { await onRun(instructions); } catch (e) { setErr(e); } finally { setBusy(false); } };
   return (
     <Sheet open onClose={onClose} title="AI Plan Draft">
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">Generate a starting draft from this client's intake and your library. You'll review and edit before publishing.</p>
         <Field label="Instructions (optional)" icon={Sparkles} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="e.g. 4-day upper/lower, dumbbells only" />
-        <Button size="lg" className="w-full" disabled={busy} onClick={async () => { setBusy(true); try { await onRun(instructions); } finally { setBusy(false); } }}>{busy ? "Drafting…" : "Generate draft"}</Button>
+        <Button size="lg" className="w-full" disabled={busy} onClick={() => void run()}>{busy ? "Drafting…" : "Generate draft"}</Button>
+        {err ? <AiErrorBox error={err} /> : null}
       </div>
     </Sheet>
   );

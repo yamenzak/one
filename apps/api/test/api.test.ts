@@ -233,6 +233,9 @@ describe("AI config (per-tenant model / prompt / tone / enable)", () => {
     expect(cfg2.config.features["parse-food"]!.enabled).toBe(false);
     const off = await SELF.fetch("http://x/api/ai/parse-food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
     expect(off.status).toBe(503);
+    // The failure is diagnosable — the real reason is surfaced, not hidden.
+    const offBody = (await off.json()) as { error: string; detail?: string };
+    expect(offBody.detail ?? offBody.error).toContain("turned off");
 
     // Re-enable with a model override — generation runs again (mock lane).
     await SELF.fetch("http://x/api/settings/ai", { method: "PATCH", headers: H, body: JSON.stringify({ features: { "parse-food": { enabled: true, model: "@cf/meta/llama-3.1-8b-instruct-fast" } } }) });

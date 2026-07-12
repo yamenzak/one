@@ -4,7 +4,7 @@
  * clients (`canUseAi`), and fully metered through generate().
  */
 
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { WorkoutBody } from "@mossa/protocol";
 import { resolveUnits } from "@mossa/domain";
@@ -46,6 +46,14 @@ function toBase64(buf: ArrayBuffer): string {
 
 /** The built-in system prompt for a feature (the tenant may override it). */
 const sys = (key: string): string => featureDef(key)!.defaultSystem;
+
+/** Surface AI failures with the real reason (so they can be diagnosed) instead
+ *  of a generic message. insufficient_credits → 402; everything else → 503 with
+ *  the underlying provider/parse detail. */
+function aiFail(c: Context<AppEnv>, r: { error: string; detail?: string; available?: number; needed?: number }) {
+  if (r.error === "insufficient_credits") return c.json({ error: "Not enough AI credits to run this.", available: r.available, needed: r.needed }, 402);
+  return c.json({ error: r.detail ? `AI failed — ${r.detail}` : "AI unavailable.", detail: r.detail }, 503);
+}
 
 interface DraftFoodQuery { query?: string; quantity?: number; unit?: string }
 interface DraftMealOption { mealType: string; mealName: string; isFree?: boolean; foods?: DraftFoodQuery[] }
@@ -133,13 +141,9 @@ export const aiRoutes = new Hono<AppEnv>()
           { label: parsed.data.text.slice(0, 60), mealType: "snack", calories: 350, proteinG: 18, carbsG: 40, fatG: 12, quantity: null, unit: null },
         ]),
     });
-    if (!result.ok) {
-      return result.error === "insufficient_credits"
-        ? c.json({ error: "insufficient_credits", available: result.available, needed: result.needed }, 402)
-        : c.json({ error: "ai unavailable" }, 503);
-    }
+    if (!result.ok) return aiFail(c, result);
     const entries = extractJson<unknown[]>(result.output);
-    if (!entries || !Array.isArray(entries)) return c.json({ error: "could not parse" }, 422);
+    if (!entries || !Array.isArray(entries)) return c.json({ error: "The AI didn't return valid entries.", raw: result.output.slice(0, 1500), mocked: result.mocked }, 422);
     return c.json({ entries, credits: result.credits, mocked: result.mocked });
   })
 
@@ -218,14 +222,15 @@ export const aiRoutes = new Hono<AppEnv>()
           ],
         }),
     });
-    if (!result.ok) {
-      return result.error === "insufficient_credits"
-        ? c.json({ error: "insufficient_credits", available: result.available, needed: result.needed }, 402)
-        : c.json({ error: "ai unavailable" }, 503);
-    }
+    if (!result.ok) return aiFail(c, result);
     const raw = extractJson<unknown>(result.output);
     const body = WorkoutBody.safeParse(raw);
-    if (!body.success) return c.json({ error: "draft did not validate", raw }, 422);
+    if (!body.success) return c.json({
+      error: "The AI didn't return a valid plan.",
+      detail: raw == null ? "no JSON found in the model's response" : body.error.issues.slice(0, 4).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "),
+      raw: result.output.slice(0, 2500),
+      mocked: result.mocked,
+    }, 422);
     // Drafts must only reference real exercises — drop hallucinated slots.
     const validIds = new Set((library.results ?? []).map((e) => e.id));
     const cleaned = {
@@ -236,6 +241,13 @@ export const aiRoutes = new Hono<AppEnv>()
           .filter((b) => b.slots.length > 0),
       })),
     };
+    const totalSlots = cleaned.days.reduce((n, d) => n + d.blocks.reduce((m, b) => m + b.slots.length, 0), 0);
+    if (totalSlots === 0) return c.json({
+      error: "The AI plan referenced exercises that aren't in your library.",
+      detail: `parsed ${body.data.days.length} day(s) but every exercise id was unknown — the model must use ids from the library list`,
+      raw: result.output.slice(0, 2500),
+      mocked: result.mocked,
+    }, 422);
     return c.json({ draft: cleaned, credits: result.credits, mocked: result.mocked });
   })
 
@@ -277,9 +289,9 @@ export const aiRoutes = new Hono<AppEnv>()
           { label: "Mixed salad", mealType: "lunch", calories: 60, proteinG: 2, carbsG: 8, fatG: 3, quantity: 100, unit: "g" },
         ]),
     });
-    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    if (!result.ok) return aiFail(c, result);
     const entries = extractJson<unknown[]>(result.output);
-    if (!entries || !Array.isArray(entries)) return c.json({ error: "could not read the photo" }, 422);
+    if (!entries || !Array.isArray(entries)) return c.json({ error: "Couldn't read the photo.", raw: result.output.slice(0, 1500), mocked: result.mocked }, 422);
     return c.json({ entries, credits: result.credits, mocked: result.mocked });
   })
 
@@ -310,9 +322,9 @@ export const aiRoutes = new Hono<AppEnv>()
       maxOutputTokens: 400,
       mock: () => JSON.stringify({ name: "Granola bar", brand: "Acme", servingSize: 40, servingUnit: "g", calories: 180, proteinG: 4, carbsG: 27, fatG: 6, fiberG: 3, sugarG: 12, sodiumMg: 95, saturatedFatG: 2, cholesterolMg: 0, potassiumMg: 90, calciumMg: 20, ironMg: 1 }),
     });
-    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    if (!result.ok) return aiFail(c, result);
     const food = extractJson<Record<string, unknown>>(result.output);
-    if (!food || typeof food !== "object" || typeof food.name !== "string") return c.json({ error: "could not read the label" }, 422);
+    if (!food || typeof food !== "object" || typeof food.name !== "string") return c.json({ error: "Couldn't read the label.", raw: result.output.slice(0, 1500), mocked: result.mocked }, 422);
     return c.json({ food, credits: result.credits, mocked: result.mocked });
   })
 
@@ -348,9 +360,9 @@ export const aiRoutes = new Hono<AppEnv>()
         { mealType: "dinner", mealName: "Salmon, potato & salad", isFree: false, foods: [{ query: "salmon", quantity: 170, unit: "g" }, { query: "potato", quantity: 200, unit: "g" }] },
       ] }),
     });
-    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    if (!result.ok) return aiFail(c, result);
     const draft = extractJson<{ mealOptions: DraftMealOption[] }>(result.output);
-    if (!draft?.mealOptions) return c.json({ error: "could not parse" }, 422);
+    if (!draft?.mealOptions) return c.json({ error: "The AI didn't return valid meals.", raw: result.output.slice(0, 1800), mocked: result.mocked }, 422);
     // Resolve each drafted food query to a real library food id (import the
     // public/tenant library into the plan) so options carry real macros.
     const resolved = await resolveMealFoods(c.env.DB, who.tenantId, draft.mealOptions);
@@ -382,9 +394,9 @@ export const aiRoutes = new Hono<AppEnv>()
       maxOutputTokens: 400,
       mock: () => JSON.stringify({ summary: `${access.client.display_name} checked in ${(rows.results ?? []).length} times recently. Mood and sleep look steady; weight trending as expected.`, suggestedReply: "Great consistency this week — keep the sleep dialed in and let's push the next session." }),
     });
-    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    if (!result.ok) return aiFail(c, result);
     const out = extractJson<{ summary: string; suggestedReply: string }>(result.output);
-    if (!out) return c.json({ error: "could not parse" }, 422);
+    if (!out) return c.json({ error: "The AI response couldn't be parsed.", raw: result.output.slice(0, 1500), mocked: result.mocked }, 422);
     return c.json({ ...out, credits: result.credits, mocked: result.mocked });
   })
 
@@ -408,7 +420,7 @@ export const aiRoutes = new Hono<AppEnv>()
       maxOutputTokens: 300,
       mock: () => `You've been remarkably consistent this month. Your logging streak and steady weight trend show the habits are sticking — that's the hard part. Keep the momentum, and let's build on this next phase.`,
     });
-    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    if (!result.ok) return aiFail(c, result);
     return c.json({ narrative: result.output.trim(), credits: result.credits, mocked: result.mocked });
   })
 
@@ -442,9 +454,9 @@ export const aiRoutes = new Hono<AppEnv>()
         { marker: "Total Testosterone", value: "410", unit: "ng/dL", refRange: "300-1000", flag: "normal" },
       ] }),
     });
-    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    if (!result.ok) return aiFail(c, result);
     const out = extractJson<{ values: unknown[] }>(result.output);
-    if (!out?.values || !Array.isArray(out.values)) return c.json({ error: "could not read the report" }, 422);
+    if (!out?.values || !Array.isArray(out.values)) return c.json({ error: "Couldn't read the lab report.", raw: result.output.slice(0, 1800), mocked: result.mocked }, 422);
     return c.json({ values: out.values, credits: result.credits, mocked: result.mocked });
   })
 
@@ -477,9 +489,9 @@ export const aiRoutes = new Hono<AppEnv>()
         { name: "Creatine monohydrate", dose: "5 g daily", rationale: "Well-supported for strength and lean mass on a muscle-gain goal.", linkedMarker: null },
       ], note: "Recheck vitamin D in 8-12 weeks. Confirm no contraindications before prescribing." }),
     });
-    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    if (!result.ok) return aiFail(c, result);
     const out = extractJson<{ recommendations: unknown[]; note?: string }>(result.output);
-    if (!out?.recommendations || !Array.isArray(out.recommendations)) return c.json({ error: "could not parse" }, 422);
+    if (!out?.recommendations || !Array.isArray(out.recommendations)) return c.json({ error: "The AI didn't return valid recommendations.", raw: result.output.slice(0, 1800), mocked: result.mocked }, 422);
     return c.json({ recommendations: out.recommendations, note: out.note ?? "", credits: result.credits, mocked: result.mocked });
   })
 
@@ -500,9 +512,9 @@ export const aiRoutes = new Hono<AppEnv>()
       maxOutputTokens: 2048,
       mock: () => JSON.stringify({ title: parsed.data.topic, summary: `A practical guide to ${parsed.data.topic.toLowerCase()}.`, body: `## Overview\n\nHere's what matters about ${parsed.data.topic.toLowerCase()}, and how to put it to work.\n\n## Key points\n\n- Start simple and stay consistent.\n- Progress gradually and track what changes.\n- Recover well — that's where results are built.\n\n## Takeaway\n\nSmall, repeatable actions compound. Pick one thing and do it this week.` }),
     });
-    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    if (!result.ok) return aiFail(c, result);
     const article = extractJson<{ title: string; summary: string; body: string }>(result.output);
-    if (!article?.body) return c.json({ error: "could not parse" }, 422);
+    if (!article?.body) return c.json({ error: "The AI didn't return a valid article.", raw: result.output.slice(0, 1800), mocked: result.mocked }, 422);
     return c.json({ article, credits: result.credits, mocked: result.mocked });
   })
 
@@ -519,7 +531,7 @@ export const aiRoutes = new Hono<AppEnv>()
       tenantId: who.tenantId, actorUserId: who.userId, feature: "cover-image",
       prompt: `${sys("cover-image")}\nSubject: ${parsed.data.prompt}`,
     });
-    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "image generation unavailable" }, 503);
+    if (!result.ok) return aiFail(c, result);
     return c.json({ key: result.key, url: `/api/media/${result.key}`, credits: result.credits, mocked: result.mocked });
   })
 
@@ -544,7 +556,7 @@ export const aiRoutes = new Hono<AppEnv>()
       prompt: `${ctx.text}\n\nWrite the coach summary now.`, maxOutputTokens: 300,
       mock: () => `${access.client.display_name} is training consistently and logging most days. Adherence is solid and the trend is positive; sleep is the main lever. Next: nudge check-in consistency and confirm protein targets are being hit.`,
     });
-    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    if (!result.ok) return aiFail(c, result);
     return c.json({ summary: result.output.trim(), credits: result.credits, mocked: result.mocked });
   })
 
