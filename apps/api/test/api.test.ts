@@ -245,6 +245,36 @@ describe("AI config (per-tenant model / prompt / tone / enable)", () => {
   });
 });
 
+describe("trainer AI features (registry)", () => {
+  it("runs supplement reco, article writer, client summary, and lab extract (mock)", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "TrainerAI" }) })).json()) as { client: { id: string } };
+
+    const rec = (await (await SELF.fetch("http://x/api/ai/supplement-reco", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { recommendations: { name: string }[]; mocked: boolean };
+    expect(rec.recommendations.length).toBeGreaterThan(0);
+    expect(rec.mocked).toBe(true);
+
+    const art = (await (await SELF.fetch("http://x/api/ai/article", { method: "POST", headers: H, body: JSON.stringify({ topic: "Sleep and recovery" }) })).json()) as { article: { title: string; body: string } };
+    expect(art.article.body.length).toBeGreaterThan(0);
+
+    const sum = (await (await SELF.fetch("http://x/api/ai/client-summary", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { summary: string };
+    expect(sum.summary).toContain("TrainerAI");
+
+    // Lab extract needs an uploaded file: request → upload a media key → extract.
+    const { id: labId } = (await (await SELF.fetch("http://x/api/labs", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, type: "blood_panel" }) })).json()) as { id: string };
+    const fd = new FormData();
+    fd.append("file", new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], { type: "image/jpeg" }), "lab.jpg");
+    fd.append("purpose", "lab");
+    const { key } = (await (await SELF.fetch("http://x/api/media/upload", { method: "POST", headers: auth(ownerCookie), body: fd })).json()) as { key: string };
+    await SELF.fetch(`http://x/api/labs/${labId}/upload`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, fileKey: key }) });
+    const ex = (await (await SELF.fetch("http://x/api/ai/lab-extract", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, labId }) })).json()) as { values: { marker: string }[] };
+    expect(ex.values.length).toBeGreaterThan(0);
+    expect(ex.values[0]!.marker.length).toBeGreaterThan(0);
+  });
+});
+
 describe("coach note (personalized, context-cached)", () => {
   it("builds a personal note, caches it, and refreshes on a material change", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

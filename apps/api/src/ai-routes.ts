@@ -43,17 +43,8 @@ function toBase64(buf: ArrayBuffer): string {
   return btoa(bin);
 }
 
-const PARSE_FOOD_SYSTEM = `You turn casual food descriptions into structured diary entries.
-Reply with ONLY a JSON array. Each item: {"label": string, "mealType": "breakfast"|"lunch"|"dinner"|"snack", "calories": number, "proteinG": number, "carbsG": number, "fatG": number, "quantity": number|null, "unit": string|null}.
-Estimate sensible macros for typical portions. No commentary.`;
-
-const LABEL_SYSTEM = `You read a nutrition-facts label from a photo.
-Reply with ONLY a JSON object: {"name": string, "brand": string|null, "servingSize": number, "servingUnit": string, "calories": number, "proteinG": number, "carbsG": number, "fatG": number, "fiberG": number, "sugarG": number, "sodiumMg": number, "saturatedFatG": number, "cholesterolMg": number, "potassiumMg": number, "calciumMg": number, "ironMg": number}.
-All values are PER SERVING (convert if the panel is per 100g). Grams for macros, mg for sodium/cholesterol/potassium/calcium/iron. Use the product name if visible, else a short descriptive name. No commentary.`;
-
-const DRAFT_PLAN_SYSTEM = `You are a certified strength coach drafting a workout plan.
-Reply with ONLY JSON matching: {"days": [{"name": string, "isRestDay": boolean, "blocks": [{"type": "single"|"superset"|"circuit"|"hiit", "rounds": number|null, "slots": [{"exerciseId": string, "measurementMode": "reps"|"time", "sets": [{"setType": "warmup"|"working", "reps": number|null, "weightMode": "unspecified"|"bodyweight", "restAfterSec": number}]}]}]}]}.
-Use ONLY exercise ids from the provided library list. 3-6 sets per exercise, sensible rest. Respect injuries, equipment, experience, and available days. No commentary.`;
+/** The built-in system prompt for a feature (the tenant may override it). */
+const sys = (key: string): string => featureDef(key)!.defaultSystem;
 
 export const aiRoutes = new Hono<AppEnv>()
   /** "2 eggs, toast and an apple" → structured entries (client confirms). */
@@ -74,7 +65,7 @@ export const aiRoutes = new Hono<AppEnv>()
       clientId: access.client.id,
       feature: "parse-food",
       task: "text-small",
-      system: PARSE_FOOD_SYSTEM,
+      system: sys("parse-food"),
       prompt: parsed.data.text,
       maxOutputTokens: 512,
       mock: () =>
@@ -133,7 +124,7 @@ export const aiRoutes = new Hono<AppEnv>()
       clientId: access.client.id,
       feature: "draft-plan",
       task: "text",
-      system: DRAFT_PLAN_SYSTEM,
+      system: sys("draft-plan"),
       prompt,
       maxOutputTokens: 3072,
       mock: () =>
@@ -212,7 +203,7 @@ export const aiRoutes = new Hono<AppEnv>()
       feature: "snap-meal",
       task: "vision", // Gemini Flash (vision) — real photo → foods + macros
       image,
-      system: PARSE_FOOD_SYSTEM,
+      system: sys("snap-meal"),
       prompt: `A photo of a meal${parsed.data.hint ? ` (${parsed.data.hint})` : ""}. Identify the foods and estimate portions + macros as the JSON array.`,
       maxOutputTokens: 512,
       mock: () =>
@@ -250,7 +241,7 @@ export const aiRoutes = new Hono<AppEnv>()
       feature: "label-reader",
       task: "vision",
       image,
-      system: LABEL_SYSTEM,
+      system: sys("label-reader"),
       prompt: "Read this nutrition-facts label. Return the single JSON food object, values per serving.",
       maxOutputTokens: 400,
       mock: () => JSON.stringify({ name: "Granola bar", brand: "Acme", servingSize: 40, servingUnit: "g", calories: 180, proteinG: 4, carbsG: 27, fatG: 6, fiberG: 3, sugarG: 12, sodiumMg: 95, saturatedFatG: 2, cholesterolMg: 0, potassiumMg: 90, calciumMg: 20, ironMg: 1 }),
@@ -282,7 +273,7 @@ export const aiRoutes = new Hono<AppEnv>()
       clientId: access.client.id,
       feature: "draft-meal",
       task: "text",
-      system: `You are a nutrition coach drafting a day of meal options. Reply with ONLY JSON: {"mealOptions":[{"mealType":"breakfast"|"lunch"|"dinner"|"snack","mealName":string,"isFree":false,"foods":[]}]}. Honor the calorie/macro targets and dietary approach. Foods arrays may be empty (the coach fills exact items) — focus on meal names + types that hit the targets. No commentary.`,
+      system: sys("draft-meal"),
       prompt: `TARGETS: ${JSON.stringify(targets)}\nINTAKE: ${JSON.stringify(intake)}\n${parsed.data.instructions}`,
       maxOutputTokens: 1536,
       mock: () => JSON.stringify({ mealOptions: [{ mealType: "breakfast", mealName: "Oats, whey & berries", isFree: false, foods: [] }, { mealType: "lunch", mealName: "Chicken, rice & greens", isFree: false, foods: [] }, { mealType: "dinner", mealName: "Salmon, potato & salad", isFree: false, foods: [] }] }),
@@ -311,9 +302,9 @@ export const aiRoutes = new Hono<AppEnv>()
       tenantId: who.tenantId,
       actorUserId: who.userId,
       clientId: access.client.id,
-      feature: "summarize-checkins",
+      feature: "checkin-reply",
       task: "text-small",
-      system: `You are a coaching assistant. Summarize a client's recent check-ins for their trainer in 2-3 sentences: adherence, trends, and any red flags. Then draft a short, warm 1-2 sentence reply to the client. Reply as JSON: {"summary":string,"suggestedReply":string}. No medical advice.`,
+      system: sys("checkin-reply"),
       prompt: JSON.stringify(rows.results),
       maxOutputTokens: 400,
       mock: () => JSON.stringify({ summary: `${access.client.display_name} checked in ${(rows.results ?? []).length} times recently. Mood and sleep look steady; weight trending as expected.`, suggestedReply: "Great consistency this week — keep the sleep dialed in and let's push the next session." }),
@@ -339,13 +330,132 @@ export const aiRoutes = new Hono<AppEnv>()
       clientId: access.client.id,
       feature: "narrative",
       task: "text-small",
-      system: `Turn these fitness stats into a warm, motivating 3-4 sentence recap for the client. Concrete, honest, encouraging. Plain text only.`,
+      system: sys("narrative"),
       prompt: JSON.stringify(parsed.data.stats),
       maxOutputTokens: 300,
       mock: () => `You've been remarkably consistent this month. Your logging streak and steady weight trend show the habits are sticking — that's the hard part. Keep the momentum, and let's build on this next phase.`,
     });
     if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
     return c.json({ narrative: result.output.trim(), credits: result.credits, mocked: result.mocked });
+  })
+
+  /** Lab Reader: an uploaded report (image/PDF) → extracted marker values that
+   *  pre-fill the coach's review (trainer). */
+  .post("/ai/lab-extract", async (c) => {
+    const who = requireTenant(c)!;
+    const role = c.get("role");
+    if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    const parsed = z.object({ clientId: z.string(), labId: z.string() }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, parsed.data.clientId);
+    if ("response" in access) return access.response;
+    const lab = await c.env.DB.prepare("SELECT file_key, display_name FROM lab_tests WHERE id = ? AND client_id = ?").bind(parsed.data.labId, access.client.id).first<{ file_key: string | null; display_name: string }>();
+    if (!lab?.file_key) return c.json({ error: "no uploaded file" }, 404);
+    if (!lab.file_key.startsWith(`t/${who.tenantId}/`)) return c.json({ error: "invalid file" }, 400);
+    const obj = await c.env.MEDIA.get(lab.file_key);
+    if (!obj) return c.json({ error: "file not found" }, 404);
+    const image = { data: toBase64(await obj.arrayBuffer()), mimeType: obj.httpMetadata?.contentType ?? "image/jpeg" };
+
+    const result = await generate(c.env, {
+      tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
+      feature: "lab-extract", task: "vision", image, system: sys("lab-extract"),
+      prompt: `Extract every marker value from this lab report (${lab.display_name}).`,
+      maxOutputTokens: 800,
+      mock: () => JSON.stringify({ values: [
+        { marker: "Vitamin D, 25-OH", value: "22", unit: "ng/mL", refRange: "30-100", flag: "low" },
+        { marker: "Ferritin", value: "85", unit: "ng/mL", refRange: "30-400", flag: "normal" },
+        { marker: "Total Testosterone", value: "410", unit: "ng/dL", refRange: "300-1000", flag: "normal" },
+      ] }),
+    });
+    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    const out = extractJson<{ values: unknown[] }>(result.output);
+    if (!out?.values || !Array.isArray(out.values)) return c.json({ error: "could not read the report" }, 422);
+    return c.json({ values: out.values, credits: result.credits, mocked: result.mocked });
+  })
+
+  /** Supplement Recommender: reviewed labs + goal + current stack → suggested
+   *  OTC supplements the coach reviews before prescribing (trainer). */
+  .post("/ai/supplement-reco", async (c) => {
+    const who = requireTenant(c)!;
+    const role = c.get("role");
+    if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    const parsed = z.object({ clientId: z.string() }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, parsed.data.clientId);
+    if ("response" in access) return access.response;
+    const [labs, goal, supps] = await Promise.all([
+      c.env.DB.prepare("SELECT display_name, values_json FROM lab_tests WHERE client_id = ? AND status = 'reviewed' ORDER BY created_at DESC LIMIT 5").bind(access.client.id).all<{ display_name: string; values_json: string | null }>(),
+      c.env.DB.prepare("SELECT targets_json, derivation_json FROM client_goals WHERE client_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(access.client.id).first<{ targets_json: string | null; derivation_json: string | null }>(),
+      c.env.DB.prepare("SELECT name, dose FROM supplements WHERE client_id = ? AND status IN ('active','paused')").bind(access.client.id).all<{ name: string; dose: string | null }>(),
+    ]);
+    const labText = (labs.results ?? []).map((l) => `${l.display_name}: ${(parseJson<{ marker: string; value: string; unit?: string; flag?: string }[]>(l.values_json, [])).map((v) => `${v.marker} ${v.value}${v.unit ?? ""}${v.flag && v.flag !== "normal" ? ` (${v.flag})` : ""}`).join(", ")}`).join("\n");
+    const primaryGoal = parseJson<{ primaryGoal?: string }>(goal?.derivation_json, {}).primaryGoal ?? "general fitness";
+    const prompt = `GOAL: ${primaryGoal}\nCURRENT SUPPLEMENTS: ${(supps.results ?? []).map((s) => s.name + (s.dose ? ` ${s.dose}` : "")).join(", ") || "none"}\nREVIEWED LABS:\n${labText || "none on file"}`;
+
+    const result = await generate(c.env, {
+      tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
+      feature: "supplement-reco", task: "text", system: sys("supplement-reco"), prompt, maxOutputTokens: 700,
+      mock: () => JSON.stringify({ recommendations: [
+        { name: "Vitamin D3", dose: "2000 IU daily", rationale: "Serum 25-OH vitamin D is below range.", linkedMarker: "Vitamin D, 25-OH" },
+        { name: "Creatine monohydrate", dose: "5 g daily", rationale: "Well-supported for strength and lean mass on a muscle-gain goal.", linkedMarker: null },
+      ], note: "Recheck vitamin D in 8-12 weeks. Confirm no contraindications before prescribing." }),
+    });
+    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    const out = extractJson<{ recommendations: unknown[]; note?: string }>(result.output);
+    if (!out?.recommendations || !Array.isArray(out.recommendations)) return c.json({ error: "could not parse" }, 422);
+    return c.json({ recommendations: out.recommendations, note: out.note ?? "", credits: result.credits, mocked: result.mocked });
+  })
+
+  /** Article Writer: a topic → a drafted knowledge-base article (trainer). */
+  .post("/ai/article", async (c) => {
+    const who = requireTenant(c)!;
+    const role = c.get("role");
+    if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    const parsed = z.object({ topic: z.string().min(3).max(200), notes: z.string().max(1000).default("") }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+
+    const result = await generate(c.env, {
+      tenantId: who.tenantId, actorUserId: who.userId,
+      feature: "article-write", task: "text", system: sys("article-write"),
+      prompt: `TOPIC: ${parsed.data.topic}${parsed.data.notes ? `\nNOTES: ${parsed.data.notes}` : ""}`,
+      maxOutputTokens: 2048,
+      mock: () => JSON.stringify({ title: parsed.data.topic, summary: `A practical guide to ${parsed.data.topic.toLowerCase()}.`, body: `## Overview\n\nHere's what matters about ${parsed.data.topic.toLowerCase()}, and how to put it to work.\n\n## Key points\n\n- Start simple and stay consistent.\n- Progress gradually and track what changes.\n- Recover well — that's where results are built.\n\n## Takeaway\n\nSmall, repeatable actions compound. Pick one thing and do it this week.` }),
+    });
+    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    const article = extractJson<{ title: string; summary: string; body: string }>(result.output);
+    if (!article?.body) return c.json({ error: "could not parse" }, 422);
+    return c.json({ article, credits: result.credits, mocked: result.mocked });
+  })
+
+  /** Client Summary: full context → a concise coach-facing status (trainer). */
+  .post("/ai/client-summary", async (c) => {
+    const who = requireTenant(c)!;
+    const role = c.get("role");
+    if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    const parsed = z.object({ clientId: z.string(), today: z.string().optional(), hour: z.coerce.number().int().min(0).max(23).optional() }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, parsed.data.clientId);
+    if ("response" in access) return access.response;
+    const prefRow = await c.env.DB.prepare("SELECT units_json FROM user_prefs WHERE user_id = ?").bind(who.userId).first<{ units_json: string | null }>();
+    const units = resolveUnits(parseJson(prefRow?.units_json ?? null, null));
+    const ctx = await buildClientContext(c.env, access.client, { today: parsed.data.today ?? new Date().toISOString().slice(0, 10), hour: parsed.data.hour ?? 12, units });
+
+    const result = await generate(c.env, {
+      tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
+      feature: "client-summary", task: "text-small", system: sys("client-summary"),
+      prompt: `${ctx.text}\n\nWrite the coach summary now.`, maxOutputTokens: 300,
+      mock: () => `${access.client.display_name} is training consistently and logging most days. Adherence is solid and the trend is positive; sleep is the main lever. Next: nudge check-in consistency and confirm protein targets are being hit.`,
+    });
+    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
+    return c.json({ summary: result.output.trim(), credits: result.credits, mocked: result.mocked });
   })
 
   /**

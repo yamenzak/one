@@ -28,6 +28,7 @@ export function ClientManage({ clientId }: { clientId: string }) {
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [grantOpen, setGrantOpen] = useState(false);
   const [suppOpen, setSuppOpen] = useState(false);
+  const [suggestOpen, setSuggestOpen] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
   const [reviewLab, setReviewLab] = useState<Lab | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
@@ -88,7 +89,10 @@ export function ClientManage({ clientId }: { clientId: string }) {
         <Card className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5"><IconBadge icon={Pill} tone="activity" size="sm" /><h2 className="font-semibold">Supplements</h2></div>
-            <Button size="sm" variant="secondary" onClick={() => setSuppOpen(true)}><Plus /> Prescribe</Button>
+            <div className="flex gap-2">
+              <Button size="sm" variant="tonal" onClick={() => setSuggestOpen(true)}><Sparkles /> Suggest</Button>
+              <Button size="sm" variant="secondary" onClick={() => setSuppOpen(true)}><Plus /> Prescribe</Button>
+            </div>
           </div>
           {supps.length === 0 ? <p className="text-sm text-muted-foreground">No supplements prescribed.</p> : supps.map((s) => (
             <SubCard key={s.id} className="space-y-2">
@@ -131,8 +135,9 @@ export function ClientManage({ clientId }: { clientId: string }) {
       </Sheet>
 
       {suppOpen && <PrescribeSheet clientId={clientId} onClose={() => setSuppOpen(false)} onDone={() => { setSuppOpen(false); void load(); }} />}
+      {suggestOpen && <SuggestSuppSheet clientId={clientId} onClose={() => setSuggestOpen(false)} onPrescribed={load} />}
       {labOpen && <RequestLabSheet clientId={clientId} onClose={() => setLabOpen(false)} onDone={() => { setLabOpen(false); void load(); }} />}
-      {reviewLab && <ReviewLabSheet lab={reviewLab} onClose={() => setReviewLab(null)} onDone={() => { setReviewLab(null); void load(); }} />}
+      {reviewLab && <ReviewLabSheet clientId={clientId} lab={reviewLab} onClose={() => setReviewLab(null)} onDone={() => { setReviewLab(null); void load(); }} />}
       {reportOpen && <ReportSheet clientId={clientId} onClose={() => setReportOpen(false)} />}
     </Page>
   );
@@ -251,6 +256,42 @@ function PrescribeSheet({ clientId, onClose, onDone }: { clientId: string; onClo
   );
 }
 
+interface SuppReco { name: string; dose: string; rationale: string; linkedMarker: string | null }
+function SuggestSuppSheet({ clientId, onClose, onPrescribed }: { clientId: string; onClose: () => void; onPrescribed: () => Promise<void> }) {
+  const [recos, setRecos] = useState<SuppReco[] | null>(null);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [added, setAdded] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    void api.post<{ recommendations: SuppReco[]; note: string }>("/api/ai/supplement-reco", { clientId })
+      .then((r) => { setRecos(r.recommendations); setNote(r.note); })
+      .catch(() => setError("AI suggestions aren't available on this studio's plan."));
+  }, [clientId]);
+  const prescribe = async (r: SuppReco) => {
+    await api.post("/api/supplements", { clientId, name: r.name, dose: r.dose || undefined, kind: "other", schedule: [{ slot: "daily" }] });
+    setAdded((a) => new Set(a).add(r.name));
+    await onPrescribed();
+  };
+  return (
+    <Sheet open onClose={onClose} title="Suggested supplements">
+      <div className="space-y-3">
+        <p className="text-xs text-muted-foreground">Evidence-based ideas from this client's reviewed labs, goal and current stack. Review before prescribing.</p>
+        {error ? <SubCard className="text-sm text-muted-foreground">{error}</SubCard> : !recos ? <Skeleton className="h-40" /> : recos.length === 0 ? <p className="text-sm text-muted-foreground">No suggestions right now.</p> : recos.map((r, i) => (
+          <SubCard key={i} className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0"><span className="font-medium">{r.name}</span>{r.dose && <span className="ml-2 text-xs text-muted-foreground">{r.dose}</span>}</div>
+              {added.has(r.name) ? <Badge tone="success">Added</Badge> : <Button size="sm" onClick={() => void prescribe(r)}>Prescribe</Button>}
+            </div>
+            <p className="text-xs text-muted-foreground">{r.rationale}</p>
+            {r.linkedMarker && <Badge tone="cardio">{r.linkedMarker}</Badge>}
+          </SubCard>
+        ))}
+        {note && <SubCard className="flex items-start gap-2 text-xs text-muted-foreground"><Sparkles className="mt-0.5 size-3.5 shrink-0 text-primary" /><span>{note}</span></SubCard>}
+      </div>
+    </Sheet>
+  );
+}
+
 const LAB_TYPES = ["blood_panel", "hormone", "vitamin_d", "lipid", "thyroid", "body_composition", "custom"];
 function RequestLabSheet({ clientId, onClose, onDone }: { clientId: string; onClose: () => void; onDone: () => void }) {
   const [type, setType] = useState("blood_panel");
@@ -276,11 +317,20 @@ function RequestLabSheet({ clientId, onClose, onDone }: { clientId: string; onCl
 
 interface LabValue { marker: string; value: string; unit: string; flag: "low" | "normal" | "high" }
 const isLabImage = (key: string) => /\.(png|jpe?g|webp|gif|heic)$/i.test(key);
-function ReviewLabSheet({ lab, onClose, onDone }: { lab: Lab; onClose: () => void; onDone: () => void }) {
+function ReviewLabSheet({ clientId, lab, onClose, onDone }: { clientId: string; lab: Lab; onClose: () => void; onDone: () => void }) {
   const [values, setValues] = useState<LabValue[]>(() => (lab.values && lab.values.length ? lab.values.map((v) => ({ marker: v.marker, value: v.value, unit: v.unit ?? "", flag: (v.flag as LabValue["flag"]) ?? "normal" })) : [{ marker: "", value: "", unit: "", flag: "normal" }]));
   const [feedback, setFeedback] = useState(lab.trainer_feedback ?? "");
   const [busy, setBusy] = useState(false);
+  const [extracting, setExtracting] = useState(false);
   const fileUrl = lab.file_key ? `/api/media/${lab.file_key}` : null;
+  const autofill = async () => {
+    setExtracting(true);
+    try {
+      const r = await api.post<{ values: { marker: string; value: string; unit?: string; flag?: string }[] }>("/api/ai/lab-extract", { clientId, labId: lab.id });
+      if (r.values?.length) setValues(r.values.map((v) => ({ marker: v.marker, value: String(v.value), unit: v.unit ?? "", flag: (v.flag as LabValue["flag"]) ?? "normal" })));
+    } catch { /* leave manual entry */ }
+    finally { setExtracting(false); }
+  };
   const setRow = (i: number, p: Partial<LabValue>) => setValues((v) => v.map((r, idx) => (idx === i ? { ...r, ...p } : r)));
   const save = async () => {
     setBusy(true);
@@ -304,6 +354,7 @@ function ReviewLabSheet({ lab, onClose, onDone }: { lab: Lab; onClose: () => voi
           </div>
         )}
         {lab.client_notes && <SubCard className="text-sm text-muted-foreground">Client note: {lab.client_notes}</SubCard>}
+        {fileUrl && <Button size="sm" variant="tonal" className="w-full" disabled={extracting} onClick={() => void autofill()}><Sparkles /> {extracting ? "Reading report…" : "Auto-fill from report"}</Button>}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-muted-foreground">Values</label>
           {values.map((v, i) => (
