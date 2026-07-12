@@ -238,7 +238,7 @@ export function Tooltip({ content, children }: { content: ReactNode; children: R
 
 // ── Avatar ───────────────────────────────────────────────────────────────────
 /** DiceBear v9 generated avatar URL for a seed (deterministic, no upload). */
-export function dicebearUrl(seed: string, style = "thumbs"): string {
+export function dicebearUrl(seed: string, style = "toon-head"): string {
   return `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}&radius=50&backgroundType=gradientLinear`;
 }
 
