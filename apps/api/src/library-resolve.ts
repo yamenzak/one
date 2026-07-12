@@ -78,9 +78,9 @@ async function importExercise(db: D1Database, tenantId: string, userId: string, 
   const force = e.force === "push" || e.force === "pull" || e.force === "static" ? e.force : null;
   const diff = ["beginner", "intermediate", "advanced"].includes(e.difficulty ?? "") ? e.difficulty : e.difficulty === "expert" ? "advanced" : null;
   await db.prepare(
-    `INSERT INTO exercises (id, tenant_id, visibility, name, slug, muscle_groups, secondary_muscle_groups, equipment, difficulty, force, category, instructions_md, thumb_url, source, source_id, active, created_by, created_at)
-     VALUES (?, ?, 'tenant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
-  ).bind(id, tenantId, e.name, slugify(e.name), e.muscleGroups.join(","), e.secondaryMuscleGroups.join(","), e.equipment.join(","), diff, force, e.category ?? null, e.instructions ?? null, e.imageUrl ?? null, e.source, e.sourceId, userId, nowIso()).run();
+    `INSERT INTO exercises (id, tenant_id, visibility, name, slug, muscle_groups, secondary_muscle_groups, equipment, difficulty, force, category, instructions_md, thumb_url, thumb2_url, source, source_id, active, created_by, created_at)
+     VALUES (?, ?, 'tenant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+  ).bind(id, tenantId, e.name, slugify(e.name), e.muscleGroups.join(","), e.secondaryMuscleGroups.join(","), e.equipment.join(","), diff, force, e.category ?? null, e.instructions ?? null, e.imageUrl ?? null, e.imageUrl2 ?? null, e.source, e.sourceId, userId, nowIso()).run();
   return id;
 }
 

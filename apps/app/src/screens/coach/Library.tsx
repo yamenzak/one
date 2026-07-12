@@ -65,7 +65,7 @@ function Exercises() {
   );
 }
 
-interface WebExercise { name: string; muscleGroups: string[]; secondaryMuscleGroups?: string[]; equipment: string[]; instructions?: string | null; category?: string | null; force?: string | null; difficulty?: string | null; source: string; sourceId: string; imageUrl: string | null }
+interface WebExercise { name: string; muscleGroups: string[]; secondaryMuscleGroups?: string[]; equipment: string[]; instructions?: string | null; category?: string | null; force?: string | null; difficulty?: string | null; source: string; sourceId: string; imageUrl: string | null; imageUrl2?: string | null }
 /** Bind an exercise's alternatives (SPEC §8.3) — two-way, instant client swaps. */
 function AlternativesSheet({ exercise, onClose }: { exercise: ExerciseInfo; onClose: () => void }) {
   const [alts, setAlts] = useState<ExerciseInfo[] | null>(null);
@@ -126,7 +126,7 @@ export function WebExerciseSheet({ onClose, onImported, onPicked }: { onClose: (
   }, [q]);
   const doImport = async (e: WebExercise) => {
     setImporting(e.sourceId);
-    try { const r = await api.post<{ id: string }>("/api/exercises/import", { name: e.name, muscleGroups: e.muscleGroups, secondaryMuscleGroups: e.secondaryMuscleGroups ?? [], equipment: e.equipment, instructions: e.instructions ?? null, category: e.category ?? null, force: e.force ?? null, difficulty: e.difficulty ?? null, imageUrl: e.imageUrl, source: e.source, sourceId: e.sourceId }); onImported?.(); onPicked?.(r.id); }
+    try { const r = await api.post<{ id: string }>("/api/exercises/import", { name: e.name, muscleGroups: e.muscleGroups, secondaryMuscleGroups: e.secondaryMuscleGroups ?? [], equipment: e.equipment, instructions: e.instructions ?? null, category: e.category ?? null, force: e.force ?? null, difficulty: e.difficulty ?? null, imageUrl: e.imageUrl, imageUrl2: e.imageUrl2 ?? null, source: e.source, sourceId: e.sourceId }); onImported?.(); onPicked?.(r.id); }
     finally { setImporting(null); }
   };
   return (

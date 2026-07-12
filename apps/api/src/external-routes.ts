@@ -59,6 +59,8 @@ export interface NormExercise {
   source: string;
   sourceId: string;
   imageUrl: string | null;
+  /** A second frame (e.g. the end position) when the provider ships one. */
+  imageUrl2: string | null;
 }
 
 const FOOD_PRECEDENCE: Record<string, number> = { openfoodfacts: 1, usda: 2, nutritionix: 3, fatsecret: 4 };
@@ -208,7 +210,7 @@ async function searchWger(q: string): Promise<NormExercise[]> {
   const data = (await res.json()) as { suggestions?: { data?: { base_id?: number; name?: string; image?: string | null; category?: string } }[] };
   return (data.suggestions ?? []).map((s) => s.data).filter((d): d is NonNullable<typeof d> => Boolean(d?.name && d?.base_id)).map((d) => ({
     name: d.name!, muscleGroups: [], secondaryMuscleGroups: [], equipment: [], instructions: null, category: d.category ?? null, force: null, difficulty: null,
-    source: "wger", sourceId: `wger_${d.base_id}`, imageUrl: d.image ? (d.image.startsWith("http") ? d.image : `https://wger.de${d.image}`) : null,
+    source: "wger", sourceId: `wger_${d.base_id}`, imageUrl: d.image ? (d.image.startsWith("http") ? d.image : `https://wger.de${d.image}`) : null, imageUrl2: null,
   }));
 }
 
@@ -228,7 +230,9 @@ async function searchFedb(kv: KVNamespace, q: string): Promise<NormExercise[]> {
   return all.filter((e) => e.name?.toLowerCase().includes(ql)).slice(0, 20).map((e) => ({
     name: e.name!, muscleGroups: e.primaryMuscles ?? [], secondaryMuscleGroups: e.secondaryMuscles ?? [], equipment: e.equipment ? [e.equipment] : [],
     instructions: (e.instructions ?? []).join("\n\n") || null, category: e.category ?? null, force: e.force ?? null, difficulty: e.level ?? null,
-    source: "freeexercisedb", sourceId: `fedb_${e.id ?? e.name}`, imageUrl: e.images?.[0] ? `${FEDB_BASE}/exercises/${e.images[0]}` : null,
+    source: "freeexercisedb", sourceId: `fedb_${e.id ?? e.name}`,
+    imageUrl: e.images?.[0] ? `${FEDB_BASE}/exercises/${e.images[0]}` : null,
+    imageUrl2: e.images?.[1] ? `${FEDB_BASE}/exercises/${e.images[1]}` : null, // start / end frames
   }));
 }
 
@@ -241,7 +245,7 @@ async function searchExerciseDb(q: string, rapidApiKey: string): Promise<NormExe
   return (Array.isArray(data) ? data : []).filter((e) => e.name).map((e) => ({
     name: e.name!, muscleGroups: e.target ? [e.target] : [], secondaryMuscleGroups: e.secondaryMuscles ?? [], equipment: e.equipment ? [e.equipment] : [],
     instructions: (e.instructions ?? []).join("\n\n") || null, category: e.bodyPart ?? null, force: null, difficulty: null,
-    source: "exercisedb", sourceId: `edb_${e.id}`, imageUrl: e.gifUrl ?? null,
+    source: "exercisedb", sourceId: `edb_${e.id}`, imageUrl: e.gifUrl ?? null, imageUrl2: null,
   }));
 }
 
@@ -356,7 +360,7 @@ export const externalRoutes = new Hono<AppEnv>()
       .object({
         name: z.string(), muscleGroups: z.array(z.string()).default([]), secondaryMuscleGroups: z.array(z.string()).default([]),
         equipment: z.array(z.string()).default([]), instructions: z.string().nullish(), category: z.string().nullish(),
-        force: z.string().nullish(), difficulty: z.string().nullish(), imageUrl: z.string().nullish(),
+        force: z.string().nullish(), difficulty: z.string().nullish(), imageUrl: z.string().nullish(), imageUrl2: z.string().nullish(),
         source: z.string(), sourceId: z.string(),
       })
       .safeParse(await c.req.json().catch(() => null));
@@ -368,10 +372,10 @@ export const externalRoutes = new Hono<AppEnv>()
     const force = d.force === "push" || d.force === "pull" || d.force === "static" ? d.force : null;
     const diff = ["beginner", "intermediate", "advanced"].includes(d.difficulty ?? "") ? d.difficulty : (d.difficulty === "expert" ? "advanced" : null);
     await c.env.DB.prepare(
-      `INSERT INTO exercises (id, tenant_id, visibility, name, slug, muscle_groups, secondary_muscle_groups, equipment, difficulty, force, category, instructions_md, thumb_url, source, source_id, active, created_by, created_at)
-       VALUES (?, ?, 'tenant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+      `INSERT INTO exercises (id, tenant_id, visibility, name, slug, muscle_groups, secondary_muscle_groups, equipment, difficulty, force, category, instructions_md, thumb_url, thumb2_url, source, source_id, active, created_by, created_at)
+       VALUES (?, ?, 'tenant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     )
-      .bind(id, who.tenantId, d.name, d.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), d.muscleGroups.join(","), d.secondaryMuscleGroups.join(","), d.equipment.join(","), diff, force, d.category ?? null, d.instructions ?? null, d.imageUrl ?? null, d.source, d.sourceId, who.userId, nowIso())
+      .bind(id, who.tenantId, d.name, d.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), d.muscleGroups.join(","), d.secondaryMuscleGroups.join(","), d.equipment.join(","), diff, force, d.category ?? null, d.instructions ?? null, d.imageUrl ?? null, d.imageUrl2 ?? null, d.source, d.sourceId, who.userId, nowIso())
       .run();
     return c.json({ ok: true, id, imported: true }, 201);
   });

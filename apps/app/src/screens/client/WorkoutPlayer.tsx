@@ -9,10 +9,11 @@ import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet } 
 import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, type ExerciseBests } from "@mossa/domain";
 import {
   Button, Card, Badge, Field, Sheet, Skeleton, SubCard, ProgressRing, EmptyState, Page, Stagger,
-  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, ChevronRight, Check, Info, Play,
+  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, ChevronRight, Check, Info,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
+import { Markdown } from "../../Markdown.js";
 import { ExerciseThumb, ExerciseMeta, splitList, pretty, type ExerciseInfo } from "../exercise.js";
 
 interface PublishedPlan { id: string; name: string; body: WorkoutBody }
@@ -255,7 +256,18 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
       <div className="space-y-4">
         {(ex?.thumb2_url || ex?.thumb_url) && (
           <div className="flex gap-2">
-            {[ex.thumb_url, ex.thumb2_url].filter(Boolean).map((src, i) => <img key={i} src={src!} alt="" className="h-40 w-full flex-1 rounded-2xl object-cover" />)}
+            {([["Start", ex?.thumb_url], ["End", ex?.thumb2_url]] as const).filter(([, src]) => src).map(([label, src]) => (
+              <div key={label} className="relative min-w-0 flex-1 overflow-hidden rounded-2xl">
+                <img src={src!} alt="" className="h-40 w-full object-cover" />
+                {ex?.thumb_url && ex?.thumb2_url && <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[0.65rem] font-semibold text-white">{label}</span>}
+              </div>
+            ))}
+          </div>
+        )}
+        {ex?.video_url && (
+          <div>
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Demo video</div>
+            <video src={ex.video_url} controls playsInline preload="metadata" className="w-full rounded-2xl bg-black" />
           </div>
         )}
         {chips.length > 0 && (
@@ -273,12 +285,11 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
         {ex?.instructions_md ? (
           <div>
             <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">How to</div>
-            <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">{ex.instructions_md.replace(/[#*_>`]/g, "")}</div>
+            <Markdown className="text-sm text-foreground/90">{ex.instructions_md}</Markdown>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No instructions yet — ask your coach for cues.</p>
         )}
-        {ex?.video_url && <a href={ex.video_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-primary [&_svg]:size-4"><Play /> Watch demo</a>}
       </div>
     </Sheet>
   );
