@@ -458,6 +458,34 @@ describe("activity history feed", () => {
   });
 });
 
+describe("wellness score", () => {
+  it("composes a 0-100 score from real signals, per-pillar availability", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "ScoreTest" }) })).json()) as { client: { id: string } };
+    const d = "2026-07-10";
+    await SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, workoutPlanId: "wp", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "ex1", sets: [{ setIndex: 0, reps: 8, weightKg: 60, completed: true }] } }) });
+    await SELF.fetch("http://x/api/logs/activity", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, activityKey: "running", durationMin: 30 } }) });
+    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, mood: 5, energy: 4, stress: 1, sleepHours: 8 } }) });
+
+    const res = (await (await SELF.fetch(`http://x/api/wellness/score?clientId=${client.id}&today=${d}`, { headers: auth(ownerCookie) })).json()) as { score: number; band: string; pillars: { key: string; available: boolean; weight: number }[] };
+    expect(typeof res.score).toBe("number");
+    expect(res.score).toBeGreaterThan(0);
+    expect(res.score).toBeLessThanOrEqual(100);
+    expect(typeof res.band).toBe("string");
+    expect(res.pillars).toHaveLength(8);
+    // Logged pillars are available; untouched ones (supplements) are not.
+    expect(res.pillars.find((p) => p.key === "training")!.available).toBe(true);
+    expect(res.pillars.find((p) => p.key === "sleep")!.available).toBe(true);
+    expect(res.pillars.find((p) => p.key === "mood")!.available).toBe(true);
+    expect(res.pillars.find((p) => p.key === "supplements")!.available).toBe(false);
+    expect(res.pillars.find((p) => p.key === "supplements")!.weight).toBe(0);
+    // Available weights redistribute to sum ~1 (display-rounded per pillar).
+    expect(res.pillars.reduce((s, p) => s + p.weight, 0)).toBeCloseTo(1, 1);
+    // Tenant isolation.
+    expect((await SELF.fetch(`http://x/api/wellness/score?clientId=${client.id}&today=${d}`, { headers: auth(otherCookie) })).status).toBe(404);
+  });
+});
+
 describe("roster activity pulse (coach Today)", () => {
   it("aggregates recent client events across the roster, tagged + tenant-scoped", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

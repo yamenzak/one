@@ -7,11 +7,17 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
+import {
+  wellnessScore, sessionLoad, epley1Rm, activityByKey, presetRange, addDays,
+  DEFAULT_WEEKLY_LOAD_TARGET, type LoggedSetLike, type WellnessInput,
+} from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
 import { notifyUser } from "./inbox-do.js";
+
+interface SessionEntry { exerciseId: string; sets: LoggedSetLike[] }
 
 const staffOnly = (c: { get: (k: "role") => string | null }) =>
   c.get("role") === "owner" || c.get("role") === "trainer";
@@ -245,6 +251,141 @@ export const healthRoutes = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
 
+  // ── Wellness Score: one composite 0-100 over the last 7 days ────────────────
+  .get("/wellness/score", async (c) => {
+    const clientId = c.req.query("clientId");
+    if (!clientId) return c.json({ error: "clientId required" }, 400);
+    const access = await requireClientAccess(c, clientId);
+    if ("response" in access) return access.response;
+    const db = c.env.DB;
+    const cid = access.client.id;
+    const today = c.req.query("today") ?? new Date().toISOString().slice(0, 10);
+    const { start, end } = presetRange("7d", today);
+    const prStart = addDays(today, -83); // longer window for a PR baseline
+
+    const [foods, sessionsWk, sessionsHist, acts, water, checkins, sleeps, moods, supps, suppLogs, measures, goal] = await Promise.all([
+      db.prepare("SELECT date_local, COALESCE(SUM(calories),0) AS cal, COALESCE(SUM(protein_g),0) AS pro FROM food_entries WHERE client_id=? AND date_local>=? AND date_local<=? GROUP BY date_local").bind(cid, start, end).all<{ date_local: string; cal: number; pro: number }>(),
+      db.prepare("SELECT date_local, entries_json FROM exercise_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, start, end).all<{ date_local: string; entries_json: string | null }>(),
+      db.prepare("SELECT date_local, entries_json FROM exercise_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, prStart, end).all<{ date_local: string; entries_json: string | null }>(),
+      db.prepare("SELECT date_local, activity_key, duration_min FROM activity_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, start, end).all<{ date_local: string; activity_key: string | null; duration_min: number | null }>(),
+      db.prepare("SELECT date_local, total_ml FROM water_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, start, end).all<{ date_local: string; total_ml: number }>(),
+      db.prepare("SELECT date_local, mood, energy, stress, sleep_hours FROM check_ins WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, start, end).all<{ date_local: string; mood: number | null; energy: number | null; stress: number | null; sleep_hours: number | null }>(),
+      db.prepare("SELECT date_local, duration_minutes FROM sleep_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, start, end).all<{ date_local: string; duration_minutes: number }>(),
+      db.prepare("SELECT date_local, mood, energy, stress FROM mood_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, start, end).all<{ date_local: string; mood: number | null; energy: number | null; stress: number | null }>(),
+      db.prepare("SELECT id, schedule_json FROM supplements WHERE client_id=? AND status='active'").bind(cid).all<{ id: string; schedule_json: string | null }>(),
+      db.prepare("SELECT COUNT(*) AS n FROM supplement_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, start, end).first<{ n: number }>(),
+      db.prepare("SELECT date_local, weight_kg, body_fat_percent FROM measurements WHERE client_id=? AND date_local>=? ORDER BY date_local").bind(cid, addDays(today, -45)).all<{ date_local: string; weight_kg: number | null; body_fat_percent: number | null }>(),
+      db.prepare("SELECT targets_json, weekly_load_target, derivation_json FROM client_goals WHERE client_id=? AND status='active' ORDER BY created_at DESC LIMIT 1").bind(cid).first<{ targets_json: string | null; weekly_load_target: number | null; derivation_json: string | null }>(),
+    ]);
+
+    const targets = parseJson<{ targetCalories?: number; targetProteinG?: number; targetWaterMl?: number }>(goal?.targets_json, {});
+    const loggedDays = new Set<string>();
+    const mark = (d: string) => loggedDays.add(d);
+
+    // Nutrition: continuous adherence over logged days.
+    const calParts: number[] = [];
+    const proParts: number[] = [];
+    for (const f of foods.results ?? []) {
+      mark(f.date_local);
+      if (targets.targetCalories && f.cal > 0) calParts.push(1 - Math.min(1, Math.abs(f.cal - targets.targetCalories) / targets.targetCalories));
+      if (targets.targetProteinG && f.pro > 0) proParts.push(Math.min(1, f.pro / targets.targetProteinG));
+    }
+    const foodLoggedDays = (foods.results ?? []).filter((f) => f.cal > 0).length;
+    // Nutrition only counts once it's relevant — the client has a calorie target
+    // or has actually logged food. A brand-new client with neither isn't scored 0.
+    const nutritionRelevant = !!targets.targetCalories || foodLoggedDays > 0;
+
+    // Training: active days + weekly load; PRs from a longer baseline.
+    const activeDaySet = new Set<string>();
+    let weeklyLoad = 0;
+    for (const s of sessionsWk.results ?? []) {
+      const entries = parseJson<SessionEntry[]>(s.entries_json, []);
+      const sets = entries.flatMap((e) => e.sets);
+      if (sets.some((x) => x.completed !== false)) { activeDaySet.add(s.date_local); mark(s.date_local); }
+      weeklyLoad += sessionLoad({ sets });
+    }
+    for (const a of acts.results ?? []) {
+      activeDaySet.add(a.date_local); mark(a.date_local);
+      weeklyLoad += sessionLoad({ cardio: [{ met: activityByKey(a.activity_key ?? "").met, durationMin: a.duration_min ?? 0 }] });
+    }
+    // PRs this week: best e1RM per exercise across the baseline window, counted
+    // fresh when the best set falls inside the current week.
+    const best = new Map<string, { e1: number; date: string }>();
+    for (const s of [...(sessionsHist.results ?? [])].sort((a, b) => a.date_local.localeCompare(b.date_local))) {
+      for (const e of parseJson<SessionEntry[]>(s.entries_json, [])) {
+        for (const set of e.sets) {
+          if (set.completed === false || !set.weightKg || !set.reps) continue;
+          const e1 = epley1Rm(set.weightKg, set.reps);
+          if (e1 == null) continue;
+          const cur = best.get(e.exerciseId);
+          if (!cur || e1 > cur.e1) best.set(e.exerciseId, { e1, date: s.date_local });
+        }
+      }
+    }
+    const prsThisWeek = [...best.values()].filter((b) => b.date >= start && b.date <= end).length;
+
+    // Hydration: average of daily fill vs target over 7 calendar days.
+    let hydrationRatio: number | null = null;
+    if (targets.targetWaterMl && targets.targetWaterMl > 0) {
+      const byDay = new Map<string, number>();
+      for (const w of water.results ?? []) { byDay.set(w.date_local, w.total_ml); if (w.total_ml > 0) mark(w.date_local); }
+      let sum = 0;
+      for (let d = start; d <= end; d = addDays(d, 1)) sum += Math.min(1, (byDay.get(d) ?? 0) / targets.targetWaterMl);
+      hydrationRatio = sum / 7;
+    }
+
+    // Sleep: prefer sleep logs, fall back to check-in hours.
+    const sleepHours: number[] = [];
+    for (const s of sleeps.results ?? []) { sleepHours.push(s.duration_minutes / 60); mark(s.date_local); }
+    for (const ci of checkins.results ?? []) if (ci.sleep_hours != null && !(sleeps.results ?? []).some((s) => s.date_local === ci.date_local)) sleepHours.push(ci.sleep_hours);
+    const avgSleepHours = sleepHours.length ? sleepHours.reduce((a, b) => a + b, 0) / sleepHours.length : null;
+
+    // Mood/energy/stress: check-ins + mood logs.
+    const moodV: number[] = [], enV: number[] = [], stV: number[] = [];
+    for (const r of [...(checkins.results ?? []), ...(moods.results ?? [])]) {
+      if (r.mood != null) moodV.push(r.mood);
+      if (r.energy != null) enV.push(r.energy);
+      if (r.stress != null) stV.push(r.stress);
+    }
+    const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+
+    // Consistency.
+    const checkInDays = new Set<string>();
+    for (const ci of checkins.results ?? []) { checkInDays.add(ci.date_local); mark(ci.date_local); }
+    for (const m of moods.results ?? []) mark(m.date_local);
+
+    // Supplements: taken / (active slots × 7).
+    let supplementAdherence: number | null = null;
+    if ((supps.results ?? []).length > 0) {
+      const slots = (supps.results ?? []).reduce((n, s) => n + Math.max(1, parseJson<{ slot: string }[]>(s.schedule_json, []).length), 0);
+      const expected = slots * 7;
+      supplementAdherence = expected > 0 ? Math.min(1, (suppLogs?.n ?? 0) / expected) : null;
+    }
+
+    // Body: favourable weight movement given goal direction.
+    const bodyProgress = computeBodyProgress(measures.results ?? [], parseJson<{ primaryGoal?: string }>(goal?.derivation_json, {}).primaryGoal);
+
+    const input: WellnessInput = {
+      activeDays: activeDaySet.size,
+      weeklyLoad,
+      weeklyLoadTarget: goal?.weekly_load_target ?? DEFAULT_WEEKLY_LOAD_TARGET,
+      prsThisWeek,
+      calorieAdherence: calParts.length ? calParts.reduce((a, b) => a + b, 0) / calParts.length : null,
+      proteinAdherence: proParts.length ? proParts.reduce((a, b) => a + b, 0) / proParts.length : null,
+      foodLoggedDays: nutritionRelevant ? foodLoggedDays : null,
+      hydrationRatio,
+      avgSleepHours,
+      avgMood: mean(moodV),
+      avgEnergy: mean(enV),
+      avgStress: mean(stV),
+      loggedDays: loggedDays.size,
+      checkInDays: checkInDays.size,
+      supplementAdherence,
+      bodyProgress,
+    };
+    return c.json({ ...wellnessScore(input), input });
+  })
+
   // ── Exercise swap requests ─────────────────────────────────────────────────
   .get("/swaps", async (c) => {
     const who = requireTenant(c)!;
@@ -364,6 +505,23 @@ export const healthRoutes = new Hono<AppEnv>()
     }
     return c.json({ ok: true });
   });
+
+/**
+ * Body-progress pillar (0..1): rewards weight moving toward the goal direction
+ * (lose/build) or staying stable when maintaining. Null with < 2 weigh-ins so
+ * the pillar simply doesn't count until there's a trend to read.
+ */
+function computeBodyProgress(measures: { weight_kg: number | null }[], primaryGoal?: string): number | null {
+  const weights = measures.map((m) => m.weight_kg).filter((w): w is number => w != null);
+  if (weights.length < 2) return null;
+  const startW = weights[0]!;
+  const lastW = weights[weights.length - 1]!;
+  if (startW <= 0) return null;
+  const pctChange = (lastW - startW) / startW; // signed
+  if (primaryGoal === "lose_weight") return Math.min(1, Math.max(0, 0.5 - pctChange * 12)); // −4% ≈ 1.0
+  if (primaryGoal === "build_muscle") return Math.min(1, Math.max(0, 0.5 + pctChange * 12));
+  return Math.min(1, Math.max(0, 1 - Math.abs(pctChange) * 20)); // maintain/unknown: stability
+}
 
 /** Apply an approved swap directly into the plan's JSON body. */
 async function applySwap(

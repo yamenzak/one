@@ -9,3 +9,4 @@ export * from "./units.js";
 export * from "./activity.js";
 export * from "./workout.js";
 export * from "./progress.js";
+export * from "./wellness.js";
