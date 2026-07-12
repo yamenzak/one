@@ -625,7 +625,7 @@ export const aiRoutes = new Hono<AppEnv>()
       if (obj) reference = { data: toBase64(await obj.arrayBuffer()), mimeType: obj.httpMetadata?.contentType ?? "image/png" };
     }
     const matchLine = reference
-      ? " Keep the EXACT same character, art style, colours, line-work, camera angle, framing, lighting and background as the reference image — change ONLY the body position."
+      ? " Use the reference image ONLY to copy the character's appearance, art style, colours, line-work, camera angle, framing and background. Draw a NEW pose — the limbs and joints MUST be clearly and substantially repositioned into the specified position; do NOT reproduce the reference pose or output a near-identical image."
       : "";
     const result = await generateImage(c.env, {
       tenantId: who.tenantId, actorUserId: who.userId, feature, reference,
@@ -658,6 +658,31 @@ export const aiRoutes = new Hono<AppEnv>()
     });
     if (!result.ok) return aiFail(c, result);
     return c.json({ recipe: result.output, credits: result.credits, mocked: result.mocked });
+  })
+
+  /** Write step-by-step how-to instructions for an exercise (trainer). */
+  .post("/ai/exercise-guide", async (c) => {
+    const who = requireTenant(c)!;
+    const role = c.get("role");
+    if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    const parsed = z.object({
+      name: z.string().min(1).max(120),
+      muscleGroups: z.array(z.string()).default([]),
+      equipment: z.array(z.string()).default([]),
+    }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const { name, muscleGroups, equipment } = parsed.data;
+    const result = await generate(c.env, {
+      tenantId: who.tenantId, actorUserId: who.userId, feature: "exercise-guide", task: "text",
+      system: sys("exercise-guide"),
+      prompt: `EXERCISE: ${name}${muscleGroups.length ? `\nMUSCLES: ${muscleGroups.join(", ")}` : ""}${equipment.length ? `\nEQUIPMENT: ${equipment.join(", ")}` : ""}\n\nWrite the instructions now.`,
+      maxOutputTokens: 600,
+      mock: () => `**Setup:** Stand tall with a shoulder-width stance and brace your core.\n\n## Steps\n1. Get into the starting position with control.\n2. Move through the full range of motion, keeping tension on the target muscle.\n3. Pause briefly at peak contraction.\n4. Return slowly to the start under control.\n\n## Coaching cues\n- Keep the movement smooth — no jerking or momentum.\n- Breathe out on the effort, in on the return.\n- Stop a rep or two short of failure to keep form clean.`,
+    });
+    if (!result.ok) return aiFail(c, result);
+    return c.json({ guide: result.output, credits: result.credits, mocked: result.mocked });
   })
 
   /** Client Summary: full context → a concise coach-facing status (trainer). */

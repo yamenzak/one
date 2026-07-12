@@ -108,6 +108,15 @@ Only well-supported, safe OTC options. Never suggest prescription drugs or anyth
     defaultSystem: `Create a clean, modern instructional illustration of ONE athletic figure performing the exercise with correct form. Full body in frame, side-on (profile) view, centred, feet-to-head visible, on a plain neutral light-grey background, even flat lighting. Consistent simple art style. No text, no words, no logos, no arrows.`,
   },
   {
+    key: "exercise-guide",
+    label: "Write exercise instructions",
+    description: "Generate step-by-step how-to coaching cues for an exercise.",
+    audience: "trainer",
+    task: "text",
+    tonable: true,
+    defaultSystem: `You are a strength coach writing how-to instructions for one exercise. Reply in concise Markdown: a one-line "**Setup:**", a "## Steps" numbered list (the execution, 3-6 steps), and a "## Coaching cues" bullet list (2-4 key form cues or common mistakes to avoid). Be specific and practical. No preamble, no title.`,
+  },
+  {
     key: "meal-recipe",
     label: "Recommend a recipe",
     description: "Turn a meal option's foods into a simple recipe the client can cook.",

@@ -449,6 +449,12 @@ describe("AI image generation + recipe", () => {
     const recOut = (await rec.json()) as { recipe: string };
     expect(recOut.recipe.length).toBeGreaterThan(10);
     expect(recOut.recipe).toContain("Ingredients");
+
+    // Exercise how-to guide.
+    const guide = await SELF.fetch("http://x/api/ai/exercise-guide", { method: "POST", headers: H, body: JSON.stringify({ name: "Barbell Curl", muscleGroups: ["biceps"], equipment: ["barbell"] }) });
+    expect(guide.status).toBe(200);
+    const guideOut = (await guide.json()) as { guide: string };
+    expect(guideOut.guide).toContain("Steps");
   });
 
   it("exercise create accepts start/end images + video", async () => {

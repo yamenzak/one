@@ -7,7 +7,7 @@
  */
 
 import { useState } from "react";
-import { Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X } from "@mossa/ui";
+import { Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Sparkles } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { AiImageField } from "../../AiImageField.js";
@@ -37,9 +37,19 @@ export function ExerciseEditor({ exerciseId, initial, onClose, onSaved }: {
   const [image2, setImage2] = useState(initial?.thumb2_url ?? "");
   const [video, setVideo] = useState(initial?.video_url ?? "");
   const [videoBusy, setVideoBusy] = useState(false);
+  const [guideBusy, setGuideBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const { ctx } = useSession();
   const canAi = !!ctx?.entitlements?.features?.aiSuite;
+
+  const generateGuide = async () => {
+    if (name.trim().length < 2) return;
+    setGuideBusy(true);
+    try {
+      const r = await api.post<{ guide: string }>("/api/ai/exercise-guide", { name: name.trim(), muscleGroups: split(muscles), equipment: split(equipment) });
+      if (r.guide) setInstructions(r.guide);
+    } finally { setGuideBusy(false); }
+  };
 
   const uploadVideo = async (file: File) => {
     setVideoBusy(true);
@@ -74,8 +84,8 @@ export function ExerciseEditor({ exerciseId, initial, onClose, onSaved }: {
         {/* Start + end frames — upload or generate. The End is generated from
             the Start image so the same athlete, style and angle carry over. */}
         <div className="grid grid-cols-2 gap-3">
-          <AiImageField value={image} onChange={setImage} feature="exercise-image" subject={name} hint="the START / setup position of the movement" canAi={canAi} label="Start" stacked />
-          <AiImageField value={image2} onChange={setImage2} feature="exercise-image" subject={name} hint="the END / bottom (fully-worked) position of the movement" canAi={canAi} label="End" stacked referenceUrl={image || undefined} />
+          <AiImageField value={image} onChange={setImage} feature="exercise-image" subject={name} hint="the STARTING / setup position, standing ready just before the rep begins" canAi={canAi} label="Start" stacked />
+          <AiImageField value={image2} onChange={setImage2} feature="exercise-image" subject={name} hint="the PEAK-CONTRACTION / finished position at the hardest point of the rep, with the joints fully flexed and CLEARLY different from the setup (e.g. a curl with the bar raised to the shoulders, a squat at the bottom with hips below the knees, a press with arms extended overhead)" canAi={canAi} label="End" stacked referenceUrl={image || undefined} />
         </div>
         {canAi && <p className="-mt-1 text-[0.7rem] leading-snug text-muted-foreground">Generate the Start first — the End is drawn from it to keep the same figure, style and angle. Style is configurable in AI settings.</p>}
 
@@ -121,8 +131,15 @@ export function ExerciseEditor({ exerciseId, initial, onClose, onSaved }: {
         </div>
 
         <div>
-          <div className="mb-1.5 text-sm text-muted-foreground">How to perform it</div>
-          <Textarea rows={5} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Cues, setup, tempo…" />
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-sm text-muted-foreground">How to perform it</span>
+            {canAi && (
+              <Button size="sm" variant="tonal" disabled={guideBusy || name.trim().length < 2} onClick={() => void generateGuide()}>
+                <Sparkles /> {guideBusy ? "Writing…" : instructions.trim() ? "Rewrite with AI" : "Generate with AI"}
+              </Button>
+            )}
+          </div>
+          <Textarea rows={6} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Setup, steps, coaching cues… or generate with AI." />
         </div>
 
         <Button size="lg" className="w-full" disabled={busy || name.trim().length < 2} onClick={() => void save()}>
