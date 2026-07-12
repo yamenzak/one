@@ -46,6 +46,65 @@ function toBase64(buf: ArrayBuffer): string {
 /** The built-in system prompt for a feature (the tenant may override it). */
 const sys = (key: string): string => featureDef(key)!.defaultSystem;
 
+interface DraftFoodQuery { query?: string; quantity?: number; unit?: string }
+interface DraftMealOption { mealType: string; mealName: string; isFree?: boolean; foods?: DraftFoodQuery[] }
+interface ResolvedMealFood { foodId: string; quantity: number; unit: string }
+
+/** Turn the model's food search queries into real library food ids — matching
+ *  the tenant's + platform (public) food library. Unresolved queries drop. */
+async function resolveMealFoods(db: D1Database, tenantId: string, options: DraftMealOption[]): Promise<(DraftMealOption & { foods: ResolvedMealFood[] })[]> {
+  const cache = new Map<string, string | null>();
+  const lookup = async (q: string): Promise<string | null> => {
+    const key = q.toLowerCase().trim();
+    if (cache.has(key)) return cache.get(key)!;
+    const row = await db
+      .prepare("SELECT id FROM foods WHERE active = 1 AND (tenant_id IS NULL OR tenant_id = ?) AND LOWER(name) LIKE ? ORDER BY verified DESC, name LIMIT 1")
+      .bind(tenantId, `%${key}%`)
+      .first<{ id: string }>();
+    cache.set(key, row?.id ?? null);
+    return row?.id ?? null;
+  };
+  const out: (DraftMealOption & { foods: ResolvedMealFood[] })[] = [];
+  for (const opt of options) {
+    if (!opt?.mealType || !opt?.mealName) continue;
+    const foods: ResolvedMealFood[] = [];
+    for (const f of (opt.foods ?? []).slice(0, 4)) {
+      const q = String(f?.query ?? "").trim();
+      if (!q) continue;
+      const id = await lookup(q);
+      if (id) foods.push({ foodId: id, quantity: Number(f.quantity) > 0 ? Number(f.quantity) : 100, unit: (f.unit || "g").slice(0, 20) });
+    }
+    out.push({ mealType: opt.mealType, mealName: opt.mealName, isFree: !!opt.isFree, foods });
+  }
+  return out;
+}
+
+/** Compact style reference from a studio's recent published meal plans. */
+async function mealPlanExamples(db: D1Database, tenantId: string): Promise<string> {
+  const rows = await db.prepare("SELECT name, body_json FROM meal_plans WHERE tenant_id = ? AND status = 'published' ORDER BY published_at DESC LIMIT 2").bind(tenantId).all<{ name: string; body_json: string | null }>();
+  const lines = (rows.results ?? []).map((p) => {
+    const opts = parseJson<{ mealOptions?: { mealType: string; mealName: string }[] }>(p.body_json, {}).mealOptions ?? [];
+    const meals = opts.slice(0, 8).map((o) => `${o.mealType}: ${o.mealName}`).join("; ");
+    return meals ? `- "${p.name}": ${meals}` : null;
+  }).filter(Boolean);
+  return lines.length ? `STYLE EXAMPLES (match this coach's approach):\n${lines.join("\n")}` : "";
+}
+
+/** Compact style reference from a studio's recent published workout plans,
+ *  exercise ids resolved to names via the provided library map. */
+async function workoutPlanExamples(db: D1Database, tenantId: string, nameOf: Map<string, string>): Promise<string> {
+  const rows = await db.prepare("SELECT name, body_json FROM workout_plans WHERE tenant_id = ? AND status = 'published' ORDER BY published_at DESC LIMIT 2").bind(tenantId).all<{ name: string; body_json: string | null }>();
+  const lines = (rows.results ?? []).map((p) => {
+    const days = parseJson<{ days?: { name?: string; isRestDay?: boolean; blocks?: { slots?: { exerciseId: string }[] }[] }[] }>(p.body_json, {}).days ?? [];
+    const daySummaries = days.filter((d) => !d.isRestDay).slice(0, 6).map((d) => {
+      const names = (d.blocks ?? []).flatMap((b) => (b.slots ?? []).map((s) => nameOf.get(s.exerciseId))).filter(Boolean).slice(0, 6);
+      return `${d.name || "Day"} (${names.join(", ")})`;
+    });
+    return daySummaries.length ? `- "${p.name}": ${daySummaries.join(" | ")}` : null;
+  }).filter(Boolean);
+  return lines.length ? `STYLE EXAMPLES (match this coach's split, selection and volume):\n${lines.join("\n")}` : "";
+}
+
 export const aiRoutes = new Hono<AppEnv>()
   /** "2 eggs, toast and an apple" → structured entries (client confirms). */
   .post("/ai/parse-food", async (c) => {
@@ -106,12 +165,16 @@ export const aiRoutes = new Hono<AppEnv>()
       .bind(who.tenantId)
       .all<{ id: string; name: string; muscle_groups: string | null; equipment: string | null }>();
     const intake = parseJson<Record<string, unknown>>(access.client.intake_json, {});
+    const nameOf = new Map((library.results ?? []).map((e) => [e.id, e.name]));
+    // Few-shot: this studio's recent published plans as a style reference.
+    const examples = await workoutPlanExamples(c.env.DB, who.tenantId, nameOf);
     const prompt = [
       `CLIENT: ${access.client.display_name}; gender=${access.client.gender ?? "?"}; intake=${JSON.stringify(intake)}`,
       `EXERCISE LIBRARY (id: name [muscles] {equipment}):`,
       ...(library.results ?? []).map(
         (e) => `${e.id}: ${e.name} [${e.muscle_groups ?? ""}] {${e.equipment ?? ""}}`,
       ),
+      examples,
       parsed.data.instructions && `COACH INSTRUCTIONS: ${parsed.data.instructions}`,
     ]
       .filter(Boolean)
@@ -266,6 +329,8 @@ export const aiRoutes = new Hono<AppEnv>()
     const goal = await c.env.DB.prepare("SELECT targets_json FROM client_goals WHERE client_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(access.client.id).first<{ targets_json: string | null }>();
     const targets = parseJson<Record<string, number>>(goal?.targets_json, {});
     const intake = parseJson<Record<string, unknown>>(access.client.intake_json, {});
+    // Few-shot: this studio's recent published meal plans as a style reference.
+    const examples = await mealPlanExamples(c.env.DB, who.tenantId);
 
     const result = await generate(c.env, {
       tenantId: who.tenantId,
@@ -274,14 +339,21 @@ export const aiRoutes = new Hono<AppEnv>()
       feature: "draft-meal",
       task: "text",
       system: sys("draft-meal"),
-      prompt: `TARGETS: ${JSON.stringify(targets)}\nINTAKE: ${JSON.stringify(intake)}\n${parsed.data.instructions}`,
+      prompt: [`TARGETS: ${JSON.stringify(targets)}`, `INTAKE: ${JSON.stringify(intake)}`, examples, parsed.data.instructions].filter(Boolean).join("\n"),
       maxOutputTokens: 1536,
-      mock: () => JSON.stringify({ mealOptions: [{ mealType: "breakfast", mealName: "Oats, whey & berries", isFree: false, foods: [] }, { mealType: "lunch", mealName: "Chicken, rice & greens", isFree: false, foods: [] }, { mealType: "dinner", mealName: "Salmon, potato & salad", isFree: false, foods: [] }] }),
+      mock: () => JSON.stringify({ mealOptions: [
+        { mealType: "breakfast", mealName: "Oats, whey & berries", isFree: false, foods: [{ query: "rolled oats", quantity: 80, unit: "g" }, { query: "whey protein", quantity: 30, unit: "g" }, { query: "blueberries", quantity: 100, unit: "g" }] },
+        { mealType: "lunch", mealName: "Chicken, rice & greens", isFree: false, foods: [{ query: "chicken breast", quantity: 180, unit: "g" }, { query: "white rice", quantity: 150, unit: "g" }, { query: "broccoli", quantity: 100, unit: "g" }] },
+        { mealType: "dinner", mealName: "Salmon, potato & salad", isFree: false, foods: [{ query: "salmon", quantity: 170, unit: "g" }, { query: "potato", quantity: 200, unit: "g" }] },
+      ] }),
     });
     if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
-    const draft = extractJson<{ mealOptions: unknown[] }>(result.output);
+    const draft = extractJson<{ mealOptions: DraftMealOption[] }>(result.output);
     if (!draft?.mealOptions) return c.json({ error: "could not parse" }, 422);
-    return c.json({ draft: { customMealTypes: [], ...draft }, credits: result.credits, mocked: result.mocked });
+    // Resolve each drafted food query to a real library food id (import the
+    // public/tenant library into the plan) so options carry real macros.
+    const resolved = await resolveMealFoods(c.env.DB, who.tenantId, draft.mealOptions);
+    return c.json({ draft: { customMealTypes: [], mealOptions: resolved }, credits: result.credits, mocked: result.mocked });
   })
 
   /** Check-in Summarizer: recent check-ins → digest + suggested reply (trainer). */

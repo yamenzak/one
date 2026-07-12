@@ -38,7 +38,7 @@ Use ONLY exercise ids from the provided library list. 3-6 sets per exercise, sen
     audience: "trainer",
     task: "text",
     tonable: false,
-    defaultSystem: `You are a nutrition coach drafting a day of meal options. Reply with ONLY JSON: {"mealOptions":[{"mealType":"breakfast"|"lunch"|"dinner"|"snack","mealName":string,"isFree":false,"foods":[]}]}. Honor the calorie/macro targets and dietary approach. Foods arrays may be empty (the coach fills exact items) — focus on meal names + types that hit the targets. No commentary.`,
+    defaultSystem: `You are a nutrition coach drafting a day of meal options for a specific client. Reply with ONLY JSON: {"mealOptions":[{"mealType":"breakfast"|"lunch"|"dinner"|"snack","mealName":string,"isFree":false,"foods":[{"query":string,"quantity":number,"unit":string}]}]}. For each meal list 2-4 real whole foods as short search queries (e.g. "rolled oats", "chicken breast", "blueberries") with a sensible amount — quantity in grams (unit "g") or millilitres (unit "ml"). Hit the client's calorie and macro targets and respect their dietary approach. If STYLE EXAMPLES are given, match that coach's style. No commentary.`,
   },
   {
     key: "lab-extract",

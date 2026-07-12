@@ -245,6 +245,24 @@ describe("AI config (per-tenant model / prompt / tone / enable)", () => {
   });
 });
 
+describe("AI meal draft — food import from the library", () => {
+  it("resolves drafted food queries to real library food ids", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    // Seed a food that the mock draft will reference ("rolled oats").
+    const { id: foodId } = (await (await SELF.fetch("http://x/api/foods", { method: "POST", headers: H, body: JSON.stringify({ name: "Rolled Oats", calories: 380, proteinG: 13, carbsG: 67, fatG: 7 }) })).json()) as { id: string };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "MealAI" }) })).json()) as { client: { id: string } };
+
+    const r = (await (await SELF.fetch("http://x/api/ai/draft-meal", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { draft: { mealOptions: { mealType: string; foods: { foodId: string; quantity: number; unit: string }[] }[] } };
+    const breakfast = r.draft.mealOptions.find((o) => o.mealType === "breakfast")!;
+    expect(breakfast.foods.length).toBeGreaterThan(0);
+    // The "rolled oats" query resolved to our seeded food id.
+    expect(breakfast.foods.some((f) => f.foodId === foodId)).toBe(true);
+    expect(breakfast.foods[0]!.quantity).toBeGreaterThan(0);
+  });
+});
+
 describe("trainer AI features (registry)", () => {
   it("runs supplement reco, article writer, client summary, and lab extract (mock)", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

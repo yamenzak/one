@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fmtEnergy } from "@mossa/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, MacroInline, Search, Plus, Globe, Trash2, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, MacroInline, Search, Plus, Globe, Trash2, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Sparkles } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { FoodEditor } from "../client/FoodEditor.js";
@@ -230,21 +230,43 @@ function Content() {
   const [items, setItems] = useState<Resource[] | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const [summary, setSummary] = useState("");
   const [body, setBody] = useState("");
   const [audience, setAudience] = useState<"public" | "clients" | "assigned">("clients");
+  const [aiTopic, setAiTopic] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const load = useCallback(async () => setItems((await api.get<{ resources: Resource[] }>("/api/resources")).resources), []);
   useEffect(() => void load(), [load]);
-  const create = async () => { const r = await api.post<{ id: string }>("/api/resources", { type: "article", title, bodyMd: body, audience }); await api.post(`/api/resources/${r.id}/publish`, { status: "published" }); setCreateOpen(false); setTitle(""); setBody(""); await load(); };
+  const reset = () => { setTitle(""); setSummary(""); setBody(""); setAiTopic(""); setAiError(null); };
+  const create = async () => { const r = await api.post<{ id: string }>("/api/resources", { type: "article", title, summary: summary || undefined, bodyMd: body, audience }); await api.post(`/api/resources/${r.id}/publish`, { status: "published" }); setCreateOpen(false); reset(); await load(); };
+  const draftAi = async () => {
+    setAiBusy(true); setAiError(null);
+    try {
+      const r = await api.post<{ article: { title: string; summary: string; body: string } }>("/api/ai/article", { topic: aiTopic });
+      setTitle(r.article.title); setSummary(r.article.summary ?? ""); setBody(r.article.body);
+    } catch { setAiError("AI drafting isn't available on this studio's plan."); }
+    finally { setAiBusy(false); }
+  };
   return (
     <div className="space-y-3">
       <div className="flex justify-end"><Button size="sm" onClick={() => setCreateOpen(true)}><PencilLine /> Write article</Button></div>
       {!items ? <Skeleton className="h-40" /> : items.length === 0 ? <EmptyState icon={PencilLine} title="Content hub is empty" description="Publish articles, recipes, and routines — public ones become your marketplace blog." /> : (
         <Stagger className="space-y-2">{items.map((r) => <Card key={r.id} className="flex items-center justify-between py-3"><div><div className="font-medium">{r.title}</div><div className="text-xs text-muted-foreground">{r.type} · {r.audience}</div></div><Badge tone={r.status === "published" ? "success" : "neutral"}>{r.status}</Badge></Card>)}</Stagger>
       )}
-      <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title="Write article">
+      <Sheet open={createOpen} onClose={() => { setCreateOpen(false); }} title="Write article">
         <div className="space-y-4">
+          <div className="space-y-2 rounded-2xl bg-primary/10 p-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-primary [&_svg]:size-4"><Sparkles /> Draft with AI</div>
+            <div className="flex gap-2">
+              <input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="Topic — e.g. Sleep for muscle growth" className="min-w-0 flex-1 rounded-lg bg-surface-2 px-3 py-2 text-sm outline-none" />
+              <Button size="sm" disabled={aiBusy || aiTopic.trim().length < 3} onClick={() => void draftAi()}>{aiBusy ? "Writing…" : "Draft"}</Button>
+            </div>
+            {aiError && <p className="text-xs text-muted-foreground">{aiError}</p>}
+          </div>
           <Field label="Title" icon={PencilLine} value={title} onChange={(e) => setTitle(e.target.value)} />
-          <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Body (markdown)</label><Textarea rows={6} value={body} onChange={(e) => setBody(e.target.value)} /></div>
+          <Field label="Summary" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="One-line teaser (optional)" />
+          <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Body (markdown)</label><Textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} /></div>
           <div className="flex gap-2">{(["clients", "public", "assigned"] as const).map((a) => <Chip key={a} selected={audience === a} onClick={() => setAudience(a)}>{a}</Chip>)}</div>
           <Button size="lg" className="w-full" disabled={title.trim().length < 2} onClick={() => void create()}><Plus /> Publish</Button>
         </div>
