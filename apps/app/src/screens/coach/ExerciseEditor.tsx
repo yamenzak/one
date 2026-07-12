@@ -11,6 +11,7 @@ import { Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Sparkles } fro
 import { api, ApiError } from "../../api.js";
 import { useSession } from "../../session.js";
 import { AiImageField } from "../../AiImageField.js";
+import { splitWideImageToHalves } from "../../imageSplit.js";
 import type { ExerciseInfo } from "../exercise.js";
 
 const DIFFICULTIES = ["beginner", "intermediate", "advanced"] as const;
@@ -39,9 +40,27 @@ export function ExerciseEditor({ exerciseId, initial, onClose, onSaved }: {
   const [videoBusy, setVideoBusy] = useState(false);
   const [guideBusy, setGuideBusy] = useState(false);
   const [guideErr, setGuideErr] = useState<string | null>(null);
+  const [pairBusy, setPairBusy] = useState(false);
+  const [imgErr, setImgErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const { ctx } = useSession();
   const canAi = !!ctx?.entitlements?.features?.aiSuite;
+
+  // One wide "start | end" render, split into the two frames — guaranteed same
+  // figure/style, genuinely different poses, one generation.
+  const generatePair = async () => {
+    if (name.trim().length < 2) return;
+    setPairBusy(true); setImgErr(null);
+    try {
+      const r = await api.post<{ url: string }>("/api/ai/generate-image", { feature: "exercise-image", subject: name.trim(), pair: true });
+      const { startUrl, endUrl } = await splitWideImageToHalves(r.url);
+      setImage(startUrl); setImage2(endUrl);
+    } catch (e) {
+      const detail = e instanceof ApiError ? (e.body?.detail as string | undefined) : undefined;
+      const m = e instanceof Error ? e.message : "";
+      setImgErr(m.includes("credits") ? "Out of AI credits." : detail ? `Failed: ${detail}` : "Couldn't generate — try again.");
+    } finally { setPairBusy(false); }
+  };
 
   const generateGuide = async () => {
     if (name.trim().length < 2) return;
@@ -87,13 +106,21 @@ export function ExerciseEditor({ exerciseId, initial, onClose, onSaved }: {
       <div className="space-y-4">
         <Field label="Name" icon={Dumbbell} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
 
-        {/* Start + end frames — upload or generate. The End is generated from
-            the Start image so the same athlete, style and angle carry over. */}
+        {/* Start + end frames — upload each yourself, or generate both at once
+            from a single wide render (same figure & style, split in two). */}
         <div className="grid grid-cols-2 gap-3">
-          <AiImageField value={image} onChange={setImage} feature="exercise-image" subject={name} hint="the STARTING / setup position, standing ready just before the rep begins" canAi={canAi} label="Start" stacked />
-          <AiImageField value={image2} onChange={setImage2} feature="exercise-image" subject={name} hint="the PEAK-CONTRACTION / finished position at the hardest point of the rep, with the joints fully flexed and CLEARLY different from the setup (e.g. a curl with the bar raised to the shoulders, a squat at the bottom with hips below the knees, a press with arms extended overhead)" canAi={canAi} label="End" stacked referenceUrl={image || undefined} />
+          <AiImageField value={image} onChange={setImage} feature="exercise-image" subject={name} canAi={false} label="Start" stacked loading={pairBusy} />
+          <AiImageField value={image2} onChange={setImage2} feature="exercise-image" subject={name} canAi={false} label="End" stacked loading={pairBusy} />
         </div>
-        {canAi && <p className="-mt-1 text-[0.7rem] leading-snug text-muted-foreground">Generate the Start first — the End is drawn from it to keep the same figure, style and angle. Style is configurable in AI settings.</p>}
+        {canAi && (
+          <div className="space-y-1">
+            <Button variant={image || image2 ? "secondary" : "tonal"} className="w-full" disabled={pairBusy || name.trim().length < 2} onClick={() => void generatePair()}>
+              <Sparkles /> {pairBusy ? "Creating both frames…" : image || image2 ? "Regenerate start & end" : "Generate start & end with AI"}
+            </Button>
+            <p className="text-[0.7rem] leading-snug text-muted-foreground">One AI render, split into the two frames — same figure, style and angle. Or upload each yourself. Style is set in AI settings.</p>
+            {imgErr && <p className="text-xs text-warning">{imgErr}</p>}
+          </div>
+        )}
 
         {/* Optional demo video */}
         <div className="space-y-1.5">

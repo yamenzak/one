@@ -16,7 +16,7 @@ import { api, ApiError } from "./api.js";
 
 type ImageFeature = "food-image" | "exercise-image";
 
-export function AiImageField({ value, onChange, feature, subject, hint, canAi, label, size = 88, stacked = false, referenceUrl }: {
+export function AiImageField({ value, onChange, feature, subject, hint, canAi, label, size = 88, stacked = false, referenceUrl, loading = false }: {
   value: string;
   onChange: (url: string) => void;
   feature: ImageFeature;
@@ -28,12 +28,15 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
   stacked?: boolean;
   /** Match this image (an /api/media url) — image-to-image for a consistent pair. */
   referenceUrl?: string;
+  /** Externally-driven "creating" state (e.g. a parent generating both frames). */
+  loading?: boolean;
 }) {
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const purpose = feature === "food-image" ? "food" : "exercise";
-  const busy = uploading || generating;
+  const busy = uploading || generating || loading;
+  const creating = generating || loading;
 
   const upload = async (file: File) => {
     setUploading(true); setErr(null);
@@ -61,7 +64,7 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
 
   const box = (className: string, style?: CSSProperties) => (
     <label style={style} className={cn("relative grid cursor-pointer place-items-center overflow-hidden rounded-2xl bg-surface-2 text-muted-foreground transition-colors hover:bg-surface-3", busy && "pointer-events-none", className)}>
-      {generating ? (
+      {creating ? (
         <div className="flex flex-col items-center gap-1 text-primary">
           <Sparkles className="size-5 animate-pulse" />
           <span className="text-[0.6rem] font-medium">Creating…</span>

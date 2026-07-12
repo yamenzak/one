@@ -614,9 +614,21 @@ export const aiRoutes = new Hono<AppEnv>()
       subject: z.string().min(1).max(200),
       hint: z.string().max(160).default(""),
       referenceKey: z.string().max(300).optional(),
+      /** Exercise diptych: one wide image with start (left) + end (right), split client-side. */
+      pair: z.boolean().default(false),
     }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
-    const { feature, subject, hint, referenceKey } = parsed.data;
+    const { feature, subject, hint, referenceKey, pair } = parsed.data;
+
+    if (pair) {
+      // One wide two-panel render → guaranteed-identical style, genuinely
+      // different poses, one generation. The client splits it into two frames.
+      const prompt = `${sys(feature)}\n\nIMPORTANT: Output ONE wide landscape image made of TWO equal side-by-side panels showing the SAME single figure in the SAME art style, same side-on camera and same background. LEFT panel: ${subject} at the STARTING / setup position (ready, before the rep). RIGHT panel: ${subject} at the PEAK-CONTRACTION / finished position at the hardest point of the rep — a clearly different body pose (e.g. a curl with the bar raised to the shoulders, a squat at the bottom with hips below the knees, a press with arms extended overhead). No dividing line, no gap, no text, no labels, no numbers.`;
+      const r = await generateImage(c.env, { tenantId: who.tenantId, actorUserId: who.userId, feature, prompt });
+      if (!r.ok) return aiFail(c, r);
+      return c.json({ key: r.key, url: `/api/media/${r.key}`, pair: true, credits: r.credits, mocked: r.mocked });
+    }
+
     // Optional reference image (same tenant) → image-to-image, so a generated
     // pair (e.g. exercise start→end) shares one athlete, style and camera angle.
     let reference: { data: string; mimeType: string } | undefined;

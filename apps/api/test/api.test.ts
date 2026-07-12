@@ -439,8 +439,15 @@ describe("AI image generation + recipe", () => {
     expect(imgOut.url).toContain(`/api/media/t/${ctx.active.tenantId}/`);
 
     // Image-to-image: generating the End from a Start reference (same-tenant key).
-    const pair = await SELF.fetch("http://x/api/ai/generate-image", { method: "POST", headers: H, body: JSON.stringify({ feature: "exercise-image", subject: "barbell squat", hint: "the end position", referenceKey: imgOut.key }) });
+    const ref = await SELF.fetch("http://x/api/ai/generate-image", { method: "POST", headers: H, body: JSON.stringify({ feature: "exercise-image", subject: "barbell squat", hint: "the end position", referenceKey: imgOut.key }) });
+    expect(ref.status).toBe(200);
+
+    // Diptych (pair) mode: one wide start|end render the client splits in two.
+    const pair = await SELF.fetch("http://x/api/ai/generate-image", { method: "POST", headers: H, body: JSON.stringify({ feature: "exercise-image", subject: "barbell curl", pair: true }) });
     expect(pair.status).toBe(200);
+    const pairOut = (await pair.json()) as { url: string; pair: boolean };
+    expect(pairOut.pair).toBe(true);
+    expect(pairOut.url).toContain(`/api/media/t/${ctx.active.tenantId}/`);
 
     // Recipe from a meal's foods.
     const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "RecipeAI" }) })).json()) as { client: { id: string } };
