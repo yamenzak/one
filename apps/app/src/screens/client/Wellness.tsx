@@ -78,10 +78,12 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
     if (loading) return;
     const ciDate = params.get("checkin");
     const labId = params.get("lab");
-    if (ciDate) { const c = checkIns.find((x) => x.date_local === ciDate); if (c) setDetailCheckIn(c); setParams({}, { replace: true }); }
-    else if (labId) { const l = labs.find((x) => x.id === labId); if (l) setDetailLab(l); setParams({}, { replace: true }); }
+    if (!ciDate && !labId) return;
+    if (ciDate) { const c = checkIns.find((x) => x.date_local === ciDate); if (c) setDetailCheckIn(c); }
+    else if (labId) { const l = labs.find((x) => x.id === labId); if (l) setDetailLab(l); }
+    setParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  }, [loading, params]);
 
   const addWater = async (displayAmount: number) => { const ml = Math.round(volumeDisplayToMl(displayAmount, units)); await api.post("/api/logs/water", { clientId, data: { date, amountMl: ml } }); setToday((t) => (t ? { ...t, waterMl: t.waterMl + ml } : t)); };
   const toggleSupp = async (id: string, slot: string) => {
