@@ -126,19 +126,13 @@ function FastingWidget({ clientId, size }: { clientId: string; size: WidgetSize 
   if (!fast) return <div className="h-full animate-pulse rounded-2xl bg-surface-2" />;
 
   if (size === "small") {
-    if (!active) return (
-      <button onClick={() => void start(16)} disabled={busy} className="relative flex h-full flex-col justify-center gap-0.5 overflow-hidden rounded-2xl bg-card px-3.5 py-2 text-left transition-transform active:scale-[0.98]">
-        <div className="relative flex items-center gap-1.5"><Timer className="size-3.5 text-sleep" /><span className="text-[0.65rem] font-medium text-muted-foreground">Fasting</span></div>
-        <div className="relative text-base font-bold leading-none text-sleep">Start 16h</div>
-      </button>
-    );
+    if (!active) return <MiniCard icon={Timer} tone="sleep" label="Fasting" value="Start 16h" onClick={() => void start(16)} />;
     return <MiniCard icon={Timer} tone={zone.tone} label={`Fasting · ${zone.label}`} value={<span className="tabular-nums">{h}:{pad(m)}</span>} progress={pct} />;
   }
 
-  // big (1×3 ring cell)
+  // big (1×3 ring cell) — bare, matching the airy ring widgets
   return (
-    <div className="relative flex h-full flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl bg-card p-3">
-      <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-sleep/10 blur-2xl" />
+    <div className="flex h-full flex-col items-center justify-center gap-3">
       {active ? (
         <>
           <ProgressRing size={132} strokeWidth={9} tone={zone.tone} progress={pct} value={<span className="tabular-nums">{h}:{pad(m)}:{pad(s)}</span>} label="Fasting" sublabel={`${zone.label} · ${active.target_hours}h`} />

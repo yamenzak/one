@@ -17,16 +17,17 @@ interface MetricPillProps {
   tone?: Tone;
   progress?: number; // 0..1 two-tone fill
   onClick?: () => void;
+  className?: string;
 }
 
-export function MetricPill({ icon: Icon, label, value, tone = "activity", progress, onClick }: MetricPillProps) {
+export function MetricPill({ icon: Icon, label, value, tone = "activity", progress, onClick, className }: MetricPillProps) {
   const pct = progress === undefined ? null : Math.min(1, Math.max(0, progress));
   const Comp = onClick ? motion.button : motion.div;
   return (
     <Comp
       onClick={onClick}
       whileTap={onClick ? { scale: 0.98 } : undefined}
-      className={cn("relative flex w-full items-center gap-3 overflow-hidden rounded-2xl p-3 text-left", toneSoft[tone])}
+      className={cn("relative flex w-full items-center gap-3 overflow-hidden rounded-2xl p-3 text-left", toneSoft[tone], className)}
     >
       {pct !== null && (
         <motion.span aria-hidden className="absolute inset-y-0 left-0 rounded-2xl bg-current opacity-[0.12]" initial={{ width: 0 }} animate={{ width: `${pct * 100}%` }} transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }} />

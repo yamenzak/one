@@ -6,7 +6,7 @@
  */
 
 import { useRef, useState, type ReactNode } from "react";
-import { Sheet, Button, IconBadge, ProgressRing, cn, toneVar, ChevronDown, X, LayoutGrid, type Tone, type LucideIcon } from "@mossa/ui";
+import { Sheet, Button, IconBadge, MetricPill, ProgressRing, cn, ChevronDown, X, LayoutGrid, type Tone, type LucideIcon } from "@mossa/ui";
 import type { WidgetItem } from "@mossa/protocol";
 
 export type { WidgetItem };
@@ -21,28 +21,20 @@ export interface WidgetDef<D> {
   available?: (data: D) => boolean;
 }
 
-const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
-
-/** Big widget shell: a metric ring that fills its 1×3 cell. */
+/** Big widget: a bare, prominent metric ring filling its 1×3 cell (airy, like
+ *  the original hero ring — no boxed card around it). */
 export function RingCard({ tone, value, label, sublabel, progress }: { tone: Tone; value: ReactNode; label: string; sublabel?: string; progress: number }) {
   return (
-    <div className="relative flex h-full items-center justify-center overflow-hidden rounded-2xl bg-card p-2">
-      <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full opacity-[0.1] blur-2xl" style={{ background: toneVar[tone] }} />
-      <ProgressRing size={148} strokeWidth={10} tone={tone} progress={progress} value={value} label={label} sublabel={sublabel} />
+    <div className="flex h-full items-center justify-center">
+      <ProgressRing size={152} strokeWidth={11} tone={tone} progress={progress} value={value} label={label} sublabel={sublabel} />
     </div>
   );
 }
 
-/** Small widget shell: an icon + value card filling its 1×1 cell. */
-export function MiniCard({ icon: Icon, tone, value, label, progress }: { icon: LucideIcon; tone: Tone; value: ReactNode; label: string; progress?: number }) {
-  return (
-    <div className="relative flex h-full flex-col justify-center gap-0.5 overflow-hidden rounded-2xl bg-card px-3.5 py-2">
-      <div className="pointer-events-none absolute -right-5 -top-5 size-12 rounded-full opacity-[0.12] blur-xl" style={{ background: toneVar[tone] }} />
-      <div className="relative flex items-center gap-1.5"><Icon className="size-3.5 shrink-0" style={{ color: toneVar[tone] }} /><span className="truncate text-[0.65rem] font-medium text-muted-foreground">{label}</span></div>
-      <div className="numeral relative truncate text-lg font-bold leading-none">{value}</div>
-      {progress != null && <div className="relative mt-1 h-1 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full transition-all" style={{ width: `${clamp01(progress) * 100}%`, background: toneVar[tone] }} /></div>}
-    </div>
-  );
+/** Small widget: the design-system MetricPill (colored, two-tone progress fill),
+ *  stretched to fill its 1×1 cell. */
+export function MiniCard({ icon, tone, value, label, progress, onClick }: { icon: LucideIcon; tone: Tone; value: ReactNode; label: string; progress?: number; onClick?: () => void }) {
+  return <MetricPill icon={icon} tone={tone} label={label} value={value} progress={progress} onClick={onClick} className="h-full" />;
 }
 
 const norm = (x: WidgetItem | string): WidgetItem => (typeof x === "string" ? { id: x, size: "small" } : x);
@@ -72,7 +64,7 @@ function packPages<D>(items: { def: WidgetDef<D>; size: WidgetSize }[]): Col<D>[
   return pages;
 }
 
-const HERO_H = "16rem";
+const HERO_H = "14rem";
 const PAGE_GAP = 12;
 
 /** The swipeable hero grid. */
