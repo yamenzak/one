@@ -133,6 +133,7 @@ export const aiRoutes = new Hono<AppEnv>()
       clientId: access.client.id,
       feature: "parse-food",
       task: "text-small",
+      expectsJson: true,
       system: sys("parse-food"),
       prompt: parsed.data.text,
       maxOutputTokens: 512,
@@ -192,6 +193,7 @@ export const aiRoutes = new Hono<AppEnv>()
       clientId: access.client.id,
       feature: "draft-plan",
       task: "text",
+      expectsJson: true,
       system: sys("draft-plan"),
       prompt,
       maxOutputTokens: 3072,
@@ -279,6 +281,7 @@ export const aiRoutes = new Hono<AppEnv>()
       feature: "snap-meal",
       task: "vision", // Gemini Flash (vision) — real photo → foods + macros
       image,
+      expectsJson: true,
       system: sys("snap-meal"),
       prompt: `A photo of a meal${parsed.data.hint ? ` (${parsed.data.hint})` : ""}. Identify the foods and estimate portions + macros as the JSON array.`,
       maxOutputTokens: 512,
@@ -317,6 +320,7 @@ export const aiRoutes = new Hono<AppEnv>()
       feature: "label-reader",
       task: "vision",
       image,
+      expectsJson: true,
       system: sys("label-reader"),
       prompt: "Read this nutrition-facts label. Return the single JSON food object, values per serving.",
       maxOutputTokens: 400,
@@ -351,6 +355,7 @@ export const aiRoutes = new Hono<AppEnv>()
       clientId: access.client.id,
       feature: "draft-meal",
       task: "text",
+      expectsJson: true,
       system: sys("draft-meal"),
       prompt: [`TARGETS: ${JSON.stringify(targets)}`, `INTAKE: ${JSON.stringify(intake)}`, examples, parsed.data.instructions].filter(Boolean).join("\n"),
       maxOutputTokens: 1536,
@@ -389,6 +394,7 @@ export const aiRoutes = new Hono<AppEnv>()
       clientId: access.client.id,
       feature: "checkin-reply",
       task: "text-small",
+      expectsJson: true,
       system: sys("checkin-reply"),
       prompt: JSON.stringify(rows.results),
       maxOutputTokens: 400,
@@ -445,7 +451,7 @@ export const aiRoutes = new Hono<AppEnv>()
 
     const result = await generate(c.env, {
       tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
-      feature: "lab-extract", task: "vision", image, system: sys("lab-extract"),
+      feature: "lab-extract", task: "vision", image, expectsJson: true, system: sys("lab-extract"),
       prompt: `Extract every marker value from this lab report (${lab.display_name}).`,
       maxOutputTokens: 800,
       mock: () => JSON.stringify({ values: [
@@ -483,7 +489,7 @@ export const aiRoutes = new Hono<AppEnv>()
 
     const result = await generate(c.env, {
       tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
-      feature: "supplement-reco", task: "text", system: sys("supplement-reco"), prompt, maxOutputTokens: 700,
+      feature: "supplement-reco", task: "text", expectsJson: true, system: sys("supplement-reco"), prompt, maxOutputTokens: 700,
       mock: () => JSON.stringify({ recommendations: [
         { name: "Vitamin D3", dose: "2000 IU daily", rationale: "Serum 25-OH vitamin D is below range.", linkedMarker: "Vitamin D, 25-OH" },
         { name: "Creatine monohydrate", dose: "5 g daily", rationale: "Well-supported for strength and lean mass on a muscle-gain goal.", linkedMarker: null },
@@ -507,7 +513,7 @@ export const aiRoutes = new Hono<AppEnv>()
 
     const result = await generate(c.env, {
       tenantId: who.tenantId, actorUserId: who.userId,
-      feature: "article-write", task: "text", system: sys("article-write"),
+      feature: "article-write", task: "text", expectsJson: true, system: sys("article-write"),
       prompt: `TOPIC: ${parsed.data.topic}${parsed.data.notes ? `\nNOTES: ${parsed.data.notes}` : ""}`,
       maxOutputTokens: 2048,
       mock: () => JSON.stringify({ title: parsed.data.topic, summary: `A practical guide to ${parsed.data.topic.toLowerCase()}.`, body: `## Overview\n\nHere's what matters about ${parsed.data.topic.toLowerCase()}, and how to put it to work.\n\n## Key points\n\n- Start simple and stay consistent.\n- Progress gradually and track what changes.\n- Recover well — that's where results are built.\n\n## Takeaway\n\nSmall, repeatable actions compound. Pick one thing and do it this week.` }),

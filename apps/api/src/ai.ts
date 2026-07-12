@@ -118,6 +118,32 @@ const DEFAULT_MODELS: Omit<AiModelRow, "enabled" | "is_default">[] = [
     markup: 3,
   },
   {
+    // Gemini 2.5 Flash — a strong text model a tenant can pick for any text
+    // feature (native JSON mode → clean structured output). Gemini models are
+    // multimodal, so this also serves as a vision fallback. ~$0.30/$2.50 /1M.
+    id: "gemini-2.5-flash",
+    task: "text",
+    label: "Gemini 2.5 Flash",
+    provider: "google",
+    input_rate: 27_273,
+    output_rate: 227_273,
+    unit_rate: null,
+    unit_kind: null,
+    markup: 3,
+  },
+  {
+    // Gemini 2.5 Flash-Lite — a cheaper Gemini option for the text-small lane.
+    id: "gemini-2.5-flash-lite",
+    task: "text-small",
+    label: "Gemini 2.5 Flash-Lite",
+    provider: "google",
+    input_rate: 9_091,
+    output_rate: 36_364,
+    unit_rate: null,
+    unit_kind: null,
+    markup: 3,
+  },
+  {
     // Gemini 2.5 Flash Image — "Nano Banana" image generation. Priced per image
     // ($0.039), stored as neuron-equivalents so it bills through the same math.
     id: "gemini-2.5-flash-image",
@@ -154,6 +180,16 @@ export async function modelForTask(db: D1Database, task: string): Promise<AiMode
   return db
     .prepare("SELECT * FROM ai_models WHERE task = ? AND enabled = 1 ORDER BY is_default DESC LIMIT 1")
     .bind(task)
+    .first<AiModelRow>();
+}
+
+/** Any enabled multimodal model for vision when no vision-tagged one exists —
+ *  Gemini text models accept images, so a Google model is a valid fallback. */
+export async function visionFallbackModel(db: D1Database): Promise<AiModelRow | null> {
+  await seedAiModels(db);
+  return db
+    .prepare("SELECT * FROM ai_models WHERE provider = 'google' AND task IN ('vision','text','text-small') AND enabled = 1 ORDER BY task = 'vision' DESC, is_default DESC LIMIT 1")
+    .bind()
     .first<AiModelRow>();
 }
 
@@ -202,6 +238,9 @@ export interface GenerateInput {
   maxOutputTokens?: number;
   /** Inline image for vision tasks (base64 + mime), routed to a vision model. */
   image?: { data: string; mimeType: string };
+  /** Ask the provider for JSON natively (Gemini responseMimeType / Workers AI
+   *  response_format) — belt-and-suspenders with the response normalizer. */
+  expectsJson?: boolean;
   /** Deterministic mock output builder for dev / `ai.mock = on`. */
   mock: () => string;
 }
@@ -231,6 +270,9 @@ async function runGemini(
 ): Promise<{ output: string; usage: Usage }> {
   const parts: Record<string, unknown>[] = [{ text: input.prompt }];
   if (input.image) parts.push({ inline_data: { mime_type: input.image.mimeType, data: input.image.data } });
+  const generationConfig: Record<string, unknown> = { maxOutputTokens: input.maxOutputTokens ?? 1024 };
+  // Native JSON mode — Gemini returns a clean, unwrapped JSON document.
+  if (input.expectsJson) generationConfig.responseMimeType = "application/json";
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`,
     {
@@ -239,7 +281,7 @@ async function runGemini(
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: input.system }] },
         contents: [{ role: "user", parts }],
-        generationConfig: { maxOutputTokens: input.maxOutputTokens ?? 1024 },
+        generationConfig,
       }),
     },
   );
@@ -264,11 +306,17 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   if (enabled === false) return { ok: false, error: "unavailable", detail: `feature "${input.feature}" is turned off in AI settings` };
 
   // Model: a tenant's per-feature override (task-compatible) wins, else the
-  // task default. Vision stays vision; text/text-small are interchangeable.
-  const compatible = (m: AiModelRow) => (input.task === "vision" ? m.task === "vision" : m.task !== "vision");
+  // task default. Vision needs a multimodal model — a vision-tagged one, or
+  // ANY Gemini model (Gemini models are all multimodal). Text/text-small are
+  // interchangeable and never route to a vision-only or image model.
+  const visionCapable = (m: AiModelRow) => m.task === "vision" || m.provider === "google";
+  const compatible = (m: AiModelRow) =>
+    input.task === "vision" ? visionCapable(m) : m.task !== "vision" && m.task !== "image";
   let model: AiModelRow | null = null;
   if (fcfg.model) { const m = await modelById(env.DB, fcfg.model); if (m && compatible(m)) model = m; }
   if (!model) model = await modelForTask(env.DB, input.task);
+  // Vision fallback: no vision-tagged model → pick any enabled Gemini model.
+  if (!model && input.task === "vision") model = await visionFallbackModel(env.DB);
   if (!model) return { ok: false, error: "unavailable", detail: `no enabled model for task "${input.task}" — sync the model catalog in admin` };
   const rate = rateOf(model);
 
@@ -317,15 +365,20 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
       output = g.output;
       usage = { inputTokens: g.usage.inputTokens ?? estUsage.inputTokens, outputTokens: g.usage.outputTokens ?? Math.ceil(output.length / 4) };
     } else {
-      const run = env.AI!.run(model.id as Parameters<Ai["run"]>[0], {
+      const args: Record<string, unknown> = {
         messages: [
           { role: "system", content: system },
           { role: "user", content: input.prompt },
         ],
         max_tokens: input.maxOutputTokens ?? 1024,
-      }) as Promise<{ response?: string; usage?: { prompt_tokens?: number; completion_tokens?: number } }>;
+      };
+      // Native JSON mode on Workers AI (supported by the Llama/Mistral catalog).
+      if (input.expectsJson) args.response_format = { type: "json_object" };
+      const run = env.AI!.run(model.id as Parameters<Ai["run"]>[0], args as Parameters<Ai["run"]>[1]) as Promise<{ response?: string | object; usage?: { prompt_tokens?: number; completion_tokens?: number } }>;
       const result = await withTimeout(run);
-      output = result.response ?? "";
+      // json_object mode can hand back an already-parsed object — re-serialize
+      // so the normalizer + callers always see a JSON string.
+      output = typeof result.response === "string" ? result.response : result.response ? JSON.stringify(result.response) : "";
       usage = {
         inputTokens: result.usage?.prompt_tokens ?? estUsage.inputTokens,
         outputTokens: result.usage?.completion_tokens ?? Math.ceil(output.length / 4),
@@ -446,17 +499,93 @@ async function audit(
     .catch(() => undefined);
 }
 
-/** Pull the first JSON object/array out of a model response (fenced or bare). */
-export function extractJson<T>(raw: string): T | null {
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const candidate = fenced?.[1] ?? raw;
-  const start = candidate.search(/[[{]/);
+// ── Response normalizer ──────────────────────────────────────────────────────
+// Provider-agnostic: works identically on Gemini and Workers AI output. Real
+// models wrap JSON in prose, fence it, add trailing commas / comments / smart
+// quotes, or get truncated by the token cap mid-object. This coerces all of
+// that back to parseable JSON so a well-formed answer is never lost to
+// formatting noise.
+
+/** Replace curly quotes, strip comments + trailing commas, drop a BOM. */
+function cleanJsonText(s: string): string {
+  return s
+    .replace(/^﻿/, "")
+    .replace(/[“”„‟″]/g, '"') // “ ” „ ‟ ″ → "
+    .replace(/[‘’‚‛′]/g, "'") // ‘ ’ ‚ ‛ ′ → '
+    .replace(/\/\*[\s\S]*?\*\//g, "") // block comments
+    .replace(/(^|[^:"'\\])\/\/[^\n\r]*/g, "$1") // line comments (not URLs in strings)
+    .replace(/,(\s*[}\]])/g, "$1"); // trailing commas
+}
+
+/** Strip a leading ```json fence (or any fence) and return the inner body. */
+function stripFence(s: string): string {
+  const m = s.match(/```(?:json|json5|javascript|js)?\s*([\s\S]*?)```/i);
+  return m ? m[1]! : s;
+}
+
+/**
+ * Slice from the first `{`/`[` to its balanced close, respecting strings and
+ * escapes. If the source is truncated (close never reached), the returned
+ * slice is repaired: any open string is terminated and missing brackets are
+ * appended in the right order, so a cut-off object still parses.
+ */
+function balancedSlice(s: string): string | null {
+  const start = s.search(/[[{]/);
   if (start === -1) return null;
-  for (let end = candidate.length; end > start; end--) {
+  const stack: string[] = [];
+  let inStr = false, esc = false;
+  for (let i = start; i < s.length; i++) {
+    const ch = s[i]!;
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === "{" || ch === "[") stack.push(ch === "{" ? "}" : "]");
+    else if (ch === "}" || ch === "]") {
+      stack.pop();
+      if (stack.length === 0) return s.slice(start, i + 1); // clean close
+    }
+  }
+  // Truncated: repair the tail. Close an open string, drop a dangling
+  // comma / partial key, then append the missing closers.
+  let out = s.slice(start);
+  if (inStr) out += '"';
+  out = out.replace(/,\s*$/, "").replace(/:\s*$/, ": null").replace(/,\s*"[^"]*"\s*:?\s*$/, "");
+  for (let i = stack.length - 1; i >= 0; i--) out += stack[i];
+  return out;
+}
+
+/**
+ * Pull structured JSON out of any model response. Tries progressively harder
+ * candidates — raw, de-fenced, balanced-sliced, cleaned, and truncation-
+ * repaired — and returns the first that parses. Null only when there is no
+ * recoverable JSON at all.
+ */
+export function extractJson<T>(raw: string): T | null {
+  if (!raw) return null;
+  const seen = new Set<string>();
+  const bodies = [raw, stripFence(raw)];
+  const candidates: string[] = [];
+  for (const b of bodies) {
+    candidates.push(b.trim());
+    const sliced = balancedSlice(b);
+    if (sliced) {
+      candidates.push(sliced);
+      candidates.push(cleanJsonText(sliced));
+    }
+    candidates.push(cleanJsonText(b));
+  }
+  for (const c of candidates) {
+    const t = c.trim();
+    if (!t || seen.has(t)) continue;
+    seen.add(t);
     try {
-      return JSON.parse(candidate.slice(start, end)) as T;
+      return JSON.parse(t) as T;
     } catch {
-      /* trim trailing junk and retry */
+      /* try the next, harder candidate */
     }
   }
   return null;
