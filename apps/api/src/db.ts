@@ -156,6 +156,8 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "ALTER TABLE tenant_settings ADD COLUMN integrations_json TEXT",
           // Per-user home-screen widget layout (client + coach surfaces).
           "ALTER TABLE user_prefs ADD COLUMN widgets_json TEXT",
+          // Tenant AI config: per-feature model/prompt/enable + house tone.
+          "ALTER TABLE tenant_settings ADD COLUMN ai_config_json TEXT",
         ];
         for (const sql of alters) await db.exec(sql).catch(() => undefined);
       })

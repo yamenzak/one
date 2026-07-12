@@ -122,12 +122,10 @@ export const DEFAULT_PACKS: PackRow[] = [
   { id: "pack_100k", name: "130,000 credits", credits: 130_000, price_usd: 100, ord: 3, active: 1 },
 ];
 
-let seeded = false;
-
-/** Idempotent seed: INSERT OR IGNORE so admin edits survive redeploys. */
+/** Idempotent seed: INSERT OR IGNORE so admin edits survive redeploys. Runs on
+ *  demand with no module-level guard, so it stays correct across isolated
+ *  per-test storage (a leaked guard would skip seeding into a fresh frame). */
 export async function seedBilling(db: D1Database): Promise<void> {
-  if (seeded) return;
-  seeded = true;
   const stmts = [
     ...DEFAULT_PLANS.map((p) =>
       db
@@ -144,9 +142,7 @@ export async function seedBilling(db: D1Database): Promise<void> {
         .bind(p.id, p.name, p.credits, p.price_usd, p.ord, p.active),
     ),
   ];
-  await db.batch(stmts).catch(() => {
-    seeded = false;
-  });
+  await db.batch(stmts).catch(() => undefined);
 }
 
 export async function listPlans(db: D1Database): Promise<PlanRow[]> {

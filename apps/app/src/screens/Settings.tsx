@@ -7,7 +7,7 @@ import { Fragment, useEffect, useState } from "react";
 import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, SegmentedControl, SettingsList, Page, Stagger,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss,
-  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus,
+  KeyRound, Moon, Sun, LogOut, Palette, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus,
   type Branding, type BrandTokens, type NeutralTint,
 } from "@mossa/ui";
 import { resolveUnits } from "@mossa/domain";
@@ -15,6 +15,7 @@ import { useSession } from "../session.js";
 import { useTheme } from "../theme.js";
 import { api } from "../api.js";
 import { enrollPasskey, listPasskeys, passkeySupported } from "../passkey.js";
+import { AiConfigSection } from "./AiSettings.js";
 
 export function Settings({ onBack }: { onBack: () => void }) {
   const { ctx, signOut, refresh } = useSession();
@@ -133,47 +134,24 @@ function UnitsSection() {
   );
 }
 
-const AI_FEATURES: { key: string; label: string; hint: string }[] = [
-  { key: "draft-plan", label: "AI workout drafts", hint: "Draft a plan from client intake" },
-  { key: "draft-meal", label: "AI meal drafts", hint: "Draft meal options from targets" },
-  { key: "narrative", label: "Progress recaps", hint: "Readable summaries for clients" },
-  { key: "summarize-checkins", label: "Check-in summaries", hint: "Digest recent check-ins" },
-  { key: "snap-meal", label: "Snap-a-meal", hint: "Estimate macros from a photo" },
-  { key: "nl-log", label: "Natural-language logging", hint: "Type meals in plain English" },
-];
-
 function StudioControls() {
-  const [aiToggles, setAiToggles] = useState<Record<string, boolean> | null>(null);
   const [marketplace, setMarketplace] = useState<{ enabled?: boolean; selfRegister?: boolean }>({});
   const [aiSuite, setAiSuite] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    void api.get<{ aiToggles: Record<string, boolean>; marketplace: { enabled?: boolean; selfRegister?: boolean }; entitlements: { features: { aiSuite?: boolean } } }>("/api/settings").then((r) => {
-      setAiToggles(r.aiToggles ?? {}); setMarketplace(r.marketplace ?? {}); setAiSuite(!!r.entitlements?.features?.aiSuite);
+    void api.get<{ marketplace: { enabled?: boolean; selfRegister?: boolean }; entitlements: { features: { aiSuite?: boolean } } }>("/api/settings").then((r) => {
+      setMarketplace(r.marketplace ?? {}); setAiSuite(!!r.entitlements?.features?.aiSuite); setLoaded(true);
     });
   }, []);
 
-  const setAi = async (key: string, on: boolean) => { setAiToggles((t) => ({ ...(t ?? {}), [key]: on })); await api.patch("/api/settings", { aiToggles: { [key]: on } }); };
   const setMarket = async (patch: { enabled?: boolean; selfRegister?: boolean }) => { setMarketplace((m) => ({ ...m, ...patch })); await api.patch("/api/settings", { marketplace: patch }); };
 
-  if (!aiToggles) return <Skeleton className="h-40" />;
+  if (!loaded) return <Skeleton className="h-40" />;
 
   return (
     <>
-      {aiSuite && (
-        <section className="mb-6">
-          <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">AI features</h3>
-          <Card className="space-y-3">
-            <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Sparkles /></div><div><div className="font-medium">Assistant</div><div className="text-sm text-muted-foreground">Turn individual AI tools on or off for your studio.</div></div></div>
-            {AI_FEATURES.map((f) => (
-              <div key={f.key} className="flex items-center justify-between gap-3">
-                <div className="min-w-0"><div className="text-sm font-medium">{f.label}</div><div className="truncate text-xs text-muted-foreground">{f.hint}</div></div>
-                <Switch checked={aiToggles[f.key] !== false} onCheckedChange={(v) => void setAi(f.key, v)} />
-              </div>
-            ))}
-          </Card>
-        </section>
-      )}
+      {aiSuite && <AiConfigSection />}
 
       <section>
         <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Marketplace</h3>

@@ -12,9 +12,11 @@
  */
 
 import { creditsForUsage, type ModelRate, type Usage } from "@mossa/domain";
+import type { TenantAiConfig, AiTone } from "@mossa/protocol";
 import type { Env } from "./env.js";
 import { newId, nowMs } from "./ids.js";
 import { getConfig } from "./billing-store.js";
+import { featureDef, TONE_GUIDE } from "./ai-features.js";
 
 export interface AiModelRow {
   id: string;
@@ -54,6 +56,53 @@ const DEFAULT_MODELS: Omit<AiModelRow, "enabled" | "is_default">[] = [
     unit_kind: null,
     markup: 3,
   },
+  // Additional Workers AI text models the tenant can pick per feature. Rates are
+  // neuron-equivalents by size class (admin-tunable in ai_models); the credit
+  // math applies markup on neurons so margins hold across the catalog.
+  {
+    id: "@cf/meta/llama-3.1-8b-instruct-fast",
+    task: "text-small",
+    label: "Llama 3.1 8B (fast)",
+    provider: "workers-ai",
+    input_rate: 9_000,
+    output_rate: 61_000,
+    unit_rate: null,
+    unit_kind: null,
+    markup: 3,
+  },
+  {
+    id: "@cf/google/gemma-3-12b-it",
+    task: "text-small",
+    label: "Gemma 3 12B",
+    provider: "workers-ai",
+    input_rate: 12_000,
+    output_rate: 80_000,
+    unit_rate: null,
+    unit_kind: null,
+    markup: 3,
+  },
+  {
+    id: "@cf/meta/llama-4-scout-17b-16e-instruct",
+    task: "text",
+    label: "Llama 4 Scout 17B",
+    provider: "workers-ai",
+    input_rate: 14_000,
+    output_rate: 100_000,
+    unit_rate: null,
+    unit_kind: null,
+    markup: 3,
+  },
+  {
+    id: "@cf/mistralai/mistral-small-3.1-24b-instruct",
+    task: "text",
+    label: "Mistral Small 3.1 24B",
+    provider: "workers-ai",
+    input_rate: 16_000,
+    output_rate: 120_000,
+    unit_rate: null,
+    unit_kind: null,
+    markup: 3,
+  },
   {
     // Gemini Flash — vision lane (Snap-a-Meal, Label Reader, Menu Scout). Rates
     // are Google list prices expressed as neuron-equivalents (~$0.011/1k) so
@@ -70,11 +119,10 @@ const DEFAULT_MODELS: Omit<AiModelRow, "enabled" | "is_default">[] = [
   },
 ];
 
-let modelsSeeded = false;
-
+/** Idempotent catalog seed (INSERT OR IGNORE by id). Runs on demand — no
+ *  module-level guard, so it stays correct across isolated-storage test runs
+ *  and picks up newly-added catalog entries without wiping admin edits. */
 export async function seedAiModels(db: D1Database): Promise<void> {
-  if (modelsSeeded) return;
-  modelsSeeded = true;
   await db
     .batch(
       DEFAULT_MODELS.map((m, i) =>
@@ -85,9 +133,7 @@ export async function seedAiModels(db: D1Database): Promise<void> {
           .bind(m.id, m.task, m.label, m.provider, m.input_rate, m.output_rate, m.unit_rate, m.unit_kind, m.markup, i === 0 ? 1 : 0),
       ),
     )
-    .catch(() => {
-      modelsSeeded = false;
-    });
+    .catch(() => undefined);
 }
 
 export async function modelForTask(db: D1Database, task: string): Promise<AiModelRow | null> {
@@ -96,6 +142,32 @@ export async function modelForTask(db: D1Database, task: string): Promise<AiMode
     .prepare("SELECT * FROM ai_models WHERE task = ? AND enabled = 1 ORDER BY is_default DESC LIMIT 1")
     .bind(task)
     .first<AiModelRow>();
+}
+
+/** An enabled model by id — for a tenant's per-feature model override. */
+export async function modelById(db: D1Database, id: string): Promise<AiModelRow | null> {
+  await seedAiModels(db);
+  return db.prepare("SELECT * FROM ai_models WHERE id = ? AND enabled = 1").bind(id).first<AiModelRow>();
+}
+
+/** All models offered in the catalog (for the settings picker). */
+export async function listModels(db: D1Database): Promise<AiModelRow[]> {
+  await seedAiModels(db);
+  const rows = await db.prepare("SELECT * FROM ai_models WHERE enabled = 1 ORDER BY task, label").all<AiModelRow>();
+  return rows.results ?? [];
+}
+
+/** The tenant's AI config + legacy on/off toggle map. */
+async function loadTenantAi(db: D1Database, tenantId: string): Promise<{ config: TenantAiConfig; toggles: Record<string, boolean> }> {
+  const row = await db
+    .prepare("SELECT ai_config_json, ai_toggles_json FROM tenant_settings WHERE tenant_id = ?")
+    .bind(tenantId)
+    .first<{ ai_config_json: string | null; ai_toggles_json: string | null }>();
+  let config: TenantAiConfig = {};
+  let toggles: Record<string, boolean> = {};
+  try { if (row?.ai_config_json) config = JSON.parse(row.ai_config_json) as TenantAiConfig; } catch { /* malformed → defaults */ }
+  try { if (row?.ai_toggles_json) toggles = JSON.parse(row.ai_toggles_json) as Record<string, boolean>; } catch { /* malformed → allow */ }
+  return { config, toggles };
 }
 
 const rateOf = (m: AiModelRow): ModelRate => ({
@@ -168,21 +240,33 @@ async function runGemini(
 }
 
 export async function generate(env: Env, input: GenerateInput): Promise<GenerateResult> {
-  // Owner AI feature toggles — a feature explicitly switched off is refused
-  // before any credit hold. Absent/true = allowed (opt-out, not opt-in).
-  const settings = await env.DB.prepare("SELECT ai_toggles_json FROM tenant_settings WHERE tenant_id = ?")
-    .bind(input.tenantId)
-    .first<{ ai_toggles_json: string | null }>();
-  if (settings?.ai_toggles_json) {
-    try {
-      const toggles = JSON.parse(settings.ai_toggles_json) as Record<string, boolean>;
-      if (toggles[input.feature] === false) return { ok: false, error: "unavailable" };
-    } catch { /* malformed toggles → allow */ }
-  }
+  // Resolve the tenant's per-feature AI config (enable, model, prompt, tone).
+  const { config, toggles } = await loadTenantAi(env.DB, input.tenantId);
+  const fcfg = config.features?.[input.feature] ?? {};
 
-  const model = await modelForTask(env.DB, input.task);
+  // Enabled: per-feature config wins, then the legacy toggle map, else on.
+  // A feature explicitly switched off is refused before any credit hold.
+  const enabled = fcfg.enabled ?? toggles[input.feature] ?? true;
+  if (enabled === false) return { ok: false, error: "unavailable" };
+
+  // Model: a tenant's per-feature override (task-compatible) wins, else the
+  // task default. Vision stays vision; text/text-small are interchangeable.
+  const compatible = (m: AiModelRow) => (input.task === "vision" ? m.task === "vision" : m.task !== "vision");
+  let model: AiModelRow | null = null;
+  if (fcfg.model) { const m = await modelById(env.DB, fcfg.model); if (m && compatible(m)) model = m; }
+  if (!model) model = await modelForTask(env.DB, input.task);
   if (!model) return { ok: false, error: "unavailable" };
   const rate = rateOf(model);
+
+  // System prompt: a tenant override replaces the built-in default; a house or
+  // per-feature tone is appended for tonable (creative) features only.
+  const def = featureDef(input.feature);
+  let system = (fcfg.system && fcfg.system.trim()) || input.system;
+  if (def?.tonable) {
+    const tone = (fcfg.tone ?? config.tone) as AiTone | null | undefined;
+    if (tone && TONE_GUIDE[tone]) system = `${system}\n\n${TONE_GUIDE[tone]}`;
+  }
+  const runInput: GenerateInput = { ...input, system };
 
   const cfg = await getConfig(env.DB);
   const mockMode = cfg["ai.mock"] ?? "auto";
@@ -194,7 +278,7 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
 
   // Worst-case estimate for the hold: prompt tokens (~chars/4) in, cap out.
   const estUsage: Usage = {
-    inputTokens: Math.ceil((input.system.length + input.prompt.length) / 4),
+    inputTokens: Math.ceil((system.length + input.prompt.length) / 4),
     outputTokens: input.maxOutputTokens ?? 1024,
   };
   const estimate = creditsForUsage(estUsage, rate);
@@ -215,13 +299,13 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
       usage = { inputTokens: estUsage.inputTokens, outputTokens: Math.ceil(output.length / 4) };
       mocked = true;
     } else if (isGoogle) {
-      const g = await withTimeout(runGemini(geminiKey!, model.id, input));
+      const g = await withTimeout(runGemini(geminiKey!, model.id, runInput));
       output = g.output;
       usage = { inputTokens: g.usage.inputTokens ?? estUsage.inputTokens, outputTokens: g.usage.outputTokens ?? Math.ceil(output.length / 4) };
     } else {
       const run = env.AI!.run(model.id as Parameters<Ai["run"]>[0], {
         messages: [
-          { role: "system", content: input.system },
+          { role: "system", content: system },
           { role: "user", content: input.prompt },
         ],
         max_tokens: input.maxOutputTokens ?? 1024,

@@ -208,6 +208,43 @@ describe("credits + AI metering", () => {
   });
 });
 
+describe("AI config (per-tenant model / prompt / tone / enable)", () => {
+  it("exposes the registry + catalog and drives generation via per-feature overrides", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    // Entitle the AI suite.
+    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+
+    // GET /settings/ai — registry + expanded model catalog + tones.
+    const reg = (await (await SELF.fetch("http://x/api/settings/ai", { headers: auth(ownerCookie) })).json()) as {
+      features: { key: string; audience: string }[]; models: { id: string; task: string }[]; tones: string[]; config: Record<string, unknown>;
+    };
+    expect(reg.features.some((f) => f.key === "coach-note" && f.audience === "client")).toBe(true);
+    expect(reg.features.some((f) => f.key === "draft-plan" && f.audience === "trainer")).toBe(true);
+    expect(reg.models.some((m) => m.id === "@cf/meta/llama-3.1-8b-instruct-fast")).toBe(true);
+    expect(reg.tones).toContain("motivating");
+
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "AICfg" }) })).json()) as { client: { id: string } };
+
+    // Disable parse-food + set a house tone; the endpoint must now refuse.
+    await SELF.fetch("http://x/api/settings/ai", { method: "PATCH", headers: H, body: JSON.stringify({ tone: "motivating", features: { "parse-food": { enabled: false } } }) });
+    const cfg2 = (await (await SELF.fetch("http://x/api/settings/ai", { headers: auth(ownerCookie) })).json()) as { config: { tone: string; features: Record<string, { enabled: boolean }> } };
+    expect(cfg2.config.tone).toBe("motivating");
+    expect(cfg2.config.features["parse-food"]!.enabled).toBe(false);
+    const off = await SELF.fetch("http://x/api/ai/parse-food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
+    expect(off.status).toBe(503);
+
+    // Re-enable with a model override — generation runs again (mock lane).
+    await SELF.fetch("http://x/api/settings/ai", { method: "PATCH", headers: H, body: JSON.stringify({ features: { "parse-food": { enabled: true, model: "@cf/meta/llama-3.1-8b-instruct-fast" } } }) });
+    const on = await SELF.fetch("http://x/api/ai/parse-food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
+    expect(on.status).toBe(200);
+    // The earlier tone edit is preserved across the second PATCH (deep merge).
+    const cfg3 = (await (await SELF.fetch("http://x/api/settings/ai", { headers: auth(ownerCookie) })).json()) as { config: { tone: string; features: Record<string, { enabled: boolean; model: string }> } };
+    expect(cfg3.config.tone).toBe("motivating");
+    expect(cfg3.config.features["parse-food"]).toMatchObject({ enabled: true, model: "@cf/meta/llama-3.1-8b-instruct-fast" });
+  });
+});
+
 describe("commerce + redemption", () => {
   it("redeeming an unknown code 404s without leaking (no oracle)", async () => {
     const { client } = (await (

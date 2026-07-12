@@ -7,11 +7,14 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
+import { AI_TONES } from "@mossa/protocol";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { tenantEntitlements } from "./billing-store.js";
 import { nowIso, periodKey } from "./ids.js";
 import { parseJson, j } from "./db.js";
 import { PROVIDERS, resolveIntegrations, maskIntegrations } from "./integrations.js";
+import { AI_FEATURES } from "./ai-features.js";
+import { listModels } from "./ai.js";
 
 export const settingsRoutes = new Hono<AppEnv>()
   .get("/settings", async (c) => {
@@ -85,6 +88,55 @@ export const settingsRoutes = new Hono<AppEnv>()
       "INSERT INTO tenant_settings (tenant_id, branding_json, ai_toggles_json, marketplace_json, integrations_json, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(tenant_id) DO UPDATE SET branding_json = ?, ai_toggles_json = ?, marketplace_json = ?, integrations_json = ?, updated_at = ?",
     )
       .bind(who.tenantId, j(branding), j(aiToggles), j(marketplace), j(integrations), nowIso(), j(branding), j(aiToggles), j(marketplace), j(integrations), nowIso())
+      .run();
+    return c.json({ ok: true });
+  })
+
+  // AI configuration surface: the feature registry + model catalog + tones,
+  // plus the tenant's current per-feature overrides.
+  .get("/settings/ai", async (c) => {
+    const who = requireTenant(c)!;
+    const role = c.get("role");
+    if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
+    const row = await c.env.DB.prepare("SELECT ai_config_json FROM tenant_settings WHERE tenant_id = ?")
+      .bind(who.tenantId)
+      .first<{ ai_config_json: string | null }>();
+    const models = (await listModels(c.env.DB)).map((m) => ({ id: m.id, label: m.label, task: m.task, provider: m.provider }));
+    return c.json({ features: AI_FEATURES, models, tones: AI_TONES, config: parseJson(row?.ai_config_json, {}) });
+  })
+
+  // Save AI config: house tone + per-feature enable/model/prompt/tone. Owner-only.
+  .patch("/settings/ai", async (c) => {
+    const who = requireTenant(c)!;
+    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
+    const featurePatch = z.object({
+      enabled: z.boolean().optional(),
+      model: z.string().max(120).nullish(),
+      system: z.string().max(8000).nullish(),
+      tone: z.string().max(40).nullish(),
+    });
+    const parsed = z
+      .object({ tone: z.string().max(40).nullish(), features: z.record(z.string(), featurePatch).optional() })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const d = parsed.data;
+
+    const row = await c.env.DB.prepare("SELECT ai_config_json FROM tenant_settings WHERE tenant_id = ?")
+      .bind(who.tenantId)
+      .first<{ ai_config_json: string | null }>();
+    const existing = parseJson<{ tone?: string | null; features?: Record<string, Record<string, unknown>> }>(row?.ai_config_json, {});
+    const merged: { tone?: string | null; features: Record<string, Record<string, unknown>> } = {
+      tone: d.tone !== undefined ? d.tone : existing.tone ?? null,
+      features: { ...(existing.features ?? {}) },
+    };
+    for (const [key, patch] of Object.entries(d.features ?? {})) {
+      merged.features[key] = { ...(merged.features[key] ?? {}), ...patch };
+    }
+
+    await c.env.DB.prepare(
+      "INSERT INTO tenant_settings (tenant_id, ai_config_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(tenant_id) DO UPDATE SET ai_config_json = ?, updated_at = ?",
+    )
+      .bind(who.tenantId, j(merged), nowIso(), j(merged), nowIso())
       .run();
     return c.json({ ok: true });
   })
