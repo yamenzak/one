@@ -208,7 +208,7 @@ export const healthRoutes = new Hono<AppEnv>()
       await c.env.DB.prepare(
         "INSERT INTO notifications (id, tenant_id, recipient_user_id, type, title, message, link, created_at) VALUES (?, ?, ?, 'lab_uploaded', ?, '', ?, ?)",
       )
-        .bind(newId("ntf"), access.client.tenant_id, primary.trainer_user_id, `${access.client.display_name} uploaded a lab result`, `/clients/${access.client.id}`, nowIso())
+        .bind(newId("ntf"), access.client.tenant_id, primary.trainer_user_id, `${access.client.display_name} uploaded a lab result`, `/clients/${access.client.id}/manage`, nowIso())
         .run()
         .catch(() => undefined);
       await notifyUser(c.env, primary.trainer_user_id);
@@ -315,7 +315,7 @@ export const healthRoutes = new Hono<AppEnv>()
         await c.env.DB.prepare(
           "INSERT INTO notifications (id, tenant_id, recipient_user_id, type, title, message, link, created_at) VALUES (?, ?, ?, 'swap_request', ?, '', ?, ?)",
         )
-          .bind(newId("ntf"), access.client.tenant_id, primary.trainer_user_id, `${access.client.display_name} requested an exercise swap`, `/clients/${access.client.id}`, nowIso())
+          .bind(newId("ntf"), access.client.tenant_id, primary.trainer_user_id, `${access.client.display_name} requested an exercise swap`, `/clients/${access.client.id}/manage`, nowIso())
           .run()
           .catch(() => undefined);
         await notifyUser(c.env, primary.trainer_user_id);

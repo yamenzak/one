@@ -343,10 +343,10 @@ export const logRoutes = new Hono<AppEnv>()
     const inRange = (day: string | null | undefined) => !!day && day >= from && day <= to;
     const dayOf = (ts: string | null | undefined) => (ts ? ts.slice(0, 10) : null);
 
-    interface Ev { id: string; kind: string; date: string; at: string; title: string; subtitle: string | null; metric?: { unit: "energy" | "volume" | "weight"; value: number } }
+    interface Ev { id: string; kind: string; date: string; at: string; title: string; subtitle: string | null; ref?: string; metric?: { unit: "energy" | "volume" | "weight"; value: number } }
     const events: Ev[] = [];
 
-    const [food, water, workouts, activities, measures, checkins, sleeps, moods, fasts, swaps, labs, wPlans, mPlans, supps] = await Promise.all([
+    const [food, water, workouts, activities, measures, checkins, sleeps, moods, fasts, swaps, labs, wPlans, mPlans, supps, sessions] = await Promise.all([
       db.prepare("SELECT date_local, meal_type, COUNT(*) AS n, COALESCE(SUM(calories),0) AS cal, MAX(created_at) AS at FROM food_entries WHERE client_id=? AND date_local>=? AND date_local<=? GROUP BY date_local, meal_type").bind(cid, from, to).all<{ date_local: string; meal_type: string; n: number; cal: number; at: string }>(),
       db.prepare("SELECT date_local, total_ml, updated_at FROM water_logs WHERE client_id=? AND date_local>=? AND date_local<=? AND total_ml>0").bind(cid, from, to).all<{ date_local: string; total_ml: number; updated_at: string }>(),
       db.prepare("SELECT date_local, entries_json, session_calories, updated_at, created_at FROM exercise_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, from, to).all<{ date_local: string; entries_json: string | null; session_calories: number | null; updated_at: string; created_at: string }>(),
@@ -361,6 +361,7 @@ export const logRoutes = new Hono<AppEnv>()
       db.prepare("SELECT id, name, published_at FROM workout_plans WHERE client_id=? AND published_at IS NOT NULL ORDER BY published_at DESC LIMIT 30").bind(cid).all<{ id: string; name: string; published_at: string }>(),
       db.prepare("SELECT id, name, published_at FROM meal_plans WHERE client_id=? AND published_at IS NOT NULL ORDER BY published_at DESC LIMIT 30").bind(cid).all<{ id: string; name: string; published_at: string }>(),
       db.prepare("SELECT sl.date_local, sl.slot, sl.taken_at, s.name AS name FROM supplement_logs sl LEFT JOIN supplements s ON s.id=sl.supplement_id WHERE sl.client_id=? AND sl.date_local>=? AND sl.date_local<=?").bind(cid, from, to).all<{ date_local: string; slot: string; taken_at: string | null; name: string | null }>(),
+      db.prepare("SELECT id, scheduled_at, duration_minutes, status, completed_at FROM trainer_sessions WHERE client_id=? ORDER BY scheduled_at DESC LIMIT 60").bind(cid).all<{ id: string; scheduled_at: string; duration_minutes: number | null; status: string; completed_at: string | null }>(),
     ]);
 
     const mealLabel = (t: string) => ({ breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner", snack: "Snack", pre_workout: "Pre-workout", post_workout: "Post-workout", free: "Free meal" } as Record<string, string>)[t] ?? t.replace(/_/g, " ").replace(/^\w/, (x) => x.toUpperCase());
@@ -379,8 +380,8 @@ export const logRoutes = new Hono<AppEnv>()
     for (const m of measures.results ?? []) { if (m.weight_kg == null && m.body_fat_percent == null && m.waist_cm == null) continue; events.push({ id: `meas-${m.date_local}`, kind: "measurement", date: m.date_local, at: atFor(m.date_local, m.created_at), title: "Body", subtitle: [m.body_fat_percent != null ? `${m.body_fat_percent}% bf` : null, m.waist_cm != null ? `waist ${m.waist_cm}` : null].filter(Boolean).join(" · ") || null, ...(m.weight_kg != null ? { metric: { unit: "weight" as const, value: m.weight_kg } } : {}) }); }
     for (const ci of checkins.results ?? []) {
       const parts = [ci.mood != null ? `mood ${ci.mood}/5` : null, ci.energy != null ? `energy ${ci.energy}/5` : null].filter(Boolean).join(" · ");
-      events.push({ id: `checkin-${ci.date_local}`, kind: "checkin", date: ci.date_local, at: atFor(ci.date_local, ci.created_at), title: "Check-in", subtitle: parts || "logged" });
-      if (ci.trainer_feedback && inRange(dayOf(ci.feedback_at))) events.push({ id: `fb-${ci.id}`, kind: "feedback", date: dayOf(ci.feedback_at)!, at: ci.feedback_at!, title: "Coach feedback", subtitle: ci.trainer_feedback.slice(0, 90) });
+      events.push({ id: `checkin-${ci.date_local}`, kind: "checkin", date: ci.date_local, at: atFor(ci.date_local, ci.created_at), title: "Check-in", subtitle: parts || "logged", ref: ci.date_local });
+      if (ci.trainer_feedback && inRange(dayOf(ci.feedback_at))) events.push({ id: `fb-${ci.id}`, kind: "feedback", date: dayOf(ci.feedback_at)!, at: ci.feedback_at!, title: "Coach feedback", subtitle: ci.trainer_feedback.slice(0, 90), ref: ci.date_local });
     }
     for (const s of sleeps.results ?? []) events.push({ id: `sleep-${s.date_local}`, kind: "sleep", date: s.date_local, at: atFor(s.date_local, s.updated_at), title: "Sleep", subtitle: [dur(s.duration_minutes), s.quality != null ? `quality ${s.quality}/5` : null].filter(Boolean).join(" · ") });
     for (const m of moods.results ?? []) events.push({ id: `mood-${m.date_local}`, kind: "mood", date: m.date_local, at: atFor(m.date_local, m.updated_at), title: "Mood", subtitle: [m.mood != null ? `mood ${m.mood}/5` : null, m.energy != null ? `energy ${m.energy}/5` : null, m.stress != null ? `stress ${m.stress}/5` : null].filter(Boolean).join(" · ") || "logged" });
@@ -394,13 +395,19 @@ export const logRoutes = new Hono<AppEnv>()
       else if (inRange(dayOf(s.created_at))) events.push({ id: `swap-req-${s.id}`, kind: "swap", date: dayOf(s.created_at)!, at: s.created_at, title: "Swap requested", subtitle: s.current_name ? `${s.current_name}${s.reason ? ` · ${s.reason}` : ""}` : s.reason || null });
     }
     for (const l of labs.results ?? []) {
-      if (l.reviewed_at && inRange(dayOf(l.reviewed_at))) events.push({ id: `lab-rev-${l.id}`, kind: "lab", date: dayOf(l.reviewed_at)!, at: l.reviewed_at, title: "Lab reviewed", subtitle: l.display_name });
-      else if (l.uploaded_at && inRange(dayOf(l.uploaded_at))) events.push({ id: `lab-up-${l.id}`, kind: "lab", date: dayOf(l.uploaded_at)!, at: l.uploaded_at, title: "Lab uploaded", subtitle: l.display_name });
-      else if (inRange(dayOf(l.created_at))) events.push({ id: `lab-req-${l.id}`, kind: "lab", date: dayOf(l.created_at)!, at: l.created_at, title: "Lab requested", subtitle: l.display_name });
+      if (l.reviewed_at && inRange(dayOf(l.reviewed_at))) events.push({ id: `lab-rev-${l.id}`, kind: "lab", date: dayOf(l.reviewed_at)!, at: l.reviewed_at, title: "Lab reviewed", subtitle: l.display_name, ref: l.id });
+      else if (l.uploaded_at && inRange(dayOf(l.uploaded_at))) events.push({ id: `lab-up-${l.id}`, kind: "lab", date: dayOf(l.uploaded_at)!, at: l.uploaded_at, title: "Lab uploaded", subtitle: l.display_name, ref: l.id });
+      else if (inRange(dayOf(l.created_at))) events.push({ id: `lab-req-${l.id}`, kind: "lab", date: dayOf(l.created_at)!, at: l.created_at, title: "Lab requested", subtitle: l.display_name, ref: l.id });
     }
     for (const p of wPlans.results ?? []) if (inRange(dayOf(p.published_at))) events.push({ id: `wplan-${p.id}`, kind: "plan_workout", date: dayOf(p.published_at)!, at: p.published_at, title: "New workout plan", subtitle: p.name });
     for (const p of mPlans.results ?? []) if (inRange(dayOf(p.published_at))) events.push({ id: `mplan-${p.id}`, kind: "plan_meal", date: dayOf(p.published_at)!, at: p.published_at, title: "New meal plan", subtitle: p.name });
     for (const s of supps.results ?? []) events.push({ id: `supp-${s.date_local}-${s.name}-${s.slot}`, kind: "supplement", date: s.date_local, at: atFor(s.date_local, s.taken_at), title: s.name || "Supplement", subtitle: s.slot ? s.slot.replace(/_/g, " ") : "taken" });
+    for (const s of sessions.results ?? []) {
+      const day = s.status === "completed" ? dayOf(s.completed_at) ?? dayOf(s.scheduled_at) : dayOf(s.scheduled_at);
+      if (!inRange(day)) continue;
+      const title = s.status === "completed" ? "Session completed" : s.status === "cancelled" ? "Session cancelled" : s.status === "no_show" ? "Session missed" : "Session";
+      events.push({ id: `sess-${s.id}`, kind: "session", date: day!, at: atFor(day!, s.status === "completed" ? s.completed_at : s.scheduled_at), title, subtitle: s.duration_minutes ? `${s.duration_minutes} min` : null, ref: s.id });
+    }
 
     events.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
     return c.json({ events });
@@ -571,7 +578,7 @@ export const logRoutes = new Hono<AppEnv>()
           primary.trainer_user_id,
           `${access.client.display_name} checked in`,
           d.notes ?? "",
-          `/clients/${access.client.id}/check-ins`,
+          `/clients/${access.client.id}/manage`,
           nowIso(),
         )
         .run()

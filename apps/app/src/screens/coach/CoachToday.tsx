@@ -115,7 +115,7 @@ export function CoachToday() {
             <div key={day}>
               <div className="px-1 pb-1 pt-2 text-xs font-semibold text-muted-foreground">{dayLabel(day)}</div>
               <Card className="divide-y divide-border/40 py-0.5">
-                {evs.map((ev) => <RosterRow key={ev.id} ev={ev} units={units} onOpen={() => nav(`/clients/${ev.clientId}/today`)} />)}
+                {evs.map((ev) => <RosterRow key={ev.id} ev={ev} units={units} onOpen={() => nav(`/clients/${ev.clientId}/${rosterSubtab(ev.kind)}`)} />)}
               </Card>
             </div>
           ))}
@@ -137,6 +137,14 @@ export function CoachToday() {
       {widgetsOpen && <WidgetCustomizeSheet catalog={COACH_WIDGETS} items={widgetItems} defaults={DEFAULT_COACH_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
     </Page>
   );
+}
+
+/** Client-detail subtab a roster event drills into (check-ins, labs, swaps all
+ *  live under Manage; body metrics under Progress; training under Today). */
+function rosterSubtab(kind: string): string {
+  if (kind === "checkin" || kind === "lab" || kind === "swap") return "manage";
+  if (kind === "measurement") return "progress";
+  return "today";
 }
 
 const shiftDay = (date: string, delta: number): string => {

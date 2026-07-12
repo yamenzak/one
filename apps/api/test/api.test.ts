@@ -432,16 +432,24 @@ describe("activity history feed", () => {
     await SELF.fetch("http://x/api/logs/water", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, amountMl: 750 } }) });
     await SELF.fetch("http://x/api/logs/activity", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, activityKey: "running", durationMin: 30 } }) });
     await SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, workoutPlanId: "wp-hist", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "ex1", sets: [{ setIndex: 0, reps: 8, weightKg: 50, completed: true }] } }) });
+    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, mood: 4, notes: "felt strong" } }) });
+    const { id: labId } = (await (await SELF.fetch("http://x/api/labs", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, type: "blood_panel" }) })).json()) as { id: string };
 
-    const feed = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2026-07-10`, { headers: auth(ownerCookie) })).json()) as { events: { kind: string; date: string; title: string; metric?: { unit: string; value: number } }[] };
+    const feed = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2026-07-10`, { headers: auth(ownerCookie) })).json()) as { events: { kind: string; date: string; title: string; ref?: string; metric?: { unit: string; value: number } }[] };
     const kinds = feed.events.map((e) => e.kind);
     expect(kinds).toContain("food:lunch");
     expect(kinds).toContain("water");
     expect(kinds).toContain("activity");
     expect(kinds).toContain("workout");
+    expect(kinds).toContain("checkin");
     expect(feed.events.every((e) => e.date >= "2026-07-08" && e.date <= "2026-07-10")).toBe(true);
     const food = feed.events.find((e) => e.kind === "food:lunch")!;
     expect(food.metric).toMatchObject({ unit: "energy", value: 500 });
+    // Deep-link ref: a check-in carries its date so the feed can open its detail.
+    expect(feed.events.find((e) => e.kind === "checkin")!.ref).toBe(d);
+    // A lab is dated by its creation time; a wide window catches it, ref = lab id.
+    const wide = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2030-01-01`, { headers: auth(ownerCookie) })).json()) as { events: { kind: string; ref?: string }[] };
+    expect(wide.events.find((e) => e.kind === "lab")!.ref).toBe(labId);
     // Out-of-range window returns nothing.
     const empty = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-06-01&to=2026-06-02`, { headers: auth(ownerCookie) })).json()) as { events: unknown[] };
     expect(empty.events.length).toBe(0);

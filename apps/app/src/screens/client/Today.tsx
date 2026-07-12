@@ -18,7 +18,7 @@ import { LogSheet } from "./LogSheet.js";
 import { WidgetCarousel, WidgetCustomizeSheet } from "../widget-kit.js";
 import { CLIENT_WIDGETS, DEFAULT_CLIENT_WIDGETS, type ClientWidgetData } from "./HomeWidgets.js";
 
-export interface FeedEvent { id: string; kind: string; date: string; at: string; title: string; subtitle: string | null; metric?: { unit: "energy" | "volume" | "weight"; value: number } }
+export interface FeedEvent { id: string; kind: string; date: string; at: string; title: string; subtitle: string | null; ref?: string; metric?: { unit: "energy" | "volume" | "weight"; value: number } }
 
 /** N days back from a YYYY-MM-DD string. */
 const shiftDay = (date: string, delta: number): string => {
@@ -41,13 +41,21 @@ export interface TodayBundle {
   weightSeries?: { kg: number; date: string }[];
 }
 
-/** Tab route a feed event links to (client context only). */
-const KIND_ROUTE: Record<string, string> = {
-  water: "/eat", workout: "/train", activity: "/train", measurement: "/progress", checkin: "/progress",
-  feedback: "/progress", sleep: "/wellness", mood: "/progress", fast: "/wellness", supplement: "/wellness",
-  swap: "/train", lab: "/wellness", plan_workout: "/train", plan_meal: "/eat",
+/** The route (with any deep-link query) a feed event opens — client context
+ *  only. Check-ins and labs open their detail sheet on the Wellness page. */
+const routeForEvent = (ev: FeedEvent): string | null => {
+  const k = ev.kind;
+  if (k.startsWith("food")) return "/eat";
+  switch (k) {
+    case "checkin": case "feedback": return ev.ref ? `/wellness?checkin=${ev.ref}` : "/wellness";
+    case "lab": return ev.ref ? `/wellness?lab=${ev.ref}` : "/wellness";
+    case "fast": case "sleep": case "supplement": case "session": return "/wellness";
+    case "water": case "plan_meal": return "/eat";
+    case "workout": case "activity": case "swap": case "plan_workout": return "/train";
+    case "measurement": case "mood": return "/progress";
+    default: return null;
+  }
 };
-const routeForKind = (kind: string): string | null => (kind.startsWith("food") ? "/eat" : KIND_ROUTE[kind] ?? null);
 
 export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart?: () => void; onOpen?: (route: string) => void }) {
   const [data, setData] = useState<TodayBundle | null>(null);
@@ -178,6 +186,7 @@ const FEED_META: Record<string, { icon: LucideIcon; tone: Tone }> = {
   supplement: { icon: Pill, tone: "activity" },
   swap: { icon: ArrowLeftRight, tone: "activity" },
   lab: { icon: FlaskConical, tone: "cardio" },
+  session: { icon: ClipboardList, tone: "activity" },
   plan_workout: { icon: Dumbbell, tone: "primary" },
   plan_meal: { icon: Utensils, tone: "primary" },
 };
@@ -209,7 +218,7 @@ function FeedRow({ ev, units, onOpen }: { ev: FeedEvent; units: UnitPrefs; onOpe
   const meta = metaFor(ev.kind);
   const sub = [ev.subtitle, formatMetric(ev.metric, units)].filter(Boolean).join(" · ");
   const time = new Date(ev.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  const route = onOpen ? routeForKind(ev.kind) : null;
+  const route = onOpen ? routeForEvent(ev) : null;
   const body = (
     <>
       <IconBadge icon={meta.icon} tone={meta.tone} size="sm" />
