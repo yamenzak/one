@@ -1,25 +1,151 @@
 /** Platform admin console — tenants (comp/topup/seed), Stripe config. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SegmentedControl, Switch, Chip, Page, Stagger, ShieldCheck, Sparkles, ArrowLeft, KeyRound, Globe } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SegmentedControl, Switch, Chip, Page, Stagger, ShieldCheck, Sparkles, ArrowLeft, KeyRound, Globe, cn, LayoutGrid } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Tenant { id: string; name: string; slug: string; plan_id: string | null; status: string | null; comp: number | null }
 const PLANS = ["free", "solo", "studio", "team"];
 
-type AdminTab = "tenants" | "stripe" | "domains" | "ai";
+type AdminTab = "tenants" | "plans" | "stripe" | "domains" | "ai";
 
 export function AdminConsole({ onBack }: { onBack: () => void }) {
   const [tab, setTab] = useState<AdminTab>("tenants");
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <div className="flex items-center gap-3"><Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button><div className="flex items-center gap-2"><ShieldCheck className="size-5 text-primary" /><h1 className="text-xl font-bold tracking-tight">Platform admin</h1></div></div>
-      <SegmentedControl options={[{ value: "tenants", label: "Tenants" }, { value: "stripe", label: "Stripe" }, { value: "ai", label: "AI" }, { value: "domains", label: "Domains" }]} value={tab} onChange={setTab} />
+      <div className="overflow-x-auto no-scrollbar"><SegmentedControl options={[{ value: "tenants", label: "Tenants" }, { value: "plans", label: "Plans" }, { value: "ai", label: "AI" }, { value: "stripe", label: "Stripe" }, { value: "domains", label: "Domains" }]} value={tab} onChange={setTab} /></div>
       {tab === "tenants" && <Tenants />}
+      {tab === "plans" && <PlansConfig />}
       {tab === "stripe" && <StripeConfig />}
       {tab === "ai" && <AiConfig />}
       {tab === "domains" && <DomainsConfig />}
     </Page>
+  );
+}
+
+// ── Entitlements: shared matrix editor (plan builder + per-tenant gifting) ────
+interface Ent { quotas: Record<string, number>; features: Record<string, boolean>; aiCredits: { monthlyGrant: number } }
+interface EntMeta { featureKeys: string[]; quotaKeys: string[]; featureMeta: Record<string, { label: string; hint: string }>; quotaMeta: Record<string, { label: string; hint: string; unit?: string }> }
+
+function EntitlementFields({ ent, meta, onChange }: { ent: Ent; meta: EntMeta; onChange: (e: Ent) => void }) {
+  const setQuota = (k: string, v: number) => onChange({ ...ent, quotas: { ...ent.quotas, [k]: v } });
+  const setFeature = (k: string, v: boolean) => onChange({ ...ent, features: { ...ent.features, [k]: v } });
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Limits</div>
+        <div className="space-y-2.5">
+          {meta.quotaKeys.map((k) => {
+            const m = meta.quotaMeta[k] ?? { label: k, hint: "" };
+            const v = ent.quotas[k] ?? 0;
+            const unlimited = v < 0;
+            return (
+              <div key={k} className="flex items-center gap-2">
+                <div className="min-w-0 flex-1"><div className="text-sm font-medium">{m.label}</div><div className="truncate text-xs text-muted-foreground">{m.hint}</div></div>
+                <button onClick={() => setQuota(k, unlimited ? 0 : -1)} className={cn("shrink-0 rounded-full px-2 py-1 text-[0.65rem] font-medium transition-colors", unlimited ? "bg-primary/15 text-primary" : "bg-surface-3 text-muted-foreground")}>∞</button>
+                <input type="number" min={0} disabled={unlimited} value={unlimited ? "" : v} onChange={(e) => setQuota(k, Math.max(0, Number(e.target.value) || 0))} className="w-20 rounded-lg bg-surface-2 px-2 py-1.5 text-right text-sm outline-none disabled:opacity-40" placeholder={unlimited ? "∞" : ""} />
+                <span className="w-8 shrink-0 text-[0.65rem] text-muted-foreground">{unlimited ? "" : m.unit ?? ""}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div>
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Features</div>
+        <div className="space-y-2.5">
+          {meta.featureKeys.map((k) => {
+            const m = meta.featureMeta[k] ?? { label: k, hint: "" };
+            return (
+              <div key={k} className="flex items-center justify-between gap-3">
+                <div className="min-w-0"><div className="text-sm font-medium">{m.label}</div><div className="truncate text-xs text-muted-foreground">{m.hint}</div></div>
+                <Switch checked={!!ent.features[k]} onCheckedChange={(val) => setFeature(k, val)} />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-3 border-t border-border/50 pt-3">
+        <div><div className="text-sm font-medium">Monthly AI credits</div><div className="text-xs text-muted-foreground">Granted each billing period</div></div>
+        <input type="number" min={0} value={ent.aiCredits.monthlyGrant} onChange={(e) => onChange({ ...ent, aiCredits: { monthlyGrant: Math.max(0, Number(e.target.value) || 0) } })} className="w-24 rounded-lg bg-surface-2 px-2 py-1.5 text-right text-sm outline-none" />
+      </div>
+    </div>
+  );
+}
+
+interface PlanFull { id: string; name: string; priceUsdMonth: number; active: number; tenantCount: number; entitlements: Ent }
+
+function PlansConfig() {
+  const [data, setData] = useState<({ plans: PlanFull[] } & EntMeta) | null>(null);
+  const [edit, setEdit] = useState<PlanFull | null>(null);
+  const load = useCallback(() => void api.get<{ plans: PlanFull[] } & EntMeta>("/api/admin/plans").then(setData).catch(() => undefined), []);
+  useEffect(load, [load]);
+  if (!data) return <Skeleton className="h-64" />;
+  return (
+    <Stagger className="space-y-3">
+      <p className="px-1 text-xs text-muted-foreground">Compose each plan from every feature flag. Raising a limit or enabling a feature applies to all tenants on the plan instantly; lowering grandfathers existing tenants automatically.</p>
+      {data.plans.map((p) => (
+        <Card key={p.id} className="flex items-center justify-between">
+          <div><div className="font-semibold">{p.name} <span className="ml-1 text-xs font-normal text-muted-foreground">${p.priceUsdMonth}/mo{p.active ? "" : " · off"}</span></div><div className="text-xs text-muted-foreground">{p.tenantCount} tenant{p.tenantCount === 1 ? "" : "s"}</div></div>
+          <Button size="sm" variant="secondary" onClick={() => setEdit(p)}><LayoutGrid /> Edit</Button>
+        </Card>
+      ))}
+      {edit && <PlanEditSheet plan={edit} meta={data} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); load(); }} />}
+    </Stagger>
+  );
+}
+
+function PlanEditSheet({ plan, meta, onClose, onSaved }: { plan: PlanFull; meta: EntMeta; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(plan.name);
+  const [price, setPrice] = useState(String(plan.priceUsdMonth));
+  const [ent, setEnt] = useState<Ent>(plan.entitlements);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const save = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await api.patch<{ grandfathered: number }>(`/api/admin/plans/${plan.id}`, { name, priceUsdMonth: Number(price) || 0, entitlements: ent });
+      setMsg(r.grandfathered ? `Saved. ${r.grandfathered} existing tenant${r.grandfathered === 1 ? "" : "s"} kept their old limits.` : "Saved — applied to all tenants on this plan.");
+      onSaved();
+    } finally { setBusy(false); }
+  };
+  return (
+    <Sheet open onClose={onClose} title={`Edit ${plan.name}`}>
+      <div className="space-y-4">
+        <div className="flex gap-2">
+          <Field label="Name" value={name} onChange={(e) => setName(e.target.value)} className="flex-1" />
+          <Field label="$ / mo" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ""))} className="w-24" />
+        </div>
+        <EntitlementFields ent={ent} meta={meta} onChange={setEnt} />
+        <Button size="lg" className="w-full" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save plan"}</Button>
+        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+      </div>
+    </Sheet>
+  );
+}
+
+function GiftSheet({ tenantId, name, onClose }: { tenantId: string; name: string; onClose: () => void }) {
+  const [data, setData] = useState<({ planId: string; effective: Ent } & EntMeta) | null>(null);
+  const [ent, setEnt] = useState<Ent | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => { void api.get<{ planId: string; effective: Ent } & EntMeta>(`/api/admin/tenants/${tenantId}/entitlements`).then((d) => { setData(d); setEnt(d.effective); }).catch(() => undefined); }, [tenantId]);
+  const save = async () => { if (!ent) return; setBusy(true); setMsg(null); try { const r = await api.patch<{ effective: Ent }>(`/api/admin/tenants/${tenantId}/overrides`, { grants: ent }); setEnt(r.effective); setMsg("Gifts applied — raises and unlocks only."); } finally { setBusy(false); } };
+  const reset = async () => { setBusy(true); setMsg(null); try { const r = await api.patch<{ effective: Ent }>(`/api/admin/tenants/${tenantId}/overrides`, { reset: true }); setEnt(r.effective); setMsg("Gifts cleared — back to plan."); } finally { setBusy(false); } };
+  return (
+    <Sheet open onClose={onClose} title={`Gift — ${name}`}>
+      {!data || !ent ? <Skeleton className="h-64" /> : (
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground">On the <span className="font-medium capitalize">{data.planId}</span> plan. You can raise limits and unlock features — never lower or disable (a value below the plan simply won't apply).</p>
+          <EntitlementFields ent={ent} meta={data} onChange={setEnt} />
+          <div className="flex gap-2">
+            <Button className="flex-1" disabled={busy} onClick={() => void save()}>{busy ? "…" : "Apply gifts"}</Button>
+            <Button variant="outline" disabled={busy} onClick={() => void reset()}>Reset to plan</Button>
+          </div>
+          {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+        </div>
+      )}
+    </Sheet>
   );
 }
 
@@ -141,6 +267,7 @@ function Tenants() {
   const [msg, setMsg] = useState<string | null>(null);
   const [topUpId, setTopUpId] = useState<string | null>(null);
   const [credits, setCredits] = useState("");
+  const [gift, setGift] = useState<{ id: string; name: string } | null>(null);
   const load = useCallback(async () => setTenants((await api.get<{ tenants: Tenant[] }>("/api/admin/tenants")).tenants), []);
   useEffect(() => void load(), [load]);
 
@@ -159,9 +286,11 @@ function Tenants() {
           <div className="flex flex-wrap gap-2">
             {PLANS.map((p) => <button key={p} disabled={busy === t.id} onClick={() => void comp(t.id, p)} className="rounded-full bg-secondary px-3 py-1 text-xs capitalize transition-all active:scale-95 hover:bg-surface-3">{p}</button>)}
             <button onClick={() => setTopUpId(t.id)} className="rounded-full bg-primary/15 px-3 py-1 text-xs text-primary transition-transform active:scale-95">+ credits</button>
+            <button onClick={() => setGift({ id: t.id, name: t.name })} className="rounded-full bg-primary/15 px-3 py-1 text-xs text-primary transition-transform active:scale-95">🎁 gift</button>
           </div>
         </Card>
       ))}
+      {gift && <GiftSheet tenantId={gift.id} name={gift.name} onClose={() => setGift(null)} />}
       <Sheet open={!!topUpId} onClose={() => setTopUpId(null)} title="Add credits">
         <div className="space-y-4">
           <Field label="Credits to add" inputMode="numeric" value={credits} onChange={(e) => setCredits(e.target.value.replace(/\D/g, ""))} autoFocus />

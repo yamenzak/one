@@ -261,6 +261,48 @@ describe("client self-profile", () => {
   });
 });
 
+describe("entitlement plan builder + grandfathering", () => {
+  it("lowering a plan grandfathers existing tenants; new tenants get the lower plan; gifts only raise", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const t1 = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json() as { active: { tenantId: string } }).active.tenantId;
+    // Put tenant 1 on studio (activeClients 100, branding on).
+    await SELF.fetch(`http://x/api/admin/tenants/${t1}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+
+    const plans = (await (await SELF.fetch("http://x/api/admin/plans", { headers: auth(ownerCookie) })).json()) as { plans: { id: string; entitlements: { quotas: Record<string, number>; features: Record<string, boolean>; aiCredits: { monthlyGrant: number } } }[]; featureKeys: string[] };
+    const studio = plans.plans.find((p) => p.id === "studio")!;
+    expect(studio.entitlements.quotas.activeClients).toBe(100);
+    expect(plans.featureKeys).toContain("aiSuite");
+
+    // Lower the plan: activeClients 100→25, disable branding.
+    const lowered = { quotas: { ...studio.entitlements.quotas, activeClients: 25 }, features: { ...studio.entitlements.features, branding: false }, aiCredits: studio.entitlements.aiCredits };
+    const patch = (await (await SELF.fetch("http://x/api/admin/plans/studio", { method: "PATCH", headers: H, body: JSON.stringify({ entitlements: lowered }) })).json()) as { grandfathered: number };
+    expect(patch.grandfathered).toBeGreaterThanOrEqual(1);
+
+    // Tenant 1 (existing) keeps the old ceiling + feature.
+    const e1 = (await (await SELF.fetch(`http://x/api/admin/tenants/${t1}/entitlements`, { headers: auth(ownerCookie) })).json()) as { effective: { quotas: Record<string, number>; features: Record<string, boolean> } };
+    expect(e1.effective.quotas.activeClients).toBe(100);
+    expect(e1.effective.features.branding).toBe(true);
+
+    // A tenant joining studio AFTER the change gets the lower plan.
+    const t2 = (await (await SELF.fetch("http://x/api/context", { headers: auth(otherCookie) })).json() as { active: { tenantId: string } }).active.tenantId;
+    await SELF.fetch(`http://x/api/admin/tenants/${t2}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    const e2 = (await (await SELF.fetch(`http://x/api/admin/tenants/${t2}/entitlements`, { headers: auth(ownerCookie) })).json()) as { effective: { quotas: Record<string, number>; features: Record<string, boolean> } };
+    expect(e2.effective.quotas.activeClients).toBe(25);
+    expect(e2.effective.features.branding).toBe(false);
+
+    // Gift tenant 2 more (grant-only): raise clients, unlock branding.
+    await SELF.fetch(`http://x/api/admin/tenants/${t2}/overrides`, { method: "PATCH", headers: H, body: JSON.stringify({ grants: { quotas: { activeClients: 500 }, features: { branding: true } } }) });
+    const g1 = (await (await SELF.fetch(`http://x/api/admin/tenants/${t2}/entitlements`, { headers: auth(ownerCookie) })).json()) as { effective: { quotas: Record<string, number>; features: Record<string, boolean> } };
+    expect(g1.effective.quotas.activeClients).toBe(500);
+    expect(g1.effective.features.branding).toBe(true);
+
+    // A gift can never lower: trying to set 10 keeps 500.
+    await SELF.fetch(`http://x/api/admin/tenants/${t2}/overrides`, { method: "PATCH", headers: H, body: JSON.stringify({ grants: { quotas: { activeClients: 10 } } }) });
+    const g2 = (await (await SELF.fetch(`http://x/api/admin/tenants/${t2}/entitlements`, { headers: auth(ownerCookie) })).json()) as { effective: { quotas: Record<string, number> } };
+    expect(g2.effective.quotas.activeClients).toBe(500);
+  });
+});
+
 describe("AI model catalog + markup (platform admin)", () => {
   it("sets a global markup applied to every model, and toggles models", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

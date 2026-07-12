@@ -76,6 +76,30 @@ export const FREE_ENTITLEMENTS: Entitlements = {
   aiCredits: { monthlyGrant: 0 },
 };
 
+/** The full key sets, derived from the baseline — new keys auto-appear in the
+ *  admin plan builder and resolve everywhere without extra wiring. */
+export const QUOTA_KEYS = Object.keys(FREE_ENTITLEMENTS.quotas) as (keyof Quotas)[];
+export const FEATURE_KEYS = Object.keys(FREE_ENTITLEMENTS.features) as (keyof Features)[];
+
+/** Human labels for the admin UI; unknown/new keys fall back to the raw key. */
+export const FEATURE_META: Record<string, { label: string; hint: string }> = {
+  commerce: { label: "Commerce", hint: "Sell packages via Stripe Connect" },
+  aiSuite: { label: "AI suite", hint: "AI drafting, coach notes, vision & image" },
+  bfCamera: { label: "Body-fat camera", hint: "Camera body-fat estimator" },
+  externalSearch: { label: "External food search", hint: "USDA / Nutritionix / FatSecret providers" },
+  supplementsLabs: { label: "Supplements & labs", hint: "Supplement tracking + lab tests" },
+  frontDesk: { label: "Front desk", hint: "Assistant role + sessions / booking" },
+  branding: { label: "White-label branding", hint: "Login skin, accent, public blog" },
+  integrations: { label: "Integrations", hint: "API / webhooks + data exports" },
+  chat: { label: "Chat", hint: "Trainer ↔ client messaging" },
+};
+export const QUOTA_META: Record<string, { label: string; hint: string; unit?: string }> = {
+  staffSeats: { label: "Staff seats", hint: "Owner + trainers + assistants", unit: "seats" },
+  activeClients: { label: "Active clients", hint: "Non-archived client records" },
+  templates: { label: "Templates", hint: "Workout + meal templates combined" },
+  storageMb: { label: "Storage", hint: "Media budget", unit: "MB" },
+};
+
 /** Deep-ish merge of a stored (possibly partial) blob onto the free baseline. */
 export function resolveEntitlements(json: string | null | undefined): Entitlements {
   if (!json) return FREE_ENTITLEMENTS;
@@ -92,10 +116,25 @@ export function resolveEntitlements(json: string | null | undefined): Entitlemen
   };
 }
 
+/** A grant/override blob — a deep-partial of Entitlements (raise/enable only). */
+export interface EntitlementGrants {
+  quotas?: Partial<Quotas>;
+  features?: Partial<Features>;
+  aiCredits?: { monthlyGrant: number };
+}
+
+/** Raise a quota by an override — unlimited (-1) always wins, else the max.
+ *  Overrides can only lift a ceiling, never lower it. */
+export function raiseQuota(base: number, over: number): number {
+  if (base < 0 || over < 0) return -1;
+  return Math.max(base, over);
+}
+
 /**
- * Layer a per-tenant override blob (a partial Entitlements) on top of the
- * plan's resolved entitlements — an admin "gift": extra seats, an unlocked
- * feature, a bigger grant. Only keys present in the override win.
+ * Layer a per-tenant override blob on top of the plan's resolved entitlements —
+ * an admin "gift". GRANT-ONLY: an override can raise a quota, enable a feature,
+ * or increase the credit grant, but it can NEVER lower a limit or disable a
+ * feature. So gifting is always safe and downgrades never bite a tenant.
  */
 export function mergeOverrides(base: Entitlements, json: string | null | undefined): Entitlements {
   if (!json) return base;
@@ -105,11 +144,53 @@ export function mergeOverrides(base: Entitlements, json: string | null | undefin
   } catch {
     return base;
   }
-  return {
-    quotas: { ...base.quotas, ...(o.quotas ?? {}) },
-    features: { ...base.features, ...(o.features ?? {}) },
-    aiCredits: { ...base.aiCredits, ...(o.aiCredits ?? {}) },
-  };
+  const quotas = { ...base.quotas };
+  for (const k of QUOTA_KEYS) {
+    const ov = o.quotas?.[k];
+    if (typeof ov === "number") quotas[k] = raiseQuota(base.quotas[k], ov);
+  }
+  const features = { ...base.features };
+  for (const k of FEATURE_KEYS) if (o.features?.[k] === true) features[k] = true; // enable-only
+  const aiCredits = { monthlyGrant: Math.max(base.aiCredits.monthlyGrant, o.aiCredits?.monthlyGrant ?? 0) };
+  return { quotas, features, aiCredits };
+}
+
+/**
+ * When a plan is edited DOWN (a quota lowered, a feature disabled, the grant
+ * cut), this returns the partial entitlements — valued at the OLD level — that
+ * existing tenants must keep. Merge it into each affected tenant's override
+ * (via `raiseOverride`) to grandfather them; new tenants get the lower plan.
+ */
+export function snapshotDowngrade(oldE: Entitlements, newE: Entitlements): EntitlementGrants {
+  const quotas: Partial<Quotas> = {};
+  for (const k of QUOTA_KEYS) {
+    const o = oldE.quotas[k], n = newE.quotas[k];
+    const decreased = (o < 0 && n >= 0) || (o >= 0 && n >= 0 && n < o);
+    if (decreased) quotas[k] = o;
+  }
+  const features: Partial<Features> = {};
+  for (const k of FEATURE_KEYS) if (oldE.features[k] && !newE.features[k]) features[k] = true;
+  const out: EntitlementGrants = {};
+  if (Object.keys(quotas).length) out.quotas = quotas;
+  if (Object.keys(features).length) out.features = features;
+  if (newE.aiCredits.monthlyGrant < oldE.aiCredits.monthlyGrant) out.aiCredits = { monthlyGrant: oldE.aiCredits.monthlyGrant };
+  return out;
+}
+
+/** Merge grants into an existing override blob, grant-only (raise/enable),
+ *  returning the new override JSON. Used to grandfather + to gift. */
+export function raiseOverride(json: string | null | undefined, grants: EntitlementGrants): string {
+  let cur: Partial<Entitlements> = {};
+  try { if (json) cur = JSON.parse(json) as Partial<Entitlements>; } catch { cur = {}; }
+  const quotas: Record<string, number> = { ...(cur.quotas ?? {}) };
+  for (const [k, v] of Object.entries(grants.quotas ?? {})) {
+    if (typeof v !== "number") continue;
+    quotas[k] = typeof quotas[k] === "number" ? raiseQuota(quotas[k]!, v) : v;
+  }
+  const features: Record<string, boolean> = { ...(cur.features ?? {}) };
+  for (const [k, v] of Object.entries(grants.features ?? {})) if (v) features[k] = true;
+  const aiCredits = { monthlyGrant: Math.max(cur.aiCredits?.monthlyGrant ?? 0, grants.aiCredits?.monthlyGrant ?? 0) };
+  return JSON.stringify({ quotas, features, aiCredits });
 }
 
 /** A tenant's current resource usage, gathered for a downgrade check. */
