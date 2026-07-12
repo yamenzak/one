@@ -245,6 +245,29 @@ describe("AI config (per-tenant model / prompt / tone / enable)", () => {
   });
 });
 
+describe("AI model catalog + markup (platform admin)", () => {
+  it("sets a global markup applied to every model, and toggles models", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const cfg1 = (await (await SELF.fetch("http://x/api/admin/ai/config", { headers: auth(ownerCookie) })).json()) as { markup: number; modelCount: number };
+    expect(cfg1.markup).toBe(3);
+    expect(cfg1.modelCount).toBeGreaterThanOrEqual(3);
+
+    // Raise markup — must apply to every catalog model (profit stays markup×).
+    await SELF.fetch("http://x/api/admin/ai/config", { method: "POST", headers: H, body: JSON.stringify({ markup: 5 }) });
+    const cfg2 = (await (await SELF.fetch("http://x/api/admin/ai/config", { headers: auth(ownerCookie) })).json()) as { markup: number };
+    expect(cfg2.markup).toBe(5);
+    const list = (await (await SELF.fetch("http://x/api/admin/ai/models", { headers: auth(ownerCookie) })).json()) as { models: { id: string; markup: number; enabled: number }[] };
+    expect(list.models.length).toBeGreaterThan(0);
+    expect(list.models.every((m) => m.markup === 5)).toBe(true);
+
+    // Disable a model, then it reads back disabled in the full catalog.
+    const id = list.models[0]!.id;
+    await SELF.fetch(`http://x/api/admin/ai/models/${encodeURIComponent(id)}`, { method: "PATCH", headers: H, body: JSON.stringify({ enabled: false }) });
+    const list2 = (await (await SELF.fetch("http://x/api/admin/ai/models", { headers: auth(ownerCookie) })).json()) as { models: { id: string; enabled: number }[] };
+    expect(list2.models.find((m) => m.id === id)!.enabled).toBe(0);
+  });
+});
+
 describe("AI meal draft — food import from the library", () => {
   it("resolves drafted food queries to real library food ids", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

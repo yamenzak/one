@@ -11,9 +11,10 @@ import { resolveUnits } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { tenantEntitlements, getConfig, setConfig } from "./billing-store.js";
-import { generate, extractJson } from "./ai.js";
+import { generate, extractJson, listModels } from "./ai.js";
 import { buildClientContext } from "./ai-context.js";
 import { featureDef } from "./ai-features.js";
+import { parseWorkersAiPricing, parseGeminiPricing } from "./ai-pricing.js";
 import { parseJson } from "./db.js";
 
 const SURFACE_FOCUS: Record<string, string> = {
@@ -591,21 +592,101 @@ export const aiRoutes = new Hono<AppEnv>()
     return c.json({ ok: true });
   });
 
-// ── Platform admin: AI provider config (Gemini key + mock mode) ──────────────
+// ── Platform admin: AI provider config, markup + the model catalog ───────────
+const DEFAULT_MARKUP = 3;
+const globalMarkup = (cfg: Record<string, string>): number => { const n = Number(cfg["ai.markup"]); return n >= 1 && n <= 100 ? n : DEFAULT_MARKUP; };
+
 export const aiAdminRoutes = new Hono<AppEnv>()
   .get("/admin/ai/config", async (c) => {
     if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
     const cfg = await getConfig(c.env.DB);
+    const models = await listModels(c.env.DB);
     // Never echo the key — only whether it's set.
-    return c.json({ geminiKeySet: !!cfg["google.gemini_key"], mockMode: cfg["ai.mock"] ?? "auto" });
+    return c.json({ geminiKeySet: !!cfg["google.gemini_key"], mockMode: cfg["ai.mock"] ?? "auto", markup: globalMarkup(cfg), modelCount: models.length });
   })
   .post("/admin/ai/config", async (c) => {
     if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
     const d = z
-      .object({ geminiKey: z.string().min(1).optional(), mockMode: z.enum(["auto", "on", "off"]).optional() })
+      .object({ geminiKey: z.string().min(1).optional(), mockMode: z.enum(["auto", "on", "off"]).optional(), markup: z.number().min(1).max(100).optional() })
       .safeParse(await c.req.json().catch(() => null));
     if (!d.success) return c.json({ error: "invalid body" }, 400);
     if (d.data.geminiKey) await setConfig(c.env.DB, "google.gemini_key", d.data.geminiKey.trim());
     if (d.data.mockMode) await setConfig(c.env.DB, "ai.mock", d.data.mockMode);
+    // Setting the global markup applies it to every model in the catalog so
+    // credit charges stay markup × real provider cost across the board.
+    if (d.data.markup !== undefined) {
+      await setConfig(c.env.DB, "ai.markup", String(d.data.markup));
+      await c.env.DB.prepare("UPDATE ai_models SET markup = ?").bind(d.data.markup).run();
+    }
     return c.json({ ok: true });
+  })
+
+  /** The full model catalog (platform admin) — includes disabled models. */
+  .get("/admin/ai/models", async (c) => {
+    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    const { seedAiModels } = await import("./ai.js");
+    await seedAiModels(c.env.DB);
+    const rows = await c.env.DB.prepare("SELECT * FROM ai_models ORDER BY provider, task, label").all();
+    return c.json({ models: rows.results ?? [] });
+  })
+
+  /** Toggle / default / per-model markup override. */
+  .patch("/admin/ai/models/:id", async (c) => {
+    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    const d = z.object({ enabled: z.boolean().optional(), isDefault: z.boolean().optional(), markup: z.number().min(1).max(100).optional() }).safeParse(await c.req.json().catch(() => null));
+    if (!d.success) return c.json({ error: "invalid body" }, 400);
+    const id = c.req.param("id");
+    // Making a model the default for its task clears the previous default.
+    if (d.data.isDefault) {
+      const row = await c.env.DB.prepare("SELECT task FROM ai_models WHERE id = ?").bind(id).first<{ task: string }>();
+      if (row) await c.env.DB.prepare("UPDATE ai_models SET is_default = 0 WHERE task = ?").bind(row.task).run();
+    }
+    const sets: string[] = [], binds: unknown[] = [];
+    if (d.data.enabled !== undefined) (sets.push("enabled = ?"), binds.push(d.data.enabled ? 1 : 0));
+    if (d.data.isDefault !== undefined) (sets.push("is_default = ?"), binds.push(d.data.isDefault ? 1 : 0));
+    if (d.data.markup !== undefined) (sets.push("markup = ?"), binds.push(d.data.markup));
+    if (sets.length) await c.env.DB.prepare(`UPDATE ai_models SET ${sets.join(", ")} WHERE id = ?`).bind(...binds, id).run();
+    return c.json({ ok: true });
+  })
+
+  /**
+   * Refresh the catalog from the official pricing docs (Cloudflare Workers AI +
+   * Google Gemini). Parses neuron-equivalent rates so every model bills through
+   * the same credit math; preserves enable/default/markup on existing rows.
+   */
+  .post("/admin/ai/models/sync", async (c) => {
+    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    const cfg = await getConfig(c.env.DB);
+    const markup = globalMarkup(cfg);
+    const errors: string[] = [];
+    const fetchMd = async (url: string): Promise<string | null> => {
+      try { const r = await fetch(url, { headers: { accept: "text/markdown" } }); return r.ok ? await r.text() : (errors.push(`${url}: ${r.status}`), null); }
+      catch (e) { errors.push(`${url}: ${String(e)}`); return null; }
+    };
+    const [cfMd, gemMd] = await Promise.all([
+      fetchMd("https://developers.cloudflare.com/workers-ai/platform/pricing/index.md"),
+      fetchMd("https://ai.google.dev/gemini-api/docs/pricing.md.txt"),
+    ]);
+    const seeds = [
+      ...(cfMd ? parseWorkersAiPricing(cfMd) : []),
+      ...(gemMd ? parseGeminiPricing(gemMd) : []),
+    ];
+    if (seeds.length === 0) return c.json({ error: "no models parsed", errors }, 502);
+    // Upsert: refresh rates/label/task/provider; preserve enabled/default/markup
+    // on existing rows, new rows inherit the global markup and land enabled.
+    await c.env.DB.batch(seeds.map((m) =>
+      c.env.DB.prepare(
+        `INSERT INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0)
+         ON CONFLICT(id) DO UPDATE SET task = excluded.task, label = excluded.label, provider = excluded.provider,
+           input_rate = excluded.input_rate, output_rate = excluded.output_rate, unit_rate = excluded.unit_rate, unit_kind = excluded.unit_kind`,
+      ).bind(m.id, m.task, m.label, m.provider, m.inputRate, m.outputRate, m.unitRate, m.unitKind, markup),
+    ));
+    // Guarantee a default per text/text-small/vision task (cheapest output).
+    for (const task of ["text", "text-small", "vision"]) {
+      const has = await c.env.DB.prepare("SELECT 1 x FROM ai_models WHERE task = ? AND enabled = 1 AND is_default = 1").bind(task).first();
+      if (!has) await c.env.DB.prepare("UPDATE ai_models SET is_default = 1 WHERE id = (SELECT id FROM ai_models WHERE task = ? AND enabled = 1 ORDER BY output_rate ASC LIMIT 1)").bind(task).run();
+    }
+    const total = (await listModels(c.env.DB)).length;
+    return c.json({ ok: true, parsed: seeds.length, total, errors });
   });
