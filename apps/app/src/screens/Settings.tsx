@@ -86,7 +86,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
         </Stagger>
       )}
 
-      {isOwner && (
+      {canBrand && (
         <Stagger>
           <DomainSection />
         </Stagger>

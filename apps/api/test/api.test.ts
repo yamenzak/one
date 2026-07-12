@@ -74,6 +74,15 @@ beforeAll(async () => {
     .run();
   ownerCookie = await signInFlow("owner1@test.dev", "Studio One");
   otherCookie = await signInFlow("owner2@test.dev", "Studio Two");
+  // Put Studio One on the top plan so feature/quota gates (commerce, frontDesk,
+  // supplementsLabs, branding, active-client capacity) are open for the suites
+  // that exercise those surfaces. Studio Two stays on free to prove the gates.
+  const owner1Ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+  await SELF.fetch(`http://x/api/admin/tenants/${owner1Ctx.active.tenantId}/plan`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...auth(ownerCookie) },
+    body: JSON.stringify({ planId: "team" }),
+  });
 });
 
 describe("health + public lanes", () => {
@@ -124,15 +133,16 @@ describe("clients + tenant isolation", () => {
 
 describe("credits + AI metering", () => {
   it("free plan blocks the AI suite (403)", async () => {
+    // Studio Two stays on the free plan, which excludes the AI suite.
     const clientRes = await SELF.fetch("http://x/api/clients", {
       method: "POST",
-      headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      headers: { "content-type": "application/json", ...auth(otherCookie) },
       body: JSON.stringify({ displayName: "AITest" }),
     });
     const { client } = (await clientRes.json()) as { client: { id: string } };
     const res = await SELF.fetch("http://x/api/ai/parse-food", {
       method: "POST",
-      headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      headers: { "content-type": "application/json", ...auth(otherCookie) },
       body: JSON.stringify({ clientId: client.id, text: "eggs and toast" }),
     });
     expect(res.status).toBe(403);
@@ -300,6 +310,55 @@ describe("entitlement plan builder + grandfathering", () => {
     await SELF.fetch(`http://x/api/admin/tenants/${t2}/overrides`, { method: "PATCH", headers: H, body: JSON.stringify({ grants: { quotas: { activeClients: 10 } } }) });
     const g2 = (await (await SELF.fetch(`http://x/api/admin/tenants/${t2}/entitlements`, { headers: auth(ownerCookie) })).json()) as { effective: { quotas: Record<string, number> } };
     expect(g2.effective.quotas.activeClients).toBe(500);
+  });
+});
+
+describe("capability gates enforce plan features + quotas", () => {
+  // Studio Two = free plan. Build headers inside each test — `otherCookie` is
+  // only assigned in beforeAll, after the describe body has been collected.
+  const H = () => ({ "content-type": "application/json", ...auth(otherCookie) });
+
+  it("free plan blocks commerce + supplements/labs at write time", async () => {
+    // Commerce package creation is gated behind features.commerce.
+    const pkg = await SELF.fetch("http://x/api/packages", {
+      method: "POST", headers: H(),
+      body: JSON.stringify({ name: "30-day", budgets: [{ feature: "all", days: 30 }] }),
+    });
+    expect(pkg.status).toBe(403);
+
+    // Labs are gated behind features.supplementsLabs.
+    const { client } = (await (await SELF.fetch("http://x/api/clients", {
+      method: "POST", headers: H(), body: JSON.stringify({ displayName: "GateTest" }),
+    })).json()) as { client: { id: string } };
+    const lab = await SELF.fetch("http://x/api/labs", {
+      method: "POST", headers: H(), body: JSON.stringify({ clientId: client.id, type: "blood_panel" }),
+    });
+    expect(lab.status).toBe(403);
+  });
+
+  it("free plan blocks adding clients past the activeClients ceiling (3)", async () => {
+    const mk = (n: string) => SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: n }) });
+    expect((await mk("C1")).status).toBe(201);
+    expect((await mk("C2")).status).toBe(201);
+    expect((await mk("C3")).status).toBe(201);
+    const over = await mk("C4"); // free cap is 3
+    expect(over.status).toBe(403);
+    expect((await over.json() as { limit: number }).limit).toBe(3);
+  });
+
+  it("a gifted feature opens the gate for that tenant", async () => {
+    const t = (await (await SELF.fetch("http://x/api/context", { headers: auth(otherCookie) })).json() as { active: { tenantId: string } }).active.tenantId;
+    // Gift commerce (grant-only override) — admin lane (ownerCookie is admin in test env).
+    await SELF.fetch(`http://x/api/admin/tenants/${t}/overrides`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ grants: { features: { commerce: true } } }),
+    });
+    const pkg = await SELF.fetch("http://x/api/packages", {
+      method: "POST", headers: H(),
+      body: JSON.stringify({ name: "Gifted", budgets: [{ feature: "all", days: 30 }] }),
+    });
+    expect(pkg.status).toBe(201);
   });
 });
 

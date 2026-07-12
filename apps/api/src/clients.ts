@@ -11,6 +11,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { type AppEnv, type AppContext, requireTenant } from "./auth-context.js";
+import { withinQuota } from "./billing-store.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
 
@@ -180,6 +181,13 @@ export const clientRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const body = CreateClient.safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
+    // Active-client capacity gate: block adding past the plan ceiling (gifts
+    // and grandfathering raise it automatically; -1 = unlimited).
+    const active = await c.env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ? AND status != 'archived'",
+    ).bind(who.tenantId).first<{ n: number }>();
+    const cap = await withinQuota(c.env.DB, who.tenantId, "activeClients", active?.n ?? 0);
+    if (!cap.ok) return c.json({ error: "active client limit reached", limit: cap.max }, 403);
     const id = newId("cli");
     await c.env.DB.prepare(
       `INSERT INTO clients (id, tenant_id, display_name, email, gender, date_of_birth, height_cm, timezone, created_at)

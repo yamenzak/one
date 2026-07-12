@@ -196,6 +196,31 @@ export async function tenantEntitlements(db: D1Database, tenantId: string): Prom
   return mergeOverrides(resolveEntitlements(plan?.entitlements_json), sub.overrides_json);
 }
 
+/** True when the tenant's plan (or a gift) includes `feature`. The single gate
+ *  helper every capability route calls — keeps the 403 shape uniform. */
+export async function hasFeature(
+  db: D1Database,
+  tenantId: string,
+  feature: keyof Entitlements["features"],
+): Promise<boolean> {
+  const ent = await tenantEntitlements(db, tenantId);
+  return ent.features[feature];
+}
+
+/** Count of a tenant's usage against a quota ceiling. `-1` ceilings are
+ *  unlimited; returns whether one more of `resource` is allowed. */
+export async function withinQuota(
+  db: D1Database,
+  tenantId: string,
+  quota: keyof Entitlements["quotas"],
+  currentCount: number,
+): Promise<{ ok: boolean; max: number }> {
+  const ent = await tenantEntitlements(db, tenantId);
+  const max = ent.quotas[quota];
+  if (max < 0) return { ok: true, max }; // unlimited
+  return { ok: currentCount < max, max };
+}
+
 /** Append-only D1 mirror of the DO ledger (invoices/history). */
 export async function appendLedger(
   db: D1Database,

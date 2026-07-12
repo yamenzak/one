@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
 import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SubCard, Chip, Page, Stagger, IconBadge, EmptyState, PhotoGrid, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon } from "@mossa/ui";
 import { api } from "../../api.js";
+import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
 import { checkInPhotos } from "../client/WellnessDetails.js";
@@ -22,6 +23,8 @@ interface Supp { id: string; name: string; dose: string | null; kind: string; st
 interface CheckIn { id: string; date_local: string; mood: number | null; energy: number | null; stress: number | null; sleep_hours: number | null; weight_kg: number | null; steps_count: number | null; notes: string | null; photos_json: string | null; trainer_feedback: string | null }
 
 export function ClientManage({ clientId }: { clientId: string }) {
+  const { ctx } = useSession();
+  const canSuppLabs = !!ctx?.entitlements?.features?.supplementsLabs;
   const [subs, setSubs] = useState<Sub[] | null>(null);
   const [packages, setPackages] = useState<Pkg[]>([]);
   const [swaps, setSwaps] = useState<Swap[]>([]);
@@ -87,6 +90,7 @@ export function ClientManage({ clientId }: { clientId: string }) {
         <CheckInReview clientId={clientId} checkIns={checkIns} onFeedback={load} />
       </Stagger>
 
+      {canSuppLabs && (
       <Stagger>
         <Card className="space-y-3">
           <div className="flex items-center justify-between">
@@ -113,7 +117,9 @@ export function ClientManage({ clientId }: { clientId: string }) {
           ))}
         </Card>
       </Stagger>
+      )}
 
+      {canSuppLabs && (
       <Stagger>
         <Card className="space-y-3">
           <div className="flex items-center justify-between">
@@ -128,6 +134,7 @@ export function ClientManage({ clientId }: { clientId: string }) {
           ))}
         </Card>
       </Stagger>
+      )}
 
       <Sheet open={grantOpen} onClose={() => setGrantOpen(false)} title="Grant a package">
         <div className="space-y-2">

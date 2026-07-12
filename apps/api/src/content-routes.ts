@@ -8,6 +8,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { type AppEnv, requireTenant } from "./auth-context.js";
+import { hasFeature } from "./billing-store.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
 
@@ -108,6 +109,10 @@ export const contentHubRoutes = new Hono<AppEnv>()
     const parsed = ResourceBody.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body", issues: parsed.error.issues }, 400);
     const d = parsed.data;
+    // Public (marketplace-SEO) content is a white-label capability; other
+    // audiences (clients / assigned) are available on every plan.
+    if (d.audience === "public" && !(await hasFeature(c.env.DB, who.tenantId, "branding")))
+      return c.json({ error: "public content requires the branding plan feature" }, 403);
     const id = newId("res");
     await c.env.DB.prepare(
       `INSERT INTO resources (id, tenant_id, type, title, summary, body_md, cover_url, topics, muscle_groups, duration_minutes, audience, assigned_json, status, author_user_id, created_at, updated_at)
@@ -135,6 +140,8 @@ export const contentHubRoutes = new Hono<AppEnv>()
     if (d.topics) put("topics", d.topics.join(","));
     if (d.muscleGroups) put("muscle_groups", d.muscleGroups.join(","));
     if (d.durationMinutes !== undefined) put("duration_minutes", d.durationMinutes);
+    if (d.audience === "public" && !(await hasFeature(c.env.DB, who.tenantId, "branding")))
+      return c.json({ error: "public content requires the branding plan feature" }, 403);
     if (d.audience) put("audience", d.audience);
     if (d.assignedClientIds) put("assigned_json", j(d.assignedClientIds));
     put("updated_at", nowIso());

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card, Badge, Skeleton, StatCard, SegmentedControl, Page, Stagger, Sparkles, CreditCard } from "@mossa/ui";
 import { api } from "../../api.js";
+import { useSession } from "../../session.js";
 import { Staff } from "./Staff.js";
 import { Packages } from "./Packages.js";
 
@@ -11,13 +12,22 @@ interface AiUsage { usage: { feature: string; calls: number; credits: number }[]
 type Tab = "overview" | "packages" | "staff";
 
 export function Business() {
+  const { ctx } = useSession();
+  const canSell = !!ctx?.entitlements?.features?.commerce; // packages = the commerce feature
   const [tab, setTab] = useState<Tab>("overview");
+  // If a plan change dropped commerce, don't strand the user on a hidden tab.
+  const activeTab = tab === "packages" && !canSell ? "overview" : tab;
+  const options: { value: Tab; label: string }[] = [
+    { value: "overview", label: "Overview" },
+    ...(canSell ? [{ value: "packages" as Tab, label: "Packages" }] : []),
+    { value: "staff", label: "Staff" },
+  ];
   return (
     <div>
-      <div className="mx-auto max-w-xl p-4 pb-0"><SegmentedControl options={[{ value: "overview", label: "Overview" }, { value: "packages", label: "Packages" }, { value: "staff", label: "Staff" }]} value={tab} onChange={setTab} /></div>
-      {tab === "overview" && <Overview />}
-      {tab === "packages" && <Packages />}
-      {tab === "staff" && <Staff />}
+      <div className="mx-auto max-w-xl p-4 pb-0"><SegmentedControl options={options} value={activeTab} onChange={(v) => setTab(v as Tab)} /></div>
+      {activeTab === "overview" && <Overview />}
+      {activeTab === "packages" && <Packages />}
+      {activeTab === "staff" && <Staff />}
     </div>
   );
 }

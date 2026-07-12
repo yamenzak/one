@@ -9,7 +9,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { resolveEntitlements, buildBudgetsForPurchase, mergeAddOnBalances, type Budget } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
-import { getSubscription, listPacks, listPlans, seedBilling } from "./billing-store.js";
+import { getSubscription, listPacks, listPlans, seedBilling, hasFeature } from "./billing-store.js";
 import { requireClientAccess } from "./clients.js";
 import {
   ensureCustomer,
@@ -89,6 +89,7 @@ export const stripeRoutes = new Hono<AppEnv>()
   .post("/connect/onboard", async (c) => {
     const who = requireTenant(c)!;
     if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
+    if (!(await hasFeature(c.env.DB, who.tenantId, "commerce"))) return c.json({ error: "commerce not in your plan" }, 403);
     const cfg = await stripeConfig(c.env.DB);
     if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
     const body = z.object({ returnUrl: z.string().url() }).safeParse(await c.req.json().catch(() => null));
