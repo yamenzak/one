@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { currentStreak, fmtVolume, fmtEnergy, kcalToDisplay, kgToDisplay, weightLabel, energyLabel, type UnitPrefs } from "@mossa/domain";
-import { Chip, Button, IconBadge, ProgressRing, Timer, Flame, Droplet, Droplets, Wheat, Beef, Dumbbell, FlaskConical, Weight, Pill } from "@mossa/ui";
+import { Chip, Button, IconBadge, ProgressRing, Timer, Flame, Droplet, Droplets, Wheat, Beef, Dumbbell, FlaskConical, Weight, Pill, HeartPulse } from "@mossa/ui";
 import { api } from "../../api.js";
 import { RingCard, MiniCard, type WidgetDef, type WidgetSize } from "../widget-kit.js";
 import type { TodayBundle } from "./Today.js";
@@ -34,6 +34,11 @@ function weightDelta(series: { kg: number; date: string }[] | undefined, units: 
 }
 
 export const CLIENT_WIDGETS: WidgetDef<ClientWidgetData>[] = [
+  {
+    id: "wellness", title: "Wellness Score", icon: HeartPulse,
+    renderBig: (d) => <WellnessWidget clientId={d.clientId} date={d.bundle.date} size="big" />,
+    renderSmall: (d) => <WellnessWidget clientId={d.clientId} date={d.bundle.date} size="small" />,
+  },
   {
     id: "calories", title: "Calories", icon: Flame,
     renderBig: (d) => { const t = d.bundle.goal?.targets?.targetCalories ?? 0; const net = d.bundle.nutrition.calories - d.bundle.burnedKcal; return <RingCard tone="calories" progress={t > 0 ? net / t : 0.001} value={kcalToDisplay(Math.max(0, net), d.units).toLocaleString()} label={d.units.energy === "kJ" ? "Energy" : "Calories"} sublabel={t > 0 ? `of ${kcalToDisplay(t, d.units).toLocaleString()} ${energyLabel(d.units)}` : "set a goal"} />; },
@@ -95,6 +100,18 @@ export const CLIENT_WIDGETS: WidgetDef<ClientWidgetData>[] = [
     renderSmall: (d) => <FastingWidget clientId={d.clientId} size="small" />,
   },
 ];
+
+// ── Wellness Score ───────────────────────────────────────────────────────────
+const BAND_LABEL: Record<string, string> = { start: "Just starting", building: "Building", solid: "Solid", strong: "Strong", peak: "Peak" };
+interface ScoreResult { score: number; band: string }
+function WellnessWidget({ clientId, date, size }: { clientId: string; date: string; size: WidgetSize }) {
+  const [res, setRes] = useState<ScoreResult | null>(null);
+  useEffect(() => { void api.get<ScoreResult>(`/api/wellness/score?clientId=${clientId}&today=${date}`).then(setRes).catch(() => setRes({ score: 0, band: "start" })); }, [clientId, date]);
+  if (!res) return <div className="h-full animate-pulse rounded-2xl bg-surface-2" />;
+  return size === "big"
+    ? <RingCard tone="primary" progress={res.score / 100 || 0.001} value={res.score} label="Wellness" sublabel={BAND_LABEL[res.band] ?? "this week"} />
+    : <MiniCard icon={HeartPulse} tone="primary" label="Wellness" value={res.score} progress={res.score / 100} />;
+}
 
 // ── Live fasting tracker ─────────────────────────────────────────────────────
 const ZONES = [
