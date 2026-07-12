@@ -11,6 +11,7 @@ import { Button, Field, Sheet, Chip, cn, toneSoft, METRICS, Utensils, Barcode, C
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
+import { AiAnalyzing } from "../../AiAnalyzing.js";
 
 export interface EditableFood {
   id?: string;
@@ -141,8 +142,10 @@ export function FoodEditor({
   };
 
   return (
-    <Sheet open onClose={onClose} title={title ?? (foodId ? "Edit food" : "Add a food")}>
-      {loading ? (
+    <Sheet open onClose={onClose} title={scanning ? "Reading the label…" : title ?? (foodId ? "Edit food" : "Add a food")}>
+      {scanning ? (
+        <AiAnalyzing label="Reading the label" sub="Pulling serving size and macros…" />
+      ) : loading ? (
         <div className="h-40 animate-pulse rounded-2xl bg-surface-2" />
       ) : (
         <div className="space-y-4">

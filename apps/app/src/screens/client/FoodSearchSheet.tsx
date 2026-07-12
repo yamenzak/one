@@ -10,6 +10,7 @@ import { api, todayLocal } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { AiAvatar } from "../../AiAvatar.js";
+import { AiAnalyzing } from "../../AiAnalyzing.js";
 import { AiErrorBox } from "../../AiError.js";
 import { BarcodeScanner } from "./BarcodeScanner.js";
 import { FoodEditor, type EditableFood } from "./FoodEditor.js";
@@ -148,6 +149,14 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
     }
     setSnap(null); onLogged?.(); onClose();
   };
+
+  if (aiBusy && !snap) {
+    return (
+      <Sheet open onClose={onClose} title="Reading your plate…">
+        <AiAnalyzing label="Analyzing your meal" sub="Spotting foods and estimating macros…" />
+      </Sheet>
+    );
+  }
 
   if (snap) {
     return (
