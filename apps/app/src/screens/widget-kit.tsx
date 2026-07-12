@@ -83,7 +83,7 @@ export function WidgetCarousel<D>({ catalog, items, defaults, data, onCustomize 
   }
   return (
     <div className="space-y-2.5">
-      <div ref={ref} onScroll={onScroll} className="flex touch-pan-y snap-x snap-mandatory overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div ref={ref} onScroll={onScroll} className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {pages.map((cols, pi) => (
           <div key={pi} className="grid w-full shrink-0 snap-center snap-always grid-cols-2 grid-rows-3 gap-2.5" style={{ height: HERO_H }}>
             {cols.flatMap((col, ci) =>
