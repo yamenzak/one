@@ -1,13 +1,16 @@
 /** Coach Today — triage inbox: roster pulse + recent notifications. */
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fmtWeight } from "@mossa/domain";
-import { Card, Skeleton, ProgressRing, MetricPill, InsightCard, Badge, Page, Stagger, EmptyState, IconBadge, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, ChevronRight, type Tone, type LucideIcon } from "@mossa/ui";
+import { Card, Skeleton, ProgressRing, InsightCard, Badge, Button, Page, Stagger, EmptyState, IconBadge, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Sliders, ChevronRight, type Tone, type LucideIcon } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
+import { useSession } from "../../session.js";
 import type { UnitPrefs } from "@mossa/domain";
 import type { ClientSummary } from "./Clients.js";
+import { WidgetCustomizeSheet, resolveWidgets } from "../widget-kit.js";
+import { COACH_WIDGETS, DEFAULT_COACH_WIDGETS, type CoachWidgetData } from "./CoachWidgets.js";
 
 interface Notification { id: string; type: string; title: string; message: string; created_at: string; read: number }
 interface AtRisk { clientId: string; name: string; daysSinceLog: number | null; reason: string }
@@ -26,11 +29,19 @@ const ROSTER_META: Record<string, { icon: LucideIcon; tone: Tone }> = {
 export function CoachToday() {
   const nav = useNavigate();
   const units = useUnits();
+  const { ctx, refresh } = useSession();
   const [clients, setClients] = useState<ClientSummary[] | null>(null);
   const [notifications, setNotifications] = useState<Notification[] | null>(null);
   const [atRisk, setAtRisk] = useState<AtRisk[]>([]);
   const [swaps, setSwaps] = useState<PendingSwap[]>([]);
   const [activity, setActivity] = useState<RosterEvent[]>([]);
+  const [widgetsOpen, setWidgetsOpen] = useState(false);
+  const [widgetIds, setWidgetIds] = useState<string[] | null>(ctx?.user.widgets?.coachHome ?? null);
+  const saveWidgets = async (ids: string[]) => {
+    setWidgetIds(ids);
+    await api.patch("/api/me/widgets", { surface: "coachHome", ids }).catch(() => undefined);
+    void refresh();
+  };
 
   useEffect(() => {
     void api.get<{ clients: ClientSummary[] }>("/api/clients").then((r) => setClients(r.clients));
@@ -45,17 +56,36 @@ export function CoachToday() {
   const activated = clients.filter((c) => c.hasLogin).length;
   const unread = notifications.filter((n) => !n.read);
   const nameOf = (id: string) => clients.find((c) => c.id === id)?.displayName ?? "A client";
+  const today = todayLocal();
+  const widgetData: CoachWidgetData = {
+    clientsTotal: clients.length,
+    clientsActive: activated,
+    swaps: swaps.length,
+    atRisk: atRisk.length,
+    unreadCheckins: unread.filter((n) => n.type === "check_in").length,
+    unread: unread.length,
+    activeToday: new Set(activity.filter((e) => e.date === today).map((e) => e.clientId)).size,
+    logsToday: activity.filter((e) => e.date === today).length,
+    labsToReview: unread.filter((n) => n.type === "lab_uploaded").length,
+  };
+  const widgets = resolveWidgets(COACH_WIDGETS, widgetIds, DEFAULT_COACH_WIDGETS, widgetData);
 
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       <Stagger className="flex items-center gap-4">
-        <ProgressRing progress={clients.length > 0 ? activated / clients.length : 0.001} size={188} tone="activity" label="Clients" value={clients.length} sublabel={`${activated} active`} />
-        <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-          <MetricPill icon={ArrowLeftRight} label="Swaps" tone="cardio" value={swaps.length} />
-          <MetricPill icon={ClipboardList} label="Check-ins" tone="nutrition" value={unread.filter((n) => n.type === "check_in").length} />
-          <MetricPill icon={AlertTriangle} label="At risk" tone="sleep" value={atRisk.length} />
+        <ProgressRing progress={clients.length > 0 ? activated / clients.length : 0.001} size={150} tone="activity" label="Clients" value={clients.length} sublabel={`${activated} active`} />
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-semibold tracking-tight">Your roster</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">{clients.length} client{clients.length === 1 ? "" : "s"} · {activated} active</p>
+          <Button size="sm" variant="secondary" className="mt-3" onClick={() => setWidgetsOpen(true)}><Sliders /> Customize</Button>
         </div>
       </Stagger>
+
+      {widgets.length > 0 && (
+        <Stagger className="grid grid-cols-2 gap-2.5">
+          {widgets.map((w) => <Fragment key={w.id}>{w.render(widgetData)}</Fragment>)}
+        </Stagger>
+      )}
 
       {swaps.length > 0 && (
         <Stagger>
@@ -111,6 +141,8 @@ export function CoachToday() {
           ))
         )}
       </Stagger>
+
+      {widgetsOpen && <WidgetCustomizeSheet catalog={COACH_WIDGETS} selected={widgetIds} defaults={DEFAULT_COACH_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
     </Page>
   );
 }

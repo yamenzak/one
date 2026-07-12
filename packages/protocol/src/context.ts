@@ -27,8 +27,14 @@ export interface TenantBranding {
   tokens?: { light?: Record<string, string> | null; dark?: Record<string, string> | null } | null;
 }
 
+/** Per-user home-screen widget layout: ordered widget ids per surface. */
+export interface WidgetPrefs {
+  home?: string[] | null;
+  coachHome?: string[] | null;
+}
+
 export interface SessionContext {
-  user: { id: string; email: string; name: string | null; units: UnitPrefs };
+  user: { id: string; email: string; name: string | null; units: UnitPrefs; widgets: WidgetPrefs };
   /** Every (tenant, role) pair the user holds — feeds the context switcher. */
   personas: PersonaRef[];
   /** The active persona (null until one is chosen). */

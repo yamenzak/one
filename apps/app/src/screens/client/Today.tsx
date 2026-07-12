@@ -2,17 +2,20 @@
  * Client Today — hero ring + metric pills, action row, timeline feed.
  */
 
-import { useCallback, useEffect, useState } from "react";
-import { currentStreak, fmtVolume, fmtEnergy, fmtWeight, kcalToDisplay, energyLabel, weightLabel, kgToDisplay, type UnitPrefs } from "@mossa/domain";
+import { Fragment, useCallback, useEffect, useState } from "react";
+import { fmtVolume, fmtEnergy, fmtWeight, kcalToDisplay, energyLabel, type UnitPrefs } from "@mossa/domain";
 import {
   Button, Card, SubCard, Skeleton, ProgressRing, MetricPill, MacroBar, InsightCard, IconBadge, Sheet, EmptyState,
-  Page, Stagger, METRICS, toneVar, Plus, Play, PencilLine, Flame, ClipboardList, FlaskConical, History, Clock,
+  Page, Stagger, METRICS, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
   Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, Sparkles, Utensils, Croissant, Soup, Apple,
   ChevronLeft, ChevronRight, type Tone, type LucideIcon,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
+import { useSession } from "../../session.js";
 import { LogSheet } from "./LogSheet.js";
+import { WidgetCustomizeSheet, resolveWidgets } from "../widget-kit.js";
+import { CLIENT_WIDGETS, DEFAULT_CLIENT_WIDGETS, type ClientWidgetData } from "./HomeWidgets.js";
 
 export interface FeedEvent { id: string; kind: string; date: string; at: string; title: string; subtitle: string | null; metric?: { unit: "energy" | "volume" | "weight"; value: number } }
 
@@ -50,8 +53,17 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   const [feed, setFeed] = useState<FeedEvent[] | null>(null);
   const [logOpen, setLogOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [widgetsOpen, setWidgetsOpen] = useState(false);
+  const { ctx, refresh } = useSession();
+  const [widgetIds, setWidgetIds] = useState<string[] | null>(ctx?.user.widgets?.home ?? null);
   const units = useUnits();
   const date = todayLocal();
+
+  const saveWidgets = async (ids: string[]) => {
+    setWidgetIds(ids);
+    await api.patch("/api/me/widgets", { surface: "home", ids }).catch(() => undefined);
+    void refresh();
+  };
 
   const load = useCallback(async () => {
     const [bundle, hist] = await Promise.all([
@@ -76,6 +88,8 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   const calTarget = targets?.targetCalories ?? 0;
   const net = data.nutrition.calories - data.burnedKcal;
   const waterTarget = targets?.targetWaterMl ?? 2500;
+  const widgetData: ClientWidgetData = { clientId, units, bundle: data };
+  const widgets = resolveWidgets(CLIENT_WIDGETS, widgetIds, DEFAULT_CLIENT_WIDGETS, widgetData);
 
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
@@ -111,17 +125,17 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
         <Button size="lg" variant="tonal" className="flex-1" onClick={onStart} disabled={!data.publishedWorkoutPlan}>
           <Play /> Start
         </Button>
-        <Button size="icon" variant="secondary" aria-label="Customize">
+        <Button size="icon" variant="secondary" aria-label="Customize widgets" onClick={() => setWidgetsOpen(true)}>
           <PencilLine />
         </Button>
       </Stagger>
 
-      {/* Home widgets */}
-      <Stagger className="grid grid-cols-3 gap-2.5">
-        <Widget icon={METRICS.streak.icon} tone={METRICS.streak.tone} value={data.checkInDates ? currentStreak(new Set(data.checkInDates), date) : 0} label="Day streak" />
-        <Widget icon={METRICS.weight.icon} tone={METRICS.weight.tone} value={weightDelta(data.weightSeries, units)} label={`7-day ${weightLabel(units)}`} />
-        <Widget icon={FlaskConical} tone="cardio" value={data.pendingLabs ?? 0} label="Labs due" />
-      </Stagger>
+      {/* Home widgets — customizable */}
+      {widgets.length > 0 && (
+        <Stagger className="grid grid-cols-2 gap-2.5">
+          {widgets.map((w) => <Fragment key={w.id}>{w.render(widgetData)}</Fragment>)}
+        </Stagger>
+      )}
 
       {!data.checkedIn && (
         <Stagger>
@@ -160,6 +174,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
 
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} clientId={clientId} onLogged={() => void load()} />
       {historyOpen && <HistorySheet clientId={clientId} onClose={() => setHistoryOpen(false)} onOpen={onOpen} />}
+      {widgetsOpen && <WidgetCustomizeSheet catalog={CLIENT_WIDGETS} selected={widgetIds} defaults={DEFAULT_CLIENT_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
     </Page>
   );
 }
@@ -266,22 +281,3 @@ function HistorySheet({ clientId, onClose, onOpen }: { clientId: string; onClose
   );
 }
 
-function Widget({ icon: Icon, tone, value, label }: { icon: typeof Flame; tone: Tone; value: number | string; label: string }) {
-  return (
-    <Card className="flex flex-col items-center gap-1 p-3 text-center">
-      <Icon className="size-4" style={{ color: toneVar[tone] }} />
-      <div className="numeral text-xl font-semibold">{value}</div>
-      <div className="text-[0.65rem] text-muted-foreground">{label}</div>
-    </Card>
-  );
-}
-
-function weightDelta(series: { kg: number; date: string }[] | undefined, units: UnitPrefs): string {
-  if (!series || series.length < 2) return "—";
-  const last = series[series.length - 1]!;
-  const target = Date.parse(last.date) - 7 * 86400000;
-  let ref = series[0]!;
-  for (const p of series) if (Math.abs(Date.parse(p.date) - target) < Math.abs(Date.parse(ref.date) - target)) ref = p;
-  const d = Math.round((kgToDisplay(last.kg, units) - kgToDisplay(ref.kg, units)) * 10) / 10;
-  return `${d > 0 ? "+" : ""}${d}`;
-}

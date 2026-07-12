@@ -402,6 +402,21 @@ describe("weekly nutrition strip (Eat tab)", () => {
   });
 });
 
+describe("home widget prefs", () => {
+  it("persists per-surface widget layout and surfaces it on /context", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const r = await SELF.fetch("http://x/api/me/widgets", { method: "PATCH", headers: H, body: JSON.stringify({ surface: "coachHome", ids: ["swaps", "atrisk", "activeToday"] }) });
+    expect(r.status).toBe(200);
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { user: { widgets: { coachHome?: string[]; home?: string[] } } };
+    expect(ctx.user.widgets.coachHome).toEqual(["swaps", "atrisk", "activeToday"]);
+    // A second surface merges without clobbering the first.
+    await SELF.fetch("http://x/api/me/widgets", { method: "PATCH", headers: H, body: JSON.stringify({ surface: "home", ids: ["fasting", "water"] }) });
+    const ctx2 = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { user: { widgets: { coachHome?: string[]; home?: string[] } } };
+    expect(ctx2.user.widgets.home).toEqual(["fasting", "water"]);
+    expect(ctx2.user.widgets.coachHome).toEqual(["swaps", "atrisk", "activeToday"]);
+  });
+});
+
 describe("activity history feed", () => {
   it("aggregates logs across surfaces into a dated timeline, tenant-scoped", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

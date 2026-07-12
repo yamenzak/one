@@ -117,13 +117,14 @@ export const contextRoutes = new Hono<AppEnv>()
       branding = parseJson<SessionContext["branding"]>(row?.branding_json ?? null, null);
     }
 
-    const prefRow = await c.env.DB.prepare("SELECT units_json FROM user_prefs WHERE user_id = ?")
+    const prefRow = await c.env.DB.prepare("SELECT units_json, widgets_json FROM user_prefs WHERE user_id = ?")
       .bind(user.id)
-      .first<{ units_json: string | null }>();
+      .first<{ units_json: string | null; widgets_json: string | null }>();
     const units = resolveUnits(parseJson(prefRow?.units_json ?? null, null));
+    const widgets = parseJson<SessionContext["user"]["widgets"]>(prefRow?.widgets_json ?? null, {});
 
     const ctx: SessionContext = {
-      user: { id: user.id, email: user.email, name: user.name ?? null, units },
+      user: { id: user.id, email: user.email, name: user.name ?? null, units, widgets },
       personas,
       active,
       mode: "coach", // the app decides coach/train client-side; server default
@@ -214,4 +215,22 @@ export const contextRoutes = new Hono<AppEnv>()
       .bind(user.id, j(merged), now, j(merged), now)
       .run();
     return c.json({ units: merged });
+  })
+
+  // Personal home-screen widget layout (cross-tenant) — per surface.
+  .patch("/me/widgets", async (c) => {
+    const user = c.get("user");
+    if (!user) return c.json({ error: "unauthenticated" }, 401);
+    const parsed = z
+      .object({ surface: z.enum(["home", "coachHome"]), ids: z.array(z.string().max(40)).max(40) })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const row = await c.env.DB.prepare("SELECT widgets_json FROM user_prefs WHERE user_id = ?").bind(user.id).first<{ widgets_json: string | null }>();
+    const current = parseJson<Record<string, string[]>>(row?.widgets_json ?? null, {});
+    const merged = { ...current, [parsed.data.surface]: parsed.data.ids };
+    const now = nowIso();
+    await c.env.DB.prepare("INSERT INTO user_prefs (user_id, widgets_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET widgets_json = ?, updated_at = ?")
+      .bind(user.id, j(merged), now, j(merged), now)
+      .run();
+    return c.json({ widgets: merged });
   });

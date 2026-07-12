@@ -154,6 +154,8 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "ALTER TABLE foods ADD COLUMN visibility TEXT DEFAULT 'tenant'",
           // Tenant integration settings (provider enable + API keys).
           "ALTER TABLE tenant_settings ADD COLUMN integrations_json TEXT",
+          // Per-user home-screen widget layout (client + coach surfaces).
+          "ALTER TABLE user_prefs ADD COLUMN widgets_json TEXT",
         ];
         for (const sql of alters) await db.exec(sql).catch(() => undefined);
       })
