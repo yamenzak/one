@@ -32,7 +32,7 @@ async function cachedJson<T>(kv: KVNamespace, key: string, fetcher: () => Promis
 }
 
 // ── Normalized shapes ────────────────────────────────────────────────────────
-interface NormFood {
+export interface NormFood {
   name: string;
   brand: string | null;
   description: string | null;
@@ -47,7 +47,7 @@ interface NormFood {
   imageUrl: string | null;
 }
 
-interface NormExercise {
+export interface NormExercise {
   name: string;
   muscleGroups: string[];
   secondaryMuscleGroups: string[];
@@ -246,7 +246,7 @@ async function searchExerciseDb(q: string, rapidApiKey: string): Promise<NormExe
 }
 
 // ── Fan-out helpers ──────────────────────────────────────────────────────────
-async function searchFoodProviders(kv: KVNamespace, cfg: Integrations, q: string, page = 1): Promise<NormFood[]> {
+export async function searchFoodProviders(kv: KVNamespace, cfg: Integrations, q: string, page = 1): Promise<NormFood[]> {
   const tasks: Promise<NormFood[]>[] = [];
   const ql = q.toLowerCase();
   if (providerReady(cfg, "openfoodfacts")) tasks.push(cachedJson(kv, `off:search:${ql}:${page}`, () => searchOff(q, page)));
@@ -258,7 +258,7 @@ async function searchFoodProviders(kv: KVNamespace, cfg: Integrations, q: string
   return mergeFoods(settled.map((s) => (s.status === "fulfilled" ? s.value : [])));
 }
 
-async function searchExerciseProviders(kv: KVNamespace, cfg: Integrations, q: string): Promise<NormExercise[]> {
+export async function searchExerciseProviders(kv: KVNamespace, cfg: Integrations, q: string): Promise<NormExercise[]> {
   const tasks: Promise<NormExercise[]>[] = [];
   const ql = q.toLowerCase();
   if (providerReady(cfg, "wger")) tasks.push(cachedJson(kv, `wger:search:${ql}`, () => searchWger(q)));

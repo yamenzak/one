@@ -21,6 +21,8 @@ const CreateExercise = z.object({
   mechanic: z.enum(["compound", "isolation"]).nullish(),
   category: z.string().max(40).nullish(),
   instructionsMd: z.string().max(10_000).nullish(),
+  thumbUrl: z.string().max(400).nullish(),
+  videoUrl: z.string().max(400).nullish(),
   visibility: z.enum(["private", "tenant"]).default("tenant"),
 });
 
@@ -108,14 +110,14 @@ export const libraryRoutes = new Hono<AppEnv>()
     const d = parsed.data;
     const id = newId("exr");
     await c.env.DB.prepare(
-      `INSERT INTO exercises (id, tenant_id, visibility, name, slug, muscle_groups, secondary_muscle_groups, equipment, difficulty, force, mechanic, category, instructions_md, source, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'custom', ?, ?)`,
+      `INSERT INTO exercises (id, tenant_id, visibility, name, slug, muscle_groups, secondary_muscle_groups, equipment, difficulty, force, mechanic, category, instructions_md, thumb_url, video_url, source, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'custom', ?, ?)`,
     )
       .bind(
         id, who.tenantId, d.visibility, d.name, slugify(d.name),
         d.muscleGroups.join(","), d.secondaryMuscleGroups.join(","), d.equipment.join(","),
         d.difficulty ?? null, d.force ?? null, d.mechanic ?? null, d.category ?? null,
-        d.instructionsMd ?? null, who.userId, nowIso(),
+        d.instructionsMd ?? null, d.thumbUrl ?? null, d.videoUrl ?? null, who.userId, nowIso(),
       )
       .run();
     return c.json({ ok: true, id }, 201);
@@ -141,6 +143,8 @@ export const libraryRoutes = new Hono<AppEnv>()
     if (d.mechanic !== undefined) (sets.push("mechanic = ?"), binds.push(d.mechanic));
     if (d.category !== undefined) (sets.push("category = ?"), binds.push(d.category));
     if (d.instructionsMd !== undefined) (sets.push("instructions_md = ?"), binds.push(d.instructionsMd));
+    if (d.thumbUrl !== undefined) (sets.push("thumb_url = ?"), binds.push(d.thumbUrl));
+    if (d.videoUrl !== undefined) (sets.push("video_url = ?"), binds.push(d.videoUrl));
     if (d.visibility !== undefined) (sets.push("visibility = ?"), binds.push(d.visibility));
     if (sets.length === 0) return c.json({ ok: true });
     await c.env.DB.prepare(`UPDATE exercises SET ${sets.join(", ")} WHERE id = ?`)

@@ -8,6 +8,7 @@ import { useUnits } from "../../units.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { AiErrorBox } from "../../AiError.js";
 import { FoodEditor } from "../client/FoodEditor.js";
+import { ExerciseEditor } from "./ExerciseEditor.js";
 import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
 
 type Tab = "exercises" | "foods" | "templates" | "content";
@@ -26,59 +27,41 @@ export function Library() {
   );
 }
 
-type ExerciseRow = ExerciseInfo & { source?: string };
+type ExerciseRow = ExerciseInfo & { source?: string; tenant_id?: string | null };
+type ExEdit = { exerciseId?: string; initial?: Partial<ExerciseInfo> };
 function Exercises() {
   const [q, setQ] = useState("");
   const [items, setItems] = useState<ExerciseRow[] | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
+  const [editor, setEditor] = useState<ExEdit | null>(null);
   const [webOpen, setWebOpen] = useState(false);
   const [altFor, setAltFor] = useState<ExerciseRow | null>(null);
   const load = useCallback(async () => setItems((await api.get<{ exercises: ExerciseRow[] }>(`/api/exercises?q=${encodeURIComponent(q)}`)).exercises), [q]);
   useEffect(() => { const t = setTimeout(() => void load(), 200); return () => clearTimeout(t); }, [load]);
+  // Tenant-owned rows edit in place; platform seeds fork into a tenant copy.
+  const open = (e: ExerciseRow) => setEditor(e.tenant_id ? { exerciseId: e.id, initial: e } : { initial: { ...e, id: undefined } });
   return (
     <div className="space-y-3">
       <Field label="Search exercises" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="flex gap-2">
-        <Button size="sm" variant="secondary" className="flex-1" onClick={() => setCreateOpen(true)}><Plus /> New</Button>
+        <Button size="sm" variant="secondary" className="flex-1" onClick={() => setEditor({})}><Plus /> New</Button>
         <Button size="sm" variant="secondary" className="flex-1" onClick={() => setWebOpen(true)}><Globe /> Web search</Button>
       </div>
       {!items ? <Skeleton className="h-40" /> : items.length === 0 ? <EmptyState icon={Dumbbell} title="No matches" /> : (
         <Stagger className="space-y-1">{items.map((e) => (
-          <button key={e.id} onClick={() => setAltFor(e)} className="flex w-full items-center gap-3 rounded-2xl bg-card px-4 py-3 text-left transition-colors hover:bg-surface-2">
-            <ExerciseThumb thumb={e.thumb_url} size={40} />
-            <div className="min-w-0 flex-1"><div className="truncate font-medium">{e.name}</div><ExerciseMeta ex={e} className="text-xs text-muted-foreground" /></div>
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs text-muted-foreground [&_svg]:size-3.5"><ArrowLeftRight /> Alternatives</span>
-          </button>
+          <div key={e.id} className="flex items-center gap-3 rounded-2xl bg-card px-3 py-2.5">
+            <button onClick={() => open(e)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+              <ExerciseThumb thumb={e.thumb_url} size={40} />
+              <div className="min-w-0 flex-1"><div className="truncate font-medium">{e.name}</div><ExerciseMeta ex={e} className="text-xs text-muted-foreground" /></div>
+            </button>
+            <button onClick={() => open(e)} aria-label="Edit" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><PencilLine /></button>
+            <button onClick={() => setAltFor(e)} aria-label="Alternatives" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><ArrowLeftRight /></button>
+          </div>
         ))}</Stagger>
       )}
-      {createOpen && <CreateExerciseSheet onClose={() => setCreateOpen(false)} onDone={() => { setCreateOpen(false); void load(); }} />}
+      {editor && <ExerciseEditor exerciseId={editor.exerciseId} initial={editor.initial} onClose={() => setEditor(null)} onSaved={() => { setEditor(null); void load(); }} />}
       {webOpen && <WebExerciseSheet onClose={() => setWebOpen(false)} onImported={() => void load()} />}
       {altFor && <AlternativesSheet exercise={altFor} onClose={() => setAltFor(null)} />}
     </div>
-  );
-}
-
-function CreateExerciseSheet({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const [name, setName] = useState("");
-  const [muscles, setMuscles] = useState("");
-  const [equipment, setEquipment] = useState("");
-  const [difficulty, setDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
-  const [busy, setBusy] = useState(false);
-  const save = async () => {
-    setBusy(true);
-    try { await api.post("/api/exercises", { name, muscleGroups: split(muscles), equipment: split(equipment), difficulty, visibility: "tenant" }); onDone(); }
-    finally { setBusy(false); }
-  };
-  return (
-    <Sheet open onClose={onClose} title="New exercise">
-      <div className="space-y-4">
-        <Field label="Name" icon={Dumbbell} value={name} onChange={(e) => setName(e.target.value)} />
-        <Field label="Muscle groups (comma-separated)" value={muscles} onChange={(e) => setMuscles(e.target.value)} placeholder="chest, triceps" />
-        <Field label="Equipment (comma-separated)" value={equipment} onChange={(e) => setEquipment(e.target.value)} placeholder="barbell" />
-        <div className="flex gap-2">{(["beginner", "intermediate", "advanced"] as const).map((d) => <Chip key={d} selected={difficulty === d} onClick={() => setDifficulty(d)}>{d}</Chip>)}</div>
-        <Button size="lg" className="w-full" disabled={busy || name.trim().length < 2} onClick={() => void save()}>{busy ? "Saving…" : "Add to library"}</Button>
-      </div>
-    </Sheet>
   );
 }
 

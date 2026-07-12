@@ -401,6 +401,28 @@ describe("AI meal draft — food import from the library", () => {
     // The "rolled oats" query resolved to our seeded food id.
     expect(breakfast.foods.some((f) => f.foodId === foodId)).toBe(true);
     expect(breakfast.foods[0]!.quantity).toBeGreaterThan(0);
+    // A food not in the library ("whey protein") still resolves — to a custom
+    // row minted from the model's macro estimate, so no meal item is dropped.
+    const wheyResolved = breakfast.foods.length >= 2;
+    expect(wheyResolved).toBe(true);
+  });
+});
+
+describe("AI workout draft — named exercises resolve to real ids", () => {
+  it("drafts a plan and resolves each named exercise to a library/custom id", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "PlanAI" }) })).json()) as { client: { id: string } };
+    const r = (await (await SELF.fetch("http://x/api/ai/draft-plan", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { draft: { days: { blocks: { slots: { exerciseId: string }[] }[] }[] } };
+    const slots = r.draft.days.flatMap((d) => d.blocks.flatMap((b) => b.slots));
+    expect(slots.length).toBeGreaterThan(0);
+    // Every slot carries a real exercise id (resolved, never a raw name).
+    expect(slots.every((s) => typeof s.exerciseId === "string" && s.exerciseId.length > 0)).toBe(true);
+    // The resolved id points at an actual library row.
+    const ex = await SELF.fetch(`http://x/api/exercises?q=`, { headers: auth(ownerCookie) });
+    const { exercises } = (await ex.json()) as { exercises: { id: string }[] };
+    expect(exercises.some((e) => e.id === slots[0]!.exerciseId)).toBe(true);
   });
 });
 

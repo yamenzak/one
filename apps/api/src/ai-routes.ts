@@ -15,6 +15,8 @@ import { generate, generateImage, extractJson, listModels } from "./ai.js";
 import { buildClientContext } from "./ai-context.js";
 import { featureDef } from "./ai-features.js";
 import { parseWorkersAiPricing, parseGeminiPricing } from "./ai-pricing.js";
+import { tenantIntegrations, type Integrations } from "./integrations.js";
+import { resolveFoodId, resolveExerciseId, type ResolveEnv } from "./library-resolve.js";
 import { parseJson } from "./db.js";
 
 const SURFACE_FOCUS: Record<string, string> = {
@@ -55,33 +57,34 @@ function aiFail(c: Context<AppEnv>, r: { error: string; detail?: string; availab
   return c.json({ error: r.detail ? `AI failed — ${r.detail}` : "AI unavailable.", detail: r.detail }, 503);
 }
 
-interface DraftFoodQuery { query?: string; quantity?: number; unit?: string }
+interface DraftFoodQuery { query?: string; quantity?: number; unit?: string; calories?: number; proteinG?: number; carbsG?: number; fatG?: number }
 interface DraftMealOption { mealType: string; mealName: string; isFree?: boolean; foods?: DraftFoodQuery[] }
 interface ResolvedMealFood { foodId: string; quantity: number; unit: string }
 
-/** Turn the model's food search queries into real library food ids — matching
- *  the tenant's + platform (public) food library. Unresolved queries drop. */
-async function resolveMealFoods(db: D1Database, tenantId: string, options: DraftMealOption[]): Promise<(DraftMealOption & { foods: ResolvedMealFood[] })[]> {
+// Loose shapes for the model's workout draft (exercises named, not id'd).
+interface RawSlot { exercise?: string; exerciseName?: string; name?: string; measurementMode?: string; slotNotes?: string | null; sets?: unknown[] }
+interface RawBlock { type?: string; rounds?: number | null; restBetweenExercisesSec?: number | null; restBetweenRoundsSec?: number | null; blockNotes?: string | null; slots?: RawSlot[] }
+interface RawDay { name?: string; dayNotes?: string | null; isRestDay?: boolean; blocks?: RawBlock[] }
+
+/** Turn the model's food queries into real library food ids: our library →
+ *  integrated web providers (imported with photo) → a custom row from the
+ *  model's macro estimate. Only truly unresolvable foods drop. */
+async function resolveMealFoods(env: ResolveEnv, tenantId: string, userId: string, cfg: Integrations, allowExternal: boolean, options: DraftMealOption[]): Promise<(DraftMealOption & { foods: ResolvedMealFood[] })[]> {
   const cache = new Map<string, string | null>();
-  const lookup = async (q: string): Promise<string | null> => {
-    const key = q.toLowerCase().trim();
-    if (cache.has(key)) return cache.get(key)!;
-    const row = await db
-      .prepare("SELECT id FROM foods WHERE active = 1 AND (tenant_id IS NULL OR tenant_id = ?) AND LOWER(name) LIKE ? ORDER BY verified DESC, name LIMIT 1")
-      .bind(tenantId, `%${key}%`)
-      .first<{ id: string }>();
-    cache.set(key, row?.id ?? null);
-    return row?.id ?? null;
-  };
   const out: (DraftMealOption & { foods: ResolvedMealFood[] })[] = [];
   for (const opt of options) {
     if (!opt?.mealType || !opt?.mealName) continue;
     const foods: ResolvedMealFood[] = [];
-    for (const f of (opt.foods ?? []).slice(0, 4)) {
+    for (const f of (opt.foods ?? []).slice(0, 5)) {
       const q = String(f?.query ?? "").trim();
       if (!q) continue;
-      const id = await lookup(q);
-      if (id) foods.push({ foodId: id, quantity: Number(f.quantity) > 0 ? Number(f.quantity) : 100, unit: (f.unit || "g").slice(0, 20) });
+      const qty = Number(f.quantity) > 0 ? Number(f.quantity) : 100;
+      const unit = (f.unit || "g").slice(0, 20);
+      const estimate = Number(f.calories) > 0
+        ? { calories: Number(f.calories), proteinG: Number(f.proteinG) || 0, carbsG: Number(f.carbsG) || 0, fatG: Number(f.fatG) || 0, servingSize: qty, servingUnit: unit }
+        : null;
+      const id = await resolveFoodId(env, tenantId, userId, q, cfg, allowExternal, estimate, cache);
+      if (id) foods.push({ foodId: id, quantity: qty, unit });
     }
     out.push({ mealType: opt.mealType, mealName: opt.mealName, isFree: !!opt.isFree, foods });
   }
@@ -186,7 +189,6 @@ export const aiRoutes = new Hono<AppEnv>()
       .filter(Boolean)
       .join("\n");
 
-    const firstExercise = library.results?.[0]?.id ?? "exr_none";
     const result = await generate(c.env, {
       tenantId: who.tenantId,
       actorUserId: who.userId,
@@ -209,7 +211,7 @@ export const aiRoutes = new Hono<AppEnv>()
                   rounds: null,
                   slots: [
                     {
-                      exerciseId: firstExercise,
+                      exercise: library.results?.[0]?.name ?? "Barbell Back Squat",
                       measurementMode: "reps",
                       sets: [
                         { setType: "warmup", reps: 10, weightMode: "unspecified", restAfterSec: 60 },
@@ -225,32 +227,50 @@ export const aiRoutes = new Hono<AppEnv>()
         }),
     });
     if (!result.ok) return aiFail(c, result);
-    const raw = extractJson<unknown>(result.output);
-    const body = WorkoutBody.safeParse(raw);
+    const raw = extractJson<{ days?: RawDay[] }>(result.output);
+    if (!raw || !Array.isArray(raw.days)) return c.json({
+      error: "The AI didn't return a valid plan.",
+      detail: raw == null ? "no JSON found in the model's response" : "expected a top-level \"days\" array",
+      raw: result.output.slice(0, 2500),
+      mocked: result.mocked,
+    }, 422);
+    // Resolve each named exercise to a real id: our library → integrated web
+    // providers (imported WITH its photo/gif) → a custom row. Only truly empty
+    // slots drop; nothing is silently discarded for lacking a library match.
+    const appCfg = await getConfig(c.env.DB);
+    const allowExternal = ent.features.externalSearch && appCfg["ai.mock"] !== "on";
+    const cfg = await tenantIntegrations(c.env.DB, who.tenantId);
+    const cache = new Map<string, string | null>();
+    const days: unknown[] = [];
+    for (const d of raw.days) {
+      const blocks: unknown[] = [];
+      for (const b of d.blocks ?? []) {
+        const slots: unknown[] = [];
+        for (const s of b.slots ?? []) {
+          const name = String(s.exercise ?? s.exerciseName ?? s.name ?? "").trim();
+          if (!name) continue;
+          const id = await resolveExerciseId(c.env as ResolveEnv, who.tenantId, who.userId, name, cfg, allowExternal, cache);
+          if (id) slots.push({ exerciseId: id, measurementMode: s.measurementMode ?? "reps", slotNotes: s.slotNotes ?? null, sets: Array.isArray(s.sets) ? s.sets : [] });
+        }
+        if (slots.length) blocks.push({ type: b.type ?? "single", rounds: b.rounds ?? null, restBetweenExercisesSec: b.restBetweenExercisesSec ?? null, restBetweenRoundsSec: b.restBetweenRoundsSec ?? null, blockNotes: b.blockNotes ?? null, slots });
+      }
+      days.push({ name: d.name ?? "", dayNotes: d.dayNotes ?? null, isRestDay: !!d.isRestDay, blocks });
+    }
+    const body = WorkoutBody.safeParse({ days });
     if (!body.success) return c.json({
       error: "The AI didn't return a valid plan.",
-      detail: raw == null ? "no JSON found in the model's response" : body.error.issues.slice(0, 4).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "),
+      detail: body.error.issues.slice(0, 4).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "),
       raw: result.output.slice(0, 2500),
       mocked: result.mocked,
     }, 422);
-    // Drafts must only reference real exercises — drop hallucinated slots.
-    const validIds = new Set((library.results ?? []).map((e) => e.id));
-    const cleaned = {
-      days: body.data.days.map((d) => ({
-        ...d,
-        blocks: d.blocks
-          .map((b) => ({ ...b, slots: b.slots.filter((s) => validIds.has(s.exerciseId)) }))
-          .filter((b) => b.slots.length > 0),
-      })),
-    };
-    const totalSlots = cleaned.days.reduce((n, d) => n + d.blocks.reduce((m, b) => m + b.slots.length, 0), 0);
+    const totalSlots = body.data.days.reduce((n, d) => n + d.blocks.reduce((m, b) => m + b.slots.length, 0), 0);
     if (totalSlots === 0) return c.json({
-      error: "The AI plan referenced exercises that aren't in your library.",
-      detail: `parsed ${body.data.days.length} day(s) but every exercise id was unknown — the model must use ids from the library list`,
+      error: "The AI plan came back empty.",
+      detail: `parsed ${body.data.days.length} day(s) but no exercises resolved`,
       raw: result.output.slice(0, 2500),
       mocked: result.mocked,
     }, 422);
-    return c.json({ draft: cleaned, credits: result.credits, mocked: result.mocked });
+    return c.json({ draft: body.data, credits: result.credits, mocked: result.mocked });
   })
 
   /**
@@ -392,17 +412,21 @@ export const aiRoutes = new Hono<AppEnv>()
       prompt: [`TARGETS: ${JSON.stringify(targets)}`, `INTAKE: ${JSON.stringify(intake)}`, examples, parsed.data.instructions].filter(Boolean).join("\n"),
       maxOutputTokens: 1536,
       mock: () => JSON.stringify({ mealOptions: [
-        { mealType: "breakfast", mealName: "Oats, whey & berries", isFree: false, foods: [{ query: "rolled oats", quantity: 80, unit: "g" }, { query: "whey protein", quantity: 30, unit: "g" }, { query: "blueberries", quantity: 100, unit: "g" }] },
-        { mealType: "lunch", mealName: "Chicken, rice & greens", isFree: false, foods: [{ query: "chicken breast", quantity: 180, unit: "g" }, { query: "white rice", quantity: 150, unit: "g" }, { query: "broccoli", quantity: 100, unit: "g" }] },
-        { mealType: "dinner", mealName: "Salmon, potato & salad", isFree: false, foods: [{ query: "salmon", quantity: 170, unit: "g" }, { query: "potato", quantity: 200, unit: "g" }] },
+        { mealType: "breakfast", mealName: "Oats, whey & berries", isFree: false, foods: [{ query: "rolled oats", quantity: 80, unit: "g", calories: 304, proteinG: 11, carbsG: 54, fatG: 6 }, { query: "whey protein", quantity: 30, unit: "g", calories: 120, proteinG: 24, carbsG: 3, fatG: 2 }, { query: "blueberries", quantity: 100, unit: "g", calories: 57, proteinG: 1, carbsG: 14, fatG: 0 }] },
+        { mealType: "lunch", mealName: "Chicken, rice & greens", isFree: false, foods: [{ query: "chicken breast", quantity: 180, unit: "g", calories: 297, proteinG: 56, carbsG: 0, fatG: 6 }, { query: "white rice", quantity: 150, unit: "g", calories: 195, proteinG: 4, carbsG: 42, fatG: 0 }, { query: "broccoli", quantity: 100, unit: "g", calories: 34, proteinG: 3, carbsG: 7, fatG: 0 }] },
+        { mealType: "dinner", mealName: "Salmon, potato & salad", isFree: false, foods: [{ query: "salmon", quantity: 170, unit: "g", calories: 354, proteinG: 34, carbsG: 0, fatG: 23 }, { query: "potato", quantity: 200, unit: "g", calories: 154, proteinG: 4, carbsG: 35, fatG: 0 }] },
       ] }),
     });
     if (!result.ok) return aiFail(c, result);
     const draft = extractJson<{ mealOptions: DraftMealOption[] }>(result.output);
     if (!draft?.mealOptions) return c.json({ error: "The AI didn't return valid meals.", raw: result.output.slice(0, 1800), mocked: result.mocked }, 422);
-    // Resolve each drafted food query to a real library food id (import the
-    // public/tenant library into the plan) so options carry real macros.
-    const resolved = await resolveMealFoods(c.env.DB, who.tenantId, draft.mealOptions);
+    // Resolve each drafted food query to a real library food id: our library →
+    // integrated web providers (imported with photo) → a custom row from the
+    // model's estimate — so every option carries real, editable macros.
+    const appCfg = await getConfig(c.env.DB);
+    const allowExternal = ent.features.externalSearch && appCfg["ai.mock"] !== "on";
+    const cfg = await tenantIntegrations(c.env.DB, who.tenantId);
+    const resolved = await resolveMealFoods(c.env as ResolveEnv, who.tenantId, who.userId, cfg, allowExternal, draft.mealOptions);
     return c.json({ draft: { customMealTypes: [], mealOptions: resolved }, credits: result.credits, mocked: result.mocked });
   })
 
