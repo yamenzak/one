@@ -54,13 +54,15 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [snapErr, setSnapErr] = useState<unknown>(null);
-  // Snap-a-meal review: the AI's detected foods + its note, held for the user
-  // to confirm/trim BEFORE anything is logged (no more fire-and-forget).
-  const [snap, setSnap] = useState<{ entries: SnapEntry[]; note: string | null } | null>(null);
+  // Snap-a-meal review: the AI's detected foods + its note + the photo, held
+  // for the user to confirm/trim BEFORE anything is logged (no fire-and-forget).
+  const [snap, setSnap] = useState<{ entries: SnapEntry[]; note: string | null; imageKey: string } | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   // Manual add / barcode-miss editor. `null` = closed; an object opens it,
   // optionally prefilled (e.g. with a scanned-but-unmatched barcode).
   const [editor, setEditor] = useState<Partial<EditableFood> | null>(null);
+  // Barcode miss → fire the label scanner on editor open (auto camera).
+  const [editorAutoScan, setEditorAutoScan] = useState(false);
   const { ctx } = useSession();
   const units = useUnits();
   const isStaff = ctx?.active?.role !== undefined && ctx.active.role !== "client";
@@ -107,8 +109,10 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
     setScanOpen(false);
     let r = await api.get<{ food: Food | null }>(`/api/foods/barcode?code=${code}`);
     if (!r.food) r = await api.get<{ food: Food | null }>(`/api/foods/barcode-external?code=${code}`);
-    // Miss → let them create it by hand (photo + details), barcode prefilled.
-    if (r.food) rowClick(r.food); else { setAiError(null); setEditor({ barcode: code }); }
+    // Miss → open the new-food editor with the barcode prefilled and fire the
+    // label scanner so they can shoot the nutrition panel to auto-fill it.
+    if (r.food) rowClick(r.food);
+    else { setAiError(null); setSnapErr(null); setEditorAutoScan(true); setEditor({ barcode: code }); }
   };
 
   const log = async () => {
@@ -131,14 +135,16 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
       const r = await api.post<{ entries: SnapEntry[]; note: string | null }>("/api/ai/snap-meal", { clientId, imageKey: key, hint: q });
       if (!r.entries?.length) throw new Error("No foods detected in that photo — try another angle or search instead.");
       // Show the AI's read for review — logging happens only on confirm.
-      setSnap({ entries: r.entries, note: r.note ?? null });
+      setSnap({ entries: r.entries, note: r.note ?? null, imageKey: key });
     } catch (e) { setSnapErr(e); } finally { setAiBusy(false); }
   };
 
-  /** Confirm a reviewed snap: log every kept item under the chosen meal. */
+  /** Confirm a reviewed snap: log every kept item under the chosen meal, each
+   *  stamped with the meal photo so the diary shows what they ate. */
   const logSnap = async (items: SnapEntry[], mealType: string) => {
+    const imageUrl = snap ? `/api/media/${snap.imageKey}` : null;
     for (const e of items) {
-      await api.post("/api/logs/food", { clientId, data: { date: todayLocal(), mealType, label: e.label, quantity: e.quantity ?? null, unit: e.unit ?? null, calories: e.calories, proteinG: e.proteinG, carbsG: e.carbsG, fatG: e.fatG } });
+      await api.post("/api/logs/food", { clientId, data: { date: todayLocal(), mealType, label: e.label, quantity: e.quantity ?? null, unit: e.unit ?? null, calories: e.calories, proteinG: e.proteinG, carbsG: e.carbsG, fatG: e.fatG, imageUrl } });
     }
     setSnap(null); onLogged?.(); onClose();
   };
@@ -214,7 +220,7 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
               <input ref={snapInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void snapMeal(e.target.files[0])} />
             </label>
           )}
-          <button onClick={() => setEditor({})} className="grid size-9 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]" aria-label="Add manually"><PencilLine /></button>
+          <button onClick={() => { setEditorAutoScan(false); setEditor({}); }} className="grid size-9 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]" aria-label="Add manually"><PencilLine /></button>
         </div>
       }
     >
@@ -250,9 +256,10 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
         <FoodEditor
           initial={editor}
           isStaff={isStaff}
+          autoScanLabel={editorAutoScan}
           title={editor.barcode ? "New product" : undefined}
-          onClose={() => setEditor(null)}
-          onSaved={(food) => { setEditor(null); if (onPick) void pickFood(food as Food); else setSelected(food as Food); }}
+          onClose={() => { setEditor(null); setEditorAutoScan(false); }}
+          onSaved={(food) => { setEditor(null); setEditorAutoScan(false); if (onPick) void pickFood(food as Food); else setSelected(food as Food); }}
         />
       )}
     </Sheet>

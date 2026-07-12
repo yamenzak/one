@@ -59,6 +59,8 @@ export const LogFoodEntry = z.object({
   source: z.enum(["self_logged", "prescribed", "ai_suggested", "free_meal"]).default("self_logged"),
   mealPlanId: z.string().nullish(),
   mealOptionIndex: z.number().int().min(0).nullish(),
+  /** A photo for this entry (e.g. the snap-a-meal image), served via /api/media. */
+  imageUrl: z.string().max(500).nullish(),
 });
 export type LogFoodEntry = z.infer<typeof LogFoodEntry>;
 

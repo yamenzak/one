@@ -284,7 +284,7 @@ export const aiRoutes = new Hono<AppEnv>()
       expectsJson: true,
       system: sys("snap-meal"),
       prompt: `A photo of a meal${parsed.data.hint ? ` (${parsed.data.hint})` : ""}. Identify the foods, estimate portions + macros, and give one short assessment as the JSON object.`,
-      maxOutputTokens: 600,
+      maxOutputTokens: 1024,
       mock: () =>
         JSON.stringify({
           items: [
@@ -298,8 +298,28 @@ export const aiRoutes = new Hono<AppEnv>()
     if (!result.ok) return aiFail(c, result);
     // The model returns {items, note}; tolerate a bare array from older prompts.
     const raw = extractJson<{ items?: unknown[]; note?: unknown } | unknown[]>(result.output);
-    const entries = Array.isArray(raw) ? raw : Array.isArray(raw?.items) ? raw.items : null;
-    if (!entries) return c.json({ error: "Couldn't read the photo.", raw: result.output.slice(0, 1500), mocked: result.mocked }, 422);
+    const list = Array.isArray(raw) ? raw : Array.isArray(raw?.items) ? raw.items : null;
+    if (!list) return c.json({ error: "Couldn't read the photo.", raw: result.output.slice(0, 1500), mocked: result.mocked }, 422);
+    // Coerce every macro to a finite number — models sometimes omit a field,
+    // stringify it ("52g"), or use an alternate key; anything else became NaN.
+    const numOf = (...vs: unknown[]) => { for (const v of vs) { const n = typeof v === "string" ? parseFloat(v) : Number(v); if (Number.isFinite(n)) return n; } return 0; };
+    const entries = list
+      .map((it) => {
+        const o = (it ?? {}) as Record<string, unknown>;
+        const qty = numOf(o.quantity, o.grams, o.amount);
+        return {
+          label: String(o.label ?? o.name ?? "Food").slice(0, 120),
+          mealType: typeof o.mealType === "string" ? o.mealType : undefined,
+          calories: Math.round(numOf(o.calories, o.kcal, o.cal)),
+          proteinG: Math.round(numOf(o.proteinG, o.protein, o.protein_g)),
+          carbsG: Math.round(numOf(o.carbsG, o.carbs, o.carbs_g)),
+          fatG: Math.round(numOf(o.fatG, o.fat, o.fat_g)),
+          quantity: qty > 0 ? qty : null,
+          unit: typeof o.unit === "string" ? o.unit : null,
+        };
+      })
+      .filter((e) => e.label && (e.calories > 0 || e.proteinG > 0 || e.carbsG > 0 || e.fatG > 0));
+    if (!entries.length) return c.json({ error: "Couldn't read the photo.", raw: result.output.slice(0, 1500), mocked: result.mocked }, 422);
     const note = !Array.isArray(raw) && typeof raw?.note === "string" ? raw.note : null;
     return c.json({ entries, note, credits: result.credits, mocked: result.mocked });
   })
@@ -333,8 +353,14 @@ export const aiRoutes = new Hono<AppEnv>()
       mock: () => JSON.stringify({ name: "Granola bar", brand: "Acme", servingSize: 40, servingUnit: "g", calories: 180, proteinG: 4, carbsG: 27, fatG: 6, fiberG: 3, sugarG: 12, sodiumMg: 95, saturatedFatG: 2, cholesterolMg: 0, potassiumMg: 90, calciumMg: 20, ironMg: 1 }),
     });
     if (!result.ok) return aiFail(c, result);
-    const food = extractJson<Record<string, unknown>>(result.output);
-    if (!food || typeof food !== "object" || typeof food.name !== "string") return c.json({ error: "Couldn't read the label.", raw: result.output.slice(0, 1500), mocked: result.mocked }, 422);
+    const parsedFood = extractJson<Record<string, unknown>>(result.output);
+    if (!parsedFood || typeof parsedFood !== "object" || typeof parsedFood.name !== "string") return c.json({ error: "Couldn't read the label.", raw: result.output.slice(0, 1500), mocked: result.mocked }, 422);
+    // Coerce numeric fields so the editor never shows NaN (models stringify or
+    // omit values). Keep name/brand/unit as text; numbers become finite or 0.
+    const numField = (v: unknown): number => { const n = typeof v === "string" ? parseFloat(v) : Number(v); return Number.isFinite(n) ? n : 0; };
+    const NUMERIC = ["servingSize", "calories", "proteinG", "carbsG", "fatG", "fiberG", "sugarG", "sodiumMg", "saturatedFatG", "cholesterolMg", "potassiumMg", "calciumMg", "ironMg"];
+    const food: Record<string, unknown> = { ...parsedFood };
+    for (const k of NUMERIC) if (k in food) food[k] = numField(food[k]);
     return c.json({ food, credits: result.credits, mocked: result.mocked });
   })
 

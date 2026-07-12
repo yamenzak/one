@@ -196,7 +196,7 @@ export const logRoutes = new Hono<AppEnv>()
     const d = parsed.data.data;
     const id = newId("fen");
     await c.env.DB.prepare(
-      "INSERT INTO food_entries (id, tenant_id, client_id, date_local, meal_type, food_id, label, quantity, unit, calories, protein_g, carbs_g, fat_g, source, meal_plan_id, meal_option_index, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO food_entries (id, tenant_id, client_id, date_local, meal_type, food_id, label, quantity, unit, calories, protein_g, carbs_g, fat_g, source, meal_plan_id, meal_option_index, image_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
       .bind(
         id,
@@ -215,6 +215,7 @@ export const logRoutes = new Hono<AppEnv>()
         d.source,
         d.mealPlanId ?? null,
         d.mealOptionIndex ?? null,
+        d.imageUrl ?? null,
         nowIso(),
       )
       .run();
@@ -268,7 +269,7 @@ export const logRoutes = new Hono<AppEnv>()
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
     const rows = await c.env.DB.prepare(
-      "SELECT fe.*, f.image_url AS image_url FROM food_entries fe LEFT JOIN foods f ON f.id = fe.food_id WHERE fe.client_id = ? AND fe.date_local = ? ORDER BY fe.created_at",
+      "SELECT fe.*, COALESCE(fe.image_url, f.image_url) AS image_url FROM food_entries fe LEFT JOIN foods f ON f.id = fe.food_id WHERE fe.client_id = ? AND fe.date_local = ? ORDER BY fe.created_at",
     )
       .bind(clientId, date)
       .all();

@@ -86,7 +86,7 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "CREATE INDEX IF NOT EXISTS idx_elogs_client ON exercise_logs(client_id, date_local);",
           "CREATE TABLE IF NOT EXISTS activity_logs (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, activity_key TEXT, label TEXT, start_time TEXT, duration_min INTEGER, avg_hr_bpm INTEGER, calories INTEGER, calories_locked INTEGER DEFAULT 0, created_at TEXT);",
           "CREATE INDEX IF NOT EXISTS idx_alogs_client ON activity_logs(client_id, date_local);",
-          "CREATE TABLE IF NOT EXISTS food_entries (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, meal_type TEXT, food_id TEXT, label TEXT, quantity REAL, unit TEXT, calories REAL DEFAULT 0, protein_g REAL DEFAULT 0, carbs_g REAL DEFAULT 0, fat_g REAL DEFAULT 0, source TEXT DEFAULT 'self_logged', meal_plan_id TEXT, meal_option_index INTEGER, created_at TEXT);",
+          "CREATE TABLE IF NOT EXISTS food_entries (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, meal_type TEXT, food_id TEXT, label TEXT, quantity REAL, unit TEXT, calories REAL DEFAULT 0, protein_g REAL DEFAULT 0, carbs_g REAL DEFAULT 0, fat_g REAL DEFAULT 0, source TEXT DEFAULT 'self_logged', meal_plan_id TEXT, meal_option_index INTEGER, image_url TEXT, created_at TEXT);",
           "CREATE INDEX IF NOT EXISTS idx_fentries_client ON food_entries(client_id, date_local);",
           "CREATE TABLE IF NOT EXISTS water_logs (client_id TEXT, date_local TEXT, tenant_id TEXT, total_ml INTEGER DEFAULT 0, entries_json TEXT, updated_at TEXT, PRIMARY KEY (client_id, date_local));",
           "CREATE TABLE IF NOT EXISTS sleep_logs (client_id TEXT, date_local TEXT, tenant_id TEXT, duration_minutes INTEGER, quality INTEGER, notes TEXT, updated_at TEXT, PRIMARY KEY (client_id, date_local));",
@@ -147,6 +147,7 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "ALTER TABLE foods ADD COLUMN calcium_mg REAL DEFAULT 0",
           "ALTER TABLE foods ADD COLUMN iron_mg REAL DEFAULT 0",
           "ALTER TABLE foods ADD COLUMN description TEXT",
+          "ALTER TABLE food_entries ADD COLUMN image_url TEXT",
           // Exercise alternatives are per-tenant (a studio's own swap map).
           "ALTER TABLE exercise_alternatives ADD COLUMN tenant_id TEXT",
           // Food ownership visibility (SPEC §8): tenant (shared) | private

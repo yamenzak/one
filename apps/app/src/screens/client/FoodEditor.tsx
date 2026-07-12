@@ -5,7 +5,7 @@
  * tenant-owned copy on the server (copy-on-write), so the returned id may differ.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { kcalToDisplay, displayToKcal, energyLabel, type UnitPrefs } from "@mossa/domain";
 import { Button, Field, Sheet, Chip, cn, toneSoft, METRICS, Utensils, Barcode, Camera, ChevronDown, Sparkles } from "@mossa/ui";
 import { api } from "../../api.js";
@@ -48,12 +48,15 @@ function toForm(f: EditableFood | undefined, units: UnitPrefs) {
 }
 
 export function FoodEditor({
-  foodId, initial, isStaff, title, onClose, onSaved,
+  foodId, initial, isStaff, title, autoScanLabel, onClose, onSaved,
 }: {
   foodId?: string;
   initial?: Partial<EditableFood>;
   isStaff?: boolean;
   title?: string;
+  /** Fire the nutrition-label scanner as soon as the editor opens — the
+   *  barcode-miss flow uses this so the camera comes up automatically. */
+  autoScanLabel?: boolean;
   onClose: () => void;
   onSaved: (food: EditableFood) => void;
 }) {
@@ -67,6 +70,7 @@ export function FoodEditor({
   const [scanning, setScanning] = useState(false);
   const [scanErr, setScanErr] = useState<string | null>(null);
   const [showMicros, setShowMicros] = useState(false);
+  const labelInputRef = useRef<HTMLInputElement>(null);
   const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }));
   const dec = (v: string) => v.replace(/[^\d.]/g, "");
 
@@ -96,6 +100,9 @@ export function FoodEditor({
       setScanErr(m.includes("insufficient") ? "Studio is out of AI credits." : "Couldn't read that label — enter it by hand.");
     } finally { setScanning(false); }
   };
+
+  // Barcode-miss entry: open the label camera immediately (aiSuite only).
+  useEffect(() => { if (autoScanLabel && aiSuite && !foodId) labelInputRef.current?.click(); }, [autoScanLabel, aiSuite, foodId]);
 
   // Load the existing row when editing (so micros/brand/photo prefill).
   useEffect(() => {
@@ -156,7 +163,7 @@ export function FoodEditor({
               <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary/15 px-3.5 text-sm font-medium text-primary transition-colors hover:bg-primary/25 [&_svg]:size-4">
                 {scanning ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Sparkles />}
                 {scanning ? "Reading label…" : "Scan nutrition label"}
-                <input type="file" accept="image/*" capture="environment" className="hidden" disabled={scanning} onChange={(e) => e.target.files?.[0] && void scanLabel(e.target.files[0])} />
+                <input ref={labelInputRef} type="file" accept="image/*" capture="environment" className="hidden" disabled={scanning} onChange={(e) => e.target.files?.[0] && void scanLabel(e.target.files[0])} />
               </label>
               {scanErr && <p className="mt-1.5 text-sm text-warning">{scanErr}</p>}
             </div>
