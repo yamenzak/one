@@ -33,6 +33,8 @@ export interface ClientRow {
   onboarding_complete: number;
   avatar_url: string | null;
   avatar_seed: string | null;
+  blood_type: string | null;
+  phone: string | null;
   created_at: string;
   archived_at: string | null;
 }
@@ -121,6 +123,8 @@ const CreateClient = z.object({
   dateOfBirth: z.string().nullish(),
   heightCm: z.number().positive().nullish(),
   timezone: z.string().max(60).nullish(),
+  bloodType: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]).nullish(),
+  phone: z.string().max(30).nullish(),
 });
 
 const UpdateClient = CreateClient.partial().extend({
@@ -149,6 +153,8 @@ function clientView(row: ClientRow) {
     hasLogin: Boolean(row.user_id),
     avatarUrl: row.avatar_url,
     avatarSeed: row.avatar_seed,
+    bloodType: row.blood_type,
+    phone: row.phone,
     createdAt: row.created_at,
   };
 }
@@ -240,7 +246,8 @@ export const clientRoutes = new Hono<AppEnv>()
     const cur = access.client;
     await c.env.DB.prepare(
       `UPDATE clients SET display_name = ?, email = ?, gender = ?, date_of_birth = ?, height_cm = ?, timezone = ?,
-        weight_unit = ?, length_unit = ?, volume_unit = ?, intake_json = ?, dashboard_prefs_json = ?, onboarding_complete = ?
+        weight_unit = ?, length_unit = ?, volume_unit = ?, intake_json = ?, dashboard_prefs_json = ?, onboarding_complete = ?,
+        blood_type = ?, phone = ?
        WHERE id = ? AND tenant_id = ?`,
     )
       .bind(
@@ -256,6 +263,8 @@ export const clientRoutes = new Hono<AppEnv>()
         d.intake !== undefined ? j(d.intake) : cur.intake_json,
         d.dashboardPrefs !== undefined ? j(d.dashboardPrefs) : cur.dashboard_prefs_json,
         d.onboardingComplete !== undefined ? (d.onboardingComplete ? 1 : 0) : cur.onboarding_complete,
+        d.bloodType !== undefined ? d.bloodType : cur.blood_type,
+        d.phone !== undefined ? d.phone : cur.phone,
         cur.id,
         cur.tenant_id,
       )

@@ -245,6 +245,19 @@ describe("AI config (per-tenant model / prompt / tone / enable)", () => {
   });
 });
 
+describe("client self-profile", () => {
+  it("persists blood type, phone, dob and gender (male/female only)", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "Profile Tester" }) })).json()) as { client: { id: string } };
+    const upd = await SELF.fetch(`http://x/api/clients/${client.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ bloodType: "O+", phone: "+1 555 111 2222", dateOfBirth: "1990-05-01", gender: "female" }) });
+    expect(upd.status).toBe(200);
+    const got = (await (await SELF.fetch(`http://x/api/clients/${client.id}`, { headers: auth(ownerCookie) })).json()) as { client: { bloodType: string; phone: string; dateOfBirth: string; gender: string } };
+    expect(got.client).toMatchObject({ bloodType: "O+", phone: "+1 555 111 2222", dateOfBirth: "1990-05-01", gender: "female" });
+    // Gender is restricted to male/female (BMR); anything else is rejected.
+    expect((await SELF.fetch(`http://x/api/clients/${client.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ gender: "other" }) })).status).toBe(400);
+  });
+});
+
 describe("AI model catalog + markup (platform admin)", () => {
   it("sets a global markup applied to every model, and toggles models", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

@@ -5,7 +5,7 @@
 
 import { Fragment, useEffect, useState } from "react";
 import {
-  Button, Card, Badge, Chip, Switch, Textarea, Skeleton, SegmentedControl, SettingsList, Page, Stagger,
+  Button, Card, Badge, Chip, Switch, Textarea, Skeleton, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
   KeyRound, Moon, Sun, LogOut, Palette, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus,
   type Branding, type BrandTokens, type NeutralTint,
@@ -48,6 +48,12 @@ export function Settings({ onBack }: { onBack: () => void }) {
           <Badge tone="neutral">{ctx?.active?.role}</Badge>
         </Card>
       </Stagger>
+
+      {ctx?.active?.clientId && (
+        <Stagger>
+          <ClientProfileSection clientId={ctx.active.clientId} email={ctx.user.email} onSaved={() => void refresh()} />
+        </Stagger>
+      )}
 
       <Stagger>
         <section>
@@ -101,6 +107,62 @@ export function Settings({ onBack }: { onBack: () => void }) {
         />
       </Stagger>
     </Page>
+  );
+}
+
+interface ClientProfile { displayName: string; email: string | null; gender: string | null; dateOfBirth: string | null; bloodType: string | null; phone: string | null; avatarUrl: string | null; avatarSeed: string | null }
+const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+/** A client's own profile — photo, name, DOB, gender (BMR), blood type, phone.
+ *  Email is read-only (changes go through the studio). */
+function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; email: string; onSaved: () => void }) {
+  const [p, setP] = useState<ClientProfile | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => { void api.get<{ client: ClientProfile }>(`/api/clients/${clientId}`).then((r) => setP(r.client)).catch(() => undefined); }, [clientId]);
+  const set = (patch: Partial<ClientProfile>) => setP((c) => (c ? { ...c, ...patch } : c));
+  const uploadAvatar = async (file: File) => {
+    const fd = new FormData(); fd.append("file", file); fd.append("purpose", "avatar");
+    const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
+    const { key } = (await up.json()) as { key?: string };
+    if (key) { const url = `/api/media/${key}`; await api.post(`/api/clients/${clientId}/avatar`, { avatarUrl: url }); set({ avatarUrl: url, avatarSeed: null }); onSaved(); }
+  };
+  const save = async () => {
+    if (!p) return; setSaving(true); setMsg(null);
+    try { await api.patch(`/api/clients/${clientId}`, { displayName: p.displayName, gender: p.gender ?? undefined, dateOfBirth: p.dateOfBirth ?? undefined, bloodType: p.bloodType ?? undefined, phone: p.phone ?? undefined }); setMsg("Profile saved."); onSaved(); }
+    finally { setSaving(false); }
+  };
+  if (!p) return <section><h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Profile</h3><Skeleton className="h-64" /></section>;
+  return (
+    <section>
+      <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Profile</h3>
+      <Card className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Avatar name={p.displayName} src={p.avatarUrl} seed={p.avatarSeed} className="size-16" />
+          <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Change photo
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAvatar(e.target.files[0])} />
+          </label>
+        </div>
+        <Field label="Name" value={p.displayName} onChange={(e) => set({ displayName: e.target.value })} />
+        <div>
+          <Field label="Email" value={p.email ?? email} disabled />
+          <p className="mt-1 px-1 text-xs text-muted-foreground">Contact your coach to change your email.</p>
+        </div>
+        <Field label="Date of birth" type="date" value={p.dateOfBirth ?? ""} onChange={(e) => set({ dateOfBirth: e.target.value || null })} />
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Gender</label>
+          <div className="flex gap-2">{([["male", "Male"], ["female", "Female"]] as const).map(([v, l]) => <Chip key={v} selected={p.gender === v} onClick={() => set({ gender: v })}>{l}</Chip>)}</div>
+          <p className="mt-1 px-1 text-xs text-muted-foreground">Used to calculate your calorie and macro targets.</p>
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Blood type</label>
+          <div className="flex flex-wrap gap-2">{BLOOD_TYPES.map((b) => <Chip key={b} selected={p.bloodType === b} onClick={() => set({ bloodType: p.bloodType === b ? null : b })}>{b}</Chip>)}</div>
+        </div>
+        <Field label="Contact number" type="tel" inputMode="tel" value={p.phone ?? ""} onChange={(e) => set({ phone: e.target.value || null })} placeholder="+1 555 000 0000" />
+        <Button size="lg" className="w-full" disabled={saving || p.displayName.trim().length < 1} onClick={() => void save()}>{saving ? "Saving…" : "Save profile"}</Button>
+        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+      </Card>
+    </section>
   );
 }
 
