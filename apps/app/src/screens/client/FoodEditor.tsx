@@ -12,6 +12,7 @@ import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
+import { AiImageField } from "../../AiImageField.js";
 
 export interface EditableFood {
   id?: string;
@@ -67,7 +68,6 @@ export function FoodEditor({
   const [f, setF] = useState(() => toForm(initial as EditableFood, units));
   const [loading, setLoading] = useState(!!foodId);
   const [busy, setBusy] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanErr, setScanErr] = useState<string | null>(null);
   const [showMicros, setShowMicros] = useState(false);
@@ -113,15 +113,6 @@ export function FoodEditor({
     return () => { alive = false; };
   }, [foodId]);
 
-  const uploadPhoto = async (file: File) => {
-    setUploading(true);
-    try {
-      const fd = new FormData(); fd.append("file", file); fd.append("purpose", "food");
-      const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
-      const { key } = (await up.json()) as { key?: string };
-      if (key) set("image", `/api/media/${key}`);
-    } finally { setUploading(false); }
-  };
 
   const save = async () => {
     setBusy(true);
@@ -149,16 +140,9 @@ export function FoodEditor({
         <div className="h-40 animate-pulse rounded-2xl bg-surface-2" />
       ) : (
         <div className="space-y-4">
-          {/* Photo */}
-          <div className="flex items-center gap-3">
-            <label className="grid size-16 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-2xl bg-surface-2 text-muted-foreground transition-colors hover:bg-surface-3">
-              {uploading ? <span className="size-5 animate-spin rounded-full border-2 border-current border-t-transparent" /> : f.image ? <img src={f.image} alt="" className="size-full object-cover" /> : <Camera className="size-5" />}
-              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadPhoto(e.target.files[0])} />
-            </label>
-            <div className="min-w-0 flex-1 space-y-2">
-              <Field label="Name" icon={Utensils} value={f.name} onChange={(e) => set("name", e.target.value)} autoFocus />
-            </div>
-          </div>
+          {/* Name + photo (upload or generate an original with AI) */}
+          <Field label="Name" icon={Utensils} value={f.name} onChange={(e) => set("name", e.target.value)} autoFocus />
+          <AiImageField value={f.image} onChange={(url) => set("image", url)} feature="food-image" subject={f.name} canAi={!!isStaff && aiSuite} label="Photo" />
 
           {/* Label Reader — photograph the nutrition panel to auto-fill. */}
           {aiSuite && (
@@ -216,7 +200,7 @@ export function FoodEditor({
             </div>
           )}
 
-          <Button size="lg" className="w-full" disabled={busy || uploading || f.name.trim().length < 2} onClick={() => void save()}>
+          <Button size="lg" className="w-full" disabled={busy || f.name.trim().length < 2} onClick={() => void save()}>
             {busy ? "Saving…" : foodId ? "Save changes" : "Add food"}
           </Button>
         </div>

@@ -8,9 +8,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy, kcalToDisplay } from "@mossa/domain";
-import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, Utensils, ShoppingCart, Plus, Minus, ChevronDown } from "@mossa/ui";
+import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, Utensils, ShoppingCart, Plus, Minus, ChevronDown, Sparkles } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
+import { useSession } from "../../session.js";
+import { Markdown } from "../../Markdown.js";
+import { AiAnalyzing } from "../../AiAnalyzing.js";
+import { AiAvatar } from "../../AiAvatar.js";
 
 interface Plan { id: string; name: string; status: string; body: MealBody }
 interface FoodRow {
@@ -52,7 +56,23 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   const [counts, setCounts] = useState<Record<number, number>>({});
   const [openIdx, setOpenIdx] = useState<number | null>(null);
   const [openType, setOpenType] = useState<string | null>(null);
+  const [recipe, setRecipe] = useState<{ title: string; text: string } | null>(null);
+  const [recipeBusy, setRecipeBusy] = useState<number | null>(null);
   const units = useUnits();
+  const { ctx } = useSession();
+  const aiSuite = !!ctx?.entitlements?.features?.aiSuite;
+
+  const recommendRecipe = async (opt: MealOption, index: number) => {
+    setRecipeBusy(index);
+    setRecipe({ title: opt.mealName || `Option ${index + 1}`, text: "" }); // opens the sheet in loading state
+    try {
+      const list = opt.foods.map((mf) => ({ name: foods.get(mf.foodId)?.name ?? "food", quantity: mf.quantity, unit: mf.unit })).filter((f) => f.name);
+      const r = await api.post<{ recipe: string }>("/api/ai/recipe", { clientId, mealName: opt.mealName || "", foods: list });
+      setRecipe({ title: opt.mealName || `Option ${index + 1}`, text: r.recipe });
+    } catch {
+      setRecipe({ title: opt.mealName || `Option ${index + 1}`, text: "Sorry — couldn't whip up a recipe just now. Try again." });
+    } finally { setRecipeBusy(null); }
+  };
 
   const load = useCallback(async () => {
     const [pl, f] = await Promise.all([api.get<{ plans: Plan[] }>(`/api/meal-plans?clientId=${clientId}`), api.get<{ foods: FoodRow[] }>("/api/foods")]);
@@ -209,6 +229,11 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                             </div>
                           )}
                           {opt.notes && <p className="text-xs text-muted-foreground">{opt.notes}</p>}
+                          {aiSuite && opt.foods.length > 0 && (
+                            <Button size="sm" variant="tonal" className="w-full" disabled={recipeBusy === index} onClick={() => void recommendRecipe(opt, index)}>
+                              <Sparkles /> {recipeBusy === index ? "Cooking up a recipe…" : "Recommend a recipe"}
+                            </Button>
+                          )}
                           {hasMicros && (
                             <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-xl bg-surface-2 p-3 text-xs">
                               {microRows.filter(([, v]) => v > 0).map(([l, v, u]) => (
@@ -262,6 +287,25 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
             </div>
           )}
         </div>
+      )}
+
+      {recipe && (
+        <Sheet open onClose={() => setRecipe(null)} title="Recipe">
+          {recipe.text === "" ? (
+            <AiAnalyzing label="Cooking up a recipe" sub="Turning your foods into something tasty…" />
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <AiAvatar className="size-9" />
+                <div className="min-w-0">
+                  <div className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">Chef's suggestion</div>
+                  <div className="truncate text-base font-bold tracking-tight">{recipe.title}</div>
+                </div>
+              </div>
+              <Markdown className="text-[0.95rem] text-foreground/90">{recipe.text}</Markdown>
+            </div>
+          )}
+        </Sheet>
       )}
     </Sheet>
   );

@@ -597,6 +597,58 @@ export const aiRoutes = new Hono<AppEnv>()
     return c.json({ key: result.key, url: `/api/media/${result.key}`, credits: result.credits, mocked: result.mocked });
   })
 
+  /**
+   * Generate/regenerate an ORIGINAL library image (food or exercise) — a
+   * license-free house-style illustration or 3D food render, so provider
+   * images (unknown licensing) can be replaced. Prompt is configurable per
+   * feature in AI settings. Staff-only (spends tenant credits).
+   */
+  .post("/ai/generate-image", async (c) => {
+    const who = requireTenant(c)!;
+    const role = c.get("role");
+    if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    const parsed = z.object({
+      feature: z.enum(["food-image", "exercise-image", "cover-image"]),
+      subject: z.string().min(1).max(200),
+      hint: z.string().max(160).default(""),
+    }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const { feature, subject, hint } = parsed.data;
+    const result = await generateImage(c.env, {
+      tenantId: who.tenantId, actorUserId: who.userId, feature,
+      prompt: `${sys(feature)}\nSubject: ${subject}.${hint ? ` ${hint}.` : ""} Produce a fresh, unique image.`,
+    });
+    if (!result.ok) return aiFail(c, result);
+    return c.json({ key: result.key, url: `/api/media/${result.key}`, credits: result.credits, mocked: result.mocked });
+  })
+
+  /** Recommend a recipe from a meal option's foods (client-facing). */
+  .post("/ai/recipe", async (c) => {
+    const who = requireTenant(c)!;
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    const parsed = z.object({
+      clientId: z.string(),
+      mealName: z.string().max(120).default(""),
+      foods: z.array(z.object({ name: z.string().min(1).max(120), quantity: z.number().nullish(), unit: z.string().max(20).nullish() })).min(1).max(12),
+    }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, parsed.data.clientId);
+    if ("response" in access) return access.response;
+    const foodList = parsed.data.foods.map((f) => `- ${f.name}${f.quantity ? ` (${Math.round(f.quantity)}${f.unit ?? "g"})` : ""}`).join("\n");
+    const result = await generate(c.env, {
+      tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
+      feature: "meal-recipe", task: "text", system: sys("meal-recipe"),
+      prompt: `MEAL: ${parsed.data.mealName || "meal"}\nFOODS:\n${foodList}\n\nWrite the recipe now.`,
+      maxOutputTokens: 700,
+      mock: () => `A quick, balanced plate that comes together fast.\n\n## Ingredients\n${foodList}\n- Olive oil, salt & pepper to taste\n\n## Steps\n1. Season the proteins and cook them through over medium heat.\n2. Prepare the carbs and vegetables alongside.\n3. Combine everything, adjust seasoning, and plate.\n\n**Total time:** 20 min`,
+    });
+    if (!result.ok) return aiFail(c, result);
+    return c.json({ recipe: result.output, credits: result.credits, mocked: result.mocked });
+  })
+
   /** Client Summary: full context → a concise coach-facing status (trainer). */
   .post("/ai/client-summary", async (c) => {
     const who = requireTenant(c)!;

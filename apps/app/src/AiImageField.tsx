@@ -1,0 +1,84 @@
+/**
+ * AiImageField — an image slot that can be uploaded OR generated with AI. Used
+ * for food photos and exercise start/end images. "Generate" mints an original,
+ * license-free house-style image (the prompt is configurable per feature in AI
+ * settings); "Regenerate" swaps it for a brand-new unique one. Falls back to a
+ * plain upload box when AI isn't available (non-staff / no aiSuite).
+ */
+
+import { useState } from "react";
+import { Button, cn, Camera, Sparkles, ImageIcon } from "@mossa/ui";
+import { api } from "./api.js";
+
+type ImageFeature = "food-image" | "exercise-image";
+
+export function AiImageField({ value, onChange, feature, subject, hint, canAi, label, size = 88 }: {
+  value: string;
+  onChange: (url: string) => void;
+  feature: ImageFeature;
+  subject: string;
+  hint?: string;
+  canAi: boolean;
+  label?: string;
+  size?: number;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const purpose = feature === "food-image" ? "food" : "exercise";
+  const busy = uploading || generating;
+
+  const upload = async (file: File) => {
+    setUploading(true); setErr(null);
+    try {
+      const fd = new FormData(); fd.append("file", file); fd.append("purpose", purpose);
+      const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
+      const { key } = (await up.json()) as { key?: string };
+      if (key) onChange(`/api/media/${key}`);
+    } finally { setUploading(false); }
+  };
+
+  const generate = async () => {
+    if (!subject.trim()) { setErr("Add a name first."); return; }
+    setGenerating(true); setErr(null);
+    try {
+      const r = await api.post<{ url: string }>("/api/ai/generate-image", { feature, subject: subject.trim(), hint: hint ?? "" });
+      if (r.url) onChange(r.url);
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "";
+      setErr(m.includes("insufficient") ? "Out of AI credits." : m.includes("aiSuite") ? "AI isn't on your plan." : "Couldn't generate — try again.");
+    } finally { setGenerating(false); }
+  };
+
+  return (
+    <div className="space-y-1.5">
+      {label && <div className="text-xs text-muted-foreground">{label}</div>}
+      <div className="flex items-center gap-3">
+        <label className={cn("relative grid shrink-0 cursor-pointer place-items-center overflow-hidden rounded-2xl bg-surface-2 text-muted-foreground transition-colors hover:bg-surface-3", busy && "pointer-events-none")} style={{ width: size, height: size }}>
+          {generating ? (
+            <div className="flex flex-col items-center gap-1 text-primary">
+              <Sparkles className="size-5 animate-pulse" />
+              <span className="text-[0.6rem] font-medium">Creating…</span>
+            </div>
+          ) : uploading ? (
+            <span className="size-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          ) : value ? (
+            <img src={value} alt="" className="size-full object-cover" />
+          ) : (
+            <Camera className="size-6" />
+          )}
+          <input type="file" accept="image/*" capture="environment" className="hidden" disabled={busy} onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
+        </label>
+        {canAi && (
+          <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
+            <Button size="sm" variant={value ? "secondary" : "tonal"} disabled={busy} onClick={() => void generate()}>
+              {value ? <><ImageIcon /> Regenerate</> : <><Sparkles /> Generate with AI</>}
+            </Button>
+            <p className="text-[0.7rem] leading-snug text-muted-foreground">Original, license-free {feature === "food-image" ? "food render" : "exercise illustration"}. Style is set in AI settings.</p>
+          </div>
+        )}
+      </div>
+      {err && <p className="text-xs text-warning">{err}</p>}
+    </div>
+  );
+}

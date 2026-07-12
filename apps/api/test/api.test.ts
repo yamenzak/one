@@ -426,6 +426,38 @@ describe("AI workout draft — named exercises resolve to real ids", () => {
   });
 });
 
+describe("AI image generation + recipe", () => {
+  it("generates an original library image and recommends a recipe", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+
+    // Food image generation (mock lane) returns a tenant-scoped media url.
+    const img = await SELF.fetch("http://x/api/ai/generate-image", { method: "POST", headers: H, body: JSON.stringify({ feature: "food-image", subject: "grilled salmon" }) });
+    expect(img.status).toBe(200);
+    const imgOut = (await img.json()) as { url: string; key: string };
+    expect(imgOut.url).toContain(`/api/media/t/${ctx.active.tenantId}/`);
+
+    // Recipe from a meal's foods.
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "RecipeAI" }) })).json()) as { client: { id: string } };
+    const rec = await SELF.fetch("http://x/api/ai/recipe", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, mealName: "Lunch", foods: [{ name: "chicken breast", quantity: 180, unit: "g" }, { name: "white rice", quantity: 150, unit: "g" }] }) });
+    expect(rec.status).toBe(200);
+    const recOut = (await rec.json()) as { recipe: string };
+    expect(recOut.recipe.length).toBeGreaterThan(10);
+    expect(recOut.recipe).toContain("Ingredients");
+  });
+
+  it("exercise create accepts start/end images + video", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { id } = (await (await SELF.fetch("http://x/api/exercises", { method: "POST", headers: H, body: JSON.stringify({ name: "Test Lunge", muscleGroups: ["quads"], thumbUrl: "/api/media/t/x/exercise/a.png", thumb2Url: "/api/media/t/x/exercise/b.png", videoUrl: "/api/media/t/x/exercise/c.mp4" }) })).json()) as { id: string };
+    const list = (await (await SELF.fetch("http://x/api/exercises?q=test lunge", { headers: auth(ownerCookie) })).json()) as { exercises: { id: string; thumb_url: string | null; thumb2_url: string | null; video_url: string | null }[] };
+    const row = list.exercises.find((e) => e.id === id)!;
+    expect(row.thumb_url).toContain("a.png");
+    expect(row.thumb2_url).toContain("b.png");
+    expect(row.video_url).toContain("c.mp4");
+  });
+});
+
 describe("trainer AI features (registry)", () => {
   it("runs supplement reco, article writer, client summary, and lab extract (mock)", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
