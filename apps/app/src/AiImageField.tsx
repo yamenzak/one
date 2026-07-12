@@ -12,7 +12,7 @@
 
 import { useState, type CSSProperties } from "react";
 import { Button, cn, Camera, Sparkles, ImageIcon } from "@mossa/ui";
-import { api } from "./api.js";
+import { api, ApiError } from "./api.js";
 
 type ImageFeature = "food-image" | "exercise-image";
 
@@ -53,8 +53,9 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
       const r = await api.post<{ url: string }>("/api/ai/generate-image", { feature, subject: subject.trim(), hint: hint ?? "", referenceKey });
       if (r.url) onChange(r.url);
     } catch (e) {
+      const detail = e instanceof ApiError ? (e.body?.detail as string | undefined) : undefined;
       const m = e instanceof Error ? e.message : "";
-      setErr(m.includes("insufficient") ? "Out of AI credits." : m.includes("aiSuite") ? "AI isn't on your plan." : "Couldn't generate — try again.");
+      setErr(m.includes("credits") || m.includes("insufficient") ? "Out of AI credits." : m.includes("aiSuite") ? "AI isn't on your plan." : detail ? `Failed: ${detail}` : "Couldn't generate — try again.");
     } finally { setGenerating(false); }
   };
 

@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Sparkles } from "@mossa/ui";
-import { api } from "../../api.js";
+import { api, ApiError } from "../../api.js";
 import { useSession } from "../../session.js";
 import { AiImageField } from "../../AiImageField.js";
 import type { ExerciseInfo } from "../exercise.js";
@@ -38,16 +38,22 @@ export function ExerciseEditor({ exerciseId, initial, onClose, onSaved }: {
   const [video, setVideo] = useState(initial?.video_url ?? "");
   const [videoBusy, setVideoBusy] = useState(false);
   const [guideBusy, setGuideBusy] = useState(false);
+  const [guideErr, setGuideErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const { ctx } = useSession();
   const canAi = !!ctx?.entitlements?.features?.aiSuite;
 
   const generateGuide = async () => {
     if (name.trim().length < 2) return;
-    setGuideBusy(true);
+    setGuideBusy(true); setGuideErr(null);
     try {
       const r = await api.post<{ guide: string }>("/api/ai/exercise-guide", { name: name.trim(), muscleGroups: split(muscles), equipment: split(equipment) });
       if (r.guide) setInstructions(r.guide);
+      else setGuideErr("The AI returned nothing — try again.");
+    } catch (e) {
+      const detail = e instanceof ApiError ? (e.body?.detail as string | undefined) : undefined;
+      const m = e instanceof Error ? e.message : "";
+      setGuideErr(m.includes("credits") ? "Out of AI credits." : detail ? `Failed: ${detail}` : "Couldn't generate — try again.");
     } finally { setGuideBusy(false); }
   };
 
@@ -140,6 +146,7 @@ export function ExerciseEditor({ exerciseId, initial, onClose, onSaved }: {
             )}
           </div>
           <Textarea rows={6} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Setup, steps, coaching cues… or generate with AI." />
+          {guideErr && <p className="mt-1.5 text-xs text-warning">{guideErr}</p>}
         </div>
 
         <Button size="lg" className="w-full" disabled={busy || name.trim().length < 2} onClick={() => void save()}>

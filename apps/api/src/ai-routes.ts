@@ -627,10 +627,19 @@ export const aiRoutes = new Hono<AppEnv>()
     const matchLine = reference
       ? " Use the reference image ONLY to copy the character's appearance, art style, colours, line-work, camera angle, framing and background. Draw a NEW pose — the limbs and joints MUST be clearly and substantially repositioned into the specified position; do NOT reproduce the reference pose or output a near-identical image."
       : "";
-    const result = await generateImage(c.env, {
+    const base = `${sys(feature)}\nSubject: ${subject}.${hint ? ` Show ${hint}.` : ""}`;
+    let result = await generateImage(c.env, {
       tenantId: who.tenantId, actorUserId: who.userId, feature, reference,
-      prompt: `${sys(feature)}\nSubject: ${subject}.${hint ? ` Show ${hint}.` : ""}${matchLine} Produce a fresh, unique image.`,
+      prompt: `${base}${matchLine} Produce a fresh, unique image.`,
     });
+    // Image-to-image can be refused by the model — fall back to a plain
+    // generation so the second frame still lands (just less style-matched).
+    if (!result.ok && reference && result.error !== "insufficient_credits") {
+      result = await generateImage(c.env, {
+        tenantId: who.tenantId, actorUserId: who.userId, feature,
+        prompt: `${base} Produce a fresh, unique image.`,
+      });
+    }
     if (!result.ok) return aiFail(c, result);
     return c.json({ key: result.key, url: `/api/media/${result.key}`, credits: result.credits, mocked: result.mocked });
   })

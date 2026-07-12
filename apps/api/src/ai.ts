@@ -442,7 +442,7 @@ export interface GenerateImageInput {
 export type GenerateImageResult =
   | { ok: true; key: string; credits: number; mocked: boolean }
   | { ok: false; error: "insufficient_credits"; available: number; needed: number }
-  | { ok: false; error: "unavailable" };
+  | { ok: false; error: "unavailable"; detail?: string };
 
 /** A 1×1 transparent PNG — the deterministic dev/mock image. */
 const MOCK_PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
@@ -475,12 +475,12 @@ async function runGeminiImage(key: string, modelId: string, prompt: string, refe
 export async function generateImage(env: Env, input: GenerateImageInput): Promise<GenerateImageResult> {
   const { config, toggles } = await loadTenantAi(env.DB, input.tenantId);
   const fcfg = config.features?.[input.feature] ?? {};
-  if ((fcfg.enabled ?? toggles[input.feature] ?? true) === false) return { ok: false, error: "unavailable" };
+  if ((fcfg.enabled ?? toggles[input.feature] ?? true) === false) return { ok: false, error: "unavailable", detail: `feature "${input.feature}" is turned off in AI settings` };
 
   let model: AiModelRow | null = null;
   if (fcfg.model) { const m = await modelById(env.DB, fcfg.model); if (m && m.task === "image") model = m; }
   if (!model) model = await modelForTask(env.DB, "image");
-  if (!model || model.provider !== "google") return { ok: false, error: "unavailable" };
+  if (!model || model.provider !== "google") return { ok: false, error: "unavailable", detail: "no enabled Gemini image model — add a Gemini key and sync the catalog" };
   const rate = rateOf(model);
 
   const cfg = await getConfig(env.DB);
@@ -501,8 +501,9 @@ export async function generateImage(env: Env, input: GenerateImageInput): Promis
     else { const r = await withTimeout(runGeminiImage(geminiKey!, model.id, input.prompt, input.reference)); bytes = r.bytes; mimeType = r.mimeType; usage = { inputTokens: r.inputTokens, images: 1 }; }
   } catch (err) {
     await dobj.release(hold.hold);
-    await audit(env, { ...imageAuditInput(input), task: "image" } as GenerateInput, model.id, 0, 0, false, String(err));
-    return { ok: false, error: "unavailable" };
+    const detail = `${model.id}: ${err instanceof Error ? err.message : String(err)}`;
+    await audit(env, { ...imageAuditInput(input), task: "image" } as GenerateInput, model.id, 0, 0, false, detail);
+    return { ok: false, error: "unavailable", detail };
   }
 
   const ext = mimeType.includes("jpeg") ? "jpg" : mimeType.includes("webp") ? "webp" : "png";
