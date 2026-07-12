@@ -405,15 +405,19 @@ describe("weekly nutrition strip (Eat tab)", () => {
 describe("home widget prefs", () => {
   it("persists per-surface widget layout and surfaces it on /context", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const r = await SELF.fetch("http://x/api/me/widgets", { method: "PATCH", headers: H, body: JSON.stringify({ surface: "coachHome", ids: ["swaps", "atrisk", "activeToday"] }) });
+    const coach = [{ id: "clients", size: "big" }, { id: "swaps", size: "small" }];
+    const r = await SELF.fetch("http://x/api/me/widgets", { method: "PATCH", headers: H, body: JSON.stringify({ surface: "coachHome", items: coach }) });
     expect(r.status).toBe(200);
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { user: { widgets: { coachHome?: string[]; home?: string[] } } };
-    expect(ctx.user.widgets.coachHome).toEqual(["swaps", "atrisk", "activeToday"]);
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { user: { widgets: { coachHome?: unknown; home?: unknown } } };
+    expect(ctx.user.widgets.coachHome).toEqual(coach);
     // A second surface merges without clobbering the first.
-    await SELF.fetch("http://x/api/me/widgets", { method: "PATCH", headers: H, body: JSON.stringify({ surface: "home", ids: ["fasting", "water"] }) });
-    const ctx2 = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { user: { widgets: { coachHome?: string[]; home?: string[] } } };
-    expect(ctx2.user.widgets.home).toEqual(["fasting", "water"]);
-    expect(ctx2.user.widgets.coachHome).toEqual(["swaps", "atrisk", "activeToday"]);
+    const home = [{ id: "calories", size: "big" }, { id: "water", size: "small" }];
+    await SELF.fetch("http://x/api/me/widgets", { method: "PATCH", headers: H, body: JSON.stringify({ surface: "home", items: home }) });
+    const ctx2 = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { user: { widgets: { coachHome?: unknown; home?: unknown } } };
+    expect(ctx2.user.widgets.home).toEqual(home);
+    expect(ctx2.user.widgets.coachHome).toEqual(coach);
+    // Bad size is rejected.
+    expect((await SELF.fetch("http://x/api/me/widgets", { method: "PATCH", headers: H, body: JSON.stringify({ surface: "home", items: [{ id: "x", size: "huge" }] }) })).status).toBe(400);
   });
 });
 

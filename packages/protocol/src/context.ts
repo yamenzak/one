@@ -27,10 +27,17 @@ export interface TenantBranding {
   tokens?: { light?: Record<string, string> | null; dark?: Record<string, string> | null } | null;
 }
 
-/** Per-user home-screen widget layout: ordered widget ids per surface. */
+/** A placed home widget: which widget, and whether it renders as a big ring
+ *  (1 col × 3 rows) or a small card (1 × 1) in the swipeable hero grid. */
+export interface WidgetItem {
+  id: string;
+  size: "big" | "small";
+}
+
+/** Per-user home-screen widget layout: ordered placements per surface. */
 export interface WidgetPrefs {
-  home?: string[] | null;
-  coachHome?: string[] | null;
+  home?: WidgetItem[] | null;
+  coachHome?: WidgetItem[] | null;
 }
 
 export interface SessionContext {

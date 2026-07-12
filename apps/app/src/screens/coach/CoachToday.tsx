@@ -1,15 +1,16 @@
 /** Coach Today — triage inbox: roster pulse + recent notifications. */
 
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fmtWeight } from "@mossa/domain";
-import { Card, Skeleton, ProgressRing, InsightCard, Badge, Button, Page, Stagger, EmptyState, IconBadge, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Sliders, ChevronRight, type Tone, type LucideIcon } from "@mossa/ui";
+import { Card, Skeleton, InsightCard, Badge, Button, Page, Stagger, EmptyState, IconBadge, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Sliders, ChevronRight, type Tone, type LucideIcon } from "@mossa/ui";
+import type { WidgetItem } from "@mossa/protocol";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
 import type { UnitPrefs } from "@mossa/domain";
 import type { ClientSummary } from "./Clients.js";
-import { WidgetCustomizeSheet, resolveWidgets } from "../widget-kit.js";
+import { WidgetCarousel, WidgetCustomizeSheet } from "../widget-kit.js";
 import { COACH_WIDGETS, DEFAULT_COACH_WIDGETS, type CoachWidgetData } from "./CoachWidgets.js";
 
 interface Notification { id: string; type: string; title: string; message: string; created_at: string; read: number }
@@ -36,10 +37,10 @@ export function CoachToday() {
   const [swaps, setSwaps] = useState<PendingSwap[]>([]);
   const [activity, setActivity] = useState<RosterEvent[]>([]);
   const [widgetsOpen, setWidgetsOpen] = useState(false);
-  const [widgetIds, setWidgetIds] = useState<string[] | null>(ctx?.user.widgets?.coachHome ?? null);
-  const saveWidgets = async (ids: string[]) => {
-    setWidgetIds(ids);
-    await api.patch("/api/me/widgets", { surface: "coachHome", ids }).catch(() => undefined);
+  const [widgetItems, setWidgetItems] = useState<WidgetItem[] | null>(ctx?.user.widgets?.coachHome ?? null);
+  const saveWidgets = async (items: WidgetItem[]) => {
+    setWidgetItems(items);
+    await api.patch("/api/me/widgets", { surface: "coachHome", items }).catch(() => undefined);
     void refresh();
   };
 
@@ -68,24 +69,15 @@ export function CoachToday() {
     logsToday: activity.filter((e) => e.date === today).length,
     labsToReview: unread.filter((n) => n.type === "lab_uploaded").length,
   };
-  const widgets = resolveWidgets(COACH_WIDGETS, widgetIds, DEFAULT_COACH_WIDGETS, widgetData);
-
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
-      <Stagger className="flex items-center gap-4">
-        <ProgressRing progress={clients.length > 0 ? activated / clients.length : 0.001} size={150} tone="activity" label="Clients" value={clients.length} sublabel={`${activated} active`} />
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold tracking-tight">Your roster</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">{clients.length} client{clients.length === 1 ? "" : "s"} · {activated} active</p>
-          <Button size="sm" variant="secondary" className="mt-3" onClick={() => setWidgetsOpen(true)}><Sliders /> Customize</Button>
-        </div>
+      <div className="flex items-center justify-between px-1">
+        <h1 className="text-2xl font-bold tracking-tight">Today</h1>
+        <Button size="sm" variant="secondary" onClick={() => setWidgetsOpen(true)}><Sliders /> Customize</Button>
+      </div>
+      <Stagger>
+        <WidgetCarousel catalog={COACH_WIDGETS} items={widgetItems} defaults={DEFAULT_COACH_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
       </Stagger>
-
-      {widgets.length > 0 && (
-        <Stagger className="grid grid-cols-2 gap-2.5">
-          {widgets.map((w) => <Fragment key={w.id}>{w.render(widgetData)}</Fragment>)}
-        </Stagger>
-      )}
 
       {swaps.length > 0 && (
         <Stagger>
@@ -142,7 +134,7 @@ export function CoachToday() {
         )}
       </Stagger>
 
-      {widgetsOpen && <WidgetCustomizeSheet catalog={COACH_WIDGETS} selected={widgetIds} defaults={DEFAULT_COACH_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
+      {widgetsOpen && <WidgetCustomizeSheet catalog={COACH_WIDGETS} items={widgetItems} defaults={DEFAULT_COACH_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
     </Page>
   );
 }

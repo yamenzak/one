@@ -2,19 +2,20 @@
  * Client Today — hero ring + metric pills, action row, timeline feed.
  */
 
-import { Fragment, useCallback, useEffect, useState } from "react";
-import { fmtVolume, fmtEnergy, fmtWeight, kcalToDisplay, energyLabel, type UnitPrefs } from "@mossa/domain";
+import { useCallback, useEffect, useState } from "react";
+import { fmtVolume, fmtEnergy, fmtWeight, type UnitPrefs } from "@mossa/domain";
 import {
-  Button, Card, SubCard, Skeleton, ProgressRing, MacroBar, InsightCard, IconBadge, Sheet, EmptyState,
-  Page, Stagger, METRICS, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
+  Button, Card, SubCard, Skeleton, MacroBar, InsightCard, IconBadge, Sheet, EmptyState,
+  Page, Stagger, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
   Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, Sparkles, Utensils, Croissant, Soup, Apple,
   ChevronLeft, ChevronRight, type Tone, type LucideIcon,
 } from "@mossa/ui";
+import type { WidgetItem } from "@mossa/protocol";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
 import { LogSheet } from "./LogSheet.js";
-import { WidgetCustomizeSheet, resolveWidgets } from "../widget-kit.js";
+import { WidgetCarousel, WidgetCustomizeSheet } from "../widget-kit.js";
 import { CLIENT_WIDGETS, DEFAULT_CLIENT_WIDGETS, type ClientWidgetData } from "./HomeWidgets.js";
 
 export interface FeedEvent { id: string; kind: string; date: string; at: string; title: string; subtitle: string | null; metric?: { unit: "energy" | "volume" | "weight"; value: number } }
@@ -55,13 +56,13 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   const [historyOpen, setHistoryOpen] = useState(false);
   const [widgetsOpen, setWidgetsOpen] = useState(false);
   const { ctx, refresh } = useSession();
-  const [widgetIds, setWidgetIds] = useState<string[] | null>(ctx?.user.widgets?.home ?? null);
+  const [widgetItems, setWidgetItems] = useState<WidgetItem[] | null>(ctx?.user.widgets?.home ?? null);
   const units = useUnits();
   const date = todayLocal();
 
-  const saveWidgets = async (ids: string[]) => {
-    setWidgetIds(ids);
-    await api.patch("/api/me/widgets", { surface: "home", ids }).catch(() => undefined);
+  const saveWidgets = async (items: WidgetItem[]) => {
+    setWidgetItems(items);
+    await api.patch("/api/me/widgets", { surface: "home", items }).catch(() => undefined);
     void refresh();
   };
 
@@ -85,36 +86,13 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   }
 
   const targets = data.goal?.targets ?? null;
-  const calTarget = targets?.targetCalories ?? 0;
-  const net = data.nutrition.calories - data.burnedKcal;
   const widgetData: ClientWidgetData = { clientId, units, bundle: data };
-  const widgets = resolveWidgets(CLIENT_WIDGETS, widgetIds, DEFAULT_CLIENT_WIDGETS, widgetData);
-  const pillWidgets = widgets.filter((w) => !w.wide);
-  const wideWidgets = widgets.filter((w) => w.wide);
 
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
-      <Stagger className="flex items-center gap-4">
-        <ProgressRing
-          progress={calTarget > 0 ? net / calTarget : 0.001}
-          size={188}
-          tone="calories"
-          label={units.energy === "kJ" ? "Energy" : METRICS.calories.label}
-          value={kcalToDisplay(Math.max(0, net), units).toLocaleString()}
-          sublabel={calTarget > 0 ? `of ${kcalToDisplay(calTarget, units).toLocaleString()} ${energyLabel(units)}` : "set a goal"}
-        />
-        <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-          {pillWidgets.length > 0
-            ? pillWidgets.map((w) => <Fragment key={w.id}>{w.render(widgetData)}</Fragment>)
-            : <button onClick={() => setWidgetsOpen(true)} className="flex h-full min-h-24 items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground transition-colors hover:bg-secondary">Add metrics</button>}
-        </div>
+      <Stagger>
+        <WidgetCarousel catalog={CLIENT_WIDGETS} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
       </Stagger>
-
-      {wideWidgets.length > 0 && (
-        <Stagger className="space-y-2.5">
-          {wideWidgets.map((w) => <Fragment key={w.id}>{w.render(widgetData)}</Fragment>)}
-        </Stagger>
-      )}
 
       <Stagger>
         <MacroBar
@@ -174,7 +152,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
 
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} clientId={clientId} onLogged={() => void load()} />
       {historyOpen && <HistorySheet clientId={clientId} onClose={() => setHistoryOpen(false)} onOpen={onOpen} />}
-      {widgetsOpen && <WidgetCustomizeSheet catalog={CLIENT_WIDGETS} selected={widgetIds} defaults={DEFAULT_CLIENT_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
+      {widgetsOpen && <WidgetCustomizeSheet catalog={CLIENT_WIDGETS} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
     </Page>
   );
 }

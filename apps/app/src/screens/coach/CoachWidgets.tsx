@@ -1,11 +1,11 @@
 /**
- * Coach home widgets — roster analytics tiles a trainer can pick for their
- * Today dashboard. All values are computed from data CoachToday already loads
- * (clients, notifications, swaps, retention, roster activity).
+ * Coach home widgets — roster analytics for the swipeable Today hero, each with
+ * a big ring (1×3) and small card (1×1) form. All values come from data
+ * CoachToday already loads (clients, notifications, swaps, retention, roster).
  */
 
 import { Users, ArrowLeftRight, AlertTriangle, ClipboardList, Bell, Flame, Activity, FlaskConical } from "@mossa/ui";
-import { StatTile, type WidgetDef } from "../widget-kit.js";
+import { RingCard, MiniCard, type WidgetDef, type WidgetItem } from "../widget-kit.js";
 
 export interface CoachWidgetData {
   clientsTotal: number;
@@ -19,15 +19,26 @@ export interface CoachWidgetData {
   labsToReview: number;
 }
 
-export const DEFAULT_COACH_WIDGETS = ["swaps", "checkins", "atrisk", "activeToday"];
+export const DEFAULT_COACH_WIDGETS: WidgetItem[] = [
+  { id: "clients", size: "big" },
+  { id: "swaps", size: "small" },
+  { id: "checkins", size: "small" },
+  { id: "atrisk", size: "small" },
+];
+
+const stat = (id: string, title: string, icon: typeof Users, tone: Parameters<typeof MiniCard>[0]["tone"], get: (d: CoachWidgetData) => number, opts?: { sub?: (d: CoachWidgetData) => string; progress?: (d: CoachWidgetData) => number }): WidgetDef<CoachWidgetData> => ({
+  id, title, icon,
+  renderBig: (d) => <RingCard tone={tone} progress={opts?.progress ? opts.progress(d) : 0.001} value={get(d)} label={title} sublabel={opts?.sub ? opts.sub(d) : undefined} />,
+  renderSmall: (d) => <MiniCard icon={icon} tone={tone} label={title} value={get(d)} progress={opts?.progress ? opts.progress(d) : undefined} />,
+});
 
 export const COACH_WIDGETS: WidgetDef<CoachWidgetData>[] = [
-  { id: "swaps", title: "Pending swaps", icon: ArrowLeftRight, render: (d) => <StatTile icon={ArrowLeftRight} tone="cardio" value={d.swaps} label="Pending swaps" /> },
-  { id: "checkins", title: "New check-ins", icon: ClipboardList, render: (d) => <StatTile icon={ClipboardList} tone="nutrition" value={d.unreadCheckins} label="New check-ins" /> },
-  { id: "atrisk", title: "At-risk clients", icon: AlertTriangle, render: (d) => <StatTile icon={AlertTriangle} tone="sleep" value={d.atRisk} label="At risk" /> },
-  { id: "activeToday", title: "Clients active today", icon: Flame, render: (d) => <StatTile icon={Flame} tone="activity" value={d.activeToday} label="Active today" /> },
-  { id: "logsToday", title: "Logs today", icon: Activity, render: (d) => <StatTile icon={Activity} tone="cardio" value={d.logsToday} label="Logs today" /> },
-  { id: "clients", title: "Total clients", icon: Users, render: (d) => <StatTile icon={Users} tone="activity" value={d.clientsTotal} label="Clients" sub={`${d.clientsActive} active`} /> },
-  { id: "unread", title: "Unread notifications", icon: Bell, render: (d) => <StatTile icon={Bell} tone="primary" value={d.unread} label="Unread" /> },
-  { id: "labs", title: "Labs to review", icon: FlaskConical, render: (d) => <StatTile icon={FlaskConical} tone="cardio" value={d.labsToReview} label="Labs to review" /> },
+  stat("clients", "Clients", Users, "activity", (d) => d.clientsTotal, { sub: (d) => `${d.clientsActive} active`, progress: (d) => (d.clientsTotal ? d.clientsActive / d.clientsTotal : 0) }),
+  stat("swaps", "Pending swaps", ArrowLeftRight, "cardio", (d) => d.swaps),
+  stat("checkins", "New check-ins", ClipboardList, "nutrition", (d) => d.unreadCheckins),
+  stat("atrisk", "At risk", AlertTriangle, "sleep", (d) => d.atRisk),
+  stat("activeToday", "Active today", Flame, "activity", (d) => d.activeToday, { progress: (d) => (d.clientsTotal ? d.activeToday / d.clientsTotal : 0) }),
+  stat("logsToday", "Logs today", Activity, "cardio", (d) => d.logsToday),
+  stat("unread", "Unread", Bell, "primary", (d) => d.unread),
+  stat("labs", "Labs to review", FlaskConical, "cardio", (d) => d.labsToReview),
 ];

@@ -222,12 +222,12 @@ export const contextRoutes = new Hono<AppEnv>()
     const user = c.get("user");
     if (!user) return c.json({ error: "unauthenticated" }, 401);
     const parsed = z
-      .object({ surface: z.enum(["home", "coachHome"]), ids: z.array(z.string().max(40)).max(40) })
+      .object({ surface: z.enum(["home", "coachHome"]), items: z.array(z.object({ id: z.string().max(40), size: z.enum(["big", "small"]) })).max(40) })
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const row = await c.env.DB.prepare("SELECT widgets_json FROM user_prefs WHERE user_id = ?").bind(user.id).first<{ widgets_json: string | null }>();
-    const current = parseJson<Record<string, string[]>>(row?.widgets_json ?? null, {});
-    const merged = { ...current, [parsed.data.surface]: parsed.data.ids };
+    const current = parseJson<Record<string, unknown>>(row?.widgets_json ?? null, {});
+    const merged = { ...current, [parsed.data.surface]: parsed.data.items };
     const now = nowIso();
     await c.env.DB.prepare("INSERT INTO user_prefs (user_id, widgets_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET widgets_json = ?, updated_at = ?")
       .bind(user.id, j(merged), now, j(merged), now)
