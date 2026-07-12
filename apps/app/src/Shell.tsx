@@ -37,8 +37,8 @@ const CLIENT_TABS: TabDef[] = [
   { key: "today", label: "Today", icon: Home },
   { key: "train", label: "Train", icon: Dumbbell },
   { key: "eat", label: "Eat", icon: Utensils },
-  { key: "progress", label: "Progress", icon: LineChart },
   { key: "wellness", label: "Wellness", icon: HeartPulse },
+  { key: "progress", label: "Progress", icon: LineChart },
 ];
 
 /** Am I currently looking at the client surface? (client role, or train mode.) */

@@ -5,8 +5,7 @@
  * theme-tone coded and their renderers format values in the user's units.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { motion, useMotionValue, animate } from "motion/react";
+import { useRef, useState, type ReactNode } from "react";
 import { Sheet, Button, IconBadge, MetricPill, ProgressRing, cn, ChevronDown, X, LayoutGrid, type Tone, type LucideIcon } from "@mossa/ui";
 import type { WidgetItem } from "@mossa/protocol";
 
@@ -66,69 +65,34 @@ function packPages<D>(items: { def: WidgetDef<D>; size: WidgetSize }[]): Col<D>[
 }
 
 const HERO_H = "14rem";
-const PAGE_GAP = 12;
-const SNAP = { type: "spring" as const, stiffness: 460, damping: 44, mass: 0.85 };
 
-/** The swipeable hero grid — a Framer drag carousel with spring snap (no
- *  scrollbar; horizontal drag pages, vertical gestures pass to page scroll). */
+/** The swipeable hero grid — native CSS scroll-snap (compositor-driven, so it
+ *  stays 60fps+), with snap-stop:always for crisp one-page paging and the
+ *  scrollbar hidden. */
 export function WidgetCarousel<D>({ catalog, items, defaults, data, onCustomize }: {
   catalog: WidgetDef<D>[]; items: readonly (WidgetItem | string)[] | null | undefined; defaults: WidgetItem[]; data: D; onCustomize: () => void;
 }) {
   const pages = packPages(resolveItems(catalog, items, defaults, data));
-  const maxPage = Math.max(0, pages.length - 1);
   const [page, setPage] = useState(0);
-  const [width, setWidth] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const x = useMotionValue(0);
-  const stride = width + PAGE_GAP;
-
-  useLayoutEffect(() => {
-    const el = containerRef.current; if (!el) return;
-    const measure = () => setWidth(el.clientWidth);
-    measure();
-    const ro = new ResizeObserver(measure); ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const goTo = (p: number, spring = true) => {
-    const np = Math.max(0, Math.min(maxPage, p));
-    setPage(np);
-    animate(x, -np * stride, spring ? SNAP : { duration: 0 });
-  };
-  // Keep position correct when width (rotate/resize) or page count changes.
-  useEffect(() => { goTo(page, false); /* eslint-disable-next-line */ }, [width, maxPage]);
+  const ref = useRef<HTMLDivElement>(null);
+  const onScroll = () => { const el = ref.current; if (el) setPage(Math.round(el.scrollLeft / Math.max(1, el.clientWidth))); };
+  const goTo = (i: number) => ref.current?.scrollTo({ left: i * ref.current.clientWidth, behavior: "smooth" });
 
   if (pages.length === 0) {
     return <button onClick={onCustomize} className="flex h-32 w-full items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground transition-colors hover:bg-secondary [&_svg]:mr-1.5 [&_svg]:size-4"><LayoutGrid /> Add widgets</button>;
   }
   return (
-    <div className="select-none space-y-2.5">
-      <div ref={containerRef} className="overflow-hidden">
-        <motion.div
-          drag={maxPage > 0 ? "x" : false}
-          dragDirectionLock
-          dragConstraints={{ left: -maxPage * stride, right: 0 }}
-          dragElastic={0.1}
-          dragMomentum={false}
-          style={{ x }}
-          onDragEnd={(_, info) => {
-            const t = width * 0.2;
-            if (info.offset.x < -t || info.velocity.x < -400) goTo(page + 1);
-            else if (info.offset.x > t || info.velocity.x > 400) goTo(page - 1);
-            else goTo(page);
-          }}
-          className="flex touch-pan-y gap-3"
-        >
-          {pages.map((cols, pi) => (
-            <div key={pi} className="grid shrink-0 grid-cols-2 grid-rows-3 gap-2.5" style={{ width: width || "100%", height: HERO_H }}>
-              {cols.flatMap((col, ci) =>
-                "big" in col
-                  ? [<div key={col.big.def.id} style={{ gridColumnStart: ci + 1, gridRowStart: 1, gridRowEnd: 4 }}>{col.big.def.renderBig(data)}</div>]
-                  : col.smalls.map((s, ri) => <div key={s.def.id} style={{ gridColumnStart: ci + 1, gridRowStart: ri + 1 }}>{s.def.renderSmall(data)}</div>),
-              )}
-            </div>
-          ))}
-        </motion.div>
+    <div className="space-y-2.5">
+      <div ref={ref} onScroll={onScroll} className="flex touch-pan-y snap-x snap-mandatory overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {pages.map((cols, pi) => (
+          <div key={pi} className="grid w-full shrink-0 snap-center snap-always grid-cols-2 grid-rows-3 gap-2.5" style={{ height: HERO_H }}>
+            {cols.flatMap((col, ci) =>
+              "big" in col
+                ? [<div key={col.big.def.id} style={{ gridColumnStart: ci + 1, gridRowStart: 1, gridRowEnd: 4 }}>{col.big.def.renderBig(data)}</div>]
+                : col.smalls.map((s, ri) => <div key={s.def.id} style={{ gridColumnStart: ci + 1, gridRowStart: ri + 1 }}>{s.def.renderSmall(data)}</div>),
+            )}
+          </div>
+        ))}
       </div>
       {pages.length > 1 && (
         <div className="flex items-center justify-center gap-1.5">
