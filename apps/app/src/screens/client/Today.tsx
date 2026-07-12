@@ -5,7 +5,7 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { fmtVolume, fmtEnergy, fmtWeight, kcalToDisplay, energyLabel, type UnitPrefs } from "@mossa/domain";
 import {
-  Button, Card, SubCard, Skeleton, ProgressRing, MetricPill, MacroBar, InsightCard, IconBadge, Sheet, EmptyState,
+  Button, Card, SubCard, Skeleton, ProgressRing, MacroBar, InsightCard, IconBadge, Sheet, EmptyState,
   Page, Stagger, METRICS, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
   Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, Sparkles, Utensils, Croissant, Soup, Apple,
   ChevronLeft, ChevronRight, type Tone, type LucideIcon,
@@ -87,9 +87,10 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   const targets = data.goal?.targets ?? null;
   const calTarget = targets?.targetCalories ?? 0;
   const net = data.nutrition.calories - data.burnedKcal;
-  const waterTarget = targets?.targetWaterMl ?? 2500;
   const widgetData: ClientWidgetData = { clientId, units, bundle: data };
   const widgets = resolveWidgets(CLIENT_WIDGETS, widgetIds, DEFAULT_CLIENT_WIDGETS, widgetData);
+  const pillWidgets = widgets.filter((w) => !w.wide);
+  const wideWidgets = widgets.filter((w) => w.wide);
 
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
@@ -103,11 +104,17 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
           sublabel={calTarget > 0 ? `of ${kcalToDisplay(calTarget, units).toLocaleString()} ${energyLabel(units)}` : "set a goal"}
         />
         <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-          <MetricPill icon={METRICS.protein.icon} label={METRICS.protein.label} tone={METRICS.protein.tone} value={`${data.nutrition.proteinG} g`} progress={targets?.targetProteinG ? data.nutrition.proteinG / targets.targetProteinG : undefined} />
-          <MetricPill icon={METRICS.water.icon} label={METRICS.water.label} tone={METRICS.water.tone} value={fmtVolume(data.waterMl, units)} progress={data.waterMl / waterTarget} />
-          <MetricPill icon={METRICS.burned.icon} label={METRICS.burned.label} tone={METRICS.burned.tone} value={kcalToDisplay(data.burnedKcal, units).toLocaleString()} />
+          {pillWidgets.length > 0
+            ? pillWidgets.map((w) => <Fragment key={w.id}>{w.render(widgetData)}</Fragment>)
+            : <button onClick={() => setWidgetsOpen(true)} className="flex h-full min-h-24 items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground transition-colors hover:bg-secondary">Add metrics</button>}
         </div>
       </Stagger>
+
+      {wideWidgets.length > 0 && (
+        <Stagger className="space-y-2.5">
+          {wideWidgets.map((w) => <Fragment key={w.id}>{w.render(widgetData)}</Fragment>)}
+        </Stagger>
+      )}
 
       <Stagger>
         <MacroBar
@@ -129,13 +136,6 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
           <PencilLine />
         </Button>
       </Stagger>
-
-      {/* Home widgets — customizable */}
-      {widgets.length > 0 && (
-        <Stagger className="grid grid-cols-2 gap-2.5">
-          {widgets.map((w) => <Fragment key={w.id}>{w.render(widgetData)}</Fragment>)}
-        </Stagger>
-      )}
 
       {!data.checkedIn && (
         <Stagger>
