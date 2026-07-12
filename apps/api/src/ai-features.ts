@@ -110,11 +110,26 @@ Only well-supported, safe OTC options. Never suggest prescription drugs or anyth
   {
     key: "exercise-guide",
     label: "Write exercise instructions",
-    description: "Generate step-by-step how-to coaching cues for an exercise.",
+    description: "Generate a full how-to guide for an exercise.",
     audience: "trainer",
     task: "text",
     tonable: true,
-    defaultSystem: `You are a strength coach writing how-to instructions for one exercise. Reply in concise Markdown: a one-line "**Setup:**", a "## Steps" numbered list (the execution, 3-6 steps), and a "## Coaching cues" bullet list (2-4 key form cues or common mistakes to avoid). Be specific and practical. No preamble, no title.`,
+    defaultSystem: `You are an expert strength coach writing a complete how-to guide for one exercise. Reply in rich Markdown with these sections:
+"## Setup" — a short paragraph on stance, grip, bar/implement position and bracing.
+"## Execution" — a numbered list of 4-7 steps describing the full movement start to finish, each a full sentence.
+"## Coaching cues" — a bullet list of 3-5 specific form cues.
+"## Common mistakes" — a bullet list of 2-4 mistakes to avoid.
+"## Breathing" — one line on when to inhale/exhale.
+Be thorough, specific and practical. Write in full prose — do not truncate. No title, no preamble.`,
+  },
+  {
+    key: "exercise-meta",
+    label: "Auto-fill exercise details",
+    description: "From an exercise name, infer muscles, equipment, difficulty, force and mechanic.",
+    audience: "trainer",
+    task: "text",
+    tonable: false,
+    defaultSystem: `You classify a strength exercise from its name. Reply with ONLY JSON: {"primaryMuscles": string[], "secondaryMuscles": string[], "equipment": string[], "difficulty": "beginner"|"intermediate"|"advanced", "force": "push"|"pull"|"static"|null, "mechanic": "compound"|"isolation"|null}. Use ONLY values from the allowed lists provided in the prompt (lowercase, exact spelling). primaryMuscles: the 1-2 prime movers. secondaryMuscles: assisting muscles. Be accurate.`,
   },
   {
     key: "meal-recipe",

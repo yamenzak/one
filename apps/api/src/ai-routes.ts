@@ -6,7 +6,7 @@
 
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { WorkoutBody } from "@mossa/protocol";
+import { WorkoutBody, MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@mossa/protocol";
 import { resolveUnits } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
@@ -623,7 +623,7 @@ export const aiRoutes = new Hono<AppEnv>()
     if (pair) {
       // One wide two-panel render → guaranteed-identical style, genuinely
       // different poses, one generation. The client splits it into two frames.
-      const prompt = `${sys(feature)}\n\nIMPORTANT: Output ONE wide landscape image made of TWO equal side-by-side panels showing the SAME single figure in the SAME art style, same side-on camera and same background. LEFT panel: ${subject} at the STARTING / setup position (ready, before the rep). RIGHT panel: ${subject} at the PEAK-CONTRACTION / finished position at the hardest point of the rep — a clearly different body pose (e.g. a curl with the bar raised to the shoulders, a squat at the bottom with hips below the knees, a press with arms extended overhead). No dividing line, no gap, no text, no labels, no numbers.`;
+      const prompt = `${sys(feature)}\n\nIMPORTANT COMPOSITION: Output ONE wide 2:1 landscape image that reads as two equal side-by-side panels showing the SAME single figure in the SAME art style, same side-on camera and same background. In the LEFT half, place ONE complete full-body figure CENTERED within that half with generous margin — whole body from head to feet visible, nothing cropped. In the RIGHT half, place the SAME figure CENTERED within that half, also full-body and uncropped. Keep the exact vertical centre of the image EMPTY (no figure straddling the middle) so the image can be split cleanly in half. LEFT = ${subject} at the STARTING / setup position (ready, before the rep). RIGHT = ${subject} at the PEAK-CONTRACTION / finished position at the hardest point of the rep — a clearly different body pose (e.g. a curl with the bar raised to the shoulders, a squat at the bottom with hips below the knees, a press with arms overhead). No dividing line, no gap, no frame, no text, no labels, no numbers.`;
       const r = await generateImage(c.env, { tenantId: who.tenantId, actorUserId: who.userId, feature, prompt });
       if (!r.ok) return aiFail(c, r);
       return c.json({ key: r.key, url: `/api/media/${r.key}`, pair: true, credits: r.credits, mocked: r.mocked });
@@ -698,12 +698,47 @@ export const aiRoutes = new Hono<AppEnv>()
     const result = await generate(c.env, {
       tenantId: who.tenantId, actorUserId: who.userId, feature: "exercise-guide", task: "text",
       system: sys("exercise-guide"),
-      prompt: `EXERCISE: ${name}${muscleGroups.length ? `\nMUSCLES: ${muscleGroups.join(", ")}` : ""}${equipment.length ? `\nEQUIPMENT: ${equipment.join(", ")}` : ""}\n\nWrite the instructions now.`,
-      maxOutputTokens: 600,
-      mock: () => `**Setup:** Stand tall with a shoulder-width stance and brace your core.\n\n## Steps\n1. Get into the starting position with control.\n2. Move through the full range of motion, keeping tension on the target muscle.\n3. Pause briefly at peak contraction.\n4. Return slowly to the start under control.\n\n## Coaching cues\n- Keep the movement smooth — no jerking or momentum.\n- Breathe out on the effort, in on the return.\n- Stop a rep or two short of failure to keep form clean.`,
+      prompt: `EXERCISE: ${name}${muscleGroups.length ? `\nMUSCLES: ${muscleGroups.join(", ")}` : ""}${equipment.length ? `\nEQUIPMENT: ${equipment.join(", ")}` : ""}\n\nWrite the full guide now.`,
+      maxOutputTokens: 1400,
+      mock: () => `## Setup\nSet the bar across your upper back, take a grip just wider than shoulder-width, brace your core and unrack with control.\n\n## Execution\n1. Step back and set your feet shoulder-width, toes turned slightly out.\n2. Take a big breath and brace hard against your belt or midsection.\n3. Break at the hips and knees together, sitting down between your legs.\n4. Descend until your hip crease passes below the top of your knee.\n5. Drive through the whole foot to stand back up, keeping your chest tall.\n6. Lock out the hips at the top and reset your breath.\n\n## Coaching cues\n- Spread the floor with your feet to keep the knees tracking out.\n- Keep the bar over mid-foot the whole way.\n- Stay tall — don't let the chest collapse forward.\n\n## Common mistakes\n- Knees caving in on the way up.\n- Cutting depth short.\n- Losing the brace at the bottom.\n\n## Breathing\nInhale and brace at the top, hold through the descent, exhale as you pass the hardest point on the way up.`,
     });
     if (!result.ok) return aiFail(c, result);
     return c.json({ guide: result.output, credits: result.credits, mocked: result.mocked });
+  })
+
+  /** Auto-fill exercise metadata (muscles, equipment, difficulty…) from a name. */
+  .post("/ai/exercise-meta", async (c) => {
+    const who = requireTenant(c)!;
+    const role = c.get("role");
+    if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    const parsed = z.object({ name: z.string().min(1).max(120) }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const result = await generate(c.env, {
+      tenantId: who.tenantId, actorUserId: who.userId, feature: "exercise-meta", task: "text", expectsJson: true,
+      system: sys("exercise-meta"),
+      prompt: `EXERCISE: ${parsed.data.name}\n\nAllowed muscles: ${MUSCLE_GROUPS.join(", ")}\nAllowed equipment: ${EQUIPMENT_TYPES.join(", ")}\n\nClassify it now.`,
+      maxOutputTokens: 300,
+      mock: () => JSON.stringify({ primaryMuscles: ["quads"], secondaryMuscles: ["glutes", "hamstrings"], equipment: ["barbell"], difficulty: "intermediate", force: "push", mechanic: "compound" }),
+    });
+    if (!result.ok) return aiFail(c, result);
+    const raw = extractJson<Record<string, unknown>>(result.output);
+    if (!raw) return c.json({ error: "The AI didn't return valid details.", raw: result.output.slice(0, 800), mocked: result.mocked }, 422);
+    // Keep only values from the allowed vocab; coerce the enums.
+    const muscles = new Set<string>(MUSCLE_GROUPS);
+    const equip = new Set<string>(EQUIPMENT_TYPES);
+    const arr = (v: unknown, allow: Set<string>) => (Array.isArray(v) ? v.map((x) => String(x).toLowerCase().trim()).filter((x) => allow.has(x)) : []);
+    const oneOf = (v: unknown, opts: string[]) => (typeof v === "string" && opts.includes(v) ? v : null);
+    const meta = {
+      primaryMuscles: arr(raw.primaryMuscles, muscles),
+      secondaryMuscles: arr(raw.secondaryMuscles, muscles),
+      equipment: arr(raw.equipment, equip),
+      difficulty: oneOf(raw.difficulty, ["beginner", "intermediate", "advanced"]),
+      force: oneOf(raw.force, ["push", "pull", "static"]),
+      mechanic: oneOf(raw.mechanic, ["compound", "isolation"]),
+    };
+    return c.json({ meta, credits: result.credits, mocked: result.mocked });
   })
 
   /** Client Summary: full context → a concise coach-facing status (trainer). */

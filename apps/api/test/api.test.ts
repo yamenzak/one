@@ -461,7 +461,15 @@ describe("AI image generation + recipe", () => {
     const guide = await SELF.fetch("http://x/api/ai/exercise-guide", { method: "POST", headers: H, body: JSON.stringify({ name: "Barbell Curl", muscleGroups: ["biceps"], equipment: ["barbell"] }) });
     expect(guide.status).toBe(200);
     const guideOut = (await guide.json()) as { guide: string };
-    expect(guideOut.guide).toContain("Steps");
+    expect(guideOut.guide).toContain("Execution");
+
+    // Auto-fill exercise metadata — only allowed-vocab values survive.
+    const meta = await SELF.fetch("http://x/api/ai/exercise-meta", { method: "POST", headers: H, body: JSON.stringify({ name: "Barbell Back Squat" }) });
+    expect(meta.status).toBe(200);
+    const metaOut = (await meta.json()) as { meta: { primaryMuscles: string[]; equipment: string[]; difficulty: string | null; mechanic: string | null } };
+    expect(metaOut.meta.primaryMuscles).toContain("quads");
+    expect(metaOut.meta.equipment).toContain("barbell");
+    expect(metaOut.meta.mechanic).toBe("compound");
   });
 
   it("exercise create accepts start/end images + video", async () => {
