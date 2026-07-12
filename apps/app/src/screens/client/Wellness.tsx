@@ -10,13 +10,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { fmtVolume, volumeLabel, volumeDisplayToMl } from "@mossa/domain";
 import {
-  Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, StatCard, WeekDots, ProgressRing, EmptyState, cn,
-  ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Bed, Flame, Plus, ChevronRight, Smile, Upload,
+  Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, StatCard, WeekDots, EmptyState, cn, toneVar,
+  ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Bed, Flame, Plus, ChevronRight, Smile, Upload, type Tone,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { LogSheet } from "./LogSheet.js";
 import { CheckInDetailSheet, LabDetailSheet, type CheckInFull, type LabFull } from "./WellnessDetails.js";
+import { WellnessScoreCard, WellnessScoreCardSkeleton, type WellnessScoreResult } from "./WellnessScore.js";
 
 interface Supplement { id: string; name: string; dose: string | null; kind: string; schedule: { slot: string }[] }
 interface Fast { activeFast: { started_at: string; target_hours: number } | null; recentFasts: { duration_minutes: number; target_hours: number }[] }
@@ -26,12 +27,40 @@ interface Today { waterMl: number; goal: { targets: { targetWaterMl?: number } |
 /** N days back from a YYYY-MM-DD string, as YYYY-MM-DD. */
 const shift = (date: string, delta: number): string => { const d = new Date(`${date}T00:00:00`); d.setDate(d.getDate() + delta); return d.toISOString().slice(0, 10); };
 
-const ZONES = [
-  { label: "Fed", max: 4, tone: "nutrition" as const },
-  { label: "Catabolic", max: 16, tone: "cardio" as const },
-  { label: "Fat burning", max: 24, tone: "activity" as const },
-  { label: "Ketosis", max: 72, tone: "sleep" as const },
+interface Zone { label: string; start: number; max: number; tone: Tone; vis: number }
+// Metabolic fasting zones — thresholds in elapsed hours (universal, target-free).
+const ZONES: Zone[] = [
+  { label: "Fed", start: 0, max: 4, tone: "nutrition", vis: 4 },
+  { label: "Catabolic", start: 4, max: 16, tone: "cardio", vis: 12 },
+  { label: "Fat burning", start: 16, max: 24, tone: "activity", vis: 8 },
+  { label: "Ketosis", start: 24, max: 72, tone: "sleep", vis: 7 },
 ];
+const zoneAt = (h: number): Zone => ZONES.find((z) => h < z.max) ?? ZONES[ZONES.length - 1]!;
+const nextZone = (h: number): Zone | null => { const i = ZONES.indexOf(zoneAt(h)); return i < ZONES.length - 1 ? ZONES[i + 1]! : null; };
+const hoursToNext = (h: number): string => { const rem = Math.max(0, zoneAt(h).max - h); const hh = Math.floor(rem); const mm = Math.round((rem - hh) * 60); return hh > 0 ? `${hh}h ${mm}m` : `${mm}m`; };
+/** The furthest zone a completed fast reached (for the recent-fasts list). */
+const zoneReached = (h: number): Zone | null => (h < 4 ? null : [...ZONES].reverse().find((z) => h >= z.start) ?? null);
+
+/** A metabolic-zone timeline: four tone-coded segments that fill as the fast
+ *  progresses through Fed → Catabolic → Fat burning → Ketosis. */
+function ZoneTrack({ elapsedHours }: { elapsedHours: number }) {
+  return (
+    <div className="relative flex gap-1.5">
+      {ZONES.map((z) => {
+        const end = z.max === 72 ? 30 : z.max; // cap the ketosis tail for a readable width
+        const frac = Math.min(1, Math.max(0, (elapsedHours - z.start) / (end - z.start)));
+        const current = elapsedHours >= z.start && elapsedHours < z.max;
+        return (
+          <div key={z.label} style={{ flexGrow: z.vis }} className="min-w-0">
+            <div className="h-2 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${frac * 100}%`, backgroundColor: toneVar[z.tone] }} /></div>
+            <div className={cn("mt-1.5 truncate text-center text-[0.55rem] font-semibold leading-tight", current ? "text-foreground" : "text-muted-foreground/60")}>{z.label}</div>
+            <div className="numeral text-center text-[0.5rem] text-muted-foreground/50">{z.start}h</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () => void }) {
   const [supps, setSupps] = useState<Supplement[]>([]);
@@ -41,6 +70,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
   const [sessions, setSessions] = useState<Session[]>([]);
   const [checkIns, setCheckIns] = useState<CheckInFull[]>([]);
   const [today, setToday] = useState<Today | null>(null);
+  const [score, setScore] = useState<WellnessScoreResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [logKind, setLogKind] = useState<"checkin" | "water" | "sleep" | "mood" | null>(null);
   const [detailCheckIn, setDetailCheckIn] = useState<CheckInFull | null>(null);
@@ -52,7 +82,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
   const waterPresets = units.volume === "oz" ? [8, 12, 16] : [250, 500, 750];
 
   const load = useCallback(async () => {
-    const [s, sl, l, f, sess, ci, td] = await Promise.all([
+    const [s, sl, l, f, sess, ci, td, sc] = await Promise.all([
       api.get<{ supplements: Supplement[] }>(`/api/supplements?clientId=${clientId}`),
       api.get<{ taken: { supplement_id: string; slot: string }[] }>(`/api/supplements/logs?clientId=${clientId}&date=${date}`),
       api.get<{ labs: LabFull[] }>(`/api/labs?clientId=${clientId}`),
@@ -60,9 +90,10 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
       api.get<{ sessions: Session[] }>(`/api/sessions?clientId=${clientId}`).catch(() => ({ sessions: [] })),
       api.get<{ checkIns: CheckInFull[] }>(`/api/check-ins?clientId=${clientId}`),
       api.get<Today>(`/api/today?clientId=${clientId}&date=${date}`),
+      api.get<WellnessScoreResult>(`/api/wellness/score?clientId=${clientId}&today=${date}`).catch(() => null),
     ]);
     setSupps(s.supplements); setTaken(new Set(sl.taken.map((t) => `${t.supplement_id}:${t.slot}`)));
-    setLabs(l.labs); setFast(f); setSessions(sess.sessions); setCheckIns(ci.checkIns); setToday(td); setLoading(false);
+    setLabs(l.labs); setFast(f); setSessions(sess.sessions); setCheckIns(ci.checkIns); setToday(td); setScore(sc); setLoading(false);
   }, [clientId, date]);
   useEffect(() => void load(), [load]);
 
@@ -91,8 +122,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
     const r = await api.post<{ taken: boolean }>(`/api/supplements/${id}/log`, { clientId, date, slot });
     setTaken((p) => { const n = new Set(p); r.taken ? n.add(key) : n.delete(key); return n; });
   };
-  const [fastTarget, setFastTarget] = useState(16);
-  const toggleFast = async () => { await api.post("/api/fasting", { clientId, data: { action: fast?.activeFast ? "end" : "start", targetHours: fastTarget } }); await load(); };
+  const toggleFast = async () => { await api.post("/api/fasting", { clientId, data: { action: fast?.activeFast ? "end" : "start", targetHours: 16 } }); await load(); };
 
   // ── This-week metrics ──
   const week = useMemo(() => {
@@ -121,7 +151,6 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
 
   const waterTarget = today.goal?.targets?.targetWaterMl ?? 2500;
   const waterPct = Math.min(1, today.waterMl / waterTarget);
-  const remaining = Math.max(0, waterTarget - today.waterMl);
   const fastElapsedMin = fast?.activeFast ? Math.floor((now - Date.parse(fast.activeFast.started_at)) / 60000) : 0;
   const fastHours = fastElapsedMin / 60;
   const zone = ZONES.find((z) => fastHours < z.max) ?? ZONES[ZONES.length - 1]!;
@@ -135,22 +164,8 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         <h1 className={onBack ? "text-xl font-bold tracking-tight" : "text-2xl font-bold tracking-tight"}>Wellness</h1>
       </div>
 
-      {/* Hydration hero */}
-      <Stagger>
-        <Card className="relative overflow-hidden">
-          <div className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full bg-hydration/10 blur-2xl" />
-          <div className="relative flex items-center gap-5">
-            <ProgressRing size={128} strokeWidth={10} tone="hydration" progress={waterPct} value={fmtVolume(today.waterMl, units)} label="Hydration" />
-            <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium uppercase tracking-wide text-hydration">Water today</div>
-              <div className="mt-0.5 text-sm text-muted-foreground">{remaining > 0 ? <><span className="numeral font-semibold text-foreground">{fmtVolume(remaining, units)}</span> to goal</> : "Goal reached 🎉"}</div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {waterPresets.map((v) => <Chip key={v} icon={Plus} onClick={() => void addWater(v)}>{v} {volumeLabel(units)}</Chip>)}
-              </div>
-            </div>
-          </div>
-        </Card>
-      </Stagger>
+      {/* Wellness Score hero */}
+      <Stagger>{score ? <WellnessScoreCard result={score} /> : <WellnessScoreCardSkeleton />}</Stagger>
 
       {/* Quick-log chips */}
       <Stagger className="flex flex-wrap gap-2">
@@ -160,34 +175,50 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         <Chip icon={Timer} onClick={() => void toggleFast()}>{fast?.activeFast ? "End fast" : "Start fast"}</Chip>
       </Stagger>
 
-      {/* Fasting */}
+      {/* Hydration — slim daily control */}
       <Stagger>
-        <Card className="relative space-y-3 overflow-hidden">
-          <div className="flex items-center justify-between">
+        <Card className="relative overflow-hidden">
+          <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-hydration/10 blur-2xl" />
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-2.5"><IconBadge icon={Droplet} tone="hydration" size="sm" /><h2 className="font-semibold">Hydration</h2></div>
+            <span className="numeral text-sm font-semibold text-hydration">{fmtVolume(today.waterMl, units)}<span className="text-muted-foreground"> / {fmtVolume(waterTarget, units)}</span></span>
+          </div>
+          <div className="relative mt-3 h-2 w-full overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-hydration transition-all duration-500" style={{ width: `${waterPct * 100}%` }} /></div>
+          <div className="relative mt-3 flex flex-wrap gap-2">
+            {waterPresets.map((v) => <Chip key={v} icon={Plus} onClick={() => void addWater(v)}>{v} {volumeLabel(units)}</Chip>)}
+          </div>
+        </Card>
+      </Stagger>
+
+      {/* Fasting — start/stop with a metabolic-zone timeline */}
+      <Stagger>
+        <Card className="relative space-y-4 overflow-hidden">
+          {fast?.activeFast && <div className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full blur-3xl" style={{ backgroundColor: `color-mix(in oklch, ${toneVar[zone.tone]} 18%, transparent)` }} />}
+          <div className="relative flex items-center justify-between">
             <div className="flex items-center gap-2.5"><IconBadge icon={Timer} tone={fast?.activeFast ? zone.tone : "sleep"} size="sm" /><h2 className="font-semibold">Fasting</h2></div>
             {fast?.activeFast ? <Badge tone={zone.tone}>{zone.label}</Badge> : <Badge tone="neutral">Not fasting</Badge>}
           </div>
+
           {fast?.activeFast ? (
             <>
-              <div className="flex items-end justify-between">
-                <div className="numeral text-3xl font-bold tracking-tight tabular-nums">{clock}</div>
-                <div className="text-xs text-muted-foreground">of {fast.activeFast.target_hours}h target</div>
+              <div className="relative text-center">
+                <div className="numeral text-5xl font-bold tracking-tight tabular-nums">{clock}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{nextZone(fastHours) ? <>In <span className="font-medium text-foreground">{zone.label}</span> · {hoursToNext(fastHours)} to {nextZone(fastHours)!.label}</> : <>Deep in <span className="font-medium text-foreground">{zone.label}</span></>}</div>
               </div>
-              <div className="h-2.5 overflow-hidden rounded-full bg-surface-2">
-                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, (fastHours / fast.activeFast.target_hours) * 100)}%`, backgroundColor: `var(--${zone.tone})` }} />
-              </div>
-              <Button className="w-full" variant="outline" onClick={() => void toggleFast()}>End fast</Button>
+              <ZoneTrack elapsedHours={fastHours} />
+              <Button className="relative w-full" variant="outline" onClick={() => void toggleFast()}>End fast</Button>
             </>
           ) : (
             <>
-              <div className="flex flex-wrap gap-2">{[16, 18, 20, 24].map((h) => <Chip key={h} selected={fastTarget === h} onClick={() => setFastTarget(h)}>{h}h</Chip>)}</div>
-              <Button className="w-full" variant="tonal" onClick={() => void toggleFast()}>Start {fastTarget}h fast</Button>
+              <ZoneTrack elapsedHours={0} />
+              <Button className="w-full" size="lg" onClick={() => void toggleFast()}><Timer /> Start fasting</Button>
               {(fast?.recentFasts.length ?? 0) > 0 && (
-                <div className="space-y-1.5 pt-1">
+                <div className="space-y-1.5 border-t border-border/50 pt-3">
+                  <div className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">Recent fasts</div>
                   {fast!.recentFasts.slice(0, 3).map((r, i) => (
                     <div key={i} className="flex items-center justify-between text-xs text-muted-foreground">
                       <span className="numeral">{Math.floor(r.duration_minutes / 60)}h {r.duration_minutes % 60}m</span>
-                      {r.duration_minutes >= r.target_hours * 60 ? <Badge tone="success">Goal met</Badge> : <span>target {r.target_hours}h</span>}
+                      {zoneReached(r.duration_minutes / 60) ? <Badge tone={zoneReached(r.duration_minutes / 60)!.tone}>{zoneReached(r.duration_minutes / 60)!.label}</Badge> : null}
                     </div>
                   ))}
                 </div>
