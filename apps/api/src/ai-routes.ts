@@ -606,7 +606,7 @@ export const aiRoutes = new Hono<AppEnv>()
       maxOutputTokens: 160,
       mock: () => coachNoteMock(surface, access.client.display_name),
     });
-    if (!result.ok) return c.json({ message: null });
+    if (!result.ok) return c.json({ message: null, detail: "detail" in result ? result.detail : undefined });
     const message = result.output.trim().replace(/^["']|["']$/g, "").slice(0, 400);
     await c.env.CACHE.put(cacheKey, JSON.stringify({ message }), { expirationTtl: 3600 }).catch(() => undefined);
     return c.json({ message, cached: false, mocked: result.mocked });

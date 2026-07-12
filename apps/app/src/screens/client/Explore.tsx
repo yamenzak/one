@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Card, Badge, Skeleton, Page, Stagger, EmptyState, ArrowLeft, Button, PencilLine } from "@mossa/ui";
 import { api } from "../../api.js";
+import { Markdown } from "../../Markdown.js";
 
 interface Resource { id: string; type: string; title: string; summary: string | null; bodyMd: string | null; coverUrl: string | null; durationMinutes: number | null }
 
@@ -17,7 +18,7 @@ export function Explore({ clientId, onBack }: { clientId: string; onBack: () => 
       <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
         <div className="flex items-center gap-3"><Button size="icon" variant="secondary" onClick={() => setOpen(null)}><ArrowLeft /></Button><h1 className="flex-1 truncate text-xl font-bold tracking-tight">{open.title}</h1></div>
         {open.coverUrl && <img src={open.coverUrl} alt="" className="max-h-56 w-full rounded-2xl object-cover" />}
-        <article className="prose-sm whitespace-pre-wrap text-[0.95rem] leading-relaxed text-foreground/90">{open.bodyMd || open.summary}</article>
+        {open.bodyMd ? <Markdown className="text-[0.95rem] text-foreground/90">{open.bodyMd}</Markdown> : <p className="text-[0.95rem] leading-relaxed text-foreground/90">{open.summary}</p>}
       </Page>
     );
   }

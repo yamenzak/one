@@ -183,6 +183,18 @@ export async function modelForTask(db: D1Database, task: string): Promise<AiMode
     .first<AiModelRow>();
 }
 
+/** The default model for a task, preferring a given provider when one is
+ *  enabled for that task (used to favor Gemini when a key is configured). */
+export async function preferredModelForTask(db: D1Database, task: string, provider: string): Promise<AiModelRow | null> {
+  await seedAiModels(db);
+  const forTask = task === "vision" ? ["vision", "text", "text-small"] : [task];
+  const placeholders = forTask.map(() => "?").join(",");
+  return db
+    .prepare(`SELECT * FROM ai_models WHERE provider = ? AND task IN (${placeholders}) AND enabled = 1 ORDER BY task = ? DESC, is_default DESC LIMIT 1`)
+    .bind(provider, ...forTask, task)
+    .first<AiModelRow>();
+}
+
 /** Any enabled multimodal model for vision when no vision-tagged one exists —
  *  Gemini text models accept images, so a Google model is a valid fallback. */
 export async function visionFallbackModel(db: D1Database): Promise<AiModelRow | null> {
@@ -241,6 +253,9 @@ export interface GenerateInput {
   /** Ask the provider for JSON natively (Gemini responseMimeType / Workers AI
    *  response_format) — belt-and-suspenders with the response normalizer. */
   expectsJson?: boolean;
+  /** Optional JSON Schema for Workers AI JSON Mode (response_format
+   *  json_schema). When omitted, the JSON directive + normalizer carry it. */
+  jsonSchema?: Record<string, unknown>;
   /** Deterministic mock output builder for dev / `ai.mock = on`. */
   mock: () => string;
 }
@@ -305,6 +320,9 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   const enabled = fcfg.enabled ?? toggles[input.feature] ?? true;
   if (enabled === false) return { ok: false, error: "unavailable", detail: `feature "${input.feature}" is turned off in AI settings` };
 
+  const cfg = await getConfig(env.DB);
+  const geminiKey = cfg["google.gemini_key"];
+
   // Model: a tenant's per-feature override (task-compatible) wins, else the
   // task default. Vision needs a multimodal model — a vision-tagged one, or
   // ANY Gemini model (Gemini models are all multimodal). Text/text-small are
@@ -314,6 +332,10 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
     input.task === "vision" ? visionCapable(m) : m.task !== "vision" && m.task !== "image";
   let model: AiModelRow | null = null;
   if (fcfg.model) { const m = await modelById(env.DB, fcfg.model); if (m && compatible(m)) model = m; }
+  // No explicit override: when a Gemini key is configured, prefer Gemini — it's
+  // the stronger model and honors native JSON mode, so structured features are
+  // far more reliable. Falls back to the Workers AI default otherwise.
+  if (!model && geminiKey) model = await preferredModelForTask(env.DB, input.task, "google");
   if (!model) model = await modelForTask(env.DB, input.task);
   // Vision fallback: no vision-tagged model → pick any enabled Gemini model.
   if (!model && input.task === "vision") model = await visionFallbackModel(env.DB);
@@ -328,12 +350,16 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
     const tone = (fcfg.tone ?? config.tone) as AiTone | null | undefined;
     if (tone && TONE_GUIDE[tone]) system = `${system}\n\n${TONE_GUIDE[tone]}`;
   }
+  // JSON features: nail the output contract in the system prompt too. Gemini
+  // has native JSON mode, but Workers AI models obey a firm instruction far
+  // better than a bare schema hint — and it costs nothing when JSON mode is on.
+  if (input.expectsJson) {
+    system = `${system}\n\nOutput format: respond with ONLY a single valid JSON value — no prose, no explanation, no markdown code fences. Do not wrap the JSON in \`\`\`.`;
+  }
   const runInput: GenerateInput = { ...input, system };
 
-  const cfg = await getConfig(env.DB);
   const mockMode = cfg["ai.mock"] ?? "auto";
   const isGoogle = model.provider === "google";
-  const geminiKey = cfg["google.gemini_key"];
   // Real run needs the matching credential: Workers AI binding, or a Gemini key.
   const canRunReal = isGoogle ? !!geminiKey : !!env.AI;
   const useMock = mockMode === "on" || (mockMode !== "off" && !canRunReal);
@@ -372,8 +398,13 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
         ],
         max_tokens: input.maxOutputTokens ?? 1024,
       };
-      // Native JSON mode on Workers AI (supported by the Llama/Mistral catalog).
-      if (input.expectsJson) args.response_format = { type: "json_object" };
+      // Workers AI JSON Mode is response_format:{type:"json_schema", json_schema}
+      // (per the docs) — a bare {type:"json_object"} isn't the supported shape.
+      // Use it only when the caller supplies a schema; otherwise the system
+      // directive + response normalizer carry it (works across the whole catalog).
+      if (input.expectsJson && input.jsonSchema) {
+        args.response_format = { type: "json_schema", json_schema: input.jsonSchema };
+      }
       const run = env.AI!.run(model.id as Parameters<Ai["run"]>[0], args as Parameters<Ai["run"]>[1]) as Promise<{ response?: string | object; usage?: { prompt_tokens?: number; completion_tokens?: number } }>;
       const result = await withTimeout(run);
       // json_object mode can hand back an already-parsed object — re-serialize

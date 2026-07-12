@@ -75,8 +75,11 @@ function FeatureCard({ feat, models, cfg, tones, onSave }: {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(cfg.system ?? "");
   const enabled = cfg.enabled !== false;
-  // Vision features can only run on vision models; text/text-small interchange.
-  const pickable = models.filter((m) => (feat.task === "vision" ? m.task === "vision" : m.task !== "vision"));
+  // Vision needs a multimodal model — a vision-tagged one, or any Gemini model
+  // (Gemini is multimodal). Text/text-small interchange; never image models.
+  const pickable = models.filter((m) =>
+    feat.task === "vision" ? m.task === "vision" || m.provider === "google" : m.task !== "vision" && m.task !== "image",
+  );
 
   return (
     <Card className="space-y-3">
