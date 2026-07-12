@@ -1,7 +1,7 @@
 /** Client Shop — marketplace packages, Stripe Connect buy, redeem codes. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Skeleton, Page, Stagger, ArrowLeft, Ticket, Store } from "@mossa/ui";
+import { Button, Card, Badge, Field, Skeleton, Page, Stagger, IconBadge, ArrowLeft, Ticket, Store } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Pkg { id: string; name: string; description: string | null; one_time_price_cents: number | null; budgets: { feature: string; days: number }[]; visibility: string }
@@ -32,7 +32,13 @@ export function Shop({ clientId, onBack }: { clientId: string; onBack: () => voi
     catch { setMsg("Checkout isn't available yet — ask your coach to finish Stripe setup."); }
   };
 
-  if (!packages) return <Skeleton className="m-4 h-64" />;
+  if (!packages) return (
+    <div className="mx-auto max-w-xl space-y-4 p-4">
+      <Skeleton className="h-9 w-40" />
+      <Skeleton className="h-24" />
+      <Skeleton className="h-32" />
+    </div>
+  );
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
@@ -45,7 +51,7 @@ export function Shop({ clientId, onBack }: { clientId: string; onBack: () => voi
 
       <Stagger>
         <Card className="space-y-3">
-          <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Ticket /></div><h2 className="font-semibold">Have a code?</h2></div>
+          <div className="flex items-center gap-2.5"><IconBadge icon={Ticket} tone="primary" size="sm" /><h2 className="font-semibold">Have a code?</h2></div>
           <div className="flex items-end gap-2">
             <Field label="Redeem code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className="flex-1" />
             <Button disabled={code.length < 4 || busy} onClick={() => void redeem()}>Redeem</Button>
@@ -56,7 +62,7 @@ export function Shop({ clientId, onBack }: { clientId: string; onBack: () => voi
 
       {packages.length > 0 && (
         <div className="space-y-3">
-          <h2 className="font-semibold">Packages</h2>
+          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Packages</h3>
           {packages.map((p) => (
             <Stagger key={p.id}>
               <Card>

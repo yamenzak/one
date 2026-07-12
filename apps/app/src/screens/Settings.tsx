@@ -204,7 +204,7 @@ function Copyable({ label, value }: { label: string; value: string }) {
       <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</div>
       <button onClick={copy} className="flex w-full items-center gap-2 rounded-lg bg-surface-3 px-2.5 py-2 text-left transition-colors hover:bg-surface-2">
         <code className="min-w-0 flex-1 truncate font-mono text-xs">{value}</code>
-        {copied ? <Check className="size-3.5 shrink-0 text-good" /> : <Copy className="size-3.5 shrink-0 text-muted-foreground" />}
+        {copied ? <Check className="size-3.5 shrink-0 text-success" /> : <Copy className="size-3.5 shrink-0 text-muted-foreground" />}
       </button>
     </div>
   );

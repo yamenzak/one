@@ -1,7 +1,7 @@
 /** Platform admin console — tenants (comp/topup/seed), Stripe config. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Skeleton, SegmentedControl, Chip, Page, Stagger, ShieldCheck, Sparkles, ArrowLeft, KeyRound, Globe } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, ShieldCheck, Sparkles, ArrowLeft, KeyRound, Globe } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Tenant { id: string; name: string; slug: string; plan_id: string | null; status: string | null; comp: number | null }
@@ -90,26 +90,36 @@ function DomainsConfig() {
 function Tenants() {
   const [tenants, setTenants] = useState<Tenant[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [topUpId, setTopUpId] = useState<string | null>(null);
+  const [credits, setCredits] = useState("");
   const load = useCallback(async () => setTenants((await api.get<{ tenants: Tenant[] }>("/api/admin/tenants")).tenants), []);
   useEffect(() => void load(), [load]);
 
   const comp = async (id: string, planId: string) => { setBusy(id); try { await api.post(`/api/admin/tenants/${id}/plan`, { planId, comp: true }); await load(); } finally { setBusy(null); } };
-  const topUp = async (id: string) => { const c = Number(prompt("Credits to add") ?? "0"); if (c) await api.post(`/api/admin/tenants/${id}/topup`, { credits: c }); };
-  const seedDemo = async () => { setBusy("demo"); try { const r = await api.post<{ seeded?: number; skipped?: string }>("/api/admin/seed-demo"); alert(r.skipped ? `Skipped: ${r.skipped}` : `Seeded ${r.seeded} sample clients.`); } finally { setBusy(null); } };
+  const topUp = async () => { const c = Number(credits); if (topUpId && c) await api.post(`/api/admin/tenants/${topUpId}/topup`, { credits: c }); setTopUpId(null); setCredits(""); setMsg(c ? `Added ${c} credits.` : null); };
+  const seedDemo = async () => { setBusy("demo"); setMsg(null); try { const r = await api.post<{ seeded?: number; skipped?: string }>("/api/admin/seed-demo"); setMsg(r.skipped ? `Skipped: ${r.skipped}` : `Seeded ${r.seeded} sample clients.`); } finally { setBusy(null); } };
 
   if (!tenants) return <Skeleton className="h-64" />;
   return (
     <Stagger className="space-y-3">
       <Button variant="tonal" className="w-full" disabled={busy === "demo"} onClick={() => void seedDemo()}><Sparkles /> {busy === "demo" ? "Seeding…" : "Seed demo data into my tenant"}</Button>
+      {msg && <p className="text-center text-sm text-muted-foreground">{msg}</p>}
       {tenants.map((t) => (
         <Card key={t.id} className="space-y-2.5">
           <div className="flex items-center justify-between"><div><div className="font-semibold">{t.name}</div><div className="text-xs text-muted-foreground">/{t.slug}</div></div><Badge tone={t.comp ? "sleep" : t.status === "active" ? "success" : "neutral"}>{t.comp ? "comped " : ""}{t.plan_id ?? "free"}</Badge></div>
           <div className="flex flex-wrap gap-2">
-            {PLANS.map((p) => <button key={p} disabled={busy === t.id} onClick={() => void comp(t.id, p)} className="rounded-full bg-secondary px-3 py-1 text-xs capitalize transition-colors hover:bg-surface-3">{p}</button>)}
-            <button onClick={() => void topUp(t.id)} className="rounded-full bg-primary/15 px-3 py-1 text-xs text-primary">+ credits</button>
+            {PLANS.map((p) => <button key={p} disabled={busy === t.id} onClick={() => void comp(t.id, p)} className="rounded-full bg-secondary px-3 py-1 text-xs capitalize transition-all active:scale-95 hover:bg-surface-3">{p}</button>)}
+            <button onClick={() => setTopUpId(t.id)} className="rounded-full bg-primary/15 px-3 py-1 text-xs text-primary transition-transform active:scale-95">+ credits</button>
           </div>
         </Card>
       ))}
+      <Sheet open={!!topUpId} onClose={() => setTopUpId(null)} title="Add credits">
+        <div className="space-y-4">
+          <Field label="Credits to add" inputMode="numeric" value={credits} onChange={(e) => setCredits(e.target.value.replace(/\D/g, ""))} autoFocus />
+          <Button size="lg" className="w-full" disabled={!Number(credits)} onClick={() => void topUp()}>Add credits</Button>
+        </div>
+      </Sheet>
     </Stagger>
   );
 }

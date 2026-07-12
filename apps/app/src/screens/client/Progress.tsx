@@ -22,7 +22,15 @@ export function Progress({ clientId }: { clientId: string }) {
     void api.get<{ checkIns: CheckIn[] }>(`/api/check-ins?clientId=${clientId}`).then((r) => setCheckIns(r.checkIns));
   }, [clientId]);
 
-  if (!measurements || !checkIns) return <Skeleton className="m-4 h-64" />;
+  if (!measurements || !checkIns) return (
+    <div className="mx-auto max-w-xl space-y-4 p-4">
+      <Skeleton className="h-9 w-40" />
+      <Skeleton className="h-10" />
+      <Skeleton className="h-28" />
+      <Skeleton className="h-28" />
+      <Skeleton className="h-28" />
+    </div>
+  );
 
   const today = todayLocal();
   const { start } = presetRange(range, today);

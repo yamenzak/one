@@ -45,7 +45,14 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
   const [fastTarget, setFastTarget] = useState(16);
   const toggleFast = async () => { await api.post("/api/fasting", { clientId, data: { action: fast?.activeFast ? "end" : "start", targetHours: fastTarget } }); await load(); };
 
-  if (loading) return <Skeleton className="m-4 h-96" />;
+  if (loading) return (
+    <div className="mx-auto max-w-xl space-y-4 p-4">
+      <Skeleton className="h-9 w-40" />
+      <Skeleton className="h-28" />
+      <Skeleton className="h-40" />
+      <Skeleton className="h-28" />
+    </div>
+  );
   const fastElapsed = fast?.activeFast ? Math.floor((Date.now() - Date.parse(fast.activeFast.started_at)) / 60000) : 0;
   const fastHours = fastElapsed / 60;
   const ZONES = [

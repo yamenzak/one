@@ -30,7 +30,7 @@ export function CoachPlans({ clientId }: { clientId: string }) {
         <Button size="sm" onClick={() => setCreateOpen(true)}><Plus /> New</Button>
       </div>
       {!plans ? <Skeleton className="h-64" /> : plans.length === 0 ? (
-        <EmptyState icon={kind === "workout" ? Dumbbell : Utensils} title={`No ${kind} plans`} description={kind === "workout" ? "Create one and build it — or use ✦ AI draft inside the builder." : "Create one and build the options bank."} />
+        <EmptyState icon={kind === "workout" ? Dumbbell : Utensils} title={`No ${kind} plans`} description={kind === "workout" ? "Create one and build it — or use the AI draft inside the builder." : "Create one and build the options bank."} />
       ) : (
         <Stagger className="space-y-2">
           {plans.map((p) => (

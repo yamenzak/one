@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@mossa/protocol";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, Save, X, Globe } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, Save, X, Globe } from "@mossa/ui";
 import { api } from "../../api.js";
 import { ExerciseThumb, ExerciseMeta, splitList, pretty, type ExerciseInfo } from "../exercise.js";
 import { WebExerciseSheet } from "./Library.js";
@@ -102,7 +102,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   const nameOf = (id: string) => exOf(id)?.name ?? "Exercise";
 
   return (
-    <div className="mx-auto max-w-xl space-y-4 p-4 pb-32">
+    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-32">
       <div className="flex items-center gap-3">
         <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
         <h1 className="flex-1 truncate text-xl font-bold tracking-tight">{plan.name}</h1>
@@ -117,6 +117,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
         {days.length > 0 && <button onClick={() => setCopyWeekOpen(true)} className="inline-flex items-center gap-1 rounded-full bg-secondary px-4 py-2 text-sm text-muted-foreground [&_svg]:size-4"><Copy /> Copy week</button>}
       </div>
 
+      <Stagger className="space-y-4">
       {days.length === 0 ? (
         <EmptyState icon={Dumbbell} title="Empty plan" description="Add a day, or let AI draft one from the client's intake." action={<Button onClick={() => setAiOpen(true)}><Sparkles /> AI draft plan</Button>} />
       ) : day ? (
@@ -173,6 +174,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
           )}
         </>
       ) : null}
+      </Stagger>
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/40 bg-background/90 p-3 backdrop-blur-xl md:pl-24">
         <div className="mx-auto flex max-w-xl gap-3">
@@ -185,7 +187,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
       {aiOpen && <AiDraftSheet onClose={() => setAiOpen(false)} onRun={runAi} />}
       {exportOpen && <ExportTemplateSheet body={{ days }} defaultName={plan.name} onClose={() => setExportOpen(false)} />}
       {copyWeekOpen && <CopyWeekSheet dayCount={days.length} onClose={() => setCopyWeekOpen(false)} onCopy={copyWeek} />}
-    </div>
+    </Page>
   );
 }
 
@@ -383,7 +385,7 @@ function ExportTemplateSheet({ body, defaultName, onClose }: { body: WorkoutBody
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">Copies this plan's structure into a reusable template. Absolute and dropset weights are cleared.</p>
           <Field label="Template name" value={name} onChange={(e) => setName(e.target.value)} />
-          <label className="flex items-center justify-between rounded-xl bg-secondary px-4 py-3 text-sm"><span>Share with the whole team</span><input type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} className="size-4 accent-(--color-primary)" /></label>
+          <label className="flex items-center justify-between rounded-xl bg-secondary px-4 py-3 text-sm"><span>Share with the whole team</span><Switch checked={shared} onCheckedChange={setShared} /></label>
           <Button size="lg" className="w-full" disabled={busy || !name.trim()} onClick={() => void run()}>{busy ? "Saving…" : "Save template"}</Button>
         </div>
       )}

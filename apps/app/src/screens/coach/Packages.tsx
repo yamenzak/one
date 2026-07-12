@@ -1,7 +1,7 @@
 /** Package editor + redemption codes + promo codes. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Switch, Sheet, Skeleton, Chip, Page, Stagger, EmptyState, CreditCard, Ticket, Tag, Trash2, Plus, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Switch, Sheet, Skeleton, Chip, Page, Stagger, EmptyState, IconBadge, CreditCard, Ticket, Tag, Trash2, Plus, X } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Pkg { id: string; name: string; one_time_price_cents: number | null; monthly_price_cents?: number | null; budgets: { feature: string; days: number }[]; visibility: string }
@@ -31,7 +31,11 @@ export function Packages() {
   useEffect(() => void load(), [load]);
   const deletePromo = async (id: string) => { await api.del(`/api/promo-codes/${id}`); await load(); };
 
-  if (!packages) return <Skeleton className="m-4 h-64" />;
+  if (!packages) return (
+    <div className="mx-auto max-w-xl space-y-4 p-4">
+      <Skeleton className="h-9 w-40" /><Skeleton className="h-20" /><Skeleton className="h-20" />
+    </div>
+  );
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
@@ -50,19 +54,27 @@ export function Packages() {
       )}
 
       <div className="flex items-center justify-between pt-2"><h2 className="text-lg font-semibold">Redemption codes</h2><Button size="sm" onClick={() => setCodeOpen(true)}><Plus /> Code</Button></div>
-      {codes.map((c) => (
-        <Card key={c.id} className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Ticket /></div><div><div className="font-mono font-semibold">{c.code}</div><div className="text-xs text-muted-foreground">{c.days_to_add}d {c.target_feature} · used {c.used_count}/{c.max_uses}</div></div></div>
-        </Card>
-      ))}
+      {codes.length === 0 ? <p className="text-sm text-muted-foreground">One-off access codes you can hand to a client to redeem.</p> : (
+        <Stagger className="space-y-2">
+          {codes.map((c) => (
+            <Card key={c.id} className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5"><IconBadge icon={Ticket} tone="primary" size="sm" /><div><div className="font-mono font-semibold">{c.code}</div><div className="text-xs text-muted-foreground">{c.days_to_add}d {c.target_feature} · used {c.used_count}/{c.max_uses}</div></div></div>
+            </Card>
+          ))}
+        </Stagger>
+      )}
 
       <div className="flex items-center justify-between pt-2"><h2 className="text-lg font-semibold">Promo codes</h2><Button size="sm" onClick={() => setPromoOpen(true)}><Plus /> Promo</Button></div>
-      {promos.length === 0 ? <p className="text-sm text-muted-foreground">Discount codes applied at checkout.</p> : promos.map((p) => (
-        <Card key={p.id} className={`flex items-center justify-between ${p.active ? "" : "opacity-50"}`}>
-          <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-nutrition-soft text-nutrition [&_svg]:size-4"><Tag /></div><div><div className="font-mono font-semibold">{p.code}</div><div className="text-xs text-muted-foreground">{p.discount_type === "percent" ? `${p.percent_off}% off` : `$${((p.amount_off_cents ?? 0) / 100).toFixed(0)} off`} · used {p.redemption_count}{p.max_redemptions ? `/${p.max_redemptions}` : ""}</div></div></div>
-          {p.active ? <button onClick={() => void deletePromo(p.id)} className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button> : <Badge tone="neutral">inactive</Badge>}
-        </Card>
-      ))}
+      {promos.length === 0 ? <p className="text-sm text-muted-foreground">Discount codes applied at checkout.</p> : (
+        <Stagger className="space-y-2">
+          {promos.map((p) => (
+            <Card key={p.id} className={`flex items-center justify-between ${p.active ? "" : "opacity-50"}`}>
+              <div className="flex items-center gap-2.5"><IconBadge icon={Tag} tone="nutrition" size="sm" /><div><div className="font-mono font-semibold">{p.code}</div><div className="text-xs text-muted-foreground">{p.discount_type === "percent" ? `${p.percent_off}% off` : `$${((p.amount_off_cents ?? 0) / 100).toFixed(0)} off`} · used {p.redemption_count}{p.max_redemptions ? `/${p.max_redemptions}` : ""}</div></div></div>
+              {p.active ? <button onClick={() => void deletePromo(p.id)} className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button> : <Badge tone="neutral">inactive</Badge>}
+            </Card>
+          ))}
+        </Stagger>
+      )}
 
       {pkgOpen && <PackageSheet onClose={() => setPkgOpen(false)} onSaved={() => { setPkgOpen(false); void load(); }} />}
       {codeOpen && <CodeSheet onClose={() => setCodeOpen(false)} onSaved={() => { setCodeOpen(false); void load(); }} />}

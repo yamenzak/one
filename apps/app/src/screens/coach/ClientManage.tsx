@@ -304,8 +304,10 @@ interface Report {
 function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => void }) {
   const [range, setRange] = useState<"7d" | "30d" | "90d">("30d");
   const [report, setReport] = useState<Report | null>(null);
+  const [exNames, setExNames] = useState<Map<string, string>>(new Map());
   const units = useUnits();
   useEffect(() => { setReport(null); const today = new Date().toISOString().slice(0, 10); void api.get<Report>(`/api/reports/client/${clientId}?range=${range}&today=${today}`).then(setReport); }, [clientId, range]);
+  useEffect(() => { void api.get<{ exercises: { id: string; name: string }[] }>("/api/exercises").then((r) => setExNames(new Map(r.exercises.map((e) => [e.id, e.name])))).catch(() => undefined); }, []);
   const weight = report?.weightSeries ?? [];
   const wDelta = weight.length >= 2 ? Math.round((kgToDisplay(weight.at(-1)!.kg, units) - kgToDisplay(weight[0]!.kg, units)) * 10) / 10 : null;
   return (
@@ -327,7 +329,7 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
           {report.prs.length > 0 && (
             <Card className="space-y-1.5">
               <h3 className="text-sm font-semibold">Top lifts (est. 1RM)</h3>
-              {report.prs.slice(0, 8).map((p) => <div key={p.exerciseId} className="flex items-center justify-between text-sm"><span className="truncate text-muted-foreground">{p.exerciseId}</span><span className="numeral font-medium">{Math.round(kgToDisplay(p.e1rm, units))} {weightLabel(units)}</span></div>)}
+              {report.prs.slice(0, 8).map((p) => <div key={p.exerciseId} className="flex items-center justify-between text-sm"><span className="truncate text-muted-foreground">{exNames.get(p.exerciseId) ?? "Exercise"}</span><span className="numeral font-medium">{Math.round(kgToDisplay(p.e1rm, units))} {weightLabel(units)}</span></div>)}
             </Card>
           )}
         </div>

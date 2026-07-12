@@ -8,7 +8,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet } from "@mossa/protocol";
 import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, type ExerciseBests } from "@mossa/domain";
 import {
-  Button, Card, Badge, Field, Sheet, Skeleton, SubCard, ProgressRing, EmptyState,
+  Button, Card, Badge, Field, Sheet, Skeleton, SubCard, ProgressRing, EmptyState, Page, Stagger,
   ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, ChevronRight, Check, Info, Play,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
@@ -71,10 +71,10 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
 
   if (dayIndex === null) {
     return (
-      <div className="mx-auto max-w-xl space-y-3 p-4 pb-28">
+      <Page className="mx-auto max-w-xl space-y-3 p-4 pb-28">
         <div className="flex items-center gap-3">
           {onExit && <Button size="icon" variant="secondary" onClick={onExit} aria-label="Back"><ArrowLeft /></Button>}
-          <h1 className="text-2xl font-bold tracking-tight">{plan.name}</h1>
+          <h1 className="text-xl font-bold tracking-tight">{plan.name}</h1>
         </div>
         {plan.body.days.map((day, i) => (
           <motion.button key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} onClick={() => !day.isRestDay && setDayIndex(i)} disabled={day.isRestDay} className="w-full disabled:opacity-60">
@@ -90,7 +90,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
             </Card>
           </motion.button>
         ))}
-      </div>
+      </Page>
     );
   }
 
@@ -139,13 +139,14 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   };
 
   return (
-    <div className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <div className="flex items-center gap-3">
         <Button size="icon" variant="secondary" onClick={() => setDayIndex(null)}><ArrowLeft /></Button>
         <h1 className="flex-1 truncate text-xl font-bold tracking-tight">{day.name || `Day ${dayIndex + 1}`}</h1>
         <ProgressRing progress={totalSets ? loggedSets / totalSets : 0} size={52} strokeWidth={6} tone="activity" value={<span className="text-sm">{loggedSets}</span>} />
       </div>
 
+      <Stagger className="space-y-4">
       {day.blocks.map((block, blockIndex) => {
         // Singles log set-by-set per exercise; supersets/circuits/HIIT log a
         // whole round (one set of every exercise) at a time.
@@ -204,6 +205,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
           </Card>
         );
       })}
+      </Stagger>
 
       <AnimatePresence>
         {toast && (
@@ -223,7 +225,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
         <SwapDrawer clientId={clientId} planId={plan.id} dayIndex={dayIndex} coords={swapSlot} currentName={exercises.get(swapSlot.exerciseId)?.name ?? "Exercise"} onClose={() => setSwapSlot(null)} onDone={(m) => { setSwapSlot(null); void load(); setToast(m); setTimeout(() => setToast(null), 3000); }} />
       )}
       {detailSlot && <ExerciseDetailSheet ex={exercises.get(detailSlot.exerciseId)} slot={detailSlot} onClose={() => setDetailSlot(null)} />}
-    </div>
+    </Page>
   );
 }
 

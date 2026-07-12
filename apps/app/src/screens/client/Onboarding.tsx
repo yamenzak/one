@@ -39,7 +39,7 @@ export function Onboarding({ clientId, displayName, onDone }: { clientId: string
           {step === 0 && (
             <Card className="space-y-4">
               <div><h2 className="text-xl font-semibold tracking-tight">Hi {displayName}</h2><p className="mt-1 text-sm text-muted-foreground">A few basics so your coach can tailor everything.</p></div>
-              <div className="flex gap-2">{(["male", "female"] as const).map((g) => <Chip key={g} selected={f.gender === g} onClick={() => set("gender", g)}>{g}</Chip>)}</div>
+              <div className="flex gap-2">{(["male", "female"] as const).map((g) => <Chip key={g} className="capitalize" selected={f.gender === g} onClick={() => set("gender", g)}>{g}</Chip>)}</div>
               <Field label="Date of birth" icon={Calendar} type="date" value={f.dateOfBirth} onChange={(e) => set("dateOfBirth", e.target.value)} />
               {units.height === "ft_in" ? (
                 <div className="grid grid-cols-2 gap-3">
@@ -93,7 +93,7 @@ function Group({ label, options, value, onChange, format }: { label: string; opt
   return (
     <div>
       <div className="mb-2 text-sm text-muted-foreground">{label}</div>
-      <div className="flex flex-wrap gap-2">{options.map((o) => <Chip key={o} selected={value === o} onClick={() => onChange(o)}>{format ? o.replace("_", " ") : o}</Chip>)}</div>
+      <div className="flex flex-wrap gap-2">{options.map((o) => <Chip key={o} className="capitalize" selected={value === o} onClick={() => onChange(o)}>{format ? o.replace("_", " ") : o}</Chip>)}</div>
     </div>
   );
 }
