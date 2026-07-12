@@ -135,9 +135,9 @@ Estimate sensible macros for typical portions. No commentary.`,
     audience: "client",
     task: "vision",
     tonable: false,
-    defaultSystem: `You turn casual food descriptions into structured diary entries.
-Reply with ONLY a JSON array. Each item: {"label": string, "mealType": "breakfast"|"lunch"|"dinner"|"snack", "calories": number, "proteinG": number, "carbsG": number, "fatG": number, "quantity": number|null, "unit": string|null}.
-Estimate sensible macros for typical portions. No commentary.`,
+    defaultSystem: `You identify the foods in a meal photo and estimate portions + macros.
+Reply with ONLY a JSON object: {"items": [ {"label": string, "mealType": "breakfast"|"lunch"|"dinner"|"snack", "calories": number, "proteinG": number, "carbsG": number, "fatG": number, "quantity": number|null, "unit": string|null} ], "note": string}.
+"note" is ONE short, friendly sentence assessing the meal — balance, protein, and a quick tip. Estimate sensible macros for typical portions.`,
   },
   {
     key: "label-reader",

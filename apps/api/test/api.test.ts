@@ -196,9 +196,10 @@ describe("credits + AI metering", () => {
       body: JSON.stringify({ clientId: client.id, imageKey: key, hint: "lunch" }),
     });
     expect(snap.status).toBe(200);
-    const snapOut = (await snap.json()) as { entries: unknown[]; mocked: boolean };
+    const snapOut = (await snap.json()) as { entries: unknown[]; note: string | null; mocked: boolean };
     expect(snapOut.mocked).toBe(true);
     expect(snapOut.entries.length).toBeGreaterThan(0);
+    expect(typeof snapOut.note).toBe("string"); // AI's one-line meal assessment
     // A key outside the caller's tenant prefix is rejected (no cross-tenant reads).
     const bad = await SELF.fetch("http://x/api/ai/snap-meal", {
       method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) },

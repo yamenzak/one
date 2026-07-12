@@ -5,12 +5,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fmtEnergy, kcalToDisplay, type UnitPrefs } from "@mossa/domain";
-import { Button, Field, Sheet, Chip, Badge, Switch, SegmentedControl, MacroInline, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, Utensils } from "@mossa/ui";
+import { Button, Field, Sheet, Chip, Badge, Switch, SegmentedControl, MacroInline, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, Utensils, X } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
+import { AiAvatar } from "../../AiAvatar.js";
+import { AiErrorBox } from "../../AiError.js";
 import { BarcodeScanner } from "./BarcodeScanner.js";
 import { FoodEditor, type EditableFood } from "./FoodEditor.js";
+
+/** A food the vision model detected in a snapped meal (pre-log, reviewable). */
+interface SnapEntry { label: string; mealType?: string; calories: number; proteinG: number; carbsG: number; fatG: number; quantity?: number | null; unit?: string | null }
 
 interface Food {
   id?: string; name: string; brand?: string | null; description?: string | null;
@@ -48,6 +53,10 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   const [webAlso, setWebAlso] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [snapErr, setSnapErr] = useState<unknown>(null);
+  // Snap-a-meal review: the AI's detected foods + its note, held for the user
+  // to confirm/trim BEFORE anything is logged (no more fire-and-forget).
+  const [snap, setSnap] = useState<{ entries: SnapEntry[]; note: string | null } | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   // Manual add / barcode-miss editor. `null` = closed; an object opens it,
   // optionally prefilled (e.g. with a scanned-but-unmatched barcode).
@@ -111,20 +120,42 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
     onLogged?.(); onClose();
   };
 
-  const aiErr = (e: unknown) => { const m = e instanceof Error ? e.message : ""; setAiError(m.includes("aiSuite") ? "AI isn't on your studio's plan yet." : m.includes("insufficient") ? "Studio is out of AI credits." : "Couldn't parse that — try search."); };
-
   const snapMeal = async (photo: File) => {
-    setAiBusy(true); setAiError(null);
+    setAiBusy(true); setAiError(null); setSnapErr(null);
     try {
       const fd = new FormData(); fd.append("file", photo); fd.append("purpose", "meal-snap");
       const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
+      if (!up.ok) throw new Error("Couldn't upload that photo — try again.");
       const { key } = (await up.json()) as { key?: string };
-      if (!key) throw new Error("upload failed");
-      const r = await api.post<{ entries: { label: string; mealType: string; calories: number; proteinG: number; carbsG: number; fatG: number }[] }>("/api/ai/snap-meal", { clientId, imageKey: key, hint: q });
-      for (const e of r.entries) await api.post("/api/logs/food", { clientId, data: { date: todayLocal(), mealType: e.mealType || meal, label: e.label, calories: e.calories, proteinG: e.proteinG, carbsG: e.carbsG, fatG: e.fatG } });
-      onLogged?.(); onClose();
-    } catch (e) { aiErr(e); } finally { setAiBusy(false); }
+      if (!key) throw new Error("Couldn't upload that photo — try again.");
+      const r = await api.post<{ entries: SnapEntry[]; note: string | null }>("/api/ai/snap-meal", { clientId, imageKey: key, hint: q });
+      if (!r.entries?.length) throw new Error("No foods detected in that photo — try another angle or search instead.");
+      // Show the AI's read for review — logging happens only on confirm.
+      setSnap({ entries: r.entries, note: r.note ?? null });
+    } catch (e) { setSnapErr(e); } finally { setAiBusy(false); }
   };
+
+  /** Confirm a reviewed snap: log every kept item under the chosen meal. */
+  const logSnap = async (items: SnapEntry[], mealType: string) => {
+    for (const e of items) {
+      await api.post("/api/logs/food", { clientId, data: { date: todayLocal(), mealType, label: e.label, quantity: e.quantity ?? null, unit: e.unit ?? null, calories: e.calories, proteinG: e.proteinG, carbsG: e.carbsG, fatG: e.fatG } });
+    }
+    setSnap(null); onLogged?.(); onClose();
+  };
+
+  if (snap) {
+    return (
+      <SnapReview
+        entries={snap.entries}
+        note={snap.note}
+        defaultMeal={snap.entries[0]?.mealType && MEALS.includes(snap.entries[0].mealType as (typeof MEALS)[number]) ? snap.entries[0].mealType! : meal}
+        units={units}
+        onCancel={() => setSnap(null)}
+        onRetake={() => { setSnap(null); snapInputRef.current?.click(); }}
+        onConfirm={logSnap}
+      />
+    );
+  }
 
   if (selected) {
     const n = norm(selected);
@@ -198,6 +229,7 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
           <label className="flex shrink-0 items-center gap-2 text-xs font-medium text-muted-foreground">Web<Switch checked={webAlso} onCheckedChange={(v) => { setWebAlso(v); if (v) void searchExternal(1); }} /></label>
         </div>
         {aiError && <p className="text-sm text-warning">{aiError}</p>}
+        {snapErr != null && <AiErrorBox error={snapErr} />}
         <div className="max-h-80 space-y-1 overflow-y-auto">
           {local.filter(matchesFilter).map((f) => <FoodRow key={f.id} food={f} badge="library" units={units} onPick={() => rowClick(f)} />)}
           {external.filter(matchesFilter).map((f, i) => <FoodRow key={`ext-${i}`} food={f} badge="web" units={units} onPick={() => rowClick(f)} />)}
@@ -245,5 +277,78 @@ function FoodRow({ food, badge, units, onPick }: { food: Food; badge: string; un
       </div>
       <Badge tone={badge === "web" ? "cardio" : "neutral"}>{badge}</Badge>
     </button>
+  );
+}
+
+/**
+ * Snap-a-meal review — the smart step between the photo and the diary. Shows
+ * the AI's read (foods + macros) and a one-line assessment, lets the user pick
+ * the meal and trim any mis-detected item, then logs everything on confirm.
+ */
+function SnapReview({ entries, note, defaultMeal, units, onCancel, onRetake, onConfirm }: {
+  entries: SnapEntry[]; note: string | null; defaultMeal: string; units: UnitPrefs;
+  onCancel: () => void; onRetake: () => void; onConfirm: (items: SnapEntry[], mealType: string) => Promise<void>;
+}) {
+  const [items, setItems] = useState<SnapEntry[]>(entries);
+  const [meal, setMeal] = useState(defaultMeal);
+  const [busy, setBusy] = useState(false);
+  const totals = items.reduce((t, e) => ({ calories: t.calories + e.calories, proteinG: t.proteinG + e.proteinG, carbsG: t.carbsG + e.carbsG, fatG: t.fatG + e.fatG }), { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 });
+  const confirm = async () => { setBusy(true); try { await onConfirm(items, meal); } finally { setBusy(false); } };
+
+  return (
+    <Sheet open onClose={onCancel} title="Review meal">
+      <div className="space-y-4">
+        {note && (
+          <div className="flex items-start gap-3 rounded-2xl bg-primary/10 p-3">
+            <AiAvatar className="size-8 shrink-0" />
+            <div className="min-w-0">
+              <div className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">AI read</div>
+              <p className="mt-0.5 text-sm leading-relaxed">{note}</p>
+            </div>
+          </div>
+        )}
+
+        <div>
+          <div className="mb-1.5 text-sm text-muted-foreground">Meal</div>
+          <div className="flex flex-wrap gap-2">{MEALS.map((m) => <Chip key={m} selected={meal === m} onClick={() => setMeal(m)}>{mealLabel(m)}</Chip>)}</div>
+        </div>
+
+        <div className="space-y-1.5">
+          {items.map((e, i) => (
+            <div key={i} className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2.5">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">{e.label}</div>
+                <div className="mt-0.5 flex items-center gap-2 truncate text-xs text-muted-foreground">
+                  {e.quantity ? <span className="numeral shrink-0">{Math.round(e.quantity)} {e.unit ?? "g"}</span> : null}
+                  <span className="numeral shrink-0 text-calories">{fmtEnergy(e.calories, units)}</span>
+                  <MacroInline proteinG={e.proteinG} carbsG={e.carbsG} fatG={e.fatG} className="shrink-0 text-[0.7rem]" />
+                </div>
+              </div>
+              <button onClick={() => setItems((xs) => xs.filter((_, j) => j !== i))} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:text-danger [&_svg]:size-4" aria-label={`Remove ${e.label}`}><X /></button>
+            </div>
+          ))}
+          {items.length === 0 && <p className="rounded-xl bg-surface-2 p-4 text-center text-sm text-muted-foreground">Nothing left — retake the photo.</p>}
+        </div>
+
+        {items.length > 0 && (
+          <div className="grid grid-cols-4 gap-2">
+            {([["calories", totals.calories], ["protein", totals.proteinG], ["carbs", totals.carbsG], ["fat", totals.fatG]] as const).map(([metric, v]) => {
+              const M = METRICS[metric];
+              return (
+                <div key={metric} className={cn("flex flex-col items-center gap-1 rounded-xl p-2.5", toneSoft[M.tone])}>
+                  <M.icon className="size-4" />
+                  <div className="numeral text-lg font-semibold leading-none">{metric === "calories" ? kcalToDisplay(v, units).toLocaleString() : Math.round(v)}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <Button variant="ghost" onClick={onRetake}><Camera /> Retake</Button>
+          <Button size="lg" className="flex-1" disabled={busy || items.length === 0} onClick={() => void confirm()}>{busy ? "Logging…" : `Log ${items.length} item${items.length === 1 ? "" : "s"}`}</Button>
+        </div>
+      </div>
+    </Sheet>
   );
 }

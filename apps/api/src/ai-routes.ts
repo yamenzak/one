@@ -283,19 +283,25 @@ export const aiRoutes = new Hono<AppEnv>()
       image,
       expectsJson: true,
       system: sys("snap-meal"),
-      prompt: `A photo of a meal${parsed.data.hint ? ` (${parsed.data.hint})` : ""}. Identify the foods and estimate portions + macros as the JSON array.`,
-      maxOutputTokens: 512,
+      prompt: `A photo of a meal${parsed.data.hint ? ` (${parsed.data.hint})` : ""}. Identify the foods, estimate portions + macros, and give one short assessment as the JSON object.`,
+      maxOutputTokens: 600,
       mock: () =>
-        JSON.stringify([
-          { label: "Grilled chicken breast", mealType: "lunch", calories: 280, proteinG: 52, carbsG: 0, fatG: 6, quantity: 170, unit: "g" },
-          { label: "Cooked rice", mealType: "lunch", calories: 260, proteinG: 5, carbsG: 57, fatG: 1, quantity: 200, unit: "g" },
-          { label: "Mixed salad", mealType: "lunch", calories: 60, proteinG: 2, carbsG: 8, fatG: 3, quantity: 100, unit: "g" },
-        ]),
+        JSON.stringify({
+          items: [
+            { label: "Grilled chicken breast", mealType: "lunch", calories: 280, proteinG: 52, carbsG: 0, fatG: 6, quantity: 170, unit: "g" },
+            { label: "Cooked rice", mealType: "lunch", calories: 260, proteinG: 5, carbsG: 57, fatG: 1, quantity: 200, unit: "g" },
+            { label: "Mixed salad", mealType: "lunch", calories: 60, proteinG: 2, carbsG: 8, fatG: 3, quantity: 100, unit: "g" },
+          ],
+          note: "Well-balanced plate with excellent lean protein — add a little olive oil to the salad for satiety.",
+        }),
     });
     if (!result.ok) return aiFail(c, result);
-    const entries = extractJson<unknown[]>(result.output);
-    if (!entries || !Array.isArray(entries)) return c.json({ error: "Couldn't read the photo.", raw: result.output.slice(0, 1500), mocked: result.mocked }, 422);
-    return c.json({ entries, credits: result.credits, mocked: result.mocked });
+    // The model returns {items, note}; tolerate a bare array from older prompts.
+    const raw = extractJson<{ items?: unknown[]; note?: unknown } | unknown[]>(result.output);
+    const entries = Array.isArray(raw) ? raw : Array.isArray(raw?.items) ? raw.items : null;
+    if (!entries) return c.json({ error: "Couldn't read the photo.", raw: result.output.slice(0, 1500), mocked: result.mocked }, 422);
+    const note = !Array.isArray(raw) && typeof raw?.note === "string" ? raw.note : null;
+    return c.json({ entries, note, credits: result.credits, mocked: result.mocked });
   })
 
   /**
