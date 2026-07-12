@@ -11,6 +11,7 @@ import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
 import { checkInPhotos } from "../client/WellnessDetails.js";
+import { AiAvatar } from "../../AiAvatar.js";
 
 interface Sub { id: string; status: string; daysRemaining: number; packageId: string | null }
 interface Pkg { id: string; name: string }
@@ -205,7 +206,7 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
         <div className="flex items-center gap-2.5"><IconBadge icon={ClipboardList} tone="nutrition" size="sm" /><h2 className="font-semibold">Check-ins</h2></div>
         <Button size="sm" variant="tonal" disabled={busy || checkIns.length === 0} onClick={() => void summarize()}><Sparkles /> {busy ? "…" : "Summarize"}</Button>
       </div>
-      {summary && <SubCard className="flex items-start gap-2 text-sm"><Sparkles className="mt-0.5 size-4 shrink-0 text-primary" /><p>{summary}</p></SubCard>}
+      {summary && <SubCard className="flex items-start gap-2.5 text-sm"><AiAvatar className="size-7" /><p>{summary}</p></SubCard>}
       {checkIns.length === 0 ? <p className="text-sm text-muted-foreground">No check-ins yet.</p> : checkIns.slice(0, 5).map((c) => {
         const photos = checkInPhotos(c.photos_json);
         const meta = [c.mood != null ? `mood ${c.mood}/5` : null, c.energy != null ? `energy ${c.energy}/5` : null, c.sleep_hours ? `${c.sleep_hours}h sleep` : null, c.steps_count ? `${c.steps_count.toLocaleString()} steps` : null].filter(Boolean).join(" · ");
@@ -275,7 +276,7 @@ function SuggestSuppSheet({ clientId, onClose, onPrescribed }: { clientId: strin
   return (
     <Sheet open onClose={onClose} title="Suggested supplements">
       <div className="space-y-3">
-        <p className="text-xs text-muted-foreground">Evidence-based ideas from this client's reviewed labs, goal and current stack. Review before prescribing.</p>
+        <div className="flex items-center gap-2.5 rounded-xl bg-primary/10 p-2.5"><AiAvatar className="size-8" /><p className="text-xs text-muted-foreground">Evidence-based ideas from this client's reviewed labs, goal and current stack. Review before prescribing.</p></div>
         {error ? <SubCard className="text-sm text-muted-foreground">{error}</SubCard> : !recos ? <Skeleton className="h-40" /> : recos.length === 0 ? <p className="text-sm text-muted-foreground">No suggestions right now.</p> : recos.map((r, i) => (
           <SubCard key={i} className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">

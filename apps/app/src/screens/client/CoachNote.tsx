@@ -7,8 +7,8 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { IconBadge, Sparkles } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
+import { AiAvatar } from "../../AiAvatar.js";
 
 type Surface = "home" | "train" | "eat" | "wellness";
 
@@ -31,7 +31,7 @@ export function CoachNote({ clientId, surface }: { clientId: string; surface: Su
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} className="relative overflow-hidden rounded-2xl bg-primary/10 p-4">
       <div className="pointer-events-none absolute -right-8 -top-8 size-28 rounded-full bg-primary/15 blur-2xl" />
       <div className="relative flex items-start gap-3">
-        <IconBadge icon={Sparkles} tone="primary" size="sm" />
+        <AiAvatar className="size-9" />
         <div className="min-w-0">
           <div className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">Your coach</div>
           <p className="mt-1 text-sm leading-relaxed">{msg}</p>

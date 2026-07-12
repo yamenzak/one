@@ -23,6 +23,8 @@ export interface TenantBranding {
   defaultMode?: "dark" | "light" | null;
   logoUrl?: string | null;
   iconUrl?: string | null;
+  /** Studio's avatar for the AI coach persona; falls back to a bottts robot. */
+  aiAvatarUrl?: string | null;
   /** Granular per-mode CSS-variable overrides (e.g. a pasted shadcn theme). */
   tokens?: { light?: Record<string, string> | null; dark?: Record<string, string> | null } | null;
 }

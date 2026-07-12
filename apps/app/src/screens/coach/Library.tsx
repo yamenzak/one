@@ -5,6 +5,7 @@ import { fmtEnergy } from "@mossa/domain";
 import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, MacroInline, Search, Plus, Globe, Trash2, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Sparkles } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
+import { AiAvatar } from "../../AiAvatar.js";
 import { FoodEditor } from "../client/FoodEditor.js";
 import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
 
@@ -265,7 +266,7 @@ function Content() {
       <Sheet open={createOpen} onClose={() => { setCreateOpen(false); }} title="Write article">
         <div className="space-y-4">
           <div className="space-y-2 rounded-2xl bg-primary/10 p-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-primary [&_svg]:size-4"><Sparkles /> Draft with AI</div>
+            <div className="flex items-center gap-2 text-sm font-medium text-primary"><AiAvatar className="size-6" /> Draft with AI</div>
             <div className="flex gap-2">
               <input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="Topic — e.g. Sleep for muscle growth" className="min-w-0 flex-1 rounded-lg bg-surface-2 px-3 py-2 text-sm outline-none" />
               <Button size="sm" disabled={aiBusy || aiTopic.trim().length < 3} onClick={() => void draftAi()}>{aiBusy ? "Writing…" : "Draft"}</Button>

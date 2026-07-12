@@ -48,6 +48,8 @@ export interface Branding {
   logoUrl?: string | null;
   /** Square app icon/mark (nav rail, favicon). */
   iconUrl?: string | null;
+  /** Avatar for the AI coach persona (falls back to a bottts robot). */
+  aiAvatarUrl?: string | null;
   /** Granular token overrides (e.g. from a pasted shadcn theme). */
   tokens?: BrandTokens | null;
 }
