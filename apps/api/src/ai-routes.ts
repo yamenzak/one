@@ -613,12 +613,23 @@ export const aiRoutes = new Hono<AppEnv>()
       feature: z.enum(["food-image", "exercise-image", "cover-image"]),
       subject: z.string().min(1).max(200),
       hint: z.string().max(160).default(""),
+      referenceKey: z.string().max(300).optional(),
     }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
-    const { feature, subject, hint } = parsed.data;
+    const { feature, subject, hint, referenceKey } = parsed.data;
+    // Optional reference image (same tenant) → image-to-image, so a generated
+    // pair (e.g. exercise start→end) shares one athlete, style and camera angle.
+    let reference: { data: string; mimeType: string } | undefined;
+    if (referenceKey && referenceKey.startsWith(`t/${who.tenantId}/`)) {
+      const obj = await c.env.MEDIA.get(referenceKey);
+      if (obj) reference = { data: toBase64(await obj.arrayBuffer()), mimeType: obj.httpMetadata?.contentType ?? "image/png" };
+    }
+    const matchLine = reference
+      ? " Keep the EXACT same character, art style, colours, line-work, camera angle, framing, lighting and background as the reference image — change ONLY the body position."
+      : "";
     const result = await generateImage(c.env, {
-      tenantId: who.tenantId, actorUserId: who.userId, feature,
-      prompt: `${sys(feature)}\nSubject: ${subject}.${hint ? ` ${hint}.` : ""} Produce a fresh, unique image.`,
+      tenantId: who.tenantId, actorUserId: who.userId, feature, reference,
+      prompt: `${sys(feature)}\nSubject: ${subject}.${hint ? ` Show ${hint}.` : ""}${matchLine} Produce a fresh, unique image.`,
     });
     if (!result.ok) return aiFail(c, result);
     return c.json({ key: result.key, url: `/api/media/${result.key}`, credits: result.credits, mocked: result.mocked });

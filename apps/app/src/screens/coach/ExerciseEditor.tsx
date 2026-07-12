@@ -71,11 +71,13 @@ export function ExerciseEditor({ exerciseId, initial, onClose, onSaved }: {
       <div className="space-y-4">
         <Field label="Name" icon={Dumbbell} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
 
-        {/* Start + end frames — upload or generate an original illustration. */}
+        {/* Start + end frames — upload or generate. The End is generated from
+            the Start image so the same athlete, style and angle carry over. */}
         <div className="grid grid-cols-2 gap-3">
-          <AiImageField value={image} onChange={setImage} feature="exercise-image" subject={name} hint="the START position of the movement" canAi={canAi} label="Start" size={72} />
-          <AiImageField value={image2} onChange={setImage2} feature="exercise-image" subject={name} hint="the END / finished position of the movement" canAi={canAi} label="End" size={72} />
+          <AiImageField value={image} onChange={setImage} feature="exercise-image" subject={name} hint="the START / setup position of the movement" canAi={canAi} label="Start" stacked />
+          <AiImageField value={image2} onChange={setImage2} feature="exercise-image" subject={name} hint="the END / bottom (fully-worked) position of the movement" canAi={canAi} label="End" stacked referenceUrl={image || undefined} />
         </div>
+        {canAi && <p className="-mt-1 text-[0.7rem] leading-snug text-muted-foreground">Generate the Start first — the End is drawn from it to keep the same figure, style and angle. Style is configurable in AI settings.</p>}
 
         {/* Optional demo video */}
         <div className="space-y-1.5">

@@ -438,6 +438,10 @@ describe("AI image generation + recipe", () => {
     const imgOut = (await img.json()) as { url: string; key: string };
     expect(imgOut.url).toContain(`/api/media/t/${ctx.active.tenantId}/`);
 
+    // Image-to-image: generating the End from a Start reference (same-tenant key).
+    const pair = await SELF.fetch("http://x/api/ai/generate-image", { method: "POST", headers: H, body: JSON.stringify({ feature: "exercise-image", subject: "barbell squat", hint: "the end position", referenceKey: imgOut.key }) });
+    expect(pair.status).toBe(200);
+
     // Recipe from a meal's foods.
     const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "RecipeAI" }) })).json()) as { client: { id: string } };
     const rec = await SELF.fetch("http://x/api/ai/recipe", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, mealName: "Lunch", foods: [{ name: "chicken breast", quantity: 180, unit: "g" }, { name: "white rice", quantity: 150, unit: "g" }] }) });

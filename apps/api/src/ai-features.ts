@@ -105,7 +105,7 @@ Only well-supported, safe OTC options. Never suggest prescription drugs or anyth
     audience: "trainer",
     task: "image",
     tonable: false,
-    defaultSystem: `Create a clean, modern illustration of a single athletic figure performing the exercise with correct form, plain neutral background, clear body position. Minimalist and instructional. No text, no words, no logos.`,
+    defaultSystem: `Create a clean, modern instructional illustration of ONE athletic figure performing the exercise with correct form. Full body in frame, side-on (profile) view, centred, feet-to-head visible, on a plain neutral light-grey background, even flat lighting. Consistent simple art style. No text, no words, no logos, no arrows.`,
   },
   {
     key: "meal-recipe",

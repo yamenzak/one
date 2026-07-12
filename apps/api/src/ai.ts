@@ -436,6 +436,8 @@ export interface GenerateImageInput {
   clientId?: string | null;
   feature: string;
   prompt: string;
+  /** Optional reference image (base64) for image-to-image generation. */
+  reference?: { data: string; mimeType: string };
 }
 export type GenerateImageResult =
   | { ok: true; key: string; credits: number; mocked: boolean }
@@ -448,10 +450,14 @@ const b64ToBytes = (b64: string): Uint8Array => { const bin = atob(b64); const a
 
 interface GeminiImageResponse { candidates?: { content?: { parts?: { inlineData?: { mimeType?: string; data?: string } }[] } }[]; usageMetadata?: { promptTokenCount?: number } }
 
-async function runGeminiImage(key: string, modelId: string, prompt: string): Promise<{ bytes: Uint8Array; mimeType: string; inputTokens: number }> {
+async function runGeminiImage(key: string, modelId: string, prompt: string, reference?: { data: string; mimeType: string }): Promise<{ bytes: Uint8Array; mimeType: string; inputTokens: number }> {
+  const parts: Record<string, unknown>[] = [{ text: prompt }];
+  // Image-to-image: seed with a reference so the output keeps its character,
+  // style and camera angle (used for a coherent exercise start→end pair).
+  if (reference) parts.push({ inline_data: { mime_type: reference.mimeType, data: reference.data } });
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`,
-    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseModalities: ["IMAGE"] } }) },
+    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { responseModalities: ["IMAGE"] } }) },
   );
   if (!res.ok) throw new Error(`HTTP ${res.status} ${(await res.text().catch(() => "")).slice(0, 300)}`);
   const json = (await res.json()) as GeminiImageResponse;
@@ -492,7 +498,7 @@ export async function generateImage(env: Env, input: GenerateImageInput): Promis
   let bytes: Uint8Array, mimeType: string, usage: Usage, mocked = false;
   try {
     if (useMock) { bytes = b64ToBytes(MOCK_PNG_B64); mimeType = "image/png"; usage = estUsage; mocked = true; }
-    else { const r = await withTimeout(runGeminiImage(geminiKey!, model.id, input.prompt)); bytes = r.bytes; mimeType = r.mimeType; usage = { inputTokens: r.inputTokens, images: 1 }; }
+    else { const r = await withTimeout(runGeminiImage(geminiKey!, model.id, input.prompt, input.reference)); bytes = r.bytes; mimeType = r.mimeType; usage = { inputTokens: r.inputTokens, images: 1 }; }
   } catch (err) {
     await dobj.release(hold.hold);
     await audit(env, { ...imageAuditInput(input), task: "image" } as GenerateInput, model.id, 0, 0, false, String(err));
