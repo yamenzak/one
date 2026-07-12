@@ -245,6 +245,38 @@ describe("AI config (per-tenant model / prompt / tone / enable)", () => {
   });
 });
 
+describe("coach note (personalized, context-cached)", () => {
+  it("builds a personal note, caches it, and refreshes on a material change", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "NoteCli" }) })).json()) as { client: { id: string } };
+    const day = "2026-07-10";
+    await SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: day, workoutPlanId: "wp", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "e", sets: [{ setIndex: 0, reps: 5, weightKg: 80, completed: true }] } }) });
+
+    const q = `clientId=${client.id}&surface=home&today=${day}&hour=9`;
+    const r1 = (await (await SELF.fetch(`http://x/api/ai/coach-note?${q}`, { headers: auth(ownerCookie) })).json()) as { message: string | null; cached: boolean; mocked: boolean };
+    expect(r1.message).toBeTruthy();
+    expect(r1.message).toContain("NoteCli");
+    expect(r1.cached).toBe(false);
+    expect(r1.mocked).toBe(true);
+
+    // Same context within the hour → served from cache.
+    const r2 = (await (await SELF.fetch(`http://x/api/ai/coach-note?${q}`, { headers: auth(ownerCookie) })).json()) as { message: string; cached: boolean };
+    expect(r2.cached).toBe(true);
+    expect(r2.message).toBe(r1.message);
+
+    // A different surface gets a different note (own focus).
+    const rt = (await (await SELF.fetch(`http://x/api/ai/coach-note?clientId=${client.id}&surface=train&today=${day}&hour=9`, { headers: auth(ownerCookie) })).json()) as { message: string };
+    expect(rt.message).not.toBe(r1.message);
+
+    // A material change (a check-in) shifts the context hash → fresh, not cached.
+    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: day, mood: 5, sleepHours: 8 } }) });
+    const r3 = (await (await SELF.fetch(`http://x/api/ai/coach-note?${q}`, { headers: auth(ownerCookie) })).json()) as { cached: boolean };
+    expect(r3.cached).toBe(false);
+  });
+});
+
 describe("commerce + redemption", () => {
   it("redeeming an unknown code 404s without leaking (no oracle)", async () => {
     const { client } = (await (

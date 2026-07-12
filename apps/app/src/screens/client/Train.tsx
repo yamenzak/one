@@ -20,6 +20,7 @@ import { useUnits } from "../../units.js";
 import { LogSheet } from "./LogSheet.js";
 import { PlanHistorySheet } from "./PlanHistorySheet.js";
 import { ExerciseThumb, ExerciseMeta, pretty, type ExerciseInfo } from "../exercise.js";
+import { CoachNote } from "./CoachNote.js";
 
 interface Plan { id: string; name: string; status: string; body: WorkoutBody }
 interface LoggedSet { reps?: number | null; weightKg?: number | null; durationSeconds?: number | null; effortLabel?: "easy" | "perfect" | "hard" | null; completed: boolean }
@@ -151,6 +152,8 @@ export function Train({ clientId }: { clientId: string }) {
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       <h1 className="text-2xl font-bold tracking-tight">Train</h1>
+
+      <Stagger><CoachNote clientId={clientId} surface="train" /></Stagger>
 
       {published ? (
         <Stagger>

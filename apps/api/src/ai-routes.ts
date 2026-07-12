@@ -7,11 +7,32 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { WorkoutBody } from "@mossa/protocol";
+import { resolveUnits } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { tenantEntitlements, getConfig, setConfig } from "./billing-store.js";
 import { generate, extractJson } from "./ai.js";
+import { buildClientContext } from "./ai-context.js";
+import { featureDef } from "./ai-features.js";
 import { parseJson } from "./db.js";
+
+const SURFACE_FOCUS: Record<string, string> = {
+  home: "Give an overall snapshot and the single most useful nudge for right now.",
+  train: "Focus on their training — today's workout, recent PRs, load and momentum.",
+  eat: "Focus on their nutrition — calories/protein vs target, meals, and today's intake so far.",
+  wellness: "Focus on recovery — sleep, hydration, mood, supplements and check-in consistency.",
+};
+
+/** Deterministic dev/mock coach note (no AI binding / ai.mock = on). */
+function coachNoteMock(surface: string, name: string): string {
+  const first = name.split(" ")[0] || "there";
+  return ({
+    home: `Solid momentum, ${first} — you're showing up. Knock out today's check-in and you're set.`,
+    train: `Your load's trending up nicely, ${first}. Bring the same intent to today's session and chase that next PR.`,
+    eat: `Protein's your lever today, ${first} — get a solid hit at your next meal and you'll land right on target.`,
+    wellness: `Sleep is trending well, ${first}. Keep the hydration up and stay on your supplements to lock in recovery.`,
+  } as Record<string, string>)[surface] ?? `Keep it up, ${first} — consistency is doing the work.`;
+}
 
 /** Base64-encode an ArrayBuffer in chunks (avoids arg-count blowups on big images). */
 function toBase64(buf: ArrayBuffer): string {
@@ -325,6 +346,52 @@ export const aiRoutes = new Hono<AppEnv>()
     });
     if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "ai unavailable" }, 503);
     return c.json({ narrative: result.output.trim(), credits: result.credits, mocked: result.mocked });
+  })
+
+  /**
+   * Personalized coach note (SPEC §6) — a short, deeply-personal message for
+   * the client's home / train / eat / wellness screen. Built from the client's
+   * FULL context; content-hashed + cached 1h in KV, so it's regenerated the
+   * moment anything material changes and free on repeat loads within the hour.
+   */
+  .get("/ai/coach-note", async (c) => {
+    const who = requireTenant(c)!;
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ message: null });
+    const parsed = z
+      .object({ clientId: z.string(), surface: z.enum(["home", "train", "eat", "wellness"]).default("home"), today: z.string().optional(), hour: z.coerce.number().int().min(0).max(23).optional() })
+      .safeParse({ clientId: c.req.query("clientId"), surface: c.req.query("surface"), today: c.req.query("today"), hour: c.req.query("hour") });
+    if (!parsed.success) return c.json({ error: "invalid query" }, 400);
+    const access = await requireClientAccess(c, parsed.data.clientId);
+    if ("response" in access) return access.response;
+    const surface = parsed.data.surface;
+    const today = parsed.data.today ?? new Date().toISOString().slice(0, 10);
+    const hour = parsed.data.hour ?? 12;
+
+    const prefRow = await c.env.DB.prepare("SELECT units_json FROM user_prefs WHERE user_id = ?").bind(c.get("user")!.id).first<{ units_json: string | null }>();
+    const units = resolveUnits(parseJson(prefRow?.units_json ?? null, null));
+    const ctx = await buildClientContext(c.env, access.client, { today, hour, units });
+
+    // Content-hash cache: material change → new key → fresh; else 1h reuse.
+    const cacheKey = `ai:note:v1:${access.client.id}:${surface}:${ctx.signalHash}`;
+    const hit = await c.env.CACHE.get(cacheKey, "json").catch(() => null);
+    if (hit && typeof (hit as { message?: string }).message === "string") return c.json({ message: (hit as { message: string }).message, cached: true });
+
+    const result = await generate(c.env, {
+      tenantId: who.tenantId,
+      actorUserId: c.get("user")!.id,
+      clientId: access.client.id,
+      feature: "coach-note",
+      task: "text-small",
+      system: featureDef("coach-note")!.defaultSystem,
+      prompt: `${ctx.text}\n\nSCREEN: ${surface}. ${SURFACE_FOCUS[surface]}\nWrite the note now — 1-2 sentences, speak directly to them.`,
+      maxOutputTokens: 160,
+      mock: () => coachNoteMock(surface, access.client.display_name),
+    });
+    if (!result.ok) return c.json({ message: null });
+    const message = result.output.trim().replace(/^["']|["']$/g, "").slice(0, 400);
+    await c.env.CACHE.put(cacheKey, JSON.stringify({ message }), { expirationTtl: 3600 }).catch(() => undefined);
+    return c.json({ message, cached: false, mocked: result.mocked });
   })
 
   /** Insight feedback (SPEC §8.11) — the 👍/👎 eval signal. */

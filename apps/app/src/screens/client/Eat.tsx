@@ -12,6 +12,7 @@ import { useUnits } from "../../units.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
 import { MealPlanDrawer } from "./MealPlanDrawer.js";
 import { PlanHistorySheet } from "./PlanHistorySheet.js";
+import { CoachNote } from "./CoachNote.js";
 
 interface Entry { id: string; meal_type: string; label: string | null; calories: number; protein_g: number; carbs_g: number; fat_g: number; quantity: number | null; unit: string | null; image_url: string | null }
 interface Targets { targetCalories?: number; targetProteinG?: number; targetCarbsG?: number; targetFatG?: number; targetWaterMl?: number }
@@ -85,6 +86,8 @@ export function Eat({ clientId }: { clientId: string }) {
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       <h1 className="text-2xl font-bold tracking-tight">Eat</h1>
+
+      <Stagger><CoachNote clientId={clientId} surface="eat" /></Stagger>
 
       {/* Hero — today's intake, the visual anchor */}
       <Stagger>

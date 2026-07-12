@@ -19,6 +19,7 @@ import { LogSheet } from "./LogSheet.js";
 import { CheckInDetailSheet, LabDetailSheet, type CheckInFull, type LabFull } from "./WellnessDetails.js";
 import { WellnessScoreCard, WellnessScoreCardSkeleton, type WellnessScoreResult } from "./WellnessScore.js";
 import { CheckRow } from "./TodayAgenda.js";
+import { CoachNote } from "./CoachNote.js";
 
 interface Supplement { id: string; name: string; dose: string | null; kind: string; schedule: { slot: string }[] }
 interface Fast { activeFast: { started_at: string; target_hours: number } | null; recentFasts: { duration_minutes: number; target_hours: number }[] }
@@ -167,6 +168,8 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
 
       {/* Wellness Score hero */}
       <Stagger>{score ? <WellnessScoreCard result={score} /> : <WellnessScoreCardSkeleton />}</Stagger>
+
+      <Stagger><CoachNote clientId={clientId} surface="wellness" /></Stagger>
 
       {/* Quick-log chips */}
       <Stagger className="flex flex-wrap gap-2">

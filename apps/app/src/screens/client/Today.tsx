@@ -18,6 +18,7 @@ import { LogSheet } from "./LogSheet.js";
 import { WidgetCarousel, WidgetCustomizeSheet } from "../widget-kit.js";
 import { CLIENT_WIDGETS, DEFAULT_CLIENT_WIDGETS, type ClientWidgetData } from "./HomeWidgets.js";
 import { TodayAgenda } from "./TodayAgenda.js";
+import { CoachNote } from "./CoachNote.js";
 
 export interface FeedEvent { id: string; kind: string; date: string; at: string; title: string; subtitle: string | null; ref?: string; metric?: { unit: "energy" | "volume" | "weight"; value: number } }
 
@@ -124,6 +125,8 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
           <PencilLine />
         </Button>
       </Stagger>
+
+      <Stagger><CoachNote clientId={clientId} surface="home" /></Stagger>
 
       <Stagger>
         <TodayAgenda clientId={clientId} date={date} bundle={data} onChanged={() => void load()} onNavigate={onOpen} onCheckIn={() => setCheckInOpen(true)} onStartWorkout={onStart} />
