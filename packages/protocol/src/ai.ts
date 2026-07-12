@@ -10,7 +10,7 @@ export const AI_TONES = ["professional", "motivating", "friendly", "direct", "fu
 export type AiTone = (typeof AI_TONES)[number];
 
 export type AiAudience = "trainer" | "client";
-export type AiTask = "text" | "text-small" | "vision";
+export type AiTask = "text" | "text-small" | "vision" | "image";
 
 /** One AI feature as advertised to the settings UI (defaults live server-side). */
 export interface AiFeatureMeta {

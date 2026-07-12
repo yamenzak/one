@@ -81,6 +81,15 @@ Only well-supported, safe OTC options. Never suggest prescription drugs or anyth
     defaultSystem: `You are a coaching assistant. From the client's full context, write a concise 3-4 sentence status summary for their coach: current phase, adherence, trajectory, and the single most important thing to address next. Plain text. No medical advice.`,
   },
   {
+    key: "cover-image",
+    label: "Generate cover image",
+    description: "Create an illustrative cover image (Gemini Nano Banana) for an article or resource.",
+    audience: "trainer",
+    task: "image",
+    tonable: false,
+    defaultSystem: `Create a clean, modern, photographic cover image for a fitness/nutrition article. No text or words in the image.`,
+  },
+  {
     key: "article-write",
     label: "Write an article",
     description: "Draft a knowledge-base / resources article in the studio's voice.",

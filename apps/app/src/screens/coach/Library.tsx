@@ -236,10 +236,18 @@ function Content() {
   const [aiTopic, setAiTopic] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [coverBusy, setCoverBusy] = useState(false);
   const load = useCallback(async () => setItems((await api.get<{ resources: Resource[] }>("/api/resources")).resources), []);
   useEffect(() => void load(), [load]);
-  const reset = () => { setTitle(""); setSummary(""); setBody(""); setAiTopic(""); setAiError(null); };
-  const create = async () => { const r = await api.post<{ id: string }>("/api/resources", { type: "article", title, summary: summary || undefined, bodyMd: body, audience }); await api.post(`/api/resources/${r.id}/publish`, { status: "published" }); setCreateOpen(false); reset(); await load(); };
+  const reset = () => { setTitle(""); setSummary(""); setBody(""); setAiTopic(""); setAiError(null); setCoverUrl(null); };
+  const create = async () => { const r = await api.post<{ id: string }>("/api/resources", { type: "article", title, summary: summary || undefined, bodyMd: body, coverUrl: coverUrl || undefined, audience }); await api.post(`/api/resources/${r.id}/publish`, { status: "published" }); setCreateOpen(false); reset(); await load(); };
+  const genCover = async () => {
+    setCoverBusy(true);
+    try { const r = await api.post<{ url: string }>("/api/ai/cover-image", { prompt: title || aiTopic }); setCoverUrl(r.url); }
+    catch { /* image gen unavailable */ }
+    finally { setCoverBusy(false); }
+  };
   const draftAi = async () => {
     setAiBusy(true); setAiError(null);
     try {
@@ -266,6 +274,10 @@ function Content() {
           </div>
           <Field label="Title" icon={PencilLine} value={title} onChange={(e) => setTitle(e.target.value)} />
           <Field label="Summary" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="One-line teaser (optional)" />
+          <div className="space-y-2">
+            {coverUrl && <img src={coverUrl} alt="Cover" className="h-32 w-full rounded-xl object-cover" />}
+            <Button size="sm" variant="secondary" className="w-full" disabled={coverBusy || (!title && !aiTopic)} onClick={() => void genCover()}><Sparkles /> {coverBusy ? "Generating…" : coverUrl ? "Regenerate cover" : "Generate cover image"}</Button>
+          </div>
           <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Body (markdown)</label><Textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} /></div>
           <div className="flex gap-2">{(["clients", "public", "assigned"] as const).map((a) => <Chip key={a} selected={audience === a} onClick={() => setAudience(a)}>{a}</Chip>)}</div>
           <Button size="lg" className="w-full" disabled={title.trim().length < 2} onClick={() => void create()}><Plus /> Publish</Button>

@@ -313,6 +313,15 @@ describe("trainer AI features (registry)", () => {
     const ex = (await (await SELF.fetch("http://x/api/ai/lab-extract", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, labId }) })).json()) as { values: { marker: string }[] };
     expect(ex.values.length).toBeGreaterThan(0);
     expect(ex.values[0]!.marker.length).toBeGreaterThan(0);
+
+    // Nano Banana cover image (mock) → an R2 media key, billed from credits.
+    const before = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { balance: number } };
+    const img = (await (await SELF.fetch("http://x/api/ai/cover-image", { method: "POST", headers: H, body: JSON.stringify({ prompt: "protein and muscle growth" }) })).json()) as { key: string; url: string; mocked: boolean };
+    expect(img.key).toContain(`t/${ctx.active.tenantId}/ai/`);
+    expect(img.url).toBe(`/api/media/${img.key}`);
+    expect(img.mocked).toBe(true);
+    const after = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { balance: number } };
+    expect(after.balance.balance).toBeLessThan(before.balance.balance); // billed with markup
   });
 });
 

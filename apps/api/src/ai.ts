@@ -117,6 +117,19 @@ const DEFAULT_MODELS: Omit<AiModelRow, "enabled" | "is_default">[] = [
     unit_kind: null,
     markup: 3,
   },
+  {
+    // Gemini 2.5 Flash Image — "Nano Banana" image generation. Priced per image
+    // ($0.039), stored as neuron-equivalents so it bills through the same math.
+    id: "gemini-2.5-flash-image",
+    task: "image",
+    label: "Gemini 2.5 Flash Image (Nano Banana)",
+    provider: "google",
+    input_rate: 27_273, // $0.30 / 1M input tokens
+    output_rate: null,
+    unit_rate: 3_545, // $0.039 per generated image
+    unit_kind: "image",
+    markup: 3,
+  },
 ];
 
 /** Idempotent catalog seed (INSERT OR IGNORE by id). Runs on demand — no
@@ -183,7 +196,7 @@ export interface GenerateInput {
   actorUserId: string;
   clientId?: string | null;
   feature: string;
-  task: "text" | "text-small" | "vision";
+  task: "text" | "text-small" | "vision" | "image";
   system: string;
   prompt: string;
   maxOutputTokens?: number;
@@ -328,6 +341,88 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   await audit(env, input, model.id, credits, usage.outputTokens ?? 0, true, null);
   return { ok: true, output, credits, mocked };
 }
+
+// ── Image generation (Gemini "Nano Banana") ─────────────────────────────────
+
+export interface GenerateImageInput {
+  tenantId: string;
+  actorUserId: string;
+  clientId?: string | null;
+  feature: string;
+  prompt: string;
+}
+export type GenerateImageResult =
+  | { ok: true; key: string; credits: number; mocked: boolean }
+  | { ok: false; error: "insufficient_credits"; available: number; needed: number }
+  | { ok: false; error: "unavailable" };
+
+/** A 1×1 transparent PNG — the deterministic dev/mock image. */
+const MOCK_PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+const b64ToBytes = (b64: string): Uint8Array => { const bin = atob(b64); const a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; };
+
+interface GeminiImageResponse { candidates?: { content?: { parts?: { inlineData?: { mimeType?: string; data?: string } }[] } }[]; usageMetadata?: { promptTokenCount?: number } }
+
+async function runGeminiImage(key: string, modelId: string, prompt: string): Promise<{ bytes: Uint8Array; mimeType: string; inputTokens: number }> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`,
+    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseModalities: ["IMAGE"] } }) },
+  );
+  if (!res.ok) throw new Error(`gemini-image ${res.status}`);
+  const json = (await res.json()) as GeminiImageResponse;
+  const part = (json.candidates?.[0]?.content?.parts ?? []).find((p) => p.inlineData?.data);
+  if (!part?.inlineData?.data) throw new Error("no image");
+  return { bytes: b64ToBytes(part.inlineData.data), mimeType: part.inlineData.mimeType ?? "image/png", inputTokens: json.usageMetadata?.promptTokenCount ?? Math.ceil(prompt.length / 4) };
+}
+
+/**
+ * Generate an image (Gemini image models). Mirrors generate()'s metered loop —
+ * reserve → run → settle — but the output is stored to R2 and a media key is
+ * returned. Billed per image at the model's rate × markup; fails when the
+ * tenant can't cover the reserve.
+ */
+export async function generateImage(env: Env, input: GenerateImageInput): Promise<GenerateImageResult> {
+  const { config, toggles } = await loadTenantAi(env.DB, input.tenantId);
+  const fcfg = config.features?.[input.feature] ?? {};
+  if ((fcfg.enabled ?? toggles[input.feature] ?? true) === false) return { ok: false, error: "unavailable" };
+
+  let model: AiModelRow | null = null;
+  if (fcfg.model) { const m = await modelById(env.DB, fcfg.model); if (m && m.task === "image") model = m; }
+  if (!model) model = await modelForTask(env.DB, "image");
+  if (!model || model.provider !== "google") return { ok: false, error: "unavailable" };
+  const rate = rateOf(model);
+
+  const cfg = await getConfig(env.DB);
+  const geminiKey = cfg["google.gemini_key"];
+  const mockMode = cfg["ai.mock"] ?? "auto";
+  const useMock = mockMode === "on" || (mockMode !== "off" && !geminiKey);
+
+  const estUsage: Usage = { inputTokens: Math.ceil(input.prompt.length / 4), images: 1 };
+  const estimate = creditsForUsage(estUsage, rate);
+  const dobj = env.BILLING.get(env.BILLING.idFromName(input.tenantId));
+  await dobj.bind(input.tenantId);
+  const hold = await dobj.reserve(estimate);
+  if (!hold.ok) return { ok: false, error: "insufficient_credits", available: hold.available, needed: hold.needed };
+
+  let bytes: Uint8Array, mimeType: string, usage: Usage, mocked = false;
+  try {
+    if (useMock) { bytes = b64ToBytes(MOCK_PNG_B64); mimeType = "image/png"; usage = estUsage; mocked = true; }
+    else { const r = await withTimeout(runGeminiImage(geminiKey!, model.id, input.prompt)); bytes = r.bytes; mimeType = r.mimeType; usage = { inputTokens: r.inputTokens, images: 1 }; }
+  } catch (err) {
+    await dobj.release(hold.hold);
+    await audit(env, { ...imageAuditInput(input), task: "image" } as GenerateInput, model.id, 0, 0, false, String(err));
+    return { ok: false, error: "unavailable" };
+  }
+
+  const ext = mimeType.includes("jpeg") ? "jpg" : mimeType.includes("webp") ? "webp" : "png";
+  const mediaKey = `t/${input.tenantId}/ai/${newId("img")}.${ext}`;
+  await env.MEDIA.put(mediaKey, bytes, { httpMetadata: { contentType: mimeType } });
+  const credits = creditsForUsage(usage, rate);
+  await dobj.settle(hold.hold, credits, `ai.${input.feature}`, model.id);
+  await audit(env, { ...imageAuditInput(input), task: "image" } as GenerateInput, model.id, credits, 0, true, null);
+  return { ok: true, key: mediaKey, credits, mocked };
+}
+
+const imageAuditInput = (i: GenerateImageInput) => ({ tenantId: i.tenantId, actorUserId: i.actorUserId, clientId: i.clientId, feature: i.feature });
 
 async function audit(
   env: Env,

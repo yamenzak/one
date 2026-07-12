@@ -11,7 +11,7 @@ import { resolveUnits } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { tenantEntitlements, getConfig, setConfig } from "./billing-store.js";
-import { generate, extractJson, listModels } from "./ai.js";
+import { generate, generateImage, extractJson, listModels } from "./ai.js";
 import { buildClientContext } from "./ai-context.js";
 import { featureDef } from "./ai-features.js";
 import { parseWorkersAiPricing, parseGeminiPricing } from "./ai-pricing.js";
@@ -504,6 +504,23 @@ export const aiRoutes = new Hono<AppEnv>()
     const article = extractJson<{ title: string; summary: string; body: string }>(result.output);
     if (!article?.body) return c.json({ error: "could not parse" }, 422);
     return c.json({ article, credits: result.credits, mocked: result.mocked });
+  })
+
+  /** Cover image (Gemini Nano Banana) → an R2 media key for the article/resource. */
+  .post("/ai/cover-image", async (c) => {
+    const who = requireTenant(c)!;
+    const role = c.get("role");
+    if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    const parsed = z.object({ prompt: z.string().min(2).max(500) }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const result = await generateImage(c.env, {
+      tenantId: who.tenantId, actorUserId: who.userId, feature: "cover-image",
+      prompt: `${sys("cover-image")}\nSubject: ${parsed.data.prompt}`,
+    });
+    if (!result.ok) return result.error === "insufficient_credits" ? c.json({ error: "insufficient_credits" }, 402) : c.json({ error: "image generation unavailable" }, 503);
+    return c.json({ key: result.key, url: `/api/media/${result.key}`, credits: result.credits, mocked: result.mocked });
   })
 
   /** Client Summary: full context → a concise coach-facing status (trainer). */
