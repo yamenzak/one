@@ -698,8 +698,8 @@ export const aiRoutes = new Hono<AppEnv>()
     const result = await generate(c.env, {
       tenantId: who.tenantId, actorUserId: who.userId, feature: "exercise-guide", task: "text",
       system: sys("exercise-guide"),
-      prompt: `EXERCISE: ${name}${muscleGroups.length ? `\nMUSCLES: ${muscleGroups.join(", ")}` : ""}${equipment.length ? `\nEQUIPMENT: ${equipment.join(", ")}` : ""}\n\nWrite the full guide now.`,
-      maxOutputTokens: 1400,
+      prompt: `EXERCISE: ${name}${muscleGroups.length ? `\nMUSCLES: ${muscleGroups.join(", ")}` : ""}${equipment.length ? `\nEQUIPMENT: ${equipment.join(", ")}` : ""}\n\nWrite the full guide now — complete every section.`,
+      maxOutputTokens: 2200,
       mock: () => `## Setup\nSet the bar across your upper back, take a grip just wider than shoulder-width, brace your core and unrack with control.\n\n## Execution\n1. Step back and set your feet shoulder-width, toes turned slightly out.\n2. Take a big breath and brace hard against your belt or midsection.\n3. Break at the hips and knees together, sitting down between your legs.\n4. Descend until your hip crease passes below the top of your knee.\n5. Drive through the whole foot to stand back up, keeping your chest tall.\n6. Lock out the hips at the top and reset your breath.\n\n## Coaching cues\n- Spread the floor with your feet to keep the knees tracking out.\n- Keep the bar over mid-foot the whole way.\n- Stay tall — don't let the chest collapse forward.\n\n## Common mistakes\n- Knees caving in on the way up.\n- Cutting depth short.\n- Losing the brace at the bottom.\n\n## Breathing\nInhale and brace at the top, hold through the descent, exhale as you pass the hardest point on the way up.`,
     });
     if (!result.ok) return aiFail(c, result);

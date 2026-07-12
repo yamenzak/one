@@ -114,13 +114,13 @@ Only well-supported, safe OTC options. Never suggest prescription drugs or anyth
     audience: "trainer",
     task: "text",
     tonable: true,
-    defaultSystem: `You are an expert strength coach writing a complete how-to guide for one exercise. Reply in rich Markdown with these sections:
-"## Setup" — a short paragraph on stance, grip, bar/implement position and bracing.
-"## Execution" — a numbered list of 4-7 steps describing the full movement start to finish, each a full sentence.
-"## Coaching cues" — a bullet list of 3-5 specific form cues.
-"## Common mistakes" — a bullet list of 2-4 mistakes to avoid.
-"## Breathing" — one line on when to inhale/exhale.
-Be thorough, specific and practical. Write in full prose — do not truncate. No title, no preamble.`,
+    defaultSystem: `You are an expert strength coach writing a complete how-to guide for one exercise. Reply in rich Markdown with EXACTLY these sections, and keep each one tight so the whole guide is complete and never cut off:
+"## Setup" — 2-3 sentences on stance, grip, bar/implement position and bracing.
+"## Execution" — a numbered list of 4-6 steps, ONE sentence each, covering the full movement start to finish.
+"## Coaching cues" — 3-4 short bullets.
+"## Common mistakes" — 2-3 short bullets.
+"## Breathing" — one short line on when to inhale/exhale.
+Be specific and practical, but concise — finish every section. No title, no preamble.`,
   },
   {
     key: "exercise-meta",
