@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  Card, IconBadge, Skeleton, cn, toneVar, Check, ClipboardList, Dumbbell, Utensils, Pill, ChevronRight, type LucideIcon, type Tone,
+  Card, IconBadge, Skeleton, cn, Check, ClipboardList, Dumbbell, Utensils, Pill, ChevronRight, type LucideIcon, type Tone,
 } from "@mossa/ui";
 import { api } from "../../api.js";
 import type { TodayBundle } from "./Today.js";
@@ -27,7 +27,7 @@ const slotLabel = (s: string) => (s === "daily" ? "" : s.replace(/_/g, " "));
 export function CheckRow({ icon: Icon, tone, label, sub, done, actionable, onClick }: { icon: LucideIcon; tone: Tone; label: string; sub?: string; done: boolean; actionable: boolean; onClick: () => void }) {
   return (
     <motion.button onClick={onClick} whileTap={{ scale: 0.99 }} className="flex w-full items-center gap-3 py-2.5 text-left">
-      <CheckBox tone={tone} done={done} />
+      <CheckBox done={done} />
       <IconBadge icon={Icon} tone={tone} size="sm" />
       <div className="min-w-0 flex-1">
         <div className={cn("truncate text-sm font-medium transition-colors", done && "text-muted-foreground line-through")}>{label}</div>
@@ -38,16 +38,16 @@ export function CheckRow({ icon: Icon, tone, label, sub, done, actionable, onCli
   );
 }
 
-/** An animated, theme-toned checkbox: the ring fills with the row's metric
- *  color (a tenant-themeable token), springs with a satisfying pop, then the
- *  check settles in. */
-function CheckBox({ tone, done }: { tone: Tone; done: boolean }) {
+/** An animated checkbox in the brand accent: the ring fills with the accent
+ *  (a tenant-themeable token), springs with a satisfying pop, then the check
+ *  settles in. */
+function CheckBox({ done }: { done: boolean }) {
   return (
     <span className={cn("relative grid size-6 shrink-0 place-items-center overflow-hidden rounded-full border-2 transition-colors duration-300", done ? "border-transparent" : "border-surface-3")}>
-      <motion.span aria-hidden className="absolute inset-0 rounded-full" style={{ backgroundColor: toneVar[tone] }} initial={false} animate={{ scale: done ? 1 : 0, opacity: done ? 1 : 0 }} transition={{ type: "spring", stiffness: 480, damping: 26 }} />
+      <motion.span aria-hidden className="absolute inset-0 rounded-full bg-primary" initial={false} animate={{ scale: done ? 1 : 0, opacity: done ? 1 : 0 }} transition={{ type: "spring", stiffness: 480, damping: 26 }} />
       <AnimatePresence initial={false}>
         {done && (
-          <motion.span key="check" className="relative text-white [&_svg]:size-3.5" initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0, opacity: 0 }} transition={{ type: "spring", stiffness: 620, damping: 20, delay: 0.06 }}>
+          <motion.span key="check" className="relative text-primary-foreground [&_svg]:size-3.5" initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0, opacity: 0 }} transition={{ type: "spring", stiffness: 620, damping: 20, delay: 0.06 }}>
             <Check strokeWidth={3.5} />
           </motion.span>
         )}
