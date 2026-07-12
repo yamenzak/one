@@ -16,7 +16,7 @@ interface Sub { id: string; status: string; daysRemaining: number; packageId: st
 interface Pkg { id: string; name: string }
 interface Swap { id: string; reason: string | null; status: string; day_index: number | null; current_exercise_id: string | null; suggested_exercise_id: string | null }
 interface Lab { id: string; display_name: string; status: string; client_notes?: string | null; file_key?: string | null; values?: { marker: string; value: string; unit?: string; flag?: string }[] | null; trainer_feedback?: string | null }
-interface Supp { id: string; name: string; dose: string | null; kind: string; status: string }
+interface Supp { id: string; name: string; dose: string | null; kind: string; status: string; schedule?: { slot: string }[] }
 interface CheckIn { id: string; date_local: string; mood: number | null; energy: number | null; stress: number | null; sleep_hours: number | null; weight_kg: number | null; steps_count: number | null; notes: string | null; photos_json: string | null; trainer_feedback: string | null }
 
 export function ClientManage({ clientId }: { clientId: string }) {
@@ -50,6 +50,7 @@ export function ClientManage({ clientId }: { clientId: string }) {
   const grant = async (packageId: string) => { await api.post("/api/subscriptions/grant", { clientId, packageId }); setGrantOpen(false); await load(); };
   const resolveSwap = async (id: string, status: "approved" | "rejected", replacementExerciseId?: string) => { await api.patch(`/api/swaps/${id}`, { status, replacementExerciseId }); await load(); };
   const discontinueSupp = async (id: string) => { await api.patch(`/api/supplements/${id}`, { status: "discontinued" }); await load(); };
+  const setSuppStatus = async (id: string, status: "active" | "paused") => { await api.patch(`/api/supplements/${id}`, { status }); await load(); };
 
   if (!subs) return <Skeleton className="m-4 h-64" />;
   const active = subs.find((s) => s.status === "active");
@@ -90,10 +91,19 @@ export function ClientManage({ clientId }: { clientId: string }) {
             <Button size="sm" variant="secondary" onClick={() => setSuppOpen(true)}><Plus /> Prescribe</Button>
           </div>
           {supps.length === 0 ? <p className="text-sm text-muted-foreground">No supplements prescribed.</p> : supps.map((s) => (
-            <div key={s.id} className="flex items-center justify-between gap-2">
-              <div className="min-w-0"><span className="truncate font-medium">{s.name}</span>{s.dose && <span className="ml-2 text-xs text-muted-foreground">{s.dose}</span>}</div>
-              <button onClick={() => void discontinueSupp(s.id)} className="text-muted-foreground hover:text-danger [&_svg]:size-4"><X /></button>
-            </div>
+            <SubCard key={s.id} className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2"><span className="truncate font-medium">{s.name}</span>{s.status === "paused" && <Badge tone="warning">Paused</Badge>}</div>
+                  {s.dose && <span className="text-xs text-muted-foreground">{s.dose}</span>}
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => void setSuppStatus(s.id, s.status === "paused" ? "active" : "paused")} className="rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground">{s.status === "paused" ? "Resume" : "Pause"}</button>
+                  <button onClick={() => void discontinueSupp(s.id)} className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:text-danger [&_svg]:size-4"><X /></button>
+                </div>
+              </div>
+              {s.schedule && s.schedule.length > 0 && <div className="flex flex-wrap gap-1.5">{s.schedule.map((sc, i) => <span key={i} className="rounded-full bg-surface-3 px-2 py-0.5 text-[0.65rem] font-medium capitalize text-muted-foreground">{sc.slot.replace(/_/g, " ")}</span>)}</div>}
+            </SubCard>
           ))}
         </Card>
       </Stagger>
