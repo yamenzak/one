@@ -431,6 +431,25 @@ describe("activity history feed", () => {
   });
 });
 
+describe("roster activity pulse (coach Today)", () => {
+  it("aggregates recent client events across the roster, tagged + tenant-scoped", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const mk = async (name: string) => ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: name }) })).json()) as { client: { id: string } }).client;
+    const a = await mk("RosterA");
+    const b = await mk("RosterB");
+    const day = "2026-07-10";
+    await SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H, body: JSON.stringify({ clientId: a.id, data: { date: day, workoutPlanId: "wp", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "e", sets: [{ setIndex: 0, reps: 8, weightKg: 40, completed: true }] } }) });
+    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: b.id, data: { date: day, mood: 4 } }) });
+
+    const roster = (await (await SELF.fetch("http://x/api/reports/roster-activity?from=2026-07-08&to=2026-07-10", { headers: auth(ownerCookie) })).json()) as { events: { clientId: string; clientName: string; kind: string }[] };
+    expect(roster.events.some((e) => e.clientId === a.id && e.kind === "workout" && e.clientName === "RosterA")).toBe(true);
+    expect(roster.events.some((e) => e.clientId === b.id && e.kind === "checkin")).toBe(true);
+    // Another tenant's coach sees their own roster only — not these clients.
+    const other = (await (await SELF.fetch("http://x/api/reports/roster-activity?from=2026-07-08&to=2026-07-10", { headers: auth(otherCookie) })).json()) as { events: { clientId: string }[] };
+    expect(other.events.some((e) => e.clientId === a.id || e.clientId === b.id)).toBe(false);
+  });
+});
+
 describe("workout logging — measurement modes (SPEC §8.3)", () => {
   it("persists reps, time, and distance sets and reads them back per slot", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

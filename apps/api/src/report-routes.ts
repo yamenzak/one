@@ -128,4 +128,59 @@ export const reportRoutes = new Hono<AppEnv>()
     }
     atRisk.sort((a, b) => (b.daysSinceLog ?? 999) - (a.daysSinceLog ?? 999));
     return c.json({ atRisk });
+  })
+
+  // Roster activity pulse — high-signal recent events across the coach's
+  // visible clients (workouts, check-ins, weigh-ins, activities, swap requests,
+  // lab uploads), each tagged with the client so the coach Today can link in.
+  .get("/reports/roster-activity", async (c) => {
+    const who = requireTenant(c)!;
+    const scope = await visibleClientIds(c);
+    if (scope !== "all" && scope.length === 0) return c.json({ events: [] });
+    const from = c.req.query("from") ?? new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
+    const to = c.req.query("to") ?? new Date().toISOString().slice(0, 10);
+    const db = c.env.DB;
+
+    let ids: string[];
+    if (scope === "all") {
+      const rows = await db.prepare("SELECT id FROM clients WHERE tenant_id = ? AND status = 'active'").bind(who.tenantId).all<{ id: string }>();
+      ids = (rows.results ?? []).map((r) => r.id);
+    } else ids = scope;
+    ids = ids.slice(0, 200);
+    if (ids.length === 0) return c.json({ events: [] });
+    const ph = ids.map(() => "?").join(",");
+    const names = new Map<string, string>();
+    const nameRows = await db.prepare(`SELECT id, display_name FROM clients WHERE id IN (${ph})`).bind(...ids).all<{ id: string; display_name: string }>();
+    for (const r of nameRows.results ?? []) names.set(r.id, r.display_name);
+    const nameOf = (id: string) => names.get(id) ?? "Client";
+    const inRange = (day: string | null | undefined) => !!day && day >= from && day <= to;
+    const dayOf = (ts: string | null | undefined) => (ts ? ts.slice(0, 10) : null);
+    const atFor = (day: string, ts?: string | null) => (ts && ts.length >= 10 ? ts : `${day}T12:00:00.000Z`);
+
+    interface REv { id: string; clientId: string; clientName: string; kind: string; date: string; at: string; title: string; subtitle: string | null; metric?: { unit: "weight"; value: number } }
+    const events: REv[] = [];
+
+    const [workouts, checkins, weights, acts, swaps, labs] = await Promise.all([
+      db.prepare(`SELECT client_id, date_local, entries_json, updated_at FROM exercise_logs WHERE client_id IN (${ph}) AND date_local>=? AND date_local<=?`).bind(...ids, from, to).all<{ client_id: string; date_local: string; entries_json: string | null; updated_at: string }>(),
+      db.prepare(`SELECT client_id, date_local, mood, energy, created_at FROM check_ins WHERE client_id IN (${ph}) AND date_local>=? AND date_local<=?`).bind(...ids, from, to).all<{ client_id: string; date_local: string; mood: number | null; energy: number | null; created_at: string }>(),
+      db.prepare(`SELECT client_id, date_local, weight_kg, created_at FROM measurements WHERE client_id IN (${ph}) AND date_local>=? AND date_local<=? AND weight_kg IS NOT NULL`).bind(...ids, from, to).all<{ client_id: string; date_local: string; weight_kg: number; created_at: string }>(),
+      db.prepare(`SELECT id, client_id, date_local, label, activity_key, duration_min, created_at FROM activity_logs WHERE client_id IN (${ph}) AND date_local>=? AND date_local<=?`).bind(...ids, from, to).all<{ id: string; client_id: string; date_local: string; label: string | null; activity_key: string | null; duration_min: number | null; created_at: string }>(),
+      db.prepare(`SELECT id, client_id, status, reason, created_at FROM swap_requests WHERE client_id IN (${ph}) ORDER BY created_at DESC LIMIT 80`).bind(...ids).all<{ id: string; client_id: string; status: string; reason: string | null; created_at: string }>(),
+      db.prepare(`SELECT id, client_id, display_name AS lab_name, uploaded_at FROM lab_tests WHERE client_id IN (${ph}) AND uploaded_at IS NOT NULL ORDER BY uploaded_at DESC LIMIT 80`).bind(...ids).all<{ id: string; client_id: string; lab_name: string; uploaded_at: string }>(),
+    ]);
+
+    for (const w of workouts.results ?? []) {
+      const entries = parseJson<SessionEntry[]>(w.entries_json, []);
+      const sets = entries.reduce((n, e) => n + e.sets.filter((s) => s.completed !== false).length, 0);
+      if (sets === 0) continue;
+      events.push({ id: `w-${w.client_id}-${w.date_local}`, clientId: w.client_id, clientName: nameOf(w.client_id), kind: "workout", date: w.date_local, at: atFor(w.date_local, w.updated_at), title: "Logged a workout", subtitle: `${sets} set${sets === 1 ? "" : "s"}` });
+    }
+    for (const ci of checkins.results ?? []) events.push({ id: `c-${ci.client_id}-${ci.date_local}`, clientId: ci.client_id, clientName: nameOf(ci.client_id), kind: "checkin", date: ci.date_local, at: atFor(ci.date_local, ci.created_at), title: "Checked in", subtitle: ci.mood != null ? `mood ${ci.mood}/5` : null });
+    for (const m of weights.results ?? []) events.push({ id: `m-${m.client_id}-${m.date_local}`, clientId: m.client_id, clientName: nameOf(m.client_id), kind: "measurement", date: m.date_local, at: atFor(m.date_local, m.created_at), title: "Weighed in", subtitle: null, metric: { unit: "weight", value: m.weight_kg } });
+    for (const a of acts.results ?? []) events.push({ id: `a-${a.id}`, clientId: a.client_id, clientName: nameOf(a.client_id), kind: "activity", date: a.date_local, at: atFor(a.date_local, a.created_at), title: a.label || (a.activity_key ?? "Activity").replace(/_/g, " "), subtitle: a.duration_min ? `${a.duration_min} min` : null });
+    for (const s of swaps.results ?? []) if (inRange(dayOf(s.created_at))) events.push({ id: `s-${s.id}`, clientId: s.client_id, clientName: nameOf(s.client_id), kind: "swap", date: dayOf(s.created_at)!, at: s.created_at, title: "Requested a swap", subtitle: s.reason || (s.status === "pending" ? "needs your pick" : s.status) });
+    for (const l of labs.results ?? []) if (inRange(dayOf(l.uploaded_at))) events.push({ id: `l-${l.id}`, clientId: l.client_id, clientName: nameOf(l.client_id), kind: "lab", date: dayOf(l.uploaded_at)!, at: l.uploaded_at, title: "Uploaded a lab", subtitle: l.lab_name });
+
+    events.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+    return c.json({ events: events.slice(0, 40) });
   });

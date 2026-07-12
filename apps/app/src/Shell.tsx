@@ -201,7 +201,7 @@ function TodayRoute() {
   const nav = useNavigate();
   if (!clientSurface) return <CoachToday />;
   if (!clientId) return <NoClient />;
-  return <Today clientId={clientId} onStart={() => nav("/train")} />;
+  return <Today clientId={clientId} onStart={() => nav("/train")} onOpen={(r) => nav(r)} />;
 }
 
 /** Guard: client-surface routes; redirect coaches, provision a training space. */

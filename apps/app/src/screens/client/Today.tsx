@@ -37,7 +37,15 @@ export interface TodayBundle {
   weightSeries?: { kg: number; date: string }[];
 }
 
-export function Today({ clientId, onStart }: { clientId: string; onStart?: () => void }) {
+/** Tab route a feed event links to (client context only). */
+const KIND_ROUTE: Record<string, string> = {
+  water: "/eat", workout: "/train", activity: "/train", measurement: "/progress", checkin: "/progress",
+  feedback: "/progress", sleep: "/wellness", mood: "/progress", fast: "/wellness", supplement: "/wellness",
+  swap: "/train", lab: "/wellness", plan_workout: "/train", plan_meal: "/eat",
+};
+const routeForKind = (kind: string): string | null => (kind.startsWith("food") ? "/eat" : KIND_ROUTE[kind] ?? null);
+
+export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart?: () => void; onOpen?: (route: string) => void }) {
   const [data, setData] = useState<TodayBundle | null>(null);
   const [feed, setFeed] = useState<FeedEvent[] | null>(null);
   const [logOpen, setLogOpen] = useState(false);
@@ -143,7 +151,7 @@ export function Today({ clientId, onStart }: { clientId: string; onStart?: () =>
             <div key={day}>
               <div className="px-1 pb-1 pt-2 text-xs font-semibold text-muted-foreground">{dayLabel(day, date)}</div>
               <Card className="divide-y divide-border/40 py-0.5">
-                {evs.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} />)}
+                {evs.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} onOpen={onOpen} />)}
               </Card>
             </div>
           ))
@@ -151,7 +159,7 @@ export function Today({ clientId, onStart }: { clientId: string; onStart?: () =>
       </Stagger>
 
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} clientId={clientId} onLogged={() => void load()} />
-      {historyOpen && <HistorySheet clientId={clientId} onClose={() => setHistoryOpen(false)} />}
+      {historyOpen && <HistorySheet clientId={clientId} onClose={() => setHistoryOpen(false)} onOpen={onOpen} />}
     </Page>
   );
 }
@@ -204,24 +212,31 @@ function dayLabel(day: string, today: string): string {
   return new Date(`${day}T00:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
 }
 
-function FeedRow({ ev, units }: { ev: FeedEvent; units: UnitPrefs }) {
+function FeedRow({ ev, units, onOpen }: { ev: FeedEvent; units: UnitPrefs; onOpen?: (route: string) => void }) {
   const meta = metaFor(ev.kind);
   const sub = [ev.subtitle, formatMetric(ev.metric, units)].filter(Boolean).join(" · ");
   const time = new Date(ev.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  return (
-    <div className="flex items-center gap-3 py-2.5">
+  const route = onOpen ? routeForKind(ev.kind) : null;
+  const body = (
+    <>
       <IconBadge icon={meta.icon} tone={meta.tone} size="sm" />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{ev.title}</div>
         {sub && <div className="truncate text-xs text-muted-foreground">{sub}</div>}
       </div>
       <span className="shrink-0 text-[0.7rem] tabular-nums text-muted-foreground">{time}</span>
-    </div>
+      {route && <ChevronRight className="size-4 shrink-0 text-muted-foreground/40" />}
+    </>
+  );
+  return route ? (
+    <button onClick={() => onOpen!(route)} className="flex w-full items-center gap-3 py-2.5 text-left transition-opacity active:opacity-60">{body}</button>
+  ) : (
+    <div className="flex items-center gap-3 py-2.5">{body}</div>
   );
 }
 
 /** History browser — pick any past day and see its full timeline. */
-function HistorySheet({ clientId, onClose }: { clientId: string; onClose: () => void }) {
+function HistorySheet({ clientId, onClose, onOpen }: { clientId: string; onClose: () => void; onOpen?: (route: string) => void }) {
   const units = useUnits();
   const today = todayLocal();
   const [day, setDay] = useState(shiftDay(today, -1));
@@ -244,7 +259,7 @@ function HistorySheet({ clientId, onClose }: { clientId: string; onClose: () => 
         ) : events.length === 0 ? (
           <EmptyState icon={Clock} title="Nothing logged" description="No activity recorded on this day." />
         ) : (
-          <Card className="divide-y divide-border/40 py-0.5">{events.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} />)}</Card>
+          <Card className="divide-y divide-border/40 py-0.5">{events.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} onOpen={onOpen ? (r) => { onClose(); onOpen(r); } : undefined} />)}</Card>
         )}
       </div>
     </Sheet>
