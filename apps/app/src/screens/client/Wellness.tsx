@@ -1,42 +1,89 @@
-/** Wellness — water, fasting timer, supplement tap-log, lab tests. */
+/**
+ * Wellness tab — the health hub, brought up to the Train/Eat bar: a hydration
+ * hero ring, quick-log chips, a live fasting timer with metabolic zones, a
+ * "this week" metrics grid, tappable check-in history (opens a detail with
+ * photos + coach feedback), a supplement tap-log, and lab tests (tap for the
+ * reviewed result). Deep-linkable via ?checkin=<date> and ?lab=<id>.
+ */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { fmtVolume, volumeLabel, volumeDisplayToMl } from "@mossa/domain";
-import { Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check } from "@mossa/ui";
+import {
+  Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, StatCard, WeekDots, ProgressRing, EmptyState, cn,
+  ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Bed, Flame, Plus, ChevronRight, Smile, Upload,
+} from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
+import { LogSheet } from "./LogSheet.js";
+import { CheckInDetailSheet, LabDetailSheet, type CheckInFull, type LabFull } from "./WellnessDetails.js";
 
 interface Supplement { id: string; name: string; dose: string | null; kind: string; schedule: { slot: string }[] }
-interface Lab { id: string; display_name: string; status: string; due_by: string | null }
 interface Fast { activeFast: { started_at: string; target_hours: number } | null; recentFasts: { duration_minutes: number; target_hours: number }[] }
 interface Session { id: string; scheduled_at: string; duration_minutes: number; status: string }
+interface Today { waterMl: number; goal: { targets: { targetWaterMl?: number } | null } | null; checkInDates: string[] }
+
+/** N days back from a YYYY-MM-DD string, as YYYY-MM-DD. */
+const shift = (date: string, delta: number): string => { const d = new Date(`${date}T00:00:00`); d.setDate(d.getDate() + delta); return d.toISOString().slice(0, 10); };
+
+const ZONES = [
+  { label: "Fed", max: 4, tone: "nutrition" as const },
+  { label: "Catabolic", max: 16, tone: "cardio" as const },
+  { label: "Fat burning", max: 24, tone: "activity" as const },
+  { label: "Ketosis", max: 72, tone: "sleep" as const },
+];
 
 export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () => void }) {
   const [supps, setSupps] = useState<Supplement[]>([]);
   const [taken, setTaken] = useState<Set<string>>(new Set());
-  const [labs, setLabs] = useState<Lab[]>([]);
+  const [labs, setLabs] = useState<LabFull[]>([]);
   const [fast, setFast] = useState<Fast | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [waterMl, setWaterMl] = useState(0);
+  const [checkIns, setCheckIns] = useState<CheckInFull[]>([]);
+  const [today, setToday] = useState<Today | null>(null);
   const [loading, setLoading] = useState(true);
+  const [logKind, setLogKind] = useState<"checkin" | "water" | "sleep" | "mood" | null>(null);
+  const [detailCheckIn, setDetailCheckIn] = useState<CheckInFull | null>(null);
+  const [detailLab, setDetailLab] = useState<LabFull | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const units = useUnits();
-  const waterPresets = units.volume === "oz" ? [8, 12, 16] : [250, 500, 750];
+  const [params, setParams] = useSearchParams();
   const date = todayLocal();
+  const waterPresets = units.volume === "oz" ? [8, 12, 16] : [250, 500, 750];
 
   const load = useCallback(async () => {
-    const [s, sl, l, f, sess, today] = await Promise.all([
+    const [s, sl, l, f, sess, ci, td] = await Promise.all([
       api.get<{ supplements: Supplement[] }>(`/api/supplements?clientId=${clientId}`),
       api.get<{ taken: { supplement_id: string; slot: string }[] }>(`/api/supplements/logs?clientId=${clientId}&date=${date}`),
-      api.get<{ labs: Lab[] }>(`/api/labs?clientId=${clientId}`),
+      api.get<{ labs: LabFull[] }>(`/api/labs?clientId=${clientId}`),
       api.get<Fast>(`/api/fasting?clientId=${clientId}`),
       api.get<{ sessions: Session[] }>(`/api/sessions?clientId=${clientId}`).catch(() => ({ sessions: [] })),
-      api.get<{ waterMl: number }>(`/api/today?clientId=${clientId}&date=${date}`),
+      api.get<{ checkIns: CheckInFull[] }>(`/api/check-ins?clientId=${clientId}`),
+      api.get<Today>(`/api/today?clientId=${clientId}&date=${date}`),
     ]);
-    setSupps(s.supplements); setTaken(new Set(sl.taken.map((t) => `${t.supplement_id}:${t.slot}`))); setLabs(l.labs); setFast(f); setSessions(sess.sessions); setWaterMl(today.waterMl); setLoading(false);
+    setSupps(s.supplements); setTaken(new Set(sl.taken.map((t) => `${t.supplement_id}:${t.slot}`)));
+    setLabs(l.labs); setFast(f); setSessions(sess.sessions); setCheckIns(ci.checkIns); setToday(td); setLoading(false);
   }, [clientId, date]);
   useEffect(() => void load(), [load]);
 
-  const addWater = async (displayAmount: number) => { const ml = Math.round(volumeDisplayToMl(displayAmount, units)); await api.post("/api/logs/water", { clientId, data: { date, amountMl: ml } }); setWaterMl((w) => w + ml); };
+  // Live tick while a fast is running.
+  useEffect(() => {
+    if (!fast?.activeFast) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [fast?.activeFast]);
+
+  // Deep-link: open a specific check-in (?checkin=<date>) or lab (?lab=<id>).
+  useEffect(() => {
+    if (loading) return;
+    const ciDate = params.get("checkin");
+    const labId = params.get("lab");
+    if (ciDate) { const c = checkIns.find((x) => x.date_local === ciDate); if (c) setDetailCheckIn(c); setParams({}, { replace: true }); }
+    else if (labId) { const l = labs.find((x) => x.id === labId); if (l) setDetailLab(l); setParams({}, { replace: true }); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  const addWater = async (displayAmount: number) => { const ml = Math.round(volumeDisplayToMl(displayAmount, units)); await api.post("/api/logs/water", { clientId, data: { date, amountMl: ml } }); setToday((t) => (t ? { ...t, waterMl: t.waterMl + ml } : t)); };
   const toggleSupp = async (id: string, slot: string) => {
     const key = `${id}:${slot}`;
     const r = await api.post<{ taken: boolean }>(`/api/supplements/${id}/log`, { clientId, date, slot });
@@ -45,123 +92,245 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
   const [fastTarget, setFastTarget] = useState(16);
   const toggleFast = async () => { await api.post("/api/fasting", { clientId, data: { action: fast?.activeFast ? "end" : "start", targetHours: fastTarget } }); await load(); };
 
-  if (loading) return (
+  // ── This-week metrics ──
+  const week = useMemo(() => {
+    const days = Array.from({ length: 7 }, (_, i) => shift(date, -(6 - i)));
+    const ciDates = new Set(checkIns.map((c) => c.date_local));
+    const present = days.map((d) => ciDates.has(d));
+    // streak: consecutive days with a check-in ending today (or yesterday).
+    let streak = 0;
+    for (let i = 0; ; i++) { const d = shift(date, -i); if (ciDates.has(d)) streak++; else if (i === 0) continue; else break; }
+    const recentSleep = checkIns.filter((c) => c.sleep_hours != null).slice(0, 7).map((c) => c.sleep_hours!);
+    const avgSleep = recentSleep.length ? recentSleep.reduce((a, b) => a + b, 0) / recentSleep.length : null;
+    const fastsDone = (fast?.recentFasts ?? []).filter((r) => r.duration_minutes >= r.target_hours * 60).length;
+    const suppSlots = supps.reduce((n, s) => n + (s.schedule.length || 1), 0);
+    const suppTaken = supps.reduce((n, s) => n + (s.schedule.length ? s.schedule : [{ slot: "daily" }]).filter((sc) => taken.has(`${s.id}:${sc.slot}`)).length, 0);
+    return { days, present, streak, avgSleep, fastsDone, suppSlots, suppTaken };
+  }, [checkIns, fast, supps, taken, date]);
+
+  if (loading || !today) return (
     <div className="mx-auto max-w-xl space-y-4 p-4">
       <Skeleton className="h-9 w-40" />
+      <Skeleton className="h-48" />
       <Skeleton className="h-28" />
       <Skeleton className="h-40" />
-      <Skeleton className="h-28" />
     </div>
   );
-  const fastElapsed = fast?.activeFast ? Math.floor((Date.now() - Date.parse(fast.activeFast.started_at)) / 60000) : 0;
-  const fastHours = fastElapsed / 60;
-  const ZONES = [
-    { label: "Fed", max: 4, tone: "nutrition" as const },
-    { label: "Catabolic", max: 16, tone: "cardio" as const },
-    { label: "Fat burning", max: 24, tone: "activity" as const },
-    { label: "Ketosis", max: 72, tone: "sleep" as const },
-  ];
+
+  const waterTarget = today.goal?.targets?.targetWaterMl ?? 2500;
+  const waterPct = Math.min(1, today.waterMl / waterTarget);
+  const remaining = Math.max(0, waterTarget - today.waterMl);
+  const fastElapsedMin = fast?.activeFast ? Math.floor((now - Date.parse(fast.activeFast.started_at)) / 60000) : 0;
+  const fastHours = fastElapsedMin / 60;
   const zone = ZONES.find((z) => fastHours < z.max) ?? ZONES[ZONES.length - 1]!;
+  const fastSecs = fast?.activeFast ? Math.floor((now - Date.parse(fast.activeFast.started_at)) / 1000) : 0;
+  const clock = `${Math.floor(fastSecs / 3600)}:${String(Math.floor((fastSecs % 3600) / 60)).padStart(2, "0")}:${String(fastSecs % 60).padStart(2, "0")}`;
 
   return (
-    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+    <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       <div className="flex items-center gap-3">
         {onBack && <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>}
         <h1 className={onBack ? "text-xl font-bold tracking-tight" : "text-2xl font-bold tracking-tight"}>Wellness</h1>
       </div>
 
+      {/* Hydration hero */}
       <Stagger>
-        <Card>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5"><IconBadge icon={Droplet} tone="hydration" size="sm" /><h2 className="font-semibold">Water</h2></div>
-            <span className="numeral font-semibold text-hydration">{fmtVolume(waterMl, units)}</span>
+        <Card className="relative overflow-hidden">
+          <div className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full bg-hydration/10 blur-2xl" />
+          <div className="relative flex items-center gap-5">
+            <ProgressRing size={128} strokeWidth={10} tone="hydration" progress={waterPct} value={fmtVolume(today.waterMl, units)} label="Hydration" />
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-medium uppercase tracking-wide text-hydration">Water today</div>
+              <div className="mt-0.5 text-sm text-muted-foreground">{remaining > 0 ? <><span className="numeral font-semibold text-foreground">{fmtVolume(remaining, units)}</span> to goal</> : "Goal reached 🎉"}</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {waterPresets.map((v) => <Chip key={v} icon={Plus} onClick={() => void addWater(v)}>{v} {volumeLabel(units)}</Chip>)}
+              </div>
+            </div>
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">{waterPresets.map((v) => <Chip key={v} onClick={() => void addWater(v)}>+{v} {volumeLabel(units)}</Chip>)}</div>
         </Card>
       </Stagger>
 
+      {/* Quick-log chips */}
+      <Stagger className="flex flex-wrap gap-2">
+        <Chip icon={ClipboardList} selected onClick={() => setLogKind("checkin")}>Check in</Chip>
+        <Chip icon={Bed} onClick={() => setLogKind("sleep")}>Log sleep</Chip>
+        <Chip icon={Smile} onClick={() => setLogKind("mood")}>Log mood</Chip>
+        <Chip icon={Timer} onClick={() => void toggleFast()}>{fast?.activeFast ? "End fast" : "Start fast"}</Chip>
+      </Stagger>
+
+      {/* Fasting */}
       <Stagger>
-        <Card className="space-y-3">
+        <Card className="relative space-y-3 overflow-hidden">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5"><IconBadge icon={Timer} tone="sleep" size="sm" /><h2 className="font-semibold">Fasting</h2></div>
-            {fast?.activeFast ? <Badge tone={zone.tone}>{Math.floor(fastElapsed / 60)}h {fastElapsed % 60}m · {zone.label}</Badge> : <Badge tone="neutral">Not fasting</Badge>}
+            <div className="flex items-center gap-2.5"><IconBadge icon={Timer} tone={fast?.activeFast ? zone.tone : "sleep"} size="sm" /><h2 className="font-semibold">Fasting</h2></div>
+            {fast?.activeFast ? <Badge tone={zone.tone}>{zone.label}</Badge> : <Badge tone="neutral">Not fasting</Badge>}
           </div>
           {fast?.activeFast ? (
             <>
-              <div className="h-2.5 overflow-hidden rounded-full bg-surface-2">
-                <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, (fastHours / fast.activeFast.target_hours) * 100)}%` }} />
+              <div className="flex items-end justify-between">
+                <div className="numeral text-3xl font-bold tracking-tight tabular-nums">{clock}</div>
+                <div className="text-xs text-muted-foreground">of {fast.activeFast.target_hours}h target</div>
               </div>
-              <div className="text-xs text-muted-foreground">Target {fast.activeFast.target_hours}h · {zone.label} zone</div>
+              <div className="h-2.5 overflow-hidden rounded-full bg-surface-2">
+                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, (fastHours / fast.activeFast.target_hours) * 100)}%`, backgroundColor: `var(--${zone.tone})` }} />
+              </div>
+              <Button className="w-full" variant="outline" onClick={() => void toggleFast()}>End fast</Button>
             </>
           ) : (
-            <div className="flex flex-wrap gap-2">{[16, 18, 20, 24].map((h) => <Chip key={h} selected={fastTarget === h} onClick={() => setFastTarget(h)}>{h}h</Chip>)}</div>
-          )}
-          <Button className="w-full" variant={fast?.activeFast ? "outline" : "tonal"} onClick={() => void toggleFast()}>{fast?.activeFast ? "End fast" : `Start ${fastTarget}h fast`}</Button>
-          {(fast?.recentFasts.length ?? 0) > 0 && (
-            <div className="space-y-1.5 pt-1">
-              {fast!.recentFasts.slice(0, 3).map((r, i) => (
-                <div key={i} className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{Math.floor(r.duration_minutes / 60)}h {r.duration_minutes % 60}m</span>
-                  {r.duration_minutes >= r.target_hours * 60 ? <Badge tone="success">Goal met</Badge> : <span>target {r.target_hours}h</span>}
+            <>
+              <div className="flex flex-wrap gap-2">{[16, 18, 20, 24].map((h) => <Chip key={h} selected={fastTarget === h} onClick={() => setFastTarget(h)}>{h}h</Chip>)}</div>
+              <Button className="w-full" variant="tonal" onClick={() => void toggleFast()}>Start {fastTarget}h fast</Button>
+              {(fast?.recentFasts.length ?? 0) > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  {fast!.recentFasts.slice(0, 3).map((r, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="numeral">{Math.floor(r.duration_minutes / 60)}h {r.duration_minutes % 60}m</span>
+                      {r.duration_minutes >= r.target_hours * 60 ? <Badge tone="success">Goal met</Badge> : <span>target {r.target_hours}h</span>}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </Card>
       </Stagger>
 
+      {/* This week */}
+      <section className="space-y-2">
+        <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">This week</h3>
+        <Stagger className="grid grid-cols-2 gap-3">
+          <StatCard stack label="Check-in streak" value={week.streak} unit={week.streak === 1 ? "day" : "days"} icon={ClipboardList} tone="nutrition"
+            chart={<WeekDots days={week.present} todayIndex={6} tone="nutrition" fill />} />
+          <StatCard stack label="Avg sleep" value={week.avgSleep != null ? week.avgSleep.toFixed(1) : "—"} unit={week.avgSleep != null ? "h" : undefined} icon={Bed} tone="sleep" />
+          <StatCard stack label="Fasts done" value={week.fastsDone} icon={Flame} tone="cardio" />
+          <StatCard stack label="Supplements" value={week.suppSlots ? `${week.suppTaken}/${week.suppSlots}` : "—"} unit={week.suppSlots ? "today" : undefined} icon={Pill} tone="activity" />
+        </Stagger>
+      </section>
+
+      {/* Check-ins */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Check-ins</h3>
+          <button onClick={() => setLogKind("checkin")} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><Plus /> Check in</button>
+        </div>
+        {checkIns.length === 0 ? (
+          <EmptyState icon={ClipboardList} title="No check-ins yet" description="Check in to track your progress and get your coach's feedback." action={<Button onClick={() => setLogKind("checkin")}><Plus /> Check in</Button>} />
+        ) : (
+          <Stagger className="space-y-1.5">
+            {checkIns.slice(0, 5).map((c) => {
+              const photos = c.photos_json ? (() => { try { return (JSON.parse(c.photos_json!) as unknown[]).length; } catch { return 0; } })() : 0;
+              const bits = [c.mood != null ? `mood ${c.mood}/5` : null, c.sleep_hours != null ? `${c.sleep_hours}h sleep` : null].filter(Boolean).join(" · ");
+              return (
+                <button key={c.id} onClick={() => setDetailCheckIn(c)} className="w-full text-left">
+                  <Card interactive className="flex items-center gap-3 py-3">
+                    <IconBadge icon={ClipboardList} tone="nutrition" size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium">{new Date(`${c.date_local}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</div>
+                      <div className="truncate text-xs text-muted-foreground">{bits || "logged"}{photos > 0 ? ` · ${photos} photo${photos === 1 ? "" : "s"}` : ""}</div>
+                    </div>
+                    {c.trainer_feedback && <Badge tone="primary">Reply</Badge>}
+                    <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
+                  </Card>
+                </button>
+              );
+            })}
+          </Stagger>
+        )}
+      </section>
+
+      {/* Supplements */}
       {supps.length > 0 && (
-        <Stagger>
-          <Card className="space-y-3">
-            <div className="flex items-center gap-2.5"><IconBadge icon={Pill} tone="activity" size="sm" /><h2 className="font-semibold">Supplements</h2></div>
-            {supps.map((s) => (
-              <div key={s.id}>
-                <div className="flex items-center justify-between"><span className="font-medium">{s.name}</span>{s.dose && <span className="text-xs text-muted-foreground">{s.dose}</span>}</div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {(s.schedule.length ? s.schedule : [{ slot: "daily" }]).map((sch) => {
-                    const on = taken.has(`${s.id}:${sch.slot}`);
-                    return <button key={sch.slot} onClick={() => void toggleSupp(s.id, sch.slot)} className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm capitalize transition-all active:scale-95 [&_svg]:size-3.5 ${on ? "bg-success-soft text-success" : "bg-secondary text-muted-foreground"}`}>{on && <Check strokeWidth={3} />}{sch.slot}</button>;
-                  })}
+        <section className="space-y-2">
+          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Supplements</h3>
+          <Stagger>
+            <Card className="space-y-3.5">
+              {supps.map((s) => (
+                <div key={s.id}>
+                  <div className="flex items-center gap-2.5">
+                    <IconBadge icon={Pill} tone="activity" size="sm" />
+                    <div className="min-w-0 flex-1"><span className="font-medium">{s.name}</span>{s.dose && <span className="ml-2 text-xs text-muted-foreground">{s.dose}</span>}</div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 pl-11">
+                    {(s.schedule.length ? s.schedule : [{ slot: "daily" }]).map((sch) => {
+                      const on = taken.has(`${s.id}:${sch.slot}`);
+                      return <button key={sch.slot} onClick={() => void toggleSupp(s.id, sch.slot)} className={cn("inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm capitalize transition-all active:scale-95 [&_svg]:size-3.5", on ? "bg-success-soft text-success" : "bg-surface-2 text-muted-foreground")}>{on && <Check strokeWidth={3} />}{sch.slot.replace(/_/g, " ")}</button>;
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </Card>
-        </Stagger>
+              ))}
+            </Card>
+          </Stagger>
+        </section>
       )}
 
+      {/* Labs */}
       {labs.length > 0 && (
-        <Stagger>
-          <Card className="space-y-3">
-            <div className="flex items-center gap-2.5"><IconBadge icon={FlaskConical} tone="cardio" size="sm" /><h2 className="font-semibold">Lab tests</h2></div>
-            {labs.map((l) => (
-              <div key={l.id} className="flex items-center justify-between gap-2">
-                <div className="min-w-0"><div className="truncate">{l.display_name}</div>{l.due_by && <div className="text-xs text-muted-foreground">Due {new Date(l.due_by).toLocaleDateString()}</div>}</div>
-                {l.status === "requested" || l.status === "scheduled" ? (
-                  <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-primary/15 px-3 text-xs font-medium text-primary [&_svg]:size-3.5"><FlaskConical /> Upload
-                    <input type="file" accept="image/*,application/pdf" className="hidden" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; const fd = new FormData(); fd.append("file", file); fd.append("purpose", "lab"); const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd }); const { key } = (await up.json()) as { key?: string }; if (key) { await api.post(`/api/labs/${l.id}/upload`, { clientId, fileKey: key }); await load(); } }} />
-                  </label>
-                ) : (
-                  <Badge tone={l.status === "reviewed" ? "success" : l.status === "uploaded" ? "cardio" : "warning"}>{l.status}</Badge>
-                )}
-              </div>
-            ))}
-          </Card>
-        </Stagger>
+        <section className="space-y-2">
+          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lab tests</h3>
+          <Stagger className="space-y-1.5">
+            {labs.map((l) => <LabRow key={l.id} lab={l} clientId={clientId} onOpen={() => setDetailLab(l)} onUploaded={load} />)}
+          </Stagger>
+        </section>
       )}
 
+      {/* Sessions */}
       {sessions.length > 0 && (
-        <Stagger>
-          <Card className="space-y-3">
-            <div className="flex items-center gap-2.5"><IconBadge icon={Calendar} tone="activity" size="sm" /><h2 className="font-semibold">Sessions</h2></div>
-            {sessions.slice(0, 6).map((s) => (
-              <div key={s.id} className="flex items-center justify-between gap-2">
-                <div className="min-w-0"><div className="truncate text-sm">{new Date(s.scheduled_at).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div><div className="text-xs text-muted-foreground">{s.duration_minutes} min</div></div>
-                <Badge tone={s.status === "completed" ? "success" : s.status === "scheduled" ? "activity" : s.status === "no_show" ? "danger" : "neutral"}>{s.status.replace("_", " ")}</Badge>
-              </div>
-            ))}
-          </Card>
-        </Stagger>
+        <section className="space-y-2">
+          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sessions</h3>
+          <Stagger>
+            <Card className="space-y-3">
+              {sessions.slice(0, 6).map((s) => (
+                <div key={s.id} className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <IconBadge icon={Calendar} tone="activity" size="sm" />
+                    <div className="min-w-0"><div className="truncate text-sm">{new Date(s.scheduled_at).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div><div className="text-xs text-muted-foreground">{s.duration_minutes} min</div></div>
+                  </div>
+                  <Badge tone={s.status === "completed" ? "success" : s.status === "scheduled" ? "activity" : s.status === "no_show" ? "danger" : "neutral"}>{s.status.replace("_", " ")}</Badge>
+                </div>
+              ))}
+            </Card>
+          </Stagger>
+        </section>
       )}
+
+      {logKind && <LogSheet open initialKind={logKind} clientId={clientId} onClose={() => setLogKind(null)} onLogged={() => { setLogKind(null); void load(); }} />}
+      {detailCheckIn && <CheckInDetailSheet checkIn={detailCheckIn} onClose={() => setDetailCheckIn(null)} />}
+      {detailLab && <LabDetailSheet lab={detailLab} onClose={() => setDetailLab(null)} />}
     </Page>
+  );
+}
+
+/** A lab row: tap to view the detail; requested/scheduled labs get an inline
+ *  upload affordance. */
+function LabRow({ lab, clientId, onOpen, onUploaded }: { lab: LabFull; clientId: string; onOpen: () => void; onUploaded: () => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const canUpload = lab.status === "requested" || lab.status === "scheduled";
+  const tone = lab.status === "reviewed" ? "success" : lab.status === "uploaded" ? "cardio" : "warning";
+  const upload = async (file: File) => {
+    setBusy(true);
+    try {
+      const fd = new FormData(); fd.append("file", file); fd.append("purpose", "lab");
+      const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
+      const { key } = (await up.json()) as { key?: string };
+      if (key) { await api.post(`/api/labs/${lab.id}/upload`, { clientId, fileKey: key }); onUploaded(); }
+    } finally { setBusy(false); }
+  };
+  return (
+    <Card interactive className="flex items-center gap-3 py-3">
+      <IconBadge icon={FlaskConical} tone="sleep" size="sm" />
+      <button onClick={onOpen} className="min-w-0 flex-1 text-left">
+        <div className="truncate font-medium">{lab.display_name}</div>
+        <div className="truncate text-xs text-muted-foreground">{canUpload && lab.due_by ? `Due ${new Date(lab.due_by).toLocaleDateString()}` : lab.status === "reviewed" ? "Result ready — tap to view" : lab.status === "uploaded" ? "Awaiting coach review" : "Tap for details"}</div>
+      </button>
+      {canUpload ? (
+        <>
+          <Button size="sm" disabled={busy} onClick={() => fileRef.current?.click()}><Upload /> {busy ? "…" : "Upload"}</Button>
+          <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); }} />
+        </>
+      ) : (
+        <Badge tone={tone}>{lab.status}</Badge>
+      )}
+    </Card>
   );
 }

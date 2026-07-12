@@ -6,17 +6,18 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SubCard, Chip, Page, Stagger, IconBadge, EmptyState, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SubCard, Chip, Page, Stagger, IconBadge, EmptyState, PhotoGrid, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
+import { checkInPhotos } from "../client/WellnessDetails.js";
 
 interface Sub { id: string; status: string; daysRemaining: number; packageId: string | null }
 interface Pkg { id: string; name: string }
 interface Swap { id: string; reason: string | null; status: string; day_index: number | null; current_exercise_id: string | null; suggested_exercise_id: string | null }
-interface Lab { id: string; display_name: string; status: string; client_notes?: string | null; file_key?: string | null }
+interface Lab { id: string; display_name: string; status: string; client_notes?: string | null; file_key?: string | null; values?: { marker: string; value: string; unit?: string; flag?: string }[] | null; trainer_feedback?: string | null }
 interface Supp { id: string; name: string; dose: string | null; kind: string; status: string }
-interface CheckIn { id: string; date_local: string; mood: number | null; sleep_hours: number | null; weight_kg: number | null; notes: string | null; trainer_feedback: string | null }
+interface CheckIn { id: string; date_local: string; mood: number | null; energy: number | null; stress: number | null; sleep_hours: number | null; weight_kg: number | null; steps_count: number | null; notes: string | null; photos_json: string | null; trainer_feedback: string | null }
 
 export function ClientManage({ clientId }: { clientId: string }) {
   const [subs, setSubs] = useState<Sub[] | null>(null);
@@ -190,21 +191,27 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
         <Button size="sm" variant="tonal" disabled={busy || checkIns.length === 0} onClick={() => void summarize()}><Sparkles /> {busy ? "…" : "Summarize"}</Button>
       </div>
       {summary && <SubCard className="flex items-start gap-2 text-sm"><Sparkles className="mt-0.5 size-4 shrink-0 text-primary" /><p>{summary}</p></SubCard>}
-      {checkIns.length === 0 ? <p className="text-sm text-muted-foreground">No check-ins yet.</p> : checkIns.slice(0, 5).map((c) => (
-        <SubCard key={c.id} className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium">{new Date(c.date_local).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}</span>
-            <span className="numeral text-xs text-muted-foreground">{c.weight_kg ? `${fmtWeight(c.weight_kg, units)} · ` : ""}{c.sleep_hours ? `${c.sleep_hours}h sleep` : ""}</span>
-          </div>
-          {c.notes && <p className="text-sm text-muted-foreground">{c.notes}</p>}
-          {c.trainer_feedback ? <div className="rounded-lg bg-primary/10 px-3 py-2 text-xs text-primary">You replied: {c.trainer_feedback}</div> : (
-            <div className="flex items-center gap-2">
-              <input value={draft[c.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [c.id]: e.target.value }))} placeholder="Reply…" className="flex-1 rounded-lg bg-surface-3 px-3 py-2 text-sm outline-none" />
-              <Button size="sm" disabled={!draft[c.id]?.trim()} onClick={() => void send(c.id)}>Send</Button>
+      {checkIns.length === 0 ? <p className="text-sm text-muted-foreground">No check-ins yet.</p> : checkIns.slice(0, 5).map((c) => {
+        const photos = checkInPhotos(c.photos_json);
+        const meta = [c.mood != null ? `mood ${c.mood}/5` : null, c.energy != null ? `energy ${c.energy}/5` : null, c.sleep_hours ? `${c.sleep_hours}h sleep` : null, c.steps_count ? `${c.steps_count.toLocaleString()} steps` : null].filter(Boolean).join(" · ");
+        return (
+          <SubCard key={c.id} className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium">{new Date(c.date_local).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}</span>
+              {c.weight_kg && <span className="numeral text-xs font-medium text-muted-foreground">{fmtWeight(c.weight_kg, units)}</span>}
             </div>
-          )}
-        </SubCard>
-      ))}
+            {meta && <div className="text-xs text-muted-foreground">{meta}</div>}
+            {photos.length > 0 && <PhotoGrid photos={photos} cols={4} />}
+            {c.notes && <p className="text-sm text-muted-foreground">“{c.notes}”</p>}
+            {c.trainer_feedback ? <div className="flex items-start gap-1.5 rounded-lg bg-primary/10 px-3 py-2 text-xs text-primary"><Check className="mt-0.5 size-3.5 shrink-0" /><span>You replied: {c.trainer_feedback}</span></div> : (
+              <div className="flex items-center gap-2">
+                <input value={draft[c.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [c.id]: e.target.value }))} placeholder="Reply…" className="flex-1 rounded-lg bg-surface-3 px-3 py-2 text-sm outline-none" />
+                <Button size="sm" disabled={!draft[c.id]?.trim()} onClick={() => void send(c.id)}>Send</Button>
+              </div>
+            )}
+          </SubCard>
+        );
+      })}
     </Card>
   );
 }
@@ -258,10 +265,12 @@ function RequestLabSheet({ clientId, onClose, onDone }: { clientId: string; onCl
 }
 
 interface LabValue { marker: string; value: string; unit: string; flag: "low" | "normal" | "high" }
+const isLabImage = (key: string) => /\.(png|jpe?g|webp|gif|heic)$/i.test(key);
 function ReviewLabSheet({ lab, onClose, onDone }: { lab: Lab; onClose: () => void; onDone: () => void }) {
-  const [values, setValues] = useState<LabValue[]>([{ marker: "", value: "", unit: "", flag: "normal" }]);
-  const [feedback, setFeedback] = useState("");
+  const [values, setValues] = useState<LabValue[]>(() => (lab.values && lab.values.length ? lab.values.map((v) => ({ marker: v.marker, value: v.value, unit: v.unit ?? "", flag: (v.flag as LabValue["flag"]) ?? "normal" })) : [{ marker: "", value: "", unit: "", flag: "normal" }]));
+  const [feedback, setFeedback] = useState(lab.trainer_feedback ?? "");
   const [busy, setBusy] = useState(false);
+  const fileUrl = lab.file_key ? `/api/media/${lab.file_key}` : null;
   const setRow = (i: number, p: Partial<LabValue>) => setValues((v) => v.map((r, idx) => (idx === i ? { ...r, ...p } : r)));
   const save = async () => {
     setBusy(true);
@@ -274,6 +283,16 @@ function ReviewLabSheet({ lab, onClose, onDone }: { lab: Lab; onClose: () => voi
   return (
     <Sheet open onClose={onClose} title={`Review — ${lab.display_name}`}>
       <div className="space-y-4">
+        {fileUrl && (
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-muted-foreground">Uploaded result</label>
+            {isLabImage(lab.file_key!) ? (
+              <PhotoGrid photos={[{ url: fileUrl, label: lab.display_name }]} cols={2} />
+            ) : (
+              <a href={fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-2xl bg-surface-2 p-3 transition-colors hover:bg-surface-3"><IconBadge icon={ImageIcon} tone="cardio" size="sm" /><span className="text-sm font-medium">Open uploaded file</span></a>
+            )}
+          </div>
+        )}
         {lab.client_notes && <SubCard className="text-sm text-muted-foreground">Client note: {lab.client_notes}</SubCard>}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-muted-foreground">Values</label>
