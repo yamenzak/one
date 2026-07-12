@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { fmtVolume, fmtEnergy, fmtWeight, type UnitPrefs } from "@mossa/domain";
 import {
-  Button, Card, SubCard, Skeleton, MacroBar, InsightCard, IconBadge, Sheet, EmptyState,
+  Button, Card, Skeleton, MacroBar, IconBadge, Sheet, EmptyState,
   Page, Stagger, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
   Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, Sparkles, Utensils, Croissant, Soup, Apple,
   ChevronLeft, ChevronRight, type Tone, type LucideIcon,
@@ -17,6 +17,7 @@ import { useSession } from "../../session.js";
 import { LogSheet } from "./LogSheet.js";
 import { WidgetCarousel, WidgetCustomizeSheet } from "../widget-kit.js";
 import { CLIENT_WIDGETS, DEFAULT_CLIENT_WIDGETS, type ClientWidgetData } from "./HomeWidgets.js";
+import { TodayAgenda } from "./TodayAgenda.js";
 
 export interface FeedEvent { id: string; kind: string; date: string; at: string; title: string; subtitle: string | null; ref?: string; metric?: { unit: "energy" | "volume" | "weight"; value: number } }
 
@@ -61,6 +62,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   const [data, setData] = useState<TodayBundle | null>(null);
   const [feed, setFeed] = useState<FeedEvent[] | null>(null);
   const [logOpen, setLogOpen] = useState(false);
+  const [checkInOpen, setCheckInOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [widgetsOpen, setWidgetsOpen] = useState(false);
   const { ctx, refresh } = useSession();
@@ -123,18 +125,9 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
         </Button>
       </Stagger>
 
-      {!data.checkedIn && (
-        <Stagger>
-          <InsightCard timestamp="Today" title="Check in" ai>
-            <SubCard>
-              <p className="text-sm text-muted-foreground">A 30-second check-in keeps your coach in the loop — weight, mood, sleep.</p>
-              <Button className="mt-3" onClick={() => setLogOpen(true)}>
-                <ClipboardList /> Check in now
-              </Button>
-            </SubCard>
-          </InsightCard>
-        </Stagger>
-      )}
+      <Stagger>
+        <TodayAgenda clientId={clientId} date={date} bundle={data} onChanged={() => void load()} onNavigate={onOpen} onCheckIn={() => setCheckInOpen(true)} onStartWorkout={onStart} />
+      </Stagger>
 
       {/* Recent activity — a live history of everything logged, last 3 days. */}
       <Stagger className="space-y-2">
@@ -159,6 +152,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
       </Stagger>
 
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} clientId={clientId} onLogged={() => void load()} />
+      {checkInOpen && <LogSheet open initialKind="checkin" onClose={() => setCheckInOpen(false)} clientId={clientId} onLogged={() => { setCheckInOpen(false); void load(); }} />}
       {historyOpen && <HistorySheet clientId={clientId} onClose={() => setHistoryOpen(false)} onOpen={onOpen} />}
       {widgetsOpen && <WidgetCustomizeSheet catalog={CLIENT_WIDGETS} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
     </Page>

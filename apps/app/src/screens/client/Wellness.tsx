@@ -18,6 +18,7 @@ import { useUnits } from "../../units.js";
 import { LogSheet } from "./LogSheet.js";
 import { CheckInDetailSheet, LabDetailSheet, type CheckInFull, type LabFull } from "./WellnessDetails.js";
 import { WellnessScoreCard, WellnessScoreCardSkeleton, type WellnessScoreResult } from "./WellnessScore.js";
+import { CheckRow } from "./TodayAgenda.js";
 
 interface Supplement { id: string; name: string; dose: string | null; kind: string; schedule: { slot: string }[] }
 interface Fast { activeFast: { started_at: string; target_hours: number } | null; recentFasts: { duration_minutes: number; target_hours: number }[] }
@@ -271,26 +272,15 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         )}
       </section>
 
-      {/* Supplements */}
+      {/* Supplements — a clear tap-to-log checklist */}
       {supps.length > 0 && (
         <section className="space-y-2">
-          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Supplements</h3>
+          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Supplements · tap to log</h3>
           <Stagger>
-            <Card className="space-y-3.5">
-              {supps.map((s) => (
-                <div key={s.id}>
-                  <div className="flex items-center gap-2.5">
-                    <IconBadge icon={Pill} tone="activity" size="sm" />
-                    <div className="min-w-0 flex-1"><span className="font-medium">{s.name}</span>{s.dose && <span className="ml-2 text-xs text-muted-foreground">{s.dose}</span>}</div>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2 pl-11">
-                    {(s.schedule.length ? s.schedule : [{ slot: "daily" }]).map((sch) => {
-                      const on = taken.has(`${s.id}:${sch.slot}`);
-                      return <button key={sch.slot} onClick={() => void toggleSupp(s.id, sch.slot)} className={cn("inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm capitalize transition-all active:scale-95 [&_svg]:size-3.5", on ? "bg-success-soft text-success" : "bg-surface-2 text-muted-foreground")}>{on && <Check strokeWidth={3} />}{sch.slot.replace(/_/g, " ")}</button>;
-                    })}
-                  </div>
-                </div>
-              ))}
+            <Card className="divide-y divide-border/40 py-0.5">
+              {supps.flatMap((s) => (s.schedule.length ? s.schedule : [{ slot: "daily" }]).map((sch) => (
+                <CheckRow key={`${s.id}:${sch.slot}`} icon={Pill} tone="activity" label={`Take ${s.name}`} sub={[s.dose, sch.slot === "daily" ? "" : sch.slot.replace(/_/g, " ")].filter(Boolean).join(" · ") || undefined} done={taken.has(`${s.id}:${sch.slot}`)} actionable={false} onClick={() => void toggleSupp(s.id, sch.slot)} />
+              )))}
             </Card>
           </Stagger>
         </section>
