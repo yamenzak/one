@@ -221,7 +221,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   return (
     <PlanShell>
       <HeaderBar title={day.name || `Day ${dayIndex + 1}`} subtitle={`${loggedSets} of ${totalSets} set${totalSets === 1 ? "" : "s"} logged`} onBack={() => setDayIndex(null)}
-        right={<ProgressRing progress={totalSets ? loggedSets / totalSets : 0} size={40} strokeWidth={5} tone="activity" value={<span className="text-xs font-semibold">{loggedSets}</span>} />} />
+        right={<ProgressRing progress={totalSets ? loggedSets / totalSets : 0} size={40} strokeWidth={5} tone="primary" value={<span className="text-xs font-semibold">{loggedSets}</span>} />} />
 
       <ol className="mx-auto max-w-xl p-4 pb-28">
         {steps.map((step, i) => {
@@ -235,7 +235,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
             <li key={i} className="flex gap-3">
               {/* Timeline rail — numbered node + connector down to the next step. */}
               <div className="flex flex-col items-center">
-                <div className={cn("z-10 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ring-4 ring-background transition-colors [&_svg]:size-4", done ? "bg-activity text-white" : "bg-surface-3 text-muted-foreground")}>
+                <div className={cn("z-10 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ring-4 ring-background transition-colors [&_svg]:size-4", done ? "bg-primary text-primary-foreground" : "bg-surface-3 text-muted-foreground")}>
                   {done ? <Check strokeWidth={3} /> : i + 1}
                 </div>
                 {!last && <div className="w-px flex-1 bg-border/60" />}
@@ -408,7 +408,7 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
     if (s.restAfterSec) parts.push(`rest ${fmtClock(s.restAfterSec)}`);
     return `Set ${i + 1} · ${parts.join(" · ")}`;
   };
-  const Attr = ({ label, chips, tone }: { label: string; chips: string[]; tone: "activity" | "neutral" }) => chips.length ? (
+  const Attr = ({ label, chips, tone }: { label: string; chips: string[]; tone: "primary" | "activity" | "neutral" }) => chips.length ? (
     <div className="flex items-start gap-2">
       <span className="mt-1 w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
       <div className="flex flex-wrap gap-1.5">{chips.map((c) => <Badge key={c} tone={tone}>{c}</Badge>)}</div>
@@ -435,7 +435,7 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
         )}
         {(primary.length > 0 || secondary.length > 0 || equipment.length > 0 || attrs.length > 0) && (
           <div className="space-y-2">
-            <Attr label="Muscles" chips={primary} tone="activity" />
+            <Attr label="Muscles" chips={primary} tone="primary" />
             <Attr label="Also works" chips={secondary} tone="neutral" />
             <Attr label="Equipment" chips={equipment} tone="neutral" />
             <Attr label="Type" chips={attrs} tone="neutral" />
@@ -456,7 +456,7 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
         {ex?.instructions_md ? (
           <div>
             <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">How to</div>
-            <Markdown className="text-sm text-foreground/90">{ex.instructions_md}</Markdown>
+            <Markdown className="text-[0.95rem] text-foreground/90">{ex.instructions_md}</Markdown>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No instructions yet — ask your coach for cues.</p>
@@ -721,9 +721,9 @@ function setMeasureShort(s: WorkoutSet, mode: MeasureMode): string {
 /** The dot color encodes set type: logged (solid), warm-up, AMRAP, or a plain
  *  working set still to do. */
 function setDotClass(s: WorkoutSet, done: boolean): string {
-  if (done) return "bg-activity";
+  if (done) return "bg-primary";
   if (s.setType === "warmup") return "bg-warning/60";
-  if (s.setType === "amrap") return "bg-primary/60";
+  if (s.setType === "amrap") return "bg-primary/40 ring-1 ring-inset ring-primary/60";
   return "bg-surface-3";
 }
 
@@ -782,7 +782,7 @@ function RestTimer({ seconds, label, className }: { seconds: number; label?: boo
     <button type="button" onClick={(e) => { e.stopPropagation(); setLeft((r) => (r === null ? seconds : null)); }}
       aria-label={running ? "Reset rest timer" : "Start rest timer"}
       className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-semibold tabular-nums transition-colors [&_svg]:size-3",
-        done ? "bg-success text-white" : running ? "bg-cardio text-white" : "bg-surface-3 text-muted-foreground hover:bg-surface-2", className)}>
+        done ? "bg-primary text-primary-foreground" : running ? "bg-cardio text-white" : "bg-surface-3 text-muted-foreground hover:bg-surface-2", className)}>
       <Timer />{done ? "Go!" : `${label ? "Rest " : ""}${fmtClock(running ? left! : seconds)}`}
     </button>
   );
