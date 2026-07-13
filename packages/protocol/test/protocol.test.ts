@@ -1,12 +1,40 @@
 import { describe, expect, it } from "vitest";
 import {
   MealBody,
+  normalizeEquipment,
+  normalizeMuscle,
   optionMacroTotals,
   prescribedSetsForDay,
   stripBodyForTemplate,
   WorkoutBody,
   type FoodLike,
 } from "../src/index.js";
+
+describe("taxonomy normalization (AI auto-fill tolerance)", () => {
+  it("folds anatomical + plural + synonym muscle names onto slugs", () => {
+    expect(normalizeMuscle("Quadriceps")).toBe("quads");
+    expect(normalizeMuscle("gluteus maximus")).toBe("glutes");
+    expect(normalizeMuscle("pecs")).toBe("chest");
+    expect(normalizeMuscle("deltoids")).toBe("shoulders");
+    expect(normalizeMuscle("rear deltoid")).toBe("rear delts");
+    expect(normalizeMuscle("latissimus dorsi")).toBe("lats");
+    expect(normalizeMuscle("core")).toBe("abs");
+    expect(normalizeMuscle("hamstring")).toBe("hamstrings");
+    expect(normalizeMuscle("calf")).toBe("calves");
+    expect(normalizeMuscle("quads")).toBe("quads"); // already-canonical passes through
+    expect(normalizeMuscle("banana")).toBeNull();
+  });
+
+  it("folds equipment synonyms onto slugs", () => {
+    expect(normalizeEquipment("body weight")).toBe("bodyweight");
+    expect(normalizeEquipment("dumbbells")).toBe("dumbbell");
+    expect(normalizeEquipment("resistance bands")).toBe("resistance band");
+    expect(normalizeEquipment("EZ curl bar")).toBe("ez bar");
+    expect(normalizeEquipment("chin-up bar")).toBe("pull-up bar");
+    expect(normalizeEquipment("cable")).toBe("cable");
+    expect(normalizeEquipment("spaceship")).toBeNull();
+  });
+});
 
 describe("workout body schema", () => {
   const body = WorkoutBody.parse({

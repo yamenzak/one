@@ -6,7 +6,7 @@
 
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { WorkoutBody, MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@mossa/protocol";
+import { WorkoutBody, MUSCLE_GROUPS, EQUIPMENT_TYPES, normalizeMuscle, normalizeEquipment } from "@mossa/protocol";
 import { resolveUnits } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
@@ -623,7 +623,7 @@ export const aiRoutes = new Hono<AppEnv>()
     if (pair) {
       // One wide two-panel render → guaranteed-identical style, genuinely
       // different poses, one generation. The client splits it into two frames.
-      const prompt = `${sys(feature)}\n\nIMPORTANT COMPOSITION: Output ONE wide 2:1 landscape image that reads as two equal side-by-side panels showing the SAME single figure in the SAME art style, same side-on camera and same background. In the LEFT half, place ONE complete full-body figure CENTERED within that half with generous margin — whole body from head to feet visible, nothing cropped. In the RIGHT half, place the SAME figure CENTERED within that half, also full-body and uncropped. Keep the exact vertical centre of the image EMPTY (no figure straddling the middle) so the image can be split cleanly in half. LEFT = ${subject} at the STARTING / setup position (ready, before the rep). RIGHT = ${subject} at the PEAK-CONTRACTION / finished position at the hardest point of the rep — a clearly different body pose (e.g. a curl with the bar raised to the shoulders, a squat at the bottom with hips below the knees, a press with arms overhead). No dividing line, no gap, no frame, no text, no labels, no numbers.`;
+      const prompt = `${sys(feature)}\n\nIMPORTANT COMPOSITION: Output ONE wide 2:1 landscape image that reads as two equal side-by-side panels showing the SAME single figure in the SAME art style, same side-on camera and same background. In the LEFT half, place ONE complete full-body figure CENTERED within that half with generous margin — whole body from head to feet visible, nothing cropped. In the RIGHT half, place the SAME figure CENTERED within that half, also full-body and uncropped. Keep the exact vertical centre of the image EMPTY (no figure straddling the middle) so the image can be split cleanly in half.\n\nTHE TWO HALVES MUST SHOW TWO DIFFERENT MOMENTS OF THE REP — this is the whole point. LEFT = ${subject} at the STARTING / setup position (the beginning of the rep, muscles lengthened, before the movement). RIGHT = ${subject} at the FINISHED / peak-contraction position (the hardest point at the end of the rep, muscles shortened). The joint angles, limb positions and body shape in the two halves MUST be VISIBLY and SUBSTANTIALLY DIFFERENT — e.g. a bicep curl: LEFT arm hanging straight down, RIGHT forearm raised with the weight at the shoulder; a squat: LEFT standing tall, RIGHT deep at the bottom with hips below knees; a bench press: LEFT bar touching the chest, RIGHT arms fully extended. Do NOT draw the same pose twice; the two figures must never be identical or near-identical mirror copies. If both halves look the same, the image is wrong.\n\nNo dividing line, no gap, no frame, no text, no labels, no numbers.`;
       const r = await generateImage(c.env, { tenantId: who.tenantId, actorUserId: who.userId, feature, prompt });
       if (!r.ok) return aiFail(c, r);
       return c.json({ key: r.key, url: `/api/media/${r.key}`, pair: true, credits: r.credits, mocked: r.mocked });
@@ -753,15 +753,16 @@ export const aiRoutes = new Hono<AppEnv>()
     if (!result.ok) return aiFail(c, result);
     const raw = extractJson<Record<string, unknown>>(result.output);
     if (!raw) return c.json({ error: "The AI didn't return valid details.", raw: result.output.slice(0, 800), mocked: result.mocked }, 422);
-    // Keep only values from the allowed vocab; coerce the enums.
-    const muscles = new Set<string>(MUSCLE_GROUPS);
-    const equip = new Set<string>(EQUIPMENT_TYPES);
-    const arr = (v: unknown, allow: Set<string>) => (Array.isArray(v) ? v.map((x) => String(x).toLowerCase().trim()).filter((x) => allow.has(x)) : []);
-    const oneOf = (v: unknown, opts: string[]) => (typeof v === "string" && opts.includes(v) ? v : null);
+    // Fold model output onto our slugs tolerantly (anatomical names, plurals,
+    // synonyms) so real-model answers actually populate the editor; coerce enums.
+    const uniq = <T,>(xs: T[]) => [...new Set(xs)];
+    const mapArr = <T,>(v: unknown, fn: (x: string) => T | null): T[] =>
+      Array.isArray(v) ? uniq(v.map((x) => fn(String(x))).filter((x): x is T => x != null)) : [];
+    const oneOf = (v: unknown, opts: string[]) => (typeof v === "string" && opts.includes(v.toLowerCase().trim()) ? v.toLowerCase().trim() : null);
     const meta = {
-      primaryMuscles: arr(raw.primaryMuscles, muscles),
-      secondaryMuscles: arr(raw.secondaryMuscles, muscles),
-      equipment: arr(raw.equipment, equip),
+      primaryMuscles: mapArr(raw.primaryMuscles, normalizeMuscle),
+      secondaryMuscles: mapArr(raw.secondaryMuscles, normalizeMuscle),
+      equipment: mapArr(raw.equipment, normalizeEquipment),
       difficulty: oneOf(raw.difficulty, ["beginner", "intermediate", "advanced"]),
       force: oneOf(raw.force, ["push", "pull", "static"]),
       mechanic: oneOf(raw.mechanic, ["compound", "isolation"]),
