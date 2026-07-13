@@ -321,7 +321,14 @@ function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, on
           {logged ? <span className="absolute right-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-nutrition px-2 py-0.5 text-[0.6rem] font-semibold text-white [&_svg]:size-2.5"><Check strokeWidth={3} /> Logged</span> : opt.isFree ? <span className="absolute right-2 top-2 rounded-full bg-white/20 px-2 py-0.5 text-[0.6rem] font-semibold text-white backdrop-blur-md">Free</span> : null}
           <div className="absolute inset-x-0 bottom-0 p-3">
             <div className="truncate font-semibold text-white">{opt.mealName || (opt.isFree ? "Free meal" : `Option ${index + 1}`)}</div>
-            <div className="numeral truncate text-xs text-white/85">{opt.isFree ? `≤ ${opt.freeMealMaxCalories != null ? fmtEnergy(opt.freeMealMaxCalories, units) : "—"}` : `${fmtEnergy(totals.calories, units)} · P${Math.round(totals.proteinG)} C${Math.round(totals.carbsG)} F${Math.round(totals.fatG)}`}</div>
+            {opt.isFree ? (
+              <div className="numeral truncate text-xs text-white/85">≤ {opt.freeMealMaxCalories != null ? fmtEnergy(opt.freeMealMaxCalories, units) : "—"}</div>
+            ) : (
+              <div className="mt-0.5 flex items-center gap-2">
+                <span className="numeral shrink-0 text-xs font-semibold text-white">{fmtEnergy(totals.calories, units)}</span>
+                <MacroInline proteinG={totals.proteinG} carbsG={totals.carbsG} fatG={totals.fatG} className="shrink-0 text-[0.7rem] drop-shadow" />
+              </div>
+            )}
           </div>
         </button>
         {!opt.isFree && <div className="px-2.5 pt-2.5"><MacroSplitBar p={totals.proteinG} c={totals.carbsG} f={totals.fatG} /></div>}
