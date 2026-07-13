@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { kcalToDisplay, displayToKcal, energyLabel, type UnitPrefs } from "@mossa/domain";
-import { FixedDrawer, Button, Field, Chip, cn, toneSoft, METRICS, Utensils, Barcode, ChevronDown, Sparkles, Globe, PencilLine, Search, Plus, X, ArrowLeft } from "@mossa/ui";
+import { FixedDrawer, Button, Field, Chip, SegmentedControl, cn, toneSoft, METRICS, Utensils, Barcode, ChevronDown, Sparkles, Globe, PencilLine, Search, Plus, X, ArrowLeft } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
@@ -91,6 +91,11 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
   const [webResults, setWebResults] = useState<FoodHit[] | null>(null);
   const [webBusy, setWebBusy] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  // Whole vs branded — brand-tagged rows are packaged/branded (Open Food Facts),
+  // brandless are whole/generic (USDA & the rest). A client-side cut of the merge.
+  const [foodFilter, setFoodFilter] = useState<"all" | "whole" | "branded">("all");
+  // Scan a barcode straight into the barcode field (manual entry), no lookup.
+  const [fieldScanOpen, setFieldScanOpen] = useState(false);
   useEffect(() => {
     if (!webMode) return;
     const q = f.name.trim();
@@ -229,10 +234,17 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                       <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground [&_svg]:size-3.5"><Search /> <span className="truncate">Results for “{f.name.trim() || "…"}” from Open Food Facts…</span></div>
                       <button onClick={() => setScanOpen(true)} aria-label="Scan barcode" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground hover:bg-surface-3 [&_svg]:size-[1.1rem]"><Barcode /></button>
                     </div>
+                    {webResults && webResults.length > 0 && (
+                      <SegmentedControl
+                        options={[{ value: "all", label: "All" }, { value: "whole", label: "Whole" }, { value: "branded", label: "Branded" }]}
+                        value={foodFilter}
+                        onChange={setFoodFilter}
+                      />
+                    )}
                     <div className="max-h-64 space-y-1 overflow-y-auto">
                       {f.name.trim().length < 2 && <p className="p-3 text-center text-sm text-muted-foreground">Type a food name above to search, or scan a barcode.</p>}
                       {webBusy && <p className="p-3 text-center text-sm text-muted-foreground">Searching…</p>}
-                      {webResults?.map((hit, i) => {
+                      {webResults?.filter((h) => foodFilter === "all" || (foodFilter === "branded" ? !!h.brand : !h.brand)).map((hit, i) => {
                         const img = hit.image_url ?? hit.imageUrl;
                         return (
                           <button key={i} onClick={() => void pickWeb(hit)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary">
@@ -243,6 +255,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                         );
                       })}
                       {webResults && webResults.length === 0 && !webBusy && <p className="p-3 text-center text-sm text-muted-foreground">No results — try Scan label or Manual.</p>}
+                      {webResults && webResults.length > 0 && !webResults.some((h) => foodFilter === "all" || (foodFilter === "branded" ? !!h.brand : !h.brand)) && <p className="p-3 text-center text-sm text-muted-foreground">No {foodFilter} foods here — try “All”.</p>}
                     </div>
                   </div>
                 )}
@@ -262,7 +275,10 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Brand" value={f.brand} onChange={(e) => set("brand", e.target.value)} placeholder="Optional" />
-                  <Field label="Barcode" icon={Barcode} inputMode="numeric" value={f.barcode} onChange={(e) => set("barcode", dec(e.target.value))} placeholder="Optional" />
+                  <div className="flex items-end gap-2">
+                    <Field className="flex-1" label="Barcode" icon={Barcode} inputMode="numeric" value={f.barcode} onChange={(e) => set("barcode", dec(e.target.value))} placeholder="Optional" />
+                    <Button type="button" variant="secondary" size="icon" aria-label="Scan barcode into the field" onClick={() => setFieldScanOpen(true)}><Barcode /></Button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Serving size" inputMode="decimal" value={f.serving} onChange={(e) => set("serving", dec(e.target.value))} />
@@ -309,6 +325,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
         )}
       </FixedDrawer>
       {scanOpen && <BarcodeScanner onDetected={(code) => void lookupBarcode(code)} onClose={() => setScanOpen(false)} />}
+      {fieldScanOpen && <BarcodeScanner onDetected={(code) => { set("barcode", code); setFieldScanOpen(false); }} onClose={() => setFieldScanOpen(false)} />}
     </>
   );
 }

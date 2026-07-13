@@ -84,6 +84,7 @@ export function Shell() {
         <Route path="clients/:clientId" element={<CoachArea><ClientDetail /></CoachArea>} />
         <Route path="clients/:clientId/:subtab" element={<CoachArea><ClientDetail /></CoachArea>} />
         <Route path="library" element={<CoachArea><Library /></CoachArea>} />
+        <Route path="library/:tab" element={<CoachArea><Library /></CoachArea>} />
         <Route path="business" element={<CoachArea><Business /></CoachArea>} />
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Route>

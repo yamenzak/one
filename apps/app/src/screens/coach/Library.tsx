@@ -1,6 +1,7 @@
 /** Coach Library — exercises (create + web import), foods, templates, content. */
 
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { fmtEnergy } from "@mossa/domain";
 import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, MacroInline, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Sparkles } from "@mossa/ui";
 import { api } from "../../api.js";
@@ -12,13 +13,18 @@ import { ExerciseEditor } from "./ExerciseEditor.js";
 import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
 
 type Tab = "exercises" | "foods" | "templates" | "content";
+const TABS: Tab[] = ["exercises", "foods", "templates", "content"];
 
 export function Library() {
-  const [tab, setTab] = useState<Tab>("exercises");
+  const nav = useNavigate();
+  // The active tab lives in the URL (/library/:tab) so tabs are deep-linkable
+  // and back/forward navigable; an unknown/absent tab falls back to exercises.
+  const { tab: tabParam } = useParams<{ tab?: string }>();
+  const tab = (TABS.includes(tabParam as Tab) ? tabParam : "exercises") as Tab;
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <h1 className="text-2xl font-bold tracking-tight">Library</h1>
-      <SegmentedControl options={[{ value: "exercises", label: "Exercises" }, { value: "foods", label: "Foods" }, { value: "templates", label: "Templates" }, { value: "content", label: "Content" }]} value={tab} onChange={setTab} />
+      <SegmentedControl options={[{ value: "exercises", label: "Exercises" }, { value: "foods", label: "Foods" }, { value: "templates", label: "Templates" }, { value: "content", label: "Content" }]} value={tab} onChange={(v) => nav(`/library/${v}`)} />
       {tab === "exercises" && <Exercises />}
       {tab === "foods" && <Foods />}
       {tab === "templates" && <Templates />}
@@ -59,7 +65,8 @@ function Exercises() {
           </div>
         ))}</Stagger>
       )}
-      {editor && <ExerciseEditor exerciseId={editor.exerciseId} initial={editor.initial} onClose={() => setEditor(null)} onSaved={() => { setEditor(null); void load(); }} />}
+      {/* After a NEW add, clear any active search so the new row is actually visible (not filtered out by a stale query). */}
+      {editor && <ExerciseEditor exerciseId={editor.exerciseId} initial={editor.initial} onClose={() => setEditor(null)} onSaved={() => { const wasNew = !editor.exerciseId; setEditor(null); if (wasNew && q) setQ(""); else void load(); }} />}
       {altFor && <AlternativesSheet exercise={altFor} onClose={() => setAltFor(null)} />}
       {archiveFor && <ArchiveConfirm kind="exercise" id={archiveFor.id} name={archiveFor.name} onClose={() => setArchiveFor(null)} onDone={() => { setArchiveFor(null); void load(); }} />}
     </div>
@@ -186,7 +193,7 @@ function Foods() {
           foodId={editor.id}
           isStaff
           onClose={() => setEditor(null)}
-          onSaved={() => { setEditor(null); void load(); }}
+          onSaved={() => { const wasNew = !editor.id; setEditor(null); if (wasNew && q) setQ(""); else void load(); }}
         />
       )}
       {archiveFor && <ArchiveConfirm kind="food" id={archiveFor.id} name={archiveFor.name} onClose={() => setArchiveFor(null)} onDone={() => { setArchiveFor(null); void load(); }} />}

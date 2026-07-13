@@ -1018,6 +1018,18 @@ describe("foods — tenant isolation + copy-on-write", () => {
     expect(twoSees).toBe(404);
   });
 
+  it("a manually-added food (custom, no sourceId) lands in the library list", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const created = (await (await SELF.fetch("http://x/api/foods", { method: "POST", headers: H, body: JSON.stringify({ name: "Homemade Granola", calories: 420, proteinG: 11, carbsG: 60, fatG: 15, source: "custom" }) })).json()) as { id: string; imported: boolean };
+    expect(created.id).toBeTruthy();
+    // Appears in the unfiltered library list…
+    const all = (await (await SELF.fetch("http://x/api/foods", { headers: auth(ownerCookie) })).json()) as { foods: { id: string }[] };
+    expect(all.foods.map((f) => f.id)).toContain(created.id);
+    // …and under a matching search.
+    const q = (await (await SELF.fetch("http://x/api/foods?q=granola", { headers: auth(ownerCookie) })).json()) as { foods: { id: string }[] };
+    expect(q.foods.map((f) => f.id)).toContain(created.id);
+  });
+
   it("the /foods/:id editor route does not shadow /foods/search-external (regression)", async () => {
     // Before the id was constrained to `food_…`, this GET matched /foods/:id
     // with id="search-external" and 404'd — silently killing web food search.
