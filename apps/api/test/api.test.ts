@@ -1053,3 +1053,64 @@ describe("foods — tenant isolation + copy-on-write", () => {
     expect(fork!.calories).toBe(120);
   });
 });
+
+describe("library archive (soft-delete) + resolve lane", () => {
+  // ownerCookie is only assigned in beforeAll (after collection), so build the
+  // auth header lazily at call time rather than at describe-body evaluation.
+  const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
+  const mkEx = async (name: string) => ((await (await SELF.fetch("http://x/api/exercises", { method: "POST", headers: H(), body: JSON.stringify({ name, visibility: "tenant" }) })).json()) as { id: string }).id;
+
+  it("archiving hides an exercise from browse but keeps it resolvable via scope=all", async () => {
+    const id = await mkEx("Archive Me Curl");
+    const before = (await (await SELF.fetch("http://x/api/exercises?q=archive me curl", { headers: auth(ownerCookie) })).json()) as { exercises: { id: string }[] };
+    expect(before.exercises.map((e) => e.id)).toContain(id);
+
+    expect((await SELF.fetch(`http://x/api/exercises/${id}`, { method: "DELETE", headers: H() })).status).toBe(200);
+
+    // Gone from the browse lane…
+    const browse = (await (await SELF.fetch("http://x/api/exercises?q=archive me curl", { headers: auth(ownerCookie) })).json()) as { exercises: { id: string }[] };
+    expect(browse.exercises.map((e) => e.id)).not.toContain(id);
+    // …but still resolves on the scope=all lane (plans/logs that reference it).
+    const resolve = (await (await SELF.fetch("http://x/api/exercises?scope=all", { headers: auth(ownerCookie) })).json()) as { exercises: { id: string; active: number }[] };
+    const row = resolve.exercises.find((e) => e.id === id);
+    expect(row).toBeTruthy();
+    expect(row!.active).toBe(0);
+  });
+
+  it("a tenant cannot archive the platform seed or another tenant's row", async () => {
+    // Platform seed (tenant NULL) — the tenant-scoped UPDATE can never match it.
+    await (env.DB as D1Database).prepare("INSERT INTO exercises (id, tenant_id, visibility, name, active, created_at) VALUES ('exr_seedA', NULL, 'tenant', 'Seed Squat', 1, '2026-01-01')").run();
+    await SELF.fetch("http://x/api/exercises/exr_seedA", { method: "DELETE", headers: H() });
+    const seed = await (env.DB as D1Database).prepare("SELECT active FROM exercises WHERE id = 'exr_seedA'").first<{ active: number }>();
+    expect(seed!.active).toBe(1);
+
+    // Another tenant's row — owner1's delete must not touch owner2's exercise.
+    const other = ((await (await SELF.fetch("http://x/api/exercises", { method: "POST", headers: { "content-type": "application/json", ...auth(otherCookie) }, body: JSON.stringify({ name: "Owner2 Row", visibility: "tenant" }) })).json()) as { id: string }).id;
+    await SELF.fetch(`http://x/api/exercises/${other}`, { method: "DELETE", headers: H() });
+    const stillThere = (await (await SELF.fetch("http://x/api/exercises?q=owner2 row", { headers: auth(otherCookie) })).json()) as { exercises: { id: string }[] };
+    expect(stillThere.exercises.map((e) => e.id)).toContain(other);
+  });
+
+  it("usage counts the plans that reference an exercise", async () => {
+    const id = await mkEx("Used In Plan Row");
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const body = JSON.stringify({ days: [{ blocks: [{ slots: [{ exerciseId: id, sets: [] }] }] }] });
+    await (env.DB as D1Database).prepare("INSERT INTO workout_plans (id, tenant_id, client_id, name, status, body_json, created_at) VALUES ('wp_use1', ?, 'c1', 'P', 'draft', ?, '2026-01-01')").bind(ctx.active.tenantId, body).run();
+
+    const usage = (await (await SELF.fetch(`http://x/api/exercises/${id}/usage`, { headers: auth(ownerCookie) })).json()) as { plans: number; templates: number };
+    expect(usage.plans).toBe(1);
+    expect(usage.templates).toBe(0);
+  });
+
+  it("archiving a food hides it from browse but the resolve routes still return it", async () => {
+    const food = ((await (await SELF.fetch("http://x/api/foods", { method: "POST", headers: H(), body: JSON.stringify({ name: "Archive Yogurt", calories: 100 }) })).json()) as { id: string }).id;
+    expect((await SELF.fetch(`http://x/api/foods/${food}`, { method: "DELETE", headers: H() })).status).toBe(200);
+
+    const browse = (await (await SELF.fetch("http://x/api/foods?q=archive yogurt", { headers: auth(ownerCookie) })).json()) as { foods: { id: string }[] };
+    expect(browse.foods.map((f) => f.id)).not.toContain(food);
+    // Resolvable both by id and on the scope=all lane.
+    expect((await SELF.fetch(`http://x/api/foods/${food}`, { headers: auth(ownerCookie) })).status).toBe(200);
+    const resolve = (await (await SELF.fetch("http://x/api/foods?scope=all", { headers: auth(ownerCookie) })).json()) as { foods: { id: string }[] };
+    expect(resolve.foods.map((f) => f.id)).toContain(food);
+  });
+});

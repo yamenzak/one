@@ -88,8 +88,11 @@ export const libraryRoutes = new Hono<AppEnv>()
     await seedExercises(c.env.DB);
     const q = (c.req.query("q") ?? "").trim().toLowerCase();
     const muscle = c.req.query("muscle");
-    let sql =
-      "SELECT * FROM exercises WHERE active = 1 AND (tenant_id IS NULL OR tenant_id = ?)";
+    // scope=all drops the active filter and the browse cap: it's the resolve
+    // lane for plans/logs/history, which must still name an archived exercise
+    // they already reference. Browse/pickers use the default (active-only).
+    const all = c.req.query("scope") === "all";
+    let sql = `SELECT * FROM exercises WHERE ${all ? "1 = 1" : "active = 1"} AND (tenant_id IS NULL OR tenant_id = ?)`;
     const binds: unknown[] = [who.tenantId];
     if (q) {
       sql += " AND LOWER(name) LIKE ?";
@@ -99,9 +102,22 @@ export const libraryRoutes = new Hono<AppEnv>()
       sql += " AND (muscle_groups LIKE ? OR secondary_muscle_groups LIKE ?)";
       binds.push(`%${muscle}%`, `%${muscle}%`);
     }
-    sql += " ORDER BY name LIMIT 100";
+    sql += all ? " ORDER BY name LIMIT 2000" : " ORDER BY name LIMIT 100";
     const rows = await c.env.DB.prepare(sql).bind(...binds).all();
     return c.json({ exercises: rows.results ?? [] });
+  })
+
+  // How many of this tenant's plans + templates still reference an exercise —
+  // powers the "used in N plans" note before archiving. Archiving is safe
+  // (the resolve lane keeps the name), but coaches want to know it's in use.
+  .get("/exercises/:id{exr_.+}/usage", async (c) => {
+    const who = requireTenant(c)!;
+    const like = `%"exerciseId":"${c.req.param("id")}"%`;
+    const [plans, templates] = await Promise.all([
+      c.env.DB.prepare("SELECT COUNT(*) AS n FROM workout_plans WHERE tenant_id = ? AND body_json LIKE ?").bind(who.tenantId, like).first<{ n: number }>(),
+      c.env.DB.prepare("SELECT COUNT(*) AS n FROM workout_templates WHERE tenant_id = ? AND body_json LIKE ?").bind(who.tenantId, like).first<{ n: number }>(),
+    ]);
+    return c.json({ plans: plans?.n ?? 0, templates: templates?.n ?? 0 });
   })
 
   .post("/exercises", async (c) => {
@@ -205,14 +221,16 @@ export const libraryRoutes = new Hono<AppEnv>()
   .get("/foods", async (c) => {
     const who = requireTenant(c)!;
     const q = (c.req.query("q") ?? "").trim().toLowerCase();
-    let sql =
-      "SELECT * FROM foods WHERE active = 1 AND (tenant_id IS NULL OR (tenant_id = ? AND (visibility <> 'private' OR created_by = ?)))";
+    // scope=all is the resolve lane (meal plans/history naming an archived
+    // food they reference); it drops the active filter + browse cap.
+    const all = c.req.query("scope") === "all";
+    let sql = `SELECT * FROM foods WHERE ${all ? "1 = 1" : "active = 1"} AND (tenant_id IS NULL OR (tenant_id = ? AND (visibility <> 'private' OR created_by = ?)))`;
     const binds: unknown[] = [who.tenantId, who.userId];
     if (q) {
       sql += " AND LOWER(name) LIKE ?";
       binds.push(`%${q}%`);
     }
-    sql += " ORDER BY verified DESC, name LIMIT 60";
+    sql += all ? " ORDER BY verified DESC, name LIMIT 2000" : " ORDER BY verified DESC, name LIMIT 60";
     const rows = await c.env.DB.prepare(sql).bind(...binds).all();
     return c.json({ foods: rows.results ?? [] });
   })
@@ -235,8 +253,10 @@ export const libraryRoutes = new Hono<AppEnv>()
   // never shadows sibling static routes like /foods/search-external.
   .get("/foods/:id{food_.+}", async (c) => {
     const who = requireTenant(c)!;
+    // Resolve-by-id (editor load / referenced row): no active filter, so an
+    // archived food can still be opened and re-activated by editing it.
     const row = await c.env.DB.prepare(
-      "SELECT * FROM foods WHERE id = ? AND active = 1 AND (tenant_id IS NULL OR tenant_id = ?)",
+      "SELECT * FROM foods WHERE id = ? AND (tenant_id IS NULL OR tenant_id = ?)",
     )
       .bind(c.req.param("id"), who.tenantId)
       .first();

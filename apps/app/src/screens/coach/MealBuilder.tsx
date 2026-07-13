@@ -29,7 +29,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const [newType, setNewType] = useState("");
 
   const load = useCallback(async () => {
-    const [p, f] = await Promise.all([api.get<{ plan: Plan }>(`/api/meal-plans/${planId}`), api.get<{ foods: FoodRow[] }>("/api/foods")]);
+    const [p, f] = await Promise.all([api.get<{ plan: Plan }>(`/api/meal-plans/${planId}`), api.get<{ foods: FoodRow[] }>("/api/foods?scope=all")]);
     setPlan(p.plan); setOptions(p.plan.body.mealOptions ?? []); setCustomTypes(p.plan.body.customMealTypes ?? []);
     setFoods(new Map(f.foods.map((x) => [x.id, { id: x.id, servingSize: x.serving_size, caloriesPerServing: x.calories, proteinG: x.protein_g, carbsG: x.carbs_g, fatG: x.fat_g }])));
     setNames(new Map(f.foods.map((x) => [x.id, x.name])));

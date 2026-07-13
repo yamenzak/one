@@ -400,7 +400,7 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
   const [exNames, setExNames] = useState<Map<string, string>>(new Map());
   const units = useUnits();
   useEffect(() => { setReport(null); const today = new Date().toISOString().slice(0, 10); void api.get<Report>(`/api/reports/client/${clientId}?range=${range}&today=${today}`).then(setReport); }, [clientId, range]);
-  useEffect(() => { void api.get<{ exercises: { id: string; name: string }[] }>("/api/exercises").then((r) => setExNames(new Map(r.exercises.map((e) => [e.id, e.name])))).catch(() => undefined); }, []);
+  useEffect(() => { void api.get<{ exercises: { id: string; name: string }[] }>("/api/exercises?scope=all").then((r) => setExNames(new Map(r.exercises.map((e) => [e.id, e.name])))).catch(() => undefined); }, []);
   const weight = report?.weightSeries ?? [];
   const wDelta = weight.length >= 2 ? Math.round((kgToDisplay(weight.at(-1)!.kg, units) - kgToDisplay(weight[0]!.kg, units)) * 10) / 10 : null;
   return (

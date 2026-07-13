@@ -40,6 +40,8 @@ export interface ExerciseInfo {
   equipment?: string | null;
   difficulty?: string | null;
   instructions_md?: string | null;
+  /** 0 = archived (soft-deleted). Present on the resolve lane (scope=all). */
+  active?: number;
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

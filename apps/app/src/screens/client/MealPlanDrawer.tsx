@@ -75,7 +75,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   };
 
   const load = useCallback(async () => {
-    const [pl, f] = await Promise.all([api.get<{ plans: Plan[] }>(`/api/meal-plans?clientId=${clientId}`), api.get<{ foods: FoodRow[] }>("/api/foods")]);
+    const [pl, f] = await Promise.all([api.get<{ plans: Plan[] }>(`/api/meal-plans?clientId=${clientId}`), api.get<{ foods: FoodRow[] }>("/api/foods?scope=all")]);
     const published = pl.plans.find((p) => p.status === "published") ?? null;
     setPlan(published);
     setOpenType(published?.body.mealOptions?.[0]?.mealType ?? null); // first meal type expanded

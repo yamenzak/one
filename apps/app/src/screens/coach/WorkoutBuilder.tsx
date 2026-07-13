@@ -60,7 +60,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   const [copyWeekOpen, setCopyWeekOpen] = useState(false);
 
   const load = useCallback(async () => {
-    const [p, ex] = await Promise.all([api.get<{ plan: Plan }>(`/api/workout-plans/${planId}`), api.get<{ exercises: ExerciseLite[] }>("/api/exercises")]);
+    const [p, ex] = await Promise.all([api.get<{ plan: Plan }>(`/api/workout-plans/${planId}`), api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all")]);
     setPlan(p.plan); setDays(p.plan.body.days ?? []); setLibrary(ex.exercises);
   }, [planId]);
   useEffect(() => void load(), [load]);
@@ -285,6 +285,7 @@ function ExercisePicker({ library, onClose, onPick, reloadLibrary }: { library: 
   const equipment = opts((e) => splitList(e.equipment));
 
   const filtered = library.filter((e) =>
+    e.active !== 0 && // archived rows resolve for existing plans but aren't offered for new picks
     e.name.toLowerCase().includes(q.toLowerCase()) &&
     (!muscle || splitList(e.muscle_groups).concat(splitList(e.secondary_muscle_groups)).includes(muscle)) &&
     (!equip || splitList(e.equipment).includes(equip)),

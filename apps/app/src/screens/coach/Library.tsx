@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fmtEnergy } from "@mossa/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, MacroInline, Search, Plus, Trash2, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Sparkles } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, MacroInline, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Sparkles } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { AiAvatar } from "../../AiAvatar.js";
@@ -34,6 +34,7 @@ function Exercises() {
   const [items, setItems] = useState<ExerciseRow[] | null>(null);
   const [editor, setEditor] = useState<ExEdit | null>(null);
   const [altFor, setAltFor] = useState<ExerciseRow | null>(null);
+  const [archiveFor, setArchiveFor] = useState<ExerciseRow | null>(null);
   const load = useCallback(async () => setItems((await api.get<{ exercises: ExerciseRow[] }>(`/api/exercises?q=${encodeURIComponent(q)}`)).exercises), [q]);
   useEffect(() => { const t = setTimeout(() => void load(), 200); return () => clearTimeout(t); }, [load]);
   // Tenant-owned rows edit in place; platform seeds fork into a tenant copy.
@@ -53,11 +54,14 @@ function Exercises() {
             </button>
             <button onClick={() => open(e)} aria-label="Edit" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><PencilLine /></button>
             <button onClick={() => setAltFor(e)} aria-label="Alternatives" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><ArrowLeftRight /></button>
+            {/* Only tenant-owned rows can be archived; platform seeds have no delete affordance. */}
+            {e.tenant_id ? <button onClick={() => setArchiveFor(e)} aria-label="Archive" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Archive /></button> : null}
           </div>
         ))}</Stagger>
       )}
       {editor && <ExerciseEditor exerciseId={editor.exerciseId} initial={editor.initial} onClose={() => setEditor(null)} onSaved={() => { setEditor(null); void load(); }} />}
       {altFor && <AlternativesSheet exercise={altFor} onClose={() => setAltFor(null)} />}
+      {archiveFor && <ArchiveConfirm kind="exercise" id={archiveFor.id} name={archiveFor.name} onClose={() => setArchiveFor(null)} onDone={() => { setArchiveFor(null); void load(); }} />}
     </div>
   );
 }
@@ -107,6 +111,44 @@ function AlternativesSheet({ exercise, onClose }: { exercise: ExerciseInfo; onCl
   );
 }
 
+/**
+ * Archive (soft-delete) confirm. Archiving hides a row from the library and
+ * pickers but keeps it resolvable for plans/logs that already reference it, so
+ * nothing goes blank. For exercises we surface how many plans still use it.
+ */
+function ArchiveConfirm({ kind, id, name, onClose, onDone }: { kind: "exercise" | "food"; id: string; name: string; onClose: () => void; onDone: () => void }) {
+  const [usage, setUsage] = useState<{ plans: number; templates: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (kind !== "exercise") return;
+    void api.get<{ plans: number; templates: number }>(`/api/exercises/${id}/usage`).then(setUsage).catch(() => setUsage(null));
+  }, [kind, id]);
+  const archive = async () => {
+    setBusy(true);
+    try { await api.del(`/api/${kind === "exercise" ? "exercises" : "foods"}/${id}`); onDone(); }
+    finally { setBusy(false); }
+  };
+  const used = usage ? usage.plans + usage.templates : 0;
+  const parts = usage ? [usage.plans && `${usage.plans} plan${usage.plans === 1 ? "" : "s"}`, usage.templates && `${usage.templates} template${usage.templates === 1 ? "" : "s"}`].filter(Boolean).join(" and ") : "";
+  return (
+    <Sheet open onClose={onClose} title={`Archive ${name}?`}>
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">It's removed from your library and pickers. Plans and logs that already use it keep working — the name still shows, and you can restore it by re-adding it.</p>
+        {kind === "exercise" && used > 0 && (
+          <div className="flex items-start gap-2.5 rounded-2xl bg-warning-soft p-3 text-sm text-warning">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+            <span>Still used in {parts}. Those keep showing it, but it won't be offered for new plans.</span>
+          </div>
+        )}
+        <div className="flex gap-3">
+          <Button variant="ghost" className="flex-1" onClick={onClose}>Cancel</Button>
+          <Button variant="destructive" className="flex-1" disabled={busy} onClick={() => void archive()}><Archive /> {busy ? "Archiving…" : "Archive"}</Button>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
 interface FoodRow { id: string; name: string; calories: number; brand: string | null; tenant_id: string | null; visibility?: string | null; protein_g?: number; carbs_g?: number; fat_g?: number; image_url?: string | null }
 function Foods() {
   const units = useUnits();
@@ -114,6 +156,7 @@ function Foods() {
   const [items, setItems] = useState<FoodRow[] | null>(null);
   // `null` = closed; `{}` = new; `{ id }` = edit that food.
   const [editor, setEditor] = useState<{ id?: string } | null>(null);
+  const [archiveFor, setArchiveFor] = useState<FoodRow | null>(null);
   const load = useCallback(async () => setItems((await api.get<{ foods: FoodRow[] }>(`/api/foods?q=${encodeURIComponent(q)}`)).foods), [q]);
   useEffect(() => { const t = setTimeout(() => void load(), 200); return () => clearTimeout(t); }, [load]);
   const tag = (f: FoodRow) => (f.tenant_id === null ? "seed" : f.visibility === "private" ? "private" : "shared");
@@ -133,6 +176,8 @@ function Foods() {
             </div>
             <Badge tone={tag(f) === "seed" ? "cardio" : tag(f) === "private" ? "neutral" : "activity"}>{tag(f)}</Badge>
             <button onClick={() => setEditor({ id: f.id })} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground [&_svg]:size-4" aria-label="Edit food"><PencilLine /></button>
+            {/* Seeds (tenant_id null) can't be archived — only a tenant's own rows. */}
+            {f.tenant_id !== null ? <button onClick={() => setArchiveFor(f)} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4" aria-label="Archive food"><Archive /></button> : null}
           </Card>
         ))}</Stagger>
       )}
@@ -144,6 +189,7 @@ function Foods() {
           onSaved={() => { setEditor(null); void load(); }}
         />
       )}
+      {archiveFor && <ArchiveConfirm kind="food" id={archiveFor.id} name={archiveFor.name} onClose={() => setArchiveFor(null)} onDone={() => { setArchiveFor(null); void load(); }} />}
     </div>
   );
 }

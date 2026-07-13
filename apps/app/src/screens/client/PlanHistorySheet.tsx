@@ -34,8 +34,8 @@ export function PlanHistorySheet({ clientId, kind, onClose }: { clientId: string
     const [pl, lib] = await Promise.all([
       api.get<{ plans: PlanRow[] }>(`/api/${endpoint}?clientId=${clientId}`),
       kind === "workout"
-        ? api.get<{ exercises: ExerciseLite[] }>("/api/exercises")
-        : api.get<{ foods: FoodRow[] }>("/api/foods"),
+        ? api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all")
+        : api.get<{ foods: FoodRow[] }>("/api/foods?scope=all"),
     ]);
     // Previous = superseded (the active plan is the published one, shown on the page).
     setPlans(pl.plans.filter((p) => p.status === "superseded"));

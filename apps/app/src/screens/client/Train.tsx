@@ -61,7 +61,7 @@ export function Train({ clientId }: { clientId: string }) {
     void api.get<{ plans: Plan[] }>(`/api/workout-plans?clientId=${clientId}`).then((r) => setPlans(r.plans));
     void api.get<{ sessions: Session[] }>(`/api/logs/workout-sessions?clientId=${clientId}&from=${shift(today, -89)}&to=${today}`).then((r) => setSessions(r.sessions));
     void api.get<{ activities: ActivityLog[] }>(`/api/logs/activities?clientId=${clientId}&from=${shift(today, -29)}&to=${today}`).then((r) => setActivities(r.activities));
-    void api.get<{ exercises: ExerciseInfo[] }>("/api/exercises").then((r) => setLibrary(r.exercises));
+    void api.get<{ exercises: ExerciseInfo[] }>("/api/exercises?scope=all").then((r) => setLibrary(r.exercises));
   };
   useEffect(load, [clientId]);
 
@@ -137,6 +137,7 @@ export function Train({ clientId }: { clientId: string }) {
   const categories = useMemo(() => {
     const count = new Map<string, number>();
     for (const e of library) {
+      if (e.active === 0) continue; // archived: still resolves for logs, but not browsed
       const c = ((e as { category?: string | null }).category ?? "").trim().toLowerCase() || null;
       if (c) count.set(c, (count.get(c) ?? 0) + 1);
     }
@@ -281,7 +282,7 @@ export function Train({ clientId }: { clientId: string }) {
 
 /** Browse a library category — freestyle content, richly listed. */
 function BrowseSheet({ category, library, onClose }: { category: string; library: ExerciseInfo[]; onClose: () => void }) {
-  const items = library.filter((e) => ((e as { category?: string | null }).category ?? "").toLowerCase() === category.toLowerCase());
+  const items = library.filter((e) => e.active !== 0 && ((e as { category?: string | null }).category ?? "").toLowerCase() === category.toLowerCase());
   return (
     <Sheet open onClose={onClose} title={pretty(category)}>
       <div className="max-h-[70vh] space-y-1 overflow-y-auto">

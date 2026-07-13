@@ -38,7 +38,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   const load = useCallback(async () => {
     const [plansRes, exRes, sessRes] = await Promise.all([
       api.get<{ plans: (PublishedPlan & { status: string })[] }>(`/api/workout-plans?clientId=${clientId}`),
-      api.get<{ exercises: ExerciseLite[] }>("/api/exercises"),
+      api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all"),
       api.get<{ sessions: { entries: SessionEntry[] }[] }>(`/api/logs/workout-sessions?clientId=${clientId}&from=${date}&to=${date}`),
     ]);
     setPlan(plansRes.plans.find((p) => p.status === "published") ?? null);
