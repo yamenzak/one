@@ -280,8 +280,8 @@ function FoodRow({ food, units, onPick }: { food: Food; units: UnitPrefs; onPick
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm">{food.name}</div>
+        {food.brand && <div className="truncate text-xs text-muted-foreground">{food.brand}</div>}
         <div className="flex items-center gap-2 truncate text-xs text-muted-foreground">
-          {food.brand && <span className="truncate">{food.brand}</span>}
           <span className="numeral shrink-0 text-calories">{fmtEnergy(n.calories, units)}</span>
           <MacroInline proteinG={n.proteinG} carbsG={n.carbsG} fatG={n.fatG} className="shrink-0 text-[0.7rem]" />
         </div>

@@ -1,9 +1,9 @@
 /** Coach Library — exercises (create + web import), foods, templates, content. */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { fmtEnergy } from "@mossa/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, MacroInline, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Sparkles } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, MacroInline, cn, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Sparkles, Ellipsis, Send, History } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { AiAvatar } from "../../AiAvatar.js";
@@ -178,7 +178,8 @@ function Foods() {
           <Card key={f.id} className="flex items-center gap-3 py-3">
             <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2">{f.image_url ? <img src={f.image_url} alt="" className="size-full object-cover" /> : <Utensils className="size-4 text-muted-foreground" />}</div>
             <div className="min-w-0 flex-1">
-              <div className="truncate font-medium">{f.name}{f.brand && <span className="ml-2 text-xs text-muted-foreground">{f.brand}</span>}</div>
+              <div className="truncate font-medium">{f.name}</div>
+              {f.brand && <div className="truncate text-xs text-muted-foreground">{f.brand}</div>}
               <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="numeral text-calories">{fmtEnergy(f.calories, units)}</span><MacroInline proteinG={f.protein_g ?? 0} carbsG={f.carbs_g ?? 0} fatG={f.fat_g ?? 0} className="text-[0.7rem]" /></div>
             </div>
             <Badge tone={tag(f) === "seed" ? "cardio" : tag(f) === "private" ? "neutral" : "activity"}>{tag(f)}</Badge>
@@ -223,65 +224,167 @@ function Templates() {
   );
 }
 
-interface Resource { id: string; type: string; title: string; status: string; audience: string }
+interface Resource { id: string; type: string; title: string; status: string; audience: string; category?: string | null; topics?: string[] }
+interface ClientOpt { id: string; displayName: string }
+
+const AUDIENCE_LABEL: Record<string, string> = { clients: "All clients", public: "Public", assigned: "Specific clients" };
+
 function Content() {
   const [items, setItems] = useState<Resource[] | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
+  // `null` = closed; `{}` = new; `{ id }` = edit that article.
+  const [sheet, setSheet] = useState<{ id?: string } | null>(null);
+  const [menuFor, setMenuFor] = useState<Resource | null>(null);
+  const [clients, setClients] = useState<ClientOpt[]>([]);
+  const load = useCallback(async () => setItems((await api.get<{ resources: Resource[] }>("/api/resources")).resources), []);
+  useEffect(() => void load(), [load]);
+  useEffect(() => { void api.get<{ clients: ClientOpt[] }>("/api/clients").then((r) => setClients(r.clients)).catch(() => undefined); }, []);
+  const tone = (s: string) => (s === "published" ? "success" : s === "archived" ? "warning" : "neutral");
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-end"><Button size="sm" onClick={() => setSheet({})}><PencilLine /> Write article</Button></div>
+      {!items ? <Skeleton className="h-40" /> : items.length === 0 ? <EmptyState icon={PencilLine} title="Content hub is empty" description="Publish articles, recipes, and routines — public ones become your marketplace blog." /> : (
+        <Stagger className="space-y-2">{items.map((r) => (
+          <Card key={r.id} className="flex items-center justify-between gap-2 py-3">
+            <button onClick={() => setSheet({ id: r.id })} className="min-w-0 flex-1 text-left">
+              <div className="truncate font-medium">{r.title}</div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                <span>{r.category || r.type}</span>
+                <span>· {AUDIENCE_LABEL[r.audience] ?? r.audience}</span>
+                {(r.topics ?? []).slice(0, 3).map((t) => <span key={t} className="rounded-full bg-surface-2 px-1.5 py-0.5">{t}</span>)}
+              </div>
+            </button>
+            <Badge tone={tone(r.status)}>{r.status}</Badge>
+            <button onClick={() => setMenuFor(r)} aria-label="Article actions" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><Ellipsis /></button>
+          </Card>
+        ))}</Stagger>
+      )}
+      {sheet && <ArticleEditor id={sheet.id} clients={clients} onClose={() => setSheet(null)} onSaved={() => { setSheet(null); void load(); }} />}
+      {menuFor && <ArticleActions article={menuFor} onClose={() => setMenuFor(null)} onEdit={() => { const id = menuFor.id; setMenuFor(null); setSheet({ id }); }} onChanged={() => { setMenuFor(null); void load(); }} />}
+    </div>
+  );
+}
+
+/** Create/edit an article — AI draft, cover, category + tags, audience (with a
+ *  per-client picker for "specific clients"), saved as draft or published. */
+function ArticleEditor({ id, clients, onClose, onSaved }: { id?: string; clients: ClientOpt[]; onClose: () => void; onSaved: () => void }) {
+  const [loading, setLoading] = useState(!!id);
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [body, setBody] = useState("");
+  const [category, setCategory] = useState("");
+  const [tags, setTags] = useState("");
   const [audience, setAudience] = useState<"public" | "clients" | "assigned">("clients");
-  const [aiTopic, setAiTopic] = useState("");
-  const [aiBusy, setAiBusy] = useState(false);
-  const [aiError, setAiError] = useState<unknown>(null);
+  const [assigned, setAssigned] = useState<string[]>([]);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [coverBusy, setCoverBusy] = useState(false);
-  const load = useCallback(async () => setItems((await api.get<{ resources: Resource[] }>("/api/resources")).resources), []);
-  useEffect(() => void load(), [load]);
-  const reset = () => { setTitle(""); setSummary(""); setBody(""); setAiTopic(""); setAiError(null); setCoverUrl(null); };
-  const create = async () => { const r = await api.post<{ id: string }>("/api/resources", { type: "article", title, summary: summary || undefined, bodyMd: body, coverUrl: coverUrl || undefined, audience }); await api.post(`/api/resources/${r.id}/publish`, { status: "published" }); setCreateOpen(false); reset(); await load(); };
-  const genCover = async () => {
-    setCoverBusy(true); setAiError(null);
-    try { const r = await api.post<{ url: string }>("/api/ai/cover-image", { prompt: title || aiTopic }); setCoverUrl(r.url); }
-    catch (e) { setAiError(e); }
-    finally { setCoverBusy(false); }
-  };
-  const draftAi = async () => {
-    setAiBusy(true); setAiError(null);
+  const [aiTopic, setAiTopic] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [err, setErr] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    let alive = true;
+    void api.get<{ resource: { title?: string; summary?: string | null; bodyMd?: string | null; category?: string | null; topics?: string[]; audience?: string; assignedClientIds?: string[]; coverUrl?: string | null } }>(`/api/resources/${id}`)
+      .then((r) => { if (!alive) return; const x = r.resource; setTitle(x.title ?? ""); setSummary(x.summary ?? ""); setBody(x.bodyMd ?? ""); setCategory(x.category ?? ""); setTags((x.topics ?? []).join(", ")); setAudience((x.audience as typeof audience) ?? "clients"); setAssigned(x.assignedClientIds ?? []); setCoverUrl(x.coverUrl ?? null); setLoading(false); })
+      .catch(() => alive && setLoading(false));
+    return () => { alive = false; };
+  }, [id]);
+
+  const genCover = async () => { setCoverBusy(true); setErr(null); try { const r = await api.post<{ url: string }>("/api/ai/cover-image", { prompt: title || aiTopic }); setCoverUrl(r.url); } catch (e) { setErr(e); } finally { setCoverBusy(false); } };
+  const draftAi = async () => { setAiBusy(true); setErr(null); try { const r = await api.post<{ article: { title: string; summary: string; body: string } }>("/api/ai/article", { topic: aiTopic }); setTitle(r.article.title); setSummary(r.article.summary ?? ""); setBody(r.article.body); } catch (e) { setErr(e); } finally { setAiBusy(false); } };
+  const toggleClient = (cid: string) => setAssigned((p) => (p.includes(cid) ? p.filter((x) => x !== cid) : [...p, cid]));
+
+  const save = async (status: "draft" | "published") => {
+    setBusy(true); setErr(null);
     try {
-      const r = await api.post<{ article: { title: string; summary: string; body: string } }>("/api/ai/article", { topic: aiTopic });
-      setTitle(r.article.title); setSummary(r.article.summary ?? ""); setBody(r.article.body);
-    } catch (e) { setAiError(e); }
-    finally { setAiBusy(false); }
+      const req = { type: "article", title, summary: summary || undefined, bodyMd: body, coverUrl: coverUrl || undefined, category: category.trim() || undefined, topics: tags.split(",").map((t) => t.trim()).filter(Boolean), audience, assignedClientIds: audience === "assigned" ? assigned : [] };
+      const rid = id ? (await api.patch(`/api/resources/${id}`, req), id) : (await api.post<{ id: string }>("/api/resources", req)).id;
+      await api.post(`/api/resources/${rid}/publish`, { status });
+      onSaved();
+    } catch (e) { setErr(e); } finally { setBusy(false); }
   };
+
   return (
-    <div className="space-y-3">
-      <div className="flex justify-end"><Button size="sm" onClick={() => setCreateOpen(true)}><PencilLine /> Write article</Button></div>
-      {!items ? <Skeleton className="h-40" /> : items.length === 0 ? <EmptyState icon={PencilLine} title="Content hub is empty" description="Publish articles, recipes, and routines — public ones become your marketplace blog." /> : (
-        <Stagger className="space-y-2">{items.map((r) => <Card key={r.id} className="flex items-center justify-between py-3"><div><div className="font-medium">{r.title}</div><div className="text-xs text-muted-foreground">{r.type} · {r.audience}</div></div><Badge tone={r.status === "published" ? "success" : "neutral"}>{r.status}</Badge></Card>)}</Stagger>
-      )}
-      <Sheet open={createOpen} onClose={() => { setCreateOpen(false); }} title="Write article">
+    <Sheet open onClose={onClose} title={id ? "Edit article" : "Write article"}>
+      {loading ? <Skeleton className="h-64" /> : (
         <div className="space-y-4">
-          <div className="space-y-2 rounded-2xl bg-primary/10 p-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-primary"><AiAvatar className="size-6" /> Draft with AI</div>
-            <div className="flex gap-2">
-              <input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="Topic — e.g. Sleep for muscle growth" className="min-w-0 flex-1 rounded-lg bg-surface-2 px-3 py-2 text-sm outline-none" />
-              <Button size="sm" disabled={aiBusy || aiTopic.trim().length < 3} onClick={() => void draftAi()}>{aiBusy ? "Writing…" : "Draft"}</Button>
+          {!id && (
+            <div className="space-y-2 rounded-2xl bg-primary/10 p-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-primary"><AiAvatar className="size-6" /> Draft with AI</div>
+              <div className="flex gap-2">
+                <input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="Topic — e.g. Sleep for muscle growth" className="min-w-0 flex-1 rounded-lg bg-surface-2 px-3 py-2 text-sm outline-none" />
+                <Button size="sm" disabled={aiBusy || aiTopic.trim().length < 3} onClick={() => void draftAi()}>{aiBusy ? "Writing…" : "Draft"}</Button>
+              </div>
             </div>
-          </div>
-          {aiError ? <AiErrorBox error={aiError} /> : null}
+          )}
+          {err ? <AiErrorBox error={err} /> : null}
           <Field label="Title" icon={PencilLine} value={title} onChange={(e) => setTitle(e.target.value)} />
           <Field label="Summary" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="One-line teaser (optional)" />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Category" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Nutrition" />
+            <Field label="Tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="comma, separated" />
+          </div>
           <div className="space-y-2">
             {coverUrl && <img src={coverUrl} alt="Cover" className="h-32 w-full rounded-xl object-cover" />}
             <Button size="sm" variant="secondary" className="w-full" disabled={coverBusy || (!title && !aiTopic)} onClick={() => void genCover()}><Sparkles /> {coverBusy ? "Generating…" : coverUrl ? "Regenerate cover" : "Generate cover image"}</Button>
           </div>
-          <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Body (markdown)</label><Textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} /></div>
-          <div className="flex gap-2">{(["clients", "public", "assigned"] as const).map((a) => <Chip key={a} selected={audience === a} onClick={() => setAudience(a)}>{a}</Chip>)}</div>
-          <Button size="lg" className="w-full" disabled={title.trim().length < 2} onClick={() => void create()}><Plus /> Publish</Button>
+          <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Body (markdown — supports tables)</label><Textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} /></div>
+          <div className="space-y-1.5">
+            <div className="text-xs text-muted-foreground">Who sees it</div>
+            <div className="flex flex-wrap gap-2">{(["clients", "public", "assigned"] as const).map((a) => <Chip key={a} selected={audience === a} onClick={() => setAudience(a)}>{AUDIENCE_LABEL[a]}</Chip>)}</div>
+          </div>
+          {audience === "assigned" && (
+            <div className="space-y-1.5">
+              <div className="text-xs text-muted-foreground">Shared only with {assigned.length ? `${assigned.length} client${assigned.length === 1 ? "" : "s"}` : "…pick clients"}</div>
+              <div className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-border/50 p-1.5">
+                {clients.length === 0 ? <p className="p-2 text-center text-xs text-muted-foreground">No clients yet.</p> : clients.map((cl) => (
+                  <button key={cl.id} onClick={() => toggleClient(cl.id)} className={cn("flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm transition-colors", assigned.includes(cl.id) ? "bg-primary/10 text-primary" : "hover:bg-surface-2")}>
+                    <span className="truncate">{cl.displayName}</span>
+                    {assigned.includes(cl.id) && <span className="text-xs">✓</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Button variant="secondary" className="flex-1" disabled={busy || title.trim().length < 2} onClick={() => void save("draft")}>{busy ? "Saving…" : "Save draft"}</Button>
+            <Button className="flex-1" disabled={busy || title.trim().length < 2} onClick={() => void save("published")}><Send /> Publish</Button>
+          </div>
         </div>
-      </Sheet>
-    </div>
+      )}
+    </Sheet>
+  );
+}
+
+/** Article lifecycle menu — publish/unpublish, archive/restore, delete. */
+function ArticleActions({ article, onClose, onEdit, onChanged }: { article: Resource; onClose: () => void; onEdit: () => void; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const act = (fn: () => Promise<unknown>) => async () => { setBusy(true); try { await fn(); onChanged(); } catch { setBusy(false); } };
+  const status = (s: string) => api.post(`/api/resources/${article.id}/publish`, { status: s });
+  return (
+    <Sheet open onClose={onClose} title={article.title}>
+      <div className="space-y-1">
+        <ActionRow icon={PencilLine} label="Edit" onClick={onEdit} />
+        {article.status !== "published" && <ActionRow icon={Send} label="Publish" disabled={busy} onClick={act(() => status("published"))} />}
+        {article.status === "published" && <ActionRow icon={History} label="Unpublish (back to draft)" disabled={busy} onClick={act(() => status("draft"))} />}
+        {article.status !== "archived" && <ActionRow icon={Archive} label="Archive" hint="Hide it without deleting" disabled={busy} onClick={act(() => status("archived"))} />}
+        {article.status === "archived" && <ActionRow icon={History} label="Restore to draft" disabled={busy} onClick={act(() => status("draft"))} />}
+        {confirmDel
+          ? <ActionRow icon={Trash2} label={busy ? "Deleting…" : "Tap again to delete"} danger disabled={busy} onClick={act(() => api.del(`/api/resources/${article.id}`))} />
+          : <ActionRow icon={Trash2} label="Delete permanently" danger onClick={() => setConfirmDel(true)} />}
+      </div>
+    </Sheet>
+  );
+}
+
+function ActionRow({ icon: Icon, label, hint, danger, disabled, onClick }: { icon: (p: { className?: string }) => ReactNode; label: string; hint?: string; danger?: boolean; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button disabled={disabled} onClick={onClick} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors disabled:opacity-50 [&_svg]:size-[1.15rem]", danger ? "text-danger hover:bg-danger-soft" : "hover:bg-surface-2")}>
+      <Icon className="shrink-0" />
+      <div className="min-w-0 flex-1"><div className="text-sm font-medium">{label}</div>{hint && <div className="text-xs text-muted-foreground">{hint}</div>}</div>
+    </button>
   );
 }
 

@@ -249,7 +249,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                         return (
                           <button key={i} onClick={() => void pickWeb(hit)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary">
                             <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2">{img ? <img src={img} alt="" className="size-full object-cover" /> : <Utensils className="size-4 text-muted-foreground" />}</div>
-                            <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{hit.name}</div><div className="truncate text-xs text-muted-foreground">{[hit.brand, `${Math.round(hit.calories)} kcal`].filter(Boolean).join(" · ")}</div></div>
+                            <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{hit.name}</div>{hit.brand && <div className="truncate text-xs text-muted-foreground">{hit.brand}</div>}<div className="truncate text-xs text-muted-foreground">{Math.round(hit.calories)} kcal</div></div>
                             <Plus className="size-4 shrink-0 text-primary" />
                           </button>
                         );

@@ -641,6 +641,60 @@ describe("content hub", () => {
     const body = (await mkt.json()) as { posts: { title: string }[] };
     expect(body.posts.some((p) => p.title === "Warm up right")).toBe(true);
   });
+
+  it("persists a category + tags and returns them in the staff list", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { id } = (await (await SELF.fetch("http://x/api/resources", { method: "POST", headers: H, body: JSON.stringify({ type: "article", title: "Sleep & Recovery", category: "Recovery", topics: ["sleep", "hormones"], bodyMd: "## Hi\n\n| a | b |\n| --- | --- |\n| 1 | 2 |" }) })).json()) as { id: string; slug: string };
+    const list = (await (await SELF.fetch("http://x/api/resources", { headers: auth(ownerCookie) })).json()) as { resources: { id: string; category: string | null; topics: string[] }[] };
+    const found = list.resources.find((r) => r.id === id)!;
+    expect(found.category).toBe("Recovery");
+    expect(found.topics).toEqual(["sleep", "hormones"]);
+  });
+
+  it("an assigned article is visible only to the assigned client", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const mkClient = async (n: string) => ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: n }) })).json()) as { client: { id: string } }).client.id;
+    const a = await mkClient("Aud A");
+    const b = await mkClient("Aud B");
+    const { id } = (await (await SELF.fetch("http://x/api/resources", { method: "POST", headers: H, body: JSON.stringify({ type: "article", title: "Just for A", audience: "assigned", assignedClientIds: [a] }) })).json()) as { id: string };
+    await SELF.fetch(`http://x/api/resources/${id}/publish`, { method: "POST", headers: H, body: JSON.stringify({ status: "published" }) });
+
+    const feedA = (await (await SELF.fetch(`http://x/api/resources/feed?clientId=${a}`, { headers: auth(ownerCookie) })).json()) as { resources: { id: string }[] };
+    const feedB = (await (await SELF.fetch(`http://x/api/resources/feed?clientId=${b}`, { headers: auth(ownerCookie) })).json()) as { resources: { id: string }[] };
+    expect(feedA.resources.map((r) => r.id)).toContain(id);
+    expect(feedB.resources.map((r) => r.id)).not.toContain(id);
+  });
+
+  it("serves published public articles headlessly (no auth); body only on the single-post route", async () => {
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await (env.DB as D1Database).prepare(
+      "INSERT INTO resources (id, tenant_id, type, title, summary, body_md, category, slug, topics, audience, status, published_at, created_at, updated_at) VALUES ('res_pub1', ?, 'article', 'Public Post', 'teaser', '# Body text here', 'News', 'public-post-abc123', 'a,b', 'public', 'published', '2026-01-01', '2026-01-01', '2026-01-01')",
+    ).bind(ctx.active.tenantId).run();
+
+    // Unauthenticated index — metadata, no body.
+    const idx = await SELF.fetch("http://x/api/marketplace/studio-one/posts");
+    expect(idx.status).toBe(200);
+    const idxBody = (await idx.json()) as { posts: { id: string; slug: string; category: string; tags: string[]; bodyMd?: string }[] };
+    const post = idxBody.posts.find((p) => p.id === "res_pub1")!;
+    expect(post).toBeTruthy();
+    expect(post.category).toBe("News");
+    expect(post.tags).toEqual(["a", "b"]);
+    expect(post.bodyMd).toBeUndefined();
+
+    // Single post by slug — includes the full body.
+    const one = await SELF.fetch("http://x/api/marketplace/studio-one/posts/public-post-abc123");
+    expect(one.status).toBe(200);
+    const oneBody = (await one.json()) as { post: { bodyMd: string } };
+    expect(oneBody.post.bodyMd).toContain("Body text here");
+  });
+
+  it("does not expose draft/archived articles on the headless API", async () => {
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await (env.DB as D1Database).prepare(
+      "INSERT INTO resources (id, tenant_id, type, title, slug, audience, status, created_at, updated_at) VALUES ('res_draft1', ?, 'article', 'Draft', 'draft-xyz', 'public', 'draft', '2026-01-01', '2026-01-01')",
+    ).bind(ctx.active.tenantId).run();
+    expect((await SELF.fetch("http://x/api/marketplace/studio-one/posts/draft-xyz")).status).toBe(404);
+  });
 });
 
 describe("reports", () => {

@@ -162,6 +162,9 @@ export function ensureSchema(db: D1Database): Promise<void> {
           // Client profile: blood type + contact number.
           "ALTER TABLE clients ADD COLUMN blood_type TEXT",
           "ALTER TABLE clients ADD COLUMN phone TEXT",
+          // Content: a single category + a URL slug for headless/public fetch.
+          "ALTER TABLE resources ADD COLUMN category TEXT",
+          "ALTER TABLE resources ADD COLUMN slug TEXT",
         ];
         for (const sql of alters) await db.exec(sql).catch(() => undefined);
       })

@@ -26,8 +26,9 @@ function isPublic(method: string, path: string): boolean {
   // Health + Stripe webhooks (signature-verified in their handlers).
   if (path === "/health") return true;
   if (path === "/api/stripe/webhook" || path === "/api/connect/webhook") return true;
-  // Tenant marketplace page data (public storefront + branded sign-in skin).
-  if (isGet && /^\/api\/marketplace\/[^/]+$/.test(path)) return true;
+  // Tenant marketplace page data + headless public article API (storefront,
+  // branded sign-in skin, and /posts index + /posts/:slug full body).
+  if (isGet && /^\/api\/marketplace\/[^/]+(\/posts(\/[^/]+)?)?$/.test(path)) return true;
   return false;
 }
 
