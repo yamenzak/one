@@ -287,7 +287,7 @@ function BrowseSheet({ category, library, onClose }: { category: string; library
       <div className="max-h-[70vh] space-y-1 overflow-y-auto">
         {items.map((e) => (
           <div key={e.id} className="flex items-center gap-3 rounded-xl px-2 py-2">
-            <ExerciseThumb thumb={e.thumb_url} size={44} />
+            <ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={44} />
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium">{e.name}</div>
               <ExerciseMeta ex={e} className="text-xs text-muted-foreground" />

@@ -6,7 +6,28 @@
  * everywhere (SPEC §8.3, DESIGN.md metric-coding).
  */
 
-import { Dumbbell } from "@mossa/ui";
+import { useEffect, useState } from "react";
+import { Dumbbell, cn } from "@mossa/ui";
+
+// ── Shared frame ticker ──────────────────────────────────────────────────────
+// One global interval drives every animated thumbnail in sync, so a whole
+// library grid of exercises cross-fades between their start/end frames without
+// spawning dozens of timers.
+const tickers = new Set<() => void>();
+let tickTimer: ReturnType<typeof setInterval> | null = null;
+function useFrameTick(): number {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const bump = () => setI((n) => n + 1);
+    tickers.add(bump);
+    if (!tickTimer) tickTimer = setInterval(() => tickers.forEach((f) => f()), 1100);
+    return () => {
+      tickers.delete(bump);
+      if (tickers.size === 0 && tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+    };
+  }, []);
+  return i;
+}
 
 export interface ExerciseInfo {
   id: string;
@@ -28,12 +49,28 @@ export const splitList = (s?: string | null): string[] => (s ?? "").split(",").m
 export const pretty = (m: string): string => cap(m.replace(/_/g, " "));
 export const firstMuscle = (e: ExerciseInfo): string | undefined => splitList(e.muscle_groups)[0];
 
-/** Square exercise thumbnail: image if present, else a muscle-tinted glyph. */
-export function ExerciseThumb({ thumb, size = 40, className = "" }: { thumb?: string | null; size?: number; className?: string }) {
+/** Square exercise thumbnail. With two frames (start + end) it cross-fades
+ *  between them to animate the movement; otherwise a still image, or a
+ *  muscle-tinted glyph when there's no image at all. */
+export function ExerciseThumb({ thumb, thumb2, size = 40, className = "" }: { thumb?: string | null; thumb2?: string | null; size?: number; className?: string }) {
+  const frames = [thumb, thumb2].filter(Boolean) as string[];
   return (
-    <div className={`grid shrink-0 place-items-center overflow-hidden rounded-lg bg-activity-soft text-activity ${className}`} style={{ width: size, height: size }}>
-      {thumb ? <img src={thumb} alt="" className="size-full object-cover" /> : <Dumbbell className="size-1/2" />}
+    <div className={`relative grid shrink-0 place-items-center overflow-hidden rounded-lg bg-activity-soft text-activity ${className}`} style={{ width: size, height: size }}>
+      {frames.length > 1 ? <AnimatedFrames frames={frames} /> : frames.length === 1 ? <img src={frames[0]} alt="" className="size-full object-cover" /> : <Dumbbell className="size-1/2" />}
     </div>
+  );
+}
+
+/** Two stacked frames that cross-fade on the shared tick. */
+function AnimatedFrames({ frames }: { frames: string[] }) {
+  const tick = useFrameTick();
+  const active = tick % frames.length;
+  return (
+    <>
+      {frames.map((f, i) => (
+        <img key={i} src={f} alt="" className={cn("absolute inset-0 size-full object-cover transition-opacity duration-700", i === active ? "opacity-100" : "opacity-0")} />
+      ))}
+    </>
   );
 }
 

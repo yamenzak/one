@@ -154,8 +154,8 @@ export function ExerciseEditor({ exerciseId, initial, onClose, onSaved }: {
 
         {/* Start + end frames */}
         <div className="grid grid-cols-2 gap-3">
-          <AiImageField value={image} onChange={setImage} feature="exercise-image" subject={name} canAi={false} label="Start" stacked loading={pairBusy} />
-          <AiImageField value={image2} onChange={setImage2} feature="exercise-image" subject={name} canAi={false} label="End" stacked loading={pairBusy} />
+          <AiImageField value={image} onChange={setImage} feature="exercise-image" subject={name} canAi={false} label="Start" stacked loading={pairBusy} contain />
+          <AiImageField value={image2} onChange={setImage2} feature="exercise-image" subject={name} canAi={false} label="End" stacked loading={pairBusy} contain />
         </div>
         {canAi && (
           <Button variant="secondary" size="sm" className="w-full" disabled={pairBusy || name.trim().length < 2} onClick={() => void runPair()}>

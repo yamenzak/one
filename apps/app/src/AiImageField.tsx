@@ -16,7 +16,7 @@ import { api, ApiError } from "./api.js";
 
 type ImageFeature = "food-image" | "exercise-image";
 
-export function AiImageField({ value, onChange, feature, subject, hint, canAi, label, size = 88, stacked = false, referenceUrl, loading = false }: {
+export function AiImageField({ value, onChange, feature, subject, hint, canAi, label, size = 88, stacked = false, referenceUrl, loading = false, contain = false }: {
   value: string;
   onChange: (url: string) => void;
   feature: ImageFeature;
@@ -30,6 +30,8 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
   referenceUrl?: string;
   /** Externally-driven "creating" state (e.g. a parent generating both frames). */
   loading?: boolean;
+  /** Fit the whole image inside the box (object-contain) instead of filling it. */
+  contain?: boolean;
 }) {
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -72,7 +74,7 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
       ) : uploading ? (
         <span className="size-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
       ) : value ? (
-        <img src={value} alt="" className="size-full object-cover" />
+        <img src={value} alt="" className={cn("size-full", contain ? "object-contain p-1" : "object-cover")} />
       ) : (
         <Camera className="size-6" />
       )}

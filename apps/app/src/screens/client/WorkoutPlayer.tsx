@@ -163,7 +163,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                 return (
                   <SubCard key={slotIndex} className="flex items-center gap-3">
                     <button onClick={() => setDetailSlot(slot)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                      <ExerciseThumb thumb={ex?.thumb_url} size={44} />
+                      <ExerciseThumb thumb={ex?.thumb_url} thumb2={ex?.thumb2_url} size={44} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1 truncate font-medium">{ex?.name ?? "Exercise"}<Info className="size-3.5 shrink-0 text-muted-foreground" /></div>
                         <div className="text-sm text-muted-foreground">{ex ? <ExerciseMeta ex={ex} className="after:mx-1 after:content-['·']" /> : null}{logged}/{slot.sets.length} sets</div>
@@ -190,7 +190,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
               return (
                 <SubCard key={slotIndex} className="flex items-center gap-3">
                   <button onClick={() => setDetailSlot(slot)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                    <ExerciseThumb thumb={ex?.thumb_url} size={44} />
+                    <ExerciseThumb thumb={ex?.thumb_url} thumb2={ex?.thumb2_url} size={44} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1 truncate font-medium">{ex?.name ?? "Exercise"}<Info className="size-3.5 shrink-0 text-muted-foreground" /></div>
                       <div className="text-sm text-muted-foreground">{ex ? <ExerciseMeta ex={ex} className="after:mx-1 after:content-['·']" /> : null}{measureSummary(slot)}</div>
@@ -431,7 +431,7 @@ function RoundLogDrawer({ block, roundIndex, exercises, onClose, onSave }: { blo
           return (
             <SubCard key={si} className="space-y-2">
               <div className="flex items-center gap-2.5">
-                <ExerciseThumb thumb={exercises.get(slot.exerciseId)?.thumb_url} size={36} />
+                <ExerciseThumb thumb={exercises.get(slot.exerciseId)?.thumb_url} thumb2={exercises.get(slot.exerciseId)?.thumb2_url} size={36} />
                 <div className="min-w-0 flex-1 truncate font-medium">{exercises.get(slot.exerciseId)?.name ?? "Exercise"}</div>
                 {target ? <span className="shrink-0 text-xs text-muted-foreground">target {target}</span> : null}
               </div>
@@ -485,7 +485,7 @@ function SwapDrawer({ clientId, planId, dayIndex, coords, currentName, onClose, 
             <div className="space-y-1">
               {alts.map((e) => (
                 <button key={e.id} disabled={busy} onClick={() => void swapTo(e)} className="flex w-full items-center gap-3 rounded-xl bg-surface-2 px-2.5 py-2 text-left transition-colors hover:bg-surface-3 disabled:opacity-50">
-                  <ExerciseThumb thumb={e.thumb_url} size={40} />
+                  <ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={40} />
                   <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{e.name}</div><ExerciseMeta ex={e} className="text-xs text-muted-foreground" /></div>
                   <ArrowLeftRight className="size-4 shrink-0 text-activity" />
                 </button>

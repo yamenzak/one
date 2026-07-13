@@ -166,7 +166,7 @@ function SwapResolver({ swap, exercises, onResolve }: { swap: Swap; exercises: E
       {swap.reason && <div className="text-xs italic text-muted-foreground">“{swap.reason}”</div>}
       {choice ? (
         <SubCard className="flex items-center gap-2.5 py-2">
-          <ExerciseThumb thumb={choice.thumb_url} size={34} />
+          <ExerciseThumb thumb={choice.thumb_url} thumb2={choice.thumb2_url} size={34} />
           <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">→ {choice.name}</div><ExerciseMeta ex={choice} className="text-xs text-muted-foreground" /></div>
           <button onClick={() => { setChoice(null); setPicking(true); }} className="shrink-0 text-xs font-medium text-primary">Change</button>
         </SubCard>
@@ -176,7 +176,7 @@ function SwapResolver({ swap, exercises, onResolve }: { swap: Swap; exercises: E
           <div className="max-h-48 space-y-1 overflow-y-auto">
             {filtered.map((e) => (
               <button key={e.id} onClick={() => { setChoice(e); setPicking(false); setQ(""); }} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-surface-3">
-                <ExerciseThumb thumb={e.thumb_url} size={32} />
+                <ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={32} />
                 <div className="min-w-0 flex-1 truncate text-sm">{e.name}</div>
               </button>
             ))}

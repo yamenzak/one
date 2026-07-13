@@ -50,7 +50,7 @@ function Exercises() {
         <Stagger className="space-y-1">{items.map((e) => (
           <div key={e.id} className="flex items-center gap-3 rounded-2xl bg-card px-3 py-2.5">
             <button onClick={() => open(e)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-              <ExerciseThumb thumb={e.thumb_url} size={40} />
+              <ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={40} />
               <div className="min-w-0 flex-1"><div className="truncate font-medium">{e.name}</div><ExerciseMeta ex={e} className="text-xs text-muted-foreground" /></div>
             </button>
             <button onClick={() => open(e)} aria-label="Edit" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><PencilLine /></button>
@@ -88,7 +88,7 @@ function AlternativesSheet({ exercise, onClose }: { exercise: ExerciseInfo; onCl
         {!alts ? <Skeleton className="h-20" /> : alts.length === 0 ? <p className="text-sm text-muted-foreground">No alternatives yet.</p> : (
           <div className="space-y-1">{alts.map((a) => (
             <div key={a.id} className="flex items-center gap-3 rounded-xl bg-surface-2 px-2.5 py-2">
-              <ExerciseThumb thumb={a.thumb_url} size={36} />
+              <ExerciseThumb thumb={a.thumb_url} thumb2={a.thumb2_url} size={36} />
               <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{a.name}</div><ExerciseMeta ex={a} className="text-xs text-muted-foreground" /></div>
               <button onClick={() => void remove(a.id)} aria-label="Remove" className="text-muted-foreground hover:text-danger [&_svg]:size-4"><Trash2 /></button>
             </div>
@@ -99,7 +99,7 @@ function AlternativesSheet({ exercise, onClose }: { exercise: ExerciseInfo; onCl
           <div className="mt-1 max-h-56 space-y-1 overflow-y-auto">
             {results.filter((e) => !altIds.has(e.id)).map((e) => (
               <button key={e.id} onClick={() => void add(e.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-secondary">
-                <ExerciseThumb thumb={e.thumb_url} size={34} />
+                <ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={34} />
                 <div className="min-w-0 flex-1 truncate text-sm">{e.name}</div>
                 <Plus className="size-4 shrink-0 text-primary" />
               </button>

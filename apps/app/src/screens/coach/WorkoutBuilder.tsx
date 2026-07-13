@@ -150,7 +150,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
               {block.slots.map((slot, slotIdx) => (
                 <SubCard key={slotIdx} className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <ExerciseThumb thumb={exOf(slot.exerciseId)?.thumb_url} size={34} />
+                    <ExerciseThumb thumb={exOf(slot.exerciseId)?.thumb_url} thumb2={exOf(slot.exerciseId)?.thumb2_url} size={34} />
                     <span className="min-w-0 flex-1 truncate font-medium">{nameOf(slot.exerciseId)}</span>
                     <select value={slot.measurementMode} onChange={(e) => { const nm = e.target.value as MeasurementMode; mutate((d) => { const sl = d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!; sl.measurementMode = nm; sl.sets.forEach((s) => normalizeSetForMode(s, nm)); }); }} className="rounded-lg bg-surface-3 px-2 py-1 text-xs outline-none">{MEASURE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select>
                     <button onClick={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots.splice(slotIdx, 1))} className="text-muted-foreground hover:text-danger [&_svg]:size-4"><X /></button>
@@ -339,7 +339,7 @@ function ExercisePicker({ library, onClose, onPick, reloadLibrary }: { library: 
       <div className="max-h-96 space-y-1 overflow-y-auto">
         {filtered.map((e) => (
           <button key={e.id} onClick={() => onPick(e.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary">
-            <ExerciseThumb thumb={e.thumb_url} size={40} />
+            <ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={40} />
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium">{e.name}</div>
               <ExerciseMeta ex={e} className="text-xs text-muted-foreground" />
