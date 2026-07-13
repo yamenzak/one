@@ -9,7 +9,7 @@ import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet } 
 import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, type ExerciseBests } from "@mossa/domain";
 import {
   Button, Card, Badge, Field, Sheet, Skeleton, SubCard, ProgressRing, EmptyState, Page, Stagger,
-  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, ChevronRight, Check, Info,
+  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, ChevronRight, Check, Info,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -72,25 +72,33 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
 
   if (dayIndex === null) {
     return (
-      <Page className="mx-auto max-w-xl space-y-3 p-4 pb-28">
+      <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
         <div className="flex items-center gap-3">
           {onExit && <Button size="icon" variant="secondary" onClick={onExit} aria-label="Back"><ArrowLeft /></Button>}
-          <h1 className="text-xl font-bold tracking-tight">{plan.name}</h1>
+          <div className="min-w-0"><h1 className="truncate text-xl font-bold tracking-tight">{plan.name}</h1><p className="text-sm text-muted-foreground">Pick a day to train</p></div>
         </div>
-        {plan.body.days.map((day, i) => (
-          <motion.button key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} onClick={() => !day.isRestDay && setDayIndex(i)} disabled={day.isRestDay} className="w-full disabled:opacity-60">
-            <Card interactive={!day.isRestDay} className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`grid size-10 place-items-center rounded-xl [&_svg]:size-[1.1rem] ${day.isRestDay ? "bg-sleep-soft text-sleep" : "bg-activity-soft text-activity"}`}><Dumbbell /></div>
-                <div className="text-left">
-                  <div className="font-semibold">{day.name || `Day ${i + 1}`}</div>
-                  <div className="text-sm text-muted-foreground">{day.isRestDay ? "Rest day" : `${countSets(day)} sets`}</div>
+        {/* Day covers — 2 per row, branded art, recommended highlighted. */}
+        <div className="grid grid-cols-2 gap-3">
+          {plan.body.days.map((day, i) => {
+            const sets = day.isRestDay ? 0 : countSets(day);
+            const exercises = day.isRestDay ? 0 : day.blocks.reduce((n, b) => n + b.slots.length, 0);
+            const rec = recommendedDay === i && !day.isRestDay;
+            return (
+              <motion.button key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} onClick={() => !day.isRestDay && setDayIndex(i)} disabled={day.isRestDay} className="text-left disabled:opacity-80">
+                <div className={`relative aspect-[4/5] overflow-hidden rounded-2xl bg-card transition-transform ${day.isRestDay ? "" : "active:scale-[0.98]"} ${rec ? "ring-2 ring-activity ring-offset-2 ring-offset-background" : ""}`}>
+                  {day.imageUrl ? <img src={day.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className={`absolute inset-0 ${day.isRestDay ? "bg-gradient-to-br from-sleep/20 to-surface-2" : "bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2"}`} />}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
+                  {!day.imageUrl && <div className="absolute inset-0 grid place-items-center text-white/35 [&_svg]:size-9">{day.isRestDay ? <Moon /> : <Dumbbell />}</div>}
+                  {day.isRestDay ? <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-[0.6rem] font-semibold text-sleep">Rest</span> : rec ? <span className="absolute right-2 top-2 rounded-full bg-activity px-2 py-0.5 text-[0.6rem] font-semibold text-white">Recommended</span> : null}
+                  <div className="absolute inset-x-0 bottom-0 p-3">
+                    <div className="truncate font-semibold text-white">{day.name || `Day ${i + 1}`}</div>
+                    <div className="truncate text-xs text-white/75">{day.isRestDay ? "Rest day" : `${exercises} exercise${exercises === 1 ? "" : "s"} · ${sets} sets`}</div>
+                  </div>
                 </div>
-              </div>
-              {day.isRestDay ? <Badge tone="sleep">Rest</Badge> : recommendedDay === i ? <Badge tone="activity">Recommended</Badge> : <ChevronRight className="size-5 text-muted-foreground" />}
-            </Card>
-          </motion.button>
-        ))}
+              </motion.button>
+            );
+          })}
+        </div>
       </Page>
     );
   }
