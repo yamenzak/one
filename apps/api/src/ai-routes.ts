@@ -610,15 +610,18 @@ export const aiRoutes = new Hono<AppEnv>()
     const ent = await tenantEntitlements(c.env.DB, who.tenantId);
     if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
     const parsed = z.object({
-      feature: z.enum(["food-image", "exercise-image", "cover-image"]),
+      feature: z.enum(["food-image", "exercise-image", "cover-image", "workout-day-image"]),
       subject: z.string().min(1).max(200),
       hint: z.string().max(160).default(""),
       referenceKey: z.string().max(300).optional(),
       /** Exercise diptych: one wide image with start (left) + end (right), split client-side. */
       pair: z.boolean().default(false),
+      /** Tenant brand accent (hex) to make the render on-brand (day covers). */
+      brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
     }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
-    const { feature, subject, hint, referenceKey, pair } = parsed.data;
+    const { feature, subject, hint, referenceKey, pair, brandColor } = parsed.data;
+    const brandLine = brandColor ? ` Use the colour ${brandColor} as the dominant accent hue throughout the image.` : "";
 
     if (pair) {
       // One wide two-panel render → guaranteed-identical style, genuinely
@@ -639,7 +642,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const matchLine = reference
       ? " Use the reference image ONLY to copy the character's appearance, art style, colours, line-work, camera angle, framing and background. Draw a NEW pose — the limbs and joints MUST be clearly and substantially repositioned into the specified position; do NOT reproduce the reference pose or output a near-identical image."
       : "";
-    const base = `${sys(feature)}\nSubject: ${subject}.${hint ? ` Show ${hint}.` : ""}`;
+    const base = `${sys(feature)}\nSubject: ${subject}.${hint ? ` Show ${hint}.` : ""}${brandLine}`;
     let result = await generateImage(c.env, {
       tenantId: who.tenantId, actorUserId: who.userId, feature, reference,
       prompt: `${base}${matchLine} Produce a fresh, unique image.`,

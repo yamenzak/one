@@ -7,8 +7,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@mossa/protocol";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, Save, History, X } from "@mossa/ui";
-import { api } from "../../api.js";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, cn, colorToHex, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, Save, History, X } from "@mossa/ui";
+import { api, ApiError } from "../../api.js";
 import { AiErrorBox } from "../../AiError.js";
 import { ExerciseThumb, ExerciseMeta, splitList, pretty, type ExerciseInfo } from "../exercise.js";
 import { ExerciseEditor } from "./ExerciseEditor.js";
@@ -46,6 +46,68 @@ function normalizeSetForMode(set: WorkoutSet, mode: MeasurementMode): void {
 const emptyBlock = (): WorkoutBlock => ({ type: "single", slots: [] });
 const emptyDay = (name: string): WorkoutDay => ({ name, isRestDay: false, blocks: [] });
 const inputCls = "rounded-lg bg-surface-3 px-2.5 py-1.5 text-sm outline-none ring-ring focus:ring-2";
+
+/** The tenant's live accent colour as #rrggbb (read from the applied --primary). */
+const accentHex = (): string => { try { return colorToHex(getComputedStyle(document.documentElement).getPropertyValue("--primary").trim()); } catch { return "#10b981"; } };
+
+const DAY_STYLES = [
+  { key: "dynamic", label: "Dynamic", hint: "bold dynamic athletic action, dramatic lighting, high energy" },
+  { key: "abstract", label: "Abstract", hint: "abstract geometric shapes and smooth gradients, no figures" },
+  { key: "anatomy", label: "Anatomy", hint: "clean anatomical illustration of the muscles worked, medical-poster style" },
+  { key: "lineart", label: "Line art", hint: "minimal single-weight continuous line-art of an athletic figure" },
+  { key: "minimal", label: "Minimal", hint: "minimal premium poster, lots of negative space, subtle texture" },
+  { key: "neon", label: "Neon", hint: "neon-lit dark gym, glowing rim light, moody and cinematic" },
+] as const;
+
+/** Per-day branded cover: generate in the tenant's accent colour, pick a style. */
+function DayCover({ dayName, value, onChange }: { dayName: string; value?: string | null; onChange: (url: string | null) => void }) {
+  const [pickOpen, setPickOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const gen = async (style: (typeof DAY_STYLES)[number]) => {
+    setPickOpen(false); setBusy(true); setErr(null);
+    try {
+      const r = await api.post<{ url: string }>("/api/ai/generate-image", { feature: "workout-day-image", subject: dayName.trim() || "training day", hint: `${style.label} style — ${style.hint}`, brandColor: accentHex() });
+      onChange(r.url);
+    } catch (e) {
+      setErr(e instanceof ApiError && e.message.toLowerCase().includes("credit") ? "Out of AI credits." : "Couldn't generate — try again.");
+    } finally { setBusy(false); }
+  };
+  return (
+    <div className="space-y-2">
+      {value ? (
+        <div className="relative overflow-hidden rounded-2xl">
+          <img src={value} alt="" className="h-32 w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+          <div className="absolute right-2 top-2 flex gap-1.5">
+            <button onClick={() => setPickOpen(true)} disabled={busy} className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><Sparkles /> {busy ? "…" : "Restyle"}</button>
+            <button onClick={() => onChange(null)} aria-label="Remove cover" className="grid size-7 place-items-center rounded-full bg-black/50 text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><Trash2 /></button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setPickOpen(true)} disabled={busy} className="flex h-24 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface-2 text-sm text-muted-foreground transition-colors hover:bg-surface-3 disabled:opacity-60 [&_svg]:size-4">
+          {busy ? <><span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> Generating cover…</> : <><Sparkles /> Generate a branded day cover</>}
+        </button>
+      )}
+      {err && <p className="text-xs text-warning">{err}</p>}
+      {pickOpen && (
+        <Sheet open onClose={() => setPickOpen(false)} title="Cover style">
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Rendered in your brand accent colour. Pick a look for &ldquo;{dayName.trim() || "this day"}&rdquo;.</p>
+            <div className="grid grid-cols-2 gap-2">
+              {DAY_STYLES.map((s) => (
+                <button key={s.key} onClick={() => void gen(s)} className="rounded-2xl border border-border/60 bg-card p-3 text-left transition-colors hover:bg-surface-2">
+                  <div className="text-sm font-semibold">{s.label}</div>
+                  <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{s.hint}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </Sheet>
+      )}
+    </div>
+  );
+}
 
 export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () => void }) {
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -116,8 +178,26 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
         <Button size="icon" variant="secondary" aria-label="Save as template" onClick={() => setExportOpen(true)}><Save /></Button>
       </div>
 
+      {/* Day cards — 2 per row, each showing its branded cover; tap to edit. */}
+      {days.length > 0 && (
+        <div className="grid grid-cols-2 gap-2.5">
+          {days.map((d, i) => {
+            const exs = d.blocks.reduce((n, b) => n + b.slots.length, 0);
+            return (
+              <button key={i} onClick={() => setDayIdx(i)} className={cn("relative aspect-[16/10] overflow-hidden rounded-2xl text-left transition-all active:scale-[0.98]", i === dayIdx && "ring-2 ring-primary ring-offset-2 ring-offset-background")}>
+                {d.imageUrl ? <img src={d.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className="absolute inset-0 bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2" />}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+                {d.isRestDay && <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-[0.6rem] font-semibold text-sleep">Rest</span>}
+                <div className="absolute inset-x-0 bottom-0 p-2.5">
+                  <div className="truncate text-sm font-semibold text-white">{d.name || `Day ${i + 1}`}</div>
+                  <div className="text-[0.68rem] text-white/70">{d.isRestDay ? "Rest day" : `${exs} exercise${exs === 1 ? "" : "s"}`}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
-        {days.map((d, i) => <button key={i} onClick={() => setDayIdx(i)} className={`rounded-full px-4 py-2 text-sm transition-colors ${i === dayIdx ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>{d.name || `Day ${i + 1}`}</button>)}
         <button onClick={() => { mutate((d) => d.push(emptyDay(`Day ${days.length + 1}`))); setDayIdx(days.length); }} className="inline-flex items-center gap-1 rounded-full bg-secondary px-4 py-2 text-sm text-muted-foreground [&_svg]:size-4"><Plus /> Day</button>
         {day && <button onClick={() => { mutate((d) => d.splice(dayIdx + 1, 0, { ...structuredClone(d[dayIdx]!), name: `${d[dayIdx]!.name || `Day ${dayIdx + 1}`} (copy)` })); setDayIdx(dayIdx + 1); }} className="inline-flex items-center gap-1 rounded-full bg-secondary px-4 py-2 text-sm text-muted-foreground [&_svg]:size-4"><Copy /> Duplicate</button>}
         {days.length > 0 && <button onClick={() => setCopyWeekOpen(true)} className="inline-flex items-center gap-1 rounded-full bg-secondary px-4 py-2 text-sm text-muted-foreground [&_svg]:size-4"><Copy /> Copy week</button>}
@@ -133,6 +213,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
               <Field label="Day name" value={day.name} onChange={(e) => mutate((d) => (d[dayIdx]!.name = e.target.value))} className="flex-1" />
               <button onClick={() => mutate((d) => (d[dayIdx]!.isRestDay = !d[dayIdx]!.isRestDay))} className={`mt-6 inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm [&_svg]:size-4 ${day.isRestDay ? "bg-sleep-soft text-sleep" : "bg-secondary text-muted-foreground"}`}><Moon /> Rest</button>
             </div>
+            {!day.isRestDay && <DayCover dayName={day.name} value={day.imageUrl} onChange={(url) => mutate((d) => (d[dayIdx]!.imageUrl = url))} />}
           </Card>
 
           {!day.isRestDay && day.blocks.map((block, blockIdx) => (

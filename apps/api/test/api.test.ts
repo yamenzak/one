@@ -497,6 +497,19 @@ describe("AI image generation + recipe", () => {
     expect(fmOut.food.calories).toBeGreaterThan(0);
     expect(fmOut.food.proteinG).toBeGreaterThan(0);
     expect(["g", "ml"]).toContain(fmOut.food.servingUnit);
+
+    // Workout day cover — branded (accent colour accepted), mock lane returns a url.
+    const dayImg = await SELF.fetch("http://x/api/ai/generate-image", { method: "POST", headers: H, body: JSON.stringify({ feature: "workout-day-image", subject: "Chest Day", hint: "Dynamic style", brandColor: "#10b981" }) });
+    expect(dayImg.status).toBe(200);
+    expect(((await dayImg.json()) as { url: string }).url).toContain(`/api/media/t/${ctx.active.tenantId}/`);
+    // A malformed brand colour is rejected.
+    expect((await SELF.fetch("http://x/api/ai/generate-image", { method: "POST", headers: H, body: JSON.stringify({ feature: "workout-day-image", subject: "Pull", brandColor: "green" }) })).status).toBe(400);
+
+    // A day's cover persists in the plan body (schema round-trip).
+    const wp = (await (await SELF.fetch("http://x/api/workout-plans", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, name: "Cover Plan" }) })).json()) as { plan: { id: string } };
+    await SELF.fetch(`http://x/api/workout-plans/${wp.plan.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ body: { days: [{ name: "Chest Day", imageUrl: "/api/media/t/x/day/chest.png", blocks: [] }] } }) });
+    const back = (await (await SELF.fetch(`http://x/api/workout-plans/${wp.plan.id}`, { headers: auth(ownerCookie) })).json()) as { plan: { body: { days: { imageUrl?: string | null }[] } } };
+    expect(back.plan.body.days[0]!.imageUrl).toBe("/api/media/t/x/day/chest.png");
   });
 
   it("exercise create accepts start/end images + video", async () => {

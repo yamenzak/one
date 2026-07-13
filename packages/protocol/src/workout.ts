@@ -63,6 +63,8 @@ export const WorkoutDay = z.object({
   name: z.string().max(80).default(""),
   dayNotes: z.string().max(2000).nullish(),
   isRestDay: z.boolean().default(false),
+  /** AI-generated (branded) cover image for the day — chest day, pull, push… */
+  imageUrl: z.string().max(400).nullish(),
   blocks: z.array(WorkoutBlock).default([]),
 });
 export type WorkoutDay = z.infer<typeof WorkoutDay>;

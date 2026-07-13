@@ -224,30 +224,30 @@ export function Train({ clientId }: { clientId: string }) {
         </section>
       )}
 
-      {/* Plan days — quick jump into the player */}
+      {/* Plan days — a carousel of branded day covers, tap to start. */}
       {published && (
         <section className="space-y-2">
           <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Plan days</h3>
-          <Stagger className="space-y-2">
+          <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
             {published.body.days.map((day, i) => {
               const sets = day.isRestDay ? 0 : prescribedSetsForDay(day);
               const exercises = day.isRestDay ? 0 : day.blocks.reduce((n, b) => n + b.slots.length, 0);
               return (
-                <button key={i} onClick={() => !day.isRestDay && start(i)} disabled={day.isRestDay} className="w-full text-left disabled:opacity-60">
-                  <Card interactive={!day.isRestDay} className="flex items-center justify-between py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className={`grid size-10 place-items-center rounded-xl [&_svg]:size-[1.1rem] ${day.isRestDay ? "bg-sleep-soft text-sleep" : "bg-activity-soft text-activity"}`}>{day.isRestDay ? <Moon /> : <Dumbbell />}</div>
-                      <div>
-                        <div className="font-medium">{day.name || `Day ${i + 1}`}</div>
-                        <div className="text-sm text-muted-foreground">{day.isRestDay ? "Rest day" : `${exercises} exercise${exercises === 1 ? "" : "s"} · ${sets} sets`}</div>
-                      </div>
+                <button key={i} onClick={() => !day.isRestDay && start(i)} disabled={day.isRestDay} className="w-[62%] shrink-0 snap-start text-left sm:w-[45%]">
+                  <div className={`relative h-36 overflow-hidden rounded-2xl bg-card transition-transform ${day.isRestDay ? "opacity-80" : "active:scale-[0.98]"}`}>
+                    {day.imageUrl ? <img src={day.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className={`absolute inset-0 ${day.isRestDay ? "bg-gradient-to-br from-sleep/20 to-surface-2" : "bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2"}`} />}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+                    {!day.imageUrl && <div className="absolute inset-0 grid place-items-center text-white/35 [&_svg]:size-8">{day.isRestDay ? <Moon /> : <Dumbbell />}</div>}
+                    {day.isRestDay && <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-[0.6rem] font-semibold text-sleep">Rest</span>}
+                    <div className="absolute inset-x-0 bottom-0 p-3">
+                      <div className="truncate font-semibold text-white">{day.name || `Day ${i + 1}`}</div>
+                      <div className="truncate text-xs text-white/75">{day.isRestDay ? "Rest day" : `${exercises} exercise${exercises === 1 ? "" : "s"} · ${sets} sets`}</div>
                     </div>
-                    {day.isRestDay ? <Badge tone="sleep">Rest</Badge> : <ChevronRight className="size-5 text-muted-foreground" />}
-                  </Card>
+                  </div>
                 </button>
               );
             })}
-          </Stagger>
+          </div>
         </section>
       )}
 

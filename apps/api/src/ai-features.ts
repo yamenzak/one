@@ -108,6 +108,15 @@ Only well-supported, safe OTC options. Never suggest prescription drugs or anyth
     defaultSystem: `Create a clean, modern instructional illustration of ONE athletic figure performing the exercise with correct form. Full body in frame, side-on (profile) view, centred, feet-to-head visible, on a plain neutral light-grey background, even flat lighting. Consistent simple art style. No text, no words, no logos, no arrows.`,
   },
   {
+    key: "workout-day-image",
+    label: "Workout day cover image",
+    description: "Branded cover art for a training day (Chest Day, Pull, Push…). The chosen style + your brand accent colour drive it. Edit to set your house look.",
+    audience: "trainer",
+    task: "image",
+    tonable: false,
+    defaultSystem: `Create a striking, premium cover image for a gym training day. Bold and dynamic with a clean, modern fitness-poster aesthetic. The training theme (e.g. the muscle group or session focus) and an art style are provided — honour both. Strong central composition with generous negative space so a title can overlay cleanly. Make the provided brand accent colour the dominant hue across the image. No text, no words, no letters, no numbers, no logos, no watermarks.`,
+  },
+  {
     key: "exercise-guide",
     label: "Write exercise instructions",
     description: "Generate a full how-to guide for an exercise.",
