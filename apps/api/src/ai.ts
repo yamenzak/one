@@ -277,6 +277,23 @@ interface GeminiResponse {
   usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
 }
 
+/** Convert a standard JSON Schema to Gemini's responseSchema dialect (uppercase
+ *  TYPE names; enum/items/properties preserved). Lets one enum schema drive both
+ *  Workers AI json_schema and Gemini responseSchema so the model is constrained
+ *  to the allowed vocab, not just "some JSON". */
+function toGeminiSchema(s: unknown): unknown {
+  if (!s || typeof s !== "object") return s;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(s as Record<string, unknown>)) {
+    if (k === "type" && typeof v === "string") out.type = v.toUpperCase();
+    else if (k === "properties" && v && typeof v === "object") {
+      out.properties = Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([pk, pv]) => [pk, toGeminiSchema(pv)]));
+    } else if (k === "items") out.items = toGeminiSchema(v);
+    else out[k] = v;
+  }
+  return out;
+}
+
 /** Google AI Studio (Gemini) generateContent — text + optional inline image. */
 async function runGemini(
   key: string,
@@ -286,8 +303,12 @@ async function runGemini(
   const parts: Record<string, unknown>[] = [{ text: input.prompt }];
   if (input.image) parts.push({ inline_data: { mime_type: input.image.mimeType, data: input.image.data } });
   const generationConfig: Record<string, unknown> = { maxOutputTokens: input.maxOutputTokens ?? 1024 };
-  // Native JSON mode — Gemini returns a clean, unwrapped JSON document.
-  if (input.expectsJson) generationConfig.responseMimeType = "application/json";
+  // Native JSON mode — Gemini returns a clean, unwrapped JSON document. With a
+  // schema it's constrained to the enum vocab (not just well-formed JSON).
+  if (input.expectsJson) {
+    generationConfig.responseMimeType = "application/json";
+    if (input.jsonSchema) generationConfig.responseSchema = toGeminiSchema(input.jsonSchema);
+  }
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`,
     {

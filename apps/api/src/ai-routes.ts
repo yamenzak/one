@@ -743,8 +743,24 @@ export const aiRoutes = new Hono<AppEnv>()
     if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
     const parsed = z.object({ name: z.string().min(1).max(120) }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    // Enum-constrained schema → the model can only return our slugs (Gemini
+    // responseSchema + Workers AI json_schema). The normalizer below stays as a
+    // backstop for any provider that ignores the enum.
+    const muscleEnum = { type: "string", enum: [...MUSCLE_GROUPS] };
+    const metaSchema = {
+      type: "object",
+      properties: {
+        primaryMuscles: { type: "array", items: muscleEnum },
+        secondaryMuscles: { type: "array", items: muscleEnum },
+        equipment: { type: "array", items: { type: "string", enum: [...EQUIPMENT_TYPES] } },
+        difficulty: { type: "string", enum: ["beginner", "intermediate", "advanced"] },
+        force: { type: "string", enum: ["push", "pull", "static"] },
+        mechanic: { type: "string", enum: ["compound", "isolation"] },
+      },
+      required: ["primaryMuscles", "secondaryMuscles", "equipment", "difficulty", "force", "mechanic"],
+    };
     const result = await generate(c.env, {
-      tenantId: who.tenantId, actorUserId: who.userId, feature: "exercise-meta", task: "text", expectsJson: true,
+      tenantId: who.tenantId, actorUserId: who.userId, feature: "exercise-meta", task: "text", expectsJson: true, jsonSchema: metaSchema,
       system: sys("exercise-meta"),
       prompt: `EXERCISE: ${parsed.data.name}\n\nAllowed muscles: ${MUSCLE_GROUPS.join(", ")}\nAllowed equipment: ${EQUIPMENT_TYPES.join(", ")}\n\nClassify it now.`,
       maxOutputTokens: 300,

@@ -11,6 +11,7 @@
 
 import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
+import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@mossa/protocol";
 import { ensureSchema } from "../src/db.js";
 
 const ORIGIN = "http://localhost:8787"; // treated as local by createAuth (non-secure cookies)
@@ -423,6 +424,24 @@ describe("AI workout draft — named exercises resolve to real ids", () => {
     const ex = await SELF.fetch(`http://x/api/exercises?q=`, { headers: auth(ownerCookie) });
     const { exercises } = (await ex.json()) as { exercises: { id: string }[] };
     expect(exercises.some((e) => e.id === slots[0]!.exerciseId)).toBe(true);
+  });
+});
+
+describe("AI exercise auto-fill (enum-constrained meta)", () => {
+  it("returns muscles/equipment/force/mechanic folded onto the allowed vocab", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    const r = await SELF.fetch("http://x/api/ai/exercise-meta", { method: "POST", headers: H, body: JSON.stringify({ name: "Back Squat" }) });
+    expect(r.status).toBe(200);
+    const { meta } = (await r.json()) as { meta: { primaryMuscles: string[]; equipment: string[]; force: string | null; mechanic: string | null } };
+    // Fields are populated (not silently emptied by a too-strict filter).
+    expect(meta.primaryMuscles.length).toBeGreaterThan(0);
+    expect(meta.equipment.length).toBeGreaterThan(0);
+    // Every value is a canonical slug from the allowed vocab.
+    expect(meta.primaryMuscles.every((m) => (MUSCLE_GROUPS as readonly string[]).includes(m))).toBe(true);
+    expect(meta.equipment.every((e) => (EQUIPMENT_TYPES as readonly string[]).includes(e))).toBe(true);
+    expect(["compound", "isolation", null]).toContain(meta.mechanic);
   });
 });
 
