@@ -9,7 +9,7 @@ import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet } 
 import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, type ExerciseBests } from "@mossa/domain";
 import {
   Button, Card, Badge, Field, Sheet, Skeleton, SubCard, ProgressRing, EmptyState, Page, Stagger,
-  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, ChevronRight, Check, Info,
+  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, ChevronRight, Check, Info, History, cn,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -17,12 +17,17 @@ import { Markdown } from "../../Markdown.js";
 import { ExerciseThumb, ExerciseMeta, splitList, pretty, type ExerciseInfo } from "../exercise.js";
 
 interface PublishedPlan { id: string; name: string; body: WorkoutBody }
+type PlanRow = PublishedPlan & { status: string; publishedAt?: string | null };
 interface LoggedSet { setIndex: number; reps?: number | null; weightKg?: number | null; durationSeconds?: number | null; distanceM?: number | null; effortLabel?: "easy" | "perfect" | "hard" | null; completed: boolean }
 interface SessionEntry { blockIndex: number; slotIndex: number; exerciseId: string; sets: LoggedSet[] }
 type ExerciseLite = ExerciseInfo;
 
 export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: string; initialDay?: number; onExit?: () => void }) {
-  const [plan, setPlan] = useState<PublishedPlan | null>(null);
+  const [plan, setPlan] = useState<PlanRow | null>(null);
+  const [allPlans, setAllPlans] = useState<PlanRow[]>([]);
+  const [viewId, setViewId] = useState<string | null>(null); // null = current published plan
+  const [histOpen, setHistOpen] = useState(false);
+  const [preview, setPreview] = useState<{ day: WorkoutDay; index: number } | null>(null);
   const [exercises, setExercises] = useState<Map<string, ExerciseLite>>(new Map());
   const [session, setSession] = useState<Map<string, LoggedSet[]>>(new Map());
   const [dayIndex, setDayIndex] = useState<number | null>(initialDay ?? null);
@@ -37,11 +42,12 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
 
   const load = useCallback(async () => {
     const [plansRes, exRes, sessRes] = await Promise.all([
-      api.get<{ plans: (PublishedPlan & { status: string })[] }>(`/api/workout-plans?clientId=${clientId}`),
+      api.get<{ plans: PlanRow[] }>(`/api/workout-plans?clientId=${clientId}`),
       api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all"),
       api.get<{ sessions: { entries: SessionEntry[] }[] }>(`/api/logs/workout-sessions?clientId=${clientId}&from=${date}&to=${date}`),
     ]);
     setPlan(plansRes.plans.find((p) => p.status === "published") ?? null);
+    setAllPlans(plansRes.plans);
     setExercises(new Map(exRes.exercises.map((e) => [e.id, e])));
     const sess = new Map<string, LoggedSet[]>();
     for (const s of sessRes.sessions) for (const e of s.entries) sess.set(`${e.blockIndex}:${e.slotIndex}`, e.sets);
@@ -68,23 +74,53 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
     return recommendNextDay(plan.body.days.map((d) => ({ isRestDay: d.isRestDay, prescribedSets: countSets(d) })), logsByDay, date);
   }, [plan, session, dayIndex, date]);
 
+  // `active` is the plan being viewed — the current published one by default, or
+  // a past (superseded) plan the client picked from history. Training always
+  // targets the current plan, so past plans render read-only (preview only).
+  const active = (viewId ? allPlans.find((p) => p.id === viewId) : plan) ?? plan ?? null;
+  const isPast = !!active && !!plan && active.id !== plan.id;
+  const pastPlans = allPlans.filter((p) => p.status === "superseded");
+  const pickPlan = (id: string | null) => { setViewId(id); setHistOpen(false); };
+
   if (!plan) return <div className="mx-auto max-w-xl p-4"><EmptyState icon={Dumbbell} title="No published plan" description="Your coach hasn't published a workout plan yet." /></div>;
 
   if (dayIndex === null) {
+    const trainingDays = active ? active.body.days.filter((d) => !d.isRestDay).length : 0;
     return (
-      <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+      <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+        {/* Header — matches the meal-plan drawer for app-wide consistency. */}
         <div className="flex items-center gap-3">
-          {onExit && <Button size="icon" variant="secondary" onClick={onExit} aria-label="Back"><ArrowLeft /></Button>}
-          <div className="min-w-0"><h1 className="truncate text-xl font-bold tracking-tight">{plan.name}</h1><p className="text-sm text-muted-foreground">Pick a day to train</p></div>
+          {onExit && <button onClick={onExit} aria-label="Back" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><ArrowLeft /></button>}
+          <div className="min-w-0 flex-1"><div className="truncate text-base font-bold tracking-tight">{isPast ? "Past plan" : "Workout plan"}</div>{active && <div className="truncate text-xs text-muted-foreground">{active.name}</div>}</div>
+          {pastPlans.length > 0 && <button onClick={() => setHistOpen(true)} aria-label="Past plans" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><History /></button>}
         </div>
+
+        {/* Hero — the plan at a glance. */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <Card className="relative overflow-hidden">
+            <div className="pointer-events-none absolute -right-10 -top-10 size-36 rounded-full bg-primary/10 blur-2xl" />
+            <div className="relative">
+              <div className={cn("text-xs font-medium uppercase tracking-wide", isPast ? "text-muted-foreground" : "text-activity")}>{isPast ? "Past plan" : "Your plan"}</div>
+              <h2 className="mt-0.5 text-xl font-semibold tracking-tight">{active?.name}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{trainingDays} training day{trainingDays === 1 ? "" : "s"}{active?.publishedAt ? ` · ${new Date(active.publishedAt).toLocaleDateString()}` : ""}</p>
+              {isPast ? (
+                <button onClick={() => pickPlan(null)} className="mt-3 inline-flex items-center gap-1 rounded-full bg-activity-soft px-3 py-1 text-xs font-semibold text-activity [&_svg]:size-3.5"><ArrowLeft /> Back to current plan</button>
+              ) : (
+                <p className="mt-3 text-sm text-muted-foreground">{isPast ? "" : "Pick a day to train."}</p>
+              )}
+            </div>
+          </Card>
+        </motion.div>
+
         {/* Day covers — 2 per row, branded art, recommended highlighted. */}
         <div className="grid grid-cols-2 gap-3">
-          {plan.body.days.map((day, i) => {
+          {(active?.body.days ?? []).map((day, i) => {
             const sets = day.isRestDay ? 0 : countSets(day);
             const exercises = day.isRestDay ? 0 : day.blocks.reduce((n, b) => n + b.slots.length, 0);
-            const rec = recommendedDay === i && !day.isRestDay;
+            const rec = !isPast && recommendedDay === i && !day.isRestDay;
+            const onPick = () => { if (day.isRestDay) return; if (isPast) setPreview({ day, index: i }); else setDayIndex(i); };
             return (
-              <motion.button key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} onClick={() => !day.isRestDay && setDayIndex(i)} disabled={day.isRestDay} className="text-left disabled:opacity-80">
+              <motion.button key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} onClick={onPick} disabled={day.isRestDay} className="text-left disabled:opacity-80">
                 <div className={`relative aspect-[4/5] overflow-hidden rounded-2xl bg-card transition-transform ${day.isRestDay ? "" : "active:scale-[0.98]"} ${rec ? "ring-2 ring-activity ring-offset-2 ring-offset-background" : ""}`}>
                   {day.imageUrl ? <img src={day.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className={`absolute inset-0 ${day.isRestDay ? "bg-gradient-to-br from-sleep/20 to-surface-2" : "bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2"}`} />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
@@ -99,6 +135,29 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
             );
           })}
         </div>
+
+        {histOpen && (
+          <Sheet open onClose={() => setHistOpen(false)} title="Past plans">
+            <div className="space-y-1.5">
+              {plan && (
+                <button onClick={() => pickPlan(null)} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-surface-2", !isPast && "bg-activity-soft/40")}>
+                  <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-activity-soft text-activity [&_svg]:size-4"><Dumbbell /></span>
+                  <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{plan.name}</div><div className="text-xs text-muted-foreground">Current plan</div></div>
+                  {!isPast && <Check className="size-4 shrink-0 text-activity" strokeWidth={3} />}
+                </button>
+              )}
+              {pastPlans.map((p) => (
+                <button key={p.id} onClick={() => pickPlan(p.id)} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-surface-2", viewId === p.id && "bg-surface-2")}>
+                  <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-muted-foreground [&_svg]:size-4"><History /></span>
+                  <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{p.name}</div><div className="text-xs text-muted-foreground">{p.publishedAt ? `Until ${new Date(p.publishedAt).toLocaleDateString()}` : "Superseded"}</div></div>
+                  {viewId === p.id && <Check className="size-4 shrink-0 text-foreground" strokeWidth={3} />}
+                </button>
+              ))}
+            </div>
+          </Sheet>
+        )}
+
+        {preview && <DayPreviewSheet day={preview.day} index={preview.index} exercises={exercises} onClose={() => setPreview(null)} />}
       </Page>
     );
   }
@@ -235,6 +294,36 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
       )}
       {detailSlot && <ExerciseDetailSheet ex={exercises.get(detailSlot.exerciseId)} slot={detailSlot} onClose={() => setDetailSlot(null)} />}
     </Page>
+  );
+}
+
+/** Read-only day preview for a PAST plan — the client browses what a day of a
+ *  superseded plan prescribed (blocks, exercises, sets) without logging. */
+function DayPreviewSheet({ day, index, exercises, onClose }: { day: WorkoutDay; index: number; exercises: Map<string, ExerciseLite>; onClose: () => void }) {
+  const total = countSets(day);
+  return (
+    <Sheet open onClose={onClose} title={day.name || `Day ${index + 1}`}>
+      <div className="space-y-4">
+        <div className="text-sm text-muted-foreground">{day.blocks.reduce((n, b) => n + b.slots.length, 0)} exercise{day.blocks.reduce((n, b) => n + b.slots.length, 0) === 1 ? "" : "s"} · {total} sets</div>
+        {day.blocks.map((block, bi) => (
+          <div key={bi} className="space-y-2">
+            <div className="flex items-center gap-2"><Badge tone="activity">{blockLabel(block.type)}</Badge>{block.type !== "single" && <span className="text-xs text-muted-foreground">{block.rounds ?? 1} rounds</span>}</div>
+            {block.slots.map((slot, si) => {
+              const ex = exercises.get(slot.exerciseId);
+              return (
+                <SubCard key={si} className="flex items-center gap-3">
+                  <ExerciseThumb thumb={ex?.thumb_url} thumb2={ex?.thumb2_url} size={44} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-medium">{ex?.name ?? "Exercise"}</div>
+                    <div className="text-sm text-muted-foreground">{ex ? <ExerciseMeta ex={ex} className="after:mx-1 after:content-['·']" /> : null}{measureSummary(slot)}</div>
+                  </div>
+                </SubCard>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </Sheet>
   );
 }
 

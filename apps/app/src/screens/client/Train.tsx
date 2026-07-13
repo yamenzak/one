@@ -13,12 +13,11 @@ import { prescribedSetsForDay, type WorkoutBody } from "@mossa/protocol";
 import { sessionTonnage, sessionLoad, epley1Rm, DEFAULT_WEEKLY_LOAD_TARGET, activityByKey, fmtEnergy, fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
 import {
   Card, Badge, Button, Chip, Skeleton, Page, Stagger, EmptyState, StatCard, WeekDots, Sparkline, MiniBars, IconBadge, Sheet,
-  Dumbbell, Play, Moon, ChevronRight, Plus, Footprints, Flame, TrendingUp, Trophy, Heart, Activity, History,
+  Dumbbell, Play, Moon, ChevronRight, Plus, Footprints, Flame, TrendingUp, Trophy, Heart, Activity,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { LogSheet } from "./LogSheet.js";
-import { PlanHistorySheet } from "./PlanHistorySheet.js";
 import { ExerciseThumb, ExerciseMeta, pretty, type ExerciseInfo } from "../exercise.js";
 import { CoachNote } from "./CoachNote.js";
 
@@ -54,7 +53,6 @@ export function Train({ clientId }: { clientId: string }) {
   const units = useUnits();
   const [activityOpen, setActivityOpen] = useState(false);
   const [browseCat, setBrowseCat] = useState<string | null>(null);
-  const [histOpen, setHistOpen] = useState(false);
   const today = todayLocal();
 
   const load = () => {
@@ -181,7 +179,6 @@ export function Train({ clientId }: { clientId: string }) {
         {published && <Chip icon={Play} selected onClick={() => start()}>Start workout</Chip>}
         <Chip icon={Footprints} onClick={() => setActivityOpen(true)}>Log activity</Chip>
         {categories.length > 0 && <Chip icon={Dumbbell} onClick={() => setBrowseCat(categories[0]![0])}>Freestyle</Chip>}
-        {plans.some((p) => p.status === "superseded") && <Chip icon={History} onClick={() => setHistOpen(true)}>Past plans</Chip>}
       </Stagger>
 
       {/* This week — key metrics from real logs */}
@@ -274,7 +271,6 @@ export function Train({ clientId }: { clientId: string }) {
       )}
 
       {activityOpen && <LogSheet open initialKind="activity" clientId={clientId} onClose={() => setActivityOpen(false)} onLogged={load} />}
-      {histOpen && <PlanHistorySheet clientId={clientId} kind="workout" onClose={() => setHistOpen(false)} />}
       {browseCat && <BrowseSheet category={browseCat} library={library} onClose={() => setBrowseCat(null)} />}
     </Page>
   );
