@@ -42,6 +42,7 @@ export function Eat({ clientId }: { clientId: string }) {
   const [planOpen, setPlanOpen] = useState(false);
   const [planHistOpen, setPlanHistOpen] = useState(false);
   const [hasPlanHistory, setHasPlanHistory] = useState(false);
+  const [mealPlan, setMealPlan] = useState<{ name: string; meals: number; options: number } | null>(null);
   const [edit, setEdit] = useState<Entry | null>(null);
   const units = useUnits();
   const date = todayLocal();
@@ -51,11 +52,14 @@ export function Eat({ clientId }: { clientId: string }) {
       api.get<{ entries: Entry[] }>(`/api/logs/food?clientId=${clientId}&date=${date}`),
       api.get<{ goal: { targets: Targets | null } | null }>(`/api/today?clientId=${clientId}&date=${date}`),
       api.get<Week>(`/api/logs/nutrition/week?clientId=${clientId}&date=${date}`),
-      api.get<{ plans: { status: string }[] }>(`/api/meal-plans?clientId=${clientId}`).catch(() => ({ plans: [] })),
+      api.get<{ plans: { status: string; name: string; body?: { mealOptions?: { mealType: string }[] } }[] }>(`/api/meal-plans?clientId=${clientId}`).catch(() => ({ plans: [] })),
     ]);
     setEntries(e.entries); setTargets(today.goal?.targets ?? null);
     setWeek(wk); setWaterMl(wk.days[wk.days.length - 1]?.waterMl ?? 0);
     setHasPlanHistory(mp.plans.some((p) => p.status === "superseded"));
+    const published = mp.plans.find((p) => p.status === "published");
+    const opts = published?.body?.mealOptions ?? [];
+    setMealPlan(published ? { name: published.name, meals: new Set(opts.map((o) => o.mealType)).size, options: opts.length } : null);
   }, [clientId, date]);
   useEffect(() => void load(), [load]);
 
@@ -115,11 +119,30 @@ export function Eat({ clientId }: { clientId: string }) {
         </Card>
       </Stagger>
 
+      {/* Your meal plan — the primary entry (parity with Train's active-plan hero) */}
+      {mealPlan && (
+        <Stagger>
+          <button onClick={() => setPlanOpen(true)} className="w-full text-left">
+            <Card interactive className="relative overflow-hidden">
+              <div className="pointer-events-none absolute -right-8 -top-8 size-32 rounded-full bg-nutrition/10 blur-2xl" />
+              <div className="relative flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-medium uppercase tracking-wide text-nutrition">Your meal plan</div>
+                  <h2 className="mt-0.5 truncate text-xl font-semibold tracking-tight">{mealPlan.name}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">{mealPlan.meals} meal{mealPlan.meals === 1 ? "" : "s"} · {mealPlan.options} options to choose from</p>
+                </div>
+                <div className="grid size-12 shrink-0 place-items-center rounded-full bg-nutrition-soft text-nutrition [&_svg]:size-6"><Utensils /></div>
+              </div>
+            </Card>
+          </button>
+        </Stagger>
+      )}
+
       {/* Primary actions — directly available */}
       <Stagger className="flex flex-wrap gap-2">
         <Chip icon={Plus} selected onClick={() => openLog()}>Log food</Chip>
         <Chip icon={Camera} onClick={() => openLog(undefined, true)}>Snap a meal</Chip>
-        <Chip icon={ClipboardList} onClick={() => setPlanOpen(true)}>My plan</Chip>
+        {!mealPlan && <Chip icon={ClipboardList} onClick={() => setPlanOpen(true)}>My plan</Chip>}
         {hasPlanHistory && <Chip icon={History} onClick={() => setPlanHistOpen(true)}>Past plans</Chip>}
       </Stagger>
 
