@@ -3,18 +3,18 @@
  * client-side Epley PR detection. Premium, animated.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet } from "@mossa/protocol";
 import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, type ExerciseBests } from "@mossa/domain";
 import {
-  Button, Card, Badge, Field, Sheet, Skeleton, SubCard, ProgressRing, EmptyState, Page, Stagger,
-  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, ChevronRight, Check, History, cn,
+  Button, Card, Badge, Field, Sheet, Skeleton, SubCard, ProgressRing, EmptyState, Page,
+  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, cn,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { Markdown } from "../../Markdown.js";
-import { ExerciseRow, splitList, pretty, type ExerciseInfo } from "../exercise.js";
+import { ExerciseRow, ExerciseThumb, metaText, splitList, pretty, type ExerciseInfo } from "../exercise.js";
 
 interface PublishedPlan { id: string; name: string; body: WorkoutBody }
 type PlanRow = PublishedPlan & { status: string; publishedAt?: string | null };
@@ -87,14 +87,10 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   if (dayIndex === null) {
     const trainingDays = active ? active.body.days.filter((d) => !d.isRestDay).length : 0;
     return (
-      <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
-        {/* Header — matches the meal-plan drawer for app-wide consistency. */}
-        <div className="flex items-center gap-3">
-          {onExit && <button onClick={onExit} aria-label="Back" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><ArrowLeft /></button>}
-          <div className="min-w-0 flex-1"><div className="truncate text-base font-bold tracking-tight">{isPast ? "Past plan" : "Workout plan"}</div>{active && <div className="truncate text-xs text-muted-foreground">{active.name}</div>}</div>
-          {pastPlans.length > 0 && <button onClick={() => setHistOpen(true)} aria-label="Past plans" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><History /></button>}
-        </div>
-
+      <Page className="pb-28">
+        <HeaderBar title={isPast ? "Past plan" : "Workout plan"} subtitle={active?.name} onBack={onExit}
+          right={pastPlans.length > 0 ? <button onClick={() => setHistOpen(true)} aria-label="Past plans" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><History /></button> : undefined} />
+        <div className="mx-auto max-w-xl space-y-5 p-4">
         {/* Hero — the plan at a glance. */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="relative overflow-hidden">
@@ -134,6 +130,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
               </motion.button>
             );
           })}
+        </div>
         </div>
 
         {histOpen && (
@@ -206,64 +203,81 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
     if (pr) { setToast(pr); navigator.vibrate?.([30, 40, 60]); setTimeout(() => setToast(null), 3000); }
   };
 
-  return (
-    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
-      <div className="flex items-center gap-3">
-        <Button size="icon" variant="secondary" onClick={() => setDayIndex(null)}><ArrowLeft /></Button>
-        <h1 className="flex-1 truncate text-xl font-bold tracking-tight">{day.name || `Day ${dayIndex + 1}`}</h1>
-        <ProgressRing progress={totalSets ? loggedSets / totalSets : 0} size={52} strokeWidth={6} tone="activity" value={<span className="text-sm">{loggedSets}</span>} />
-      </div>
+  // Flatten the day into a linear timeline: each single-exercise slot is its own
+  // step; each superset/circuit/HIIT block is one grouped step. Steps run in
+  // order, so a vertical timeline reads exactly how you train the day.
+  type Step = { blockIndex: number; block: WorkoutBlock } & ({ kind: "single"; slot: ExerciseSlot; slotIndex: number } | { kind: "group" });
+  const steps: Step[] = [];
+  day.blocks.forEach((block, blockIndex) => {
+    if (block.type === "single") block.slots.forEach((slot, slotIndex) => steps.push({ kind: "single", block, blockIndex, slot, slotIndex }));
+    else steps.push({ kind: "group", block, blockIndex });
+  });
 
-      <Stagger className="space-y-4">
-      {day.blocks.map((block, blockIndex) => {
-        // Singles log set-by-set per exercise; supersets/circuits/HIIT log a
-        // whole round (one set of every exercise) at a time.
-        const rounds = block.type === "single" ? null : block.rounds ?? 1;
-        if (rounds === null) {
+  return (
+    <Page className="pb-28">
+      <HeaderBar title={day.name || `Day ${dayIndex + 1}`} subtitle={`${loggedSets} of ${totalSets} set${totalSets === 1 ? "" : "s"} logged`} onBack={() => setDayIndex(null)}
+        right={<ProgressRing progress={totalSets ? loggedSets / totalSets : 0} size={40} strokeWidth={5} tone="activity" value={<span className="text-xs font-semibold">{loggedSets}</span>} />} />
+
+      <ol className="mx-auto max-w-xl p-4">
+        {steps.map((step, i) => {
+          const last = i === steps.length - 1;
+          const single = step.kind === "single";
+          const logged = single ? session.get(`${step.blockIndex}:${step.slotIndex}`)?.filter((s) => s.completed).length ?? 0 : 0;
+          const roundsDone = single ? 0 : (step.block.slots.length ? Math.min(...step.block.slots.map((_, si) => session.get(`${step.blockIndex}:${si}`)?.filter((s) => s.completed).length ?? 0)) : 0);
+          const rounds = single ? 0 : step.block.rounds ?? 1;
+          const done = single ? logged >= step.slot.sets.length : roundsDone >= rounds;
           return (
-            <Card key={blockIndex} className="space-y-3">
-              <div className="flex items-center gap-2"><Badge tone="activity">{blockLabel(block.type)}</Badge></div>
-              {block.slots.map((slot, slotIndex) => {
-                const ex = exercises.get(slot.exerciseId);
-                const logged = session.get(`${blockIndex}:${slotIndex}`)?.filter((s) => s.completed).length ?? 0;
-                const done = logged >= slot.sets.length;
-                return (
-                  <SubCard key={slotIndex}>
-                    <ExerciseRow ex={ex} info sub={`${logged}/${slot.sets.length} sets`} onClick={() => setDetailSlot(slot)}
-                      trailing={
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
-                          <Button size="sm" variant={done ? "secondary" : "default"} onClick={() => setLogSlot({ blockIndex, slotIndex, slot })}>{done ? <Check /> : "Log"}</Button>
+            <li key={i} className="flex gap-3">
+              {/* Timeline rail — numbered node + connector down to the next step. */}
+              <div className="flex flex-col items-center">
+                <div className={cn("z-10 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ring-4 ring-background transition-colors [&_svg]:size-4", done ? "bg-activity text-white" : "bg-surface-3 text-muted-foreground")}>
+                  {done ? <Check strokeWidth={3} /> : i + 1}
+                </div>
+                {!last && <div className="w-px flex-1 bg-border/60" />}
+              </div>
+
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="min-w-0 flex-1 pb-4">
+                {single ? (
+                  // Rich single-exercise card — thumbnail, prescription, set dots, actions.
+                  <div className={cn("overflow-hidden rounded-2xl bg-card ring-1 ring-inset transition-colors", done ? "ring-activity/25" : "ring-border/50")}>
+                    <button onClick={() => setDetailSlot(step.slot)} className="flex w-full items-center gap-3 p-2.5 text-left transition-opacity active:opacity-80">
+                      <ExerciseThumb thumb={exercises.get(step.slot.exerciseId)?.thumb_url} thumb2={exercises.get(step.slot.exerciseId)?.thumb2_url} size={60} className="rounded-xl" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1 font-semibold"><span className="truncate">{exercises.get(step.slot.exerciseId)?.name ?? "Exercise"}</span><Info className="size-3.5 shrink-0 text-muted-foreground" /></div>
+                        {metaText(exercises.get(step.slot.exerciseId)) && <div className="truncate text-xs text-muted-foreground">{metaText(exercises.get(step.slot.exerciseId))}</div>}
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <span className="shrink-0 rounded-md bg-activity-soft px-1.5 py-0.5 text-[0.7rem] font-semibold text-activity">{measureSummary(step.slot)}</span>
+                          <div className="flex items-center gap-1">{step.slot.sets.map((_, k) => <span key={k} className={cn("size-1.5 rounded-full transition-colors", k < logged ? "bg-activity" : "bg-surface-3")} />)}</div>
                         </div>
-                      } />
-                  </SubCard>
-                );
-              })}
-            </Card>
+                      </div>
+                    </button>
+                    <div className="flex items-center gap-2 border-t border-border/50 p-2">
+                      <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex: step.blockIndex, slotIndex: step.slotIndex, exerciseId: step.slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
+                      <Button size="sm" className="flex-1" variant={done ? "secondary" : "default"} onClick={() => setLogSlot({ blockIndex: step.blockIndex, slotIndex: step.slotIndex, slot: step.slot })}>{done ? <><Check /> Done</> : `Log · ${logged}/${step.slot.sets.length}`}</Button>
+                    </div>
+                  </div>
+                ) : (
+                  // Grouped block — superset/circuit/HIIT, logged one round at a time.
+                  <div className="overflow-hidden rounded-2xl bg-card ring-1 ring-inset ring-border/50">
+                    <div className="flex items-center gap-2 px-3 pt-3"><Badge tone="activity">{blockLabel(step.block.type)}</Badge><span className="text-xs text-muted-foreground">{roundsDone}/{rounds} rounds</span></div>
+                    <div className="space-y-1.5 p-3">
+                      {step.block.slots.map((slot, slotIndex) => (
+                        <div key={slotIndex} className="rounded-xl bg-surface-2 p-2">
+                          <ExerciseRow ex={exercises.get(slot.exerciseId)} info thumbSize={40} sub={measureSummary(slot)} onClick={() => setDetailSlot(slot)}
+                            trailing={<Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex: step.blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>} />
+                        </div>
+                      ))}
+                      <Button className="w-full" variant={done ? "secondary" : "default"} disabled={done} onClick={() => setRoundBlock({ blockIndex: step.blockIndex, block: step.block, roundIndex: roundsDone })}>
+                        {done ? <><Check /> Rounds complete</> : `Log round ${roundsDone + 1} of ${rounds}`}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            </li>
           );
-        }
-        // Completed rounds = the fewest completed sets across the block's slots.
-        const roundsDone = block.slots.length ? Math.min(...block.slots.map((_, si) => session.get(`${blockIndex}:${si}`)?.filter((s) => s.completed).length ?? 0)) : 0;
-        const blockDone = roundsDone >= rounds;
-        return (
-          <Card key={blockIndex} className="space-y-3">
-            <div className="flex items-center gap-2"><Badge tone="activity">{blockLabel(block.type)}</Badge><span className="text-sm text-muted-foreground">{roundsDone}/{rounds} rounds</span></div>
-            {block.slots.map((slot, slotIndex) => {
-              const ex = exercises.get(slot.exerciseId);
-              return (
-                <SubCard key={slotIndex}>
-                  <ExerciseRow ex={ex} info sub={measureSummary(slot)} onClick={() => setDetailSlot(slot)}
-                    trailing={<Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>} />
-                </SubCard>
-              );
-            })}
-            <Button className="w-full" variant={blockDone ? "secondary" : "default"} disabled={blockDone} onClick={() => setRoundBlock({ blockIndex, block, roundIndex: roundsDone })}>
-              {blockDone ? <><Check /> Rounds complete</> : `Log round ${roundsDone + 1} of ${rounds}`}
-            </Button>
-          </Card>
-        );
-      })}
-      </Stagger>
+        })}
+      </ol>
 
       <AnimatePresence>
         {toast && (
@@ -284,6 +298,18 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
       )}
       {detailSlot && <ExerciseDetailSheet ex={exercises.get(detailSlot.exerciseId)} slot={detailSlot} onClose={() => setDetailSlot(null)} />}
     </Page>
+  );
+}
+
+/** Sticky, blurred plan header — one bar for both the day picker and the active
+ *  session, matching the meal-plan drawer so plans feel identical app-wide. */
+function HeaderBar({ title, subtitle, onBack, right }: { title: string; subtitle?: ReactNode; onBack?: () => void; right?: ReactNode }) {
+  return (
+    <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-border/40 bg-background/85 px-4 py-3 backdrop-blur-xl">
+      {onBack && <button onClick={onBack} aria-label="Back" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><ArrowLeft /></button>}
+      <div className="min-w-0 flex-1"><div className="truncate text-base font-bold tracking-tight">{title}</div>{subtitle != null && <div className="truncate text-xs text-muted-foreground">{subtitle}</div>}</div>
+      {right}
+    </div>
   );
 }
 
