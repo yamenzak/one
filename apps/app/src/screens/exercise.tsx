@@ -39,6 +39,11 @@ export interface ExerciseInfo {
   secondary_muscle_groups?: string | null;
   equipment?: string | null;
   difficulty?: string | null;
+  /** push | pull | static */
+  force?: string | null;
+  /** compound | isolation */
+  mechanic?: string | null;
+  category?: string | null;
   instructions_md?: string | null;
   /** 0 = archived (soft-deleted). Present on the resolve lane (scope=all). */
   active?: number;

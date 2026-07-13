@@ -3,7 +3,7 @@
  * client-side Epley PR detection. Premium, animated.
  */
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, Fragment, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet } from "@mossa/protocol";
 import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, type ExerciseBests } from "@mossa/domain";
@@ -242,29 +242,47 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
               </div>
 
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="min-w-0 flex-1 pb-4">
-                {single ? (
-                  // Rich single-exercise card — thumbnail, prescription, set dots, actions.
+                {single ? (() => {
+                  const ex = exercises.get(step.slot.exerciseId);
+                  const mode = step.slot.measurementMode;
+                  const mods = slotModifiers(step.slot, units);
+                  return (
+                  // Rich single-exercise card — thumbnail, per-set dots + rest clocks, actions.
                   <div className={cn("overflow-hidden rounded-2xl bg-card ring-1 ring-inset transition-colors", done ? "ring-activity/25" : "ring-border/50")}>
                     <button onClick={() => setDetailSlot(step.slot)} className="flex w-full items-center gap-3 p-2.5 text-left transition-opacity active:opacity-80">
-                      <ExerciseThumb thumb={exercises.get(step.slot.exerciseId)?.thumb_url} thumb2={exercises.get(step.slot.exerciseId)?.thumb2_url} size={60} className="rounded-xl" />
+                      <ExerciseThumb thumb={ex?.thumb_url} thumb2={ex?.thumb2_url} size={60} className="rounded-xl" />
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1 font-semibold"><span className="truncate">{exercises.get(step.slot.exerciseId)?.name ?? "Exercise"}</span><Info className="size-3.5 shrink-0 text-muted-foreground" /></div>
-                        {metaText(exercises.get(step.slot.exerciseId)) && <div className="truncate text-xs text-muted-foreground">{metaText(exercises.get(step.slot.exerciseId))}</div>}
-                        <div className="mt-1.5 flex items-center gap-2">
-                          <span className="shrink-0 rounded-md bg-activity-soft px-1.5 py-0.5 text-[0.7rem] font-semibold text-activity">{measureSummary(step.slot)}</span>
-                          <div className="flex items-center gap-1">{step.slot.sets.map((_, k) => <span key={k} className={cn("size-1.5 rounded-full transition-colors", k < logged ? "bg-activity" : "bg-surface-3")} />)}</div>
-                        </div>
+                        <div className="flex items-center gap-1 font-semibold"><span className="truncate">{ex?.name ?? "Exercise"}</span><Info className="size-3.5 shrink-0 text-muted-foreground" /></div>
+                        {metaText(ex) && <div className="truncate text-xs text-muted-foreground">{metaText(ex)}</div>}
                       </div>
                     </button>
-                    <div className="flex items-center gap-2 border-t border-border/50 p-2">
+                    {/* Prescription — one dot per set with its target beneath, a tappable
+                        rest clock in every gap, then the loading/effort modifiers. */}
+                    <div className="px-2.5 pb-1">
+                      <div className="flex flex-wrap items-start gap-x-1.5 gap-y-2">
+                        {step.slot.sets.map((set, k) => (
+                          <Fragment key={k}>
+                            <div className="flex flex-col items-center gap-1">
+                              <span className={cn("size-2.5 rounded-full transition-colors", setDotClass(set, k < logged))} />
+                              <span className="text-[0.62rem] font-semibold leading-none tabular-nums text-muted-foreground">{setMeasureShort(set, mode)}</span>
+                            </div>
+                            {k < step.slot.sets.length - 1 && <RestTimer seconds={set.restAfterSec ?? 60} />}
+                          </Fragment>
+                        ))}
+                      </div>
+                      {mods.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{mods.map((m) => <span key={m} className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.65rem] font-medium text-muted-foreground">{m}</span>)}</div>}
+                      {step.slot.slotNotes && <p className="mt-2 text-[0.72rem] italic leading-snug text-muted-foreground">“{step.slot.slotNotes}”</p>}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 border-t border-border/50 p-2">
                       <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex: step.blockIndex, slotIndex: step.slotIndex, exerciseId: step.slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
                       <Button size="sm" className="flex-1" variant={done ? "secondary" : "default"} onClick={() => setLogSlot({ blockIndex: step.blockIndex, slotIndex: step.slotIndex, slot: step.slot })}>{done ? <><Check /> Done</> : `Log · ${logged}/${step.slot.sets.length}`}</Button>
                     </div>
                   </div>
-                ) : (
+                  ); })() : (
                   // Grouped block — superset/circuit/HIIT, logged one round at a time.
                   <div className="overflow-hidden rounded-2xl bg-card ring-1 ring-inset ring-border/50">
-                    <div className="flex items-center gap-2 px-3 pt-3"><Badge tone="activity">{blockLabel(step.block.type)}</Badge><span className="text-xs text-muted-foreground">{roundsDone}/{rounds} rounds</span></div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 pt-3"><Badge tone="activity">{blockLabel(step.block.type)}</Badge><span className="text-xs text-muted-foreground">{roundsDone}/{rounds} rounds</span>{step.block.restBetweenRoundsSec ? <span className="text-xs text-muted-foreground">· {fmtClock(step.block.restBetweenRoundsSec)} between</span> : null}</div>
+                    {step.block.blockNotes && <p className="px-3 pt-1 text-[0.72rem] italic leading-snug text-muted-foreground">“{step.block.blockNotes}”</p>}
                     <div className="space-y-1.5 p-3">
                       {step.block.slots.map((slot, slotIndex) => (
                         <div key={slotIndex} className="rounded-xl bg-surface-2 p-2">
@@ -276,6 +294,13 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                         {done ? <><Check /> Rounds complete</> : `Log round ${roundsDone + 1} of ${rounds}`}
                       </Button>
                     </div>
+                  </div>
+                )}
+                {!last && (
+                  <div className="mt-2.5 flex items-center gap-2 pl-0.5">
+                    <span className="h-px w-4 bg-border/60" />
+                    <RestTimer seconds={single ? stepRestSeconds(step.block, step.slot) : stepRestSeconds(step.block)} label />
+                    <span className="text-[0.65rem] text-muted-foreground">before next</span>
                   </div>
                 )}
               </motion.div>
@@ -359,9 +384,16 @@ function DayPreviewSheet({ day, index, exercises, onClose }: { day: WorkoutDay; 
  *  full prescription for this slot (SPEC §8.3 — client sees what's configured). */
 function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: ExerciseSlot; onClose: () => void }) {
   const units = useUnits();
-  const chips = [...splitList(ex?.muscle_groups), ...splitList(ex?.equipment)].map(pretty);
+  const primary = splitList(ex?.muscle_groups).map(pretty);
+  const secondary = splitList(ex?.secondary_muscle_groups).map(pretty);
+  const equipment = splitList(ex?.equipment).map(pretty);
+  // Library attributes the trainer/library set: difficulty, movement type…
+  const attrs = [ex?.difficulty, ex?.mechanic, ex?.force, ex?.category].filter(Boolean).map((a) => pretty(a!));
   const setLine = (s: WorkoutSet, i: number): string => {
-    const parts: string[] = [measurePart(s, slot.measurementMode)];
+    const parts: string[] = [];
+    if (s.setType === "warmup") parts.push("Warm-up");
+    else if (s.setType === "amrap") parts.push("AMRAP");
+    parts.push(measurePart(s, slot.measurementMode));
     const wm = s.weightMode;
     if (wm === "absolute" && s.weightValue != null) parts.push(`${fmtWeight(s.weightValue, units)}`);
     else if (wm === "percent_1rm" && s.percent1rm != null) parts.push(`${s.percent1rm}% 1RM`);
@@ -373,9 +405,15 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
     if (s.rpe != null) parts.push(`RPE ${s.rpe}`);
     else if (s.rir != null) parts.push(`RIR ${s.rir}`);
     if (s.tempo) parts.push(`tempo ${s.tempo}`);
-    if (s.restAfterSec) parts.push(`rest ${s.restAfterSec}s`);
+    if (s.restAfterSec) parts.push(`rest ${fmtClock(s.restAfterSec)}`);
     return `Set ${i + 1} · ${parts.join(" · ")}`;
   };
+  const Attr = ({ label, chips, tone }: { label: string; chips: string[]; tone: "activity" | "neutral" }) => chips.length ? (
+    <div className="flex items-start gap-2">
+      <span className="mt-1 w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+      <div className="flex flex-wrap gap-1.5">{chips.map((c) => <Badge key={c} tone={tone}>{c}</Badge>)}</div>
+    </div>
+  ) : null;
   return (
     <Sheet open onClose={onClose} title={ex?.name ?? "Exercise"}>
       <div className="space-y-4">
@@ -395,16 +433,24 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
             <video src={ex.video_url} controls playsInline preload="metadata" className="w-full rounded-2xl bg-black" />
           </div>
         )}
-        {chips.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {ex?.difficulty && <Badge tone="neutral">{ex.difficulty}</Badge>}
-            {chips.map((c) => <Badge key={c} tone="activity">{c}</Badge>)}
+        {(primary.length > 0 || secondary.length > 0 || equipment.length > 0 || attrs.length > 0) && (
+          <div className="space-y-2">
+            <Attr label="Muscles" chips={primary} tone="activity" />
+            <Attr label="Also works" chips={secondary} tone="neutral" />
+            <Attr label="Equipment" chips={equipment} tone="neutral" />
+            <Attr label="Type" chips={attrs} tone="neutral" />
           </div>
         )}
         <div>
           <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prescribed</div>
-          <SubCard className="space-y-1">
-            {slot.sets.map((s, i) => <div key={i} className="text-sm">{setLine(s, i)}</div>)}
+          <SubCard className="space-y-1.5">
+            {slot.sets.map((s, i) => (
+              <div key={i}>
+                <div className="text-sm">{setLine(s, i)}</div>
+                {s.notes && <div className="text-xs italic text-muted-foreground">{s.notes}</div>}
+              </div>
+            ))}
+            {slot.slotNotes && <p className="border-t border-border/50 pt-1.5 text-xs italic text-muted-foreground">Coach: {slot.slotNotes}</p>}
           </SubCard>
         </div>
         {ex?.instructions_md ? (
@@ -430,16 +476,9 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
   const [distance, setDistance] = useState("");
   const [weight, setWeight] = useState("");
   const [effort, setEffort] = useState<"easy" | "perfect" | "hard" | null>(null);
-  const [restLeft, setRestLeft] = useState<number | null>(null);
   const prescribed = slot.sets[Math.min(setIndex, slot.sets.length - 1)];
   const showWeight = prescribed?.weightMode !== "bodyweight";
   const editing = completed.some((s) => s.setIndex === setIndex);
-
-  useEffect(() => {
-    if (restLeft === null || restLeft <= 0) return;
-    const t = setInterval(() => setRestLeft((r) => (r === null ? null : r - 1)), 1000);
-    return () => clearInterval(t);
-  }, [restLeft]);
 
   // Tap a logged set to pull it back into the inputs and correct it.
   const edit = (s: LoggedSet) => {
@@ -449,7 +488,6 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
     setDistance(s.distanceM != null ? String(s.distanceM) : "");
     setWeight(s.weightKg != null ? String(kgToDisplay(s.weightKg, units)) : "");
     setEffort(s.effortLabel ?? null);
-    setRestLeft(null);
   };
 
   const save = async () => {
@@ -464,8 +502,8 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
       completed: true,
     });
     setReps(""); setDuration(""); setDistance(""); setWeight(""); setEffort(null);
-    if (wasEditing) { setSetIndex(completed.length); setRestLeft(null); }
-    else { setSetIndex((i) => i + 1); setRestLeft(prescribed?.restAfterSec ?? 60); }
+    if (wasEditing) setSetIndex(completed.length);
+    else setSetIndex((i) => i + 1);
   };
 
   const canLog = editing || setIndex < slot.sets.length;
@@ -484,9 +522,6 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
           </div>
         )}
         <div className="text-sm text-muted-foreground">{editing ? `Editing set ${setIndex + 1}` : `Set ${setIndex + 1} of ${slot.sets.length}`}{target ? ` · target ${target}` : ""}</div>
-        {restLeft !== null && restLeft > 0 && (
-          <div className="flex items-center justify-center gap-2 rounded-2xl bg-cardio-soft px-4 py-3 font-semibold text-cardio"><Timer className="size-4" /> Rest {restLeft}s</div>
-        )}
         <div className="grid grid-cols-2 gap-3">
           {needsReps(mode) && <Field label="Reps" inputMode="numeric" value={reps} onChange={(e) => setReps(e.target.value.replace(/\D/g, ""))} />}
           {needsDuration(mode) && <Field label="Duration (sec)" inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value.replace(/\D/g, ""))} />}
@@ -672,4 +707,83 @@ function loggedLabel(s: LoggedSet, units: Parameters<typeof fmtWeight>[1]): stri
 }
 function blockLabel(type: string): string {
   return type === "single" ? "Exercise" : type === "hiit" ? "HIIT" : type[0]!.toUpperCase() + type.slice(1);
+}
+
+/** Very short per-set measure for the dot labels: "10" / "30s" / "500m" / "10·30s". */
+function setMeasureShort(s: WorkoutSet, mode: MeasureMode): string {
+  const bits: string[] = [];
+  if (needsReps(mode)) bits.push(s.reps != null ? `${s.reps}` : "–");
+  if (needsDuration(mode)) bits.push(s.timeSec != null ? fmtDuration(s.timeSec) : "–");
+  if (needsDistance(mode)) bits.push(s.distanceM != null ? `${s.distanceM}m` : "–");
+  return bits.join("·") || "–";
+}
+
+/** The dot color encodes set type: logged (solid), warm-up, AMRAP, or a plain
+ *  working set still to do. */
+function setDotClass(s: WorkoutSet, done: boolean): string {
+  if (done) return "bg-activity";
+  if (s.setType === "warmup") return "bg-warning/60";
+  if (s.setType === "amrap") return "bg-primary/60";
+  return "bg-surface-3";
+}
+
+/** The trainer's loading/effort modifiers for a slot, as compact chips — read
+ *  off the working set (or the first set): weight target, RPE/RIR, tempo, plus
+ *  warm-up / AMRAP flags. Only what's actually set shows. */
+function slotModifiers(slot: ExerciseSlot, units: Parameters<typeof fmtWeight>[1]): string[] {
+  const out: string[] = [];
+  const work = slot.sets.find((s) => s.setType === "working") ?? slot.sets[0];
+  if (work) {
+    const wm = work.weightMode;
+    if (wm === "absolute" && work.weightValue != null) out.push(fmtWeight(work.weightValue, units));
+    else if (wm === "percent_1rm" && work.percent1rm != null) out.push(`${work.percent1rm}% 1RM`);
+    else if (wm === "bodyweight") out.push("Bodyweight");
+    else if (wm === "previous_plus" && work.weightValue != null) out.push(`Prev +${fmtWeight(work.weightValue, units)}`);
+    else if (wm === "previous_times" && work.weightValue != null) out.push(`Prev ×${work.weightValue}`);
+    else if (wm === "dropset") out.push("Dropset");
+    if (work.rpe != null) out.push(`RPE ${work.rpe}`);
+    else if (work.rir != null) out.push(`RIR ${work.rir}`);
+    if (work.tempo) out.push(`Tempo ${work.tempo}`);
+  }
+  if (slot.sets.some((s) => s.setType === "warmup")) out.push("Warm-up incl.");
+  if (slot.sets.some((s) => s.setType === "amrap")) out.push("AMRAP");
+  return out;
+}
+
+/** The rest to suggest after a whole step (for the between-exercise timer):
+ *  a group rests by its block config; a single rests by its last set. */
+function stepRestSeconds(block: WorkoutBlock, slot?: ExerciseSlot): number {
+  if (slot) return slot.sets[slot.sets.length - 1]?.restAfterSec ?? 90;
+  return block.restAfterBlockSec ?? block.restBetweenExercisesSec ?? block.restBetweenRoundsSec ?? 90;
+}
+
+/** mm:ss / Ns clock label. */
+function fmtClock(sec: number): string {
+  if (sec <= 0) return "0s";
+  return sec >= 60 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}` : `${sec}s`;
+}
+
+/**
+ * A self-contained rest timer chip: shows the prescribed rest, tap to start the
+ * countdown, tap again to reset. Buzzes and flashes "Go" when it lands on zero.
+ * Used between the set dots (per-set rest) and between exercises (step rest).
+ */
+function RestTimer({ seconds, label, className }: { seconds: number; label?: boolean; className?: string }) {
+  const [left, setLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (left === null) return;
+    if (left <= 0) { navigator.vibrate?.([40, 30, 60]); const t = setTimeout(() => setLeft(null), 1100); return () => clearTimeout(t); }
+    const t = setInterval(() => setLeft((r) => (r == null ? null : r - 1)), 1000);
+    return () => clearInterval(t);
+  }, [left]);
+  const running = left !== null && left > 0;
+  const done = left === 0;
+  return (
+    <button type="button" onClick={(e) => { e.stopPropagation(); setLeft((r) => (r === null ? seconds : null)); }}
+      aria-label={running ? "Reset rest timer" : "Start rest timer"}
+      className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-semibold tabular-nums transition-colors [&_svg]:size-3",
+        done ? "bg-success text-white" : running ? "bg-cardio text-white" : "bg-surface-3 text-muted-foreground hover:bg-surface-2", className)}>
+      <Timer />{done ? "Go!" : `${label ? "Rest " : ""}${fmtClock(running ? left! : seconds)}`}
+    </button>
+  );
 }
