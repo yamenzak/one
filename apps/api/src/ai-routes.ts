@@ -656,6 +656,34 @@ export const aiRoutes = new Hono<AppEnv>()
     return c.json({ key: result.key, url: `/api/media/${result.key}`, credits: result.credits, mocked: result.mocked });
   })
 
+  /** Estimate a food's nutrition from its name (fills the food editor). */
+  .post("/ai/food-meta", async (c) => {
+    const who = requireTenant(c)!;
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    const parsed = z.object({ name: z.string().min(1).max(160) }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const result = await generate(c.env, {
+      tenantId: who.tenantId, actorUserId: who.userId, feature: "food-meta", task: "text", expectsJson: true,
+      system: sys("food-meta"),
+      prompt: `FOOD: ${parsed.data.name}\n\nEstimate its nutrition now.`,
+      maxOutputTokens: 300,
+      mock: () => JSON.stringify({ servingSize: 100, servingUnit: "g", calories: 165, proteinG: 31, carbsG: 0, fatG: 4, fiberG: 0, sugarG: 0, sodiumMg: 74 }),
+    });
+    if (!result.ok) return aiFail(c, result);
+    const raw = extractJson<Record<string, unknown>>(result.output);
+    if (!raw) return c.json({ error: "The AI didn't return valid nutrition.", raw: result.output.slice(0, 600), mocked: result.mocked }, 422);
+    const numField = (v: unknown): number => { const n = typeof v === "string" ? parseFloat(v) : Number(v); return Number.isFinite(n) && n >= 0 ? n : 0; };
+    const food = {
+      name: parsed.data.name,
+      servingSize: numField(raw.servingSize) || 100,
+      servingUnit: raw.servingUnit === "ml" ? "ml" : "g",
+      calories: numField(raw.calories), proteinG: numField(raw.proteinG), carbsG: numField(raw.carbsG), fatG: numField(raw.fatG),
+      fiberG: numField(raw.fiberG), sugarG: numField(raw.sugarG), sodiumMg: numField(raw.sodiumMg),
+    };
+    return c.json({ food, credits: result.credits, mocked: result.mocked });
+  })
+
   /** Recommend a recipe from a meal option's foods (client-facing). */
   .post("/ai/recipe", async (c) => {
     const who = requireTenant(c)!;

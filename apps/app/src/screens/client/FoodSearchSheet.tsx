@@ -266,7 +266,6 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
           initial={editor}
           isStaff={isStaff}
           autoScanLabel={editorAutoScan}
-          title={editor.barcode ? "New product" : undefined}
           onClose={() => { setEditor(null); setEditorAutoScan(false); }}
           onSaved={(food) => { setEditor(null); setEditorAutoScan(false); if (onPick) void pickFood(food as Food); else setSelected(food as Food); }}
         />

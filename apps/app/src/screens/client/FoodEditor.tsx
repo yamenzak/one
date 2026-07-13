@@ -1,18 +1,26 @@
 /**
- * FoodEditor — create or edit a food, with photo, barcode, macros + micros and
- * a visibility toggle (staff). Shared by the client food search (manual add /
- * barcode-miss) and the trainer Library. Editing a platform-seed food forks a
- * tenant-owned copy on the server (copy-on-write), so the returned id may differ.
+ * FoodEditor — the unified create/edit food composer, used in the trainer
+ * Library and inline in client food logging (manual add / barcode-miss). A
+ * fixed-height, non-dismissible drawer with two steps:
+ *
+ *   choose  → name + four ways in: With AI (estimate) · Web/barcode · Scan
+ *             label · Manual
+ *   review  → photo, serving, macros + micros, visibility → Add / Update
+ *
+ * Editing (or a barcode-miss with autoScanLabel) jumps straight to review.
+ * Editing a platform-seed food forks a tenant copy on the server.
  */
 
 import { useEffect, useRef, useState } from "react";
 import { kcalToDisplay, displayToKcal, energyLabel, type UnitPrefs } from "@mossa/domain";
-import { Button, Field, Sheet, Chip, cn, toneSoft, METRICS, Utensils, Barcode, Camera, ChevronDown, Sparkles } from "@mossa/ui";
+import { FixedDrawer, Button, Field, Chip, cn, toneSoft, METRICS, Utensils, Barcode, ChevronDown, Sparkles, Globe, PencilLine, Search, Plus, X, ArrowLeft } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
 import { AiImageField } from "../../AiImageField.js";
+import { ModeCard, StepFade } from "../../composer.js";
+import { BarcodeScanner } from "./BarcodeScanner.js";
 
 export interface EditableFood {
   id?: string;
@@ -28,12 +36,12 @@ export interface EditableFood {
 const num = (v: string) => (v ? Number(v) : 0);
 const s = (v: number | undefined) => (v ? String(v) : "");
 const pick = (a: number | undefined, b: number | undefined) => a ?? b ?? undefined;
+const pk = (a: number | undefined, b: number | undefined) => a ?? b ?? 0;
 
 const MICROS = [
   ["fiber", "Fiber", "g"], ["sugar", "Sugar", "g"], ["satFat", "Sat. fat", "g"], ["sodium", "Sodium", "mg"],
   ["cholesterol", "Cholesterol", "mg"], ["potassium", "Potassium", "mg"], ["calcium", "Calcium", "mg"], ["iron", "Iron", "mg"],
 ] as const;
-
 type MicroKey = (typeof MICROS)[number][0];
 
 function toForm(f: EditableFood | undefined, units: UnitPrefs) {
@@ -49,15 +57,13 @@ function toForm(f: EditableFood | undefined, units: UnitPrefs) {
   };
 }
 
-export function FoodEditor({
-  foodId, initial, isStaff, title, autoScanLabel, onClose, onSaved,
-}: {
+type FoodHit = EditableFood;
+
+export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, onSaved }: {
   foodId?: string;
   initial?: Partial<EditableFood>;
   isStaff?: boolean;
-  title?: string;
-  /** Fire the nutrition-label scanner as soon as the editor opens — the
-   *  barcode-miss flow uses this so the camera comes up automatically. */
+  /** Fire the nutrition-label scanner as soon as the drawer opens (barcode-miss). */
   autoScanLabel?: boolean;
   onClose: () => void;
   onSaved: (food: EditableFood) => void;
@@ -65,19 +71,31 @@ export function FoodEditor({
   const { ctx } = useSession();
   const units = useUnits();
   const aiSuite = !!ctx?.entitlements?.features?.aiSuite;
+  const startReview = !!foodId || !!autoScanLabel;
+
+  const [step, setStep] = useState<"choose" | "review">(startReview ? "review" : "choose");
+  const [editId, setEditId] = useState<string | undefined>(foodId);
   const [f, setF] = useState(() => toForm(initial as EditableFood, units));
   const [loading, setLoading] = useState(!!foodId);
   const [busy, setBusy] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const [scanErr, setScanErr] = useState<string | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const [showMicros, setShowMicros] = useState(false);
   const labelInputRef = useRef<HTMLInputElement>(null);
   const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }));
   const dec = (v: string) => v.replace(/[^\d.]/g, "");
 
-  // Label Reader (SPEC §6): photograph the nutrition panel → auto-fill fields.
+  // Web/barcode
+  const [webMode, setWebMode] = useState(false);
+  const [webQ, setWebQ] = useState("");
+  const [webResults, setWebResults] = useState<FoodHit[] | null>(null);
+  const [webBusy, setWebBusy] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+
+  // Label Reader — photograph the nutrition panel → auto-fill.
   const scanLabel = async (file: File) => {
-    setScanning(true); setScanErr(null);
+    setScanning(true); setErr(null);
     try {
       const fd = new FormData(); fd.append("file", file); fd.append("purpose", "label");
       const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
@@ -87,25 +105,74 @@ export function FoodEditor({
       const g = r.food;
       const str = (v: unknown) => (v == null ? "" : String(v));
       setF((p) => ({
-        ...p,
-        name: p.name || str(g.name), brand: p.brand || str(g.brand),
+        ...p, name: p.name || str(g.name), brand: p.brand || str(g.brand),
         serving: g.servingSize != null ? str(g.servingSize) : p.serving, unit: str(g.servingUnit) || p.unit,
         cal: g.calories != null ? String(kcalToDisplay(Number(g.calories), units)) : "", p: str(g.proteinG), c: str(g.carbsG), ft: str(g.fatG),
         fiber: str(g.fiberG), sugar: str(g.sugarG), satFat: str(g.saturatedFatG), sodium: str(g.sodiumMg),
         cholesterol: str(g.cholesterolMg), potassium: str(g.potassiumMg), calcium: str(g.calciumMg), iron: str(g.ironMg),
         image: p.image || `/api/media/${key}`,
       }));
-      setShowMicros(true);
+      setShowMicros(true); setStep("review");
     } catch (e) {
       const m = e instanceof Error ? e.message : "";
-      setScanErr(m.includes("insufficient") ? "Studio is out of AI credits." : "Couldn't read that label — enter it by hand.");
+      setErr(m.includes("insufficient") || m.includes("credits") ? "Out of AI credits." : "Couldn't read that label — enter it by hand.");
     } finally { setScanning(false); }
   };
 
-  // Barcode-miss entry: open the label camera immediately (aiSuite only).
-  useEffect(() => { if (autoScanLabel && aiSuite && !foodId) labelInputRef.current?.click(); }, [autoScanLabel, aiSuite, foodId]);
+  // With AI — estimate the macros from the name.
+  const estimateFromName = async () => {
+    if (f.name.trim().length < 2) return;
+    setAiBusy(true); setErr(null);
+    try {
+      const r = await api.post<{ food: Record<string, number | string> }>("/api/ai/food-meta", { name: f.name.trim() });
+      const g = r.food;
+      setF((p) => ({
+        ...p, serving: String(g.servingSize ?? 100), unit: String(g.servingUnit ?? "g"),
+        cal: g.calories != null ? String(kcalToDisplay(Number(g.calories), units)) : "", p: String(g.proteinG ?? ""), c: String(g.carbsG ?? ""), ft: String(g.fatG ?? ""),
+        fiber: String(g.fiberG ?? ""), sugar: String(g.sugarG ?? ""), sodium: String(g.sodiumMg ?? ""),
+      }));
+      setStep("review");
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "";
+      setErr(m.includes("credits") ? "Out of AI credits." : "Couldn't estimate — enter it by hand.");
+    } finally { setAiBusy(false); }
+  };
 
-  // Load the existing row when editing (so micros/brand/photo prefill).
+  const searchWeb = async (q: string) => {
+    setWebQ(q);
+    if (q.trim().length < 2) { setWebResults(null); return; }
+    setWebBusy(true);
+    try { setWebResults((await api.get<{ foods: FoodHit[] }>(`/api/foods/search-external?q=${encodeURIComponent(q)}`)).foods); }
+    catch { setWebResults([]); }
+    finally { setWebBusy(false); }
+  };
+
+  const importHit = async (hit: FoodHit) => {
+    if (hit.id) return hit.id;
+    return (await api.post<{ id: string }>("/api/foods/import", {
+      name: hit.name, brand: hit.brand ?? null,
+      servingSize: hit.serving_size ?? hit.servingSize ?? 100, servingUnit: hit.serving_unit ?? hit.servingUnit ?? "g",
+      calories: hit.calories, proteinG: pk(hit.protein_g, hit.proteinG), carbsG: pk(hit.carbs_g, hit.carbsG), fatG: pk(hit.fat_g, hit.fatG),
+      fiberG: pk(hit.fiber_g, hit.fiberG), sugarG: pk(hit.sugar_g, hit.sugarG), sodiumMg: pk(hit.sodium_mg, hit.sodiumMg),
+      imageUrl: hit.image_url ?? hit.imageUrl ?? null, source: hit.source ?? "openfoodfacts", sourceId: hit.sourceId ?? hit.name, barcode: hit.barcode ?? null,
+    })).id;
+  };
+
+  const pickWeb = async (hit: FoodHit) => {
+    setErr(null);
+    try { const id = await importHit(hit); setEditId(id); setF(toForm(hit, units)); setStep("review"); }
+    catch (e) { setErr(e instanceof Error && e.message.includes("externalSearch") ? "Web search isn't on your plan." : "Couldn't import that."); }
+  };
+
+  const lookupBarcode = async (code: string) => {
+    setScanOpen(false);
+    let r = await api.get<{ food: FoodHit | null }>(`/api/foods/barcode?code=${code}`);
+    if (!r.food) r = await api.get<{ food: FoodHit | null }>(`/api/foods/barcode-external?code=${code}`);
+    if (r.food) { setEditId(r.food.id); setF(toForm(r.food, units)); setStep("review"); }
+    else { setF((p) => ({ ...p, barcode: code })); setStep("review"); }
+  };
+
+  useEffect(() => { if (autoScanLabel && aiSuite && !foodId) labelInputRef.current?.click(); }, [autoScanLabel, aiSuite, foodId]);
   useEffect(() => {
     if (!foodId) return;
     let alive = true;
@@ -113,9 +180,8 @@ export function FoodEditor({
     return () => { alive = false; };
   }, [foodId]);
 
-
   const save = async () => {
-    setBusy(true);
+    setBusy(true); setErr(null);
     try {
       const body = {
         name: f.name.trim(), brand: f.brand.trim() || null, barcode: f.barcode.trim() || null,
@@ -125,86 +191,122 @@ export function FoodEditor({
         cholesterolMg: num(f.cholesterol), potassiumMg: num(f.potassium), calciumMg: num(f.calcium), ironMg: num(f.iron),
         visibility: f.visibility, source: "custom" as const,
       };
-      const res = foodId
-        ? await api.patch<{ id: string }>(`/api/foods/${foodId}`, body)
-        : await api.post<{ id: string }>("/api/foods", body);
+      const res = editId ? await api.patch<{ id: string }>(`/api/foods/${editId}`, body) : await api.post<{ id: string }>("/api/foods", body);
       onSaved({ id: res.id, ...body });
-    } finally { setBusy(false); }
+    } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't save."); } finally { setBusy(false); }
   };
 
+  const closeX = <button onClick={onClose} aria-label="Close" className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-[1.15rem]"><X /></button>;
+  const title = scanning ? "Reading the label…" : step === "choose" ? "Add a food" : editId && foodId ? "Edit food" : "Review food";
+  const footer = step === "review" && !scanning && !loading ? (
+    <Button size="lg" className="w-full" disabled={busy || f.name.trim().length < 2} onClick={() => void save()}>{busy ? "Saving…" : editId ? "Save changes" : "Add food"}</Button>
+  ) : null;
+
   return (
-    <Sheet open onClose={onClose} title={scanning ? "Reading the label…" : title ?? (foodId ? "Edit food" : "Add a food")}>
-      {scanning ? (
-        <AiAnalyzing label="Reading the label" sub="Pulling serving size and macros…" />
-      ) : loading ? (
-        <div className="h-40 animate-pulse rounded-2xl bg-surface-2" />
-      ) : (
-        <div className="space-y-4">
-          {/* Name + photo (upload or generate an original with AI) */}
-          <Field label="Name" icon={Utensils} value={f.name} onChange={(e) => set("name", e.target.value)} autoFocus />
-          <AiImageField value={f.image} onChange={(url) => set("image", url)} feature="food-image" subject={f.name} canAi={!!isStaff && aiSuite} label="Photo" />
+    <>
+      <FixedDrawer open onClose={onClose} dismissible={false} title={title} headerAction={closeX} footer={footer}>
+        {scanning ? (
+          <AiAnalyzing label="Reading the label" sub="Pulling serving size and macros…" />
+        ) : loading ? (
+          <div className="h-40 animate-pulse rounded-2xl bg-surface-2" />
+        ) : (
+          <StepFade stepKey={step}>
+            {step === "choose" ? (
+              <div className="space-y-4">
+                <Field label="Food name" icon={Utensils} value={f.name} onChange={(e) => set("name", e.target.value)} autoFocus placeholder="e.g. Greek yogurt" />
+                <div className="grid grid-cols-2 gap-2">
+                  {aiSuite && <ModeCard icon={Sparkles} label="With AI" hint="Estimate macros" busy={aiBusy} disabled={f.name.trim().length < 2} onClick={() => void estimateFromName()} />}
+                  <ModeCard icon={Globe} label="Web / barcode" hint="From databases" active={webMode} onClick={() => setWebMode((v) => !v)} />
+                  {aiSuite && <ModeCard icon={Barcode} label="Scan label" hint="Read the panel" onClick={() => labelInputRef.current?.click()} />}
+                  <ModeCard icon={PencilLine} label="Manual" hint="Enter it yourself" disabled={f.name.trim().length < 2} onClick={() => setStep("review")} />
+                </div>
+                <input ref={labelInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void scanLabel(e.target.files[0])} />
 
-          {/* Label Reader — photograph the nutrition panel to auto-fill. */}
-          {aiSuite && (
-            <div>
-              <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary/15 px-3.5 text-sm font-medium text-primary transition-colors hover:bg-primary/25 [&_svg]:size-4">
-                {scanning ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Sparkles />}
-                {scanning ? "Reading label…" : "Scan nutrition label"}
-                <input ref={labelInputRef} type="file" accept="image/*" capture="environment" className="hidden" disabled={scanning} onChange={(e) => e.target.files?.[0] && void scanLabel(e.target.files[0])} />
-              </label>
-              {scanErr && <p className="mt-1.5 text-sm text-warning">{scanErr}</p>}
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Brand" value={f.brand} onChange={(e) => set("brand", e.target.value)} placeholder="Optional" />
-            <Field label="Barcode" icon={Barcode} inputMode="numeric" value={f.barcode} onChange={(e) => set("barcode", dec(e.target.value))} placeholder="Optional" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Serving size" inputMode="decimal" value={f.serving} onChange={(e) => set("serving", dec(e.target.value))} />
-            <Field label="Unit" value={f.unit} onChange={(e) => set("unit", e.target.value)} placeholder="g / ml / piece" />
-          </div>
-
-          <div className="text-xs text-muted-foreground">Per serving:</div>
-          <div className="grid grid-cols-4 gap-2">
-            {([["cal", energyLabel(units), "calories"], ["p", "P", "protein"], ["c", "C", "carbs"], ["ft", "F", "fat"]] as const).map(([k, ph, metric]) => {
-              const M = METRICS[metric];
-              return (
-                <label key={k} className={cn("flex flex-col items-center gap-1 rounded-xl p-2", toneSoft[M.tone])}>
-                  <M.icon className="size-4" />
-                  <input inputMode="decimal" value={f[k]} onChange={(e) => set(k, dec(e.target.value))} placeholder={ph} className="w-full bg-transparent text-center text-sm font-semibold outline-none placeholder:font-normal placeholder:opacity-60" />
-                </label>
-              );
-            })}
-          </div>
-
-          {/* Micronutrients (collapsible) */}
-          <button type="button" onClick={() => setShowMicros((v) => !v)} className="flex w-full items-center justify-between text-sm text-muted-foreground">
-            More nutrients <ChevronDown className={cn("size-4 transition-transform", showMicros && "rotate-180")} />
-          </button>
-          {showMicros && (
-            <div className="grid grid-cols-2 gap-3">
-              {MICROS.map(([k, label, unit]) => (
-                <Field key={k} label={`${label} (${unit})`} inputMode="decimal" value={f[k as MicroKey]} onChange={(e) => set(k as MicroKey, dec(e.target.value))} placeholder="0" />
-              ))}
-            </div>
-          )}
-
-          {/* Visibility (staff only) */}
-          {isStaff && (
-            <div className="space-y-1.5">
-              <div className="text-xs text-muted-foreground">Who can use this food</div>
-              <div className="flex gap-2">
-                <Chip selected={f.visibility === "tenant"} onClick={() => set("visibility", "tenant")}>Shared with team</Chip>
-                <Chip selected={f.visibility === "private"} onClick={() => set("visibility", "private")}>Only me</Chip>
+                {webMode && (
+                  <div className="space-y-2 rounded-2xl border border-border/50 p-3">
+                    <div className="flex items-center gap-2">
+                      <Field label="Search foods (Open Food Facts…)" icon={Search} value={webQ} onChange={(e) => void searchWeb(e.target.value)} className="flex-1" placeholder="e.g. greek yogurt" />
+                      <button onClick={() => setScanOpen(true)} aria-label="Scan barcode" className="mt-5 grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground hover:bg-surface-3 [&_svg]:size-[1.1rem]"><Barcode /></button>
+                    </div>
+                    <div className="max-h-64 space-y-1 overflow-y-auto">
+                      {webBusy && <p className="p-3 text-center text-sm text-muted-foreground">Searching…</p>}
+                      {webResults?.map((hit, i) => {
+                        const img = hit.image_url ?? hit.imageUrl;
+                        return (
+                          <button key={i} onClick={() => void pickWeb(hit)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary">
+                            <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2">{img ? <img src={img} alt="" className="size-full object-cover" /> : <Utensils className="size-4 text-muted-foreground" />}</div>
+                            <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{hit.name}</div><div className="truncate text-xs text-muted-foreground">{[hit.brand, `${Math.round(hit.calories)} kcal`].filter(Boolean).join(" · ")}</div></div>
+                            <Plus className="size-4 shrink-0 text-primary" />
+                          </button>
+                        );
+                      })}
+                      {webResults && webResults.length === 0 && !webBusy && <p className="p-3 text-center text-sm text-muted-foreground">No results — try Scan label or Manual.</p>}
+                    </div>
+                  </div>
+                )}
+                {err && <p className="text-sm text-warning">{err}</p>}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="space-y-4">
+                {!foodId && <button onClick={() => setStep("choose")} className="inline-flex items-center gap-1 text-sm text-muted-foreground [&_svg]:size-4"><ArrowLeft /> Back</button>}
+                <Field label="Name" icon={Utensils} value={f.name} onChange={(e) => set("name", e.target.value)} />
+                <AiImageField value={f.image} onChange={(url) => set("image", url)} feature="food-image" subject={f.name} canAi={!!isStaff && aiSuite} label="Photo" />
 
-          <Button size="lg" className="w-full" disabled={busy || f.name.trim().length < 2} onClick={() => void save()}>
-            {busy ? "Saving…" : foodId ? "Save changes" : "Add food"}
-          </Button>
-        </div>
-      )}
-    </Sheet>
+                {aiSuite && (
+                  <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary/15 px-3.5 text-sm font-medium text-primary transition-colors hover:bg-primary/25 [&_svg]:size-4">
+                    <Sparkles /> Scan nutrition label
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void scanLabel(e.target.files[0])} />
+                  </label>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Brand" value={f.brand} onChange={(e) => set("brand", e.target.value)} placeholder="Optional" />
+                  <Field label="Barcode" icon={Barcode} inputMode="numeric" value={f.barcode} onChange={(e) => set("barcode", dec(e.target.value))} placeholder="Optional" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Serving size" inputMode="decimal" value={f.serving} onChange={(e) => set("serving", dec(e.target.value))} />
+                  <Field label="Unit" value={f.unit} onChange={(e) => set("unit", e.target.value)} placeholder="g / ml / piece" />
+                </div>
+
+                <div className="text-xs text-muted-foreground">Per serving:</div>
+                <div className="grid grid-cols-4 gap-2">
+                  {([["cal", energyLabel(units), "calories"], ["p", "P", "protein"], ["c", "C", "carbs"], ["ft", "F", "fat"]] as const).map(([k, ph, metric]) => {
+                    const M = METRICS[metric];
+                    return (
+                      <label key={k} className={cn("flex flex-col items-center gap-1 rounded-xl p-2", toneSoft[M.tone])}>
+                        <M.icon className="size-4" />
+                        <input inputMode="decimal" value={f[k]} onChange={(e) => set(k, dec(e.target.value))} placeholder={ph} className="w-full bg-transparent text-center text-sm font-semibold outline-none placeholder:font-normal placeholder:opacity-60" />
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <button type="button" onClick={() => setShowMicros((v) => !v)} className="flex w-full items-center justify-between text-sm text-muted-foreground">
+                  More nutrients <ChevronDown className={cn("size-4 transition-transform", showMicros && "rotate-180")} />
+                </button>
+                {showMicros && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {MICROS.map(([k, label, unit]) => (
+                      <Field key={k} label={`${label} (${unit})`} inputMode="decimal" value={f[k as MicroKey]} onChange={(e) => set(k as MicroKey, dec(e.target.value))} placeholder="0" />
+                    ))}
+                  </div>
+                )}
+
+                {isStaff && (
+                  <div className="space-y-1.5">
+                    <div className="text-xs text-muted-foreground">Who can use this food</div>
+                    <div className="flex gap-2">
+                      <Chip selected={f.visibility === "tenant"} onClick={() => set("visibility", "tenant")}>Shared with team</Chip>
+                      <Chip selected={f.visibility === "private"} onClick={() => set("visibility", "private")}>Only me</Chip>
+                    </div>
+                  </div>
+                )}
+                {err && <p className="text-sm text-warning">{err}</p>}
+              </div>
+            )}
+          </StepFade>
+        )}
+      </FixedDrawer>
+      {scanOpen && <BarcodeScanner onDetected={(code) => void lookupBarcode(code)} onClose={() => setScanOpen(false)} />}
+    </>
   );
 }

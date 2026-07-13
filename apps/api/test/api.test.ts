@@ -470,6 +470,14 @@ describe("AI image generation + recipe", () => {
     expect(metaOut.meta.primaryMuscles).toContain("quads");
     expect(metaOut.meta.equipment).toContain("barbell");
     expect(metaOut.meta.mechanic).toBe("compound");
+
+    // Food nutrition estimate from a name.
+    const fm = await SELF.fetch("http://x/api/ai/food-meta", { method: "POST", headers: H, body: JSON.stringify({ name: "grilled chicken breast" }) });
+    expect(fm.status).toBe(200);
+    const fmOut = (await fm.json()) as { food: { name: string; calories: number; proteinG: number; servingUnit: string } };
+    expect(fmOut.food.calories).toBeGreaterThan(0);
+    expect(fmOut.food.proteinG).toBeGreaterThan(0);
+    expect(["g", "ml"]).toContain(fmOut.food.servingUnit);
   });
 
   it("exercise create accepts start/end images + video", async () => {

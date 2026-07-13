@@ -18,6 +18,7 @@ import { api, ApiError } from "../../api.js";
 import { useSession } from "../../session.js";
 import { AiImageField } from "../../AiImageField.js";
 import { splitWideImageToHalves } from "../../imageSplit.js";
+import { ModeCard, StepFade } from "../../composer.js";
 import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
 
 const DIFFICULTIES = ["beginner", "intermediate", "advanced"] as const;
@@ -171,6 +172,7 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
   return (
     <>
       <FixedDrawer open onClose={onClose} dismissible={false} title={title} headerAction={closeX} footer={footer}>
+        <StepFade stepKey={step}>
         {step === "choose" ? (
           <div className="space-y-4">
             <Field label="Exercise name" icon={Dumbbell} value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="e.g. Barbell Back Squat" />
@@ -252,21 +254,11 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
             {err && <p className="text-sm text-warning">{err}</p>}
           </div>
         )}
+        </StepFade>
       </FixedDrawer>
 
       {altOpen && editId && <AlternativesSheet exerciseId={editId} exerciseName={name} onClose={() => setAltOpen(false)} />}
     </>
-  );
-}
-
-/** Compact icon+label card for the "how do you want to create it" choice. */
-function ModeCard({ icon: Icon, label, hint, onClick, disabled, active, busy }: { icon: typeof Sparkles; label: string; hint: string; onClick: () => void; disabled?: boolean; active?: boolean; busy?: boolean }) {
-  return (
-    <button onClick={onClick} disabled={disabled || busy} className={cn("flex flex-col items-center gap-1 rounded-2xl border p-3 text-center transition-colors disabled:opacity-40", active ? "border-primary bg-primary/10 text-primary" : "border-border/60 bg-card hover:bg-surface-2")}>
-      {busy ? <span className="size-5 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Icon className="size-5" />}
-      <span className="text-xs font-semibold leading-tight">{label}</span>
-      <span className="text-[0.6rem] leading-tight text-muted-foreground">{hint}</span>
-    </button>
   );
 }
 

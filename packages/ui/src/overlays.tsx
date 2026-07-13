@@ -62,8 +62,8 @@ export function FixedDrawer({ open, onClose, dismissible = true, title, headerAc
   return (
     <Drawer.Root open={open} onOpenChange={(o) => dismissible && !o && onClose()} dismissible={dismissible} repositionInputs={false}>
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
-        <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex h-[87vh] w-full max-w-xl flex-col rounded-t-3xl border-t border-border/60 bg-popover outline-none">
+        <Drawer.Overlay className={overlayCls} />
+        <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex h-[87vh] w-full max-w-xl flex-col rounded-t-3xl border-t border-border/60 bg-popover shadow-2xl outline-none">
           <div className="flex items-center justify-between gap-3 border-b border-border/50 px-5 py-3">
             <Drawer.Title className={cn("truncate text-lg font-semibold tracking-tight", !title && "sr-only")}>{title ?? "Sheet"}</Drawer.Title>
             {headerAction}

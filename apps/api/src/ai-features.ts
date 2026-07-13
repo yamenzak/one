@@ -132,6 +132,15 @@ Be specific and practical, but concise — finish every section. No title, no pr
     defaultSystem: `You classify a strength exercise from its name. Reply with ONLY JSON: {"primaryMuscles": string[], "secondaryMuscles": string[], "equipment": string[], "difficulty": "beginner"|"intermediate"|"advanced", "force": "push"|"pull"|"static"|null, "mechanic": "compound"|"isolation"|null}. Use ONLY values from the allowed lists provided in the prompt (lowercase, exact spelling). primaryMuscles: the 1-2 prime movers. secondaryMuscles: assisting muscles. Be accurate.`,
   },
   {
+    key: "food-meta",
+    label: "Estimate food nutrition",
+    description: "From a food name, estimate a typical serving's macros + micros.",
+    audience: "client",
+    task: "text",
+    tonable: false,
+    defaultSystem: `You estimate nutrition for a food from its name. Reply with ONLY JSON: {"servingSize": number, "servingUnit": "g"|"ml", "calories": number, "proteinG": number, "carbsG": number, "fatG": number, "fiberG": number, "sugarG": number, "sodiumMg": number}. Use a realistic common serving size and accurate typical values for that food. Numbers only.`,
+  },
+  {
     key: "meal-recipe",
     label: "Recommend a recipe",
     description: "Turn a meal option's foods into a simple recipe the client can cook.",
