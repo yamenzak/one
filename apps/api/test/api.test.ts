@@ -1114,3 +1114,55 @@ describe("library archive (soft-delete) + resolve lane", () => {
     expect(resolve.foods.map((f) => f.id)).toContain(food);
   });
 });
+
+describe("plan lifecycle — publish supersedes, restore, draft-only delete", () => {
+  const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
+  const mkClient = async () => ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "PlanLifecycle" }) })).json()) as { client: { id: string } }).client.id;
+  const mkPlan = async (clientId: string, name: string) => ((await (await SELF.fetch("http://x/api/workout-plans", { method: "POST", headers: H(), body: JSON.stringify({ clientId, name }) })).json()) as { plan: { id: string } }).plan.id;
+  const publish = (id: string) => SELF.fetch(`http://x/api/workout-plans/${id}/publish`, { method: "POST", headers: H() });
+  const statusMap = async (clientId: string) => {
+    const r = (await (await SELF.fetch(`http://x/api/workout-plans?clientId=${clientId}`, { headers: auth(ownerCookie) })).json()) as { plans: { id: string; status: string }[] };
+    return new Map(r.plans.map((p) => [p.id, p.status]));
+  };
+
+  it("publishing supersedes the prior plan; re-publishing an older one supersedes the newer", async () => {
+    const client = await mkClient();
+    const a = await mkPlan(client, "Plan A");
+    const b = await mkPlan(client, "Plan B");
+    await publish(a);
+    let s = await statusMap(client);
+    expect(s.get(a)).toBe("published");
+    expect(s.get(b)).toBe("draft");
+    await publish(b);
+    s = await statusMap(client);
+    expect(s.get(b)).toBe("published");
+    expect(s.get(a)).toBe("superseded");
+    // Re-publish the OLDER plan A → it goes active again and B is superseded.
+    expect((await publish(a)).status).toBe(200);
+    s = await statusMap(client);
+    expect(s.get(a)).toBe("published");
+    expect(s.get(b)).toBe("superseded");
+  });
+
+  it("only drafts can be deleted; published plans must be archived instead", async () => {
+    const client = await mkClient();
+    const draft = await mkPlan(client, "Deletable");
+    expect((await SELF.fetch(`http://x/api/workout-plans/${draft}`, { method: "DELETE", headers: H() })).status).toBe(200);
+
+    const pub = await mkPlan(client, "Publishable");
+    await publish(pub);
+    expect((await SELF.fetch(`http://x/api/workout-plans/${pub}`, { method: "DELETE", headers: H() })).status).toBe(409);
+    expect((await SELF.fetch(`http://x/api/workout-plans/${pub}/status`, { method: "POST", headers: H(), body: JSON.stringify({ status: "archived" }) })).status).toBe(200);
+    expect((await statusMap(client)).get(pub)).toBe("archived");
+  });
+
+  it("a superseded plan is read-only until rolled back to a draft", async () => {
+    const client = await mkClient();
+    const a = await mkPlan(client, "RollA");
+    const b = await mkPlan(client, "RollB");
+    await publish(a); await publish(b); // a is now superseded
+    expect((await SELF.fetch(`http://x/api/workout-plans/${a}`, { method: "PATCH", headers: H(), body: JSON.stringify({ name: "nope" }) })).status).toBe(409);
+    expect((await SELF.fetch(`http://x/api/workout-plans/${a}/status`, { method: "POST", headers: H(), body: JSON.stringify({ status: "draft" }) })).status).toBe(200);
+    expect((await SELF.fetch(`http://x/api/workout-plans/${a}`, { method: "PATCH", headers: H(), body: JSON.stringify({ name: "RollA v2" }) })).status).toBe(200);
+  });
+});

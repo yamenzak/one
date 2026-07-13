@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy } from "@mossa/domain";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, Page, Stagger, ArrowLeft, Plus, Sparkles, Utensils, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, Page, Stagger, ArrowLeft, Plus, Sparkles, Utensils, History, X } from "@mossa/ui";
 import { api } from "../../api.js";
 import { AiErrorBox } from "../../AiError.js";
 import { useUnits } from "../../units.js";
@@ -40,6 +40,10 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const mutate = (fn: (d: MealOption[]) => void) => { const next = structuredClone(options); fn(next); setOptions(next); setDirty(true); };
   const save = async () => { setSaving(true); try { await api.patch(`/api/meal-plans/${planId}`, { body: { customMealTypes: customTypes, mealOptions: options } }); setDirty(false); } finally { setSaving(false); } };
   const publish = async () => { await save(); await api.post(`/api/meal-plans/${planId}/publish`); await load(); };
+  // Superseded/archived plans are read-only (PATCH 409s). "Make active" re-publishes
+  // WITHOUT a save first (which would 409); rollback returns it to an editable draft.
+  const makeActive = async () => { await api.post(`/api/meal-plans/${planId}/publish`); await load(); };
+  const rollback = async () => { await api.post(`/api/meal-plans/${planId}/status`, { status: "draft" }); await load(); };
   const addCustomType = () => { const label = newType.trim(); if (label && !customTypes.some((t) => t.label === label)) { setCustomTypes((p) => [...p, { label }]); setDirty(true); } setNewType(""); setTypeOpen(false); };
   const runAi = async (instructions: string) => {
     if (!plan) return;
@@ -48,6 +52,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   };
 
   if (!plan) return <Skeleton className="m-4 h-96" />;
+  const readOnly = plan.status === "superseded" || plan.status === "archived";
   const byType = new Map<string, { opt: MealOption; idx: number }[]>();
   options.forEach((opt, idx) => byType.set(opt.mealType, [...(byType.get(opt.mealType) ?? []), { opt, idx }]));
   const targets = plan.targetGoal?.targets ?? null;
@@ -119,9 +124,23 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
       </Stagger>
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/40 bg-background/90 p-3 backdrop-blur-xl md:pl-24">
-        <div className="mx-auto flex max-w-xl gap-3">
-          <Button variant="outline" className="flex-1" disabled={!dirty || saving} onClick={() => void save()}>{saving ? "Saving…" : dirty ? "Save draft" : "Saved"}</Button>
-          <Button className="flex-1" onClick={() => void publish()}>{plan.status === "published" ? "Re-publish" : "Publish"}</Button>
+        <div className="mx-auto max-w-xl space-y-2">
+          {readOnly && (
+            <div className="flex items-center gap-2 rounded-xl bg-warning-soft px-3 py-2 text-xs text-warning [&_svg]:size-3.5"><History /> This plan is {plan.status} — read-only. Roll it back to a draft to edit, or make it active again.</div>
+          )}
+          <div className="flex gap-3">
+            {readOnly ? (
+              <>
+                <Button variant="outline" className="flex-1" onClick={() => void rollback()}>Roll back to draft</Button>
+                <Button className="flex-1" onClick={() => void makeActive()}>Make active</Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" className="flex-1" disabled={!dirty || saving} onClick={() => void save()}>{saving ? "Saving…" : dirty ? "Save draft" : "Saved"}</Button>
+                <Button className="flex-1" onClick={() => void publish()}>{plan.status === "published" ? "Re-publish" : "Publish"}</Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

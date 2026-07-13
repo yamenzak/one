@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@mossa/protocol";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, Save, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, Save, History, X } from "@mossa/ui";
 import { api } from "../../api.js";
 import { AiErrorBox } from "../../AiError.js";
 import { ExerciseThumb, ExerciseMeta, splitList, pretty, type ExerciseInfo } from "../exercise.js";
@@ -68,6 +68,10 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   const mutate = (fn: (d: WorkoutDay[]) => void) => { const next = structuredClone(days); fn(next); setDays(next); setDirty(true); };
   const save = async () => { setSaving(true); try { await api.patch(`/api/workout-plans/${planId}`, { body: { days } }); setDirty(false); } finally { setSaving(false); } };
   const publish = async () => { await save(); await api.post(`/api/workout-plans/${planId}/publish`); await load(); };
+  // Superseded/archived plans are read-only (PATCH 409s). "Make active" re-publishes
+  // WITHOUT a save first (which would 409); rollback returns it to an editable draft.
+  const makeActive = async () => { await api.post(`/api/workout-plans/${planId}/publish`); await load(); };
+  const rollback = async () => { await api.post(`/api/workout-plans/${planId}/status`, { status: "draft" }); await load(); };
   const runAi = async (instructions: string) => { if (!plan) return; const res = await api.post<{ draft: WorkoutBody }>("/api/ai/draft-plan", { clientId: plan.clientId, instructions }); setDays(res.draft.days); setDirty(true); setAiOpen(false); };
 
   // Copy week: duplicate every current day as a new mesocycle week, with an
@@ -98,6 +102,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   };
 
   if (!plan) return <Skeleton className="m-4 h-96" />;
+  const readOnly = plan.status === "superseded" || plan.status === "archived";
   const day = days[dayIdx];
   const exOf = (id: string) => library.find((e) => e.id === id);
   const nameOf = (id: string) => exOf(id)?.name ?? "Exercise";
@@ -178,9 +183,23 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
       </Stagger>
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/40 bg-background/90 p-3 backdrop-blur-xl md:pl-24">
-        <div className="mx-auto flex max-w-xl gap-3">
-          <Button variant="outline" className="flex-1" disabled={!dirty || saving} onClick={() => void save()}>{saving ? "Saving…" : dirty ? "Save draft" : "Saved"}</Button>
-          <Button className="flex-1" onClick={() => void publish()}>{plan.status === "published" ? "Re-publish" : "Publish"}</Button>
+        <div className="mx-auto max-w-xl space-y-2">
+          {readOnly && (
+            <div className="flex items-center gap-2 rounded-xl bg-warning-soft px-3 py-2 text-xs text-warning [&_svg]:size-3.5"><History /> This plan is {plan.status} — read-only. Roll it back to a draft to edit, or make it active again.</div>
+          )}
+          <div className="flex gap-3">
+            {readOnly ? (
+              <>
+                <Button variant="outline" className="flex-1" onClick={() => void rollback()}>Roll back to draft</Button>
+                <Button className="flex-1" onClick={() => void makeActive()}>Make active</Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" className="flex-1" disabled={!dirty || saving} onClick={() => void save()}>{saving ? "Saving…" : dirty ? "Save draft" : "Saved"}</Button>
+                <Button className="flex-1" onClick={() => void publish()}>{plan.status === "published" ? "Re-publish" : "Publish"}</Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
