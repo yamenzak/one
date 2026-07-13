@@ -610,7 +610,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const ent = await tenantEntitlements(c.env.DB, who.tenantId);
     if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
     const parsed = z.object({
-      feature: z.enum(["food-image", "exercise-image", "cover-image", "workout-day-image"]),
+      feature: z.enum(["food-image", "exercise-image", "cover-image", "workout-day-image", "meal-image"]),
       subject: z.string().min(1).max(200),
       hint: z.string().max(160).default(""),
       referenceKey: z.string().max(300).optional(),
@@ -621,7 +621,13 @@ export const aiRoutes = new Hono<AppEnv>()
     }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const { feature, subject, hint, referenceKey, pair, brandColor } = parsed.data;
-    const brandLine = brandColor ? ` Use the colour ${brandColor} as the dominant accent hue throughout the image.` : "";
+    // Food/meal shots want realistic colour with only a hint of brand (plating);
+    // day covers want the accent to dominate.
+    const brandLine = brandColor
+      ? feature === "meal-image" || feature === "food-image"
+        ? ` Style the plating, tableware or garnish with subtle touches of the colour ${brandColor}.`
+        : ` Use the colour ${brandColor} as the dominant accent hue throughout the image.`
+      : "";
 
     if (pair) {
       // One wide two-panel render → guaranteed-identical style, genuinely

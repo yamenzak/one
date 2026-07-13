@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy, kcalToDisplay } from "@mossa/domain";
-import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Utensils, ShoppingCart, Plus, Minus, ChevronDown, Sparkles, Check, ArrowLeft, Croissant, Soup, Apple, Dumbbell } from "@mossa/ui";
+import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Utensils, ShoppingCart, Plus, Minus, Sparkles, Check, ArrowLeft, Croissant, Soup, Apple, Dumbbell } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
@@ -63,7 +63,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   const [view, setView] = useState<"plan" | "shop">("plan");
   const [counts, setCounts] = useState<Record<number, number>>({});
   const [checked, setChecked] = useState<Set<string>>(new Set());
-  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const [detail, setDetail] = useState<{ opt: MealOption; index: number } | null>(null);
   const [recipe, setRecipe] = useState<{ title: string; text: string } | null>(null);
   const [recipeBusy, setRecipeBusy] = useState<number | null>(null);
   const units = useUnits();
@@ -99,6 +99,8 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
     const factor = f && f.serving_size > 0 ? mf.quantity / f.serving_size : 0;
     return { f, factor };
   };
+  // The card hero: the AI plated render, else the first food photo, else none.
+  const optionImage = (opt: MealOption): string | null => opt.imageUrl || opt.foods.map((mf) => foods.get(mf.foodId)?.image_url).find((x): x is string => !!x) || null;
 
   const recommendRecipe = async (opt: MealOption, index: number) => {
     setRecipeBusy(index);
@@ -203,13 +205,11 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                           <span className="font-semibold">{meta.label}</span>
                           <span className="text-xs text-muted-foreground">{opts.length} option{opts.length === 1 ? "" : "s"}</span>
                         </div>
-                        <div className="space-y-2.5">
+                        <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
                           {opts.map(({ opt, index }) => (
-                            <OptionCard
-                              key={index} opt={opt} index={index} units={units} foods={foods} foodMap={foodMap}
-                              expanded={openIdx === index} onToggle={() => setOpenIdx(openIdx === index ? null : index)}
-                              logged={loggedIdx.has(index)} logging={logging === index} onLog={() => void logOption(opt, index)}
-                              aiSuite={aiSuite} recipeBusy={recipeBusy === index} onRecipe={() => void recommendRecipe(opt, index)}
+                            <OptionPhotoCard
+                              key={index} opt={opt} index={index} units={units} image={optionImage(opt)} totals={optionMacroTotals(opt, foodMap)}
+                              logged={loggedIdx.has(index)} logging={logging === index} onLog={() => void logOption(opt, index)} onOpen={() => setDetail({ opt, index })}
                             />
                           ))}
                         </div>
@@ -275,6 +275,15 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
         )}
       </div>
 
+      {detail && (
+        <OptionDetailSheet
+          opt={detail.opt} index={detail.index} units={units} foods={foods} foodMap={foodMap} image={optionImage(detail.opt)}
+          logged={loggedIdx.has(detail.index)} logging={logging === detail.index} onLog={() => void logOption(detail.opt, detail.index)}
+          aiSuite={aiSuite} recipeBusy={recipeBusy === detail.index} onRecipe={() => void recommendRecipe(detail.opt, detail.index)}
+          onClose={() => setDetail(null)}
+        />
+      )}
+
       {recipe && (
         <Sheet open onClose={() => setRecipe(null)} title="Recipe">
           {recipe.text === "" ? (
@@ -297,10 +306,37 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   );
 }
 
-/** A single meal option — thumbnail, macros, expandable foods + micros, recipe + log. */
-function OptionCard({ opt, index, units, foods, foodMap, expanded, onToggle, logged, logging, onLog, aiSuite, recipeBusy, onRecipe }: {
-  opt: MealOption; index: number; units: ReturnType<typeof useUnits>; foods: Map<string, FoodRow>; foodMap: Map<string, FoodLike>;
-  expanded: boolean; onToggle: () => void; logged: boolean; logging: boolean; onLog: () => void; aiSuite: boolean; recipeBusy: boolean; onRecipe: () => void;
+/** A meal option as a photo-hero carousel card — cover, name, calories, macro
+ *  split, Log button. Tapping the cover opens the full detail sheet. */
+function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, onLog, onOpen }: {
+  opt: MealOption; index: number; units: ReturnType<typeof useUnits>; image: string | null;
+  totals: { calories: number; proteinG: number; carbsG: number; fatG: number }; logged: boolean; logging: boolean; onLog: () => void; onOpen: () => void;
+}) {
+  return (
+    <div className="w-[74%] shrink-0 snap-start sm:w-[52%]">
+      <div className={cn("overflow-hidden rounded-2xl bg-card", logged && "ring-1 ring-nutrition/50")}>
+        <button onClick={onOpen} className="relative block h-36 w-full text-left transition-opacity active:opacity-90">
+          {image ? <img src={image} alt="" className="absolute inset-0 size-full object-cover" /> : <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-nutrition/20 to-surface-2 text-nutrition/50 [&_svg]:size-9"><Utensils /></div>}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+          {logged ? <span className="absolute right-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-nutrition px-2 py-0.5 text-[0.6rem] font-semibold text-white [&_svg]:size-2.5"><Check strokeWidth={3} /> Logged</span> : opt.isFree ? <span className="absolute right-2 top-2 rounded-full bg-white/20 px-2 py-0.5 text-[0.6rem] font-semibold text-white backdrop-blur-md">Free</span> : null}
+          <div className="absolute inset-x-0 bottom-0 p-3">
+            <div className="truncate font-semibold text-white">{opt.mealName || (opt.isFree ? "Free meal" : `Option ${index + 1}`)}</div>
+            <div className="numeral truncate text-xs text-white/85">{opt.isFree ? `≤ ${opt.freeMealMaxCalories != null ? fmtEnergy(opt.freeMealMaxCalories, units) : "—"}` : `${fmtEnergy(totals.calories, units)} · P${Math.round(totals.proteinG)} C${Math.round(totals.carbsG)} F${Math.round(totals.fatG)}`}</div>
+          </div>
+        </button>
+        {!opt.isFree && <div className="px-2.5 pt-2.5"><MacroSplitBar p={totals.proteinG} c={totals.carbsG} f={totals.fatG} /></div>}
+        <div className="p-2.5">
+          <Button size="sm" className="w-full" variant={logged ? "secondary" : opt.isFree ? "tonal" : "default"} disabled={logging} onClick={onLog}>{logging ? "…" : logged ? "Log again" : "Log this"}</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The full option breakdown — cover, macro tiles, foods, notes, recipe, micros. */
+function OptionDetailSheet({ opt, index, units, foods, foodMap, image, logged, logging, onLog, aiSuite, recipeBusy, onRecipe, onClose }: {
+  opt: MealOption; index: number; units: ReturnType<typeof useUnits>; foods: Map<string, FoodRow>; foodMap: Map<string, FoodLike>; image: string | null;
+  logged: boolean; logging: boolean; onLog: () => void; aiSuite: boolean; recipeBusy: boolean; onRecipe: () => void; onClose: () => void;
 }) {
   const t = optionMacroTotals(opt, foodMap);
   const contrib = (mf: MealOption["foods"][number]) => { const f = foods.get(mf.foodId); return { f, factor: f && f.serving_size > 0 ? mf.quantity / f.serving_size : 0 }; };
@@ -308,78 +344,63 @@ function OptionCard({ opt, index, units, foods, foodMap, expanded, onToggle, log
   for (const mf of opt.foods) { const { f, factor } = contrib(mf); if (!f) continue; micro.fiberG += (f.fiber_g ?? 0) * factor; micro.sugarG += (f.sugar_g ?? 0) * factor; micro.saturatedFatG += (f.saturated_fat_g ?? 0) * factor; micro.sodiumMg += (f.sodium_mg ?? 0) * factor; micro.cholesterolMg += (f.cholesterol_mg ?? 0) * factor; micro.potassiumMg += (f.potassium_mg ?? 0) * factor; micro.calciumMg += (f.calcium_mg ?? 0) * factor; micro.ironMg += (f.iron_mg ?? 0) * factor; }
   const microRows: [string, number, string][] = [["Fiber", micro.fiberG, "g"], ["Sugar", micro.sugarG, "g"], ["Sat. fat", micro.saturatedFatG, "g"], ["Sodium", micro.sodiumMg, "mg"], ["Cholesterol", micro.cholesterolMg, "mg"], ["Potassium", micro.potassiumMg, "mg"], ["Calcium", micro.calciumMg, "mg"], ["Iron", micro.ironMg, "mg"]];
   const hasMicros = microRows.some(([, v]) => v > 0);
-  const thumb = opt.foods.map((mf) => foods.get(mf.foodId)?.image_url).find(Boolean);
 
   return (
-    <Card className={cn("space-y-2.5 p-3 transition-shadow", logged && "ring-1 ring-nutrition/40")}>
-      <div className="flex items-center gap-3">
-        <button onClick={() => !opt.isFree && onToggle()} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-          <FoodThumb src={opt.isFree ? null : thumb} size={44} />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className="truncate text-sm font-semibold">{opt.mealName || (opt.isFree ? "Free meal" : `Option ${index + 1}`)}</span>
-              {logged && <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-nutrition-soft px-1.5 py-0.5 text-[0.6rem] font-semibold text-nutrition [&_svg]:size-2.5"><Check strokeWidth={3} /> Logged</span>}
-            </div>
-            <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="numeral shrink-0 text-calories">{opt.isFree ? `≤ ${opt.freeMealMaxCalories != null ? fmtEnergy(opt.freeMealMaxCalories, units) : "—"}` : fmtEnergy(t.calories, units)}</span>
-              {!opt.isFree && <MacroInline proteinG={t.proteinG} carbsG={t.carbsG} fatG={t.fatG} className="shrink-0 text-[0.7rem]" />}
-            </div>
-          </div>
-          {!opt.isFree && <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-180")} />}
-        </button>
-        <Button size="sm" variant={logged ? "secondary" : opt.isFree ? "tonal" : "default"} disabled={logging} onClick={onLog}>{logging ? "…" : logged ? "Again" : "Log"}</Button>
-      </div>
-
-      {!opt.isFree && <MacroSplitBar p={t.proteinG} c={t.carbsG} f={t.fatG} />}
-
-      {expanded && !opt.isFree && (
-        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-2.5 overflow-hidden pt-0.5">
-          <div className="grid grid-cols-4 gap-2">
-            {MACRO_TILES.map(([metric, key]) => {
-              const M = METRICS[metric];
-              return (
-                <div key={metric} className={cn("flex flex-col items-center gap-1 rounded-xl p-2", toneSoft[M.tone])}>
-                  <M.icon className="size-4" />
-                  <div className="numeral text-base font-semibold leading-none">{metric === "calories" ? kcalToDisplay(t[key], units).toLocaleString() : Math.round(t[key])}</div>
-                </div>
-              );
-            })}
-          </div>
-          {opt.foods.length > 0 && (
-            <div className="space-y-1">
-              {opt.foods.map((mf, k) => {
-                const { f, factor } = contrib(mf);
+    <Sheet open onClose={onClose} title={opt.mealName || (opt.isFree ? "Free meal" : `Option ${index + 1}`)}>
+      <div className="space-y-3">
+        {image && <img src={image} alt="" className="h-44 w-full rounded-2xl object-cover" />}
+        {opt.isFree ? (
+          <p className="text-sm text-muted-foreground">A free meal up to {opt.freeMealMaxCalories != null ? fmtEnergy(opt.freeMealMaxCalories, units) : "your cap"} — eat what you like within it.</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-4 gap-2">
+              {MACRO_TILES.map(([metric, key]) => {
+                const M = METRICS[metric];
                 return (
-                  <div key={k} className="flex items-center gap-3 rounded-xl bg-surface-2 px-2 py-1.5">
-                    <FoodThumb src={f?.image_url} size={34} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm">{f?.name ?? "Food"}</div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="numeral shrink-0">{Math.round(mf.quantity)} {mf.unit}</span>
-                        <span className="numeral shrink-0 text-calories">{fmtEnergy((f?.calories ?? 0) * factor, units)}</span>
-                      </div>
-                    </div>
-                    <MacroInline proteinG={Math.round((f?.protein_g ?? 0) * factor)} carbsG={Math.round((f?.carbs_g ?? 0) * factor)} fatG={Math.round((f?.fat_g ?? 0) * factor)} className="shrink-0 text-[0.7rem]" />
+                  <div key={metric} className={cn("flex flex-col items-center gap-1 rounded-xl p-2.5", toneSoft[M.tone])}>
+                    <M.icon className="size-4" />
+                    <div className="numeral text-lg font-semibold leading-none">{metric === "calories" ? kcalToDisplay(t[key], units).toLocaleString() : Math.round(t[key])}</div>
                   </div>
                 );
               })}
             </div>
-          )}
-          {opt.notes && <p className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-muted-foreground">{opt.notes}</p>}
-          {aiSuite && opt.foods.length > 0 && (
-            <Button size="sm" variant="tonal" className="w-full" disabled={recipeBusy} onClick={onRecipe}>
-              <Sparkles /> {recipeBusy ? "Cooking up a recipe…" : "Recommend a recipe"}
-            </Button>
-          )}
-          {hasMicros && (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-xl bg-surface-2 p-3 text-xs">
-              {microRows.filter(([, v]) => v > 0).map(([l, v, u]) => (
-                <div key={l} className="flex items-center justify-between"><span className="text-muted-foreground">{l}</span><span className="numeral">{Math.round(v * 10) / 10} {u}</span></div>
-              ))}
-            </div>
-          )}
-        </motion.div>
-      )}
-    </Card>
+            {opt.foods.length > 0 && (
+              <div className="space-y-1">
+                {opt.foods.map((mf, k) => {
+                  const { f, factor } = contrib(mf);
+                  return (
+                    <div key={k} className="flex items-center gap-3 rounded-xl bg-surface-2 px-2 py-1.5">
+                      <FoodThumb src={f?.image_url} size={34} />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm">{f?.name ?? "Food"}</div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="numeral shrink-0">{Math.round(mf.quantity)} {mf.unit}</span>
+                          <span className="numeral shrink-0 text-calories">{fmtEnergy((f?.calories ?? 0) * factor, units)}</span>
+                        </div>
+                      </div>
+                      <MacroInline proteinG={Math.round((f?.protein_g ?? 0) * factor)} carbsG={Math.round((f?.carbs_g ?? 0) * factor)} fatG={Math.round((f?.fat_g ?? 0) * factor)} className="shrink-0 text-[0.7rem]" />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {opt.notes && <p className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-muted-foreground">{opt.notes}</p>}
+            {aiSuite && opt.foods.length > 0 && (
+              <Button size="sm" variant="tonal" className="w-full" disabled={recipeBusy} onClick={onRecipe}>
+                <Sparkles /> {recipeBusy ? "Cooking up a recipe…" : "Recommend a recipe"}
+              </Button>
+            )}
+            {hasMicros && (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-xl bg-surface-2 p-3 text-xs">
+                {microRows.filter(([, v]) => v > 0).map(([l, v, u]) => (
+                  <div key={l} className="flex items-center justify-between"><span className="text-muted-foreground">{l}</span><span className="numeral">{Math.round(v * 10) / 10} {u}</span></div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+        <Button size="lg" className="w-full" variant={logged ? "secondary" : "default"} disabled={logging} onClick={() => { onLog(); onClose(); }}>{logging ? "Logging…" : logged ? "Log again" : "Log this meal"}</Button>
+      </div>
+    </Sheet>
   );
 }

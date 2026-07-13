@@ -117,6 +117,15 @@ Only well-supported, safe OTC options. Never suggest prescription drugs or anyth
     defaultSystem: `Create a striking, premium cover image for a gym training day. Bold and dynamic with a clean, modern fitness-poster aesthetic. The training theme (e.g. the muscle group or session focus) and an art style are provided — honour both. Strong central composition with generous negative space so a title can overlay cleanly. Make the provided brand accent colour the dominant hue across the image. No text, no words, no letters, no numbers, no logos, no watermarks.`,
   },
   {
+    key: "meal-image",
+    label: "Plated meal image",
+    description: "An appetizing, realistic photo of a plated meal built from its foods — the meal-plan card's hero. Your brand accent tints the plating subtly.",
+    audience: "trainer",
+    task: "image",
+    tonable: false,
+    defaultSystem: `Create ONE appetizing, photorealistic photo of a plated, ready-to-eat meal composed of the given foods. Restaurant-quality food photography: natural soft light, shallow depth of field, a clean plate on a simple neutral surface, shot from a flattering overhead or 45-degree angle. Make it look genuinely delicious and real. No text, no words, no hands, no packaging, no clutter.`,
+  },
+  {
     key: "exercise-guide",
     label: "Write exercise instructions",
     description: "Generate a full how-to guide for an exercise.",

@@ -510,6 +510,15 @@ describe("AI image generation + recipe", () => {
     await SELF.fetch(`http://x/api/workout-plans/${wp.plan.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ body: { days: [{ name: "Chest Day", imageUrl: "/api/media/t/x/day/chest.png", blocks: [] }] } }) });
     const back = (await (await SELF.fetch(`http://x/api/workout-plans/${wp.plan.id}`, { headers: auth(ownerCookie) })).json()) as { plan: { body: { days: { imageUrl?: string | null }[] } } };
     expect(back.plan.body.days[0]!.imageUrl).toBe("/api/media/t/x/day/chest.png");
+
+    // Plated meal image (subtle-brand variant) + a meal option's imageUrl round-trip.
+    const mealImg = await SELF.fetch("http://x/api/ai/generate-image", { method: "POST", headers: H, body: JSON.stringify({ feature: "meal-image", subject: "Chicken & Rice", hint: "made of chicken breast, rice", brandColor: "#10b981" }) });
+    expect(mealImg.status).toBe(200);
+    expect(((await mealImg.json()) as { url: string }).url).toContain(`/api/media/t/${ctx.active.tenantId}/`);
+    const mp = (await (await SELF.fetch("http://x/api/meal-plans", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, name: "Photo Meals" }) })).json()) as { plan: { id: string } };
+    await SELF.fetch(`http://x/api/meal-plans/${mp.plan.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ body: { mealOptions: [{ mealType: "lunch", mealName: "Chicken & Rice", imageUrl: "/api/media/t/x/meal/cr.png", foods: [] }] } }) });
+    const mback = (await (await SELF.fetch(`http://x/api/meal-plans/${mp.plan.id}`, { headers: auth(ownerCookie) })).json()) as { plan: { body: { mealOptions: { imageUrl?: string | null }[] } } };
+    expect(mback.plan.body.mealOptions[0]!.imageUrl).toBe("/api/media/t/x/meal/cr.png");
   });
 
   it("exercise create accepts start/end images + video", async () => {

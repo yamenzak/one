@@ -30,6 +30,8 @@ export const MealOption = z.object({
   isFree: z.boolean().default(false),
   freeMealMaxCalories: z.number().int().positive().nullish(),
   notes: z.string().max(1000).nullish(),
+  /** AI-generated plated-meal photo (subtly branded) — the option card's hero. */
+  imageUrl: z.string().max(400).nullish(),
   foods: z.array(MealFood).default([]),
 });
 export type MealOption = z.infer<typeof MealOption>;

@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy } from "@mossa/domain";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, Page, Stagger, ArrowLeft, Plus, Sparkles, Utensils, History, X } from "@mossa/ui";
-import { api } from "../../api.js";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, Page, Stagger, colorToHex, ArrowLeft, Plus, Sparkles, Utensils, History, X } from "@mossa/ui";
+import { api, ApiError } from "../../api.js";
 import { AiErrorBox } from "../../AiError.js";
 import { useUnits } from "../../units.js";
 import { FoodSearchSheet } from "../client/FoodSearchSheet.js";
@@ -113,6 +113,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
                         </div>
                       ))}
                       <button onClick={() => setFoodPicker({ optIdx: idx })} className="text-xs font-medium text-primary">+ Food</button>
+                      {opt.foods.length > 0 && <MealImage mealName={opt.mealName} foodNames={opt.foods.map((mf) => nameOf(mf.foodId))} value={opt.imageUrl} onChange={(url) => mutate((d) => (d[idx]!.imageUrl = url))} />}
                     </>
                   )}
                 </SubCard>
@@ -153,6 +154,44 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
         </div>
       </Sheet>
     </Page>
+  );
+}
+
+/** The tenant's live accent colour as #rrggbb (from the applied --primary). */
+const accentHex = (): string => { try { return colorToHex(getComputedStyle(document.documentElement).getPropertyValue("--primary").trim()); } catch { return "#10b981"; } };
+
+/** Per-option plated-meal photo — an appetizing AI render of the option's foods. */
+function MealImage({ mealName, foodNames, value, onChange }: { mealName: string; foodNames: string[]; value?: string | null; onChange: (url: string | null) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const gen = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const r = await api.post<{ url: string }>("/api/ai/generate-image", { feature: "meal-image", subject: mealName.trim() || "a healthy meal", hint: foodNames.length ? `made of ${foodNames.slice(0, 6).join(", ")}` : "", brandColor: accentHex() });
+      onChange(r.url);
+    } catch (e) {
+      setErr(e instanceof ApiError && e.message.toLowerCase().includes("credit") ? "Out of AI credits." : "Couldn't generate — try again.");
+    } finally { setBusy(false); }
+  };
+  if (value) {
+    return (
+      <div className="relative overflow-hidden rounded-xl">
+        <img src={value} alt="" className="h-24 w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+        <div className="absolute right-2 top-2 flex gap-1.5">
+          <button onClick={() => void gen()} disabled={busy} className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><Sparkles /> {busy ? "…" : "Redo"}</button>
+          <button onClick={() => onChange(null)} aria-label="Remove photo" className="grid size-7 place-items-center rounded-full bg-black/50 text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><X /></button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <>
+      <button onClick={() => void gen()} disabled={busy} className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface-3 text-xs text-muted-foreground transition-colors hover:bg-surface-2 disabled:opacity-50 [&_svg]:size-3.5">
+        {busy ? <><span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" /> Plating…</> : <><Sparkles /> Generate plated-meal photo</>}
+      </button>
+      {err && <p className="text-xs text-warning">{err}</p>}
+    </>
   );
 }
 
