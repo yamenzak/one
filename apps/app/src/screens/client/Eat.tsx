@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { fmtEnergy, fmtVolume, volumeDisplayToMl, kcalToDisplay } from "@mossa/domain";
 import {
-  Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MacroInline, MetricChip, ProgressRing, METRICS, toneSoft, Page, Stagger, EmptyState, motion,
+  Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MetricChip, ProgressRing, METRICS, toneSoft, Page, Stagger, EmptyState, motion,
   Plus, ClipboardList, Utensils, Croissant, Soup, Apple, Dumbbell, Droplet, Beef, Camera, Trash2, type LucideIcon,
 } from "@mossa/ui";
 import type { UnitPrefs } from "@mossa/domain";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
+import { FoodRow, normFood } from "../food.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
 import { MealPlanDrawer } from "./MealPlanDrawer.js";
 import { CoachNote } from "./CoachNote.js";
@@ -186,19 +187,14 @@ export function Eat({ clientId }: { clientId: string }) {
                   </div>
                   <div className="divide-y divide-border/40">
                     {list.map((e) => (
-                      <button key={e.id} onClick={() => setEdit(e)} className="flex w-full items-center gap-3 py-2.5 text-left transition-colors active:opacity-70">
-                        <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2">
-                          {e.image_url ? <img src={e.image_url} alt="" className="size-full object-cover" /> : <Utensils className="size-4 text-muted-foreground" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm">{e.label ?? "Food"}</div>
-                          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                            {e.quantity ? <span className="numeral shrink-0">{Math.round(e.quantity)} {e.unit ?? "g"}</span> : null}
-                            <MacroInline proteinG={e.protein_g} carbsG={e.carbs_g} fatG={e.fat_g} className="text-[0.7rem]" />
-                          </div>
-                        </div>
-                        <span className="numeral shrink-0 text-sm">{fmtEnergy(e.calories, units)}</span>
-                      </button>
+                      <FoodRow
+                        key={e.id}
+                        {...normFood(e)}
+                        sub={e.quantity ? `${Math.round(e.quantity)} ${e.unit ?? "g"}` : undefined}
+                        thumbSize={36}
+                        onClick={() => setEdit(e)}
+                        className="py-2.5"
+                      />
                     ))}
                   </div>
                   <button onClick={() => openLog(meal)} className="pt-0.5 text-xs font-semibold text-primary">+ Add to {meta.label.toLowerCase()}</button>

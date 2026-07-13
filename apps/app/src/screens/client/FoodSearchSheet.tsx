@@ -4,11 +4,12 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fmtEnergy, kcalToDisplay, type UnitPrefs } from "@mossa/domain";
-import { Button, Field, Sheet, Chip, SegmentedControl, MacroInline, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, Utensils, X } from "@mossa/ui";
+import { kcalToDisplay, type UnitPrefs } from "@mossa/domain";
+import { Button, Field, Sheet, Chip, SegmentedControl, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, X } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
+import { FoodRow, normFood } from "../food.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
 import { AiErrorBox } from "../../AiError.js";
@@ -245,8 +246,8 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
         {aiError && <p className="text-sm text-warning">{aiError}</p>}
         {snapErr != null && <AiErrorBox error={snapErr} />}
         <div className="max-h-80 space-y-1 overflow-y-auto">
-          {local.filter(matchesFilter).map((f) => <FoodRow key={f.id} food={f} units={units} onPick={() => rowClick(f)} />)}
-          {external.filter(matchesFilter).map((f, i) => <FoodRow key={`ext-${i}`} food={f} units={units} onPick={() => rowClick(f)} />)}
+          {local.filter(matchesFilter).map((f) => <FoodResult key={f.id} food={f} onPick={() => rowClick(f)} />)}
+          {external.filter(matchesFilter).map((f, i) => <FoodResult key={`ext-${i}`} food={f} onPick={() => rowClick(f)} />)}
           {searching && external.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Searching…</p>}
           {q.length >= 2 && !searching && local.filter(matchesFilter).length === 0 && external.filter(matchesFilter).length === 0 && (
             <p className="p-4 text-center text-sm text-muted-foreground">No matches — scan a barcode or add it manually.</p>
@@ -270,22 +271,10 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   );
 }
 
-function FoodRow({ food, units, onPick }: { food: Food; units: UnitPrefs; onPick: () => void }) {
-  const img = food.image_url ?? food.imageUrl;
-  const n = norm(food);
+function FoodResult({ food, onPick }: { food: Food; onPick: () => void }) {
   return (
-    <button onClick={onPick} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary">
-      <div className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2">
-        {img ? <img src={img} alt="" className="size-full object-cover" /> : <Utensils className="size-4 text-muted-foreground" />}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm">{food.name}</div>
-        {food.brand && <div className="truncate text-xs text-muted-foreground">{food.brand}</div>}
-        <div className="flex items-center gap-2 truncate text-xs text-muted-foreground">
-          <span className="numeral shrink-0 text-calories">{fmtEnergy(n.calories, units)}</span>
-          <MacroInline proteinG={n.proteinG} carbsG={n.carbsG} fatG={n.fatG} className="shrink-0 text-[0.7rem]" />
-        </div>
-      </div>
+    <button onClick={onPick} className="block w-full rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary">
+      <FoodRow {...normFood(food)} thumbSize={44} />
     </button>
   );
 }
@@ -325,16 +314,12 @@ function SnapReview({ entries, note, defaultMeal, units, onCancel, onRetake, onC
 
         <div className="space-y-1.5">
           {items.map((e, i) => (
-            <div key={i} className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2.5">
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{e.label}</div>
-                <div className="mt-0.5 flex items-center gap-2 truncate text-xs text-muted-foreground">
-                  {e.quantity ? <span className="numeral shrink-0">{Math.round(e.quantity)} {e.unit ?? "g"}</span> : null}
-                  <span className="numeral shrink-0 text-calories">{fmtEnergy(e.calories, units)}</span>
-                  <MacroInline proteinG={e.proteinG} carbsG={e.carbsG} fatG={e.fatG} className="shrink-0 text-[0.7rem]" />
-                </div>
-              </div>
-              <button onClick={() => setItems((xs) => xs.filter((_, j) => j !== i))} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:text-danger [&_svg]:size-4" aria-label={`Remove ${e.label}`}><X /></button>
+            <div key={i} className="rounded-xl bg-surface-2 px-3 py-2.5">
+              <FoodRow
+                {...normFood(e)}
+                sub={e.quantity ? `${Math.round(e.quantity)} ${e.unit ?? "g"}` : undefined}
+                trailing={<button onClick={() => setItems((xs) => xs.filter((_, j) => j !== i))} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:text-danger [&_svg]:size-4" aria-label={`Remove ${e.label}`}><X /></button>}
+              />
             </div>
           ))}
           {items.length === 0 && <p className="rounded-xl bg-surface-2 p-4 text-center text-sm text-muted-foreground">Nothing left — retake the photo.</p>}

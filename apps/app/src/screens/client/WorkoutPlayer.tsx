@@ -9,12 +9,12 @@ import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet } 
 import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, type ExerciseBests } from "@mossa/domain";
 import {
   Button, Card, Badge, Field, Sheet, Skeleton, SubCard, ProgressRing, EmptyState, Page, Stagger,
-  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, ChevronRight, Check, Info, History, cn,
+  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, ChevronRight, Check, History, cn,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { Markdown } from "../../Markdown.js";
-import { ExerciseThumb, ExerciseMeta, splitList, pretty, type ExerciseInfo } from "../exercise.js";
+import { ExerciseRow, splitList, pretty, type ExerciseInfo } from "../exercise.js";
 
 interface PublishedPlan { id: string; name: string; body: WorkoutBody }
 type PlanRow = PublishedPlan & { status: string; publishedAt?: string | null };
@@ -228,18 +228,14 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                 const logged = session.get(`${blockIndex}:${slotIndex}`)?.filter((s) => s.completed).length ?? 0;
                 const done = logged >= slot.sets.length;
                 return (
-                  <SubCard key={slotIndex} className="flex items-center gap-3">
-                    <button onClick={() => setDetailSlot(slot)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                      <ExerciseThumb thumb={ex?.thumb_url} thumb2={ex?.thumb2_url} size={44} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1 truncate font-medium">{ex?.name ?? "Exercise"}<Info className="size-3.5 shrink-0 text-muted-foreground" /></div>
-                        <div className="text-sm text-muted-foreground">{ex ? <ExerciseMeta ex={ex} className="after:mx-1 after:content-['·']" /> : null}{logged}/{slot.sets.length} sets</div>
-                      </div>
-                    </button>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
-                      <Button size="sm" variant={done ? "secondary" : "default"} onClick={() => setLogSlot({ blockIndex, slotIndex, slot })}>{done ? <Check /> : "Log"}</Button>
-                    </div>
+                  <SubCard key={slotIndex}>
+                    <ExerciseRow ex={ex} info sub={`${logged}/${slot.sets.length} sets`} onClick={() => setDetailSlot(slot)}
+                      trailing={
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
+                          <Button size="sm" variant={done ? "secondary" : "default"} onClick={() => setLogSlot({ blockIndex, slotIndex, slot })}>{done ? <Check /> : "Log"}</Button>
+                        </div>
+                      } />
                   </SubCard>
                 );
               })}
@@ -255,15 +251,9 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
             {block.slots.map((slot, slotIndex) => {
               const ex = exercises.get(slot.exerciseId);
               return (
-                <SubCard key={slotIndex} className="flex items-center gap-3">
-                  <button onClick={() => setDetailSlot(slot)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                    <ExerciseThumb thumb={ex?.thumb_url} thumb2={ex?.thumb2_url} size={44} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1 truncate font-medium">{ex?.name ?? "Exercise"}<Info className="size-3.5 shrink-0 text-muted-foreground" /></div>
-                      <div className="text-sm text-muted-foreground">{ex ? <ExerciseMeta ex={ex} className="after:mx-1 after:content-['·']" /> : null}{measureSummary(slot)}</div>
-                    </div>
-                  </button>
-                  <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
+                <SubCard key={slotIndex}>
+                  <ExerciseRow ex={ex} info sub={measureSummary(slot)} onClick={() => setDetailSlot(slot)}
+                    trailing={<Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>} />
                 </SubCard>
               );
             })}
@@ -311,12 +301,8 @@ function DayPreviewSheet({ day, index, exercises, onClose }: { day: WorkoutDay; 
             {block.slots.map((slot, si) => {
               const ex = exercises.get(slot.exerciseId);
               return (
-                <SubCard key={si} className="flex items-center gap-3">
-                  <ExerciseThumb thumb={ex?.thumb_url} thumb2={ex?.thumb2_url} size={44} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">{ex?.name ?? "Exercise"}</div>
-                    <div className="text-sm text-muted-foreground">{ex ? <ExerciseMeta ex={ex} className="after:mx-1 after:content-['·']" /> : null}{measureSummary(slot)}</div>
-                  </div>
+                <SubCard key={si}>
+                  <ExerciseRow ex={ex} sub={measureSummary(slot)} />
                 </SubCard>
               );
             })}
@@ -527,11 +513,8 @@ function RoundLogDrawer({ block, roundIndex, exercises, onClose, onSave }: { blo
           const target = prescribed ? measurePart(prescribed, mode) : "";
           return (
             <SubCard key={si} className="space-y-2">
-              <div className="flex items-center gap-2.5">
-                <ExerciseThumb thumb={exercises.get(slot.exerciseId)?.thumb_url} thumb2={exercises.get(slot.exerciseId)?.thumb2_url} size={36} />
-                <div className="min-w-0 flex-1 truncate font-medium">{exercises.get(slot.exerciseId)?.name ?? "Exercise"}</div>
-                {target ? <span className="shrink-0 text-xs text-muted-foreground">target {target}</span> : null}
-              </div>
+              <ExerciseRow ex={exercises.get(slot.exerciseId)} meta={false} thumbSize={36}
+                trailing={target ? <span className="shrink-0 text-xs text-muted-foreground">target {target}</span> : null} />
               <div className="grid grid-cols-2 gap-3">
                 {needsReps(mode) && <Field label="Reps" inputMode="numeric" value={v.reps} onChange={(e) => setV(si, { reps: e.target.value.replace(/\D/g, "") })} />}
                 {needsDuration(mode) && <Field label="Duration (sec)" inputMode="numeric" value={v.duration} onChange={(e) => setV(si, { duration: e.target.value.replace(/\D/g, "") })} />}
@@ -581,10 +564,8 @@ function SwapDrawer({ clientId, planId, dayIndex, coords, currentName, onClose, 
             <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Instant swaps — coach-approved alternatives</div>
             <div className="space-y-1">
               {alts.map((e) => (
-                <button key={e.id} disabled={busy} onClick={() => void swapTo(e)} className="flex w-full items-center gap-3 rounded-xl bg-surface-2 px-2.5 py-2 text-left transition-colors hover:bg-surface-3 disabled:opacity-50">
-                  <ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={40} />
-                  <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{e.name}</div><ExerciseMeta ex={e} className="text-xs text-muted-foreground" /></div>
-                  <ArrowLeftRight className="size-4 shrink-0 text-activity" />
+                <button key={e.id} disabled={busy} onClick={() => void swapTo(e)} className="w-full rounded-xl bg-surface-2 px-2.5 py-2 text-left transition-colors hover:bg-surface-3 disabled:opacity-50">
+                  <ExerciseRow ex={e} thumbSize={40} trailing={<ArrowLeftRight className="size-4 shrink-0 text-activity" />} />
                 </button>
               ))}
             </div>

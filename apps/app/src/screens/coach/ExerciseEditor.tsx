@@ -19,7 +19,7 @@ import { useSession } from "../../session.js";
 import { AiImageField } from "../../AiImageField.js";
 import { splitWideImageToHalves } from "../../imageSplit.js";
 import { ModeCard, StepFade } from "../../composer.js";
-import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
+import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
 
 const DIFFICULTIES = ["beginner", "intermediate", "advanced"] as const;
 const FORCES = ["push", "pull", "static"] as const;
@@ -281,10 +281,10 @@ function AlternativesSheet({ exerciseId, exerciseName, onClose }: { exerciseId: 
         <p className="text-sm text-muted-foreground">Bound alternatives let clients swap instantly — no approval. Binding is two-way.</p>
         {alts === null ? null : alts.length === 0 ? <p className="text-sm text-muted-foreground">No alternatives yet.</p> : (
           <div className="space-y-1">{alts.map((a) => (
-            <div key={a.id} className="flex items-center gap-3 rounded-xl bg-surface-2 px-2.5 py-2">
-              <ExerciseThumb thumb={a.thumb_url} thumb2={a.thumb2_url} size={36} />
-              <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{a.name}</div><ExerciseMeta ex={a} className="text-xs text-muted-foreground" /></div>
-              <button onClick={() => void remove(a.id)} aria-label="Remove" className="text-muted-foreground hover:text-danger [&_svg]:size-4"><Trash2 /></button>
+            <div key={a.id} className="rounded-xl bg-surface-2 px-2.5 py-2">
+              <ExerciseRow ex={a} thumbSize={36} trailing={
+                <button onClick={() => void remove(a.id)} aria-label="Remove" className="text-muted-foreground hover:text-danger [&_svg]:size-4"><Trash2 /></button>
+              } />
             </div>
           ))}</div>
         )}
@@ -293,9 +293,7 @@ function AlternativesSheet({ exerciseId, exerciseName, onClose }: { exerciseId: 
           <div className="mt-1 max-h-56 space-y-1 overflow-y-auto">
             {results.filter((e) => !altIds.has(e.id)).map((e) => (
               <button key={e.id} onClick={() => void add(e.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-secondary">
-                <ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={34} />
-                <div className="min-w-0 flex-1 truncate text-sm">{e.name}</div>
-                <Plus className="size-4 shrink-0 text-primary" />
+                <ExerciseRow ex={e} thumbSize={34} meta={false} trailing={<Plus className="size-4 shrink-0 text-primary" />} />
               </button>
             ))}
           </div>

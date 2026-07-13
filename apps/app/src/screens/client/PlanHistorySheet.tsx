@@ -14,6 +14,7 @@ import {
 } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
+import { ExerciseRow } from "../exercise.js";
 
 type Kind = "workout" | "meal";
 interface PlanRow { id: string; name: string; status: string; publishedAt: string | null; createdAt: string; body: WorkoutBody & MealBody }
@@ -103,10 +104,8 @@ function WorkoutDetail({ body, exName }: { body: WorkoutBody; exName: (id: strin
             {!day.isRestDay && (
               <div className="space-y-1">
                 {slots.map((slot, k) => (
-                  <div key={k} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="min-w-0 truncate">{exName(slot.exerciseId)}</span>
-                    <span className="numeral shrink-0 text-xs text-muted-foreground">{slotLine(slot)}</span>
-                  </div>
+                  <ExerciseRow key={k} name={exName(slot.exerciseId)} meta={false} thumbSize={36}
+                    trailing={<span className="numeral shrink-0 text-xs text-muted-foreground">{slotLine(slot)}</span>} />
                 ))}
                 {slots.length === 0 && <p className="text-xs text-muted-foreground">No exercises.</p>}
               </div>

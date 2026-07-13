@@ -17,6 +17,7 @@ import { useSession } from "../../session.js";
 import { Markdown } from "../../Markdown.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
 import { AiAvatar } from "../../AiAvatar.js";
+import { FoodThumb, MacroSplitBar, FoodRow as FoodRowUI } from "../food.js";
 
 interface Plan { id: string; name: string; status: string; publishedAt?: string | null; body: MealBody }
 interface FoodRow {
@@ -34,25 +35,6 @@ const MEAL_META: Record<string, { label: string; icon: LucideIcon }> = {
 const MEAL_ORDER = ["breakfast", "lunch", "dinner", "snack", "pre_workout", "post_workout", "free"];
 const metaFor = (m: string) => MEAL_META[m] ?? { label: m.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase()), icon: Utensils };
 const MACRO_TILES = [["calories", "calories"], ["protein", "proteinG"], ["carbs", "carbsG"], ["fat", "fatG"]] as const;
-
-function FoodThumb({ src, size = 38 }: { src?: string | null; size?: number }) {
-  return (
-    <div className="grid shrink-0 place-items-center overflow-hidden rounded-lg bg-nutrition-soft text-nutrition" style={{ width: size, height: size }}>
-      {src ? <img src={src} alt="" className="size-full object-cover" /> : <Utensils className="size-1/2" />}
-    </div>
-  );
-}
-
-function MacroSplitBar({ p, c, f }: { p: number; c: number; f: number }) {
-  const total = p + c + f || 1;
-  return (
-    <div className="flex h-1.5 overflow-hidden rounded-full bg-surface-3">
-      <span className="bg-protein" style={{ width: `${(p / total) * 100}%` }} />
-      <span className="bg-carbs" style={{ width: `${(c / total) * 100}%` }} />
-      <span className="bg-fat" style={{ width: `${(f / total) * 100}%` }} />
-    </div>
-  );
-}
 
 export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: string; onClose: () => void; onLogged: () => void }) {
   const [plan, setPlan] = useState<Plan | null | undefined>(undefined);
@@ -367,7 +349,7 @@ function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, on
             )}
           </div>
         </button>
-        {!opt.isFree && <div className={cn("px-2.5 pt-2.5", readOnly && "pb-2.5")}><MacroSplitBar p={totals.proteinG} c={totals.carbsG} f={totals.fatG} /></div>}
+        {!opt.isFree && <div className={cn("px-2.5 pt-2.5", readOnly && "pb-2.5")}><MacroSplitBar proteinG={totals.proteinG} carbsG={totals.carbsG} fatG={totals.fatG} /></div>}
         {readOnly ? (
           <button onClick={onOpen} className="w-full px-2.5 py-2 text-center text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">View details</button>
         ) : (
@@ -416,16 +398,17 @@ function OptionDetailSheet({ opt, index, units, foods, foodMap, image, logged, l
                 {opt.foods.map((mf, k) => {
                   const { f, factor } = contrib(mf);
                   return (
-                    <div key={k} className="flex items-center gap-3 rounded-xl bg-surface-2 px-2 py-1.5">
-                      <FoodThumb src={f?.image_url} size={34} />
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm">{f?.name ?? "Food"}</div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span className="numeral shrink-0">{Math.round(mf.quantity)} {mf.unit}</span>
-                          <span className="numeral shrink-0 text-calories">{fmtEnergy((f?.calories ?? 0) * factor, units)}</span>
-                        </div>
-                      </div>
-                      <MacroInline proteinG={Math.round((f?.protein_g ?? 0) * factor)} carbsG={Math.round((f?.carbs_g ?? 0) * factor)} fatG={Math.round((f?.fat_g ?? 0) * factor)} className="shrink-0 text-[0.7rem]" />
+                    <div key={k} className="rounded-xl bg-surface-2 px-2 py-1.5">
+                      <FoodRowUI
+                        name={f?.name ?? "Food"}
+                        image={f?.image_url}
+                        calories={(f?.calories ?? 0) * factor}
+                        proteinG={Math.round((f?.protein_g ?? 0) * factor)}
+                        carbsG={Math.round((f?.carbs_g ?? 0) * factor)}
+                        fatG={Math.round((f?.fat_g ?? 0) * factor)}
+                        sub={`${Math.round(mf.quantity)} ${mf.unit}`}
+                        thumbSize={34}
+                      />
                     </div>
                   );
                 })}

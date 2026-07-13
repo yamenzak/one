@@ -21,6 +21,7 @@ import { AiAnalyzing } from "../../AiAnalyzing.js";
 import { AiImageField } from "../../AiImageField.js";
 import { ModeCard, StepFade } from "../../composer.js";
 import { BarcodeScanner } from "./BarcodeScanner.js";
+import { FoodRow, normFood } from "../food.js";
 
 export interface EditableFood {
   id?: string;
@@ -244,16 +245,17 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                     <div className="max-h-64 space-y-1 overflow-y-auto">
                       {f.name.trim().length < 2 && <p className="p-3 text-center text-sm text-muted-foreground">Type a food name above to search, or scan a barcode.</p>}
                       {webBusy && <p className="p-3 text-center text-sm text-muted-foreground">Searching…</p>}
-                      {webResults?.filter((h) => foodFilter === "all" || (foodFilter === "branded" ? !!h.brand : !h.brand)).map((hit, i) => {
-                        const img = hit.image_url ?? hit.imageUrl;
-                        return (
-                          <button key={i} onClick={() => void pickWeb(hit)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary">
-                            <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2">{img ? <img src={img} alt="" className="size-full object-cover" /> : <Utensils className="size-4 text-muted-foreground" />}</div>
-                            <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{hit.name}</div>{hit.brand && <div className="truncate text-xs text-muted-foreground">{hit.brand}</div>}<div className="truncate text-xs text-muted-foreground">{Math.round(hit.calories)} kcal</div></div>
-                            <Plus className="size-4 shrink-0 text-primary" />
-                          </button>
-                        );
-                      })}
+                      {webResults?.filter((h) => foodFilter === "all" || (foodFilter === "branded" ? !!h.brand : !h.brand)).map((hit, i) => (
+                        <div key={i} className="rounded-xl px-2 py-2 transition-colors hover:bg-secondary">
+                          <FoodRow
+                            {...normFood(hit)}
+                            macros={false}
+                            thumbSize={40}
+                            onClick={() => void pickWeb(hit)}
+                            trailing={<Plus className="size-4 shrink-0 text-primary" />}
+                          />
+                        </div>
+                      ))}
                       {webResults && webResults.length === 0 && !webBusy && <p className="p-3 text-center text-sm text-muted-foreground">No results — try Scan label or Manual.</p>}
                       {webResults && webResults.length > 0 && !webResults.some((h) => foodFilter === "all" || (foodFilter === "branded" ? !!h.brand : !h.brand)) && <p className="p-3 text-center text-sm text-muted-foreground">No {foodFilter} foods here — try “All”.</p>}
                     </div>

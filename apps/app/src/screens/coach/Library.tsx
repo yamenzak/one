@@ -2,15 +2,14 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { fmtEnergy } from "@mossa/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, MacroInline, cn, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Sparkles, Ellipsis, Send, History } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, cn, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Sparkles, Ellipsis, Send, History } from "@mossa/ui";
 import { api } from "../../api.js";
-import { useUnits } from "../../units.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { AiErrorBox } from "../../AiError.js";
 import { FoodEditor } from "../client/FoodEditor.js";
 import { ExerciseEditor } from "./ExerciseEditor.js";
-import { ExerciseThumb, ExerciseMeta, type ExerciseInfo } from "../exercise.js";
+import { FoodRow as FoodRowUI, normFood } from "../food.js";
+import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
 
 type Tab = "exercises" | "foods" | "templates" | "content";
 const TABS: Tab[] = ["exercises", "foods", "templates", "content"];
@@ -33,18 +32,18 @@ export function Library() {
   );
 }
 
-type ExerciseRow = ExerciseInfo & { source?: string; tenant_id?: string | null };
+type LibraryExercise = ExerciseInfo & { source?: string; tenant_id?: string | null };
 type ExEdit = { exerciseId?: string; initial?: Partial<ExerciseInfo> };
 function Exercises() {
   const [q, setQ] = useState("");
-  const [items, setItems] = useState<ExerciseRow[] | null>(null);
+  const [items, setItems] = useState<LibraryExercise[] | null>(null);
   const [editor, setEditor] = useState<ExEdit | null>(null);
-  const [altFor, setAltFor] = useState<ExerciseRow | null>(null);
-  const [archiveFor, setArchiveFor] = useState<ExerciseRow | null>(null);
-  const load = useCallback(async () => setItems((await api.get<{ exercises: ExerciseRow[] }>(`/api/exercises?q=${encodeURIComponent(q)}`)).exercises), [q]);
+  const [altFor, setAltFor] = useState<LibraryExercise | null>(null);
+  const [archiveFor, setArchiveFor] = useState<LibraryExercise | null>(null);
+  const load = useCallback(async () => setItems((await api.get<{ exercises: LibraryExercise[] }>(`/api/exercises?q=${encodeURIComponent(q)}`)).exercises), [q]);
   useEffect(() => { const t = setTimeout(() => void load(), 200); return () => clearTimeout(t); }, [load]);
   // Tenant-owned rows edit in place; platform seeds fork into a tenant copy.
-  const open = (e: ExerciseRow) => setEditor(e.tenant_id ? { exerciseId: e.id, initial: e } : { initial: { ...e, id: undefined } });
+  const open = (e: LibraryExercise) => setEditor(e.tenant_id ? { exerciseId: e.id, initial: e } : { initial: { ...e, id: undefined } });
   return (
     <div className="space-y-3">
       <div className="flex items-end gap-2">
@@ -53,15 +52,15 @@ function Exercises() {
       </div>
       {!items ? <Skeleton className="h-40" /> : items.length === 0 ? <EmptyState icon={Dumbbell} title="No matches" /> : (
         <Stagger className="space-y-1">{items.map((e) => (
-          <div key={e.id} className="flex items-center gap-3 rounded-2xl bg-card px-3 py-2.5">
-            <button onClick={() => open(e)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-              <ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={40} />
-              <div className="min-w-0 flex-1"><div className="truncate font-medium">{e.name}</div><ExerciseMeta ex={e} className="text-xs text-muted-foreground" /></div>
-            </button>
-            <button onClick={() => open(e)} aria-label="Edit" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><PencilLine /></button>
-            <button onClick={() => setAltFor(e)} aria-label="Alternatives" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><ArrowLeftRight /></button>
-            {/* Only tenant-owned rows can be archived; platform seeds have no delete affordance. */}
-            {e.tenant_id ? <button onClick={() => setArchiveFor(e)} aria-label="Archive" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Archive /></button> : null}
+          <div key={e.id} className="rounded-2xl bg-card px-3 py-2.5">
+            <ExerciseRow ex={e} thumbSize={40} onClick={() => open(e)} trailing={
+              <div className="flex items-center gap-0">
+                <button onClick={() => open(e)} aria-label="Edit" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><PencilLine /></button>
+                <button onClick={() => setAltFor(e)} aria-label="Alternatives" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><ArrowLeftRight /></button>
+                {/* Only tenant-owned rows can be archived; platform seeds have no delete affordance. */}
+                {e.tenant_id ? <button onClick={() => setArchiveFor(e)} aria-label="Archive" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Archive /></button> : null}
+              </div>
+            } />
           </div>
         ))}</Stagger>
       )}
@@ -94,10 +93,10 @@ function AlternativesSheet({ exercise, onClose }: { exercise: ExerciseInfo; onCl
         <p className="text-sm text-muted-foreground">Bound alternatives let clients swap instantly — no approval. Binding is two-way.</p>
         {!alts ? <Skeleton className="h-20" /> : alts.length === 0 ? <p className="text-sm text-muted-foreground">No alternatives yet.</p> : (
           <div className="space-y-1">{alts.map((a) => (
-            <div key={a.id} className="flex items-center gap-3 rounded-xl bg-surface-2 px-2.5 py-2">
-              <ExerciseThumb thumb={a.thumb_url} thumb2={a.thumb2_url} size={36} />
-              <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{a.name}</div><ExerciseMeta ex={a} className="text-xs text-muted-foreground" /></div>
-              <button onClick={() => void remove(a.id)} aria-label="Remove" className="text-muted-foreground hover:text-danger [&_svg]:size-4"><Trash2 /></button>
+            <div key={a.id} className="rounded-xl bg-surface-2 px-2.5 py-2">
+              <ExerciseRow ex={a} thumbSize={36} trailing={
+                <button onClick={() => void remove(a.id)} aria-label="Remove" className="text-muted-foreground hover:text-danger [&_svg]:size-4"><Trash2 /></button>
+              } />
             </div>
           ))}</div>
         )}
@@ -106,9 +105,7 @@ function AlternativesSheet({ exercise, onClose }: { exercise: ExerciseInfo; onCl
           <div className="mt-1 max-h-56 space-y-1 overflow-y-auto">
             {results.filter((e) => !altIds.has(e.id)).map((e) => (
               <button key={e.id} onClick={() => void add(e.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-secondary">
-                <ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={34} />
-                <div className="min-w-0 flex-1 truncate text-sm">{e.name}</div>
-                <Plus className="size-4 shrink-0 text-primary" />
+                <ExerciseRow ex={e} thumbSize={34} meta={false} trailing={<Plus className="size-4 shrink-0 text-primary" />} />
               </button>
             ))}
           </div>
@@ -158,7 +155,6 @@ function ArchiveConfirm({ kind, id, name, onClose, onDone }: { kind: "exercise" 
 
 interface FoodRow { id: string; name: string; calories: number; brand: string | null; tenant_id: string | null; visibility?: string | null; protein_g?: number; carbs_g?: number; fat_g?: number; image_url?: string | null }
 function Foods() {
-  const units = useUnits();
   const [q, setQ] = useState("");
   const [items, setItems] = useState<FoodRow[] | null>(null);
   // `null` = closed; `{}` = new; `{ id }` = edit that food.
@@ -175,17 +171,20 @@ function Foods() {
       </div>
       {!items ? <Skeleton className="h-40" /> : items.length === 0 ? <EmptyState icon={Utensils} title="No foods yet" description="Add one, or build your library from the Eat tab." action={<Button onClick={() => setEditor({})}><Plus /> New food</Button>} /> : (
         <Stagger className="space-y-1">{items.map((f) => (
-          <Card key={f.id} className="flex items-center gap-3 py-3">
-            <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2">{f.image_url ? <img src={f.image_url} alt="" className="size-full object-cover" /> : <Utensils className="size-4 text-muted-foreground" />}</div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-medium">{f.name}</div>
-              {f.brand && <div className="truncate text-xs text-muted-foreground">{f.brand}</div>}
-              <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="numeral text-calories">{fmtEnergy(f.calories, units)}</span><MacroInline proteinG={f.protein_g ?? 0} carbsG={f.carbs_g ?? 0} fatG={f.fat_g ?? 0} className="text-[0.7rem]" /></div>
-            </div>
-            <Badge tone={tag(f) === "seed" ? "cardio" : tag(f) === "private" ? "neutral" : "activity"}>{tag(f)}</Badge>
-            <button onClick={() => setEditor({ id: f.id })} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground [&_svg]:size-4" aria-label="Edit food"><PencilLine /></button>
-            {/* Seeds (tenant_id null) can't be archived — only a tenant's own rows. */}
-            {f.tenant_id !== null ? <button onClick={() => setArchiveFor(f)} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4" aria-label="Archive food"><Archive /></button> : null}
+          <Card key={f.id} className="py-3">
+            <FoodRowUI
+              {...normFood(f)}
+              thumbSize={40}
+              macros={f.protein_g != null}
+              trailing={
+                <>
+                  <Badge tone={tag(f) === "seed" ? "cardio" : tag(f) === "private" ? "neutral" : "activity"}>{tag(f)}</Badge>
+                  <button onClick={() => setEditor({ id: f.id })} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground [&_svg]:size-4" aria-label="Edit food"><PencilLine /></button>
+                  {/* Seeds (tenant_id null) can't be archived — only a tenant's own rows. */}
+                  {f.tenant_id !== null ? <button onClick={() => setArchiveFor(f)} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4" aria-label="Archive food"><Archive /></button> : null}
+                </>
+              }
+            />
           </Card>
         ))}</Stagger>
       )}

@@ -18,7 +18,7 @@ import {
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { LogSheet } from "./LogSheet.js";
-import { ExerciseThumb, ExerciseMeta, pretty, type ExerciseInfo } from "../exercise.js";
+import { ExerciseRow, pretty, type ExerciseInfo } from "../exercise.js";
 import { CoachNote } from "./CoachNote.js";
 
 interface Plan { id: string; name: string; status: string; body: WorkoutBody }
@@ -283,13 +283,8 @@ function BrowseSheet({ category, library, onClose }: { category: string; library
     <Sheet open onClose={onClose} title={pretty(category)}>
       <div className="max-h-[70vh] space-y-1 overflow-y-auto">
         {items.map((e) => (
-          <div key={e.id} className="flex items-center gap-3 rounded-xl px-2 py-2">
-            <ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={44} />
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium">{e.name}</div>
-              <ExerciseMeta ex={e} className="text-xs text-muted-foreground" />
-            </div>
-            {e.difficulty && <Badge tone="neutral">{e.difficulty}</Badge>}
+          <div key={e.id} className="rounded-xl px-2 py-2">
+            <ExerciseRow ex={e} trailing={e.difficulty ? <Badge tone="neutral">{e.difficulty}</Badge> : null} />
           </div>
         ))}
         {items.length === 0 && <p className="px-3 py-6 text-center text-sm text-muted-foreground">Nothing here yet.</p>}

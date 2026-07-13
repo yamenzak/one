@@ -6,8 +6,8 @@
  * everywhere (SPEC §8.3, DESIGN.md metric-coding).
  */
 
-import { useEffect, useState } from "react";
-import { Dumbbell, cn } from "@mossa/ui";
+import { useEffect, useState, type ReactNode } from "react";
+import { Dumbbell, Info, cn } from "@mossa/ui";
 
 // ── Shared frame ticker ──────────────────────────────────────────────────────
 // One global interval drives every animated thumbnail in sync, so a whole
@@ -76,9 +76,64 @@ function AnimatedFrames({ frames }: { frames: string[] }) {
   );
 }
 
+/** The muscle · equipment label as a plain string (for composing sub-lines). */
+export const metaText = (ex?: ExerciseInfo): string =>
+  ex ? [firstMuscle(ex), splitList(ex.equipment)[0]].filter(Boolean).map((b) => pretty(b!)).join(" · ") : "";
+
 /** Small muscle + equipment sub-label ("Chest · Barbell"). */
 export function ExerciseMeta({ ex, className = "" }: { ex: ExerciseInfo; className?: string }) {
-  const bits = [firstMuscle(ex), splitList(ex.equipment)[0]].filter(Boolean).map((b) => pretty(b!));
-  if (bits.length === 0) return null;
-  return <span className={className}>{bits.join(" · ")}</span>;
+  const t = metaText(ex);
+  if (!t) return null;
+  return <span className={className}>{t}</span>;
+}
+
+/**
+ * The canonical exercise row: thumbnail, name (with an optional ⓘ affordance),
+ * and a sub-line that leads with the muscle · equipment meta and appends
+ * whatever `sub` you pass (a prescription like "3 × 10 reps", a "2/3 sets"
+ * progress, etc.). The tappable content is thumb+text; `trailing` hangs actions
+ * or a difficulty badge off the end. Wrap it in the surface's own container
+ * (SubCard, Card, a bare list) — the row is the shared, unified part.
+ */
+export function ExerciseRow({
+  ex, name, sub, trailing, info, meta = true, thumbSize = 44, onClick, className,
+}: {
+  ex?: ExerciseInfo;
+  /** Fallback name when `ex` is absent (e.g. an id-only reference). */
+  name?: string;
+  /** Extra sub-line text, appended after the muscle · equipment meta. */
+  sub?: ReactNode;
+  /** Actions/badge pinned to the far right. */
+  trailing?: ReactNode;
+  /** Show the ⓘ info affordance next to the name. */
+  info?: boolean;
+  /** Lead the sub-line with muscle · equipment (default true). */
+  meta?: boolean;
+  thumbSize?: number;
+  onClick?: () => void;
+  className?: string;
+}) {
+  const label = ex?.name ?? name ?? "Exercise";
+  const m = meta ? metaText(ex) : "";
+  const Body = (
+    <>
+      <ExerciseThumb thumb={ex?.thumb_url} thumb2={ex?.thumb2_url} size={thumbSize} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1 font-medium"><span className="truncate">{label}</span>{info && <Info className="size-3.5 shrink-0 text-muted-foreground" />}</div>
+        {(m || sub != null) && (
+          <div className="truncate text-sm text-muted-foreground">{m}{m && sub != null ? <span className="mx-1 text-muted-foreground/50">·</span> : null}{sub}</div>
+        )}
+      </div>
+    </>
+  );
+  return (
+    <div className={cn("flex items-center gap-3", className)}>
+      {onClick ? (
+        <button onClick={onClick} className="flex min-w-0 flex-1 items-center gap-3 text-left transition-opacity active:opacity-80">{Body}</button>
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center gap-3">{Body}</div>
+      )}
+      {trailing}
+    </div>
+  );
 }

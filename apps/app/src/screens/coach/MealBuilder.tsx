@@ -9,6 +9,7 @@ import { api, ApiError } from "../../api.js";
 import { AiErrorBox } from "../../AiError.js";
 import { useUnits } from "../../units.js";
 import { FoodSearchSheet } from "../client/FoodSearchSheet.js";
+import { FoodRow as FoodRowUI } from "../food.js";
 
 interface Plan { id: string; clientId: string; name: string; status: string; body: MealBody; targetGoal?: { targets?: Record<string, number> | null } | null }
 interface FoodRow { id: string; name: string; serving_size: number; calories: number; protein_g: number; carbs_g: number; fat_g: number }
@@ -105,12 +106,20 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
                   ) : (
                     <>
                       {opt.foods.map((mf, fi) => (
-                        <div key={fi} className="flex items-center gap-2 text-sm">
-                          <span className="flex-1 truncate">{nameOf(mf.foodId)}</span>
-                          <input type="number" value={mf.quantity} onChange={(e) => mutate((d) => (d[idx]!.foods[fi]!.quantity = Number(e.target.value)))} className="w-16 rounded-lg bg-surface-3 px-2 py-1 outline-none" />
-                          <span className="text-xs text-muted-foreground">{mf.unit}</span>
-                          <button onClick={() => mutate((d) => d[idx]!.foods.splice(fi, 1))} className="text-muted-foreground hover:text-danger [&_svg]:size-3.5"><X /></button>
-                        </div>
+                        <FoodRowUI
+                          key={fi}
+                          name={nameOf(mf.foodId)}
+                          macros={false}
+                          energy={false}
+                          thumbSize={34}
+                          trailing={
+                            <div className="flex items-center gap-2 text-sm">
+                              <input type="number" value={mf.quantity} onChange={(e) => mutate((d) => (d[idx]!.foods[fi]!.quantity = Number(e.target.value)))} className="w-16 rounded-lg bg-surface-3 px-2 py-1 outline-none" />
+                              <span className="text-xs text-muted-foreground">{mf.unit}</span>
+                              <button onClick={() => mutate((d) => d[idx]!.foods.splice(fi, 1))} className="text-muted-foreground hover:text-danger [&_svg]:size-3.5"><X /></button>
+                            </div>
+                          }
+                        />
                       ))}
                       <button onClick={() => setFoodPicker({ optIdx: idx })} className="text-xs font-medium text-primary">+ Food</button>
                       {opt.foods.length > 0 && <MealImage mealName={opt.mealName} foodNames={opt.foods.map((mf) => nameOf(mf.foodId))} value={opt.imageUrl} onChange={(url) => mutate((d) => (d[idx]!.imageUrl = url))} />}
