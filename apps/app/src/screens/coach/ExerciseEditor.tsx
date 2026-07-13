@@ -178,9 +178,9 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
           <div className="space-y-4">
             <Field label="Exercise name" icon={Dumbbell} value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="e.g. Barbell Back Squat" />
             <div className="grid grid-cols-3 gap-2">
-              {canAi && <ModeCard icon={Sparkles} label="With AI" hint="Fill everything" busy={autoBusy} disabled={name.trim().length < 2} onClick={() => void startWithAi()} />}
-              <ModeCard icon={Globe} label="Web search" hint="From libraries" active={webMode} onClick={() => setWebMode((v) => !v)} />
-              <ModeCard icon={PencilLine} label="Manual" hint="Enter it yourself" disabled={name.trim().length < 2} onClick={() => setStep("review")} />
+              {canAi && <ModeCard icon={Sparkles} tone="primary" label="With AI" hint="Fill everything" busy={autoBusy} disabled={name.trim().length < 2} onClick={() => void startWithAi()} />}
+              <ModeCard icon={Globe} tone="cardio" label="Web search" hint="From libraries" active={webMode} onClick={() => setWebMode((v) => !v)} />
+              <ModeCard icon={PencilLine} tone="neutral" label="Manual" hint="Enter it yourself" disabled={name.trim().length < 2} onClick={() => setStep("review")} />
             </div>
 
             {webMode && (
