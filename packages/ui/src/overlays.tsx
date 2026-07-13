@@ -14,10 +14,38 @@ import { Drawer } from "vaul";
 import { motion } from "motion/react";
 import { Check, ChevronDown, X } from "./lib/icons.js";
 import { cn } from "./lib/utils.js";
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 const overlayCls =
   "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm data-[state=open]:animate-[overlay-in_0.2s_ease] data-[state=closed]:animate-[overlay-out_0.15s_ease]";
+
+/**
+ * How many px the on-screen keyboard overlaps the layout viewport, via the
+ * VisualViewport API. On both iOS and Android the keyboard covers (not
+ * resizes) the layout viewport, so bottom-anchored drawers hide their footer
+ * behind it. Drawers lift by this inset and clamp their height to the space
+ * above the keyboard. Small deltas (address-bar chrome) are ignored.
+ */
+function useKeyboardInset(active: boolean) {
+  const [inset, setInset] = useState(0);
+  useEffect(() => {
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    if (!active || !vv) return;
+    const update = () => {
+      const overlap = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setInset(overlap > 90 ? Math.round(overlap) : 0);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      setInset(0);
+    };
+  }, [active]);
+  return inset;
+}
 
 // ── Dialog (centered modal) ─────────────────────────────────────────────────
 export function Dialog({ open, onOpenChange, children }: { open: boolean; onOpenChange: (o: boolean) => void; children: ReactNode }) {
@@ -59,17 +87,23 @@ export const DialogClose = DialogPrimitive.Close;
 export function FixedDrawer({ open, onClose, dismissible = true, title, headerAction, footer, children }: {
   open: boolean; onClose: () => void; dismissible?: boolean; title?: string; headerAction?: ReactNode; footer?: ReactNode; children: ReactNode;
 }) {
+  const kb = useKeyboardInset(open);
   return (
     <Drawer.Root open={open} onOpenChange={(o) => dismissible && !o && onClose()} dismissible={dismissible} repositionInputs={false}>
       <Drawer.Portal>
         <Drawer.Overlay className={overlayCls} />
-        <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex h-[87vh] w-full max-w-xl flex-col rounded-t-3xl border-t border-border/60 bg-popover shadow-2xl outline-none">
+        {/* Lift above the keyboard and clamp height so header + footer stay on
+            screen; the scroll area shrinks and keeps the focused field in view. */}
+        <Drawer.Content
+          style={{ bottom: kb || undefined, maxHeight: kb ? `calc(100dvh - ${kb}px)` : undefined }}
+          className="fixed inset-x-0 bottom-0 z-50 mx-auto flex h-[87vh] w-full max-w-xl flex-col rounded-t-3xl border-t border-border/60 bg-popover shadow-2xl outline-none transition-[max-height,bottom] duration-200 ease-out"
+        >
           <div className="flex items-center justify-between gap-3 border-b border-border/50 px-5 py-3">
             <Drawer.Title className={cn("truncate text-lg font-semibold tracking-tight", !title && "sr-only")}>{title ?? "Sheet"}</Drawer.Title>
             {headerAction}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
-          {footer && <div className="border-t border-border/50 px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">{footer}</div>}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
+          {footer && <div className="border-t border-border/50 px-5 py-3" style={{ paddingBottom: kb ? "0.75rem" : "calc(0.75rem + env(safe-area-inset-bottom))" }}>{footer}</div>}
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
@@ -78,13 +112,17 @@ export function FixedDrawer({ open, onClose, dismissible = true, title, headerAc
 
 // ── Sheet (bottom drawer, drag-to-dismiss) ──────────────────────────────────
 export function Sheet({ open, onClose, title, titleAction, children }: { open: boolean; onClose: () => void; title?: string; titleAction?: ReactNode; children: ReactNode }) {
+  const kb = useKeyboardInset(open);
   return (
     <Drawer.Root open={open} onOpenChange={(o) => !o && onClose()} repositionInputs={false}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
-        <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92vh] max-w-xl flex-col rounded-t-3xl border-t border-border/60 bg-popover outline-none">
+        <Drawer.Content
+          style={{ bottom: kb || undefined, maxHeight: kb ? `calc(100dvh - ${kb}px)` : undefined }}
+          className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92vh] max-w-xl flex-col rounded-t-3xl border-t border-border/60 bg-popover outline-none transition-[max-height,bottom] duration-200 ease-out"
+        >
           <div className="mx-auto mt-3 h-1.5 w-10 shrink-0 rounded-full bg-surface-3" />
-          <div className="overflow-y-auto px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4">
+          <div className="overflow-y-auto overscroll-contain px-5 pt-4" style={{ paddingBottom: kb ? "1.5rem" : "calc(1.5rem + env(safe-area-inset-bottom))" }}>
             <div className={cn("flex items-center justify-between gap-3", (title || titleAction) && "mb-4")}>
               <Drawer.Title className={cn("text-xl font-semibold tracking-tight", !title && "sr-only")}>{title ?? "Sheet"}</Drawer.Title>
               {titleAction}
