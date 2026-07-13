@@ -4,14 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { fmtEnergy, fmtVolume, volumeDisplayToMl, kcalToDisplay } from "@mossa/domain";
 import {
   Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MacroInline, MetricChip, ProgressRing, METRICS, toneSoft, Page, Stagger, EmptyState, motion,
-  Plus, ClipboardList, Utensils, Croissant, Soup, Apple, Dumbbell, Droplet, Beef, Camera, History, Trash2, type LucideIcon,
+  Plus, ClipboardList, Utensils, Croissant, Soup, Apple, Dumbbell, Droplet, Beef, Camera, Trash2, type LucideIcon,
 } from "@mossa/ui";
 import type { UnitPrefs } from "@mossa/domain";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
 import { MealPlanDrawer } from "./MealPlanDrawer.js";
-import { PlanHistorySheet } from "./PlanHistorySheet.js";
 import { CoachNote } from "./CoachNote.js";
 
 interface Entry { id: string; meal_type: string; label: string | null; calories: number; protein_g: number; carbs_g: number; fat_g: number; quantity: number | null; unit: string | null; image_url: string | null }
@@ -40,8 +39,6 @@ export function Eat({ clientId }: { clientId: string }) {
   const [logOpen, setLogOpen] = useState(false);
   const [logCamera, setLogCamera] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
-  const [planHistOpen, setPlanHistOpen] = useState(false);
-  const [hasPlanHistory, setHasPlanHistory] = useState(false);
   const [mealPlan, setMealPlan] = useState<{ name: string; meals: number; options: number } | null>(null);
   const [edit, setEdit] = useState<Entry | null>(null);
   const units = useUnits();
@@ -56,7 +53,6 @@ export function Eat({ clientId }: { clientId: string }) {
     ]);
     setEntries(e.entries); setTargets(today.goal?.targets ?? null);
     setWeek(wk); setWaterMl(wk.days[wk.days.length - 1]?.waterMl ?? 0);
-    setHasPlanHistory(mp.plans.some((p) => p.status === "superseded"));
     const published = mp.plans.find((p) => p.status === "published");
     const opts = published?.body?.mealOptions ?? [];
     setMealPlan(published ? { name: published.name, meals: new Set(opts.map((o) => o.mealType)).size, options: opts.length } : null);
@@ -143,7 +139,6 @@ export function Eat({ clientId }: { clientId: string }) {
         <Chip icon={Plus} selected onClick={() => openLog()}>Log food</Chip>
         <Chip icon={Camera} onClick={() => openLog(undefined, true)}>Snap a meal</Chip>
         {!mealPlan && <Chip icon={ClipboardList} onClick={() => setPlanOpen(true)}>My plan</Chip>}
-        {hasPlanHistory && <Chip icon={History} onClick={() => setPlanHistOpen(true)}>Past plans</Chip>}
       </Stagger>
 
       {/* Today — hydration + protein at a glance */}
@@ -224,7 +219,6 @@ export function Eat({ clientId }: { clientId: string }) {
 
       {logOpen && <FoodSearchSheet clientId={clientId} mealType={logMeal} autoCamera={logCamera} onClose={() => setLogOpen(false)} onLogged={() => void load()} />}
       {planOpen && <MealPlanDrawer clientId={clientId} onClose={() => setPlanOpen(false)} onLogged={() => void load()} />}
-      {planHistOpen && <PlanHistorySheet clientId={clientId} kind="meal" onClose={() => setPlanHistOpen(false)} />}
       {edit && <EditEntrySheet entry={edit} clientId={clientId} units={units} onClose={() => setEdit(null)} onSaved={() => void load()} />}
     </Page>
   );

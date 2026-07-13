@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy, kcalToDisplay } from "@mossa/domain";
-import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Utensils, ShoppingCart, Plus, Minus, Sparkles, Check, ArrowLeft, Croissant, Soup, Apple, Dumbbell } from "@mossa/ui";
+import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Utensils, ShoppingCart, Plus, Minus, Sparkles, Check, ArrowLeft, History, Croissant, Soup, Apple, Dumbbell } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
@@ -18,7 +18,7 @@ import { Markdown } from "../../Markdown.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
 import { AiAvatar } from "../../AiAvatar.js";
 
-interface Plan { id: string; name: string; status: string; body: MealBody }
+interface Plan { id: string; name: string; status: string; publishedAt?: string | null; body: MealBody }
 interface FoodRow {
   id: string; name: string; serving_size: number; serving_unit: string; calories: number;
   protein_g: number; carbs_g: number; fat_g: number; fiber_g: number; sugar_g: number; sodium_mg: number;
@@ -56,6 +56,9 @@ function MacroSplitBar({ p, c, f }: { p: number; c: number; f: number }) {
 
 export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: string; onClose: () => void; onLogged: () => void }) {
   const [plan, setPlan] = useState<Plan | null | undefined>(undefined);
+  const [allPlans, setAllPlans] = useState<Plan[]>([]);
+  const [viewId, setViewId] = useState<string | null>(null); // null = the current published plan
+  const [histOpen, setHistOpen] = useState(false);
   const [foods, setFoods] = useState<Map<string, FoodRow>>(new Map());
   const [targets, setTargets] = useState<Targets | null>(null);
   const [loggedIdx, setLoggedIdx] = useState<Set<number>>(new Set());
@@ -80,6 +83,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
     ]);
     const published = pl.plans.find((p) => p.status === "published") ?? null;
     setPlan(published);
+    setAllPlans(pl.plans);
     setFoods(new Map(f.foods.map((x) => [x.id, x])));
     setTargets(today.goal?.targets ?? null);
     setLoggedIdx(new Set((log.entries ?? []).filter((e) => e.meal_plan_id === published?.id && e.meal_option_index != null).map((e) => e.meal_option_index as number)));
@@ -88,11 +92,19 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
 
   const foodMap = useMemo(() => new Map([...foods.entries()].map(([id, f]) => [id, { id: f.id, servingSize: f.serving_size, caloriesPerServing: f.calories, proteinG: f.protein_g, carbsG: f.carbs_g, fatG: f.fat_g } as FoodLike])), [foods]);
 
+  // `active` is the plan being viewed — the current published one by default, or
+  // a past (superseded) plan the client picked from history. Logging always
+  // targets the current plan, so past plans render read-only.
+  const active = (viewId ? allPlans.find((p) => p.id === viewId) : plan) ?? plan ?? null;
+  const isPast = !!active && !!plan && active.id !== plan.id;
+  const pastPlans = allPlans.filter((p) => p.status === "superseded");
+  const pickPlan = (id: string | null) => { setViewId(id); setHistOpen(false); setView("plan"); setCounts({}); setChecked(new Set()); };
+
   const groups = useMemo(() => {
     const g = new Map<string, { opt: MealOption; index: number }[]>();
-    (plan?.body.mealOptions ?? []).forEach((opt, index) => { const arr = g.get(opt.mealType) ?? []; arr.push({ opt, index }); g.set(opt.mealType, arr); });
+    (active?.body.mealOptions ?? []).forEach((opt, index) => { const arr = g.get(opt.mealType) ?? []; arr.push({ opt, index }); g.set(opt.mealType, arr); });
     return [...g.entries()].sort((a, b) => (MEAL_ORDER.indexOf(a[0]) + 99 * (MEAL_ORDER.indexOf(a[0]) < 0 ? 1 : 0)) - (MEAL_ORDER.indexOf(b[0]) + 99 * (MEAL_ORDER.indexOf(b[0]) < 0 ? 1 : 0)));
-  }, [plan]);
+  }, [active]);
 
   const contrib = (mf: MealOption["foods"][number]) => {
     const f = foods.get(mf.foodId);
@@ -136,7 +148,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
 
   const grocery = useMemo(() => {
     const acc = new Map<string, { name: string; qty: number; unit: string; img: string | null }>();
-    (plan?.body.mealOptions ?? []).forEach((opt, index) => {
+    (active?.body.mealOptions ?? []).forEach((opt, index) => {
       const days = counts[index] ?? 0;
       if (days <= 0 || opt.isFree) return;
       for (const mf of opt.foods) {
@@ -146,29 +158,30 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
       }
     });
     return [...acc.entries()].map(([id, v]) => ({ id, ...v })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [plan, counts, foods]);
+  }, [active, counts, foods]);
 
   const weekTotals = useMemo(() => {
     let cal = 0, pro = 0, days = 0;
-    (plan?.body.mealOptions ?? []).forEach((opt, index) => {
+    (active?.body.mealOptions ?? []).forEach((opt, index) => {
       const n = counts[index] ?? 0; days += n;
       if (opt.isFree) { cal += (opt.freeMealMaxCalories ?? 0) * n; return; }
       const t = optionMacroTotals(opt, foodMap); cal += t.calories * n; pro += t.proteinG * n;
     });
     return { cal, pro, days };
-  }, [plan, counts, foodMap]);
+  }, [active, counts, foodMap]);
 
   return (
     <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-background">
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border/40 bg-background/85 px-4 py-3 backdrop-blur-xl">
         <button onClick={onClose} aria-label="Close" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><ArrowLeft /></button>
-        <div className="min-w-0 flex-1"><div className="truncate text-base font-bold tracking-tight">Meal plan</div>{plan && <div className="truncate text-xs text-muted-foreground">{plan.name}</div>}</div>
+        <div className="min-w-0 flex-1"><div className="truncate text-base font-bold tracking-tight">{isPast ? "Past plan" : "Meal plan"}</div>{active && <div className="truncate text-xs text-muted-foreground">{active.name}</div>}</div>
+        {pastPlans.length > 0 && <button onClick={() => setHistOpen(true)} aria-label="Past plans" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><History /></button>}
       </div>
 
       <div className="mx-auto max-w-xl space-y-5 p-4 pb-28">
         {plan === undefined ? (
           <div className="space-y-3"><Skeleton className="h-28 rounded-2xl" /><Skeleton className="h-40 rounded-2xl" /></div>
-        ) : !plan ? (
+        ) : !active ? (
           <EmptyState icon={Utensils} title="No meal plan yet" description="Your coach hasn't published a meal plan. You can still log food from the Eat tab." />
         ) : (
           <>
@@ -177,15 +190,17 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
               <Card className="relative overflow-hidden">
                 <div className="pointer-events-none absolute -right-10 -top-10 size-36 rounded-full bg-nutrition/10 blur-2xl" />
                 <div className="relative">
-                  <div className="text-xs font-medium uppercase tracking-wide text-nutrition">Your plan</div>
-                  <h2 className="mt-0.5 text-xl font-semibold tracking-tight">{plan.name}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">{groups.length} meal{groups.length === 1 ? "" : "s"} · {plan.body.mealOptions?.length ?? 0} options to choose from</p>
-                  {(targets?.targetCalories || targets?.targetProteinG) && (
+                  <div className={cn("text-xs font-medium uppercase tracking-wide", isPast ? "text-muted-foreground" : "text-nutrition")}>{isPast ? "Past plan" : "Your plan"}</div>
+                  <h2 className="mt-0.5 text-xl font-semibold tracking-tight">{active?.name}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">{groups.length} meal{groups.length === 1 ? "" : "s"} · {active?.body.mealOptions?.length ?? 0} options{active?.publishedAt ? ` · ${new Date(active.publishedAt).toLocaleDateString()}` : ""}</p>
+                  {isPast ? (
+                    <button onClick={() => pickPlan(null)} className="mt-3 inline-flex items-center gap-1 rounded-full bg-nutrition-soft px-3 py-1 text-xs font-semibold text-nutrition [&_svg]:size-3.5"><ArrowLeft /> Back to current plan</button>
+                  ) : (targets?.targetCalories || targets?.targetProteinG) ? (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {targets?.targetCalories ? <span className="rounded-full bg-calories-soft px-2.5 py-1 text-xs font-semibold text-calories">{fmtEnergy(targets.targetCalories, units)} / day</span> : null}
                       {targets?.targetProteinG ? <span className="rounded-full bg-protein-soft px-2.5 py-1 text-xs font-semibold text-protein">{targets.targetProteinG} g protein</span> : null}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </Card>
             </motion.div>
@@ -195,7 +210,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
             {view === "plan" ? (
               groups.length === 0 ? <EmptyState icon={Utensils} title="No options yet" /> : (
                 <div className="space-y-6">
-                  <p className="-mt-1 px-1 text-sm text-muted-foreground">Pick one option per meal each day, then tap <span className="font-medium text-foreground">Log</span> when you eat it.</p>
+                  <p className="-mt-1 px-1 text-sm text-muted-foreground">{isPast ? "A plan you were on before — browse the meals and recipes." : <>Pick one option per meal each day, then tap <span className="font-medium text-foreground">Log</span> when you eat it.</>}</p>
                   {groups.map(([type, opts]) => {
                     const meta = metaFor(type);
                     return (
@@ -208,8 +223,8 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                         <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
                           {opts.map(({ opt, index }) => (
                             <OptionPhotoCard
-                              key={index} opt={opt} index={index} units={units} image={optionImage(opt)} totals={optionMacroTotals(opt, foodMap)}
-                              logged={loggedIdx.has(index)} logging={logging === index} onLog={() => void logOption(opt, index)} onOpen={() => setDetail({ opt, index })}
+                              key={index} opt={opt} index={index} units={units} image={optionImage(opt)} totals={optionMacroTotals(opt, foodMap)} readOnly={isPast}
+                              logged={!isPast && loggedIdx.has(index)} logging={logging === index} onLog={() => void logOption(opt, index)} onOpen={() => setDetail({ opt, index })}
                             />
                           ))}
                         </div>
@@ -221,7 +236,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
             ) : (
               <div className="space-y-4">
                 <p className="-mt-1 px-1 text-sm text-muted-foreground">How many days will you eat each option this week? We'll total up your shopping list.</p>
-                {(plan.body.mealOptions ?? []).map((opt, index) => (
+                {(active?.body.mealOptions ?? []).map((opt, index) => (
                   opt.isFree ? null : (
                     <div key={index} className="flex items-center gap-3 rounded-2xl bg-card px-3 py-2.5">
                       <FoodThumb src={opt.foods.map((mf) => foods.get(mf.foodId)?.image_url).find(Boolean)} size={38} />
@@ -277,11 +292,32 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
 
       {detail && (
         <OptionDetailSheet
-          opt={detail.opt} index={detail.index} units={units} foods={foods} foodMap={foodMap} image={optionImage(detail.opt)}
-          logged={loggedIdx.has(detail.index)} logging={logging === detail.index} onLog={() => void logOption(detail.opt, detail.index)}
+          opt={detail.opt} index={detail.index} units={units} foods={foods} foodMap={foodMap} image={optionImage(detail.opt)} readOnly={isPast}
+          logged={!isPast && loggedIdx.has(detail.index)} logging={logging === detail.index} onLog={() => void logOption(detail.opt, detail.index)}
           aiSuite={aiSuite} recipeBusy={recipeBusy === detail.index} onRecipe={() => void recommendRecipe(detail.opt, detail.index)}
           onClose={() => setDetail(null)}
         />
+      )}
+
+      {histOpen && (
+        <Sheet open onClose={() => setHistOpen(false)} title="Past plans">
+          <div className="space-y-1.5">
+            {plan && (
+              <button onClick={() => pickPlan(null)} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-surface-2", !isPast && "bg-nutrition-soft/40")}>
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-nutrition-soft text-nutrition [&_svg]:size-4"><Utensils /></span>
+                <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{plan.name}</div><div className="text-xs text-muted-foreground">Current plan</div></div>
+                {!isPast && <Check className="size-4 shrink-0 text-nutrition" strokeWidth={3} />}
+              </button>
+            )}
+            {pastPlans.map((p) => (
+              <button key={p.id} onClick={() => pickPlan(p.id)} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-surface-2", viewId === p.id && "bg-surface-2")}>
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-muted-foreground [&_svg]:size-4"><History /></span>
+                <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{p.name}</div><div className="text-xs text-muted-foreground">{p.publishedAt ? `Until ${new Date(p.publishedAt).toLocaleDateString()}` : "Superseded"}</div></div>
+                {viewId === p.id && <Check className="size-4 shrink-0 text-foreground" strokeWidth={3} />}
+              </button>
+            ))}
+          </div>
+        </Sheet>
       )}
 
       {recipe && (
@@ -308,9 +344,9 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
 
 /** A meal option as a photo-hero carousel card — cover, name, calories, macro
  *  split, Log button. Tapping the cover opens the full detail sheet. */
-function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, onLog, onOpen }: {
+function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, onLog, onOpen, readOnly }: {
   opt: MealOption; index: number; units: ReturnType<typeof useUnits>; image: string | null;
-  totals: { calories: number; proteinG: number; carbsG: number; fatG: number }; logged: boolean; logging: boolean; onLog: () => void; onOpen: () => void;
+  totals: { calories: number; proteinG: number; carbsG: number; fatG: number }; logged: boolean; logging: boolean; onLog: () => void; onOpen: () => void; readOnly?: boolean;
 }) {
   return (
     <div className="w-[74%] shrink-0 snap-start sm:w-[52%]">
@@ -331,19 +367,23 @@ function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, on
             )}
           </div>
         </button>
-        {!opt.isFree && <div className="px-2.5 pt-2.5"><MacroSplitBar p={totals.proteinG} c={totals.carbsG} f={totals.fatG} /></div>}
-        <div className="p-2.5">
-          <Button size="sm" className="w-full" variant={logged ? "secondary" : opt.isFree ? "tonal" : "default"} disabled={logging} onClick={onLog}>{logging ? "…" : logged ? "Log again" : "Log this"}</Button>
-        </div>
+        {!opt.isFree && <div className={cn("px-2.5 pt-2.5", readOnly && "pb-2.5")}><MacroSplitBar p={totals.proteinG} c={totals.carbsG} f={totals.fatG} /></div>}
+        {readOnly ? (
+          <button onClick={onOpen} className="w-full px-2.5 py-2 text-center text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">View details</button>
+        ) : (
+          <div className="p-2.5">
+            <Button size="sm" className="w-full" variant={logged ? "secondary" : opt.isFree ? "tonal" : "default"} disabled={logging} onClick={onLog}>{logging ? "…" : logged ? "Log again" : "Log this"}</Button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 /** The full option breakdown — cover, macro tiles, foods, notes, recipe, micros. */
-function OptionDetailSheet({ opt, index, units, foods, foodMap, image, logged, logging, onLog, aiSuite, recipeBusy, onRecipe, onClose }: {
+function OptionDetailSheet({ opt, index, units, foods, foodMap, image, logged, logging, onLog, aiSuite, recipeBusy, onRecipe, onClose, readOnly }: {
   opt: MealOption; index: number; units: ReturnType<typeof useUnits>; foods: Map<string, FoodRow>; foodMap: Map<string, FoodLike>; image: string | null;
-  logged: boolean; logging: boolean; onLog: () => void; aiSuite: boolean; recipeBusy: boolean; onRecipe: () => void; onClose: () => void;
+  logged: boolean; logging: boolean; onLog: () => void; aiSuite: boolean; recipeBusy: boolean; onRecipe: () => void; onClose: () => void; readOnly?: boolean;
 }) {
   const t = optionMacroTotals(opt, foodMap);
   const contrib = (mf: MealOption["foods"][number]) => { const f = foods.get(mf.foodId); return { f, factor: f && f.serving_size > 0 ? mf.quantity / f.serving_size : 0 }; };
@@ -406,7 +446,7 @@ function OptionDetailSheet({ opt, index, units, foods, foodMap, image, logged, l
             )}
           </>
         )}
-        <Button size="lg" className="w-full" variant={logged ? "secondary" : "default"} disabled={logging} onClick={() => { onLog(); onClose(); }}>{logging ? "Logging…" : logged ? "Log again" : "Log this meal"}</Button>
+        {!readOnly && <Button size="lg" className="w-full" variant={logged ? "secondary" : "default"} disabled={logging} onClick={() => { onLog(); onClose(); }}>{logging ? "Logging…" : logged ? "Log again" : "Log this meal"}</Button>}
       </div>
     </Sheet>
   );
