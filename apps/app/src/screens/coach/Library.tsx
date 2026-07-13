@@ -40,7 +40,7 @@ function Exercises() {
   const open = (e: ExerciseRow) => setEditor(e.tenant_id ? { exerciseId: e.id, initial: e } : { initial: { ...e, id: undefined } });
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="flex items-end gap-2">
         <Field className="flex-1" label="Search exercises" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
         <Button variant="tonal" aria-label="New exercise" onClick={() => setEditor({})}><Plus /></Button>
       </div>
@@ -119,7 +119,7 @@ function Foods() {
   const tag = (f: FoodRow) => (f.tenant_id === null ? "seed" : f.visibility === "private" ? "private" : "shared");
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="flex items-end gap-2">
         <Field className="flex-1" label="Search foods" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
         <Button variant="tonal" aria-label="New food" onClick={() => setEditor({})}><Plus /></Button>
       </div>
