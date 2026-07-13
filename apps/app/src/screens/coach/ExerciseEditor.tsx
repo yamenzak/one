@@ -11,8 +11,8 @@
  * managed from an optional nested drawer once the exercise exists.
  */
 
-import { useState } from "react";
-import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, cn, Dumbbell, Play, X, Sparkles, Globe, PencilLine, ArrowLeft, Search, Plus, Trash2 } from "@mossa/ui";
+import { useEffect, useState } from "react";
+import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Sparkles, Globe, PencilLine, ArrowLeft, Search, Plus, Trash2 } from "@mossa/ui";
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@mossa/protocol";
 import { api, ApiError } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -73,12 +73,22 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
   const [busy, setBusy] = useState(false);
   const [altOpen, setAltOpen] = useState(false);
 
-  // Web search
+  // Web search — driven by the exercise-name field (no separate query box).
   const [webMode, setWebMode] = useState(false);
-  const [webQ, setWebQ] = useState("");
   const [webResults, setWebResults] = useState<WebExercise[] | null>(null);
   const [webBusy, setWebBusy] = useState(false);
   const [importing, setImporting] = useState<string | null>(null);
+  useEffect(() => {
+    if (!webMode) return;
+    const q = name.trim();
+    if (q.length < 2) { setWebResults(null); return; }
+    const t = setTimeout(() => {
+      setWebBusy(true);
+      api.get<{ exercises: WebExercise[] }>(`/api/exercises/search-external?q=${encodeURIComponent(q)}`)
+        .then((r) => setWebResults(r.exercises)).catch(() => setWebResults([])).finally(() => setWebBusy(false));
+    }, 350);
+    return () => clearTimeout(t);
+  }, [webMode, name]);
 
   const errText = (e: unknown) => {
     const detail = e instanceof ApiError ? (e.body?.detail as string | undefined) : undefined;
@@ -112,15 +122,6 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
 
   const runGuide = async () => { setGuideBusy(true); setErr(null); try { await genGuide(); } catch (e) { setErr(errText(e)); } finally { setGuideBusy(false); } };
   const runPair = async () => { setPairBusy(true); setErr(null); try { await genPair(); } catch (e) { setErr(errText(e)); } finally { setPairBusy(false); } };
-
-  const searchWeb = async (q: string) => {
-    setWebQ(q);
-    if (q.trim().length < 2) { setWebResults(null); return; }
-    setWebBusy(true);
-    try { setWebResults((await api.get<{ exercises: WebExercise[] }>(`/api/exercises/search-external?q=${encodeURIComponent(q)}`)).exercises); }
-    catch { setWebResults([]); }
-    finally { setWebBusy(false); }
-  };
 
   // Pick a provider result → import it (dedup + brings its images) → review.
   const pickWeb = async (e: WebExercise) => {
@@ -184,8 +185,9 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
 
             {webMode && (
               <div className="space-y-2 rounded-2xl border border-border/50 p-3">
-                <Field label="Search the web (wger, free-exercise-db…)" icon={Search} value={webQ} onChange={(e) => void searchWeb(e.target.value)} placeholder="e.g. bulgarian split squat" />
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground [&_svg]:size-3.5"><Search /> Results for “{name.trim() || "…"}” from wger, free-exercise-db…</div>
                 <div className="max-h-72 space-y-1 overflow-y-auto">
+                  {name.trim().length < 2 && <p className="p-3 text-center text-sm text-muted-foreground">Type an exercise name above to search.</p>}
                   {webBusy && <p className="p-3 text-center text-sm text-muted-foreground">Searching…</p>}
                   {webResults?.map((e) => (
                     <button key={e.sourceId} disabled={!!importing} onClick={() => void pickWeb(e)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary disabled:opacity-60">

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fmtEnergy } from "@mossa/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, MacroInline, Search, Plus, Globe, Trash2, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Sparkles } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, MacroInline, Search, Plus, Trash2, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Sparkles } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { AiAvatar } from "../../AiAvatar.js";
@@ -33,7 +33,6 @@ function Exercises() {
   const [q, setQ] = useState("");
   const [items, setItems] = useState<ExerciseRow[] | null>(null);
   const [editor, setEditor] = useState<ExEdit | null>(null);
-  const [webOpen, setWebOpen] = useState(false);
   const [altFor, setAltFor] = useState<ExerciseRow | null>(null);
   const load = useCallback(async () => setItems((await api.get<{ exercises: ExerciseRow[] }>(`/api/exercises?q=${encodeURIComponent(q)}`)).exercises), [q]);
   useEffect(() => { const t = setTimeout(() => void load(), 200); return () => clearTimeout(t); }, [load]);
@@ -41,10 +40,9 @@ function Exercises() {
   const open = (e: ExerciseRow) => setEditor(e.tenant_id ? { exerciseId: e.id, initial: e } : { initial: { ...e, id: undefined } });
   return (
     <div className="space-y-3">
-      <Field label="Search exercises" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
-      <div className="flex gap-2">
-        <Button size="sm" variant="secondary" className="flex-1" onClick={() => setEditor({})}><Plus /> New</Button>
-        <Button size="sm" variant="secondary" className="flex-1" onClick={() => setWebOpen(true)}><Globe /> Web search</Button>
+      <div className="flex items-center gap-2">
+        <Field className="flex-1" label="Search exercises" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
+        <Button variant="tonal" aria-label="New exercise" onClick={() => setEditor({})}><Plus /></Button>
       </div>
       {!items ? <Skeleton className="h-40" /> : items.length === 0 ? <EmptyState icon={Dumbbell} title="No matches" /> : (
         <Stagger className="space-y-1">{items.map((e) => (
@@ -59,13 +57,11 @@ function Exercises() {
         ))}</Stagger>
       )}
       {editor && <ExerciseEditor exerciseId={editor.exerciseId} initial={editor.initial} onClose={() => setEditor(null)} onSaved={() => { setEditor(null); void load(); }} />}
-      {webOpen && <WebExerciseSheet onClose={() => setWebOpen(false)} onImported={() => void load()} />}
       {altFor && <AlternativesSheet exercise={altFor} onClose={() => setAltFor(null)} />}
     </div>
   );
 }
 
-interface WebExercise { name: string; muscleGroups: string[]; secondaryMuscleGroups?: string[]; equipment: string[]; instructions?: string | null; category?: string | null; force?: string | null; difficulty?: string | null; source: string; sourceId: string; imageUrl: string | null; imageUrl2?: string | null }
 /** Bind an exercise's alternatives (SPEC §8.3) — two-way, instant client swaps. */
 function AlternativesSheet({ exercise, onClose }: { exercise: ExerciseInfo; onClose: () => void }) {
   const [alts, setAlts] = useState<ExerciseInfo[] | null>(null);
@@ -111,42 +107,6 @@ function AlternativesSheet({ exercise, onClose }: { exercise: ExerciseInfo; onCl
   );
 }
 
-export function WebExerciseSheet({ onClose, onImported, onPicked }: { onClose: () => void; onImported?: () => void; onPicked?: (id: string) => void }) {
-  const [q, setQ] = useState("");
-  const [results, setResults] = useState<WebExercise[] | null>(null);
-  const [importing, setImporting] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    if (q.trim().length < 2) { setResults(null); return; }
-    const t = setTimeout(async () => {
-      try { setResults((await api.get<{ exercises: WebExercise[] }>(`/api/exercises/search-external?q=${encodeURIComponent(q)}`)).exercises); setError(null); }
-      catch { setError("Web search isn't enabled on your plan."); setResults([]); }
-    }, 350);
-    return () => clearTimeout(t);
-  }, [q]);
-  const doImport = async (e: WebExercise) => {
-    setImporting(e.sourceId);
-    try { const r = await api.post<{ id: string }>("/api/exercises/import", { name: e.name, muscleGroups: e.muscleGroups, secondaryMuscleGroups: e.secondaryMuscleGroups ?? [], equipment: e.equipment, instructions: e.instructions ?? null, category: e.category ?? null, force: e.force ?? null, difficulty: e.difficulty ?? null, imageUrl: e.imageUrl, imageUrl2: e.imageUrl2 ?? null, source: e.source, sourceId: e.sourceId }); onImported?.(); onPicked?.(r.id); }
-    finally { setImporting(null); }
-  };
-  return (
-    <Sheet open onClose={onClose} title="Import from the web">
-      <Field label="Search wger" icon={Globe} value={q} onChange={(e) => setQ(e.target.value)} className="mb-3" placeholder="e.g. bulgarian split squat" />
-      {error && <p className="px-1 py-2 text-sm text-danger">{error}</p>}
-      <div className="max-h-96 space-y-2 overflow-y-auto">
-        {results?.map((e) => (
-          <Card key={e.sourceId} className="flex items-center gap-3 py-2.5">
-            {e.imageUrl && <img src={e.imageUrl} alt="" className="size-10 rounded-lg object-cover" />}
-            <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{e.name}</div><div className="truncate text-xs text-muted-foreground">{[e.muscleGroups.join(", "), e.category].filter(Boolean).join(" · ") || "—"} · {e.source}</div></div>
-            <Button size="sm" variant="secondary" disabled={importing === e.sourceId} onClick={() => void doImport(e)}>{importing === e.sourceId ? "…" : "Import"}</Button>
-          </Card>
-        ))}
-        {results && results.length === 0 && !error && <p className="py-6 text-center text-sm text-muted-foreground">No results.</p>}
-      </div>
-    </Sheet>
-  );
-}
-
 interface FoodRow { id: string; name: string; calories: number; brand: string | null; tenant_id: string | null; visibility?: string | null; protein_g?: number; carbs_g?: number; fat_g?: number; image_url?: string | null }
 function Foods() {
   const units = useUnits();
@@ -161,7 +121,7 @@ function Foods() {
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Field className="flex-1" label="Search foods" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
-        <Button variant="tonal" onClick={() => setEditor({})}><Plus /> New</Button>
+        <Button variant="tonal" aria-label="New food" onClick={() => setEditor({})}><Plus /></Button>
       </div>
       {!items ? <Skeleton className="h-40" /> : items.length === 0 ? <EmptyState icon={Utensils} title="No foods yet" description="Add one, or build your library from the Eat tab." action={<Button onClick={() => setEditor({})}><Plus /> New food</Button>} /> : (
         <Stagger className="space-y-1">{items.map((f) => (

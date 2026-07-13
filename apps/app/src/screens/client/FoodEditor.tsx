@@ -86,12 +86,22 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
   const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }));
   const dec = (v: string) => v.replace(/[^\d.]/g, "");
 
-  // Web/barcode
+  // Web/barcode — driven by the food-name field (no separate query box).
   const [webMode, setWebMode] = useState(false);
-  const [webQ, setWebQ] = useState("");
   const [webResults, setWebResults] = useState<FoodHit[] | null>(null);
   const [webBusy, setWebBusy] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  useEffect(() => {
+    if (!webMode) return;
+    const q = f.name.trim();
+    if (q.length < 2) { setWebResults(null); return; }
+    const t = setTimeout(() => {
+      setWebBusy(true);
+      api.get<{ foods: FoodHit[] }>(`/api/foods/search-external?q=${encodeURIComponent(q)}`)
+        .then((r) => setWebResults(r.foods)).catch(() => setWebResults([])).finally(() => setWebBusy(false));
+    }, 350);
+    return () => clearTimeout(t);
+  }, [webMode, f.name]);
 
   // Label Reader — photograph the nutrition panel → auto-fill.
   const scanLabel = async (file: File) => {
@@ -136,15 +146,6 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
       const m = e instanceof Error ? e.message : "";
       setErr(m.includes("credits") ? "Out of AI credits." : "Couldn't estimate — enter it by hand.");
     } finally { setAiBusy(false); }
-  };
-
-  const searchWeb = async (q: string) => {
-    setWebQ(q);
-    if (q.trim().length < 2) { setWebResults(null); return; }
-    setWebBusy(true);
-    try { setWebResults((await api.get<{ foods: FoodHit[] }>(`/api/foods/search-external?q=${encodeURIComponent(q)}`)).foods); }
-    catch { setWebResults([]); }
-    finally { setWebBusy(false); }
   };
 
   const importHit = async (hit: FoodHit) => {
@@ -224,11 +225,12 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
 
                 {webMode && (
                   <div className="space-y-2 rounded-2xl border border-border/50 p-3">
-                    <div className="flex items-center gap-2">
-                      <Field label="Search foods (Open Food Facts…)" icon={Search} value={webQ} onChange={(e) => void searchWeb(e.target.value)} className="flex-1" placeholder="e.g. greek yogurt" />
-                      <button onClick={() => setScanOpen(true)} aria-label="Scan barcode" className="mt-5 grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground hover:bg-surface-3 [&_svg]:size-[1.1rem]"><Barcode /></button>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground [&_svg]:size-3.5"><Search /> <span className="truncate">Results for “{f.name.trim() || "…"}” from Open Food Facts…</span></div>
+                      <button onClick={() => setScanOpen(true)} aria-label="Scan barcode" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground hover:bg-surface-3 [&_svg]:size-[1.1rem]"><Barcode /></button>
                     </div>
                     <div className="max-h-64 space-y-1 overflow-y-auto">
+                      {f.name.trim().length < 2 && <p className="p-3 text-center text-sm text-muted-foreground">Type a food name above to search, or scan a barcode.</p>}
                       {webBusy && <p className="p-3 text-center text-sm text-muted-foreground">Searching…</p>}
                       {webResults?.map((hit, i) => {
                         const img = hit.image_url ?? hit.imageUrl;
