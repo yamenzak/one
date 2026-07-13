@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fmtEnergy, kcalToDisplay, type UnitPrefs } from "@mossa/domain";
-import { Button, Field, Sheet, Chip, Badge, Switch, SegmentedControl, MacroInline, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, Utensils, X } from "@mossa/ui";
+import { Button, Field, Sheet, Chip, SegmentedControl, MacroInline, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, Utensils, X } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
@@ -51,7 +51,6 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   const [extPage, setExtPage] = useState(0);
   const [extMore, setExtMore] = useState(false);
   const [filter, setFilter] = useState<"all" | "whole" | "branded">("all");
-  const [webAlso, setWebAlso] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [snapErr, setSnapErr] = useState<unknown>(null);
@@ -67,6 +66,9 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   const { ctx } = useSession();
   const units = useUnits();
   const isStaff = ctx?.active?.role !== undefined && ctx.active.role !== "client";
+  // Web providers (keyless OFF/wger) fold into the same list when the plan
+  // allows — no toggle. A logger doesn't care if a food is ours or the web's.
+  const webEnabled = !!ctx?.entitlements?.features?.externalSearch;
 
   const searchExternal = useCallback(async (page = 1) => {
     if (q.trim().length < 2) return;
@@ -87,8 +89,8 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
     if (q.trim().length < 2) { setLocal([]); setExternal([]); setExtPage(0); return; }
     setLocal((await api.get<{ foods: Food[] }>(`/api/foods?q=${encodeURIComponent(q)}`)).foods);
     setExternal([]); setExtPage(0); setExtMore(false);
-    if (webAlso) void searchExternal(1);
-  }, [q, webAlso, searchExternal]);
+    if (webEnabled) void searchExternal(1);
+  }, [q, webEnabled, searchExternal]);
   useEffect(() => { const t = setTimeout(() => void search(), 300); return () => clearTimeout(t); }, [search]);
   // "Snap a meal" entry point — open the camera picker as soon as the sheet mounts.
   useEffect(() => { if (autoCamera) snapInputRef.current?.click(); }, [autoCamera]);
@@ -235,28 +237,22 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
     >
       <div className="space-y-3">
         <Field label="Search foods" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-        <div className="flex items-center justify-between gap-3">
-          <SegmentedControl
-            options={[{ value: "all", label: "All" }, { value: "whole", label: "Whole" }, { value: "branded", label: "Branded" }]}
-            value={filter}
-            onChange={setFilter}
-          />
-          <label className="flex shrink-0 items-center gap-2 text-xs font-medium text-muted-foreground">Web<Switch checked={webAlso} onCheckedChange={(v) => { setWebAlso(v); if (v) void searchExternal(1); }} /></label>
-        </div>
+        <SegmentedControl
+          options={[{ value: "all", label: "All" }, { value: "whole", label: "Whole" }, { value: "branded", label: "Branded" }]}
+          value={filter}
+          onChange={setFilter}
+        />
         {aiError && <p className="text-sm text-warning">{aiError}</p>}
         {snapErr != null && <AiErrorBox error={snapErr} />}
         <div className="max-h-80 space-y-1 overflow-y-auto">
-          {local.filter(matchesFilter).map((f) => <FoodRow key={f.id} food={f} badge="library" units={units} onPick={() => rowClick(f)} />)}
-          {external.filter(matchesFilter).map((f, i) => <FoodRow key={`ext-${i}`} food={f} badge="web" units={units} onPick={() => rowClick(f)} />)}
-          {searching && external.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Searching the web…</p>}
+          {local.filter(matchesFilter).map((f) => <FoodRow key={f.id} food={f} units={units} onPick={() => rowClick(f)} />)}
+          {external.filter(matchesFilter).map((f, i) => <FoodRow key={`ext-${i}`} food={f} units={units} onPick={() => rowClick(f)} />)}
+          {searching && external.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Searching…</p>}
           {q.length >= 2 && !searching && local.filter(matchesFilter).length === 0 && external.filter(matchesFilter).length === 0 && (
-            <p className="p-4 text-center text-sm text-muted-foreground">{extPage === 0 && !webAlso ? "Nothing in your library — turn on Web." : "No matches."}</p>
+            <p className="p-4 text-center text-sm text-muted-foreground">No matches — scan a barcode or add it manually.</p>
           )}
           {extPage > 0 && extMore && (
             <Button variant="ghost" className="w-full" disabled={searching} onClick={() => void searchExternal(extPage + 1)}>{searching ? "Loading…" : "Load more results"}</Button>
-          )}
-          {!webAlso && extPage === 0 && q.length >= 2 && !searching && (
-            <button onClick={() => { setWebAlso(true); void searchExternal(1); }} className="w-full rounded-xl px-3 py-2.5 text-center text-sm font-medium text-primary">Can't find it? Search the web →</button>
           )}
         </div>
       </div>
@@ -274,7 +270,7 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   );
 }
 
-function FoodRow({ food, badge, units, onPick }: { food: Food; badge: string; units: UnitPrefs; onPick: () => void }) {
+function FoodRow({ food, units, onPick }: { food: Food; units: UnitPrefs; onPick: () => void }) {
   const img = food.image_url ?? food.imageUrl;
   const n = norm(food);
   return (
@@ -290,7 +286,6 @@ function FoodRow({ food, badge, units, onPick }: { food: Food; badge: string; un
           <MacroInline proteinG={n.proteinG} carbsG={n.carbsG} fatG={n.fatG} className="shrink-0 text-[0.7rem]" />
         </div>
       </div>
-      <Badge tone={badge === "web" ? "cardio" : "neutral"}>{badge}</Badge>
     </button>
   );
 }
