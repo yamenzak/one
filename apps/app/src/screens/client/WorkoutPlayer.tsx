@@ -8,7 +8,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet } from "@mossa/protocol";
 import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, type ExerciseBests } from "@mossa/domain";
 import {
-  Button, Card, Badge, Field, Sheet, Skeleton, SubCard, ProgressRing, EmptyState, Page,
+  Button, Card, Badge, Field, Sheet, Skeleton, SubCard, ProgressRing, EmptyState,
   ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, cn,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
@@ -82,15 +82,20 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   const pastPlans = allPlans.filter((p) => p.status === "superseded");
   const pickPlan = (id: string | null) => { setViewId(id); setHistOpen(false); };
 
-  if (!plan) return <div className="mx-auto max-w-xl p-4"><EmptyState icon={Dumbbell} title="No published plan" description="Your coach hasn't published a workout plan yet." /></div>;
+  if (!plan) return (
+    <PlanShell>
+      <HeaderBar title="Workout plan" onBack={onExit} />
+      <div className="mx-auto max-w-xl p-4"><EmptyState icon={Dumbbell} title="No published plan" description="Your coach hasn't published a workout plan yet." /></div>
+    </PlanShell>
+  );
 
   if (dayIndex === null) {
     const trainingDays = active ? active.body.days.filter((d) => !d.isRestDay).length : 0;
     return (
-      <Page className="pb-28">
+      <PlanShell>
         <HeaderBar title={isPast ? "Past plan" : "Workout plan"} subtitle={active?.name} onBack={onExit}
           right={pastPlans.length > 0 ? <button onClick={() => setHistOpen(true)} aria-label="Past plans" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><History /></button> : undefined} />
-        <div className="mx-auto max-w-xl space-y-5 p-4">
+        <div className="mx-auto max-w-xl space-y-5 p-4 pb-28">
         {/* Hero — the plan at a glance. */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="relative overflow-hidden">
@@ -117,11 +122,11 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
             const onPick = () => { if (day.isRestDay) return; if (isPast) setPreview({ day, index: i }); else setDayIndex(i); };
             return (
               <motion.button key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} onClick={onPick} disabled={day.isRestDay} className="text-left disabled:opacity-80">
-                <div className={`relative aspect-[4/5] overflow-hidden rounded-2xl bg-card transition-transform ${day.isRestDay ? "" : "active:scale-[0.98]"} ${rec ? "ring-2 ring-activity ring-offset-2 ring-offset-background" : ""}`}>
+                <div className={`relative aspect-[4/5] overflow-hidden rounded-2xl bg-card transition-transform ${day.isRestDay ? "" : "active:scale-[0.98]"} ${rec ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}>
                   {day.imageUrl ? <img src={day.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className={`absolute inset-0 ${day.isRestDay ? "bg-gradient-to-br from-sleep/20 to-surface-2" : "bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2"}`} />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
                   {!day.imageUrl && <div className="absolute inset-0 grid place-items-center text-white/35 [&_svg]:size-9">{day.isRestDay ? <Moon /> : <Dumbbell />}</div>}
-                  {day.isRestDay ? <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-[0.6rem] font-semibold text-sleep">Rest</span> : rec ? <span className="absolute right-2 top-2 rounded-full bg-activity px-2 py-0.5 text-[0.6rem] font-semibold text-white">Recommended</span> : null}
+                  {day.isRestDay ? <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-[0.6rem] font-semibold text-sleep">Rest</span> : rec ? <span className="absolute right-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[0.6rem] font-semibold text-primary-foreground">Recommended</span> : null}
                   <div className="absolute inset-x-0 bottom-0 p-3">
                     <div className="truncate font-semibold text-white">{day.name || `Day ${i + 1}`}</div>
                     <div className="truncate text-xs text-white/75">{day.isRestDay ? "Rest day" : `${exercises} exercise${exercises === 1 ? "" : "s"} · ${sets} sets`}</div>
@@ -155,7 +160,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
         )}
 
         {preview && <DayPreviewSheet day={preview.day} index={preview.index} exercises={exercises} onClose={() => setPreview(null)} />}
-      </Page>
+      </PlanShell>
     );
   }
 
@@ -214,11 +219,11 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   });
 
   return (
-    <Page className="pb-28">
+    <PlanShell>
       <HeaderBar title={day.name || `Day ${dayIndex + 1}`} subtitle={`${loggedSets} of ${totalSets} set${totalSets === 1 ? "" : "s"} logged`} onBack={() => setDayIndex(null)}
         right={<ProgressRing progress={totalSets ? loggedSets / totalSets : 0} size={40} strokeWidth={5} tone="activity" value={<span className="text-xs font-semibold">{loggedSets}</span>} />} />
 
-      <ol className="mx-auto max-w-xl p-4">
+      <ol className="mx-auto max-w-xl p-4 pb-28">
         {steps.map((step, i) => {
           const last = i === steps.length - 1;
           const single = step.kind === "single";
@@ -297,7 +302,18 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
         <SwapDrawer clientId={clientId} planId={plan.id} dayIndex={dayIndex} coords={swapSlot} currentName={exercises.get(swapSlot.exerciseId)?.name ?? "Exercise"} onClose={() => setSwapSlot(null)} onDone={(m) => { setSwapSlot(null); void load(); setToast(m); setTimeout(() => setToast(null), 3000); }} />
       )}
       {detailSlot && <ExerciseDetailSheet ex={exercises.get(detailSlot.exerciseId)} slot={detailSlot} onClose={() => setDetailSlot(null)} />}
-    </Page>
+    </PlanShell>
+  );
+}
+
+/** Full-screen focused plan overlay — covers the app chrome (top bar + tab bar)
+ *  and owns its own scroll, exactly like the meal-plan drawer, so a plan is a
+ *  distraction-free surface rather than a page inside the shell. */
+function PlanShell({ children }: { children: ReactNode }) {
+  return (
+    <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-background">
+      {children}
+    </motion.div>
   );
 }
 
