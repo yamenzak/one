@@ -7,11 +7,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@mossa/protocol";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, Save, X, Globe } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, Save, X } from "@mossa/ui";
 import { api } from "../../api.js";
 import { AiErrorBox } from "../../AiError.js";
 import { ExerciseThumb, ExerciseMeta, splitList, pretty, type ExerciseInfo } from "../exercise.js";
-import { WebExerciseSheet } from "./Library.js";
+import { ExerciseEditor } from "./ExerciseEditor.js";
 
 interface Plan { id: string; clientId: string; name: string; status: string; body: WorkoutBody }
 type ExerciseLite = ExerciseInfo;
@@ -273,21 +273,7 @@ function ExercisePicker({ library, onClose, onPick, reloadLibrary }: { library: 
   const [q, setQ] = useState("");
   const [muscle, setMuscle] = useState<string | null>(null);
   const [equip, setEquip] = useState<string | null>(null);
-  const [mode, setMode] = useState<"search" | "new">("search");
-  const [webOpen, setWebOpen] = useState(false);
-  const [nf, setNf] = useState({ name: "", muscles: "", equipment: "", difficulty: "intermediate" as "beginner" | "intermediate" | "advanced" });
-  const [busy, setBusy] = useState(false);
-  const csv = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
-
-  // Create a custom exercise inline and drop it straight into the plan.
-  const create = async () => {
-    setBusy(true);
-    try {
-      const { id } = await api.post<{ id: string }>("/api/exercises", { name: nf.name.trim(), muscleGroups: csv(nf.muscles), equipment: csv(nf.equipment), difficulty: nf.difficulty, visibility: "tenant" });
-      reloadLibrary();
-      onPick(id);
-    } finally { setBusy(false); }
-  };
+  const [compose, setCompose] = useState(false);
 
   // Filter options derived from the loaded library (most common first).
   const opts = (get: (e: ExerciseLite) => string[]) => {
@@ -304,28 +290,15 @@ function ExercisePicker({ library, onClose, onPick, reloadLibrary }: { library: 
     (!equip || splitList(e.equipment).includes(equip)),
   ).slice(0, 80);
 
-  if (mode === "new") {
-    return (
-      <Sheet open onClose={onClose} title="New exercise">
-        <div className="space-y-4">
-          <button onClick={() => setMode("search")} className="inline-flex items-center gap-1 text-sm text-muted-foreground [&_svg]:size-4"><ArrowLeft /> Back to search</button>
-          <Field label="Name" icon={Dumbbell} value={nf.name} onChange={(e) => setNf((p) => ({ ...p, name: e.target.value }))} autoFocus />
-          <Field label="Muscle groups (comma-separated)" value={nf.muscles} onChange={(e) => setNf((p) => ({ ...p, muscles: e.target.value }))} placeholder="chest, triceps" />
-          <Field label="Equipment (comma-separated)" value={nf.equipment} onChange={(e) => setNf((p) => ({ ...p, equipment: e.target.value }))} placeholder="barbell" />
-          <div className="flex gap-2">{(["beginner", "intermediate", "advanced"] as const).map((d) => <Chip key={d} selected={nf.difficulty === d} onClick={() => setNf((p) => ({ ...p, difficulty: d }))}>{d}</Chip>)}</div>
-          <Button size="lg" className="w-full" disabled={busy || nf.name.trim().length < 2} onClick={() => void create()}>{busy ? "Adding…" : "Create + add to plan"}</Button>
-        </div>
-      </Sheet>
-    );
+  // "Create new" opens the unified composer (AI / web / manual) in plan mode.
+  if (compose) {
+    return <ExerciseEditor planMode onClose={() => setCompose(false)} onSaved={(id) => { setCompose(false); reloadLibrary(); if (id) onPick(id); }} />;
   }
 
   return (
     <Sheet open onClose={onClose} title="Add exercise">
-      <Field label="Search" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} className="mb-2" />
-      <div className="mb-3 flex gap-2">
-        <Button size="sm" variant="secondary" className="flex-1" onClick={() => setMode("new")}><Plus /> New exercise</Button>
-        <Button size="sm" variant="secondary" className="flex-1" onClick={() => setWebOpen(true)}><Globe /> Web search</Button>
-      </div>
+      <Field label="Search your library" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} className="mb-2" />
+      <Button size="sm" variant="secondary" className="mb-3 w-full" onClick={() => setCompose(true)}><Plus /> Create a new exercise</Button>
       {muscles.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1.5">
           {muscles.map((m) => <Chip key={m} selected={muscle === m} onClick={() => setMuscle(muscle === m ? null : m)}>{pretty(m)}</Chip>)}
@@ -347,9 +320,8 @@ function ExercisePicker({ library, onClose, onPick, reloadLibrary }: { library: 
             {e.difficulty && <Badge tone="neutral">{e.difficulty}</Badge>}
           </button>
         ))}
-        {filtered.length === 0 && <p className="px-3 py-6 text-center text-sm text-muted-foreground">No matches — create one or search the web above.</p>}
+        {filtered.length === 0 && <p className="px-3 py-6 text-center text-sm text-muted-foreground">No matches — create a new one above.</p>}
       </div>
-      {webOpen && <WebExerciseSheet onClose={() => setWebOpen(false)} onPicked={(id) => { setWebOpen(false); reloadLibrary(); onPick(id); }} />}
     </Sheet>
   );
 }

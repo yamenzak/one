@@ -53,6 +53,29 @@ export function DialogContent({ title, children, className }: { title?: string; 
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.Close;
 
+// ── FixedDrawer — fixed-height bottom drawer with a sticky header + footer.
+// Use for multi-step forms: set `dismissible={false}` so an accidental
+// outside-tap/drag can't discard in-progress input; close via the header X. ──
+export function FixedDrawer({ open, onClose, dismissible = true, title, headerAction, footer, children }: {
+  open: boolean; onClose: () => void; dismissible?: boolean; title?: string; headerAction?: ReactNode; footer?: ReactNode; children: ReactNode;
+}) {
+  return (
+    <Drawer.Root open={open} onOpenChange={(o) => dismissible && !o && onClose()} dismissible={dismissible} repositionInputs={false}>
+      <Drawer.Portal>
+        <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+        <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex h-[87vh] w-full max-w-xl flex-col rounded-t-3xl border-t border-border/60 bg-popover outline-none">
+          <div className="flex items-center justify-between gap-3 border-b border-border/50 px-5 py-3">
+            <Drawer.Title className={cn("truncate text-lg font-semibold tracking-tight", !title && "sr-only")}>{title ?? "Sheet"}</Drawer.Title>
+            {headerAction}
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+          {footer && <div className="border-t border-border/50 px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">{footer}</div>}
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
+  );
+}
+
 // ── Sheet (bottom drawer, drag-to-dismiss) ──────────────────────────────────
 export function Sheet({ open, onClose, title, titleAction, children }: { open: boolean; onClose: () => void; title?: string; titleAction?: ReactNode; children: ReactNode }) {
   return (
