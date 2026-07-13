@@ -122,11 +122,11 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
             const onPick = () => { if (day.isRestDay) return; if (isPast) setPreview({ day, index: i }); else setDayIndex(i); };
             return (
               <motion.button key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} onClick={onPick} disabled={day.isRestDay} className="text-left disabled:opacity-80">
-                <div className={`relative aspect-[4/5] overflow-hidden rounded-2xl bg-card transition-transform ${day.isRestDay ? "" : "active:scale-[0.98]"} ${rec ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}>
+                <div className={`relative aspect-[4/5] overflow-hidden rounded-2xl bg-card transition-transform ${day.isRestDay ? "" : "active:scale-[0.98]"} ${rec ? "ring-2 ring-activity ring-offset-2 ring-offset-background" : ""}`}>
                   {day.imageUrl ? <img src={day.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className={`absolute inset-0 ${day.isRestDay ? "bg-gradient-to-br from-sleep/20 to-surface-2" : "bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2"}`} />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
                   {!day.imageUrl && <div className="absolute inset-0 grid place-items-center text-white/35 [&_svg]:size-9">{day.isRestDay ? <Moon /> : <Dumbbell />}</div>}
-                  {day.isRestDay ? <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-[0.6rem] font-semibold text-sleep">Rest</span> : rec ? <span className="absolute right-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[0.6rem] font-semibold text-primary-foreground">Recommended</span> : null}
+                  {day.isRestDay ? <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-[0.6rem] font-semibold text-sleep">Rest</span> : rec ? <span className="absolute right-2 top-2 rounded-full bg-activity px-2 py-0.5 text-[0.6rem] font-semibold text-white">Recommended</span> : null}
                   <div className="absolute inset-x-0 bottom-0 p-3">
                     <div className="truncate font-semibold text-white">{day.name || `Day ${i + 1}`}</div>
                     <div className="truncate text-xs text-white/75">{day.isRestDay ? "Rest day" : `${exercises} exercise${exercises === 1 ? "" : "s"} · ${sets} sets`}</div>
@@ -221,7 +221,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   return (
     <PlanShell>
       <HeaderBar title={day.name || `Day ${dayIndex + 1}`} subtitle={`${loggedSets} of ${totalSets} set${totalSets === 1 ? "" : "s"} logged`} onBack={() => setDayIndex(null)}
-        right={<ProgressRing progress={totalSets ? loggedSets / totalSets : 0} size={40} strokeWidth={5} tone="primary" value={<span className="text-xs font-semibold">{loggedSets}</span>} />} />
+        right={<ProgressRing progress={totalSets ? loggedSets / totalSets : 0} size={40} strokeWidth={5} tone="activity" value={<span className="text-xs font-semibold">{loggedSets}</span>} />} />
 
       <ol className="mx-auto max-w-xl p-4 pb-28">
         {steps.map((step, i) => {
@@ -235,7 +235,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
             <li key={i} className="flex gap-3">
               {/* Timeline rail — numbered node + connector down to the next step. */}
               <div className="flex flex-col items-center">
-                <div className={cn("z-10 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ring-4 ring-background transition-colors [&_svg]:size-4", done ? "bg-primary text-primary-foreground" : "bg-surface-3 text-muted-foreground")}>
+                <div className={cn("z-10 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ring-4 ring-background transition-colors [&_svg]:size-4", done ? "bg-activity text-white" : "bg-surface-3 text-muted-foreground")}>
                   {done ? <Check strokeWidth={3} /> : i + 1}
                 </div>
                 {!last && <div className="w-px flex-1 bg-border/60" />}
@@ -435,7 +435,7 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
         )}
         {(primary.length > 0 || secondary.length > 0 || equipment.length > 0 || attrs.length > 0) && (
           <div className="space-y-2">
-            <Attr label="Muscles" chips={primary} tone="primary" />
+            <Attr label="Muscles" chips={primary} tone="activity" />
             <Attr label="Also works" chips={secondary} tone="neutral" />
             <Attr label="Equipment" chips={equipment} tone="neutral" />
             <Attr label="Type" chips={attrs} tone="neutral" />
@@ -721,9 +721,9 @@ function setMeasureShort(s: WorkoutSet, mode: MeasureMode): string {
 /** The dot color encodes set type: logged (solid), warm-up, AMRAP, or a plain
  *  working set still to do. */
 function setDotClass(s: WorkoutSet, done: boolean): string {
-  if (done) return "bg-primary";
+  if (done) return "bg-activity";
   if (s.setType === "warmup") return "bg-warning/60";
-  if (s.setType === "amrap") return "bg-primary/40 ring-1 ring-inset ring-primary/60";
+  if (s.setType === "amrap") return "bg-activity/40 ring-1 ring-inset ring-activity/60";
   return "bg-surface-3";
 }
 
@@ -782,7 +782,7 @@ function RestTimer({ seconds, label, className }: { seconds: number; label?: boo
     <button type="button" onClick={(e) => { e.stopPropagation(); setLeft((r) => (r === null ? seconds : null)); }}
       aria-label={running ? "Reset rest timer" : "Start rest timer"}
       className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-semibold tabular-nums transition-colors [&_svg]:size-3",
-        done ? "bg-primary text-primary-foreground" : running ? "bg-cardio text-white" : "bg-surface-3 text-muted-foreground hover:bg-surface-2", className)}>
+        done ? "bg-activity text-white" : running ? "bg-cardio text-white" : "bg-surface-3 text-muted-foreground hover:bg-surface-2", className)}>
       <Timer />{done ? "Go!" : `${label ? "Rest " : ""}${fmtClock(running ? left! : seconds)}`}
     </button>
   );

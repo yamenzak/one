@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  Card, IconBadge, Skeleton, cn, Check, ClipboardList, Dumbbell, Utensils, Pill, ChevronRight, type LucideIcon, type Tone,
+  Card, IconBadge, Skeleton, cn, Check, ClipboardList, Dumbbell, Utensils, Pill, ChevronRight, ChevronDown, type LucideIcon, type Tone,
 } from "@mossa/ui";
 import { api } from "../../api.js";
 import type { TodayBundle } from "./Today.js";
@@ -64,6 +64,7 @@ export function TodayAgenda({ clientId, date, bundle, onChanged, onNavigate, onC
   const [mealTypes, setMealTypes] = useState<string[]>([]);
   const [loggedMeals, setLoggedMeals] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const load = useCallback(async () => {
     const [s, sl, mp, food] = await Promise.all([
@@ -111,6 +112,9 @@ export function TodayAgenda({ clientId, date, bundle, onChanged, onNavigate, onC
   if (items.length === 0) return null;
   const doneCount = items.filter((i) => i.done).length;
   const allDone = doneCount === items.length;
+  // When everything's done the checklist collapses into the celebration banner;
+  // tap it to expand the list back (e.g. to re-check or review).
+  const showList = !allDone || expanded;
 
   return (
     <section className="space-y-2">
@@ -127,11 +131,17 @@ export function TodayAgenda({ clientId, date, bundle, onChanged, onNavigate, onC
         </AnimatePresence>
       </div>
       <AnimatePresence initial={false}>
-        {allDone && <CompletionBanner count={items.length} />}
+        {allDone && <CompletionBanner count={items.length} expanded={expanded} onToggle={() => setExpanded((e) => !e)} />}
       </AnimatePresence>
-      <Card className="divide-y divide-border/40 py-0.5">
-        {items.map((i) => <CheckRow key={i.key} icon={i.icon} tone={i.tone} label={i.label} sub={i.sub} done={i.done} actionable={i.actionable} onClick={i.onClick} />)}
-      </Card>
+      <AnimatePresence initial={false}>
+        {showList && (
+          <motion.div key="list" initial={allDone ? { opacity: 0, height: 0 } : false} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={{ type: "spring", stiffness: 320, damping: 32 }} className="overflow-hidden">
+            <Card className="divide-y divide-border/40 py-0.5">
+              {items.map((i) => <CheckRow key={i.key} icon={i.icon} tone={i.tone} label={i.label} sub={i.sub} done={i.done} actionable={i.actionable} onClick={i.onClick} />)}
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }
@@ -139,14 +149,16 @@ export function TodayAgenda({ clientId, date, bundle, onChanged, onNavigate, onC
 /** The celebratory "everything's done" banner — a spring-in check with a
  *  one-shot ripple burst and a soft accent glow. Replaces the emoji with
  *  something that actually feels earned. */
-function CompletionBanner({ count }: { count: number }) {
+function CompletionBanner({ count, expanded, onToggle }: { count: number; expanded: boolean; onToggle: () => void }) {
   return (
-    <motion.div
+    <motion.button
+      type="button"
+      onClick={onToggle}
       initial={{ opacity: 0, y: -6, height: 0 }}
       animate={{ opacity: 1, y: 0, height: "auto" }}
       exit={{ opacity: 0, y: -6, height: 0 }}
       transition={{ type: "spring", stiffness: 320, damping: 30 }}
-      className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-success/15 to-primary/10 p-4"
+      className="relative w-full overflow-hidden rounded-2xl bg-gradient-to-br from-success/15 to-primary/10 p-4 text-left transition-colors hover:from-success/20"
     >
       <div className="pointer-events-none absolute -right-6 -top-8 size-24 rounded-full bg-success/25 blur-2xl" />
       <div className="relative flex items-center gap-3">
@@ -172,11 +184,12 @@ function CompletionBanner({ count }: { count: number }) {
             </motion.span>
           </motion.span>
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold">All done for today</div>
-          <div className="text-xs text-muted-foreground">{count} {count === 1 ? "task" : "tasks"} complete — nice work.</div>
+          <div className="text-xs text-muted-foreground">{count} {count === 1 ? "task" : "tasks"} complete — {expanded ? "tap to hide" : "tap to review"}.</div>
         </div>
+        <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-180")} />
       </div>
-    </motion.div>
+    </motion.button>
   );
 }

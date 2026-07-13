@@ -80,7 +80,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   const load = useCallback(async () => {
     const [bundle, hist] = await Promise.all([
       api.get<TodayBundle>(`/api/today?clientId=${clientId}&date=${date}`),
-      api.get<{ events: FeedEvent[] }>(`/api/activity-history?clientId=${clientId}&from=${shiftDay(date, -2)}&to=${date}`),
+      api.get<{ events: FeedEvent[] }>(`/api/activity-history?clientId=${clientId}&from=${date}&to=${date}`),
     ]);
     setData(bundle); setFeed(hist.events);
   }, [clientId, date]);
@@ -126,33 +126,28 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
         </Button>
       </Stagger>
 
-      <Stagger><CoachNote clientId={clientId} surface="home" /></Stagger>
-
       <Stagger>
         <TodayAgenda clientId={clientId} date={date} bundle={data} onChanged={() => void load()} onNavigate={onOpen} onCheckIn={() => setCheckInOpen(true)} onStartWorkout={onStart} />
       </Stagger>
 
-      {/* Recent activity — a live history of everything logged, last 3 days. */}
+      {/* Today's activity — everything logged today; older days live in History. */}
       <Stagger className="space-y-2">
         <div className="flex items-center justify-between px-1">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent activity</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today's activity</h3>
           <button onClick={() => setHistoryOpen(true)} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><History /> History</button>
         </div>
         {!feed ? (
           <Skeleton className="h-32" />
         ) : feed.length === 0 ? (
-          <Card className="text-center text-sm text-muted-foreground">Your history grows here as you log — meals, workouts, check-ins and more.</Card>
+          <Card className="text-center text-sm text-muted-foreground">Your day fills in here as you log — meals, workouts, check-ins and more.</Card>
         ) : (
-          groupByDay(feed).map(([day, evs]) => (
-            <div key={day}>
-              <div className="px-1 pb-1 pt-2 text-xs font-semibold text-muted-foreground">{dayLabel(day, date)}</div>
-              <Card className="divide-y divide-border/40 py-0.5">
-                {evs.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} onOpen={onOpen} />)}
-              </Card>
-            </div>
-          ))
+          <Card className="divide-y divide-border/40 py-0.5">
+            {feed.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} onOpen={onOpen} />)}
+          </Card>
         )}
       </Stagger>
+
+      <Stagger><CoachNote clientId={clientId} surface="home" /></Stagger>
 
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} clientId={clientId} onLogged={() => void load()} />
       {checkInOpen && <LogSheet open initialKind="checkin" onClose={() => setCheckInOpen(false)} clientId={clientId} onLogged={() => { setCheckInOpen(false); void load(); }} />}
@@ -184,25 +179,14 @@ const FEED_META: Record<string, { icon: LucideIcon; tone: Tone }> = {
   swap: { icon: ArrowLeftRight, tone: "activity" },
   lab: { icon: FlaskConical, tone: "cardio" },
   session: { icon: ClipboardList, tone: "activity" },
-  plan_workout: { icon: Dumbbell, tone: "primary" },
-  plan_meal: { icon: Utensils, tone: "primary" },
+  plan_workout: { icon: Dumbbell, tone: "activity" },
+  plan_meal: { icon: Utensils, tone: "nutrition" },
 };
 const metaFor = (kind: string) => FEED_META[kind] ?? { icon: Sparkles, tone: "neutral" as Tone };
 
 function formatMetric(metric: FeedEvent["metric"], units: UnitPrefs): string | null {
   if (!metric) return null;
   return metric.unit === "energy" ? fmtEnergy(metric.value, units) : metric.unit === "volume" ? fmtVolume(metric.value, units) : fmtWeight(metric.value, units);
-}
-
-/** Group a time-sorted (desc) event list into [day, events][] preserving order. */
-function groupByDay(events: FeedEvent[]): [string, FeedEvent[]][] {
-  const out: [string, FeedEvent[]][] = [];
-  for (const ev of events) {
-    const last = out[out.length - 1];
-    if (last && last[0] === ev.date) last[1].push(ev);
-    else out.push([ev.date, [ev]]);
-  }
-  return out;
 }
 
 function dayLabel(day: string, today: string): string {

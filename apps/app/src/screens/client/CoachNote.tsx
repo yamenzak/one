@@ -28,14 +28,11 @@ export function CoachNote({ clientId, surface }: { clientId: string; surface: Su
 
   if (!msg) return null;
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} className="relative overflow-hidden rounded-2xl bg-primary/10 p-4">
-      <div className="pointer-events-none absolute -right-8 -top-8 size-28 rounded-full bg-primary/15 blur-2xl" />
-      <div className="relative flex items-start gap-3">
-        <AiAvatar className="size-9" />
-        <div className="min-w-0">
-          <div className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">Your coach</div>
-          <p className="mt-1 text-sm leading-relaxed">{msg}</p>
-        </div>
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} className="flex items-start gap-3 px-1">
+      <AiAvatar className="mt-0.5 size-8 shrink-0" />
+      <div className="min-w-0 flex-1">
+        <div className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-primary">Your coach</div>
+        <p className="mt-1 text-[0.95rem] leading-relaxed text-foreground/85">{msg}</p>
       </div>
     </motion.div>
   );

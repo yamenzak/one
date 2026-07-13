@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fmtEnergy, fmtVolume, volumeDisplayToMl, kcalToDisplay } from "@mossa/domain";
 import {
   Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MetricChip, ProgressRing, METRICS, toneSoft, Page, Stagger, EmptyState, motion,
-  Plus, ClipboardList, Utensils, Croissant, Soup, Apple, Dumbbell, Droplet, Beef, Camera, Trash2, type LucideIcon,
+  Plus, Utensils, Croissant, Soup, Apple, Dumbbell, Droplet, Beef, Trash2, type LucideIcon,
 } from "@mossa/ui";
 import type { UnitPrefs } from "@mossa/domain";
 import { api, todayLocal } from "../../api.js";
@@ -38,7 +38,6 @@ export function Eat({ clientId }: { clientId: string }) {
   const [waterMl, setWaterMl] = useState(0);
   const [logMeal, setLogMeal] = useState<string | undefined>(undefined);
   const [logOpen, setLogOpen] = useState(false);
-  const [logCamera, setLogCamera] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
   const [mealPlan, setMealPlan] = useState<{ name: string; meals: number; options: number } | null>(null);
   const [edit, setEdit] = useState<Entry | null>(null);
@@ -68,7 +67,7 @@ export function Eat({ clientId }: { clientId: string }) {
     await api.post("/api/logs/water", { clientId, data: { date, amountMl: ml } });
   };
 
-  const openLog = (meal?: string, camera = false) => { setLogMeal(meal); setLogCamera(camera); setLogOpen(true); };
+  const openLog = (meal?: string) => { setLogMeal(meal); setLogOpen(true); };
 
   if (!entries) return <Skeleton className="m-4 h-64" />;
 
@@ -87,34 +86,6 @@ export function Eat({ clientId }: { clientId: string }) {
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       <h1 className="text-2xl font-bold tracking-tight">Eat</h1>
-
-      <Stagger><CoachNote clientId={clientId} surface="eat" /></Stagger>
-
-      {/* Hero — today's intake, the visual anchor */}
-      <Stagger>
-        <Card className="relative overflow-hidden">
-          <div className="pointer-events-none absolute -right-12 -top-12 size-40 rounded-full bg-calories/10 blur-2xl" />
-          <div className="relative flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <div className="text-xs font-medium uppercase tracking-wide text-calories">Today's intake</div>
-              <div className="numeral mt-1.5 text-3xl font-bold leading-none">{fmtEnergy(total, units)}</div>
-              <div className="mt-1.5 text-sm text-muted-foreground">
-                {calTarget > 0 ? (remaining >= 0 ? `${fmtEnergy(remaining, units)} left` : `${fmtEnergy(-remaining, units)} over`) : "Log your meals to track intake"}
-              </div>
-            </div>
-            {calTarget > 0 && (
-              <ProgressRing size={92} strokeWidth={9} tone={remaining < 0 ? "danger" : "calories"} progress={pct} value={`${Math.round(pct * 100)}%`} className="shrink-0" />
-            )}
-          </div>
-          <MacroBar
-            className="relative mt-4"
-            proteinG={sum((e) => e.protein_g)}
-            carbsG={sum((e) => e.carbs_g)}
-            fatG={sum((e) => e.fat_g)}
-            targets={targets ? { proteinG: targets.targetProteinG, carbsG: targets.targetCarbsG, fatG: targets.targetFatG } : null}
-          />
-        </Card>
-      </Stagger>
 
       {/* Your meal plan — the primary entry (parity with Train's active-plan hero) */}
       {mealPlan && (
@@ -137,14 +108,40 @@ export function Eat({ clientId }: { clientId: string }) {
 
       {/* Primary actions — directly available */}
       <Stagger className="flex flex-wrap gap-2">
-        <Chip icon={Plus} selected onClick={() => openLog()}>Log food</Chip>
-        <Chip icon={Camera} onClick={() => openLog(undefined, true)}>Snap a meal</Chip>
-        {!mealPlan && <Chip icon={ClipboardList} onClick={() => setPlanOpen(true)}>My plan</Chip>}
+        {mealPlan && <Chip icon={Utensils} selected onClick={() => setPlanOpen(true)}>View plan</Chip>}
+        <Chip icon={Plus} selected={!mealPlan} onClick={() => openLog()}>Log food</Chip>
       </Stagger>
 
-      {/* Today — hydration + protein at a glance */}
+      {/* Today — intake, hydration + protein at a glance */}
       <section className="space-y-2">
         <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today</h3>
+
+        {/* Hero — today's intake, the visual anchor */}
+        <Stagger>
+          <Card className="relative overflow-hidden">
+            <div className="pointer-events-none absolute -right-12 -top-12 size-40 rounded-full bg-calories/10 blur-2xl" />
+            <div className="relative flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-xs font-medium uppercase tracking-wide text-calories">Today's intake</div>
+                <div className="numeral mt-1.5 text-3xl font-bold leading-none">{fmtEnergy(total, units)}</div>
+                <div className="mt-1.5 text-sm text-muted-foreground">
+                  {calTarget > 0 ? (remaining >= 0 ? `${fmtEnergy(remaining, units)} left` : `${fmtEnergy(-remaining, units)} over`) : "Log your meals to track intake"}
+                </div>
+              </div>
+              {calTarget > 0 && (
+                <ProgressRing size={92} strokeWidth={9} tone={remaining < 0 ? "danger" : "calories"} progress={pct} value={`${Math.round(pct * 100)}%`} className="shrink-0" />
+              )}
+            </div>
+            <MacroBar
+              className="relative mt-4"
+              proteinG={sum((e) => e.protein_g)}
+              carbsG={sum((e) => e.carbs_g)}
+              fatG={sum((e) => e.fat_g)}
+              targets={targets ? { proteinG: targets.targetProteinG, carbsG: targets.targetCarbsG, fatG: targets.targetFatG } : null}
+            />
+          </Card>
+        </Stagger>
+
         <Stagger className="grid grid-cols-2 gap-3">
           <div className="relative flex flex-col gap-2.5 overflow-hidden rounded-2xl bg-card p-4">
             <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-hydration/10 blur-2xl" />
@@ -213,7 +210,9 @@ export function Eat({ clientId }: { clientId: string }) {
         </section>
       )}
 
-      {logOpen && <FoodSearchSheet clientId={clientId} mealType={logMeal} autoCamera={logCamera} onClose={() => setLogOpen(false)} onLogged={() => void load()} />}
+      <Stagger><CoachNote clientId={clientId} surface="eat" /></Stagger>
+
+      {logOpen && <FoodSearchSheet clientId={clientId} mealType={logMeal} onClose={() => setLogOpen(false)} onLogged={() => void load()} />}
       {planOpen && <MealPlanDrawer clientId={clientId} onClose={() => setPlanOpen(false)} onLogged={() => void load()} />}
       {edit && <EditEntrySheet entry={edit} clientId={clientId} units={units} onClose={() => setEdit(null)} onSaved={() => void load()} />}
     </Page>

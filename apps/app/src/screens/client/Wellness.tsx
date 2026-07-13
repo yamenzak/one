@@ -169,8 +169,6 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
       {/* Wellness Score hero */}
       <Stagger>{score ? <WellnessScoreCard result={score} /> : <WellnessScoreCardSkeleton />}</Stagger>
 
-      <Stagger><CoachNote clientId={clientId} surface="wellness" /></Stagger>
-
       {/* Quick-log chips */}
       <Stagger className="flex flex-wrap gap-2">
         <Chip icon={ClipboardList} selected onClick={() => setLogKind("checkin")}>Check in</Chip>
@@ -318,6 +316,8 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
           </Stagger>
         </section>
       )}
+
+      <Stagger><CoachNote clientId={clientId} surface="wellness" /></Stagger>
 
       {logKind && <LogSheet open initialKind={logKind} clientId={clientId} onClose={() => setLogKind(null)} onLogged={() => { setLogKind(null); void load(); }} />}
       {detailCheckIn && <CheckInDetailSheet checkIn={detailCheckIn} onClose={() => setDetailCheckIn(null)} />}
