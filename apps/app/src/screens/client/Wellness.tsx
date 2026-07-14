@@ -16,7 +16,7 @@ import {
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { LogSheet } from "./LogSheet.js";
-import { CheckInDetailSheet, LabDetailSheet, type CheckInFull, type LabFull } from "./WellnessDetails.js";
+import { CheckInDetailSheet, LabDetailSheet, labStatus, isLabImage, type CheckInFull, type LabFull } from "./WellnessDetails.js";
 import { WellnessScoreCard, WellnessScoreCardSkeleton, type WellnessScoreResult } from "./WellnessScore.js";
 import { CheckRow } from "./TodayAgenda.js";
 import { CoachNote } from "./CoachNote.js";
@@ -340,12 +340,22 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
 }
 
 /** A lab row: tap to view the detail; requested/scheduled labs get an inline
- *  upload affordance. */
+ *  upload affordance. Status coding is shared with the detail sheet; reviewed
+ *  labs summarise their markers and flag any out-of-range results. */
 function LabRow({ lab, clientId, onOpen, onUploaded }: { lab: LabFull; clientId: string; onOpen: () => void; onUploaded: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const canUpload = lab.status === "requested" || lab.status === "scheduled";
-  const tone = lab.status === "reviewed" ? "success" : lab.status === "uploaded" ? "cardio" : "warning";
+  const st = labStatus(lab.status);
+  const thumb = lab.file_key && isLabImage(lab.file_key) ? `/api/media/${lab.file_key}` : null;
+  const markers = lab.values?.length ?? 0;
+  const flagged = lab.values?.filter((v) => v.flag && v.flag !== "normal").length ?? 0;
+  const sub = canUpload
+    ? (lab.due_by ? `Due ${new Date(lab.due_by).toLocaleDateString()}` : "Tap to upload your result")
+    : lab.status === "uploaded" ? "Awaiting coach review"
+    : lab.status === "reviewed" ? (markers ? `${markers} marker${markers === 1 ? "" : "s"}${flagged ? ` · ${flagged} flagged` : " · all in range"}` : "Result ready — tap to view")
+    : lab.status === "cancelled" ? "Cancelled by your coach"
+    : "Tap for details";
   const upload = async (file: File) => {
     setBusy(true);
     try {
@@ -357,10 +367,12 @@ function LabRow({ lab, clientId, onOpen, onUploaded }: { lab: LabFull; clientId:
   };
   return (
     <Card interactive className="flex items-center gap-3 py-3">
-      <IconBadge icon={FlaskConical} tone="sleep" size="sm" />
+      {thumb
+        ? <img src={thumb} alt="" className="size-10 shrink-0 rounded-xl object-cover" />
+        : <IconBadge icon={FlaskConical} tone={st.tone} size="sm" />}
       <button onClick={onOpen} className="min-w-0 flex-1 text-left">
         <div className="truncate font-medium">{lab.display_name}</div>
-        <div className="truncate text-xs text-muted-foreground">{canUpload && lab.due_by ? `Due ${new Date(lab.due_by).toLocaleDateString()}` : lab.status === "reviewed" ? "Result ready — tap to view" : lab.status === "uploaded" ? "Awaiting coach review" : "Tap for details"}</div>
+        <div className="truncate text-xs text-muted-foreground">{sub}</div>
       </button>
       {canUpload ? (
         <>
@@ -368,7 +380,7 @@ function LabRow({ lab, clientId, onOpen, onUploaded }: { lab: LabFull; clientId:
           <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); }} />
         </>
       ) : (
-        <Badge tone={tone}>{lab.status}</Badge>
+        <Badge tone={lab.status === "reviewed" && flagged ? "danger" : st.tone}>{lab.status === "reviewed" && flagged ? `${flagged} flagged` : st.label}</Badge>
       )}
     </Card>
   );

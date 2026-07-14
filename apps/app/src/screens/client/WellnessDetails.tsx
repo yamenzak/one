@@ -145,16 +145,26 @@ export function CheckInDetailSheet({ checkIn, onClose }: { checkIn: CheckInFull;
 
 // ── Lab detail ───────────────────────────────────────────────────────────────
 
-const FLAG_TONE: Record<string, Tone> = { low: "cardio", normal: "nutrition", high: "sleep" };
-const LAB_STATUS_TONE: Record<string, Tone> = { requested: "sleep", scheduled: "cardio", uploaded: "activity", reviewed: "nutrition", cancelled: "sleep" };
-const isImage = (key: string) => /\.(png|jpe?g|webp|gif|heic)$/i.test(key);
+const FLAG_TONE: Record<string, Tone> = { low: "cardio", normal: "success", high: "danger" };
+/** Shared lab-status coding — tone + label — so the list row and this sheet
+ *  always agree on how a status looks and reads. */
+export const LAB_STATUS: Record<string, { tone: Tone; label: string }> = {
+  requested: { tone: "warning", label: "Requested" },
+  scheduled: { tone: "cardio", label: "Scheduled" },
+  uploaded: { tone: "activity", label: "In review" },
+  reviewed: { tone: "success", label: "Reviewed" },
+  cancelled: { tone: "neutral", label: "Cancelled" },
+};
+export const labStatus = (status: string) => LAB_STATUS[status] ?? { tone: "sleep" as Tone, label: status };
+export const isLabImage = (key: string) => /\.(png|jpe?g|webp|gif|heic)$/i.test(key);
 
 export function LabDetailSheet({ lab, onClose }: { lab: LabFull; onClose: () => void }) {
   const fileUrl = lab.file_key ? `/api/media/${lab.file_key}` : null;
-  const hasImage = !!(lab.file_key && isImage(lab.file_key));
+  const hasImage = !!(lab.file_key && isLabImage(lab.file_key));
+  const st = labStatus(lab.status);
 
   return (
-    <Sheet open onClose={onClose} title={lab.display_name} titleAction={<Badge tone={LAB_STATUS_TONE[lab.status] ?? "sleep"}>{lab.status}</Badge>}>
+    <Sheet open onClose={onClose} title={lab.display_name} titleAction={<Badge tone={st.tone}>{st.label}</Badge>}>
       <div className="space-y-4">
         {lab.instructions && (
           <SubCard className="space-y-1">
