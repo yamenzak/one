@@ -109,7 +109,7 @@ export function TodayAgenda({ clientId, date, bundle, agenda, onChanged, onNavig
   for (const s of supps) {
     for (const sc of s.schedule.length ? s.schedule : [{ slot: "daily" }]) {
       const key = `${s.id}:${sc.slot}`;
-      items.push({ key: `supp:${key}`, icon: Pill, tone: "activity", label: `Take ${s.name}`, sub: [s.dose, slotLabel(sc.slot)].filter(Boolean).join(" · ") || undefined, done: taken.has(key), actionable: false, onClick: () => void toggleSupp(s.id, sc.slot) });
+      items.push({ key: `supp:${key}`, icon: Pill, tone: "supplement", label: `Take ${s.name}`, sub: [s.dose, slotLabel(sc.slot)].filter(Boolean).join(" · ") || undefined, done: taken.has(key), actionable: false, onClick: () => void toggleSupp(s.id, sc.slot) });
     }
   }
 

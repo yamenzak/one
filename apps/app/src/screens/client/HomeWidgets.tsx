@@ -86,8 +86,8 @@ export const CLIENT_WIDGETS: WidgetDef<ClientWidgetData>[] = [
   },
   {
     id: "labs", title: "Labs due", icon: FlaskConical,
-    renderBig: (d) => <RingCard tone="cardio" progress={0.001} value={d.bundle.pendingLabs ?? 0} label="Labs" sublabel="due" />,
-    renderSmall: (d) => <MiniCard icon={FlaskConical} tone="cardio" label="Labs due" value={d.bundle.pendingLabs ?? 0} />,
+    renderBig: (d) => <RingCard tone="lab" progress={0.001} value={d.bundle.pendingLabs ?? 0} label="Labs" sublabel="due" />,
+    renderSmall: (d) => <MiniCard icon={FlaskConical} tone="lab" label="Labs due" value={d.bundle.pendingLabs ?? 0} />,
   },
   {
     id: "supplements", title: "Supplements today", icon: Pill,
@@ -181,6 +181,6 @@ function SupplementsWidget({ clientId, size }: { clientId: string; size: WidgetS
   const value = total === null ? "—" : `${taken}/${total}`;
   const progress = total ? taken / total : undefined;
   return size === "big"
-    ? <RingCard tone="activity" progress={progress ?? 0.001} value={value} label="Supplements" sublabel="taken today" />
-    : <MiniCard icon={Pill} tone="activity" label="Supplements" value={value} progress={progress} />;
+    ? <RingCard tone="supplement" progress={progress ?? 0.001} value={value} label="Supplements" sublabel="taken today" />
+    : <MiniCard icon={Pill} tone="supplement" label="Supplements" value={value} progress={progress} />;
 }

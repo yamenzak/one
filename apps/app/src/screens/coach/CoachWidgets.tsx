@@ -40,5 +40,5 @@ export const COACH_WIDGETS: WidgetDef<CoachWidgetData>[] = [
   stat("activeToday", "Active today", Flame, "activity", (d) => d.activeToday, { progress: (d) => (d.clientsTotal ? d.activeToday / d.clientsTotal : 0) }),
   stat("logsToday", "Logs today", Activity, "cardio", (d) => d.logsToday),
   stat("unread", "Unread", Bell, "primary", (d) => d.unread),
-  stat("labs", "Labs to review", FlaskConical, "cardio", (d) => d.labsToReview),
+  stat("labs", "Labs to review", FlaskConical, "lab", (d) => d.labsToReview),
 ];

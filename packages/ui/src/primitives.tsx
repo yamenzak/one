@@ -19,7 +19,7 @@ import { cn } from "./lib/utils.js";
 import type { LucideIcon } from "./lib/icons.js";
 
 export type Tone =
-  | "activity" | "nutrition" | "sleep" | "cardio" | "hydration"
+  | "activity" | "nutrition" | "sleep" | "cardio" | "hydration" | "supplement" | "lab"
   | "calories" | "protein" | "carbs" | "fat"
   | "success" | "warning" | "danger" | "primary" | "neutral";
 
@@ -29,6 +29,8 @@ export const toneText: Record<Tone, string> = {
   sleep: "text-sleep",
   cardio: "text-cardio",
   hydration: "text-hydration",
+  supplement: "text-supplement",
+  lab: "text-lab",
   calories: "text-calories",
   protein: "text-protein",
   carbs: "text-carbs",
@@ -46,6 +48,8 @@ export const toneSoft: Record<Tone, string> = {
   sleep: "bg-sleep-soft text-sleep",
   cardio: "bg-cardio-soft text-cardio",
   hydration: "bg-hydration-soft text-hydration",
+  supplement: "bg-supplement-soft text-supplement",
+  lab: "bg-lab-soft text-lab",
   calories: "bg-calories-soft text-calories",
   protein: "bg-protein-soft text-protein",
   carbs: "bg-carbs-soft text-carbs",
@@ -63,6 +67,8 @@ export const toneVar: Record<Tone, string> = {
   sleep: "var(--sleep)",
   cardio: "var(--cardio)",
   hydration: "var(--hydration)",
+  supplement: "var(--supplement)",
+  lab: "var(--lab)",
   calories: "var(--calories)",
   protein: "var(--protein)",
   carbs: "var(--carbs)",

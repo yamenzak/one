@@ -24,7 +24,7 @@ const ROSTER_META: Record<string, { icon: LucideIcon; tone: Tone }> = {
   measurement: { icon: Weight, tone: "cardio" },
   activity: { icon: Footprints, tone: "cardio" },
   swap: { icon: ArrowLeftRight, tone: "cardio" },
-  lab: { icon: FlaskConical, tone: "cardio" },
+  lab: { icon: FlaskConical, tone: "lab" },
 };
 
 export function CoachToday() {

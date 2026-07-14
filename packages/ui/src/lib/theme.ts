@@ -60,7 +60,7 @@ export const THEME_TOKEN_GROUPS: { label: string; tokens: string[] }[] = [
   { label: "Brand & UI", tokens: ["primary", "primary-foreground", "secondary", "secondary-foreground", "muted", "muted-foreground", "accent", "accent-foreground", "border", "input", "ring"] },
   { label: "Status", tokens: ["destructive", "destructive-foreground", "success", "success-soft", "warning", "warning-soft", "danger", "danger-soft"] },
   { label: "Macros", tokens: ["calories", "calories-soft", "protein", "protein-soft", "carbs", "carbs-soft", "fat", "fat-soft"] },
-  { label: "Activity accents", tokens: ["activity", "activity-soft", "nutrition", "nutrition-soft", "sleep", "sleep-soft", "cardio", "cardio-soft", "hydration", "hydration-soft"] },
+  { label: "Domain accents", tokens: ["activity", "activity-soft", "nutrition", "nutrition-soft", "sleep", "sleep-soft", "cardio", "cardio-soft", "hydration", "hydration-soft", "supplement", "supplement-soft", "lab", "lab-soft"] },
 ];
 
 /** The shipped token values (mirrors tokens.css) — used for editor placeholders
@@ -89,6 +89,8 @@ export const DEFAULT_TOKENS: BrandTokens = {
     "--sleep": "oklch(0.74 0.12 300)", "--sleep-soft": "oklch(0.34 0.06 300)",
     "--cardio": "oklch(0.74 0.13 250)", "--cardio-soft": "oklch(0.34 0.06 250)",
     "--hydration": "oklch(0.78 0.1 214)", "--hydration-soft": "oklch(0.34 0.05 214)",
+    "--supplement": "oklch(0.77 0.11 190)", "--supplement-soft": "oklch(0.34 0.05 190)",
+    "--lab": "oklch(0.74 0.14 322)", "--lab-soft": "oklch(0.34 0.06 322)",
   },
   light: {
     "--background": "oklch(0.985 0.002 285)", "--foreground": "oklch(0.2 0.01 285)",
@@ -113,6 +115,8 @@ export const DEFAULT_TOKENS: BrandTokens = {
     "--sleep": "oklch(0.55 0.15 300)", "--sleep-soft": "oklch(0.94 0.05 300)",
     "--cardio": "oklch(0.55 0.16 250)", "--cardio-soft": "oklch(0.94 0.05 250)",
     "--hydration": "oklch(0.58 0.12 214)", "--hydration-soft": "oklch(0.94 0.05 214)",
+    "--supplement": "oklch(0.56 0.1 190)", "--supplement-soft": "oklch(0.93 0.05 190)",
+    "--lab": "oklch(0.56 0.15 322)", "--lab-soft": "oklch(0.94 0.05 322)",
   },
 };
 

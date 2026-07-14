@@ -155,7 +155,7 @@ export const LAB_STATUS: Record<string, { tone: Tone; label: string }> = {
   reviewed: { tone: "success", label: "Reviewed" },
   cancelled: { tone: "neutral", label: "Cancelled" },
 };
-export const labStatus = (status: string) => LAB_STATUS[status] ?? { tone: "sleep" as Tone, label: status };
+export const labStatus = (status: string) => LAB_STATUS[status] ?? { tone: "lab" as Tone, label: status };
 export const isLabImage = (key: string) => /\.(png|jpe?g|webp|gif|heic)$/i.test(key);
 
 export function LabDetailSheet({ lab, onClose }: { lab: LabFull; onClose: () => void }) {
@@ -183,7 +183,7 @@ export function LabDetailSheet({ lab, onClose }: { lab: LabFull; onClose: () => 
               <PhotoGrid photos={[{ url: fileUrl, label: lab.display_name }]} cols={2} />
             ) : (
               <a href={fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-2xl bg-surface-2 p-3 transition-colors hover:bg-surface-3">
-                <IconBadge icon={ImageIcon} tone="cardio" size="sm" />
+                <IconBadge icon={ImageIcon} tone="lab" size="sm" />
                 <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">View uploaded file</div><div className="text-xs text-muted-foreground">Opens in a new tab</div></div>
               </a>
             )}

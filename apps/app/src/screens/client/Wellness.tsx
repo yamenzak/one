@@ -250,7 +250,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
             chart={week.moodSeries.length >= 2 ? <Sparkline values={week.moodSeries} tone="cardio" width={132} /> : undefined} />
           <StatCard stack label="Fasts done" value={week.fastsDone} icon={Timer} tone="activity"
             chart={week.fastHoursSeries.length >= 2 ? <MiniBars values={week.fastHoursSeries} tone="activity" width={132} target={16} /> : undefined} />
-          <StatCard stack label="Supplements" value={week.suppSlots ? `${week.suppTaken}/${week.suppSlots}` : "—"} unit={week.suppSlots ? "today" : undefined} icon={Pill} tone="activity" />
+          <StatCard stack label="Supplements" value={week.suppSlots ? `${week.suppTaken}/${week.suppSlots}` : "—"} unit={week.suppSlots ? "today" : undefined} icon={Pill} tone="supplement" />
           <StatCard stack label="Sessions" value={week.sessionsWeek} unit="this wk" icon={Calendar} tone="cardio" />
         </Stagger>
       </section>
@@ -293,7 +293,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
           <Stagger>
             <Card className="divide-y divide-border/40 py-0.5">
               {supps.flatMap((s) => (s.schedule.length ? s.schedule : [{ slot: "daily" }]).map((sch) => (
-                <CheckRow key={`${s.id}:${sch.slot}`} icon={Pill} tone="activity" label={`Take ${s.name}`} sub={[s.dose, sch.slot === "daily" ? "" : sch.slot.replace(/_/g, " ")].filter(Boolean).join(" · ") || undefined} done={taken.has(`${s.id}:${sch.slot}`)} actionable={false} onClick={() => void toggleSupp(s.id, sch.slot)} />
+                <CheckRow key={`${s.id}:${sch.slot}`} icon={Pill} tone="supplement" label={`Take ${s.name}`} sub={[s.dose, sch.slot === "daily" ? "" : sch.slot.replace(/_/g, " ")].filter(Boolean).join(" · ") || undefined} done={taken.has(`${s.id}:${sch.slot}`)} actionable={false} onClick={() => void toggleSupp(s.id, sch.slot)} />
               )))}
             </Card>
           </Stagger>
@@ -369,7 +369,7 @@ function LabRow({ lab, clientId, onOpen, onUploaded }: { lab: LabFull; clientId:
     <Card interactive className="flex items-center gap-3 py-3">
       {thumb
         ? <img src={thumb} alt="" className="size-10 shrink-0 rounded-xl object-cover" />
-        : <IconBadge icon={FlaskConical} tone={st.tone} size="sm" />}
+        : <IconBadge icon={FlaskConical} tone="lab" size="sm" />}
       <button onClick={onOpen} className="min-w-0 flex-1 text-left">
         <div className="truncate font-medium">{lab.display_name}</div>
         <div className="truncate text-xs text-muted-foreground">{sub}</div>

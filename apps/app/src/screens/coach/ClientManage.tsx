@@ -94,7 +94,7 @@ export function ClientManage({ clientId }: { clientId: string }) {
       <Stagger>
         <Card className="space-y-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5"><IconBadge icon={Pill} tone="activity" size="sm" /><h2 className="font-semibold">Supplements</h2></div>
+            <div className="flex items-center gap-2.5"><IconBadge icon={Pill} tone="supplement" size="sm" /><h2 className="font-semibold">Supplements</h2></div>
             <div className="flex gap-2">
               <Button size="sm" variant="tonal" onClick={() => setSuggestOpen(true)}><Sparkles /> Suggest</Button>
               <Button size="sm" variant="secondary" onClick={() => setSuppOpen(true)}><Plus /> Prescribe</Button>
@@ -123,7 +123,7 @@ export function ClientManage({ clientId }: { clientId: string }) {
       <Stagger>
         <Card className="space-y-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5"><IconBadge icon={FlaskConical} tone="sleep" size="sm" /><h2 className="font-semibold">Lab tests</h2></div>
+            <div className="flex items-center gap-2.5"><IconBadge icon={FlaskConical} tone="lab" size="sm" /><h2 className="font-semibold">Lab tests</h2></div>
             <Button size="sm" variant="secondary" onClick={() => setLabOpen(true)}><Plus /> Request</Button>
           </div>
           {labs.length === 0 ? <p className="text-sm text-muted-foreground">No lab tests.</p> : labs.map((l) => (

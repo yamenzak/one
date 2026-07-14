@@ -17,7 +17,7 @@ const PILLAR_META: Record<string, { tone: Tone; icon: LucideIcon }> = {
   consistency: { tone: "primary", icon: ListChecks },
   hydration: { tone: "hydration", icon: Droplet },
   mood: { tone: "cardio", icon: Smile },
-  supplements: { tone: "activity", icon: Pill },
+  supplements: { tone: "supplement", icon: Pill },
   body: { tone: "cardio", icon: Scale },
 };
 
