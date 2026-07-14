@@ -1,7 +1,7 @@
 /** Package editor + redemption codes + promo codes. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Switch, Sheet, Skeleton, Chip, Page, Stagger, EmptyState, IconBadge, CreditCard, Ticket, Tag, Trash2, Plus, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Switch, Sheet, Skeleton, Chip, Page, Stagger, EmptyState, IconBadge, SectionHeader, CreditCard, Ticket, Tag, Trash2, Plus, X } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Pkg { id: string; name: string; one_time_price_cents: number | null; monthly_price_cents?: number | null; budgets: { feature: string; days: number }[]; visibility: string }
@@ -39,7 +39,7 @@ export function Packages() {
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
-      <div className="flex items-center justify-between"><h2 className="text-lg font-semibold">Packages</h2><Button size="sm" onClick={() => setPkgOpen(true)}><Plus /> New</Button></div>
+      <SectionHeader icon={CreditCard} tone="primary" title="Packages" action={<Button size="sm" onClick={() => setPkgOpen(true)}><Plus /> New</Button>} />
       {packages.length === 0 ? (
         <EmptyState icon={CreditCard} title="No packages yet" description="Build a package — feature budgets (workout/meal/all) sold once or as installments. $0 packages are comps you grant directly." />
       ) : (
@@ -53,7 +53,7 @@ export function Packages() {
         </Stagger>
       )}
 
-      <div className="flex items-center justify-between pt-2"><h2 className="text-lg font-semibold">Redemption codes</h2><Button size="sm" onClick={() => setCodeOpen(true)}><Plus /> Code</Button></div>
+      <SectionHeader className="pt-2" icon={Ticket} tone="primary" title="Redemption codes" action={<Button size="sm" onClick={() => setCodeOpen(true)}><Plus /> Code</Button>} />
       {codes.length === 0 ? <p className="text-sm text-muted-foreground">One-off access codes you can hand to a client to redeem.</p> : (
         <Stagger className="space-y-2">
           {codes.map((c) => (
@@ -64,7 +64,7 @@ export function Packages() {
         </Stagger>
       )}
 
-      <div className="flex items-center justify-between pt-2"><h2 className="text-lg font-semibold">Promo codes</h2><Button size="sm" onClick={() => setPromoOpen(true)}><Plus /> Promo</Button></div>
+      <SectionHeader className="pt-2" icon={Tag} tone="nutrition" title="Promo codes" action={<Button size="sm" onClick={() => setPromoOpen(true)}><Plus /> Promo</Button>} />
       {promos.length === 0 ? <p className="text-sm text-muted-foreground">Discount codes applied at checkout.</p> : (
         <Stagger className="space-y-2">
           {promos.map((p) => (

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PERMISSION_CATALOG } from "@mossa/domain";
-import { Button, Card, Field, Sheet, Skeleton, Avatar, Select, Chip, Page, Stagger, Mail, ShieldCheck, Plus } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, Avatar, Select, Chip, Page, Stagger, SectionHeader, Users, Mail, ShieldCheck, Plus } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Member { userId: string; role: string; name: string | null; email: string | null; customGrant?: Record<string, string[]> | null }
@@ -34,15 +34,18 @@ export function Staff() {
 
   return (
     <Page className="mx-auto max-w-xl space-y-3 p-4 pb-28">
-      <div className="flex items-center justify-between"><h2 className="text-lg font-semibold">Staff</h2><Button size="sm" onClick={() => setInviteOpen(true)}><Plus /> Invite</Button></div>
+      <SectionHeader icon={Users} tone="cardio" title="Staff" action={<Button size="sm" onClick={() => setInviteOpen(true)}><Plus /> Invite</Button>} />
       {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
       <Stagger className="space-y-2">
         {members.filter((m) => m.role !== "client").map((m) => (
           <Card key={m.userId} className="flex items-center gap-3">
             <Avatar name={m.name || m.email || "?"} seed={m.email ?? m.userId} className="size-10" />
-            <div className="min-w-0 flex-1"><div className="truncate font-medium">{m.name || m.email}</div><div className="truncate text-xs text-muted-foreground">{m.customGrant ? "Custom access" : m.email}</div></div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2"><span className="truncate font-medium">{m.name || m.email}</span>{m.customGrant && <Badge tone="warning">Custom</Badge>}</div>
+              <div className="truncate text-xs text-muted-foreground">{m.email}</div>
+            </div>
             {m.role !== "owner" && <Button size="icon" variant="secondary" aria-label="Permissions" onClick={() => setPermMember(m)}><ShieldCheck /></Button>}
-            <div className="w-32"><Select value={m.role} onChange={(v) => void changeRole(m.userId, v)} options={ROLES} /></div>
+            <div className="w-28"><Select value={m.role} onChange={(v) => void changeRole(m.userId, v)} options={ROLES} /></div>
           </Card>
         ))}
       </Stagger>

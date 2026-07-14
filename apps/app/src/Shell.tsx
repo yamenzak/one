@@ -106,10 +106,10 @@ function TabLayout() {
   const tabs: TabDef[] = clientSurface
     ? CLIENT_TABS
     : [
-        { key: "today", label: "Today", icon: Home },
-        { key: "clients", label: "Clients", icon: Users },
-        { key: "library", label: "Library", icon: LayoutGrid },
-        ...(active.role === "owner" ? [{ key: "business", label: "Business", icon: Wallet } as TabDef] : []),
+        { key: "today", label: "Today", icon: Home, tone: "primary" },
+        { key: "clients", label: "Clients", icon: Users, tone: "cardio" },
+        { key: "library", label: "Library", icon: LayoutGrid, tone: "activity" },
+        ...(active.role === "owner" ? [{ key: "business", label: "Business", icon: Wallet, tone: "warning" } as TabDef] : []),
       ];
   const seg = loc.pathname.split("/")[1] || "today";
   const current = tabs.some((t) => t.key === seg) ? seg : "today";

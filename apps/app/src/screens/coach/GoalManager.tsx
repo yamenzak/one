@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fmtEnergy, fmtVolume, weightLabel, displayToKg, feetInchesToCm } from "@mossa/domain";
-import { Button, Card, Badge, Field, Select, Skeleton, Page, Stagger, METRICS, toneVar, Target, type MetricKey } from "@mossa/ui";
+import { Button, Card, Badge, Field, Select, Skeleton, Page, Stagger, SectionHeader, METRICS, toneVar, Target, History, type MetricKey } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 
@@ -48,9 +48,9 @@ export function GoalManager({ clientId }: { clientId: string }) {
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       {active?.targets && (
         <Stagger>
-          <Card>
-            <div className="flex items-center justify-between"><div className="flex items-center gap-2"><Target className="size-4 text-primary" /><h2 className="text-lg font-semibold">{active.label}</h2></div><Badge tone="success">Active</Badge></div>
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Card className="space-y-3">
+            <SectionHeader icon={Target} tone="nutrition" title={active.label} action={<Badge tone="success">Active</Badge>} />
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {TARGET_ROWS.map(({ metric, field }) => {
                 const m = METRICS[metric];
                 const v = active.targets![field];
@@ -69,7 +69,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
 
       <Stagger>
         <Card className="space-y-3">
-          <h2 className="text-lg font-semibold">New goal phase</h2>
+          <SectionHeader icon={Target} tone="nutrition" title="New goal phase" />
           <Field label="Phase label" icon={Target} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Cut — 8 weeks" />
           <div className="grid grid-cols-2 gap-3">
             <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Gender</label><Select value={form.gender} onChange={(v) => setForm({ ...form, gender: v })} options={[{ value: "male", label: "Male" }, { value: "female", label: "Female" }]} /></div>
@@ -100,7 +100,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
       {history.length > 0 && (
         <Stagger>
           <Card className="space-y-2">
-            <h2 className="text-lg font-semibold">Goal history</h2>
+            <SectionHeader icon={History} tone="cardio" title="Goal history" />
             {history.map((g) => (
               <div key={g.id} className="flex items-center justify-between gap-2 border-t border-border/40 pt-2 first:border-0 first:pt-0">
                 <div className="min-w-0"><div className="truncate text-sm font-medium">{g.label}</div><div className="numeral text-xs text-muted-foreground">{g.targets?.targetCalories != null ? fmtEnergy(g.targets.targetCalories, units) : "—"} · {new Date(g.created_at).toLocaleDateString()}</div></div>

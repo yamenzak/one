@@ -283,4 +283,17 @@ export function SectionTitle({ children, action }: { children: ReactNode; action
   );
 }
 
+/** A tone-coded section header: squircle icon + title (+ optional count badge
+ *  and a trailing action). The polished pattern used across cards app-wide. */
+export function SectionHeader({ icon, tone = "primary", title, count, action, className }: { icon?: LucideIcon; tone?: Tone; title: ReactNode; count?: ReactNode; action?: ReactNode; className?: string }) {
+  return (
+    <div className={cn("flex items-center gap-2.5", className)}>
+      {icon && <IconBadge icon={icon} tone={tone} size="sm" />}
+      <h2 className="min-w-0 flex-1 truncate font-semibold">{title}</h2>
+      {count != null && <span className="numeral shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-muted-foreground">{count}</span>}
+      {action}
+    </div>
+  );
+}
+
 export { buttonVariants };
