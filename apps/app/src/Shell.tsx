@@ -5,7 +5,7 @@
  * /business · /settings /wellness /shop /explore /admin.
  */
 
-import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
@@ -137,6 +137,12 @@ function TabLayout() {
 
   const activeTone = tabs.find((t) => t.key === current)?.tone;
   const ambientColor = activeTone ? `var(--${activeTone})` : "var(--primary)";
+  // Ambient "token ambience": rebind --primary/--ring to the active section's
+  // domain token so every accent on the page (buttons, selected chips, links,
+  // rings) speaks that section's colour instead of the brand primary. The
+  // foreground token is mode-adaptive and contrasts across every domain token,
+  // so it's left as-is. Scoped to the content — the nav keeps its own tinting.
+  const pageVars = ambient && activeTone ? ({ "--primary": ambientColor, "--ring": ambientColor } as CSSProperties) : undefined;
 
   return (
     <div className="min-h-dvh pb-20 md:pb-0 md:pl-24">
@@ -153,7 +159,7 @@ function TabLayout() {
           }}
         />
       )}
-      <div className="relative z-10">
+      <div className="relative z-10 transition-colors duration-500" style={pageVars}>
       <AppBar
         bare={ambient}
         scrolled={scrolled}
