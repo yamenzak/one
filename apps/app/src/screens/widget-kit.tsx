@@ -26,7 +26,7 @@ export interface WidgetDef<D> {
 export function RingCard({ tone, value, label, sublabel, progress }: { tone: Tone; value: ReactNode; label: string; sublabel?: string; progress: number }) {
   return (
     <div className="flex h-full items-center justify-center">
-      <ProgressRing size={152} strokeWidth={11} tone={tone} progress={progress} value={value} label={label} sublabel={sublabel} />
+      <ProgressRing size={152} strokeWidth={17} tone={tone} progress={progress} value={value} label={label} sublabel={sublabel} softTrack tintValue />
     </div>
   );
 }

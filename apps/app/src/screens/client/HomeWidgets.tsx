@@ -152,7 +152,7 @@ function FastingWidget({ clientId, size }: { clientId: string; size: WidgetSize 
     <div className="flex h-full flex-col items-center justify-center gap-3">
       {active ? (
         <>
-          <ProgressRing size={132} strokeWidth={9} tone={zone.tone} progress={pct} value={<span className="tabular-nums">{h}:{pad(m)}:{pad(s)}</span>} label="Fasting" sublabel={`${zone.label} · ${active.target_hours}h`} />
+          <ProgressRing size={132} strokeWidth={15} tone={zone.tone} progress={pct} value={<span className="tabular-nums">{h}:{pad(m)}:{pad(s)}</span>} label="Fasting" sublabel={`${zone.label} · ${active.target_hours}h`} softTrack tintValue />
           <Button size="sm" variant="outline" className="relative w-full" disabled={busy} onClick={() => void end()}>End fast</Button>
         </>
       ) : (

@@ -17,15 +17,20 @@ interface ProgressRingProps {
   label?: string;
   sublabel?: string;
   className?: string;
+  /** Tint the unfilled track with the tone (instead of neutral surface-3). */
+  softTrack?: boolean;
+  /** Colour the centre value with the tone. */
+  tintValue?: boolean;
 }
 
-export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activity", value, label, sublabel, className }: ProgressRingProps) {
+export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activity", value, label, sublabel, className, softTrack, tintValue }: ProgressRingProps) {
   const sw = strokeWidth ?? Math.max(8, Math.round(size * 0.1));
   const r = (size - sw) / 2;
   const c = 2 * Math.PI * r;
   const p = Math.min(1, Math.max(0, progress));
   const gradId = useId();
   const color = toneVar[tone];
+  const track = softTrack ? `color-mix(in oklch, ${color} 22%, var(--surface-3))` : "var(--surface-3)";
 
   return (
     <div className={cn("relative shrink-0", className)} style={{ width: size, height: size }}>
@@ -36,7 +41,7 @@ export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activi
             <stop offset="100%" stopColor={color} />
           </linearGradient>
         </defs>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--surface-3)" strokeWidth={sw} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={sw} />
         <motion.circle
           cx={size / 2}
           cy={size / 2}
@@ -55,7 +60,7 @@ export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activi
         {label && <div className="text-xs font-medium text-muted-foreground" style={{ fontSize: size * 0.065 }}>{label}</div>}
         <motion.div
           className="numeral font-semibold leading-none"
-          style={{ fontSize: size * 0.2 }}
+          style={{ fontSize: size * 0.2, color: tintValue ? color : undefined }}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15, duration: 0.4 }}
