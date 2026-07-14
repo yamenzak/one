@@ -5,7 +5,7 @@
  * /business · /settings /wellness /shop /explore /admin.
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
@@ -114,6 +114,18 @@ function TabLayout() {
   const seg = loc.pathname.split("/")[1] || "today";
   const current = tabs.some((t) => t.key === seg) ? seg : "today";
 
+  // App-bar glass pills appear only once the page is scrolled off the top. Track
+  // window scroll, and reset to top BEFORE paint on every navigation so a new
+  // page always opens at the top with bare (pill-less) brand + actions.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  useLayoutEffect(() => { window.scrollTo(0, 0); setScrolled(false); }, [loc.pathname]);
+
   const enterTrainMode = async () => {
     if (!active.clientId) { await api.post("/api/clients/self"); await refresh(); }
     setMode("train");
@@ -141,6 +153,7 @@ function TabLayout() {
       <div className="relative z-10">
       <AppBar
         bare={ambient}
+        scrolled={scrolled}
         leading={
           <div className="flex min-w-0 items-center gap-2">
             {ctx!.branding?.logoUrl ? (

@@ -4,7 +4,7 @@
  */
 
 import { motion } from "motion/react";
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { cn } from "./lib/utils.js";
 import { toneVar, type Tone } from "./primitives.js";
 import { Sparkles, ThumbsDown, ThumbsUp, type LucideIcon } from "./lib/icons.js";
@@ -24,21 +24,14 @@ const activeColor = (tabs: TabDef[], active: string, tinted?: boolean): string =
   return tinted && tone ? toneVar[tone] : "var(--primary)";
 };
 
-export function AppBar({ leading, title, trailing, bare }: { leading?: ReactNode; title?: ReactNode; trailing?: ReactNode; bare?: boolean }) {
+export function AppBar({ leading, title, trailing, bare, scrolled }: { leading?: ReactNode; title?: ReactNode; trailing?: ReactNode; bare?: boolean; scrolled?: boolean }) {
   // `bare` drops the tint, border AND blur so an ambient page wash bleeds all the
   // way up behind the bar, crisp — no frosted-glass compositing lag on load.
-  // Once you scroll off the top, the brand + actions grow their own glass pills
-  // so they stay legible over the content passing beneath the transparent bar.
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    if (!bare) return;
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [bare]);
+  // Once you scroll off the top (`scrolled`), the brand + actions grow their own
+  // glass pills so they stay legible over the content passing beneath the bar.
+  const showPills = bare && scrolled;
   const cluster = bare
-    ? cn("flex items-center rounded-full border px-3 py-1.5 backdrop-blur-md transition-colors duration-300", scrolled ? "border-border/40 bg-background/60" : "border-transparent")
+    ? cn("flex items-center rounded-full border px-3 py-1.5 backdrop-blur-md transition-colors duration-300", showPills ? "border-border/40 bg-background/60" : "border-transparent")
     : "flex items-center";
   return (
     <header className={cn("sticky top-0 z-30 flex h-16 items-center justify-between gap-3 px-4", !bare && "border-b border-border/40 bg-background/80 backdrop-blur-xl")}>
