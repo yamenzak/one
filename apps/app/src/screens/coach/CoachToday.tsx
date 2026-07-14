@@ -44,12 +44,23 @@ export function CoachToday() {
     void refresh();
   };
 
+  // Load everything the page renders in one shot, then commit together — so the
+  // page mounts complete and animates as one, with no mid-page section popping
+  // in late (which would shift the sections below it during the entrance).
   useEffect(() => {
-    void api.get<{ clients: ClientSummary[] }>("/api/clients").then((r) => setClients(r.clients));
-    void api.get<{ notifications: Notification[] }>("/api/notifications").then((r) => setNotifications(r.notifications));
-    void api.get<{ atRisk: AtRisk[] }>("/api/reports/retention").then((r) => setAtRisk(r.atRisk)).catch(() => undefined);
-    void api.get<{ swaps: PendingSwap[] }>("/api/swaps").then((r) => setSwaps(r.swaps)).catch(() => undefined);
-    void api.get<{ events: RosterEvent[] }>("/api/reports/roster-activity").then((r) => setActivity(r.events)).catch(() => undefined);
+    void (async () => {
+      try {
+        const [c, n, ar, sw, ev] = await Promise.all([
+          api.get<{ clients: ClientSummary[] }>("/api/clients"),
+          api.get<{ notifications: Notification[] }>("/api/notifications"),
+          api.get<{ atRisk: AtRisk[] }>("/api/reports/retention").catch(() => ({ atRisk: [] as AtRisk[] })),
+          api.get<{ swaps: PendingSwap[] }>("/api/swaps").catch(() => ({ swaps: [] as PendingSwap[] })),
+          api.get<{ events: RosterEvent[] }>("/api/reports/roster-activity").catch(() => ({ events: [] as RosterEvent[] })),
+        ]);
+        setAtRisk(ar.atRisk); setSwaps(sw.swaps); setActivity(ev.events);
+        setClients(c.clients); setNotifications(n.notifications);
+      } catch { /* clients/notifications failed — stay in the skeleton */ }
+    })();
   }, []);
 
   if (!clients || !notifications) return <div className="space-y-4 p-4"><Skeleton className="h-52" /><Skeleton className="h-36" /></div>;
