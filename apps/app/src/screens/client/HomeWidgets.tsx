@@ -109,8 +109,8 @@ function WellnessWidget({ clientId, date, size }: { clientId: string; date: stri
   useEffect(() => { void api.get<ScoreResult>(`/api/wellness/score?clientId=${clientId}&today=${date}`).then(setRes).catch(() => setRes({ score: 0, band: "start" })); }, [clientId, date]);
   if (!res) return <div className="h-full animate-pulse rounded-2xl bg-surface-2" />;
   return size === "big"
-    ? <RingCard tone="primary" progress={res.score / 100 || 0.001} value={res.score} label="Wellness" sublabel={BAND_LABEL[res.band] ?? "this week"} />
-    : <MiniCard icon={HeartPulse} tone="primary" label="Wellness" value={res.score} progress={res.score / 100} />;
+    ? <RingCard tone="sleep" progress={res.score / 100 || 0.001} value={res.score} label="Wellness" sublabel={BAND_LABEL[res.band] ?? "this week"} />
+    : <MiniCard icon={HeartPulse} tone="sleep" label="Wellness" value={res.score} progress={res.score / 100} />;
 }
 
 // ── Live fasting tracker ─────────────────────────────────────────────────────

@@ -55,7 +55,7 @@ export function WellnessScoreCard({ result }: { result: WellnessScoreResult }) {
     <div className="relative overflow-hidden rounded-2xl bg-card p-5">
       <div className="pointer-events-none absolute -right-12 -top-12 size-44 rounded-full bg-primary/10 blur-3xl" />
       <div className="relative flex items-center gap-5">
-        <ProgressRing size={132} strokeWidth={11} tone="primary" progress={result.score / 100} value={result.score} label="Wellness" />
+        <ProgressRing size={132} strokeWidth={11} tone="sleep" progress={result.score / 100} value={result.score} label="Wellness" />
         <div className="min-w-0 flex-1">
           <div className="text-xs font-medium uppercase tracking-wide text-primary">This week</div>
           <div className="mt-0.5 text-lg font-bold tracking-tight">{band.label}</div>
