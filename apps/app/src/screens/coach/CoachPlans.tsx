@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SegmentedControl, Page, Stagger, EmptyState, cn, Dumbbell, Utensils, Plus, Ellipsis, Trash2, Archive, History, Zap, PencilLine } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SegmentedControl, Page, Stagger, EmptyState, SectionHeader, cn, Dumbbell, Utensils, Plus, Ellipsis, Trash2, Archive, History, Zap, PencilLine } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Plan { id: string; name: string; status: string; publishedAt: string | null }
@@ -26,10 +26,7 @@ export function CoachPlans({ clientId }: { clientId: string }) {
   return (
     <Page className="mx-auto max-w-xl space-y-3 p-4 pb-28">
       <SegmentedControl options={[{ value: "workout", label: "Workout" }, { value: "meal", label: "Meal" }]} value={kind} onChange={setKind} />
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold capitalize">{kind} plans</h2>
-        <Button size="sm" onClick={() => setCreateOpen(true)}><Plus /> New</Button>
-      </div>
+      <SectionHeader icon={kind === "workout" ? Dumbbell : Utensils} tone={kind === "workout" ? "activity" : "nutrition"} title={`${kind === "workout" ? "Workout" : "Meal"} plans`} action={<Button size="sm" onClick={() => setCreateOpen(true)}><Plus /> New</Button>} />
       {!plans ? <Skeleton className="h-64" /> : plans.length === 0 ? (
         <EmptyState icon={kind === "workout" ? Dumbbell : Utensils} title={`No ${kind} plans`} description={kind === "workout" ? "Create one and build it — or use the AI draft inside the builder." : "Create one and build the options bank."} />
       ) : (
