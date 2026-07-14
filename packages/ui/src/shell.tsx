@@ -4,7 +4,7 @@
  */
 
 import { motion } from "motion/react";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "./lib/utils.js";
 import { toneVar, type Tone } from "./primitives.js";
 import { Sparkles, ThumbsDown, ThumbsUp, type LucideIcon } from "./lib/icons.js";
@@ -27,11 +27,24 @@ const activeColor = (tabs: TabDef[], active: string, tinted?: boolean): string =
 export function AppBar({ leading, title, trailing, bare }: { leading?: ReactNode; title?: ReactNode; trailing?: ReactNode; bare?: boolean }) {
   // `bare` drops the tint, border AND blur so an ambient page wash bleeds all the
   // way up behind the bar, crisp — no frosted-glass compositing lag on load.
+  // Once you scroll off the top, the brand + actions grow their own glass pills
+  // so they stay legible over the content passing beneath the transparent bar.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    if (!bare) return;
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [bare]);
+  const cluster = bare
+    ? cn("flex items-center rounded-full border px-3 py-1.5 backdrop-blur-md transition-colors duration-300", scrolled ? "border-border/40 bg-background/60" : "border-transparent")
+    : "flex items-center";
   return (
     <header className={cn("sticky top-0 z-30 flex h-16 items-center justify-between gap-3 px-4", !bare && "border-b border-border/40 bg-background/80 backdrop-blur-xl")}>
-      <div className="flex min-w-0 flex-1 items-center gap-2">{leading}</div>
+      <div className={cn(cluster, "min-w-0 gap-2")}>{leading}</div>
       {title && <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-base font-semibold">{title}</div>}
-      <div className="flex items-center gap-1.5">{trailing}</div>
+      <div className={cn(cluster, "gap-1.5")}>{trailing}</div>
     </header>
   );
 }
