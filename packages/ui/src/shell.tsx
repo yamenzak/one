@@ -30,10 +30,10 @@ export function AppBar({ leading, title, trailing, bare, scrolled }: { leading?:
   // Once you scroll off the top (`scrolled`), the brand + actions grow their own
   // glass pills so they stay legible over the content passing beneath the bar.
   const showPills = bare && scrolled;
-  // Blur/bg/border only when scrolled — an always-on backdrop-filter flashes the
-  // gradient on load and leaves a faint clipped edge at the top.
+  // At the top: just padding — NO border/ring, bg, blur or rounding (an always-on
+  // border flashes/leaves an edge). The glass pill only materialises on scroll.
   const cluster = bare
-    ? cn("flex items-center rounded-full border px-3 py-1.5 transition-colors duration-300", showPills ? "border-border/40 bg-background/60 backdrop-blur-md" : "border-transparent")
+    ? cn("flex items-center px-3 py-1.5 transition-colors duration-300", showPills && "rounded-full border border-border/40 bg-background/60 backdrop-blur-md")
     : "flex items-center";
   return (
     <header className={cn("sticky top-0 z-30 flex h-16 items-center justify-between gap-3 px-4", !bare && "border-b border-border/40 bg-background/80 backdrop-blur-xl")}>
