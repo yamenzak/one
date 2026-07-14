@@ -8,8 +8,8 @@ import { motion } from "motion/react";
 import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
-  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Dumbbell, Building2,
-  type Branding, type BrandTokens, type NeutralTint, type LucideIcon, type Tone,
+  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2,
+  type Branding, type BrandTokens, type NeutralTint, type LucideIcon,
 } from "@mossa/ui";
 import { resolveUnits } from "@mossa/domain";
 import { useSession } from "../session.js";
@@ -18,22 +18,18 @@ import { api } from "../api.js";
 import { enrollPasskey, listPasskeys, passkeySupported } from "../passkey.js";
 import { AiConfigSection } from "./AiSettings.js";
 
-/** Who a setting is for — a small badge so the mixed owner view reads clearly. */
-type Scope = "trainer" | "tenant";
-const SCOPE_META: Record<Scope, { label: string; icon: LucideIcon; tone: Tone }> = {
-  trainer: { label: "Trainer", icon: Dumbbell, tone: "activity" },
-  tenant: { label: "Studio", icon: Building2, tone: "primary" },
-};
-function ScopeTag({ scope }: { scope: Scope }) {
-  const m = SCOPE_META[scope];
-  return <Badge tone={m.tone}><m.icon /> {m.label}</Badge>;
+/** Studio-level settings the owner controls carry this badge, so the owner can
+ *  tell them apart from their own personal (Account / Preferences) settings. */
+type Scope = "tenant";
+function ScopeTag() {
+  return <Badge tone="primary"><Building2 /> Studio</Badge>;
 }
-/** Section header with an optional who-is-this-for badge. */
+/** Section header with an optional studio-scope badge. */
 function SectionHead({ title, scope }: { title: string; scope?: Scope }) {
   return (
     <div className="mb-2 flex items-center justify-between gap-2 px-1">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
-      {scope && <ScopeTag scope={scope} />}
+      {scope && <ScopeTag />}
     </div>
   );
 }
@@ -88,7 +84,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
 
         {tab === "studio" && isOwner && (
           <>
-            <p className="px-1 text-sm text-muted-foreground">Settings you control for the whole studio. The badge on each shows whether it shapes your <span className="font-medium text-activity">coaching</span> or your <span className="font-medium text-primary">business</span>.</p>
+            <p className="px-1 text-sm text-muted-foreground">Studio-wide settings you control as the owner — your brand, your AI and your business. The <span className="font-medium text-primary">Studio</span> badge marks them apart from your personal settings.</p>
             {canBrand && <BrandingEditor initial={(ctx?.branding ?? null) as Branding | null} onPreview={preview} onSaved={() => void refresh()} />}
             {aiSuite && <AiConfigSection />}
             <MarketplaceSection />

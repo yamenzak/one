@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from "react";
 import type { AiSettingsPayload, AiFeatureMeta, AiModelMeta, TenantAiConfig, AiFeatureConfig, AiTone } from "@mossa/protocol";
-import { Card, Badge, Skeleton, Switch, Button, Textarea, Chip, IconBadge, cn, Sparkles, ChevronDown, Dumbbell, Users, HeartPulse, Camera, ImageIcon, type Tone, type LucideIcon } from "@mossa/ui";
+import { Card, Badge, Skeleton, Switch, Button, Textarea, Chip, IconBadge, cn, Sparkles, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, type Tone, type LucideIcon } from "@mossa/ui";
 import { api } from "../api.js";
 
 const TONE_LABEL: Record<string, string> = {
@@ -73,7 +73,7 @@ export function AiConfigSection() {
       <div>
         <div className="mb-2 flex items-center justify-between gap-2 px-1">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">AI assistant</h3>
-          <Badge tone="activity"><Dumbbell /> Trainer</Badge>
+          <Badge tone="primary"><Building2 /> Studio</Badge>
         </div>
         <Card className="space-y-3">
           <div className="flex items-center gap-2.5">
