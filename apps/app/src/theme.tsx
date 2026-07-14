@@ -16,11 +16,21 @@ interface ThemeCtx {
   /** Tint the active nav tab by its section's domain token (persisted). */
   tintedNav: boolean;
   setTintedNav: (v: boolean) => void;
+  /** Wash each page's hero area in its section's domain token (persisted). */
+  ambient: boolean;
+  setAmbient: (v: boolean) => void;
 }
 
 const Ctx = createContext<ThemeCtx | null>(null);
 
 const TINTED_NAV_KEY = "mossa:tintedNav";
+const AMBIENT_KEY = "mossa:ambient";
+const readBool = (key: string, dflt: boolean): boolean => {
+  if (typeof localStorage === "undefined") return dflt;
+  const v = localStorage.getItem(key);
+  return v === null ? dflt : v !== "0";
+};
+const writeBool = (key: string, v: boolean) => { try { localStorage.setItem(key, v ? "1" : "0"); } catch { /* private mode */ } };
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const { ctx, host } = useSession();
@@ -49,19 +59,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyMode(mode);
   }, [mode]);
 
-  const [tintedNav, setTintedNavState] = useState<boolean>(() => {
-    if (typeof localStorage === "undefined") return true;
-    return localStorage.getItem(TINTED_NAV_KEY) !== "0";
-  });
-  const setTintedNav = useCallback((v: boolean) => {
-    setTintedNavState(v);
-    try { localStorage.setItem(TINTED_NAV_KEY, v ? "1" : "0"); } catch { /* private mode */ }
-  }, []);
+  const [tintedNav, setTintedNavState] = useState<boolean>(() => readBool(TINTED_NAV_KEY, true));
+  const setTintedNav = useCallback((v: boolean) => { setTintedNavState(v); writeBool(TINTED_NAV_KEY, v); }, []);
+  const [ambient, setAmbientState] = useState<boolean>(() => readBool(AMBIENT_KEY, true));
+  const setAmbient = useCallback((v: boolean) => { setAmbientState(v); writeBool(AMBIENT_KEY, v); }, []);
 
   const toggleMode = useCallback(() => setMode((m) => (m === "dark" ? "light" : "dark")), []);
   const preview = useCallback((b: Branding | null) => applyBranding(b ?? branding), [branding]);
 
-  const value = useMemo(() => ({ mode, toggleMode, preview, tintedNav, setTintedNav }), [mode, toggleMode, preview, tintedNav, setTintedNav]);
+  const value = useMemo(() => ({ mode, toggleMode, preview, tintedNav, setTintedNav, ambient, setAmbient }), [mode, toggleMode, preview, tintedNav, setTintedNav, ambient, setAmbient]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

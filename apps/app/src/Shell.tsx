@@ -95,7 +95,7 @@ export function Shell() {
 /** The tab layout: app bar + routed content + bottom tabs / nav rail. */
 function TabLayout() {
   const { ctx, mode, setMode, switchTenant, signOut, refresh } = useSession();
-  const { mode: themeMode, toggleMode, tintedNav } = useTheme();
+  const { mode: themeMode, toggleMode, tintedNav, ambient } = useTheme();
   const clientId = useActiveClientId();
   const clientSurface = useClientSurface();
   const nav = useNavigate();
@@ -120,8 +120,25 @@ function TabLayout() {
     nav("/today");
   };
 
+  const activeTone = tabs.find((t) => t.key === current)?.tone;
+  const ambientColor = activeTone ? `var(--${activeTone})` : "var(--primary)";
+
   return (
     <div className="min-h-dvh pb-20 md:pb-0 md:pl-24">
+      {/* Ambient hero wash — each section's domain token bleeds from the top and
+          fades into the background, crossfading as you move between pages. */}
+      {ambient && (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-x-0 top-0 z-0 h-[52vh] transition-[background-color] duration-700 ease-out md:left-24"
+          style={{
+            backgroundColor: `color-mix(in oklch, ${ambientColor} 24%, transparent)`,
+            maskImage: "linear-gradient(to bottom, black 0%, black 6%, transparent 100%)",
+            WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 6%, transparent 100%)",
+          }}
+        />
+      )}
+      <div className="relative z-10">
       <AppBar
         leading={
           <div className="flex min-w-0 items-center gap-2">
@@ -188,6 +205,7 @@ function TabLayout() {
       />
 
       <main><Outlet /></main>
+      </div>
 
       <BottomTabs tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} tinted={tintedNav} />
       <NavRail tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} tinted={tintedNav} brand={ctx!.branding?.iconUrl ? <img src={ctx!.branding.iconUrl} alt={active.tenantName} className="size-full object-cover" /> : active.tenantName.charAt(0).toUpperCase()} />
