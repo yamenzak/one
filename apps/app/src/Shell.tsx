@@ -142,7 +142,11 @@ function TabLayout() {
   // rings) speaks that section's colour instead of the brand primary. The
   // foreground token is mode-adaptive and contrasts across every domain token,
   // so it's left as-is. Scoped to the content — the nav keeps its own tinting.
-  const pageVars = ambient && activeTone ? ({ "--primary": ambientColor, "--ring": ambientColor } as CSSProperties) : undefined;
+  // Only rebind for the non-primary section tokens — `--primary: var(--primary)`
+  // would be a circular self-reference and blank out every primary-tinted element.
+  const pageVars = ambient && activeTone && activeTone !== "primary"
+    ? ({ "--primary": `var(--${activeTone})`, "--ring": `var(--${activeTone})` } as CSSProperties)
+    : undefined;
 
   return (
     <div className="min-h-dvh pb-20 md:pb-0 md:pl-24">
