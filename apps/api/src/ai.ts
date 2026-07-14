@@ -348,9 +348,14 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   // task default. Vision needs a multimodal model — a vision-tagged one, or
   // ANY Gemini model (Gemini models are all multimodal). Text/text-small are
   // interchangeable and never route to a vision-only or image model.
+  // Gemini models are multimodal — they read images (vision) and generate them,
+  // so a Google model is valid on any lane, not just its tagged task.
   const visionCapable = (m: AiModelRow) => m.task === "vision" || m.provider === "google";
+  const imageCapable = (m: AiModelRow) => m.task === "image" || m.provider === "google";
   const compatible = (m: AiModelRow) =>
-    input.task === "vision" ? visionCapable(m) : m.task !== "vision" && m.task !== "image";
+    input.task === "image" ? imageCapable(m)
+      : input.task === "vision" ? visionCapable(m)
+        : m.task !== "vision" && m.task !== "image";
   let model: AiModelRow | null = null;
   if (fcfg.model) { const m = await modelById(env.DB, fcfg.model); if (m && compatible(m)) model = m; }
   // No explicit override: when a Gemini key is configured, prefer Gemini — it's
@@ -503,18 +508,25 @@ export async function generateImage(env: Env, input: GenerateImageInput): Promis
   const fcfg = config.features?.[input.feature] ?? {};
   if ((fcfg.enabled ?? toggles[input.feature] ?? true) === false) return { ok: false, error: "unavailable", detail: `feature "${input.feature}" is turned off in AI settings` };
 
+  // Any Gemini model can generate images; prefer a dedicated image-priced model
+  // (per-image billing), else fall back to any enabled Gemini model.
   let model: AiModelRow | null = null;
-  if (fcfg.model) { const m = await modelById(env.DB, fcfg.model); if (m && m.task === "image") model = m; }
+  if (fcfg.model) { const m = await modelById(env.DB, fcfg.model); if (m && (m.task === "image" || m.provider === "google")) model = m; }
   if (!model) model = await modelForTask(env.DB, "image");
+  if (!model) model = await visionFallbackModel(env.DB);
   if (!model || model.provider !== "google") return { ok: false, error: "unavailable", detail: "no enabled Gemini image model — add a Gemini key and sync the catalog" };
   const rate = rateOf(model);
+
+  // The studio's custom style instructions append to the built-in image prompt
+  // (kept, not replaced) — same additive rule as the text features.
+  const prompt = fcfg.system && fcfg.system.trim() ? `${input.prompt}\n\nThe studio also asks: ${fcfg.system.trim()}` : input.prompt;
 
   const cfg = await getConfig(env.DB);
   const geminiKey = cfg["google.gemini_key"];
   const mockMode = cfg["ai.mock"] ?? "auto";
   const useMock = mockMode === "on" || (mockMode !== "off" && !geminiKey);
 
-  const estUsage: Usage = { inputTokens: Math.ceil(input.prompt.length / 4), images: 1 };
+  const estUsage: Usage = { inputTokens: Math.ceil(prompt.length / 4), images: 1 };
   const estimate = creditsForUsage(estUsage, rate);
   const dobj = env.BILLING.get(env.BILLING.idFromName(input.tenantId));
   await dobj.bind(input.tenantId);
@@ -524,7 +536,7 @@ export async function generateImage(env: Env, input: GenerateImageInput): Promis
   let bytes: Uint8Array, mimeType: string, usage: Usage, mocked = false;
   try {
     if (useMock) { bytes = b64ToBytes(MOCK_PNG_B64); mimeType = "image/png"; usage = estUsage; mocked = true; }
-    else { const r = await withTimeout(runGeminiImage(geminiKey!, model.id, input.prompt, input.reference)); bytes = r.bytes; mimeType = r.mimeType; usage = { inputTokens: r.inputTokens, images: 1 }; }
+    else { const r = await withTimeout(runGeminiImage(geminiKey!, model.id, prompt, input.reference)); bytes = r.bytes; mimeType = r.mimeType; usage = { inputTokens: r.inputTokens, images: 1 }; }
   } catch (err) {
     await dobj.release(hold.hold);
     const detail = `${model.id}: ${err instanceof Error ? err.message : String(err)}`;

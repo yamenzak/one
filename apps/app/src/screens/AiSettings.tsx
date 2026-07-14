@@ -100,7 +100,7 @@ export function AiConfigSection() {
 const MODEL_GROUPS: { key: string; label: string; desc: string; icon: LucideIcon; tone: Tone; matchFeature: (t: string) => boolean; matchModel: (m: AiModelMeta) => boolean }[] = [
   { key: "text", label: "Text model", desc: "Plans, summaries, notes & writing.", icon: Sparkles, tone: "primary", matchFeature: (t) => t === "text" || t === "text-small", matchModel: (m) => m.task !== "vision" && m.task !== "image" },
   { key: "vision", label: "Vision model", desc: "Reading meal photos, labels & lab reports.", icon: Camera, tone: "cardio", matchFeature: (t) => t === "vision", matchModel: (m) => m.task === "vision" || m.provider === "google" },
-  { key: "image", label: "Image model", desc: "Generated cover, food & exercise images.", icon: ImageIcon, tone: "nutrition", matchFeature: (t) => t === "image", matchModel: (m) => m.task === "image" },
+  { key: "image", label: "Image model", desc: "Generated cover, food & exercise images.", icon: ImageIcon, tone: "nutrition", matchFeature: (t) => t === "image", matchModel: (m) => m.task === "image" || m.provider === "google" },
 ];
 
 function DefaultModels({ features, models, config, onApply }: {
@@ -159,7 +159,9 @@ function FeatureCard({ feat, models, cfg, tones, onSave }: {
   // Vision needs a multimodal model — a vision-tagged one, or any Gemini model
   // (Gemini is multimodal). Text/text-small interchange; never image models.
   const pickable = models.filter((m) =>
-    feat.task === "vision" ? m.task === "vision" || m.provider === "google" : m.task !== "vision" && m.task !== "image",
+    feat.task === "image" ? m.task === "image" || m.provider === "google"
+      : feat.task === "vision" ? m.task === "vision" || m.provider === "google"
+        : m.task !== "vision" && m.task !== "image",
   );
 
   return (
