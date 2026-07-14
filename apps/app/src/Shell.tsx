@@ -34,11 +34,11 @@ import { AdminConsole } from "./screens/admin/AdminConsole.js";
 import { NotificationBell } from "./NotificationBell.js";
 
 const CLIENT_TABS: TabDef[] = [
-  { key: "today", label: "Today", icon: Home },
-  { key: "train", label: "Train", icon: Dumbbell },
-  { key: "eat", label: "Eat", icon: Utensils },
-  { key: "wellness", label: "Wellness", icon: HeartPulse },
-  { key: "progress", label: "Progress", icon: LineChart },
+  { key: "today", label: "Today", icon: Home, tone: "primary" },
+  { key: "train", label: "Train", icon: Dumbbell, tone: "activity" },
+  { key: "eat", label: "Eat", icon: Utensils, tone: "nutrition" },
+  { key: "wellness", label: "Wellness", icon: HeartPulse, tone: "sleep" },
+  { key: "progress", label: "Progress", icon: LineChart, tone: "cardio" },
 ];
 
 /** Am I currently looking at the client surface? (client role, or train mode.) */
@@ -95,7 +95,7 @@ export function Shell() {
 /** The tab layout: app bar + routed content + bottom tabs / nav rail. */
 function TabLayout() {
   const { ctx, mode, setMode, switchTenant, signOut, refresh } = useSession();
-  const { mode: themeMode, toggleMode } = useTheme();
+  const { mode: themeMode, toggleMode, tintedNav } = useTheme();
   const clientId = useActiveClientId();
   const clientSurface = useClientSurface();
   const nav = useNavigate();
@@ -189,8 +189,8 @@ function TabLayout() {
 
       <main><Outlet /></main>
 
-      <BottomTabs tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} />
-      <NavRail tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} brand={ctx!.branding?.iconUrl ? <img src={ctx!.branding.iconUrl} alt={active.tenantName} className="size-full object-cover" /> : active.tenantName.charAt(0).toUpperCase()} />
+      <BottomTabs tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} tinted={tintedNav} />
+      <NavRail tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} tinted={tintedNav} brand={ctx!.branding?.iconUrl ? <img src={ctx!.branding.iconUrl} alt={active.tenantName} className="size-full object-cover" /> : active.tenantName.charAt(0).toUpperCase()} />
     </div>
   );
 }

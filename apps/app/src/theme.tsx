@@ -13,9 +13,14 @@ interface ThemeCtx {
   toggleMode: () => void;
   /** Live-preview a branding (no persistence) — for the editor. */
   preview: (b: Branding | null) => void;
+  /** Tint the active nav tab by its section's domain token (persisted). */
+  tintedNav: boolean;
+  setTintedNav: (v: boolean) => void;
 }
 
 const Ctx = createContext<ThemeCtx | null>(null);
+
+const TINTED_NAV_KEY = "mossa:tintedNav";
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const { ctx, host } = useSession();
@@ -44,10 +49,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyMode(mode);
   }, [mode]);
 
+  const [tintedNav, setTintedNavState] = useState<boolean>(() => {
+    if (typeof localStorage === "undefined") return true;
+    return localStorage.getItem(TINTED_NAV_KEY) !== "0";
+  });
+  const setTintedNav = useCallback((v: boolean) => {
+    setTintedNavState(v);
+    try { localStorage.setItem(TINTED_NAV_KEY, v ? "1" : "0"); } catch { /* private mode */ }
+  }, []);
+
   const toggleMode = useCallback(() => setMode((m) => (m === "dark" ? "light" : "dark")), []);
   const preview = useCallback((b: Branding | null) => applyBranding(b ?? branding), [branding]);
 
-  const value = useMemo(() => ({ mode, toggleMode, preview }), [mode, toggleMode, preview]);
+  const value = useMemo(() => ({ mode, toggleMode, preview, tintedNav, setTintedNav }), [mode, toggleMode, preview, tintedNav, setTintedNav]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

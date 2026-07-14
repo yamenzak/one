@@ -19,7 +19,7 @@ import { AiConfigSection } from "./AiSettings.js";
 
 export function Settings({ onBack }: { onBack: () => void }) {
   const { ctx, signOut, refresh } = useSession();
-  const { mode, toggleMode, preview } = useTheme();
+  const { mode, toggleMode, preview, tintedNav, setTintedNav } = useTheme();
   const [passkeys, setPasskeys] = useState<{ id: string; name: string | null }[]>([]);
   const [enrolling, setEnrolling] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -98,10 +98,24 @@ export function Settings({ onBack }: { onBack: () => void }) {
         </Stagger>
       )}
 
-      <Stagger>
+      <Stagger className="space-y-3">
         <SettingsList
           sections={[
             { header: "Appearance", rows: [{ icon: mode === "dark" ? Sun : Moon, label: mode === "dark" ? "Switch to light" : "Switch to dark", onClick: toggleMode }] },
+          ]}
+        />
+        <Card className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3.5">
+            <Palette className="size-[1.2rem] shrink-0 text-muted-foreground" />
+            <div className="min-w-0">
+              <div className="text-sm font-medium">Colorful tab bar</div>
+              <div className="text-xs text-muted-foreground">Tint the active tab by section — Train green, Eat amber, and so on.</div>
+            </div>
+          </div>
+          <Switch checked={tintedNav} onCheckedChange={setTintedNav} />
+        </Card>
+        <SettingsList
+          sections={[
             { header: "Account", rows: [{ icon: LogOut, label: "Sign out", destructive: true, onClick: () => void signOut().then(() => location.reload()) }] },
           ]}
         />

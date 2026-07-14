@@ -6,13 +6,23 @@
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
 import { cn } from "./lib/utils.js";
+import { toneVar, type Tone } from "./primitives.js";
 import { Sparkles, ThumbsDown, ThumbsUp, type LucideIcon } from "./lib/icons.js";
 
 export interface TabDef {
   key: string;
   label: string;
   icon: LucideIcon;
+  /** Domain token for the active-tab tint (when the tinted nav is enabled). */
+  tone?: Tone;
 }
+
+const pillTween = { backgroundColor: { type: "tween" as const, duration: 0.35, ease: "easeOut" as const } };
+/** The active tab's tint colour — its domain token when tinting is on, else the brand accent. */
+const activeColor = (tabs: TabDef[], active: string, tinted?: boolean): string => {
+  const tone = tabs.find((t) => t.key === active)?.tone;
+  return tinted && tone ? toneVar[tone] : "var(--primary)";
+};
 
 export function AppBar({ leading, title, trailing }: { leading?: ReactNode; title?: ReactNode; trailing?: ReactNode }) {
   return (
@@ -26,7 +36,8 @@ export function AppBar({ leading, title, trailing }: { leading?: ReactNode; titl
 
 const navSpring = { type: "spring" as const, stiffness: 420, damping: 34 };
 
-export function BottomTabs({ tabs, active, onSelect }: { tabs: TabDef[]; active: string; onSelect: (k: string) => void }) {
+export function BottomTabs({ tabs, active, onSelect, tinted }: { tabs: TabDef[]; active: string; onSelect: (k: string) => void; tinted?: boolean }) {
+  const color = activeColor(tabs, active, tinted);
   return (
     <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.7rem)] md:hidden">
       <div className="pointer-events-auto flex max-w-full items-center gap-0.5 rounded-full border border-border/60 bg-card/75 p-1.5 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] backdrop-blur-2xl">
@@ -42,7 +53,7 @@ export function BottomTabs({ tabs, active, onSelect }: { tabs: TabDef[]; active:
                 on ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {on && <motion.span layoutId="tab-pill" transition={navSpring} className="absolute inset-0 rounded-full bg-primary" />}
+              {on && <motion.span layoutId="tab-pill" initial={false} animate={{ backgroundColor: color }} transition={{ ...navSpring, ...pillTween }} className="absolute inset-0 rounded-full" />}
               <t.icon className="relative size-[1.25rem]" strokeWidth={on ? 2.4 : 2} />
               {on && (
                 <motion.span
@@ -62,7 +73,9 @@ export function BottomTabs({ tabs, active, onSelect }: { tabs: TabDef[]; active:
   );
 }
 
-export function NavRail({ tabs, active, onSelect, footer, brand }: { tabs: TabDef[]; active: string; onSelect: (k: string) => void; footer?: ReactNode; brand?: ReactNode }) {
+export function NavRail({ tabs, active, onSelect, footer, brand, tinted }: { tabs: TabDef[]; active: string; onSelect: (k: string) => void; footer?: ReactNode; brand?: ReactNode; tinted?: boolean }) {
+  const color = activeColor(tabs, active, tinted);
+  const soft = `color-mix(in oklch, ${color} 14%, transparent)`;
   return (
     <nav className="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col items-center border-r border-border/40 bg-card/40 py-6 backdrop-blur-xl md:flex">
       <div className="mb-6 grid size-11 place-items-center overflow-hidden rounded-2xl bg-primary text-lg font-black text-primary-foreground">{brand ?? "M"}</div>
@@ -76,13 +89,14 @@ export function NavRail({ tabs, active, onSelect, footer, brand }: { tabs: TabDe
               aria-current={on ? "page" : undefined}
               className="group relative flex w-full flex-col items-center gap-1 rounded-2xl py-2.5 transition-colors"
             >
-              {on && <motion.span layoutId="rail-pill" transition={navSpring} className="absolute inset-0 rounded-2xl bg-primary/12" />}
-              {on && <motion.span layoutId="rail-bar" transition={navSpring} className="absolute -left-3 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-primary" />}
+              {on && <motion.span layoutId="rail-pill" initial={false} animate={{ backgroundColor: soft }} transition={{ ...navSpring, ...pillTween }} className="absolute inset-0 rounded-2xl" />}
+              {on && <motion.span layoutId="rail-bar" initial={false} animate={{ backgroundColor: color }} transition={{ ...navSpring, ...pillTween }} className="absolute -left-3 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full" />}
               <t.icon
-                className={cn("relative size-[1.35rem] transition-colors", on ? "text-primary" : "text-muted-foreground group-hover:text-foreground")}
+                style={on ? { color } : undefined}
+                className={cn("relative size-[1.35rem] transition-colors", !on && "text-muted-foreground group-hover:text-foreground")}
                 strokeWidth={on ? 2.4 : 2}
               />
-              <span className={cn("relative text-[0.66rem] font-medium transition-colors", on ? "text-primary" : "text-muted-foreground group-hover:text-foreground")}>{t.label}</span>
+              <span style={on ? { color } : undefined} className={cn("relative text-[0.66rem] font-medium transition-colors", !on && "text-muted-foreground group-hover:text-foreground")}>{t.label}</span>
             </button>
           );
         })}
