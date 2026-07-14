@@ -7,12 +7,39 @@
 
 import { useEffect, useState } from "react";
 import type { AiSettingsPayload, AiFeatureMeta, AiModelMeta, TenantAiConfig, AiFeatureConfig, AiTone } from "@mossa/protocol";
-import { Card, Badge, Skeleton, Switch, Button, Textarea, Chip, IconBadge, cn, Sparkles, ChevronDown, Dumbbell, Users, HeartPulse } from "@mossa/ui";
+import { Card, Badge, Skeleton, Switch, Button, Textarea, Chip, IconBadge, cn, Sparkles, ChevronDown, Dumbbell, Users, HeartPulse, Camera, ImageIcon, type Tone, type LucideIcon } from "@mossa/ui";
 import { api } from "../api.js";
 
 const TONE_LABEL: Record<string, string> = {
   professional: "Professional", motivating: "Motivating", friendly: "Friendly", direct: "Direct", funny: "Funny", "tough-love": "Tough love",
 };
+
+/** Example house-rule additions, shown as the placeholder for each feature's
+ *  extra-instructions field (these are appended to the built-in prompt). */
+const EXAMPLE_MODS: Record<string, string> = {
+  "draft-plan": "e.g. Start every session with a 5-minute mobility warm-up, and prefer dumbbell variations.",
+  "draft-meal": "e.g. Favour high-protein breakfasts and never include pork.",
+  "lab-extract": "e.g. Also flag any value within 10% of the range edge as borderline.",
+  "supplement-reco": "e.g. Only third-party-tested brands, and never more than four supplements.",
+  "checkin-reply": "e.g. Always end the reply with one specific follow-up question.",
+  "client-summary": "e.g. Call out sleep and stress trends explicitly whenever they move.",
+  "cover-image": "e.g. Moody, high-contrast gym aesthetic with deep shadows.",
+  "food-image": "e.g. Plate everything on rustic ceramic with a linen napkin.",
+  "exercise-image": "e.g. Friendly flat-illustration style in our brand green.",
+  "workout-day-image": "e.g. Cinematic and dramatic, with strong rim lighting.",
+  "meal-image": "e.g. Bright and fresh, overhead flat-lay on a marble surface.",
+  "exercise-guide": "e.g. Add a short 'Scaling options' note for beginners in every guide.",
+  "exercise-meta": "e.g. Prefer the most specific muscle names available.",
+  "food-meta": "e.g. Assume metric serving sizes unless the food is counted in pieces.",
+  "meal-recipe": "e.g. Keep every recipe under 20 minutes and one pan where possible.",
+  "article-write": "e.g. Write at a 9th-grade reading level and explain mechanisms simply.",
+  "coach-note": "e.g. Occasionally reference their long-term goal by name.",
+  "narrative": "e.g. Always open with their biggest win of the period.",
+  "parse-food": "e.g. Default ambiguous portions to a single typical serving.",
+  "snap-meal": "e.g. Be conservative on calorie estimates when portions are unclear.",
+  "label-reader": "e.g. Prefer the product's marketing name when both are visible.",
+};
+const exampleMod = (key: string) => EXAMPLE_MODS[key] ?? "e.g. add a house rule or preference — it's applied on top of the built-in instructions.";
 
 export function AiConfigSection() {
   const [data, setData] = useState<AiSettingsPayload | null>(null);
@@ -29,6 +56,12 @@ export function AiConfigSection() {
   const saveFeature = async (key: string, patch: AiFeatureConfig) => {
     setConfig((c) => ({ ...c, features: { ...(c.features ?? {}), [key]: { ...(c.features?.[key] ?? {}), ...patch } } }));
     await api.patch("/api/settings/ai", { features: { [key]: patch } }).catch(() => undefined);
+  };
+  /** Apply one patch to many features at once (used by the quick model picks). */
+  const saveFeatures = async (keys: string[], patch: AiFeatureConfig) => {
+    const patches = Object.fromEntries(keys.map((k) => [k, patch]));
+    setConfig((c) => { const features = { ...(c.features ?? {}) }; for (const k of keys) features[k] = { ...(features[k] ?? {}), ...patch }; return { ...c, features }; });
+    await api.patch("/api/settings/ai", { features: patches }).catch(() => undefined);
   };
 
   if (!data) return <Skeleton className="h-64" />;
@@ -53,9 +86,54 @@ export function AiConfigSection() {
         </Card>
       </div>
 
+      <DefaultModels features={data.features} models={data.models} config={config} onApply={saveFeatures} />
+
       <FeatureGroup title="For trainers" icon={Users} features={trainer} models={data.models} config={config} tones={data.tones} onSave={saveFeature} />
       <FeatureGroup title="For clients" icon={HeartPulse} features={client} models={data.models} config={config} tones={data.tones} onSave={saveFeature} />
     </section>
+  );
+}
+
+/** Quick model picks — set the model for a whole category (text / vision /
+ *  image) in one tap; it applies to every feature of that type. Individual
+ *  features can still override below. */
+const MODEL_GROUPS: { key: string; label: string; desc: string; icon: LucideIcon; tone: Tone; matchFeature: (t: string) => boolean; matchModel: (m: AiModelMeta) => boolean }[] = [
+  { key: "text", label: "Text model", desc: "Plans, summaries, notes & writing.", icon: Sparkles, tone: "primary", matchFeature: (t) => t === "text" || t === "text-small", matchModel: (m) => m.task !== "vision" && m.task !== "image" },
+  { key: "vision", label: "Vision model", desc: "Reading meal photos, labels & lab reports.", icon: Camera, tone: "cardio", matchFeature: (t) => t === "vision", matchModel: (m) => m.task === "vision" || m.provider === "google" },
+  { key: "image", label: "Image model", desc: "Generated cover, food & exercise images.", icon: ImageIcon, tone: "nutrition", matchFeature: (t) => t === "image", matchModel: (m) => m.task === "image" },
+];
+
+function DefaultModels({ features, models, config, onApply }: {
+  features: AiFeatureMeta[]; models: AiModelMeta[]; config: TenantAiConfig; onApply: (keys: string[], patch: AiFeatureConfig) => void;
+}) {
+  const rows = MODEL_GROUPS.map((g) => {
+    const keys = features.filter((f) => g.matchFeature(f.task)).map((f) => f.key);
+    const pickable = models.filter(g.matchModel);
+    if (!keys.length || !pickable.length) return null;
+    const vals = new Set(keys.map((k) => config.features?.[k]?.model ?? ""));
+    return { g, keys, pickable, current: vals.size === 1 ? [...vals][0]! : "", mixed: vals.size > 1 };
+  }).filter((r): r is NonNullable<typeof r> => !!r);
+  if (!rows.length) return null;
+
+  return (
+    <div>
+      <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Default models</h3>
+      <Card className="space-y-3">
+        <p className="text-xs text-muted-foreground">Pick a model per category — it applies to every feature of that type at once. Fine-tune any single feature below.</p>
+        {rows.map(({ g, keys, pickable, current, mixed }) => (
+          <div key={g.key} className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <IconBadge icon={g.icon} tone={g.tone} size="sm" />
+              <div className="min-w-0"><div className="text-sm font-medium">{g.label}</div><div className="truncate text-xs text-muted-foreground">{g.desc}</div></div>
+            </div>
+            <select value={current} onChange={(e) => onApply(keys, { model: e.target.value || null })} className="max-w-[44%] shrink-0 truncate rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none">
+              <option value="">{mixed ? "Mixed — set all…" : "Default (auto)"}</option>
+              {pickable.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </select>
+          </div>
+        ))}
+      </Card>
+    </div>
   );
 }
 
@@ -118,14 +196,15 @@ function FeatureCard({ feat, models, cfg, tones, onSave }: {
 
           <div>
             <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4">
-              <ChevronDown className={cn("transition-transform", open && "rotate-180")} /> {cfg.system ? "Custom prompt" : "Customize prompt"}
+              <ChevronDown className={cn("transition-transform", open && "rotate-180")} /> {cfg.system ? "Extra instructions added" : "Add instructions"}
             </button>
             {open && (
               <div className="mt-2 space-y-2">
-                <Textarea rows={6} value={draft} placeholder={feat.defaultSystem} onChange={(e) => setDraft(e.target.value)} className="text-xs" />
+                <p className="text-xs text-muted-foreground">Added on top of the built-in instructions — the AI is told the studio also asked for this. Your notes refine the output; they don't replace how the feature works.</p>
+                <Textarea rows={4} value={draft} placeholder={exampleMod(feat.key)} onChange={(e) => setDraft(e.target.value)} className="text-xs" />
                 <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={() => onSave({ system: draft.trim() || null })}>Save prompt</Button>
-                  {cfg.system && <Button size="sm" variant="ghost" onClick={() => { setDraft(""); onSave({ system: null }); }}>Reset to default</Button>}
+                  <Button size="sm" onClick={() => onSave({ system: draft.trim() || null })}>Save</Button>
+                  {cfg.system && <Button size="sm" variant="ghost" onClick={() => { setDraft(""); onSave({ system: null }); }}>Clear</Button>}
                 </div>
               </div>
             )}

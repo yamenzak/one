@@ -363,10 +363,15 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   if (!model) return { ok: false, error: "unavailable", detail: `no enabled model for task "${input.task}" — sync the model catalog in admin` };
   const rate = rateOf(model);
 
-  // System prompt: a tenant override replaces the built-in default; a house or
+  // System prompt: the built-in default is authoritative and always kept; a
+  // tenant's custom instructions are APPENDED (framed as an extra request), so
+  // they refine rather than clobber the engine's output contract. A house or
   // per-feature tone is appended for tonable (creative) features only.
   const def = featureDef(input.feature);
-  let system = (fcfg.system && fcfg.system.trim()) || input.system;
+  let system = input.system;
+  if (fcfg.system && fcfg.system.trim()) {
+    system = `${system}\n\nThe studio has also asked you to follow these additional instructions, as long as they don't conflict with the rules above:\n${fcfg.system.trim()}`;
+  }
   if (def?.tonable) {
     const tone = (fcfg.tone ?? config.tone) as AiTone | null | undefined;
     if (tone && TONE_GUIDE[tone]) system = `${system}\n\n${TONE_GUIDE[tone]}`;

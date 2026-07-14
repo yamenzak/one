@@ -36,6 +36,9 @@ export const settingsRoutes = new Hono<AppEnv>()
 
   .patch("/settings", async (c) => {
     const who = requireTenant(c)!;
+    // Studio-level config (branding, marketplace, integrations) is the owner's —
+    // employed trainers/assistants can't change it.
+    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
     const tokenMap = z.record(z.string(), z.string().max(120));
     const parsed = z
       .object({
@@ -97,8 +100,8 @@ export const settingsRoutes = new Hono<AppEnv>()
   // plus the tenant's current per-feature overrides.
   .get("/settings/ai", async (c) => {
     const who = requireTenant(c)!;
-    const role = c.get("role");
-    if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
+    // AI configuration is owner-only — trainers use the AI, they don't tune it.
+    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
     const row = await c.env.DB.prepare("SELECT ai_config_json FROM tenant_settings WHERE tenant_id = ?")
       .bind(who.tenantId)
       .first<{ ai_config_json: string | null }>();
