@@ -203,7 +203,7 @@ export const TabsContent = TabsPrimitive.Content;
  *  an ancestor (a drawer, an expanding accordion) grows — which made the pill
  *  visibly fly across the container. Measuring keeps it inside the control, so
  *  it only ever springs between its own segments. */
-export function SegmentedControl<T extends string>({ options, value, onChange, className }: { options: { value: T; label: ReactNode }[]; value: T; onChange: (v: T) => void; className?: string }) {
+export function SegmentedControl<T extends string>({ options, value, onChange, className, fill }: { options: { value: T; label: ReactNode }[]; value: T; onChange: (v: T) => void; className?: string; fill?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const btnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
@@ -220,7 +220,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
   }, [value, options.length]);
 
   return (
-    <div ref={containerRef} className={cn("relative inline-flex items-center gap-1 rounded-full bg-secondary p-1", className)}>
+    <div ref={containerRef} className={cn("relative items-center gap-1 rounded-full bg-secondary p-1", fill ? "flex w-full" : "inline-flex", className)}>
       {pill && (
         <motion.span
           aria-hidden
@@ -235,7 +235,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
           key={o.value}
           ref={(el) => { btnRefs.current[o.value] = el; }}
           onClick={() => onChange(o.value)}
-          className={cn("relative z-10 rounded-full px-4 py-1.5 text-sm font-medium transition-colors", value === o.value ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+          className={cn("relative z-10 truncate rounded-full py-1.5 text-sm font-medium transition-colors", fill ? "flex-1 basis-0 px-2 text-center" : "px-4", value === o.value ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
         >
           {o.label}
         </button>

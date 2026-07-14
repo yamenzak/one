@@ -103,8 +103,8 @@ export function ClientDetail() {
             <div className="text-xs text-muted-foreground">Coach view</div>
           </div>
         </div>
-        <div className="mx-auto max-w-xl overflow-x-auto">
-          <SegmentedControl options={TABS.map((t) => ({ value: t.value, label: t.label }))} value={tab} onChange={(v) => nav(`/clients/${clientId}/${v}`)} />
+        <div className="mx-auto max-w-xl">
+          <SegmentedControl fill options={TABS.map((t) => ({ value: t.value, label: t.label }))} value={tab} onChange={(v) => nav(`/clients/${clientId}/${v}`)} />
         </div>
       </div>
       {tab === "today" && <Today clientId={clientId} />}
