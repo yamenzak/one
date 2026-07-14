@@ -119,7 +119,10 @@ function TabLayout() {
   // page always opens at the top with bare (pill-less) brand + actions.
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    // Own the scroll position — stop the browser from restoring it on reload
+    // after our reset runs (which would re-fire scroll and wrongly show pills).
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    const onScroll = () => setScrolled(window.scrollY > 40);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
