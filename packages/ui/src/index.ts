@@ -7,5 +7,6 @@ export * from "./primitives.js";
 export * from "./overlays.js";
 export * from "./rings.js";
 export * from "./metrics.js";
+export * from "./charts.js";
 export * from "./media.js";
 export * from "./shell.js";

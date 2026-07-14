@@ -733,6 +733,38 @@ describe("reports", () => {
   });
 });
 
+describe("progress analytics aggregation", () => {
+  it("returns per-day body + wellness series, deltas, radar and a consistency heatmap", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "ProgressPat" }) })).json()) as { client: { id: string } };
+    const today = new Date().toISOString().slice(0, 10);
+    const dayBack = (n: number) => { const d = new Date(`${today}T00:00:00`); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+
+    // Two weigh-ins (a downward trend) + body fat, and two check-ins.
+    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: dayBack(6), weightKg: 82, bodyFatPercent: 20, waistCm: 90 } }) });
+    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: today, weightKg: 80.5, bodyFatPercent: 19, waistCm: 88 } }) });
+    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: dayBack(1), mood: 4, energy: 3, stress: 2, sleepHours: 7.5 } }) });
+    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: today, mood: 5, energy: 4, stress: 1, sleepHours: 8 } }) });
+
+    const res = await SELF.fetch(`http://x/api/progress/${client.id}?range=30d&today=${today}`, { headers: auth(ownerCookie) });
+    expect(res.status).toBe(200);
+    const p = (await res.json()) as {
+      body: { weight: { date: string; v: number }[]; deltas: { weight: { delta: number } | null }; latest: { weightKg: number | null } };
+      wellness: { averages: { mood: number | null }; radar: { mood: number; calm: number }; index: number | null };
+      consistency: { heatmap: Record<string, number>; checkInDays: number; streak: number };
+      training: { prs: unknown[]; totalSets: number };
+    };
+    expect(p.body.weight.length).toBe(2);
+    expect(p.body.latest.weightKg).toBe(80.5);
+    expect(p.body.deltas.weight?.delta).toBeCloseTo(-1.5, 1); // trending down
+    expect(p.wellness.averages.mood).toBeCloseTo(4.5, 1);
+    expect(p.wellness.radar.calm).toBeGreaterThan(0.5); // low stress → high calm
+    expect(p.consistency.checkInDays).toBe(2);
+    expect(p.consistency.streak).toBeGreaterThanOrEqual(1);
+    expect(p.consistency.heatmap[today]).toBeGreaterThanOrEqual(2); // check-in + weigh-in
+  });
+});
+
 describe("access economy", () => {
   it("granting a package twice queues budgets, never sums", async () => {
     const { client } = (await (
