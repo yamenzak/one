@@ -24,6 +24,7 @@ const SURFACE_FOCUS: Record<string, string> = {
   train: "Focus on their training — today's workout, recent PRs, load and momentum.",
   eat: "Focus on their nutrition — calories/protein vs target, meals, and today's intake so far.",
   wellness: "Focus on recovery — sleep, hydration, mood, supplements and check-in consistency.",
+  progress: "Focus on their trends — weight/body-composition direction, training volume and PRs, consistency and what the trajectory says.",
 };
 
 /** Deterministic dev/mock coach note (no AI binding / ai.mock = on). */
@@ -34,6 +35,7 @@ function coachNoteMock(surface: string, name: string): string {
     train: `Your load's trending up nicely, ${first}. Bring the same intent to today's session and chase that next PR.`,
     eat: `Protein's your lever today, ${first} — get a solid hit at your next meal and you'll land right on target.`,
     wellness: `Sleep is trending well, ${first}. Keep the hydration up and stay on your supplements to lock in recovery.`,
+    progress: `The trend is your friend, ${first} — weight's easing down and your volume's climbing. Keep stacking consistent weeks.`,
   } as Record<string, string>)[surface] ?? `Keep it up, ${first} — consistency is doing the work.`;
 }
 
@@ -831,7 +833,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const ent = await tenantEntitlements(c.env.DB, who.tenantId);
     if (!ent.features.aiSuite) return c.json({ message: null });
     const parsed = z
-      .object({ clientId: z.string(), surface: z.enum(["home", "train", "eat", "wellness"]).default("home"), today: z.string().optional(), hour: z.coerce.number().int().min(0).max(23).optional() })
+      .object({ clientId: z.string(), surface: z.enum(["home", "train", "eat", "wellness", "progress"]).default("home"), today: z.string().optional(), hour: z.coerce.number().int().min(0).max(23).optional() })
       .safeParse({ clientId: c.req.query("clientId"), surface: c.req.query("surface"), today: c.req.query("today"), hour: c.req.query("hour") });
     if (!parsed.success) return c.json({ error: "invalid query" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);

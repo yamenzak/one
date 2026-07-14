@@ -10,7 +10,7 @@ import { motion } from "motion/react";
 import { api, todayLocal } from "../../api.js";
 import { AiAvatar } from "../../AiAvatar.js";
 
-type Surface = "home" | "train" | "eat" | "wellness";
+type Surface = "home" | "train" | "eat" | "wellness" | "progress";
 
 export function CoachNote({ clientId, surface }: { clientId: string; surface: Surface }) {
   const [msg, setMsg] = useState<string | null>(null);

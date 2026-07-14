@@ -73,7 +73,7 @@ export function AreaChart({ values, tone = "activity", height = 180, target, tre
   const padX = 10, padTop = 14, padBot = 22;
   const pts = values.map((v, i) => ({ i, v })).filter((p): p is { i: number; v: number } => p.v != null);
 
-  if (pts.length < 2) return <div ref={ref} className={cn("grid h-[--h] place-items-center rounded-2xl bg-surface-2 text-xs text-muted-foreground", className)} style={{ ["--h" as string]: `${height}px` }}>Not enough data yet</div>;
+  if (pts.length < 2) return <div ref={ref} className={cn("grid place-items-center rounded-2xl bg-surface-2 text-xs text-muted-foreground", className)} style={{ height }}>Not enough data yet</div>;
 
   const present = pts.map((p) => p.v);
   const lo = Math.min(...present, ...(target != null ? [target] : []));

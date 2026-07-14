@@ -8,15 +8,16 @@
  */
 
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, type RangePreset, type SeriesDelta } from "@mossa/domain";
 import {
-  Button, Card, Badge, Skeleton, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge,
+  Card, Badge, Skeleton, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger,
   AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, METRICS, cn, toneVar,
-  Sparkles, X, Scale, Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, type Tone, type LucideIcon,
+  Scale, Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, type Tone, type LucideIcon,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
+import { CoachNote } from "./CoachNote.js";
 
 // ── API shapes ──
 interface Pt { date: string; v: number }
@@ -66,23 +67,22 @@ export function Progress({ clientId }: { clientId: string }) {
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Progress</h1>
-        <NarrativeButton clientId={clientId} streak={data.consistency.streak} weights={data.body.weight.length} />
-      </div>
+      <h1 className="text-2xl font-bold tracking-tight">Progress</h1>
       <div className="flex flex-wrap items-center gap-2">
         <SegmentedControl options={[{ value: "overview", label: "Overview" }, { value: "body", label: "Body" }, { value: "training", label: "Training" }, { value: "wellness", label: "Wellness" }]} value={tab} onChange={(v) => setTab(v as Tab)} />
         <SegmentedControl className="ml-auto" options={[{ value: "7d", label: "7d" }, { value: "30d", label: "30d" }, { value: "90d", label: "90d" }]} value={range} onChange={(v) => setRange(v as RangePreset)} />
       </div>
 
-      <AnimatePresence mode="wait">
-        <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }} className="space-y-4">
-          {tab === "overview" && <Overview data={data} dateLabel={dateLabel} />}
-          {tab === "body" && <Body data={data} units={units} dateLabel={dateLabel} />}
-          {tab === "training" && <Training data={data} units={units} />}
-          {tab === "wellness" && <Wellness data={data} dateLabel={dateLabel} />}
-        </motion.div>
-      </AnimatePresence>
+      {/* Keyed remount per tab → each lens re-staggers in; no AnimatePresence
+          wait-handshake (which could strand the incoming tab unmounted). */}
+      <motion.div key={tab} variants={stagger} initial="hidden" animate="show" className="space-y-4">
+        {tab === "overview" && <Overview data={data} dateLabel={dateLabel} />}
+        {tab === "body" && <Body data={data} units={units} dateLabel={dateLabel} />}
+        {tab === "training" && <Training data={data} units={units} />}
+        {tab === "wellness" && <Wellness data={data} dateLabel={dateLabel} />}
+      </motion.div>
+
+      <CoachNote clientId={clientId} surface="progress" />
     </Page>
   );
 }
@@ -286,28 +286,4 @@ function MeasChip({ label, value, units }: { label: string; value: number | null
 
 function EmptyMini({ label }: { label: string }) {
   return <div className="grid h-24 place-items-center rounded-xl bg-surface-2 px-4 text-center text-xs text-muted-foreground">{label}</div>;
-}
-
-function NarrativeButton({ clientId, streak, weights }: { clientId: string; streak: number; weights: number }) {
-  const [text, setText] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState(false);
-  const run = async () => {
-    setBusy(true); setOpen(true);
-    try { setText((await api.post<{ narrative: string }>("/api/ai/narrative", { clientId, stats: { checkInStreak: streak, weightEntries: weights } })).narrative); }
-    catch { setText("AI recap isn't available on your studio's plan."); }
-    finally { setBusy(false); }
-  };
-  return (
-    <>
-      <Button variant="tonal" size="sm" onClick={() => void run()}><Sparkles /> Recap</Button>
-      <AnimatePresence>
-        {open && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed inset-x-4 bottom-24 z-40 mx-auto max-w-lg">
-            <Card className="flex items-start gap-3 shadow-lg"><Sparkles className="mt-0.5 size-4 shrink-0 text-primary" /><p className="flex-1 text-sm">{busy ? "Writing your recap…" : text}</p><button onClick={() => setOpen(false)} className="text-muted-foreground"><X className="size-4" /></button></Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
-  );
 }
