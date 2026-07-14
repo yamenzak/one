@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { fmtVolume, volumeLabel, volumeDisplayToMl } from "@mossa/domain";
 import {
-  Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, StatCard, WeekDots, EmptyState, cn, toneVar,
+  Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, StatCard, WeekDots, Sparkline, MiniBars, EmptyState, cn, toneVar,
   ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Bed, Flame, Plus, ChevronRight, Smile, Upload, type Tone,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
@@ -134,13 +134,21 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
     // streak: consecutive days with a check-in ending today (or yesterday).
     let streak = 0;
     for (let i = 0; ; i++) { const d = shift(date, -i); if (ciDates.has(d)) streak++; else if (i === 0) continue; else break; }
-    const recentSleep = checkIns.filter((c) => c.sleep_hours != null).slice(0, 7).map((c) => c.sleep_hours!);
-    const avgSleep = recentSleep.length ? recentSleep.reduce((a, b) => a + b, 0) / recentSleep.length : null;
+    // Per-day series over the week window (chronological) → sparklines.
+    const sleepByDay = new Map(checkIns.filter((c) => c.sleep_hours != null).map((c) => [c.date_local, c.sleep_hours!] as const));
+    const moodByDay = new Map(checkIns.filter((c) => c.mood != null).map((c) => [c.date_local, c.mood!] as const));
+    const sleepSeries = days.map((d) => sleepByDay.get(d)).filter((v): v is number => v != null);
+    const moodSeries = days.map((d) => moodByDay.get(d)).filter((v): v is number => v != null);
+    const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+    const avgSleep = avg(sleepSeries);
+    const avgMood = avg(moodSeries);
+    const fastHoursSeries = (fast?.recentFasts ?? []).map((r) => r.duration_minutes / 60).reverse().slice(-7);
     const fastsDone = (fast?.recentFasts ?? []).filter((r) => r.duration_minutes >= r.target_hours * 60).length;
+    const sessionsWeek = sessions.filter((s) => { const d = s.scheduled_at.slice(0, 10); return d >= days[0]! && d <= date; }).length;
     const suppSlots = supps.reduce((n, s) => n + (s.schedule.length || 1), 0);
     const suppTaken = supps.reduce((n, s) => n + (s.schedule.length ? s.schedule : [{ slot: "daily" }]).filter((sc) => taken.has(`${s.id}:${sc.slot}`)).length, 0);
-    return { days, present, streak, avgSleep, fastsDone, suppSlots, suppTaken };
-  }, [checkIns, fast, supps, taken, date]);
+    return { days, present, streak, sleepSeries, moodSeries, avgSleep, avgMood, fastHoursSeries, fastsDone, sessionsWeek, suppSlots, suppTaken };
+  }, [checkIns, fast, supps, taken, sessions, date]);
 
   if (loading || !today) return (
     <div className="mx-auto max-w-xl space-y-4 p-4">
@@ -236,9 +244,14 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         <Stagger className="grid grid-cols-2 gap-3">
           <StatCard stack label="Check-in streak" value={week.streak} unit={week.streak === 1 ? "day" : "days"} icon={ClipboardList} tone="nutrition"
             chart={<WeekDots days={week.present} todayIndex={6} tone="nutrition" fill />} />
-          <StatCard stack label="Avg sleep" value={week.avgSleep != null ? week.avgSleep.toFixed(1) : "—"} unit={week.avgSleep != null ? "h" : undefined} icon={Bed} tone="sleep" />
-          <StatCard stack label="Fasts done" value={week.fastsDone} icon={Flame} tone="cardio" />
+          <StatCard stack label="Avg sleep" value={week.avgSleep != null ? week.avgSleep.toFixed(1) : "—"} unit={week.avgSleep != null ? "h" : undefined} icon={Bed} tone="sleep"
+            chart={week.sleepSeries.length >= 2 ? <Sparkline values={week.sleepSeries} tone="sleep" width={132} /> : undefined} />
+          <StatCard stack label="Avg mood" value={week.avgMood != null ? week.avgMood.toFixed(1) : "—"} unit={week.avgMood != null ? "/ 5" : undefined} icon={Smile} tone="cardio"
+            chart={week.moodSeries.length >= 2 ? <Sparkline values={week.moodSeries} tone="cardio" width={132} /> : undefined} />
+          <StatCard stack label="Fasts done" value={week.fastsDone} icon={Timer} tone="activity"
+            chart={week.fastHoursSeries.length >= 2 ? <MiniBars values={week.fastHoursSeries} tone="activity" width={132} target={16} /> : undefined} />
           <StatCard stack label="Supplements" value={week.suppSlots ? `${week.suppTaken}/${week.suppSlots}` : "—"} unit={week.suppSlots ? "today" : undefined} icon={Pill} tone="activity" />
+          <StatCard stack label="Sessions" value={week.sessionsWeek} unit="this wk" icon={Calendar} tone="cardio" />
         </Stagger>
       </section>
 
