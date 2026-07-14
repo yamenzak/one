@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { currentStreak, fmtVolume, fmtEnergy, kcalToDisplay, kgToDisplay, weightLabel, energyLabel, type UnitPrefs } from "@mossa/domain";
-import { Chip, Button, IconBadge, ProgressRing, Timer, Flame, Droplet, Droplets, Wheat, Beef, Dumbbell, FlaskConical, Weight, Pill, HeartPulse } from "@mossa/ui";
+import { Chip, Button, IconBadge, ProgressRing, METRICS, Timer, FlaskConical, Pill, HeartPulse } from "@mossa/ui";
 import { api } from "../../api.js";
 import { RingCard, MiniCard, type WidgetDef, type WidgetSize } from "../widget-kit.js";
 import type { TodayBundle } from "./Today.js";
@@ -40,49 +40,49 @@ export const CLIENT_WIDGETS: WidgetDef<ClientWidgetData>[] = [
     renderSmall: (d) => <WellnessWidget clientId={d.clientId} date={d.bundle.date} size="small" />,
   },
   {
-    id: "calories", title: "Calories", icon: Flame,
-    renderBig: (d) => { const t = d.bundle.goal?.targets?.targetCalories ?? 0; const net = d.bundle.nutrition.calories - d.bundle.burnedKcal; return <RingCard tone="calories" progress={t > 0 ? net / t : 0.001} value={kcalToDisplay(Math.max(0, net), d.units).toLocaleString()} label={d.units.energy === "kJ" ? "Energy" : "Calories"} sublabel={t > 0 ? `of ${kcalToDisplay(t, d.units).toLocaleString()} ${energyLabel(d.units)}` : "set a goal"} />; },
-    renderSmall: (d) => { const t = d.bundle.goal?.targets?.targetCalories ?? 0; const net = d.bundle.nutrition.calories - d.bundle.burnedKcal; return <MiniCard icon={Flame} tone="calories" label={d.units.energy === "kJ" ? "Energy" : "Calories"} value={kcalToDisplay(Math.max(0, net), d.units).toLocaleString()} progress={ratio(net, t)} />; },
+    id: "calories", title: "Calories", icon: METRICS.calories.icon,
+    renderBig: (d) => { const t = d.bundle.goal?.targets?.targetCalories ?? 0; const net = d.bundle.nutrition.calories - d.bundle.burnedKcal; return <RingCard tone={METRICS.calories.tone} progress={t > 0 ? net / t : 0.001} value={kcalToDisplay(Math.max(0, net), d.units).toLocaleString()} label={d.units.energy === "kJ" ? "Energy" : "Calories"} sublabel={t > 0 ? `of ${kcalToDisplay(t, d.units).toLocaleString()} ${energyLabel(d.units)}` : "set a goal"} />; },
+    renderSmall: (d) => { const t = d.bundle.goal?.targets?.targetCalories ?? 0; const net = d.bundle.nutrition.calories - d.bundle.burnedKcal; return <MiniCard icon={METRICS.calories.icon} tone={METRICS.calories.tone} label={d.units.energy === "kJ" ? "Energy" : "Calories"} value={kcalToDisplay(Math.max(0, net), d.units).toLocaleString()} progress={ratio(net, t)} />; },
   },
   {
-    id: "protein", title: "Protein", icon: Beef,
-    renderBig: (d) => { const t = d.bundle.goal?.targets?.targetProteinG; return <RingCard tone="protein" progress={ratio(d.bundle.nutrition.proteinG, t) ?? 0.001} value={`${d.bundle.nutrition.proteinG}`} label="Protein" sublabel={t ? `of ${t} g` : "grams"} />; },
-    renderSmall: (d) => { const t = d.bundle.goal?.targets?.targetProteinG; return <MiniCard icon={Beef} tone="protein" label="Protein" value={`${d.bundle.nutrition.proteinG} g`} progress={ratio(d.bundle.nutrition.proteinG, t)} />; },
+    id: "protein", title: "Protein", icon: METRICS.protein.icon,
+    renderBig: (d) => { const t = d.bundle.goal?.targets?.targetProteinG; return <RingCard tone={METRICS.protein.tone} progress={ratio(d.bundle.nutrition.proteinG, t) ?? 0.001} value={`${d.bundle.nutrition.proteinG}`} label="Protein" sublabel={t ? `of ${t} g` : "grams"} />; },
+    renderSmall: (d) => { const t = d.bundle.goal?.targets?.targetProteinG; return <MiniCard icon={METRICS.protein.icon} tone={METRICS.protein.tone} label="Protein" value={`${d.bundle.nutrition.proteinG} g`} progress={ratio(d.bundle.nutrition.proteinG, t)} />; },
   },
   {
-    id: "carbs", title: "Carbs", icon: Wheat,
-    renderBig: (d) => { const t = d.bundle.goal?.targets?.targetCarbsG; return <RingCard tone="carbs" progress={ratio(d.bundle.nutrition.carbsG, t) ?? 0.001} value={`${d.bundle.nutrition.carbsG}`} label="Carbs" sublabel={t ? `of ${t} g` : "grams"} />; },
-    renderSmall: (d) => { const t = d.bundle.goal?.targets?.targetCarbsG; return <MiniCard icon={Wheat} tone="carbs" label="Carbs" value={`${d.bundle.nutrition.carbsG} g`} progress={ratio(d.bundle.nutrition.carbsG, t)} />; },
+    id: "carbs", title: "Carbs", icon: METRICS.carbs.icon,
+    renderBig: (d) => { const t = d.bundle.goal?.targets?.targetCarbsG; return <RingCard tone={METRICS.carbs.tone} progress={ratio(d.bundle.nutrition.carbsG, t) ?? 0.001} value={`${d.bundle.nutrition.carbsG}`} label="Carbs" sublabel={t ? `of ${t} g` : "grams"} />; },
+    renderSmall: (d) => { const t = d.bundle.goal?.targets?.targetCarbsG; return <MiniCard icon={METRICS.carbs.icon} tone={METRICS.carbs.tone} label="Carbs" value={`${d.bundle.nutrition.carbsG} g`} progress={ratio(d.bundle.nutrition.carbsG, t)} />; },
   },
   {
-    id: "fat", title: "Fat", icon: Droplets,
-    renderBig: (d) => { const t = d.bundle.goal?.targets?.targetFatG; return <RingCard tone="fat" progress={ratio(d.bundle.nutrition.fatG, t) ?? 0.001} value={`${d.bundle.nutrition.fatG}`} label="Fat" sublabel={t ? `of ${t} g` : "grams"} />; },
-    renderSmall: (d) => { const t = d.bundle.goal?.targets?.targetFatG; return <MiniCard icon={Droplets} tone="fat" label="Fat" value={`${d.bundle.nutrition.fatG} g`} progress={ratio(d.bundle.nutrition.fatG, t)} />; },
+    id: "fat", title: "Fat", icon: METRICS.fat.icon,
+    renderBig: (d) => { const t = d.bundle.goal?.targets?.targetFatG; return <RingCard tone={METRICS.fat.tone} progress={ratio(d.bundle.nutrition.fatG, t) ?? 0.001} value={`${d.bundle.nutrition.fatG}`} label="Fat" sublabel={t ? `of ${t} g` : "grams"} />; },
+    renderSmall: (d) => { const t = d.bundle.goal?.targets?.targetFatG; return <MiniCard icon={METRICS.fat.icon} tone={METRICS.fat.tone} label="Fat" value={`${d.bundle.nutrition.fatG} g`} progress={ratio(d.bundle.nutrition.fatG, t)} />; },
   },
   {
-    id: "water", title: "Water", icon: Droplet,
-    renderBig: (d) => { const t = d.bundle.goal?.targets?.targetWaterMl ?? 2500; return <RingCard tone="hydration" progress={d.bundle.waterMl / t} value={fmtVolume(d.bundle.waterMl, d.units)} label="Water" sublabel={`of ${fmtVolume(t, d.units)}`} />; },
-    renderSmall: (d) => { const t = d.bundle.goal?.targets?.targetWaterMl ?? 2500; return <MiniCard icon={Droplet} tone="hydration" label="Water" value={fmtVolume(d.bundle.waterMl, d.units)} progress={d.bundle.waterMl / t} />; },
+    id: "water", title: "Water", icon: METRICS.water.icon,
+    renderBig: (d) => { const t = d.bundle.goal?.targets?.targetWaterMl ?? 2500; return <RingCard tone={METRICS.water.tone} progress={d.bundle.waterMl / t} value={fmtVolume(d.bundle.waterMl, d.units)} label="Water" sublabel={`of ${fmtVolume(t, d.units)}`} />; },
+    renderSmall: (d) => { const t = d.bundle.goal?.targets?.targetWaterMl ?? 2500; return <MiniCard icon={METRICS.water.icon} tone={METRICS.water.tone} label="Water" value={fmtVolume(d.bundle.waterMl, d.units)} progress={d.bundle.waterMl / t} />; },
   },
   {
-    id: "burned", title: "Calories burned", icon: Flame,
-    renderBig: (d) => <RingCard tone="cardio" progress={0.001} value={kcalToDisplay(d.bundle.burnedKcal, d.units).toLocaleString()} label="Burned" sublabel={energyLabel(d.units)} />,
-    renderSmall: (d) => <MiniCard icon={Flame} tone="cardio" label="Burned" value={kcalToDisplay(d.bundle.burnedKcal, d.units).toLocaleString()} />,
+    id: "burned", title: "Calories burned", icon: METRICS.burned.icon,
+    renderBig: (d) => <RingCard tone={METRICS.burned.tone} progress={0.001} value={kcalToDisplay(d.bundle.burnedKcal, d.units).toLocaleString()} label="Burned" sublabel={energyLabel(d.units)} />,
+    renderSmall: (d) => <MiniCard icon={METRICS.burned.icon} tone={METRICS.burned.tone} label="Burned" value={kcalToDisplay(d.bundle.burnedKcal, d.units).toLocaleString()} />,
   },
   {
-    id: "streak", title: "Check-in streak", icon: Flame,
-    renderBig: (d) => { const v = d.bundle.checkInDates ? currentStreak(new Set(d.bundle.checkInDates), d.bundle.date) : 0; return <RingCard tone="calories" progress={Math.min(1, v / 30) || 0.001} value={v} label="Streak" sublabel={v === 1 ? "day" : "days"} />; },
-    renderSmall: (d) => <MiniCard icon={Flame} tone="calories" label="Day streak" value={d.bundle.checkInDates ? currentStreak(new Set(d.bundle.checkInDates), d.bundle.date) : 0} />,
+    id: "streak", title: "Check-in streak", icon: METRICS.streak.icon,
+    renderBig: (d) => { const v = d.bundle.checkInDates ? currentStreak(new Set(d.bundle.checkInDates), d.bundle.date) : 0; return <RingCard tone={METRICS.streak.tone} progress={Math.min(1, v / 30) || 0.001} value={v} label="Streak" sublabel={v === 1 ? "day" : "days"} />; },
+    renderSmall: (d) => <MiniCard icon={METRICS.streak.icon} tone={METRICS.streak.tone} label="Day streak" value={d.bundle.checkInDates ? currentStreak(new Set(d.bundle.checkInDates), d.bundle.date) : 0} />,
   },
   {
-    id: "weight", title: "Weight trend (7d)", icon: Weight,
-    renderBig: (d) => <RingCard tone="cardio" progress={0.001} value={weightDelta(d.bundle.weightSeries, d.units)} label="Weight" sublabel={`7-day ${weightLabel(d.units)}`} />,
-    renderSmall: (d) => <MiniCard icon={Weight} tone="cardio" label={`Weight 7d ${weightLabel(d.units)}`} value={weightDelta(d.bundle.weightSeries, d.units)} />,
+    id: "weight", title: "Weight trend (7d)", icon: METRICS.weight.icon,
+    renderBig: (d) => <RingCard tone={METRICS.weight.tone} progress={0.001} value={weightDelta(d.bundle.weightSeries, d.units)} label="Weight" sublabel={`7-day ${weightLabel(d.units)}`} />,
+    renderSmall: (d) => <MiniCard icon={METRICS.weight.icon} tone={METRICS.weight.tone} label={`Weight 7d ${weightLabel(d.units)}`} value={weightDelta(d.bundle.weightSeries, d.units)} />,
   },
   {
-    id: "sets", title: "Sets logged today", icon: Dumbbell,
-    renderBig: (d) => <RingCard tone="activity" progress={0.001} value={d.bundle.workout.loggedSets} label="Sets" sublabel="today" />,
-    renderSmall: (d) => <MiniCard icon={Dumbbell} tone="activity" label="Sets today" value={d.bundle.workout.loggedSets} />,
+    id: "sets", title: "Sets logged today", icon: METRICS.sets.icon,
+    renderBig: (d) => <RingCard tone={METRICS.sets.tone} progress={0.001} value={d.bundle.workout.loggedSets} label="Sets" sublabel="today" />,
+    renderSmall: (d) => <MiniCard icon={METRICS.sets.icon} tone={METRICS.sets.tone} label="Sets today" value={d.bundle.workout.loggedSets} />,
   },
   {
     id: "labs", title: "Labs due", icon: FlaskConical,
