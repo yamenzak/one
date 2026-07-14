@@ -7,16 +7,38 @@
  * day's logs and tap through to where you complete them.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  Card, IconBadge, Skeleton, cn, Check, ClipboardList, Dumbbell, Utensils, Pill, ChevronRight, ChevronDown, type LucideIcon, type Tone,
+  Card, IconBadge, cn, Check, ClipboardList, Dumbbell, Utensils, Pill, ChevronRight, ChevronDown, type LucideIcon, type Tone,
 } from "@mossa/ui";
 import { api } from "../../api.js";
 import type { TodayBundle } from "./Today.js";
 
 interface Supp { id: string; name: string; dose: string | null; schedule: { slot: string }[] }
 interface MealPlan { status: string; body: { mealOptions?: { mealType: string }[] } }
+
+/** The agenda's own data, fetched with the rest of the Today page so it mounts
+ *  complete — no skeleton→content swap that would stutter the page animation. */
+export interface AgendaData { supps: Supp[]; taken: string[]; mealTypes: string[]; loggedMeals: string[] }
+
+export async function fetchAgenda(clientId: string, date: string): Promise<AgendaData> {
+  const [s, sl, mp, food] = await Promise.all([
+    api.get<{ supplements: Supp[] }>(`/api/supplements?clientId=${clientId}`).catch(() => ({ supplements: [] })),
+    api.get<{ taken: { supplement_id: string; slot: string }[] }>(`/api/supplements/logs?clientId=${clientId}&date=${date}`).catch(() => ({ taken: [] })),
+    api.get<{ plans: MealPlan[] }>(`/api/meal-plans?clientId=${clientId}`).catch(() => ({ plans: [] })),
+    api.get<{ entries: { meal_type: string }[] }>(`/api/logs/food?clientId=${clientId}&date=${date}`).catch(() => ({ entries: [] })),
+  ]);
+  const pub = mp.plans.find((p) => p.status === "published");
+  const types = pub?.body.mealOptions ? [...new Set(pub.body.mealOptions.map((o) => o.mealType))] : [];
+  const ord = (x: string) => { const i = MEAL_ORDER.indexOf(x); return i < 0 ? 99 : i; };
+  return {
+    supps: s.supplements,
+    taken: sl.taken.map((t) => `${t.supplement_id}:${t.slot}`),
+    mealTypes: types.sort((a, b) => ord(a) - ord(b)),
+    loggedMeals: food.entries.map((e) => e.meal_type),
+  };
+}
 
 const MEAL_LABEL: Record<string, string> = { breakfast: "breakfast", lunch: "lunch", dinner: "dinner", snack: "snack", pre_workout: "pre-workout", post_workout: "post-workout", free: "free meal" };
 const MEAL_ORDER = ["breakfast", "lunch", "dinner", "snack", "pre_workout", "post_workout", "free"];
@@ -56,33 +78,16 @@ function CheckBox({ done }: { done: boolean }) {
   );
 }
 
-export function TodayAgenda({ clientId, date, bundle, onChanged, onNavigate, onCheckIn, onStartWorkout }: {
-  clientId: string; date: string; bundle: TodayBundle; onChanged: () => void; onNavigate?: (route: string) => void; onCheckIn: () => void; onStartWorkout?: () => void;
+export function TodayAgenda({ clientId, date, bundle, agenda, onChanged, onNavigate, onCheckIn, onStartWorkout }: {
+  clientId: string; date: string; bundle: TodayBundle; agenda: AgendaData; onChanged: () => void; onNavigate?: (route: string) => void; onCheckIn: () => void; onStartWorkout?: () => void;
 }) {
-  const [supps, setSupps] = useState<Supp[]>([]);
-  const [taken, setTaken] = useState<Set<string>>(new Set());
-  const [mealTypes, setMealTypes] = useState<string[]>([]);
-  const [loggedMeals, setLoggedMeals] = useState<Set<string>>(new Set());
-  const [loaded, setLoaded] = useState(false);
+  const { supps, mealTypes } = agenda;
+  const loggedMeals = useMemo(() => new Set(agenda.loggedMeals), [agenda.loggedMeals]);
+  // Supplement checks toggle optimistically; re-sync to server truth when the
+  // page reloads new agenda data.
+  const [taken, setTaken] = useState<Set<string>>(() => new Set(agenda.taken));
+  useEffect(() => { setTaken(new Set(agenda.taken)); }, [agenda.taken]);
   const [expanded, setExpanded] = useState(false);
-
-  const load = useCallback(async () => {
-    const [s, sl, mp, food] = await Promise.all([
-      api.get<{ supplements: Supp[] }>(`/api/supplements?clientId=${clientId}`).catch(() => ({ supplements: [] })),
-      api.get<{ taken: { supplement_id: string; slot: string }[] }>(`/api/supplements/logs?clientId=${clientId}&date=${date}`).catch(() => ({ taken: [] })),
-      api.get<{ plans: MealPlan[] }>(`/api/meal-plans?clientId=${clientId}`).catch(() => ({ plans: [] })),
-      api.get<{ entries: { meal_type: string }[] }>(`/api/logs/food?clientId=${clientId}&date=${date}`).catch(() => ({ entries: [] })),
-    ]);
-    setSupps(s.supplements);
-    setTaken(new Set(sl.taken.map((t) => `${t.supplement_id}:${t.slot}`)));
-    const pub = mp.plans.find((p) => p.status === "published");
-    const types = pub?.body.mealOptions ? [...new Set(pub.body.mealOptions.map((o) => o.mealType))] : [];
-    const ord = (x: string) => { const i = MEAL_ORDER.indexOf(x); return i < 0 ? 99 : i; };
-    setMealTypes(types.sort((a, b) => ord(a) - ord(b)));
-    setLoggedMeals(new Set(food.entries.map((e) => e.meal_type)));
-    setLoaded(true);
-  }, [clientId, date]);
-  useEffect(() => void load(), [load]);
 
   const toggleSupp = async (id: string, slot: string) => {
     const key = `${id}:${slot}`;
@@ -108,7 +113,6 @@ export function TodayAgenda({ clientId, date, bundle, onChanged, onNavigate, onC
     }
   }
 
-  if (!loaded) return <Skeleton className="h-40" />;
   if (items.length === 0) return null;
   const doneCount = items.filter((i) => i.done).length;
   const allDone = doneCount === items.length;

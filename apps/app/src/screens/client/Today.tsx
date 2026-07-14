@@ -17,7 +17,7 @@ import { useSession } from "../../session.js";
 import { LogSheet } from "./LogSheet.js";
 import { WidgetCarousel, WidgetCustomizeSheet } from "../widget-kit.js";
 import { CLIENT_WIDGETS, DEFAULT_CLIENT_WIDGETS, type ClientWidgetData } from "./HomeWidgets.js";
-import { TodayAgenda } from "./TodayAgenda.js";
+import { TodayAgenda, fetchAgenda, type AgendaData } from "./TodayAgenda.js";
 import { CoachNote } from "./CoachNote.js";
 
 export interface FeedEvent { id: string; kind: string; date: string; at: string; title: string; subtitle: string | null; ref?: string; metric?: { unit: "energy" | "volume" | "weight"; value: number } }
@@ -61,6 +61,7 @@ const routeForEvent = (ev: FeedEvent): string | null => {
 
 export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart?: () => void; onOpen?: (route: string) => void }) {
   const [data, setData] = useState<TodayBundle | null>(null);
+  const [agenda, setAgenda] = useState<AgendaData | null>(null);
   const [feed, setFeed] = useState<FeedEvent[] | null>(null);
   const [logOpen, setLogOpen] = useState(false);
   const [checkInOpen, setCheckInOpen] = useState(false);
@@ -78,15 +79,16 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   };
 
   const load = useCallback(async () => {
-    const [bundle, hist] = await Promise.all([
+    const [bundle, hist, ag] = await Promise.all([
       api.get<TodayBundle>(`/api/today?clientId=${clientId}&date=${date}`),
       api.get<{ events: FeedEvent[] }>(`/api/activity-history?clientId=${clientId}&from=${date}&to=${date}`),
+      fetchAgenda(clientId, date),
     ]);
-    setData(bundle); setFeed(hist.events);
+    setData(bundle); setFeed(hist.events); setAgenda(ag);
   }, [clientId, date]);
   useEffect(() => void load(), [load]);
 
-  if (!data) {
+  if (!data || !agenda) {
     return (
       <div className="mx-auto max-w-xl space-y-4 p-4">
         <Skeleton className="h-52" />
@@ -127,7 +129,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
       </Stagger>
 
       <Stagger>
-        <TodayAgenda clientId={clientId} date={date} bundle={data} onChanged={() => void load()} onNavigate={onOpen} onCheckIn={() => setCheckInOpen(true)} onStartWorkout={onStart} />
+        <TodayAgenda clientId={clientId} date={date} bundle={data} agenda={agenda} onChanged={() => void load()} onNavigate={onOpen} onCheckIn={() => setCheckInOpen(true)} onStartWorkout={onStart} />
       </Stagger>
 
       {/* Today's activity — everything logged today; older days live in History. */}
