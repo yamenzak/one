@@ -20,6 +20,21 @@ const CV = "v2"; // cache-key version — bump to invalidate poisoned entries
 const UA = "Mossa/1.0 (https://mossa.4dl.app; coaching platform)";
 const r1 = (n: unknown): number => (typeof n === "number" && isFinite(n) ? Math.round(n * 10) / 10 : 0);
 
+/** Fetch with a hard timeout so a slow/hanging upstream provider degrades to an
+ *  empty result (all callers already treat null as "no data") instead of
+ *  blocking the request — and the test suite — indefinitely. */
+async function fetchT(url: string, init?: RequestInit, timeoutMs = 4000): Promise<Response | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Cache a fetcher's result — but NEVER cache empty/failed results (so a
  *  provider hiccup doesn't poison the key for a whole day). */
 async function cachedJson<T>(kv: KVNamespace, key: string, fetcher: () => Promise<T>): Promise<T> {
@@ -97,14 +112,14 @@ function normalizeOff(p: OffProduct): NormFood | null {
 
 async function searchOff(q: string, page = 1): Promise<NormFood[]> {
   const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&page=${page}&fields=id,product_name,generic_name,brands,nutriments,image_small_url,code`;
-  const res = await fetch(url, { headers: { "User-Agent": UA } }).catch(() => null);
+  const res = await fetchT(url, { headers: { "User-Agent": UA } });
   if (!res?.ok) return [];
   const data = (await res.json()) as { products?: OffProduct[] };
   return (data.products ?? []).map(normalizeOff).filter((f): f is NormFood => f !== null);
 }
 
 async function barcodeOff(code: string): Promise<NormFood | null> {
-  const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(code)}.json`, { headers: { "User-Agent": UA } }).catch(() => null);
+  const res = await fetchT(`https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(code)}.json`, { headers: { "User-Agent": UA } });
   if (!res?.ok) return null;
   const data = (await res.json()) as { status?: number; product?: OffProduct };
   if (data.status !== 1 || !data.product) return null;
@@ -114,7 +129,7 @@ async function barcodeOff(code: string): Promise<NormFood | null> {
 // ── USDA FoodData Central (API key) ──────────────────────────────────────────
 async function searchUsda(q: string, apiKey: string, page = 1): Promise<NormFood[]> {
   const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(q)}&pageSize=15&pageNumber=${page}`;
-  const res = await fetch(url).catch(() => null);
+  const res = await fetchT(url);
   if (!res?.ok) return [];
   const data = (await res.json()) as { foods?: { fdcId?: number; description?: string; brandOwner?: string; gtinUpc?: string; foodNutrients?: { nutrientNumber?: string; value?: number }[] }[] };
   return (data.foods ?? []).map((f): NormFood | null => {
@@ -184,7 +199,7 @@ async function searchFatSecret(kv: KVNamespace, q: string, clientId: string, cli
   const token = await fatSecretToken(kv, clientId, clientSecret);
   if (!token) return [];
   const url = `https://platform.fatsecret.com/rest/server.api?method=foods.search&search_expression=${encodeURIComponent(q)}&format=json&max_results=15`;
-  const res = await fetch(url, { headers: { authorization: `Bearer ${token}` } }).catch(() => null);
+  const res = await fetchT(url, { headers: { authorization: `Bearer ${token}` } });
   if (!res?.ok) return [];
   const data = (await res.json()) as { foods?: { food?: { food_id?: string; food_name?: string; brand_name?: string; food_description?: string }[] } };
   const arr = data.foods?.food ?? [];
@@ -205,7 +220,7 @@ async function searchFatSecret(kv: KVNamespace, q: string, clientId: string, cli
 // ── wger (keyless) ───────────────────────────────────────────────────────────
 async function searchWger(q: string): Promise<NormExercise[]> {
   const url = `https://wger.de/api/v2/exercise/search/?term=${encodeURIComponent(q)}&language=english&format=json`;
-  const res = await fetch(url).catch(() => null);
+  const res = await fetchT(url);
   if (!res?.ok) return [];
   const data = (await res.json()) as { suggestions?: { data?: { base_id?: number; name?: string; image?: string | null; category?: string } }[] };
   return (data.suggestions ?? []).map((s) => s.data).filter((d): d is NonNullable<typeof d> => Boolean(d?.name && d?.base_id)).map((d) => ({
@@ -219,7 +234,7 @@ interface FedbRow { id?: string; name?: string; force?: string | null; level?: s
 const FEDB_BASE = "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main";
 async function fedbAll(kv: KVNamespace): Promise<FedbRow[]> {
   return cachedJson(kv, "fedb:all", async () => {
-    const res = await fetch(`${FEDB_BASE}/dist/exercises.json`).catch(() => null);
+    const res = await fetchT(`${FEDB_BASE}/dist/exercises.json`);
     if (!res?.ok) return [];
     return (await res.json()) as FedbRow[];
   });
@@ -239,7 +254,7 @@ async function searchFedb(kv: KVNamespace, q: string): Promise<NormExercise[]> {
 // ── ExerciseDB (RapidAPI key) ────────────────────────────────────────────────
 async function searchExerciseDb(q: string, rapidApiKey: string): Promise<NormExercise[]> {
   const url = `https://exercisedb.p.rapidapi.com/exercises/name/${encodeURIComponent(q.toLowerCase())}?limit=15`;
-  const res = await fetch(url, { headers: { "X-RapidAPI-Key": rapidApiKey, "X-RapidAPI-Host": "exercisedb.p.rapidapi.com" } }).catch(() => null);
+  const res = await fetchT(url, { headers: { "X-RapidAPI-Key": rapidApiKey, "X-RapidAPI-Host": "exercisedb.p.rapidapi.com" } });
   if (!res?.ok) return [];
   const data = (await res.json()) as { id?: string; name?: string; bodyPart?: string; target?: string; secondaryMuscles?: string[]; equipment?: string; gifUrl?: string; instructions?: string[] }[];
   return (Array.isArray(data) ? data : []).filter((e) => e.name).map((e) => ({

@@ -1132,7 +1132,7 @@ describe("foods — tenant isolation + copy-on-write", () => {
     expect(res.status).not.toBe(404);
     const body = (await res.json()) as { foods?: unknown[]; error?: string };
     expect(body.error).not.toBe("not found");
-  });
+  }, 15000);
 
   it("editing a platform-seed food forks a tenant copy (copy-on-write), leaving the seed intact", async () => {
     // Seed a global food (tenant_id NULL) directly, as the build-time seed would.
