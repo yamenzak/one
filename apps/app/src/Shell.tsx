@@ -140,6 +140,7 @@ function TabLayout() {
       )}
       <div className="relative z-10">
       <AppBar
+        bare={ambient}
         leading={
           <div className="flex min-w-0 items-center gap-2">
             {ctx!.branding?.logoUrl ? (
