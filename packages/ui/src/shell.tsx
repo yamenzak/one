@@ -25,10 +25,10 @@ const activeColor = (tabs: TabDef[], active: string, tinted?: boolean): string =
 };
 
 export function AppBar({ leading, title, trailing, bare }: { leading?: ReactNode; title?: ReactNode; trailing?: ReactNode; bare?: boolean }) {
-  // `bare` drops the solid tint + border (keeping only a frosted blur) so an
-  // ambient page wash can bleed all the way up behind the bar.
+  // `bare` drops the tint, border AND blur so an ambient page wash bleeds all the
+  // way up behind the bar, crisp — no frosted-glass compositing lag on load.
   return (
-    <header className={cn("sticky top-0 z-30 flex h-16 items-center justify-between gap-3 px-4 backdrop-blur-xl", !bare && "border-b border-border/40 bg-background/80")}>
+    <header className={cn("sticky top-0 z-30 flex h-16 items-center justify-between gap-3 px-4", !bare && "border-b border-border/40 bg-background/80 backdrop-blur-xl")}>
       <div className="flex min-w-0 flex-1 items-center gap-2">{leading}</div>
       {title && <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-base font-semibold">{title}</div>}
       <div className="flex items-center gap-1.5">{trailing}</div>
