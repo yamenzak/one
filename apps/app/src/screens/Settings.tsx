@@ -4,11 +4,12 @@
  */
 
 import { Fragment, useEffect, useState } from "react";
+import { motion } from "motion/react";
 import {
-  Button, Card, Badge, Chip, Switch, Textarea, Skeleton, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar,
+  Button, Card, Badge, Chip, Switch, Textarea, Skeleton, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
-  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus,
-  type Branding, type BrandTokens, type NeutralTint,
+  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Dumbbell, Building2,
+  type Branding, type BrandTokens, type NeutralTint, type LucideIcon, type Tone,
 } from "@mossa/ui";
 import { resolveUnits } from "@mossa/domain";
 import { useSession } from "../session.js";
@@ -17,122 +18,150 @@ import { api } from "../api.js";
 import { enrollPasskey, listPasskeys, passkeySupported } from "../passkey.js";
 import { AiConfigSection } from "./AiSettings.js";
 
+/** Who a setting is for — a small badge so the mixed owner view reads clearly. */
+type Scope = "trainer" | "tenant";
+const SCOPE_META: Record<Scope, { label: string; icon: LucideIcon; tone: Tone }> = {
+  trainer: { label: "Trainer", icon: Dumbbell, tone: "activity" },
+  tenant: { label: "Studio", icon: Building2, tone: "primary" },
+};
+function ScopeTag({ scope }: { scope: Scope }) {
+  const m = SCOPE_META[scope];
+  return <Badge tone={m.tone}><m.icon /> {m.label}</Badge>;
+}
+/** Section header with an optional who-is-this-for badge. */
+function SectionHead({ title, scope }: { title: string; scope?: Scope }) {
+  return (
+    <div className="mb-2 flex items-center justify-between gap-2 px-1">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
+      {scope && <ScopeTag scope={scope} />}
+    </div>
+  );
+}
+
 export function Settings({ onBack }: { onBack: () => void }) {
-  const { ctx, signOut, refresh } = useSession();
-  const { mode, toggleMode, preview, tintedNav, setTintedNav, ambient, setAmbient } = useTheme();
-  const [passkeys, setPasskeys] = useState<{ id: string; name: string | null }[]>([]);
-  const [enrolling, setEnrolling] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const { ctx, refresh } = useSession();
+  const { preview } = useTheme();
   const isOwner = ctx?.active?.role === "owner";
   const canBrand = isOwner && ctx?.entitlements.features.branding;
+  const aiSuite = isOwner && ctx?.entitlements.features.aiSuite;
+  const role = ctx?.active?.role ?? "member";
 
-  useEffect(() => { if (passkeySupported()) void listPasskeys().then(setPasskeys); }, []);
-
-  const addPasskey = async () => {
-    setEnrolling(true); setMsg(null);
-    try { await enrollPasskey(`${navigator.platform || "device"} passkey`); setPasskeys(await listPasskeys()); setMsg("Passkey added — next time, sign in with a tap."); }
-    catch { setMsg("Passkey setup was cancelled or failed."); }
-    finally { setEnrolling(false); }
-  };
+  const tabs = [
+    { value: "account", label: "Account" },
+    { value: "prefs", label: "Preferences" },
+    ...(isOwner ? [{ value: "studio", label: "Studio" }] : []),
+  ];
+  const [tab, setTab] = useState<string>("account");
 
   return (
-    <Page className="mx-auto max-w-xl space-y-6 p-4 pb-28">
+    <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       <div className="flex items-center gap-3">
         <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
         <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
       </div>
 
       <Stagger>
-        <Card className="flex items-center justify-between">
-          <div><div className="text-sm text-muted-foreground">Signed in as</div><div className="font-semibold">{ctx?.user.email}</div></div>
-          <Badge tone="neutral">{ctx?.active?.role}</Badge>
+        <Card className="flex items-center justify-between gap-3">
+          <div className="min-w-0"><div className="text-sm text-muted-foreground">Signed in as</div><div className="truncate font-semibold">{ctx?.user.email}</div></div>
+          <Badge tone="neutral" className="capitalize">{role}</Badge>
         </Card>
       </Stagger>
 
-      {ctx?.active?.clientId && (
-        <Stagger>
-          <ClientProfileSection clientId={ctx.active.clientId} email={ctx.user.email} onSaved={() => void refresh()} />
-        </Stagger>
-      )}
+      <SegmentedControl options={tabs} value={tab} onChange={setTab} />
 
-      <Stagger>
-        <section>
-          <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Security</h3>
-          <Card className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div><div className="font-medium">Passkeys</div><div className="text-sm text-muted-foreground">One-tap sign-in with Face ID / fingerprint.</div></div>
-              <Badge tone={passkeys.length ? "success" : "neutral"}>{passkeys.length}</Badge>
-            </div>
-            {passkeys.map((p) => <div key={p.id} className="flex items-center gap-2 text-sm text-muted-foreground"><KeyRound className="size-4" /> {p.name ?? "Passkey"}</div>)}
-            {passkeySupported() ? <Button variant="tonal" className="w-full" disabled={enrolling} onClick={() => void addPasskey()}><KeyRound /> {enrolling ? "Waiting for your device…" : "Add a passkey"}</Button> : <p className="text-sm text-muted-foreground">This device doesn't support passkeys — you'll keep using email codes.</p>}
-            {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
-          </Card>
-        </section>
-      </Stagger>
+      {/* Keyed remount → each tab re-staggers its sections in. */}
+      <motion.div key={tab} variants={stagger} initial="hidden" animate="show" className="space-y-6">
+        {tab === "account" && (
+          <>
+            {ctx?.active?.clientId && <ClientProfileSection clientId={ctx.active.clientId} email={ctx.user.email} onSaved={() => void refresh()} />}
+            <SecuritySection />
+            <SignOutSection />
+          </>
+        )}
 
-      {canBrand && (
-        <Stagger>
-          <BrandingEditor initial={(ctx?.branding ?? null) as Branding | null} onPreview={preview} onSaved={() => void refresh()} />
-        </Stagger>
-      )}
+        {tab === "prefs" && (
+          <>
+            <UnitsSection />
+            <AppearanceSection />
+          </>
+        )}
 
-      <Stagger>
-        <UnitsSection />
-      </Stagger>
-
-      {isOwner && (
-        <Stagger>
-          <StudioControls />
-        </Stagger>
-      )}
-
-      {canBrand && (
-        <Stagger>
-          <DomainSection />
-        </Stagger>
-      )}
-
-      {isOwner && (
-        <Stagger>
-          <IntegrationsSection />
-        </Stagger>
-      )}
-
-      <Stagger className="space-y-3">
-        <SettingsList
-          sections={[
-            { header: "Appearance", rows: [{ icon: mode === "dark" ? Sun : Moon, label: mode === "dark" ? "Switch to light" : "Switch to dark", onClick: toggleMode }] },
-          ]}
-        />
-        <Card className="divide-y divide-border/50 p-0">
-          <div className="flex items-center justify-between gap-3 p-4">
-            <div className="flex min-w-0 items-center gap-3.5">
-              <Palette className="size-[1.2rem] shrink-0 text-muted-foreground" />
-              <div className="min-w-0">
-                <div className="text-sm font-medium">Colorful tab bar</div>
-                <div className="text-xs text-muted-foreground">Tint the active tab by section — Train green, Eat amber, and so on.</div>
-              </div>
-            </div>
-            <Switch checked={tintedNav} onCheckedChange={setTintedNav} />
-          </div>
-          <div className="flex items-center justify-between gap-3 p-4">
-            <div className="flex min-w-0 items-center gap-3.5">
-              <Sparkles className="size-[1.2rem] shrink-0 text-muted-foreground" />
-              <div className="min-w-0">
-                <div className="text-sm font-medium">Ambient page color</div>
-                <div className="text-xs text-muted-foreground">Wash each page's hero in its section's color, fading into the background.</div>
-              </div>
-            </div>
-            <Switch checked={ambient} onCheckedChange={setAmbient} />
-          </div>
-        </Card>
-        <SettingsList
-          sections={[
-            { header: "Account", rows: [{ icon: LogOut, label: "Sign out", destructive: true, onClick: () => void signOut().then(() => location.reload()) }] },
-          ]}
-        />
-      </Stagger>
+        {tab === "studio" && isOwner && (
+          <>
+            <p className="px-1 text-sm text-muted-foreground">Settings you control for the whole studio. The badge on each shows whether it shapes your <span className="font-medium text-activity">coaching</span> or your <span className="font-medium text-primary">business</span>.</p>
+            {canBrand && <BrandingEditor initial={(ctx?.branding ?? null) as Branding | null} onPreview={preview} onSaved={() => void refresh()} />}
+            {aiSuite && <AiConfigSection />}
+            <MarketplaceSection />
+            <IntegrationsSection />
+            {canBrand && <DomainSection />}
+          </>
+        )}
+      </motion.div>
     </Page>
+  );
+}
+
+/** Passkey enrollment — personal, applies to the signed-in user on this device. */
+function SecuritySection() {
+  const [passkeys, setPasskeys] = useState<{ id: string; name: string | null }[]>([]);
+  const [enrolling, setEnrolling] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => { if (passkeySupported()) void listPasskeys().then(setPasskeys); }, []);
+  const addPasskey = async () => {
+    setEnrolling(true); setMsg(null);
+    try { await enrollPasskey(`${navigator.platform || "device"} passkey`); setPasskeys(await listPasskeys()); setMsg("Passkey added — next time, sign in with a tap."); }
+    catch { setMsg("Passkey setup was cancelled or failed."); }
+    finally { setEnrolling(false); }
+  };
+  return (
+    <section>
+      <SectionHead title="Security" />
+      <Card className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div><div className="font-medium">Passkeys</div><div className="text-sm text-muted-foreground">One-tap sign-in with Face ID / fingerprint.</div></div>
+          <Badge tone={passkeys.length ? "success" : "neutral"}>{passkeys.length}</Badge>
+        </div>
+        {passkeys.map((p) => <div key={p.id} className="flex items-center gap-2 text-sm text-muted-foreground"><KeyRound className="size-4" /> {p.name ?? "Passkey"}</div>)}
+        {passkeySupported() ? <Button variant="tonal" className="w-full" disabled={enrolling} onClick={() => void addPasskey()}><KeyRound /> {enrolling ? "Waiting for your device…" : "Add a passkey"}</Button> : <p className="text-sm text-muted-foreground">This device doesn't support passkeys — you'll keep using email codes.</p>}
+        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+      </Card>
+    </section>
+  );
+}
+
+/** Personalization — theme, tinted nav, ambient wash. All device-local to you. */
+function AppearanceSection() {
+  const { mode, toggleMode, tintedNav, setTintedNav, ambient, setAmbient } = useTheme();
+  return (
+    <section>
+      <SectionHead title="Appearance" />
+      <Card className="divide-y divide-border/50 p-0">
+        <ToggleRow icon={mode === "dark" ? Moon : Sun} title="Dark mode" desc="Switch the whole app between light and dark." checked={mode === "dark"} onChange={() => toggleMode()} />
+        <ToggleRow icon={Palette} title="Colorful tab bar" desc="Tint the active tab by section — Train green, Eat amber, and so on." checked={tintedNav} onChange={setTintedNav} />
+        <ToggleRow icon={Sparkles} title="Ambient page color" desc="Wash each page's hero in its section's color, fading into the background." checked={ambient} onChange={setAmbient} />
+      </Card>
+    </section>
+  );
+}
+
+function ToggleRow({ icon: Icon, title, desc, checked, onChange }: { icon: LucideIcon; title: string; desc: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 p-4">
+      <div className="flex min-w-0 items-center gap-3.5">
+        <Icon className="size-[1.2rem] shrink-0 text-muted-foreground" />
+        <div className="min-w-0"><div className="text-sm font-medium">{title}</div><div className="text-xs text-muted-foreground">{desc}</div></div>
+      </div>
+      <Switch checked={checked} onCheckedChange={onChange} />
+    </div>
+  );
+}
+
+function SignOutSection() {
+  const { signOut } = useSession();
+  return (
+    <SettingsList
+      sections={[{ header: "Account", rows: [{ icon: LogOut, label: "Sign out", destructive: true, onClick: () => void signOut().then(() => location.reload()) }] }]}
+    />
   );
 }
 
@@ -222,15 +251,12 @@ function UnitsSection() {
   );
 }
 
-function StudioControls() {
+function MarketplaceSection() {
   const [marketplace, setMarketplace] = useState<{ enabled?: boolean; selfRegister?: boolean }>({});
-  const [aiSuite, setAiSuite] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    void api.get<{ marketplace: { enabled?: boolean; selfRegister?: boolean }; entitlements: { features: { aiSuite?: boolean } } }>("/api/settings").then((r) => {
-      setMarketplace(r.marketplace ?? {}); setAiSuite(!!r.entitlements?.features?.aiSuite); setLoaded(true);
-    });
+    void api.get<{ marketplace: { enabled?: boolean; selfRegister?: boolean } }>("/api/settings").then((r) => { setMarketplace(r.marketplace ?? {}); setLoaded(true); });
   }, []);
 
   const setMarket = async (patch: { enabled?: boolean; selfRegister?: boolean }) => { setMarketplace((m) => ({ ...m, ...patch })); await api.patch("/api/settings", { marketplace: patch }); };
@@ -238,18 +264,14 @@ function StudioControls() {
   if (!loaded) return <Skeleton className="h-40" />;
 
   return (
-    <>
-      {aiSuite && <AiConfigSection />}
-
-      <section>
-        <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Marketplace</h3>
-        <Card className="space-y-3">
-          <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Store /></div><div><div className="font-medium">Public storefront</div><div className="text-sm text-muted-foreground">A shareable page with your packages and blog.</div></div></div>
-          <div className="flex items-center justify-between"><span className="text-sm">Enable storefront</span><Switch checked={!!marketplace.enabled} onCheckedChange={(v) => void setMarket({ enabled: v })} /></div>
-          <div className="flex items-center justify-between"><span className="text-sm">Allow self sign-up</span><Switch checked={!!marketplace.selfRegister} onCheckedChange={(v) => void setMarket({ selfRegister: v })} /></div>
-        </Card>
-      </section>
-    </>
+    <section>
+      <SectionHead title="Marketplace" scope="tenant" />
+      <Card className="space-y-3">
+        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Store /></div><div><div className="font-medium">Public storefront</div><div className="text-sm text-muted-foreground">A shareable page with your packages and blog.</div></div></div>
+        <div className="flex items-center justify-between"><span className="text-sm">Enable storefront</span><Switch checked={!!marketplace.enabled} onCheckedChange={(v) => void setMarket({ enabled: v })} /></div>
+        <div className="flex items-center justify-between"><span className="text-sm">Allow self sign-up</span><Switch checked={!!marketplace.selfRegister} onCheckedChange={(v) => void setMarket({ selfRegister: v })} /></div>
+      </Card>
+    </section>
   );
 }
 
@@ -307,7 +329,7 @@ function DomainSection() {
 
   return (
     <section>
-      <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Custom domain</h3>
+      <SectionHead title="Custom domain" scope="tenant" />
       <Card className="space-y-4">
         <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Globe /></div><div><div className="font-medium">Your own domain</div><div className="text-sm text-muted-foreground">Run the app on your domain — e.g. train.yourgym.com.</div></div></div>
 
@@ -390,7 +412,7 @@ function IntegrationsSection() {
 
   return (
     <section>
-      <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Integrations</h3>
+      <SectionHead title="Integrations" scope="tenant" />
       <Card className="space-y-4">
         <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Plug /></div><div><div className="font-medium">Data providers</div><div className="text-sm text-muted-foreground">Turn on sources so builders pull ready-made foods & exercises.</div></div></div>
         {groups.map((g) => (
@@ -498,7 +520,7 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
 
   return (
     <section>
-      <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Branding</h3>
+      <SectionHead title="Branding" scope="tenant" />
       <Card className="space-y-5">
         <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Palette /></div><div><div className="font-medium">Theme</div><div className="text-sm text-muted-foreground">Pick one color — the whole app themes itself, light and dark.</div></div></div>
 
