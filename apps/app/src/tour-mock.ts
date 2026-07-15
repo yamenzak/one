@@ -115,17 +115,20 @@ const checkIns = {
 const labs = { labs: [{ id: "l1", display_name: "Full blood panel", status: "reviewed", values: [{ marker: "Vitamin D", value: "42", unit: "ng/mL", flag: "normal" }, { marker: "Ferritin", value: "38", unit: "ng/mL", flag: "low" }], reviewed_at: at(10, 12) }] };
 
 // ── Train ────────────────────────────────────────────────────────────────
+// A block whose slots each carry a `sets` array — matching WorkoutBody so
+// prescribedSetsForDay (reads slot.sets.length) and the day cards render.
+const blk = (slots: number, sets = 3) => ({ type: "single", slots: range(slots).map((s) => ({ exerciseId: `ex${s}`, measurementMode: "reps", sets: range(sets).map(() => ({ reps: 10 })) })) });
 const workoutPlans = {
   plans: [
     {
       id: "demo-plan", name: "Upper / Lower Split", status: "published",
       body: {
         days: [
-          { name: "Upper A", blocks: [{ slots: range(5) }, { slots: range(1) }] },
-          { name: "Lower A", blocks: [{ slots: range(5) }] },
+          { name: "Upper A", blocks: [blk(5), blk(1)] },
+          { name: "Lower A", blocks: [blk(5)] },
           { name: "Rest", isRestDay: true, blocks: [] },
-          { name: "Upper B", blocks: [{ slots: range(5) }] },
-          { name: "Lower B", blocks: [{ slots: range(5) }] },
+          { name: "Upper B", blocks: [blk(5)] },
+          { name: "Lower B", blocks: [blk(5)] },
         ],
       },
     },
