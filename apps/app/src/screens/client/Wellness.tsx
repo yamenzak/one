@@ -181,7 +181,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         {today && (
         <>
       {/* Wellness Score hero */}
-      <Stagger>{score ? <WellnessScoreCard result={score} /> : <WellnessScoreCardSkeleton />}</Stagger>
+      <Stagger data-tour="wellness-hero">{score ? <WellnessScoreCard result={score} /> : <WellnessScoreCardSkeleton />}</Stagger>
 
       {/* Quick-log chips */}
       <Stagger className="flex flex-wrap gap-2">

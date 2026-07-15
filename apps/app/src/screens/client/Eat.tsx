@@ -136,7 +136,7 @@ export function Eat({ clientId }: { clientId: string }) {
         <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today</h3>
 
         {/* Hero — today's intake, the visual anchor */}
-        <Stagger>
+        <Stagger data-tour="eat-hero">
           <Card className="relative overflow-hidden">
             <div className="pointer-events-none absolute -right-12 -top-12 size-40 rounded-full bg-calories/10 blur-2xl" />
             <div className="relative flex items-center justify-between gap-4">

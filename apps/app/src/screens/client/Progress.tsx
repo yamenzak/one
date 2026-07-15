@@ -96,7 +96,7 @@ function Overview({ data, dateLabel }: { data: ProgressData; dateLabel: (i: numb
   const idxPct = wellness.index != null ? wellness.index / 5 : 0;
   return (
     <>
-      <Stagger>
+      <Stagger data-tour="progress-hero">
         <Card className="relative flex items-center gap-5 overflow-hidden">
           <div className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full bg-cardio/10 blur-3xl" />
           <ProgressRing size={116} strokeWidth={11} tone="cardio" progress={idxPct || 0.001} value={wellness.index != null ? wellness.index.toFixed(1) : "—"} label="Wellness" sublabel="/ 5" softTrack tintValue />

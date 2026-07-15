@@ -15,7 +15,23 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Optional request interceptor — the interactive tour installs one to serve
+ * mock data (so every screen is populated) and to swallow writes (so tapping
+ * around never touches real data). Return a value to short-circuit the request,
+ * or `undefined` to fall through to the network.
+ */
+export type ApiInterceptor = (method: string, path: string, body?: unknown) => unknown | undefined;
+let interceptor: ApiInterceptor | null = null;
+export function setApiInterceptor(fn: ApiInterceptor | null): void {
+  interceptor = fn;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  if (interceptor) {
+    const mocked = interceptor(method, path, body);
+    if (mocked !== undefined) return mocked as T;
+  }
   const res = await fetch(path, {
     method,
     credentials: "include",

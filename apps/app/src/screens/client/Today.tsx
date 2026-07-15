@@ -149,7 +149,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
             </Stagger>
           )}
 
-          <Stagger>
+          <Stagger data-tour="today-hero">
             <WidgetCarousel catalog={CLIENT_WIDGETS} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
           </Stagger>
 
@@ -163,7 +163,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
           </Stagger>
 
           <Stagger className="flex items-center gap-2.5">
-            <Button size="lg" className="flex-1" onClick={() => setLogOpen(true)}>
+            <Button size="lg" className="flex-1" data-tour="today-log" onClick={() => setLogOpen(true)}>
               <Plus /> Log
             </Button>
             <Button size="lg" variant="tonal" className="flex-1" onClick={onStart} disabled={!data.publishedWorkoutPlan}>
@@ -174,7 +174,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
             </Button>
           </Stagger>
 
-          <Stagger>
+          <Stagger data-tour="today-agenda">
             <TodayAgenda clientId={clientId} date={date} bundle={data} agenda={agenda} onChanged={() => void load()} onNavigate={onOpen} onCheckIn={() => setCheckInOpen(true)} onStartWorkout={onStart} />
           </Stagger>
 

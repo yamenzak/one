@@ -32,6 +32,7 @@ import { Shop } from "./screens/client/Shop.js";
 import { Explore } from "./screens/client/Explore.js";
 import { AdminConsole } from "./screens/admin/AdminConsole.js";
 import { NotificationBell } from "./NotificationBell.js";
+import { TourProvider, useTour, tourSeen } from "./tour.js";
 
 const CLIENT_TABS: TabDef[] = [
   { key: "today", label: "Today", icon: Home, tone: "primary" },
@@ -61,6 +62,7 @@ export function Shell() {
   if (gateClientId && needsOnboarding) return <Onboarding clientId={gateClientId} displayName={ctx!.user.name || "there"} onDone={() => setNeedsOnboarding(false)} />;
 
   return (
+    <TourProvider>
     <Routes>
       {/* Full-screen surfaces (no tab chrome). */}
       <Route path="/settings" element={<SettingsRoute />} />
@@ -89,6 +91,7 @@ export function Shell() {
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Route>
     </Routes>
+    </TourProvider>
   );
 }
 
@@ -102,6 +105,14 @@ function TabLayout() {
   const loc = useLocation();
   const active = ctx!.active!;
   const isStaff = active.role !== "client";
+  const { active: tourActive, start: startTour } = useTour();
+
+  // First-run interactive tour — once per device, for the client surface.
+  useEffect(() => {
+    if (!clientSurface || tourSeen()) return;
+    const t = setTimeout(() => startTour(), 700);
+    return () => clearTimeout(t);
+  }, [clientSurface, startTour]);
 
   const tabs: TabDef[] = clientSurface
     ? CLIENT_TABS
@@ -231,7 +242,9 @@ function TabLayout() {
         }
       />
 
-      <main><Outlet /></main>
+      {/* Remount the routed content when the tour toggles, so screens refetch
+          through the (mock ↔ live) api interceptor. */}
+      <main key={tourActive ? "tour" : "live"}><Outlet /></main>
       </div>
 
       <BottomTabs tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} tinted={tintedNav} />

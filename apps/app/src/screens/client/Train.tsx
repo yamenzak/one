@@ -147,7 +147,7 @@ export function Train({ clientId }: { clientId: string }) {
         {plans && (
         <>
       {published ? (
-        <Stagger>
+        <Stagger data-tour="train-hero">
           <button onClick={() => start()} className="w-full text-left">
             <Card interactive className="relative overflow-hidden">
               <div className="pointer-events-none absolute -right-8 -top-8 size-32 rounded-full bg-primary/10 blur-2xl" />
