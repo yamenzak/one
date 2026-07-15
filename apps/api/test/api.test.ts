@@ -1342,3 +1342,61 @@ describe("plan lifecycle — publish supersedes, restore, draft-only delete", ()
     expect((await SELF.fetch(`http://x/api/workout-plans/${a}`, { method: "PATCH", headers: H(), body: JSON.stringify({ name: "RollA v2" }) })).status).toBe(200);
   });
 });
+
+describe("client preferences + body metrics + goal staleness", () => {
+  const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
+  const mkClient = async (): Promise<string> => {
+    const r = await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "Metrics Client", gender: "male", dateOfBirth: "1994-01-01", heightCm: 180 }) });
+    return ((await r.json()) as { client: { id: string } }).client.id;
+  };
+  const measure = (clientId: string, date: string, weightKg: number, bodyFatPercent?: number) =>
+    SELF.fetch("http://x/api/measurements", { method: "POST", headers: H(), body: JSON.stringify({ clientId, data: { date, weightKg, ...(bodyFatPercent != null ? { bodyFatPercent } : {}) } }) });
+
+  it("preferences round-trip + profile completeness", async () => {
+    const id = await mkClient();
+    await SELF.fetch(`http://x/api/clients/${id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ preferences: { targetWeightKg: 78, primaryGoal: "lose_weight", activityLevel: "moderate", workoutsPerWeek: 4, mealsPerDay: 3, workoutLocation: "gym" } }) });
+    const view = (await (await SELF.fetch(`http://x/api/clients/${id}`, { headers: H() })).json()) as { client: { preferences: Record<string, unknown>; profileComplete: boolean } };
+    expect(view.client.preferences.primaryGoal).toBe("lose_weight");
+    expect(view.client.preferences.workoutLocation).toBe("gym");
+    expect(view.client.profileComplete).toBe(true);
+
+    // Partial patch must not wipe other prefs.
+    await SELF.fetch(`http://x/api/clients/${id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ preferences: { mealsPerDay: 5 } }) });
+    const v2 = (await (await SELF.fetch(`http://x/api/clients/${id}`, { headers: H() })).json()) as { client: { preferences: Record<string, unknown> } };
+    expect(v2.client.preferences.mealsPerDay).toBe(5);
+    expect(v2.client.preferences.primaryGoal).toBe("lose_weight");
+  });
+
+  it("recomputes BMI + BMR on every weight entry", async () => {
+    const id = await mkClient();
+    await measure(id, "2026-01-10", 80);
+    const m = (await (await SELF.fetch(`http://x/api/clients/${id}`, { headers: H() })).json()) as { metrics: { bmi: number | null; bmr: number | null; weightKg: number | null } };
+    expect(m.metrics.weightKg).toBe(80);
+    expect(m.metrics.bmi).toBe(24.7); // 80 / 1.8^2
+    expect(m.metrics.bmr).toBe(10 * 80 + 6.25 * 180 - 5 * 32 + 5); // Mifflin, age 32 in 2026
+  });
+
+  it("detects a stale goal after the body drifts", async () => {
+    const id = await mkClient();
+    await measure(id, "2026-01-10", 90);
+    // Goal built for a 90kg body.
+    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, label: "Cut", calculator: { gender: "male", ageYears: 32, heightCm: 180, weightKg: 90, activityLevel: "moderate", primaryGoal: "lose_weight", dietaryApproach: "balanced" } }) });
+    let m = (await (await SELF.fetch(`http://x/api/clients/${id}`, { headers: H() })).json()) as { metrics: { staleness: { stale: boolean; weightDeltaKg: number | null } | null } };
+    expect(m.metrics.staleness?.stale).toBe(false);
+    // Drop 8kg → stale.
+    await measure(id, "2026-02-20", 82);
+    m = (await (await SELF.fetch(`http://x/api/clients/${id}`, { headers: H() })).json()) as { metrics: { staleness: { stale: boolean; weightDeltaKg: number | null } | null } };
+    expect(m.metrics.staleness?.stale).toBe(true);
+    expect(m.metrics.staleness?.weightDeltaKg).toBe(-8);
+  });
+
+  it("Today bundle reports profile completeness", async () => {
+    const id = await mkClient();
+    const before = (await (await SELF.fetch(`http://x/api/today?clientId=${id}&date=2026-01-10`, { headers: H() })).json()) as { profile: { complete: boolean; gaps: string[] } };
+    expect(before.profile.complete).toBe(false);
+    expect(before.profile.gaps).toContain("goal");
+    await SELF.fetch(`http://x/api/clients/${id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ preferences: { targetWeightKg: 78, primaryGoal: "maintain", activityLevel: "light", workoutsPerWeek: 3, mealsPerDay: 3, workoutLocation: "home" } }) });
+    const after = (await (await SELF.fetch(`http://x/api/today?clientId=${id}&date=2026-01-10`, { headers: H() })).json()) as { profile: { complete: boolean } };
+    expect(after.profile.complete).toBe(true);
+  });
+});

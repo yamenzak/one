@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@mossa/protocol";
 import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, cn, colorToHex, Reveal, SkeletonLine, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, Save, History, X } from "@mossa/ui";
 import { api, ApiError } from "../../api.js";
+import { ClientPrefsStrip } from "./ClientPrefsStrip.js";
 import { AiErrorBox } from "../../AiError.js";
 import { ExerciseRow, splitList, pretty, type ExerciseInfo } from "../exercise.js";
 import { ExerciseEditor } from "./ExerciseEditor.js";
@@ -196,6 +197,8 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
         <Badge tone={plan.status === "published" ? "success" : "neutral"}>{plan.status}</Badge>
         <Button size="icon" variant="secondary" aria-label="Save as template" onClick={() => setExportOpen(true)}><Save /></Button>
       </div>
+
+      <ClientPrefsStrip clientId={plan.clientId} focus="workout" />
 
       {/* Day cards — 2 per row, each showing its branded cover; tap to edit. */}
       {days.length > 0 && (

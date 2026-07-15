@@ -4,6 +4,7 @@ export * from "./perms.js";
 export * from "./budgets.js";
 export * from "./clientFlags.js";
 export * from "./nutrition.js";
+export * from "./body.js";
 export * from "./bodyfat.js";
 export * from "./units.js";
 export * from "./activity.js";

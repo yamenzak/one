@@ -92,7 +92,9 @@ export const goalRoutes = new Hono<AppEnv>()
         primaryGoal: d.calculator.primaryGoal as PrimaryGoal,
         dietaryApproach: d.calculator.dietaryApproach as DietaryApproach,
       });
-      derivation = result.derivation;
+      // Snapshot the body the goal was built for, so staleness detection can
+      // later compare it to the client's current weight/BMR.
+      derivation = { ...result.derivation, snapshotWeightKg: d.calculator.weightKg, snapshotBodyFatPercent: d.calculator.bodyFatPercent ?? null };
       targets = {
         targetCalories: result.targetCalories,
         targetProteinG: result.targetProteinG,

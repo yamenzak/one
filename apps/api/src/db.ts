@@ -165,6 +165,12 @@ export function ensureSchema(db: D1Database): Promise<void> {
           // Content: a single category + a URL slug for headless/public fetch.
           "ALTER TABLE resources ADD COLUMN category TEXT",
           "ALTER TABLE resources ADD COLUMN slug TEXT",
+          // Client preferences (settings-managed profile: target weight, goal,
+          // activity, workouts/week, meals/day, workout location, dietary).
+          "ALTER TABLE clients ADD COLUMN preferences_json TEXT",
+          // Body composition recomputed on every weight/body-fat entry.
+          "ALTER TABLE measurements ADD COLUMN bmi REAL",
+          "ALTER TABLE measurements ADD COLUMN bmr REAL",
         ];
         for (const sql of alters) await db.exec(sql).catch(() => undefined);
       })

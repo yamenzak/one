@@ -14,6 +14,7 @@ import { type AppEnv, type AppContext, requireTenant } from "./auth-context.js";
 import { withinQuota } from "./billing-store.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
+import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps } from "@mossa/domain";
 
 export interface ClientRow {
   id: string;
@@ -36,6 +37,7 @@ export interface ClientRow {
   avatar_seed: string | null;
   blood_type: string | null;
   phone: string | null;
+  preferences_json: string | null;
   created_at: string;
   archived_at: string | null;
 }
@@ -128,12 +130,27 @@ const CreateClient = z.object({
   phone: z.string().max(30).nullish(),
 });
 
+/** Settings-managed preferences (metric; the app converts for display). */
+const ClientPrefs = z
+  .object({
+    targetWeightKg: z.number().positive().max(600).nullish(),
+    workoutsPerWeek: z.number().int().min(0).max(14).nullish(),
+    mealsPerDay: z.number().int().min(1).max(12).nullish(),
+    workoutLocation: z.enum(["home", "gym", "hybrid", "outdoor"]).nullish(),
+    primaryGoal: z.enum(["lose_weight", "build_muscle", "maintain", "improve_fitness"]).nullish(),
+    activityLevel: z.enum(["sedentary", "light", "moderate", "very_active"]).nullish(),
+    dietaryApproach: z.enum(["balanced", "high_protein", "low_carb", "keto", "vegan", "vegetarian"]).nullish(),
+    limitations: z.string().max(500).nullish(),
+  })
+  .partial();
+
 const UpdateClient = CreateClient.partial().extend({
   weightUnit: z.enum(["kg", "lbs"]).optional(),
   lengthUnit: z.enum(["cm", "in"]).optional(),
   volumeUnit: z.enum(["ml", "oz"]).optional(),
   intake: z.record(z.string(), z.unknown()).optional(),
   dashboardPrefs: z.record(z.string(), z.unknown()).optional(),
+  preferences: ClientPrefs.optional(),
   onboardingComplete: z.boolean().optional(),
 });
 
@@ -156,7 +173,47 @@ function clientView(row: ClientRow) {
     avatarSeed: row.avatar_seed,
     bloodType: row.blood_type,
     phone: row.phone,
+    preferences: parseJson<ClientPreferences>(row.preferences_json, {}),
+    profileComplete: profileGaps({ gender: row.gender, dateOfBirth: row.date_of_birth, heightCm: row.height_cm, prefs: parseJson<ClientPreferences>(row.preferences_json, {}) }).length === 0,
     createdAt: row.created_at,
+  };
+}
+
+/**
+ * Live body metrics for a client — the latest logged weight/body-fat with BMI +
+ * BMR recomputed from the current profile, plus whether the active goal has gone
+ * stale against that body. Drives the coach's goal-setting + planning context.
+ */
+async function clientMetrics(db: D1Database, row: ClientRow) {
+  const meas = await db
+    .prepare("SELECT date_local, weight_kg, body_fat_percent, bmi, bmr FROM measurements WHERE client_id = ? AND weight_kg IS NOT NULL ORDER BY date_local DESC LIMIT 1")
+    .bind(row.id)
+    .first<{ date_local: string; weight_kg: number | null; body_fat_percent: number | null; bmi: number | null; bmr: number | null }>();
+  const ageYears = ageFromDob(row.date_of_birth);
+  const weightKg = meas?.weight_kg ?? null;
+  const bodyFatPercent = meas?.body_fat_percent ?? null;
+  const bmi = weightKg != null && row.height_cm ? calculateBMI(weightKg, row.height_cm) : null;
+  const bmrCalc = weightKg != null && row.height_cm && ageYears != null && row.gender ? calculateBMR({ weightKg, heightCm: row.height_cm, ageYears, gender: row.gender as "male" | "female", bodyFatPercent }) : null;
+
+  // Staleness vs the active goal's snapshot.
+  const goal = await db
+    .prepare("SELECT ranges_json, derivation_json FROM client_goals WHERE client_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1")
+    .bind(row.id)
+    .first<{ ranges_json: string | null; derivation_json: string | null }>();
+  const deriv = parseJson<{ snapshotWeightKg?: number; bmr?: number }>(goal?.derivation_json, {});
+  const staleness = goal ? goalStaleness({ goalWeightKg: deriv.snapshotWeightKg ?? null, currentWeightKg: weightKg, goalBmr: deriv.bmr ?? null, currentBmr: bmrCalc?.bmr ?? null }) : null;
+
+  return {
+    ageYears,
+    weightKg,
+    bodyFatPercent,
+    measuredAt: meas?.date_local ?? null,
+    bmi,
+    bmiCategory: bmi != null ? classifyBMI(bmi) : null,
+    bmr: bmrCalc?.bmr ?? null,
+    bmrFormula: bmrCalc?.formula ?? null,
+    hasActiveGoal: Boolean(goal),
+    staleness,
   };
 }
 
@@ -242,7 +299,8 @@ export const clientRoutes = new Hono<AppEnv>()
   .get("/clients/:id", async (c) => {
     const access = await requireClientAccess(c, c.req.param("id"));
     if ("response" in access) return access.response;
-    return c.json({ client: clientView(access.client) });
+    const metrics = await clientMetrics(c.env.DB, access.client);
+    return c.json({ client: clientView(access.client), metrics });
   })
 
   .patch("/clients/:id", async (c) => {
@@ -252,9 +310,14 @@ export const clientRoutes = new Hono<AppEnv>()
     if (!body.success) return c.json({ error: "invalid body" }, 400);
     const d = body.data;
     const cur = access.client;
+    // Preferences merge (partial): updating one field never wipes the others.
+    const prefsJson =
+      d.preferences !== undefined
+        ? j({ ...parseJson<ClientPreferences>(cur.preferences_json, {}), ...d.preferences })
+        : cur.preferences_json;
     await c.env.DB.prepare(
       `UPDATE clients SET display_name = ?, email = ?, gender = ?, date_of_birth = ?, height_cm = ?, timezone = ?,
-        weight_unit = ?, length_unit = ?, volume_unit = ?, intake_json = ?, dashboard_prefs_json = ?, onboarding_complete = ?,
+        weight_unit = ?, length_unit = ?, volume_unit = ?, intake_json = ?, dashboard_prefs_json = ?, preferences_json = ?, onboarding_complete = ?,
         blood_type = ?, phone = ?
        WHERE id = ? AND tenant_id = ?`,
     )
@@ -270,6 +333,7 @@ export const clientRoutes = new Hono<AppEnv>()
         d.volumeUnit ?? cur.volume_unit,
         d.intake !== undefined ? j(d.intake) : cur.intake_json,
         d.dashboardPrefs !== undefined ? j(d.dashboardPrefs) : cur.dashboard_prefs_json,
+        prefsJson,
         d.onboardingComplete !== undefined ? (d.onboardingComplete ? 1 : 0) : cur.onboarding_complete,
         d.bloodType !== undefined ? d.bloodType : cur.blood_type,
         d.phone !== undefined ? d.phone : cur.phone,
@@ -278,7 +342,8 @@ export const clientRoutes = new Hono<AppEnv>()
       )
       .run();
     const row = await getClient(c.env.DB, cur.tenant_id, cur.id);
-    return c.json({ client: clientView(row!) });
+    const metrics = await clientMetrics(c.env.DB, row!);
+    return c.json({ client: clientView(row!), metrics });
   })
 
   .post("/clients/:id/archive", async (c) => {

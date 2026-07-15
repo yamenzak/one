@@ -6,6 +6,7 @@ import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy } from "@mossa/domain";
 import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, ArrowLeft, Plus, Sparkles, Utensils, History, X } from "@mossa/ui";
 import { api, ApiError } from "../../api.js";
+import { ClientPrefsStrip } from "./ClientPrefsStrip.js";
 import { AiErrorBox } from "../../AiError.js";
 import { useUnits } from "../../units.js";
 import { FoodSearchSheet } from "../client/FoodSearchSheet.js";
@@ -84,6 +85,8 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
         <h1 className="flex-1 truncate text-xl font-bold tracking-tight">{plan.name}</h1>
         <Badge tone={plan.status === "published" ? "success" : "neutral"}>{plan.status}</Badge>
       </div>
+
+      <ClientPrefsStrip clientId={plan.clientId} focus="meal" />
 
       {targets?.targetCalories ? (
         <Card className="flex items-center justify-between py-3 text-sm">

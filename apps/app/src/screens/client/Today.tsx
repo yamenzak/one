@@ -12,8 +12,10 @@ import {
   ChevronLeft, ChevronRight, type Tone, type LucideIcon,
 } from "@mossa/ui";
 import type { WidgetItem } from "@mossa/protocol";
+import { useNavigate } from "react-router-dom";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
+import { useSession } from "../../session.js";
 import { LogSheet } from "./LogSheet.js";
 import { WidgetCarousel, WidgetCustomizeSheet } from "../widget-kit.js";
 import { CLIENT_WIDGETS, DEFAULT_CLIENT_WIDGETS, type ClientWidgetData } from "./HomeWidgets.js";
@@ -42,7 +44,20 @@ export interface TodayBundle {
   pendingLabs?: number;
   weightSeries?: { kg: number; date: string }[];
   widgets?: WidgetItem[] | null;
+  profile?: { complete: boolean; gaps: string[] } | null;
 }
+
+const GAP_LABELS: Record<string, string> = {
+  gender: "Gender",
+  dateOfBirth: "Date of birth",
+  height: "Height",
+  targetWeight: "Target weight",
+  goal: "Primary goal",
+  activityLevel: "Activity level",
+  workoutsPerWeek: "Workouts / week",
+  mealsPerDay: "Meals / day",
+  workoutLocation: "Where you train",
+};
 
 /** The route (with any deep-link query) a feed event opens — client context
  *  only. Check-ins and labs open their detail sheet on the Wellness page. */
@@ -73,6 +88,9 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   // client's own hero — not their own — and both see the same arrangement.
   const [widgetItems, setWidgetItems] = useState<WidgetItem[] | null>(null);
   const units = useUnits();
+  const nav = useNavigate();
+  const { ctx } = useSession();
+  const ownView = ctx?.active?.clientId === clientId;
   const date = todayLocal();
 
   const saveWidgets = async (items: WidgetItem[]) => {
@@ -113,6 +131,24 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
       }>
         {data && agenda && widgetData && (
         <>
+          {data.profile && !data.profile.complete && (
+            <Stagger>
+              <Card className="space-y-3 border border-warning/25 bg-warning-soft/50">
+                <div className="flex items-start gap-3">
+                  <IconBadge icon={ClipboardList} tone="warning" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold">{ownView ? "Finish your profile" : "Profile incomplete"}</div>
+                    <p className="text-sm text-muted-foreground">{ownView ? "A few details let your coach build accurate goals, workouts and meals for you." : "Ask this client to complete their profile in Settings for accurate targets."}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {data.profile.gaps.map((g) => <span key={g} className="rounded-full bg-warning-soft px-2.5 py-1 text-xs font-medium text-warning">{GAP_LABELS[g] ?? g}</span>)}
+                </div>
+                {ownView && <Button size="sm" variant="tonal" onClick={() => nav("/settings")}><ClipboardList /> Complete profile</Button>}
+              </Card>
+            </Stagger>
+          )}
+
           <Stagger>
             <WidgetCarousel catalog={CLIENT_WIDGETS} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
           </Stagger>

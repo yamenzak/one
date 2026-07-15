@@ -19,9 +19,9 @@ import {
   SubmitCheckIn,
   type LoggedSet,
 } from "@mossa/protocol";
-import { activityByKey, estimateBurnedCalories } from "@mossa/domain";
+import { activityByKey, estimateBurnedCalories, calculateBMI, calculateBMR, ageFromDob, profileGaps, type ClientPreferences } from "@mossa/domain";
 import { type AppEnv } from "./auth-context.js";
-import { requireClientAccess } from "./clients.js";
+import { requireClientAccess, type ClientRow } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
 import { notifyUser } from "./inbox-do.js";
 import { parseJson, j } from "./db.js";
@@ -29,6 +29,32 @@ import { parseJson, j } from "./db.js";
 /** Every log payload arrives wrapped with the target clientId. */
 const withClient = <T extends z.ZodTypeAny>(schema: T) =>
   z.object({ clientId: z.string().min(1), data: schema });
+
+/**
+ * Recompute BMI + BMR for a client's measurement on a given day and store the
+ * snapshot on that row. Runs after every weight / body-fat entry so the coach
+ * always reads a live basal rate and staleness detection has fresh numbers.
+ * Uses the measurement's own weight/body-fat with the client's profile
+ * (height/gender/DOB). No-op when weight or height is missing.
+ */
+async function recomputeBodyMetrics(db: D1Database, client: ClientRow, dateLocal: string): Promise<void> {
+  const row = await db
+    .prepare("SELECT weight_kg, body_fat_percent FROM measurements WHERE client_id = ? AND date_local = ?")
+    .bind(client.id, dateLocal)
+    .first<{ weight_kg: number | null; body_fat_percent: number | null }>();
+  const weightKg = row?.weight_kg ?? null;
+  if (weightKg == null || !client.height_cm) return;
+  const bmi = calculateBMI(weightKg, client.height_cm);
+  const ageYears = ageFromDob(client.date_of_birth);
+  const bmr =
+    ageYears != null && client.gender
+      ? calculateBMR({ weightKg, heightCm: client.height_cm, ageYears, gender: client.gender as "male" | "female", bodyFatPercent: row?.body_fat_percent ?? null })?.bmr ?? null
+      : null;
+  await db
+    .prepare("UPDATE measurements SET bmi = ?, bmr = ? WHERE client_id = ? AND date_local = ?")
+    .bind(bmi, bmr, client.id, dateLocal)
+    .run();
+}
 
 interface SessionEntry {
   blockIndex: number;
@@ -505,6 +531,7 @@ export const logRoutes = new Hono<AppEnv>()
         nowIso(),
       )
       .run();
+    await recomputeBodyMetrics(c.env.DB, access.client, d.date);
     return c.json({ ok: true });
   })
 
@@ -562,6 +589,7 @@ export const logRoutes = new Hono<AppEnv>()
       )
         .bind(newId("mea"), access.client.tenant_id, access.client.id, d.date, d.weightKg, nowIso())
         .run();
+      await recomputeBodyMetrics(c.env.DB, access.client, d.date);
     }
     // Notify the primary trainer (fan-out fix: primary only, SPEC §2).
     const primary = await c.env.DB.prepare(
@@ -802,5 +830,16 @@ export const logRoutes = new Hono<AppEnv>()
       // Client-scoped home widget layout (editable by the client OR their coach),
       // so a coach can arrange a client's hero on their behalf.
       widgets: parseJson<{ widgets?: unknown[] }>(access.client.dashboard_prefs_json, {}).widgets ?? null,
+      // Profile completeness — drives the "finish your profile" prompt so the
+      // coach can build accurate macro/goal targets.
+      profile: (() => {
+        const gaps = profileGaps({
+          gender: access.client.gender,
+          dateOfBirth: access.client.date_of_birth,
+          heightCm: access.client.height_cm,
+          prefs: parseJson<ClientPreferences>(access.client.preferences_json, {}),
+        });
+        return { complete: gaps.length === 0, gaps };
+      })(),
     });
   });
