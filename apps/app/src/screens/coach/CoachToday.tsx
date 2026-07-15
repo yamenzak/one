@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fmtWeight } from "@mossa/domain";
-import { Card, Skeleton, InsightCard, Badge, Button, Page, Stagger, EmptyState, IconBadge, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Sliders, ChevronRight, type Tone, type LucideIcon } from "@mossa/ui";
+import { Card, Skeleton, InsightCard, Badge, Button, Page, Stagger, EmptyState, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, type Tone, type LucideIcon } from "@mossa/ui";
 import type { WidgetItem } from "@mossa/protocol";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -17,6 +17,13 @@ interface Notification { id: string; type: string; title: string; message: strin
 interface AtRisk { clientId: string; name: string; daysSinceLog: number | null; reason: string }
 interface PendingSwap { id: string; client_id: string; day_index: number | null; reason: string | null }
 interface RosterEvent { id: string; clientId: string; clientName: string; kind: string; date: string; at: string; title: string; subtitle: string | null; metric?: { unit: "weight"; value: number } }
+interface RosterAnalytics {
+  roster: { total: number; active7: number; atRisk: number };
+  daily: { date: string; active: number; logs: number }[];
+  engagement: { checkInRate: number; workoutRate: number; avgActivePerDay: number };
+  topClients: { clientId: string; name: string; logs: number }[];
+}
+const dm = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
 
 const ROSTER_META: Record<string, { icon: LucideIcon; tone: Tone }> = {
   workout: { icon: Dumbbell, tone: "activity" },
@@ -36,6 +43,7 @@ export function CoachToday() {
   const [atRisk, setAtRisk] = useState<AtRisk[]>([]);
   const [swaps, setSwaps] = useState<PendingSwap[]>([]);
   const [activity, setActivity] = useState<RosterEvent[]>([]);
+  const [analytics, setAnalytics] = useState<RosterAnalytics | null>(null);
   const [widgetsOpen, setWidgetsOpen] = useState(false);
   const [widgetItems, setWidgetItems] = useState<WidgetItem[] | null>(ctx?.user.widgets?.coachHome ?? null);
   const saveWidgets = async (items: WidgetItem[]) => {
@@ -50,14 +58,15 @@ export function CoachToday() {
   useEffect(() => {
     void (async () => {
       try {
-        const [c, n, ar, sw, ev] = await Promise.all([
+        const [c, n, ar, sw, ev, an] = await Promise.all([
           api.get<{ clients: ClientSummary[] }>("/api/clients"),
           api.get<{ notifications: Notification[] }>("/api/notifications"),
           api.get<{ atRisk: AtRisk[] }>("/api/reports/retention").catch(() => ({ atRisk: [] as AtRisk[] })),
           api.get<{ swaps: PendingSwap[] }>("/api/swaps").catch(() => ({ swaps: [] as PendingSwap[] })),
           api.get<{ events: RosterEvent[] }>("/api/reports/roster-activity").catch(() => ({ events: [] as RosterEvent[] })),
+          api.get<RosterAnalytics>(`/api/reports/roster-analytics?days=14&today=${todayLocal()}`).catch(() => null),
         ]);
-        setAtRisk(ar.atRisk); setSwaps(sw.swaps); setActivity(ev.events);
+        setAtRisk(ar.atRisk); setSwaps(sw.swaps); setActivity(ev.events); setAnalytics(an);
         setClients(c.clients); setNotifications(n.notifications);
       } catch { /* clients/notifications failed — stay in the skeleton */ }
     })();
@@ -89,6 +98,35 @@ export function CoachToday() {
       <Stagger>
         <WidgetCarousel catalog={COACH_WIDGETS} items={widgetItems} defaults={DEFAULT_COACH_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
       </Stagger>
+
+      {analytics && analytics.roster.total > 0 && (
+        <Stagger className="space-y-3">
+          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Roster analytics</h3>
+          <ChartCard title="Active clients" icon={Activity} tone="cardio" value={analytics.engagement.avgActivePerDay} unit={`/ day · of ${analytics.roster.total}`} delta={<Badge tone="neutral">{analytics.daily.length}-day trend</Badge>}>
+            <BarChart values={analytics.daily.map((d) => d.active)} labels={analytics.daily.map((d) => dm(d.date))} tone="cardio" target={analytics.roster.total} format={(v) => `${v} active`} />
+          </ChartCard>
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard stack label="Check-in rate" value={analytics.engagement.checkInRate} unit="%" icon={ClipboardList} tone="nutrition" badge={<Badge tone="neutral">7-day</Badge>} />
+            <StatCard stack label="Workout rate" value={analytics.engagement.workoutRate} unit="%" icon={Dumbbell} tone="activity" badge={<Badge tone="neutral">7-day</Badge>} />
+          </div>
+          {analytics.topClients.length > 0 && (
+            <Card className="space-y-3">
+              <SectionHeader icon={Trophy} tone="activity" title="Most active" />
+              <div className="space-y-2.5">
+                {analytics.topClients.map((t) => {
+                  const max = analytics.topClients[0]!.logs || 1;
+                  return (
+                    <button key={t.clientId} onClick={() => nav(`/clients/${t.clientId}/today`)} className="block w-full text-left">
+                      <div className="flex items-center justify-between gap-2 text-sm"><span className="truncate font-medium">{t.name}</span><span className="numeral shrink-0 text-muted-foreground">{t.logs} logs</span></div>
+                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(6, (t.logs / max) * 100)}%`, backgroundColor: toneVar.activity }} /></div>
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+        </Stagger>
+      )}
 
       {swaps.length > 0 && (
         <Stagger>

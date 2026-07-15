@@ -7,9 +7,11 @@
 
 import { Hono } from "hono";
 import {
+  addDays,
   calorieAdherencePct,
   consistencyPct,
   currentStreak,
+  daysInRange,
   epley1Rm,
   presetRange,
   sessionTonnage,
@@ -183,4 +185,70 @@ export const reportRoutes = new Hono<AppEnv>()
 
     events.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
     return c.json({ events: events.slice(0, 40) });
+  })
+
+  // Roster analytics (SPEC §8.11) — studio-wide engagement over a window: a
+  // daily active-clients trend, 7-day check-in/workout rates, at-risk count and
+  // the most-active clients. Coach-scoped to the caller's visible roster.
+  .get("/reports/roster-analytics", async (c) => {
+    const who = requireTenant(c)!;
+    const scope = await visibleClientIds(c);
+    const today = c.req.query("today") ?? new Date().toISOString().slice(0, 10);
+    const days = Math.min(30, Math.max(7, Number(c.req.query("days")) || 14));
+    const window = daysInRange(addDays(today, -(days - 1)), today);
+    const start = window[0]!;
+    const db = c.env.DB;
+
+    let ids: string[];
+    if (scope === "all") {
+      const rows = await db.prepare("SELECT id FROM clients WHERE tenant_id = ? AND status = 'active'").bind(who.tenantId).all<{ id: string }>();
+      ids = (rows.results ?? []).map((r) => r.id);
+    } else ids = scope;
+    const empty = { range: { start, end: today, days: window }, roster: { total: ids.length, active7: 0, atRisk: ids.length }, daily: window.map((d) => ({ date: d, active: 0, logs: 0 })), engagement: { checkInRate: 0, workoutRate: 0, avgActivePerDay: 0 }, topClients: [] as unknown[] };
+    if (ids.length === 0) return c.json(empty);
+    ids = ids.slice(0, 500);
+    const ph = ids.map(() => "?").join(",");
+
+    const names = new Map<string, string>();
+    const nrows = await db.prepare(`SELECT id, display_name FROM clients WHERE id IN (${ph})`).bind(...ids).all<{ id: string; display_name: string }>();
+    for (const r of nrows.results ?? []) names.set(r.id, r.display_name);
+
+    const q = (table: string) => db.prepare(`SELECT DISTINCT client_id, date_local FROM ${table} WHERE client_id IN (${ph}) AND date_local >= ? AND date_local <= ?`).bind(...ids, start, today).all<{ client_id: string; date_local: string }>();
+    const [ci, fe, xl, al] = await Promise.all([q("check_ins"), q("food_entries"), q("exercise_logs"), q("activity_logs")]);
+
+    const activeByDay = new Map<string, Set<string>>();
+    const logsByDay = new Map<string, number>();
+    const perClient = new Map<string, number>();
+    const active5 = new Set<string>();
+    const active7 = new Set<string>();
+    const checkin7 = new Set<string>();
+    const workout7 = new Set<string>();
+    const d7 = addDays(today, -6), d5 = addDays(today, -4);
+    const add = (cid: string, date: string, kind: string) => {
+      let s = activeByDay.get(date); if (!s) { s = new Set(); activeByDay.set(date, s); }
+      s.add(cid);
+      logsByDay.set(date, (logsByDay.get(date) ?? 0) + 1);
+      perClient.set(cid, (perClient.get(cid) ?? 0) + 1);
+      if (date >= d5) active5.add(cid);
+      if (date >= d7) { active7.add(cid); if (kind === "checkin") checkin7.add(cid); if (kind === "workout") workout7.add(cid); }
+    };
+    for (const r of ci.results ?? []) add(r.client_id, r.date_local, "checkin");
+    for (const r of fe.results ?? []) add(r.client_id, r.date_local, "food");
+    for (const r of xl.results ?? []) add(r.client_id, r.date_local, "workout");
+    for (const r of al.results ?? []) add(r.client_id, r.date_local, "activity");
+
+    const daily = window.map((d) => ({ date: d, active: activeByDay.get(d)?.size ?? 0, logs: logsByDay.get(d) ?? 0 }));
+    const total = ids.length;
+    const topClients = [...perClient.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([id, logs]) => ({ clientId: id, name: names.get(id) ?? "Client", logs }));
+    return c.json({
+      range: { start, end: today, days: window },
+      roster: { total, active7: active7.size, atRisk: Math.max(0, total - active5.size) },
+      daily,
+      engagement: {
+        checkInRate: total ? Math.round((checkin7.size / total) * 100) : 0,
+        workoutRate: total ? Math.round((workout7.size / total) * 100) : 0,
+        avgActivePerDay: Math.round(daily.reduce((n, x) => n + x.active, 0) / daily.length),
+      },
+      topClients,
+    });
   });

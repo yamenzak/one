@@ -997,6 +997,30 @@ describe("roster activity pulse (coach Today)", () => {
     const other = (await (await SELF.fetch("http://x/api/reports/roster-activity?from=2026-07-08&to=2026-07-10", { headers: auth(otherCookie) })).json()) as { events: { clientId: string }[] };
     expect(other.events.some((e) => e.clientId === a.id || e.clientId === b.id)).toBe(false);
   });
+
+  it("roster-analytics aggregates a daily active-clients trend + engagement rates", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "AnalyticsAna" }) })).json()) as { client: { id: string } };
+    const today = new Date().toISOString().slice(0, 10);
+    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: today, mood: 5 } }) });
+    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: today, mealType: "lunch", label: "Rice", calories: 300, proteinG: 8, carbsG: 60, fatG: 2 } }) });
+
+    const a = (await (await SELF.fetch(`http://x/api/reports/roster-analytics?days=14&today=${today}`, { headers: auth(ownerCookie) })).json()) as {
+      roster: { total: number; active7: number; atRisk: number };
+      daily: { date: string; active: number }[];
+      engagement: { checkInRate: number; workoutRate: number; avgActivePerDay: number };
+      topClients: { clientId: string; name: string; logs: number }[];
+    };
+    expect(a.daily.length).toBe(14);
+    expect(a.daily[13]!.date).toBe(today);
+    expect(a.daily[13]!.active).toBeGreaterThanOrEqual(1); // Ana logged today
+    expect(a.roster.total).toBeGreaterThanOrEqual(1);
+    expect(a.engagement.checkInRate).toBeGreaterThanOrEqual(0);
+    expect(a.topClients.some((t) => t.clientId === client.id && t.logs >= 2)).toBe(true); // check-in + food
+    // Tenant isolation — another tenant's coach doesn't see Ana.
+    const other = (await (await SELF.fetch(`http://x/api/reports/roster-analytics?days=14&today=${today}`, { headers: auth(otherCookie) })).json()) as { topClients: { clientId: string }[] };
+    expect(other.topClients.some((t) => t.clientId === client.id)).toBe(false);
+  });
 });
 
 describe("workout logging — measurement modes (SPEC §8.3)", () => {
