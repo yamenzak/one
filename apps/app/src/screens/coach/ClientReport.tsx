@@ -15,6 +15,7 @@ import {
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { AiAvatar } from "../../AiAvatar.js";
+import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
 
 interface Report {
   compliance: { checkInDays: number; foodDays: number; workoutDays: number; checkInConsistencyPct: number; currentStreak: number; calorieAdherencePct: number | null };
@@ -29,14 +30,14 @@ const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateStrin
 export function ClientReport({ clientId }: { clientId: string }) {
   const [range, setRange] = useState<RangePreset>("30d");
   const [report, setReport] = useState<Report | null>(null);
-  const [exNames, setExNames] = useState<Map<string, string>>(new Map());
+  const [exMap, setExMap] = useState<Map<string, ExerciseInfo>>(new Map());
   const [summary, setSummary] = useState<string | null>(null);
   const [summaryBusy, setSummaryBusy] = useState(false);
   const units = useUnits();
   const today = todayLocal();
 
   useEffect(() => { setReport(null); void api.get<Report>(`/api/reports/client/${clientId}?range=${range}&today=${today}`).then(setReport).catch(() => setReport(null)); }, [clientId, range, today]);
-  useEffect(() => { void api.get<{ exercises: { id: string; name: string }[] }>("/api/exercises?scope=all").then((r) => setExNames(new Map(r.exercises.map((e) => [e.id, e.name])))).catch(() => undefined); }, []);
+  useEffect(() => { void api.get<{ exercises: ExerciseInfo[] }>("/api/exercises?scope=all").then((r) => setExMap(new Map(r.exercises.map((e) => [e.id, e])))).catch(() => undefined); }, []);
 
   const genSummary = async () => {
     setSummaryBusy(true);
@@ -100,14 +101,15 @@ export function ClientReport({ clientId }: { clientId: string }) {
             <Stagger>
               <Card className="space-y-3">
                 <SectionHeader icon={Trophy} tone="activity" title="Top lifts · est. 1RM" />
-                <div className="space-y-2.5">
+                <div className="space-y-3">
                   {report.prs.slice(0, 8).map((p) => (
-                    <div key={p.exerciseId} className="min-w-0">
-                      <div className="flex items-center justify-between gap-2 text-sm">
-                        <span className="truncate">{exNames.get(p.exerciseId) ?? "Exercise"}</span>
-                        <span className="numeral shrink-0 font-semibold">{Math.round(kgToDisplay(p.e1rm, units))} <span className="text-xs font-medium text-muted-foreground">{weightLabel(units)}</span></span>
-                      </div>
-                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(6, (p.e1rm / maxE1) * 100)}%`, backgroundColor: toneVar.activity }} /></div>
+                    <div key={p.exerciseId} className="space-y-1.5">
+                      <ExerciseRow
+                        ex={exMap.get(p.exerciseId)} name="Exercise" thumbSize={40}
+                        sub={<>{Math.round(kgToDisplay(p.weight, units))} {weightLabel(units)} × {p.reps}</>}
+                        trailing={<span className="numeral shrink-0 font-semibold">{Math.round(kgToDisplay(p.e1rm, units))} <span className="text-xs font-medium text-muted-foreground">{weightLabel(units)}</span></span>}
+                      />
+                      <div className="ml-[52px] h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(6, (p.e1rm / maxE1) * 100)}%`, backgroundColor: toneVar.activity }} /></div>
                     </div>
                   ))}
                 </div>
