@@ -282,8 +282,44 @@ body {
   }
 }
 @keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
   100% {
     transform: translateX(100%);
+  }
+}
+
+/* Premium skeleton: a resting surface tint with a soft, foreground-tinted
+   highlight sweeping across it. The sweep is a masked pseudo-element so a whole
+   grid of skeletons animates on the GPU with no per-node JS. The tint derives
+   from --foreground, so it reads as a light gloss in dark mode and a subtle
+   grey sheen in light mode without any per-theme overrides. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--surface-2);
+  isolation: isolate;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklch, var(--foreground) 6%, transparent) 45%,
+    color-mix(in oklch, var(--foreground) 9%, transparent) 50%,
+    color-mix(in oklch, var(--foreground) 6%, transparent) 55%,
+    transparent 100%
+  );
+  animation: shimmer 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
   }
 }
 

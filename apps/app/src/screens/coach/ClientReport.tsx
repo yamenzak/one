@@ -9,7 +9,8 @@
 import { useEffect, useState } from "react";
 import { kgToDisplay, weightLabel, type RangePreset } from "@mossa/domain";
 import {
-  Button, Card, Badge, Skeleton, SegmentedControl, Page, Stagger, StatCard, ChartCard, AreaChart, SectionHeader, toneVar,
+  Button, Card, Badge, SegmentedControl, Page, Stagger, StatCard, ChartCard, AreaChart, SectionHeader, toneVar,
+  Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList,
   Flame, Gauge, Dumbbell, Utensils, Scale, Moon, Smile, Trophy, Sparkles, TrendingUp, cn,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
@@ -69,9 +70,15 @@ export function ClientReport({ clientId }: { clientId: string }) {
         </Card>
       </Stagger>
 
-      {!report ? (
-        <div className="space-y-4"><Skeleton className="h-28" /><Skeleton className="h-44" /></div>
-      ) : (
+      <Reveal loading={!report} className="space-y-4" skeleton={
+        <>
+          <SkeletonStatGrid count={6} foot />
+          <SkeletonChart height={160} />
+          <SkeletonStatGrid count={2} />
+          <SkeletonList card rows={5} thumb={40} />
+        </>
+      }>
+        {report && (
         <>
           <Stagger className="grid grid-cols-2 gap-3">
             <StatCard stack label="Check-in streak" value={report.compliance.currentStreak} unit={report.compliance.currentStreak === 1 ? "day" : "days"} icon={Flame} tone="calories"
@@ -117,7 +124,8 @@ export function ClientReport({ clientId }: { clientId: string }) {
             </Stagger>
           )}
         </>
-      )}
+        )}
+      </Reveal>
     </Page>
   );
 }
