@@ -9,44 +9,41 @@
  * like the page developing rather than a hard cut.
  */
 
-import { AnimatePresence, motion } from "motion/react";
+import { motion, type Variants } from "motion/react";
 import type { ReactNode } from "react";
 import { cn } from "./lib/utils.js";
 import { Skeleton } from "./primitives.js";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
+// The content wrapper animates via VARIANT LABELS ("hidden"/"show"), not target
+// objects. This matters: content commonly holds <Stagger> children that inherit
+// their animation state from this parent — an object `animate` propagates no
+// label, leaving those children stuck at their hidden variant (invisible). A
+// labelled parent propagates "show", and `staggerChildren` cascades them in as
+// the blur lifts.
+const revealContent: Variants = {
+  hidden: { opacity: 0, filter: "blur(8px)" },
+  show: { opacity: 1, filter: "blur(0px)", transition: { duration: 0.4, ease: EASE, staggerChildren: 0.05, delayChildren: 0.03 } },
+};
+
 // ── Reveal — the skeleton→content transition ────────────────────────────────
 /**
- * Swap a skeleton for its content with a premium crossfade: the skeleton fades
- * and blurs away while the content dissolves in. `mode="wait"` sequences them so
- * the skeleton clears before the content settles — pair it with a <Page>/<Stagger>
- * content root and the children stagger in right after the blur lifts.
+ * Swap a skeleton for its content with a premium reveal: the moment data lands,
+ * the skeleton gives way to the content, which blurs + rises into focus and (if
+ * it holds <Stagger> children) cascades them in.
+ *
+ * Deliberately a plain conditional, NOT an AnimatePresence crossfade: content
+ * visibility must never depend on an exit animation completing, so it can't get
+ * stranded hidden. The content owns the whole transition — it enters over the
+ * spot the skeleton just vacated, which reads as the page developing.
  */
 export function Reveal({ loading, skeleton, children, className }: { loading: boolean; skeleton: ReactNode; children: ReactNode; className?: string }) {
+  if (loading) return <div className={className}>{skeleton}</div>;
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      {loading ? (
-        <motion.div
-          key="skeleton"
-          exit={{ opacity: 0, filter: "blur(10px)", scale: 0.985 }}
-          transition={{ duration: 0.3, ease: EASE }}
-          className={className}
-        >
-          {skeleton}
-        </motion.div>
-      ) : (
-        <motion.div
-          key="content"
-          initial={{ opacity: 0, filter: "blur(10px)" }}
-          animate={{ opacity: 1, filter: "blur(0px)" }}
-          transition={{ duration: 0.4, ease: EASE }}
-          className={className}
-        >
-          {children}
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <motion.div variants={revealContent} initial="hidden" animate="show" className={className}>
+      {children}
+    </motion.div>
   );
 }
 
