@@ -14,7 +14,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { Button, ArrowRight, ArrowLeft, X, Sparkles, toneVar, type Tone } from "@mossa/ui";
+import { Button, ArrowRight, ArrowLeft, X, Sparkles, Hand, toneVar, type Tone } from "@mossa/ui";
 import { setApiInterceptor } from "./api.js";
 import { tourInterceptor } from "./tour-mock.js";
 
@@ -24,36 +24,42 @@ const doneKey = (id: TourId) => `mossa.tour.v1.${id}.done`;
 export const tourSeen = (id: TourId): boolean => { try { return localStorage.getItem(doneKey(id)) === "1"; } catch { return true; } };
 const markSeen = (id: TourId): void => { try { localStorage.setItem(doneKey(id), "1"); } catch { /* private mode */ } };
 
-interface TourStep { route?: string; routeMatch?: string; selector?: string; title: string; body: string; tone?: Tone }
+interface TourStep { route?: string; routeMatch?: string; selector?: string; action?: boolean; title: string; body: string; tone?: Tone }
 
+// `action: true` → the highlighted element is live: doing the thing (tapping
+// it) advances the tour. Beginner-friendly "now you try it" beats.
 const TOURS: Record<TourId, TourStep[]> = {
   app: [
-    { route: "/today", title: "Welcome to your training home", body: "Let's take a quick spin. We've filled the app with sample data so you can see everything in action — none of this is real yet.", tone: "primary" },
-    { route: "/today", selector: "today-hero", title: "Your day at a glance", body: "Live rings for today — calories, protein, water and workouts. Tap Customize to rearrange them however you like.", tone: "primary" },
+    { route: "/today", title: "Welcome to your training home", body: "Let's take a hands-on spin. We've filled the app with sample data so you can try everything — none of it is real yet.", tone: "primary" },
+    { route: "/today", selector: "today-hero", title: "Your day at a glance", body: "Live rings for today — calories, protein, water and workouts. Long-press to rearrange them however you like.", tone: "primary" },
     { route: "/today", selector: "today-log", title: "Log in a tap", body: "Meals, water, weight, workouts — everything you track starts from this button.", tone: "primary" },
-    { route: "/today", selector: "today-agenda", title: "Today's game plan", body: "Your checklist for the day: check-in, workout, meals and supplements. Tick them off as you go.", tone: "primary" },
-    { route: "/today", selector: "navbar", title: "Move around", body: "Your five tabs live here — Today, Train, Eat, Wellness and Progress. Tap to jump, or just swipe between them.", tone: "primary" },
+    { route: "/today", selector: "today-agenda", title: "Today's game plan", body: "Your checklist for the day — check-in, workout, meals and supplements. Tick them off as you go.", tone: "primary" },
+    { selector: "tab-train", action: true, title: "Now you try — tap Train", body: "These are your five tabs. Give the Train tab a tap to see your workouts.", tone: "activity" },
     { route: "/train", selector: "train-hero", title: "Your training plan", body: "Your coach's plan, day by day. Tap a day to start a guided session with rest timers and set logging.", tone: "activity" },
+    { selector: "tab-eat", action: true, title: "Tap the Eat tab", body: "Nice! Now hop over to Eat.", tone: "nutrition" },
     { route: "/eat", selector: "eat-hero", title: "Nutrition, made simple", body: "Today's intake against your targets, your meal plan to follow, and food logging in seconds.", tone: "nutrition" },
+    { selector: "tab-wellness", action: true, title: "Tap Wellness", body: "Keep going — open the Wellness tab.", tone: "sleep" },
     { route: "/wellness", selector: "wellness-hero", title: "Your wellness score", body: "One number for how you're really doing — blending sleep, nutrition, training, hydration and mood.", tone: "sleep" },
+    { selector: "tab-progress", action: true, title: "Last one — tap Progress", body: "And finally, the Progress tab.", tone: "cardio" },
     { route: "/progress", selector: "progress-hero", title: "Watch yourself improve", body: "Weight, strength, adherence and wellness, all trending over time so you can see the work pay off.", tone: "cardio" },
-    { route: "/today", title: "You're all set", body: "That was sample data — your real journey starts now. Finish your profile and your coach will tailor everything to you.", tone: "primary" },
+    { route: "/today", title: "You've got it", body: "That was sample data — your real journey starts now. Finish your profile and your coach will tailor everything to you.", tone: "primary" },
   ],
   workout: [
-    { route: "/train/session/0", routeMatch: "/train/session", selector: "wp-exercise", title: "Your workout, guided", body: "Each exercise in order with everything you need to train it — no guessing. Let's walk one through.", tone: "activity" },
-    { selector: "wp-details", title: "Know every move", body: "Tap the exercise to see a demo, the muscles it works, and step-by-step how-to — great when something's new.", tone: "activity" },
-    { selector: "wp-sets", title: "Your prescribed sets", body: "Each dot is a set with its target reps and weight. They fill in as you log — so you always know where you are.", tone: "activity" },
-    { selector: "wp-timer", title: "Rest timers built in", body: "The clock between sets (and between exercises) keeps your pacing honest. Tap it to start your rest countdown.", tone: "activity" },
-    { selector: "wp-log", title: "Log as you lift", body: "Hit Log after each set to record reps, weight and how it felt. Beat a lift and you'll get a PR celebration.", tone: "activity" },
-    { selector: "wp-progress", title: "Finish strong", body: "This ring tracks your whole session — when it's full, you're done. Head back with the arrow any time.", tone: "activity" },
+    { route: "/train/session/0", routeMatch: "/train/session", selector: "wp-exercise", title: "Your workout, guided", body: "Each exercise in order with everything you need to train it — no guessing. Here's the first.", tone: "activity" },
+    { selector: "wp-details", title: "Know every move", body: "Tap the exercise name anytime for a demo, the muscles it works, and step-by-step how-to.", tone: "activity" },
+    { selector: "wp-sets", title: "Your prescribed sets", body: "Each dot is a set with its target reps and weight. They fill in as you log.", tone: "activity" },
+    { selector: "wp-timer", action: true, title: "Now you try — start a rest", body: "Between exercises there's a rest clock. Tap it to start your countdown.", tone: "activity" },
+    { selector: "wp-progress", title: "Track your session", body: "This ring fills as you log — when it's full, you're done. Head back with the arrow any time.", tone: "activity" },
+    { selector: "wp-log", action: true, title: "Log a set", body: "Ready? Tap Log to record your reps, weight and how it felt — that's it, you're training!", tone: "activity" },
   ],
   meal: [
     { route: "/eat?tour=meal", routeMatch: "/eat", selector: "mp-hero", title: "Your meal plan", body: "Everything your coach designed for you, with your daily calorie and protein targets right up top.", tone: "nutrition" },
-    { selector: "mp-tabs", title: "Meals & shopping list", body: "Two views: your meals to follow, and a Shopping list that totals every ingredient for the week.", tone: "nutrition" },
     { selector: "mp-section", title: "Options for every meal", body: "Each meal comes with options — swipe through and tap one to see its foods, full macros and even an AI recipe.", tone: "nutrition" },
-    { selector: "mp-log", title: "Pick & log", body: "Found what you're eating? Tap Log to add the whole meal to today in one go.", tone: "nutrition" },
-    { selector: "mp-shop-days", title: "Plan your week", body: "Say how many days you'll eat each option — we total everything you need into one list.", tone: "nutrition" },
-    { selector: "mp-shop-list", title: "Your shopping list", body: "Every ingredient, summed for the week and saved on your device. Check things off as you buy them, then start over at the top of a new week.", tone: "nutrition" },
+    { selector: "mp-log", action: true, title: "Now you try — log a meal", body: "Eating this one? Tap Log to add it to today.", tone: "nutrition" },
+    { selector: "mp-tabs", title: "Meals & shopping list", body: "Two views: your meals, and a Shopping list that totals every ingredient you need for the week.", tone: "nutrition" },
+    { selector: "mp-shop-add", action: true, title: "Plan your week", body: "Switch to the shopping list. Tap + to add a day of this meal — we'll build your list.", tone: "nutrition" },
+    { selector: "mp-shop-item", action: true, title: "Check it off", body: "There's your list. Tap an item to mark it as bought — it's saved on your device.", tone: "nutrition" },
+    { selector: "mp-shop-reset", title: "Fresh start each week", body: "When a new week rolls around, hit Start over to clear it and plan again.", tone: "nutrition" },
   ],
 };
 
@@ -83,12 +89,22 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
 const PAD = 8;
 
+/** The visible element for a data-tour anchor (an anchor can exist twice — the
+ *  mobile bottom bar and the desktop rail — only one is on-screen). */
+const pickEl = (selector: string): HTMLElement | null => {
+  const els = [...document.querySelectorAll<HTMLElement>(`[data-tour="${selector}"]`)];
+  return els.find((e) => e.getBoundingClientRect().width > 0) ?? els[0] ?? null;
+};
+
 function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: number; setIdx: (i: number) => void; stop: () => void }) {
   const step = steps[idx]!;
   const nav = useNavigate();
   const loc = useLocation();
   const [rect, setRect] = useState<DOMRect | null>(null);
   const accent = toneVar[step.tone ?? "primary"];
+  const last = idx === steps.length - 1;
+  const next = () => (last ? stop() : setIdx(idx + 1));
+  const back = () => idx > 0 && setIdx(idx - 1);
 
   // Navigate to the step's route before highlighting. Compare on pathname only
   // so a query (e.g. ?tour=meal, used to open the Eat meal drawer) doesn't loop.
@@ -98,13 +114,28 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
     if (routePath && base && !loc.pathname.startsWith(base)) nav(step.route!);
   }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Action steps: advance when the user actually does the thing (taps the live
+  // target). The element's own handler runs first, then we step forward.
+  useEffect(() => {
+    if (!step.action || !step.selector) return;
+    let raf = 0, tries = 0, el: Element | null = null;
+    const onClick = () => window.setTimeout(next, 60);
+    const attach = () => {
+      el = pickEl(step.selector!);
+      if (el) el.addEventListener("click", onClick, { once: true });
+      else if (tries++ < 200) raf = requestAnimationFrame(attach);
+    };
+    raf = requestAnimationFrame(attach);
+    return () => { cancelAnimationFrame(raf); el?.removeEventListener("click", onClick); };
+  }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Find + track the target element (it may still be loading in after nav).
   useEffect(() => {
     if (!step.selector) { setRect(null); return; }
     setRect(null);
     let raf = 0, tries = 0, scrolled = false;
     const find = () => {
-      const el = document.querySelector(`[data-tour="${step.selector}"]`) as HTMLElement | null;
+      const el = pickEl(step.selector!);
       if (el) {
         if (!scrolled) { el.scrollIntoView({ block: "center", behavior: "smooth" }); scrolled = true; raf = requestAnimationFrame(() => setTimeout(() => setRect(el.getBoundingClientRect()), 260)); return; }
         setRect(el.getBoundingClientRect());
@@ -117,16 +148,12 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
   // Keep the highlight glued to the element through scroll / layout shifts.
   useEffect(() => {
     if (!step.selector) return;
-    const update = () => { const el = document.querySelector(`[data-tour="${step.selector}"]`); if (el) setRect(el.getBoundingClientRect()); };
+    const update = () => { const el = pickEl(step.selector!); if (el) setRect(el.getBoundingClientRect()); };
     window.addEventListener("scroll", update, true);
     window.addEventListener("resize", update);
     const iv = window.setInterval(update, 350);
     return () => { window.removeEventListener("scroll", update, true); window.removeEventListener("resize", update); clearInterval(iv); };
   }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const last = idx === steps.length - 1;
-  const next = () => (last ? stop() : setIdx(idx + 1));
-  const back = () => idx > 0 && setIdx(idx - 1);
 
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
   const below = rect ? rect.top + rect.height / 2 < vh * 0.5 : false;
@@ -138,8 +165,9 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
 
   return createPortal(
     <div className="fixed inset-0 z-[200]">
-      {/* Click-catcher — keeps the tour on rails. */}
-      <div className="absolute inset-0" />
+      {/* Info steps block interaction (Next to advance). Action steps leave the
+          spotlit target live so the user can actually tap it. */}
+      {!step.action && <div className="absolute inset-0" />}
 
       {rect ? (
         <>
@@ -148,8 +176,11 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
           <div className="absolute bg-black/65 backdrop-blur-[1px]" style={{ top: rect.top - PAD, height: rect.height + PAD * 2, left: 0, width: Math.max(0, rect.left - PAD) }} />
           <div className="absolute bg-black/65 backdrop-blur-[1px]" style={{ top: rect.top - PAD, height: rect.height + PAD * 2, left: rect.right + PAD, right: 0 }} />
           <motion.div
+            aria-hidden
             className="pointer-events-none absolute rounded-2xl"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            initial={{ opacity: 0 }}
+            animate={step.action ? { opacity: 1, boxShadow: [`0 0 0 2px ${accent}, 0 0 0 4px color-mix(in oklch, ${accent} 35%, transparent)`, `0 0 0 2px ${accent}, 0 0 0 12px color-mix(in oklch, ${accent} 0%, transparent)`] } : { opacity: 1 }}
+            transition={step.action ? { boxShadow: { duration: 1.4, repeat: Infinity, ease: "easeOut" }, opacity: { duration: 0.2 } } : { duration: 0.2 }}
             style={{ top: rect.top - PAD, left: rect.left - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2, boxShadow: `0 0 0 2px ${accent}, 0 0 0 6px color-mix(in oklch, ${accent} 30%, transparent)` }}
           />
         </>
@@ -166,7 +197,7 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
             className="pointer-events-auto mx-auto max-w-md rounded-3xl border border-border/50 bg-card p-5 shadow-[0_24px_60px_-20px_oklch(0_0_0/0.6)]"
           >
             <div className="flex items-start gap-3">
-              <div className="grid size-9 shrink-0 place-items-center rounded-xl [&_svg]:size-[1.1rem]" style={{ backgroundColor: `color-mix(in oklch, ${accent} 16%, transparent)`, color: accent }}><Sparkles /></div>
+              <div className="grid size-9 shrink-0 place-items-center rounded-xl [&_svg]:size-[1.1rem]" style={{ backgroundColor: `color-mix(in oklch, ${accent} 16%, transparent)`, color: accent }}>{step.action ? <Hand /> : <Sparkles />}</div>
               <div className="min-w-0 flex-1">
                 <div className="font-semibold leading-tight">{step.title}</div>
                 <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{step.body}</p>
@@ -177,7 +208,14 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
               <div className="flex gap-1.5">{steps.map((_, i) => <span key={i} className="h-1.5 rounded-full transition-all" style={{ width: i === idx ? 18 : 6, backgroundColor: i === idx ? accent : "var(--surface-3)" }} />)}</div>
               <div className="flex items-center gap-2">
                 {idx > 0 && <Button size="sm" variant="ghost" onClick={back}><ArrowLeft /> Back</Button>}
-                <Button size="sm" onClick={next} style={{ backgroundColor: accent }}>{last ? "Finish" : "Next"} {!last && <ArrowRight />}</Button>
+                {step.action ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: accent }}><Hand className="size-3.5" /> Try it</span>
+                    <Button size="sm" variant="ghost" onClick={next}>Skip</Button>
+                  </div>
+                ) : (
+                  <Button size="sm" onClick={next} style={{ backgroundColor: accent }}>{last ? "Finish" : "Next"} {!last && <ArrowRight />}</Button>
+                )}
               </div>
             </div>
           </motion.div>

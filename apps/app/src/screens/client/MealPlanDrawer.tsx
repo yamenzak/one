@@ -90,14 +90,14 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   // list is populated when its steps come up.
   useEffect(() => {
     if (tour !== "meal" || !stepSelector) return;
-    if (stepSelector === "mp-shop-days" || stepSelector === "mp-shop-list") {
+    if (stepSelector === "mp-shop-add" || stepSelector === "mp-shop-item" || stepSelector === "mp-shop-reset") {
       setView("shop");
-      setCounts((c) => {
-        if (Object.values(c).some((n) => n > 0)) return c;
-        const seeded: Record<number, number> = {};
-        (plan?.body.mealOptions ?? []).forEach((o, i) => { if (!o.isFree) seeded[i] = 2; });
-        return seeded;
-      });
+      // The check-off / reset steps need at least one item to point at, in case
+      // the "add a day" step was skipped.
+      if (stepSelector !== "mp-shop-add") {
+        const first = (plan?.body.mealOptions ?? []).findIndex((o) => !o.isFree);
+        setCounts((c) => (Object.values(c).some((n) => n > 0) || first < 0 ? c : { [first]: 1 }));
+      }
     } else if (stepSelector.startsWith("mp-")) {
       setView("plan");
     }
@@ -300,7 +300,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                       <div className="flex items-center gap-2">
                         <Button size="icon-sm" variant="secondary" disabled={(counts[index] ?? 0) === 0} onClick={() => bump(index, -1)} aria-label="Fewer days"><Minus /></Button>
                         <span className="numeral w-5 text-center font-semibold">{counts[index] ?? 0}</span>
-                        <Button size="icon-sm" variant="secondary" onClick={() => bump(index, 1)} aria-label="More days"><Plus /></Button>
+                        <Button size="icon-sm" variant="secondary" data-tour={index === firstShopIdx ? "mp-shop-add" : undefined} onClick={() => bump(index, 1)} aria-label="More days"><Plus /></Button>
                       </div>
                     </div>
                   )
@@ -319,7 +319,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                 <div className="flex items-center justify-between px-1 pt-1">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Shopping list</div>
                   <div className="flex items-center gap-2">
-                    {(weekTotals.days > 0 || checked.size > 0) && <button onClick={resetShop} className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-3.5"><RotateCcw /> Start over</button>}
+                    {(weekTotals.days > 0 || checked.size > 0) && <button data-tour="mp-shop-reset" onClick={resetShop} className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-3.5"><RotateCcw /> Start over</button>}
                     {grocery.length > 0 && <Badge tone="nutrition">{grocery.filter((g) => !checked.has(g.id)).length} to buy</Badge>}
                   </div>
                 </div>
@@ -327,10 +327,10 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                   <EmptyState icon={ShoppingCart} title="Nothing yet" description="Add days to some options above." />
                 ) : (
                   <Card data-tour="mp-shop-list" className="space-y-0.5 p-2">
-                    {grocery.map((g) => {
+                    {grocery.map((g, gi) => {
                       const done = checked.has(g.id);
                       return (
-                        <button key={g.id} onClick={() => setChecked((s) => { const n = new Set(s); n.has(g.id) ? n.delete(g.id) : n.add(g.id); return n; })} className="flex w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-surface-2">
+                        <button key={g.id} data-tour={gi === 0 ? "mp-shop-item" : undefined} onClick={() => setChecked((s) => { const n = new Set(s); n.has(g.id) ? n.delete(g.id) : n.add(g.id); return n; })} className="flex w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-surface-2">
                           <span className={cn("grid size-5 shrink-0 place-items-center rounded-full border transition-colors [&_svg]:size-3", done ? "border-nutrition bg-nutrition text-white" : "border-border")}>{done && <Check strokeWidth={3} />}</span>
                           <FoodThumb src={g.img} size={32} />
                           <span className={cn("min-w-0 flex-1 truncate text-sm transition-colors", done && "text-muted-foreground line-through")}>{g.name}</span>

@@ -57,6 +57,7 @@ export function BottomTabs({ tabs, active, onSelect, tinted }: { tabs: TabDef[];
           return (
             <button
               key={t.key}
+              data-tour={`tab-${t.key}`}
               onClick={() => onSelect(t.key)}
               aria-current={on ? "page" : undefined}
               className={cn(
@@ -96,6 +97,7 @@ export function NavRail({ tabs, active, onSelect, footer, brand, tinted }: { tab
           return (
             <button
               key={t.key}
+              data-tour={`tab-${t.key}`}
               onClick={() => onSelect(t.key)}
               aria-current={on ? "page" : undefined}
               className="group relative flex w-full flex-col items-center gap-1 rounded-2xl py-2.5 transition-colors"
