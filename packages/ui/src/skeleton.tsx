@@ -9,42 +9,27 @@
  * like the page developing rather than a hard cut.
  */
 
-import { motion, type Variants } from "motion/react";
 import type { ReactNode } from "react";
 import { cn } from "./lib/utils.js";
 import { Skeleton } from "./primitives.js";
 
-const EASE = [0.22, 1, 0.36, 1] as const;
-
-// The content wrapper animates via VARIANT LABELS ("hidden"/"show"), not target
-// objects. This matters: content commonly holds <Stagger> children that inherit
-// their animation state from this parent — an object `animate` propagates no
-// label, leaving those children stuck at their hidden variant (invisible). A
-// labelled parent propagates "show", and `staggerChildren` cascades them in as
-// the blur lifts.
-const revealContent: Variants = {
-  hidden: { opacity: 0, filter: "blur(8px)" },
-  show: { opacity: 1, filter: "blur(0px)", transition: { duration: 0.4, ease: EASE, staggerChildren: 0.05, delayChildren: 0.03 } },
-};
-
 // ── Reveal — the skeleton→content transition ────────────────────────────────
 /**
- * Swap a skeleton for its content with a premium reveal: the moment data lands,
- * the skeleton gives way to the content, which blurs + rises into focus and (if
- * it holds <Stagger> children) cascades them in.
+ * Swap a skeleton for its content. Deliberately a PLAIN wrapper with no motion
+ * of its own: a bare <div> is transparent to framer's MotionContext, so the
+ * content's <Stagger> children inherit their entrance ("show") straight from the
+ * ancestor <Page> — exactly as they did before this skeleton pass, and the same
+ * cascade that's proven across the app.
  *
- * Deliberately a plain conditional, NOT an AnimatePresence crossfade: content
- * visibility must never depend on an exit animation completing, so it can't get
- * stranded hidden. The content owns the whole transition — it enters over the
- * spot the skeleton just vacated, which reads as the page developing.
+ * Why not animate the wrapper itself: an intermediate motion layer with an
+ * opacity/blur "hidden" initial can strand content invisible if its enter
+ * animation doesn't run (mobile Chrome after an async data-load was the harsh
+ * case). Owning zero animation here means the content can never be left hidden —
+ * the premium reveal comes from the shimmer skeleton clearing and the Stagger
+ * children rising in.
  */
 export function Reveal({ loading, skeleton, children, className }: { loading: boolean; skeleton: ReactNode; children: ReactNode; className?: string }) {
-  if (loading) return <div className={className}>{skeleton}</div>;
-  return (
-    <motion.div variants={revealContent} initial="hidden" animate="show" className={className}>
-      {children}
-    </motion.div>
-  );
+  return <div className={className}>{loading ? skeleton : children}</div>;
 }
 
 // ── Primitive shapes ────────────────────────────────────────────────────────
