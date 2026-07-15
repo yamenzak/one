@@ -6,19 +6,15 @@
 import { Fragment, useEffect, useState } from "react";
 import { motion } from "motion/react";
 import {
-  Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, Page, Stagger, Field, Select, Avatar, stagger,
-  Target, Dumbbell, Utensils, MapPin, Activity,
+  Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
   KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2,
   type Branding, type BrandTokens, type NeutralTint, type LucideIcon,
 } from "@mossa/ui";
-import {
-  resolveUnits, cmToFeetInches, feetInchesToCm, kgToDisplay, displayToKg, weightLabel, lengthLabel,
-  PRIMARY_GOAL_LABELS, ACTIVITY_LEVEL_LABELS, DIETARY_APPROACH_LABELS, WORKOUT_LOCATION_LABELS,
-  type ClientPreferences, type WorkoutLocation,
-} from "@mossa/domain";
+import { resolveUnits, cmToFeetInches, feetInchesToCm } from "@mossa/domain";
 import { useUnits } from "../units.js";
 import { useSession } from "../session.js";
+import { PreferencesEditorCard } from "./PreferencesEditor.js";
 import { useTheme } from "../theme.js";
 import { api } from "../api.js";
 import { enrollPasskey, listPasskeys, passkeySupported } from "../passkey.js";
@@ -246,68 +242,13 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
   );
 }
 
-const WORKOUT_LOCATIONS = Object.keys(WORKOUT_LOCATION_LABELS) as WorkoutLocation[];
-const opts = (m: Record<string, string>) => [{ value: "", label: "Select…" }, ...Object.entries(m).map(([value, label]) => ({ value, label }))];
-
-/** A client's training & nutrition preferences — the profile a coach builds
- *  goals, workouts and meals from. Stored metric; shown in the client's units. */
+/** A client's training & nutrition preferences — delegates to the shared editor
+ *  (the coach edits the same fields from the client's Manage tab). */
 function PreferencesSection({ clientId, onSaved }: { clientId: string; onSaved: () => void }) {
-  const [prefs, setPrefs] = useState<ClientPreferences | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const units = useUnits();
-  useEffect(() => { void api.get<{ client: { preferences: ClientPreferences } }>(`/api/clients/${clientId}`).then((r) => setPrefs(r.client.preferences ?? {})).catch(() => undefined); }, [clientId]);
-  const set = (patch: Partial<ClientPreferences>) => setPrefs((p) => ({ ...(p ?? {}), ...patch }));
-  const num = (s: string): number | null => { const n = Number(s.replace(/[^\d.]/g, "")); return s && !isNaN(n) ? n : null; };
-  const save = async () => {
-    if (!prefs) return; setSaving(true); setMsg(null);
-    try { await api.patch(`/api/clients/${clientId}`, { preferences: prefs }); setMsg("Preferences saved."); onSaved(); }
-    finally { setSaving(false); }
-  };
-  const tw = prefs?.targetWeightKg != null ? kgToDisplay(prefs.targetWeightKg, units) : null;
   return (
     <section>
       <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Training &amp; nutrition</h3>
-      <Reveal loading={!prefs} skeleton={
-        <Card className="space-y-4">
-          {Array.from({ length: 5 }).map((_, i) => <div key={i} className="space-y-1.5"><SkeletonLine w="35%" h="xs" /><Skeleton className="h-10 w-full rounded-xl" /></div>)}
-          <Skeleton className="h-11 w-full rounded-full" />
-        </Card>
-      }>
-        {prefs && (
-        <Card className="space-y-4">
-          <p className="text-sm text-muted-foreground">Your coach uses these to build accurate targets, workouts and meals. Keep them current.</p>
-          <div>
-            <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-muted-foreground"><Target className="size-4" /> Primary goal</label>
-            <Select value={prefs.primaryGoal ?? ""} onChange={(v) => set({ primaryGoal: (v || null) as ClientPreferences["primaryGoal"] })} options={opts(PRIMARY_GOAL_LABELS)} />
-          </div>
-          <Field label={`Target weight (${weightLabel(units)})`} inputMode="decimal" value={tw != null ? String(tw) : ""} onChange={(e) => set({ targetWeightKg: e.target.value ? displayToKg(Number(e.target.value.replace(/[^\d.]/g, "")), units) : null })} placeholder="Where you're headed" />
-          <div>
-            <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-muted-foreground"><Activity className="size-4" /> Activity level</label>
-            <Select value={prefs.activityLevel ?? ""} onChange={(v) => set({ activityLevel: (v || null) as ClientPreferences["activityLevel"] })} options={opts(ACTIVITY_LEVEL_LABELS)} />
-            <p className="mt-1 px-1 text-xs text-muted-foreground">Day-to-day movement outside workouts — sets your calorie baseline.</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Workouts / week" icon={Dumbbell} inputMode="numeric" value={prefs.workoutsPerWeek != null ? String(prefs.workoutsPerWeek) : ""} onChange={(e) => set({ workoutsPerWeek: num(e.target.value) })} />
-            <Field label="Meals / day" icon={Utensils} inputMode="numeric" value={prefs.mealsPerDay != null ? String(prefs.mealsPerDay) : ""} onChange={(e) => set({ mealsPerDay: num(e.target.value) })} />
-          </div>
-          <div>
-            <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-muted-foreground"><MapPin className="size-4" /> Where you train</label>
-            <div className="flex flex-wrap gap-2">{WORKOUT_LOCATIONS.map((loc) => <Chip key={loc} selected={prefs.workoutLocation === loc} onClick={() => set({ workoutLocation: prefs.workoutLocation === loc ? null : loc })}>{WORKOUT_LOCATION_LABELS[loc]}</Chip>)}</div>
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Dietary approach</label>
-            <Select value={prefs.dietaryApproach ?? ""} onChange={(v) => set({ dietaryApproach: (v || null) as ClientPreferences["dietaryApproach"] })} options={opts(DIETARY_APPROACH_LABELS)} />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Injuries or limitations</label>
-            <Textarea value={prefs.limitations ?? ""} onChange={(e) => set({ limitations: e.target.value || null })} placeholder="Anything your coach should know — a bad knee, allergies, equipment you don't have…" rows={3} />
-          </div>
-          <Button size="lg" className="w-full" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save preferences"}</Button>
-          {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
-        </Card>
-        )}
-      </Reveal>
+      <PreferencesEditorCard clientId={clientId} onSaved={onSaved} />
     </section>
   );
 }

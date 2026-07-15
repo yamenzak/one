@@ -11,6 +11,7 @@ import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
+import { PreferencesEditorCard } from "../PreferencesEditor.js";
 import { checkInPhotos } from "../client/WellnessDetails.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { AiErrorBox } from "../../AiError.js";
@@ -82,6 +83,11 @@ export function ClientManage({ clientId }: { clientId: string }) {
           </div>
           {active ? <div className="mt-3 flex items-center justify-between"><span className="text-sm text-muted-foreground">Active subscription</span><Badge tone="success">{active.daysRemaining} days left</Badge></div> : <p className="mt-2 text-sm text-muted-foreground">No active subscription. Grant a package (or a $0 comp) to unlock features.</p>}
         </Card>
+      </Stagger>
+
+      <Stagger>
+        <div className="mb-2 flex items-center gap-2.5 px-1"><IconBadge icon={ClipboardList} tone="nutrition" size="sm" /><h2 className="font-semibold">Profile &amp; preferences</h2></div>
+        <PreferencesEditorCard clientId={clientId} includeProfile onSaved={load} />
       </Stagger>
 
       {pending.length > 0 && (
