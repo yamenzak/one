@@ -96,13 +96,20 @@ export function ClientDetail() {
   if (!clientId) return null;
   return (
     <div>
-      <div className="sticky top-16 z-20 space-y-3 border-b border-border/40 bg-background/80 px-4 pb-3 pt-3 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-xl items-center gap-3">
-          <Button size="icon" variant="secondary" onClick={() => nav("/clients")}><ArrowLeft /></Button>
-          <Avatar name={client?.displayName ?? ""} src={client?.avatarUrl} seed={client?.avatarSeed ?? clientId} className="size-10" />
-          <div className="min-w-0 flex-1">
-            <div className="truncate font-semibold">{client?.displayName ?? "…"}</div>
-            <div className="text-xs text-muted-foreground">Coach view</div>
+      {/* Bare, floating sub-header — mirrors the AppBar's ambient language:
+          no solid slab, so the page wash + content bleed behind it and only the
+          identity chip + tab pill float over what's scrolling past. */}
+      <div className="sticky top-16 z-20 space-y-2.5 px-4 pb-2 pt-2">
+        <div className="mx-auto flex max-w-xl items-center">
+          <div className="flex min-w-0 items-center gap-1.5 rounded-full border border-border/40 bg-background/60 py-1 pl-1 pr-3.5 backdrop-blur-md">
+            <button onClick={() => nav("/clients")} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" aria-label="All clients">
+              <ArrowLeft className="size-[1.1rem]" />
+            </button>
+            <Avatar name={client?.displayName ?? ""} src={client?.avatarUrl} seed={client?.avatarSeed ?? clientId} className="size-8 shrink-0" />
+            <div className="min-w-0 leading-tight">
+              <div className="truncate text-sm font-semibold">{client?.displayName ?? "…"}</div>
+              <div className="text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground">Coach view</div>
+            </div>
           </div>
         </div>
         <div className="mx-auto max-w-xl">
