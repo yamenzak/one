@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNod
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
-  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, type TabDef,
+  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, type TabDef,
 } from "@mossa/ui";
 import { useSession, useActiveClientId } from "./session.js";
 import { useTheme } from "./theme.js";
@@ -32,7 +32,7 @@ import { Shop } from "./screens/client/Shop.js";
 import { Explore } from "./screens/client/Explore.js";
 import { AdminConsole } from "./screens/admin/AdminConsole.js";
 import { NotificationBell } from "./NotificationBell.js";
-import { TourProvider, useTour, tourSeen } from "./tour.js";
+import { TourProvider, useTour } from "./tour.js";
 
 const CLIENT_TABS: TabDef[] = [
   { key: "today", label: "Today", icon: Home, tone: "primary" },
@@ -105,14 +105,14 @@ function TabLayout() {
   const loc = useLocation();
   const active = ctx!.active!;
   const isStaff = active.role !== "client";
-  const { active: tourActive, start: startTour } = useTour();
+  const { tour: activeTour, start: startTour, startIfNew } = useTour();
 
   // First-run interactive tour — once per device, for the client surface.
   useEffect(() => {
-    if (!clientSurface || tourSeen()) return;
-    const t = setTimeout(() => startTour(), 700);
+    if (!clientSurface) return;
+    const t = setTimeout(() => startIfNew("app"), 700);
     return () => clearTimeout(t);
-  }, [clientSurface, startTour]);
+  }, [clientSurface, startIfNew]);
 
   const tabs: TabDef[] = clientSurface
     ? CLIENT_TABS
@@ -228,6 +228,12 @@ function TabLayout() {
                     <DropdownMenuSeparator />
                   </>
                 )}
+                {clientSurface && (
+                  <>
+                    <DropdownMenuItem onSelect={() => startTour("app")}><Sparkles /> Replay app tour</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 {clientSurface && clientId && (
                   <DropdownMenuItem onSelect={() => nav("/shop")}><Store /> Plans &amp; access</DropdownMenuItem>
                 )}
@@ -242,9 +248,10 @@ function TabLayout() {
         }
       />
 
-      {/* Remount the routed content when the tour toggles, so screens refetch
-          through the (mock ↔ live) api interceptor. */}
-      <main key={tourActive ? "tour" : "live"}><Outlet /></main>
+      {/* Remount the routed content when the APP tour toggles, so screens refetch
+          through the (mock ↔ live) api interceptor. The workout/meal tours annotate
+          the real screen in place, so they must NOT remount it. */}
+      <main key={activeTour === "app" ? "tour" : "live"}><Outlet /></main>
       </div>
 
       <BottomTabs tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} tinted={tintedNav} />

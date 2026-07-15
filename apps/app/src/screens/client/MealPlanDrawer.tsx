@@ -14,6 +14,7 @@ import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, Mac
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
+import { useTour } from "../../tour.js";
 import { Markdown } from "../../Markdown.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
 import { AiAvatar } from "../../AiAvatar.js";
@@ -53,8 +54,16 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   const [recipeBusy, setRecipeBusy] = useState<number | null>(null);
   const units = useUnits();
   const { ctx } = useSession();
+  const { startIfNew, active: tourActive } = useTour();
   const aiSuite = !!ctx?.entitlements?.features?.aiSuite;
   const date = todayLocal();
+
+  // First time a client opens their meal plan, walk them through it.
+  useEffect(() => {
+    if (!plan || tourActive) return;
+    const t = setTimeout(() => startIfNew("meal"), 550);
+    return () => clearTimeout(t);
+  }, [plan, tourActive, startIfNew]);
 
   const load = useCallback(async () => {
     const [pl, f, today, log] = await Promise.all([
@@ -191,7 +200,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
         ) : (
           <>
             {/* Hero — the plan at a glance + daily target context */}
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} data-tour="mp-hero">
               <Card className="relative overflow-hidden">
                 <div className="pointer-events-none absolute -right-10 -top-10 size-36 rounded-full bg-nutrition/10 blur-2xl" />
                 <div className="relative">
@@ -210,16 +219,16 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
               </Card>
             </motion.div>
 
-            <SegmentedControl options={[{ value: "plan", label: "My meals" }, { value: "shop", label: "Shopping list" }]} value={view} onChange={setView} />
+            <div data-tour="mp-tabs"><SegmentedControl options={[{ value: "plan", label: "My meals" }, { value: "shop", label: "Shopping list" }]} value={view} onChange={setView} /></div>
 
             {view === "plan" ? (
               groups.length === 0 ? <EmptyState icon={Utensils} title="No options yet" /> : (
                 <div className="space-y-6">
                   <p className="-mt-1 px-1 text-sm text-muted-foreground">{isPast ? "A plan you were on before — browse the meals and recipes." : <>Pick one option per meal each day, then tap <span className="font-medium text-foreground">Log</span> when you eat it.</>}</p>
-                  {groups.map(([type, opts]) => {
+                  {groups.map(([type, opts], gi) => {
                     const meta = metaFor(type);
                     return (
-                      <section key={type} className="space-y-2.5">
+                      <section key={type} data-tour={gi === 0 ? "mp-section" : undefined} className="space-y-2.5">
                         <div className="flex items-center gap-2 px-1">
                           <span className="grid size-7 place-items-center rounded-xl bg-nutrition-soft text-nutrition [&_svg]:size-4"><meta.icon /></span>
                           <span className="font-semibold">{meta.label}</span>

@@ -51,7 +51,7 @@ export function BottomTabs({ tabs, active, onSelect, tinted }: { tabs: TabDef[];
   const color = activeColor(tabs, active, tinted);
   return (
     <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.7rem)] md:hidden">
-      <div className="pointer-events-auto flex max-w-full items-center gap-0.5 rounded-full border border-border/60 bg-card/75 p-1.5 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] backdrop-blur-2xl">
+      <div data-tour="navbar" className="pointer-events-auto flex max-w-full items-center gap-0.5 rounded-full border border-border/60 bg-card/75 p-1.5 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] backdrop-blur-2xl">
         {tabs.map((t) => {
           const on = active === t.key;
           return (

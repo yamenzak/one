@@ -39,7 +39,7 @@ export function Eat({ clientId }: { clientId: string }) {
   const [waterMl, setWaterMl] = useState(0);
   const [logMeal, setLogMeal] = useState<string | undefined>(undefined);
   const [logOpen, setLogOpen] = useState(false);
-  const [planOpen, setPlanOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tour") === "meal");
   const [mealPlan, setMealPlan] = useState<{ name: string; meals: number; options: number } | null>(null);
   const [edit, setEdit] = useState<Entry | null>(null);
   const units = useUnits();

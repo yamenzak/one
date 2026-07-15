@@ -7,7 +7,7 @@ import { Fragment, useEffect, useState } from "react";
 import { motion } from "motion/react";
 import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger,
-  BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
+  BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, toneVar, Dumbbell, Utensils,
   KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, ArrowRight, Globe, Copy, Plus, Building2,
   type Branding, type BrandTokens, type NeutralTint, type LucideIcon,
 } from "@mossa/ui";
@@ -76,12 +76,20 @@ export function Settings({ onBack }: { onBack: () => void }) {
             {ctx?.active?.clientId && <ClientProfileSection clientId={ctx.active.clientId} email={ctx.user.email} onSaved={() => void refresh()} />}
             {ctx?.active?.clientId && <PreferencesSection clientId={ctx.active.clientId} onSaved={() => void refresh()} />}
             <section>
-              <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Help</h3>
-              <Card interactive onClick={() => startTour()} className="flex items-center gap-3">
-                <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary [&_svg]:size-5"><Sparkles /></div>
-                <div className="min-w-0 flex-1"><div className="font-medium">Take the app tour</div><div className="text-sm text-muted-foreground">A quick guided walkthrough with sample data.</div></div>
-                <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
-              </Card>
+              <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Guided tours</h3>
+              <div className="space-y-2">
+                {([
+                  { id: "app" as const, icon: Sparkles, tone: "primary" as const, title: "App tour", sub: "A quick walkthrough of everything, with sample data." },
+                  { id: "workout" as const, icon: Dumbbell, tone: "activity" as const, title: "Workout plan tour", sub: "Days, exercise details, set logging and rest timers." },
+                  { id: "meal" as const, icon: Utensils, tone: "nutrition" as const, title: "Meal plan tour", sub: "Meal options, macros, recipes and your shopping list." },
+                ]).map((t) => (
+                  <Card key={t.id} interactive onClick={() => startTour(t.id)} className="flex items-center gap-3">
+                    <div className="grid size-10 shrink-0 place-items-center rounded-xl [&_svg]:size-5" style={{ backgroundColor: `color-mix(in oklch, ${toneVar[t.tone]} 14%, transparent)`, color: toneVar[t.tone] }}><t.icon /></div>
+                    <div className="min-w-0 flex-1"><div className="font-medium">{t.title}</div><div className="text-sm text-muted-foreground">{t.sub}</div></div>
+                    <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+                  </Card>
+                ))}
+              </div>
             </section>
             <SecuritySection />
             <SignOutSection />
