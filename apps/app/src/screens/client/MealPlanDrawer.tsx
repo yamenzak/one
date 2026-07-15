@@ -6,11 +6,11 @@
  * with a hero, clear "pick one per meal" framing, and premium motion.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy, kcalToDisplay } from "@mossa/domain";
-import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, Utensils, ShoppingCart, Plus, Minus, Sparkles, Check, ArrowLeft, History, Croissant, Soup, Apple, Dumbbell } from "@mossa/ui";
+import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, Utensils, ShoppingCart, Plus, Minus, Sparkles, Check, ArrowLeft, History, Croissant, Soup, Apple, Dumbbell, RotateCcw } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
@@ -54,9 +54,11 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   const [recipeBusy, setRecipeBusy] = useState<number | null>(null);
   const units = useUnits();
   const { ctx } = useSession();
-  const { startIfNew, active: tourActive } = useTour();
+  const { startIfNew, active: tourActive, tour, stepSelector } = useTour();
   const aiSuite = !!ctx?.entitlements?.features?.aiSuite;
   const date = todayLocal();
+  const shopKey = plan ? `mossa.shop.${plan.id}` : null;
+  const shopReady = useRef<string | null>(null);
 
   // First time a client opens their meal plan, walk them through it.
   useEffect(() => {
@@ -64,6 +66,42 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
     const t = setTimeout(() => startIfNew("meal"), 550);
     return () => clearTimeout(t);
   }, [plan, tourActive, startIfNew]);
+
+  // Shopping list persists on-device per plan — what you've got vs still need,
+  // and how many days of each option you're buying. Hydrate when the plan loads.
+  useEffect(() => {
+    if (!shopKey) return;
+    try {
+      const raw = localStorage.getItem(shopKey);
+      const s = raw ? (JSON.parse(raw) as { counts?: Record<number, number>; checked?: string[] }) : {};
+      setCounts(s.counts ?? {});
+      setChecked(new Set(s.checked ?? []));
+    } catch { setCounts({}); setChecked(new Set()); }
+    shopReady.current = shopKey;
+  }, [shopKey]);
+  // Persist on change (never while the tour is driving sample state).
+  useEffect(() => {
+    if (!shopKey || shopReady.current !== shopKey || tourActive) return;
+    try { localStorage.setItem(shopKey, JSON.stringify({ counts, checked: [...checked] })); } catch { /* private mode */ }
+  }, [counts, checked]); // eslint-disable-line react-hooks/exhaustive-deps
+  const resetShop = () => { setCounts({}); setChecked(new Set()); if (shopKey) try { localStorage.removeItem(shopKey); } catch { /* ignore */ } };
+
+  // During the meal tour, drive the view (and seed a few days) so the shopping
+  // list is populated when its steps come up.
+  useEffect(() => {
+    if (tour !== "meal" || !stepSelector) return;
+    if (stepSelector === "mp-shop-days" || stepSelector === "mp-shop-list") {
+      setView("shop");
+      setCounts((c) => {
+        if (Object.values(c).some((n) => n > 0)) return c;
+        const seeded: Record<number, number> = {};
+        (plan?.body.mealOptions ?? []).forEach((o, i) => { if (!o.isFree) seeded[i] = 2; });
+        return seeded;
+      });
+    } else if (stepSelector.startsWith("mp-")) {
+      setView("plan");
+    }
+  }, [tour, stepSelector, plan]);
 
   const load = useCallback(async () => {
     const [pl, f, today, log] = await Promise.all([
@@ -88,6 +126,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   // targets the current plan, so past plans render read-only.
   const active = (viewId ? allPlans.find((p) => p.id === viewId) : plan) ?? plan ?? null;
   const isPast = !!active && !!plan && active.id !== plan.id;
+  const firstShopIdx = (active?.body.mealOptions ?? []).findIndex((o) => !o.isFree);
   const pastPlans = allPlans.filter((p) => p.status === "superseded");
   const pickPlan = (id: string | null) => { setViewId(id); setHistOpen(false); setView("plan"); setCounts({}); setChecked(new Set()); };
 
@@ -235,9 +274,9 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                           <span className="text-xs text-muted-foreground">{opts.length} option{opts.length === 1 ? "" : "s"}</span>
                         </div>
                         <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 py-2">
-                          {opts.map(({ opt, index }) => (
+                          {opts.map(({ opt, index }, oi) => (
                             <OptionPhotoCard
-                              key={index} opt={opt} index={index} units={units} image={optionImage(opt)} totals={optionMacroTotals(opt, foodMap)} readOnly={isPast}
+                              key={index} opt={opt} index={index} units={units} image={optionImage(opt)} totals={optionMacroTotals(opt, foodMap)} readOnly={isPast} anchor={gi === 0 && oi === 0}
                               logged={!isPast && loggedIdx.has(index)} logging={logging === index} onLog={() => void logOption(opt, index)} onOpen={() => setDetail({ opt, index })}
                             />
                           ))}
@@ -252,7 +291,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                 <p className="-mt-1 px-1 text-sm text-muted-foreground">How many days will you eat each option this week? We'll total up your shopping list.</p>
                 {(active?.body.mealOptions ?? []).map((opt, index) => (
                   opt.isFree ? null : (
-                    <div key={index} className="flex items-center gap-3 rounded-2xl bg-card px-3 py-2.5">
+                    <div key={index} data-tour={index === firstShopIdx ? "mp-shop-days" : undefined} className="flex items-center gap-3 rounded-2xl bg-card px-3 py-2.5">
                       <FoodThumb src={opt.foods.map((mf) => foods.get(mf.foodId)?.image_url).find(Boolean)} size={38} />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium">{opt.mealName || `Option ${index + 1}`}</div>
@@ -279,12 +318,15 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
 
                 <div className="flex items-center justify-between px-1 pt-1">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Shopping list</div>
-                  {grocery.length > 0 && <Badge tone="nutrition">{grocery.filter((g) => !checked.has(g.id)).length} to buy</Badge>}
+                  <div className="flex items-center gap-2">
+                    {(weekTotals.days > 0 || checked.size > 0) && <button onClick={resetShop} className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-3.5"><RotateCcw /> Start over</button>}
+                    {grocery.length > 0 && <Badge tone="nutrition">{grocery.filter((g) => !checked.has(g.id)).length} to buy</Badge>}
+                  </div>
                 </div>
                 {grocery.length === 0 ? (
                   <EmptyState icon={ShoppingCart} title="Nothing yet" description="Add days to some options above." />
                 ) : (
-                  <Card className="space-y-0.5 p-2">
+                  <Card data-tour="mp-shop-list" className="space-y-0.5 p-2">
                     {grocery.map((g) => {
                       const done = checked.has(g.id);
                       return (
@@ -359,12 +401,12 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
 
 /** A meal option as a photo-hero carousel card — cover, name, calories, macro
  *  split, Log button. Tapping the cover opens the full detail sheet. */
-function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, onLog, onOpen, readOnly }: {
+function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, onLog, onOpen, readOnly, anchor }: {
   opt: MealOption; index: number; units: ReturnType<typeof useUnits>; image: string | null;
-  totals: { calories: number; proteinG: number; carbsG: number; fatG: number }; logged: boolean; logging: boolean; onLog: () => void; onOpen: () => void; readOnly?: boolean;
+  totals: { calories: number; proteinG: number; carbsG: number; fatG: number }; logged: boolean; logging: boolean; onLog: () => void; onOpen: () => void; readOnly?: boolean; anchor?: boolean;
 }) {
   return (
-    <div className="w-[74%] shrink-0 snap-start sm:w-[52%]">
+    <div data-tour={anchor ? "mp-option" : undefined} className="w-[74%] shrink-0 snap-start sm:w-[52%]">
       <div className={cn("overflow-hidden rounded-2xl bg-card", logged && "ring-1 ring-nutrition/50")}>
         <button onClick={onOpen} className="relative block h-36 w-full text-left transition-opacity active:opacity-90">
           {image ? <img src={image} alt="" className="absolute inset-0 size-full object-cover" /> : <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-nutrition/20 to-surface-2 text-nutrition/50 [&_svg]:size-9"><Utensils /></div>}
@@ -386,7 +428,7 @@ function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, on
         {readOnly ? (
           <button onClick={onOpen} className="w-full px-2.5 py-2 text-center text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">View details</button>
         ) : (
-          <div className="p-2.5">
+          <div data-tour={anchor ? "mp-log" : undefined} className="p-2.5">
             <Button size="sm" className="w-full" variant={logged ? "secondary" : opt.isFree ? "tonal" : "default"} disabled={logging} onClick={onLog}>{logging ? "…" : logged ? "Log again" : "Log this"}</Button>
           </div>
         )}

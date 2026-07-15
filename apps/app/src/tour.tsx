@@ -49,13 +49,16 @@ const TOURS: Record<TourId, TourStep[]> = {
   ],
   meal: [
     { route: "/eat?tour=meal", routeMatch: "/eat", selector: "mp-hero", title: "Your meal plan", body: "Everything your coach designed for you, with your daily calorie and protein targets right up top.", tone: "nutrition" },
-    { selector: "mp-tabs", title: "Meals & shopping list", body: "Two views: your meals to follow, and a Shopping list that auto-totals every ingredient for the week so you can tick them off at the store.", tone: "nutrition" },
-    { selector: "mp-section", title: "Pick, see, log", body: "Each meal comes with options — swipe through, tap one for its foods, macros and even an AI recipe, then hit Log to add it to your day.", tone: "nutrition" },
+    { selector: "mp-tabs", title: "Meals & shopping list", body: "Two views: your meals to follow, and a Shopping list that totals every ingredient for the week.", tone: "nutrition" },
+    { selector: "mp-section", title: "Options for every meal", body: "Each meal comes with options — swipe through and tap one to see its foods, full macros and even an AI recipe.", tone: "nutrition" },
+    { selector: "mp-log", title: "Pick & log", body: "Found what you're eating? Tap Log to add the whole meal to today in one go.", tone: "nutrition" },
+    { selector: "mp-shop-days", title: "Plan your week", body: "Say how many days you'll eat each option — we total everything you need into one list.", tone: "nutrition" },
+    { selector: "mp-shop-list", title: "Your shopping list", body: "Every ingredient, summed for the week and saved on your device. Check things off as you buy them, then start over at the top of a new week.", tone: "nutrition" },
   ],
 };
 
-interface TourValue { tour: TourId | null; active: boolean; start: (id: TourId) => void; startIfNew: (id: TourId) => void; stop: () => void }
-const TourCtx = createContext<TourValue>({ tour: null, active: false, start: () => {}, startIfNew: () => {}, stop: () => {} });
+interface TourValue { tour: TourId | null; active: boolean; stepSelector: string | null; start: (id: TourId) => void; startIfNew: (id: TourId) => void; stop: () => void }
+const TourCtx = createContext<TourValue>({ tour: null, active: false, stepSelector: null, start: () => {}, startIfNew: () => {}, stop: () => {} });
 export const useTour = (): TourValue => useContext(TourCtx);
 
 export function TourProvider({ children }: { children: ReactNode }) {
@@ -68,7 +71,8 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const startIfNew = useCallback((id: TourId) => { if (!tourSeen(id)) start(id); }, [start]);
   const stop = useCallback(() => { setApiInterceptor(null); setState((s) => { if (s) markSeen(s.tour); return null; }); }, []);
   const setIdx = useCallback((idx: number) => setState((s) => (s ? { ...s, idx } : s)), []);
-  const value = useMemo(() => ({ tour: state?.tour ?? null, active, start, startIfNew, stop }), [state, active, start, startIfNew, stop]);
+  const stepSelector = state ? TOURS[state.tour][state.idx]?.selector ?? null : null;
+  const value = useMemo(() => ({ tour: state?.tour ?? null, active, stepSelector, start, startIfNew, stop }), [state, active, stepSelector, start, startIfNew, stop]);
   return (
     <TourCtx.Provider value={value}>
       {children}
