@@ -9,7 +9,8 @@ import type { WorkoutBody, MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy } from "@mossa/domain";
 import {
-  Sheet, Card, Badge, Skeleton, EmptyState, MacroInline, cn,
+  Sheet, Card, Badge, EmptyState, MacroInline, cn,
+  Reveal, SkeletonList,
   Dumbbell, Utensils, Moon, ChevronDown, History, type LucideIcon,
 } from "@mossa/ui";
 import { api } from "../../api.js";
@@ -52,11 +53,16 @@ export function PlanHistorySheet({ clientId, kind, onClose }: { clientId: string
 
   return (
     <Sheet open onClose={onClose} title={kind === "workout" ? "Previous workout plans" : "Previous meal plans"}>
-      {!plans ? (
-        <Skeleton className="h-40" />
-      ) : plans.length === 0 ? (
-        <EmptyState icon={History} title="No previous plans" description="When your coach publishes a new plan, the old one lands here for reference." />
-      ) : (
+      <Reveal loading={!plans} skeleton={
+        <div className="space-y-2.5">
+          <SkeletonList card rows={1} thumb={36} />
+          <SkeletonList card rows={1} thumb={36} />
+          <SkeletonList card rows={1} thumb={36} />
+        </div>
+      }>
+        {plans && (plans.length === 0 ? (
+          <EmptyState icon={History} title="No previous plans" description="When your coach publishes a new plan, the old one lands here for reference." />
+        ) : (
         <div className="space-y-2.5">
           {plans.map((p) => {
             const open = openId === p.id;
@@ -76,7 +82,8 @@ export function PlanHistorySheet({ clientId, kind, onClose }: { clientId: string
             );
           })}
         </div>
-      )}
+        ))}
+      </Reveal>
     </Sheet>
   );
 }

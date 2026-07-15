@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fmtWeight } from "@mossa/domain";
-import { Card, Skeleton, InsightCard, Badge, Button, Page, Stagger, EmptyState, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, type Tone, type LucideIcon } from "@mossa/ui";
+import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, type Tone, type LucideIcon } from "@mossa/ui";
 import type { WidgetItem } from "@mossa/protocol";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -72,32 +72,41 @@ export function CoachToday() {
     })();
   }, []);
 
-  if (!clients || !notifications) return <div className="space-y-4 p-4"><Skeleton className="h-52" /><Skeleton className="h-36" /></div>;
-
-  const activated = clients.filter((c) => c.hasLogin).length;
-  const unread = notifications.filter((n) => !n.read);
-  const nameOf = (id: string) => clients.find((c) => c.id === id)?.displayName ?? "A client";
-  const today = todayLocal();
-  const widgetData: CoachWidgetData = {
-    clientsTotal: clients.length,
-    clientsActive: activated,
-    swaps: swaps.length,
-    atRisk: atRisk.length,
-    unreadCheckins: unread.filter((n) => n.type === "check_in").length,
-    unread: unread.length,
-    activeToday: new Set(activity.filter((e) => e.date === today).map((e) => e.clientId)).size,
-    logsToday: activity.filter((e) => e.date === today).length,
-    labsToReview: unread.filter((n) => n.type === "lab_uploaded").length,
-  };
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       <div className="flex items-center justify-between px-1">
         <h1 className="text-2xl font-bold tracking-tight">Today</h1>
         <Button size="sm" variant="secondary" onClick={() => setWidgetsOpen(true)}><Sliders /> Customize</Button>
       </div>
-      <Stagger>
-        <WidgetCarousel catalog={COACH_WIDGETS} items={widgetItems} defaults={DEFAULT_COACH_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
-      </Stagger>
+      <Reveal loading={!clients || !notifications} className="space-y-5" skeleton={
+        <>
+          <SkeletonHero height={150} />
+          <SkeletonChart height={160} />
+          <SkeletonStatGrid count={2} />
+          <SkeletonList card rows={4} />
+        </>
+      }>
+      {clients && notifications && (() => {
+        const activated = clients.filter((c) => c.hasLogin).length;
+        const unread = notifications.filter((n) => !n.read);
+        const nameOf = (id: string) => clients.find((c) => c.id === id)?.displayName ?? "A client";
+        const today = todayLocal();
+        const widgetData: CoachWidgetData = {
+          clientsTotal: clients.length,
+          clientsActive: activated,
+          swaps: swaps.length,
+          atRisk: atRisk.length,
+          unreadCheckins: unread.filter((n) => n.type === "check_in").length,
+          unread: unread.length,
+          activeToday: new Set(activity.filter((e) => e.date === today).map((e) => e.clientId)).size,
+          logsToday: activity.filter((e) => e.date === today).length,
+          labsToReview: unread.filter((n) => n.type === "lab_uploaded").length,
+        };
+        return (
+          <>
+            <Stagger>
+              <WidgetCarousel catalog={COACH_WIDGETS} items={widgetItems} defaults={DEFAULT_COACH_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
+            </Stagger>
 
       {analytics && analytics.roster.total > 0 && (
         <Stagger className="space-y-3">
@@ -182,6 +191,10 @@ export function CoachToday() {
           ))
         )}
       </Stagger>
+          </>
+        );
+      })()}
+      </Reveal>
 
       {widgetsOpen && <WidgetCustomizeSheet catalog={COACH_WIDGETS} items={widgetItems} defaults={DEFAULT_COACH_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
     </Page>

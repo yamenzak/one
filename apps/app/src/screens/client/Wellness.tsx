@@ -11,6 +11,7 @@ import { useSearchParams } from "react-router-dom";
 import { fmtVolume, volumeLabel, volumeDisplayToMl } from "@mossa/domain";
 import {
   Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, StatCard, WeekDots, Sparkline, MiniBars, EmptyState, cn, toneVar,
+  Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList,
   ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Bed, Flame, Plus, ChevronRight, Smile, Upload, type Tone,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
@@ -150,17 +151,8 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
     return { days, present, streak, sleepSeries, moodSeries, avgSleep, avgMood, fastHoursSeries, fastsDone, sessionsWeek, suppSlots, suppTaken };
   }, [checkIns, fast, supps, taken, sessions, date]);
 
-  if (loading || !today) return (
-    <div className="mx-auto max-w-xl space-y-4 p-4">
-      <Skeleton className="h-9 w-40" />
-      <Skeleton className="h-48" />
-      <Skeleton className="h-28" />
-      <Skeleton className="h-40" />
-    </div>
-  );
-
-  const waterTarget = today.goal?.targets?.targetWaterMl ?? 2500;
-  const waterPct = Math.min(1, today.waterMl / waterTarget);
+  const waterTarget = today?.goal?.targets?.targetWaterMl ?? 2500;
+  const waterPct = today ? Math.min(1, today.waterMl / waterTarget) : 0;
   const fastElapsedMin = fast?.activeFast ? Math.floor((now - Date.parse(fast.activeFast.started_at)) / 60000) : 0;
   const fastHours = fastElapsedMin / 60;
   const zone = ZONES.find((z) => fastHours < z.max) ?? ZONES[ZONES.length - 1]!;
@@ -174,6 +166,20 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         <h1 className={onBack ? "text-xl font-bold tracking-tight" : "text-2xl font-bold tracking-tight"}>Wellness</h1>
       </div>
 
+      <Reveal loading={loading || !today} className="space-y-5" skeleton={
+        <>
+          <SkeletonHero height={150} />
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-9 w-24 rounded-full" />)}
+          </div>
+          <Skeleton className="h-32 rounded-2xl" />
+          <Skeleton className="h-44 rounded-2xl" />
+          <SkeletonStatGrid count={6} />
+          <SkeletonList card rows={4} />
+        </>
+      }>
+        {today && (
+        <>
       {/* Wellness Score hero */}
       <Stagger>{score ? <WellnessScoreCard result={score} /> : <WellnessScoreCardSkeleton />}</Stagger>
 
@@ -331,6 +337,9 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
       )}
 
       <Stagger><CoachNote clientId={clientId} surface="wellness" /></Stagger>
+        </>
+        )}
+      </Reveal>
 
       {logKind && <LogSheet open initialKind={logKind} clientId={clientId} onClose={() => setLogKind(null)} onLogged={() => { setLogKind(null); void load(); }} />}
       {detailCheckIn && <CheckInDetailSheet checkIn={detailCheckIn} onClose={() => setDetailCheckIn(null)} />}

@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SubCard, Chip, Page, Stagger, IconBadge, EmptyState, PhotoGrid, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, PhotoGrid, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
@@ -58,12 +58,19 @@ export function ClientManage({ clientId }: { clientId: string }) {
   const discontinueSupp = async (id: string) => { await api.patch(`/api/supplements/${id}`, { status: "discontinued" }); await load(); };
   const setSuppStatus = async (id: string, status: "active" | "paused") => { await api.patch(`/api/supplements/${id}`, { status }); await load(); };
 
-  if (!subs) return <Skeleton className="m-4 h-64" />;
-  const active = subs.find((s) => s.status === "active");
+  const active = subs?.find((s) => s.status === "active");
   const pending = swaps.filter((s) => s.status === "pending");
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+      <Reveal loading={!subs} className="space-y-4" skeleton={
+        <>
+          <SkeletonList card rows={1} />
+          <SkeletonList card rows={3} thumb={40} />
+          <SkeletonList card rows={2} />
+        </>
+      }>
+      {subs && (<>
       <Stagger>
         <Card>
           <div className="flex items-center justify-between">
@@ -135,6 +142,8 @@ export function ClientManage({ clientId }: { clientId: string }) {
         </Card>
       </Stagger>
       )}
+      </>)}
+      </Reveal>
 
       <Sheet open={grantOpen} onClose={() => setGrantOpen(false)} title="Grant a package">
         <div className="space-y-2">
@@ -286,16 +295,20 @@ function SuggestSuppSheet({ clientId, onClose, onPrescribed }: { clientId: strin
     <Sheet open onClose={onClose} title="Suggested supplements">
       <div className="space-y-3">
         <div className="flex items-center gap-2.5 rounded-xl bg-primary/10 p-2.5"><AiAvatar className="size-8" /><p className="text-xs text-muted-foreground">Evidence-based ideas from this client's reviewed labs, goal and current stack. Review before prescribing.</p></div>
-        {error ? <AiErrorBox error={error} /> : !recos ? <Skeleton className="h-40" /> : recos.length === 0 ? <p className="text-sm text-muted-foreground">No suggestions right now.</p> : recos.map((r, i) => (
-          <SubCard key={i} className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0"><span className="font-medium">{r.name}</span>{r.dose && <span className="ml-2 text-xs text-muted-foreground">{r.dose}</span>}</div>
-              {added.has(r.name) ? <Badge tone="success">Added</Badge> : <Button size="sm" onClick={() => void prescribe(r)}>Prescribe</Button>}
-            </div>
-            <p className="text-xs text-muted-foreground">{r.rationale}</p>
-            {r.linkedMarker && <Badge tone="cardio">{r.linkedMarker}</Badge>}
-          </SubCard>
-        ))}
+        {error ? <AiErrorBox error={error} /> : (
+          <Reveal loading={!recos} className="space-y-3" skeleton={<SkeletonList rows={3} />}>
+            {recos && (recos.length === 0 ? <p className="text-sm text-muted-foreground">No suggestions right now.</p> : recos.map((r, i) => (
+              <SubCard key={i} className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0"><span className="font-medium">{r.name}</span>{r.dose && <span className="ml-2 text-xs text-muted-foreground">{r.dose}</span>}</div>
+                  {added.has(r.name) ? <Badge tone="success">Added</Badge> : <Button size="sm" onClick={() => void prescribe(r)}>Prescribe</Button>}
+                </div>
+                <p className="text-xs text-muted-foreground">{r.rationale}</p>
+                {r.linkedMarker && <Badge tone="cardio">{r.linkedMarker}</Badge>}
+              </SubCard>
+            )))}
+          </Reveal>
+        )}
         {note && <SubCard className="flex items-start gap-2 text-xs text-muted-foreground"><Sparkles className="mt-0.5 size-3.5 shrink-0 text-primary" /><span>{note}</span></SubCard>}
       </div>
     </Sheet>
@@ -405,7 +418,8 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
   return (
     <Sheet open onClose={onClose} title="Client report">
       <div className="mb-3 flex gap-2">{(["7d", "30d", "90d"] as const).map((r) => <Chip key={r} selected={range === r} onClick={() => setRange(r)}>{r}</Chip>)}</div>
-      {!report ? <Skeleton className="h-64" /> : (
+      <Reveal loading={!report} skeleton={<><SkeletonStatGrid count={9} cols={3} /><SkeletonList card rows={5} thumb={0} /></>}>
+        {report && (
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-2 text-center">
             <Metric label="Check-ins" value={report.compliance.checkInDays} />
@@ -425,7 +439,8 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
             </Card>
           )}
         </div>
-      )}
+        )}
+      </Reveal>
     </Sheet>
   );
 }

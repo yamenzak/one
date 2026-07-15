@@ -1,7 +1,7 @@
 /** Client Shop — marketplace packages, Stripe Connect buy, redeem codes. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Skeleton, Page, Stagger, IconBadge, ArrowLeft, Ticket, Store } from "@mossa/ui";
+import { Button, Card, Badge, Field, Page, Stagger, IconBadge, ArrowLeft, Ticket, Store, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Pkg { id: string; name: string; description: string | null; one_time_price_cents: number | null; budgets: { feature: string; days: number }[]; visibility: string }
@@ -32,14 +32,6 @@ export function Shop({ clientId, onBack }: { clientId: string; onBack: () => voi
     catch { setMsg("Checkout isn't available yet — ask your coach to finish Stripe setup."); }
   };
 
-  if (!packages) return (
-    <div className="mx-auto max-w-xl space-y-4 p-4">
-      <Skeleton className="h-9 w-40" />
-      <Skeleton className="h-24" />
-      <Skeleton className="h-32" />
-    </div>
-  );
-
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <div className="flex items-center gap-3">
@@ -47,6 +39,18 @@ export function Shop({ clientId, onBack }: { clientId: string; onBack: () => voi
         <h1 className="text-xl font-bold tracking-tight">Plans &amp; access</h1>
       </div>
 
+      <Reveal loading={!packages} className="space-y-4" skeleton={
+        <>
+          <SkeletonList card rows={1} />
+          <SkeletonList card rows={2} thumb={36} />
+          <div className="space-y-3">
+            <SkeletonLine w="6rem" h="xs" className="ml-1" />
+            <SkeletonList card rows={3} thumb={44} />
+          </div>
+        </>
+      }>
+        {packages && (
+        <>
       {sub && <Card className="flex items-center justify-between"><span className="text-sm text-muted-foreground">Current access</span><Badge tone="success">{sub.daysRemaining} days left</Badge></Card>}
 
       <Stagger>
@@ -80,6 +84,9 @@ export function Shop({ clientId, onBack }: { clientId: string; onBack: () => voi
           ))}
         </div>
       )}
+        </>
+        )}
+      </Reveal>
     </Page>
   );
 }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy } from "@mossa/domain";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, Page, Stagger, colorToHex, ArrowLeft, Plus, Sparkles, Utensils, History, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, ArrowLeft, Plus, Sparkles, Utensils, History, X } from "@mossa/ui";
 import { api, ApiError } from "../../api.js";
 import { AiErrorBox } from "../../AiError.js";
 import { useUnits } from "../../units.js";
@@ -52,15 +52,33 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
     setOptions((prev) => [...prev, ...(res.draft.mealOptions ?? [])]); setDirty(true); setAiOpen(false);
   };
 
-  if (!plan) return <Skeleton className="m-4 h-96" />;
-  const readOnly = plan.status === "superseded" || plan.status === "archived";
+  const readOnly = plan?.status === "superseded" || plan?.status === "archived";
   const byType = new Map<string, { opt: MealOption; idx: number }[]>();
   options.forEach((opt, idx) => byType.set(opt.mealType, [...(byType.get(opt.mealType) ?? []), { opt, idx }]));
-  const targets = plan.targetGoal?.targets ?? null;
+  const targets = plan?.targetGoal?.targets ?? null;
   const allTypes = [...BUILTIN_TYPES, ...customTypes.map((t) => t.label)];
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-32">
+      <Reveal loading={!plan} className="space-y-4" skeleton={
+        <>
+          <div className="flex items-center gap-3">
+            <Skeleton className="size-9 rounded-xl" />
+            <SkeletonLine w="40%" h="title" className="flex-1" />
+            <Skeleton className="h-6 w-16 rounded-full" />
+          </div>
+          <Skeleton className="h-12 rounded-2xl" />
+          <div className="flex gap-2"><Skeleton className="h-10 flex-1 rounded-xl" /><Skeleton className="h-10 w-32 rounded-xl" /></div>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="space-y-3 rounded-2xl bg-card p-4">
+              <SkeletonLine w="30%" h="title" />
+              <div className="rounded-xl bg-surface-2 p-3"><SkeletonRow thumb={34} /></div>
+            </div>
+          ))}
+        </>
+      }>
+        {plan && (
+        <>
       <div className="flex items-center gap-3">
         <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
         <h1 className="flex-1 truncate text-xl font-bold tracking-tight">{plan.name}</h1>
@@ -153,6 +171,9 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
           </div>
         </div>
       </div>
+        </>
+        )}
+      </Reveal>
 
       {foodPicker && <FoodSearchSheet onClose={() => setFoodPicker(null)} onPick={(id, name) => { mutate((d) => d[foodPicker.optIdx]!.foods.push({ foodId: id, quantity: 100, unit: "g" })); setNames((p) => new Map(p).set(id, name)); setFoodPicker(null); }} />}
       {aiOpen && <AiMealSheet onClose={() => setAiOpen(false)} onRun={runAi} />}

@@ -6,7 +6,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { motion } from "motion/react";
 import {
-  Button, Card, Badge, Chip, Switch, Textarea, Skeleton, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger,
+  Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
   KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2,
   type Branding, type BrandTokens, type NeutralTint, type LucideIcon,
@@ -183,10 +183,20 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
     try { await api.patch(`/api/clients/${clientId}`, { displayName: p.displayName, gender: p.gender ?? undefined, dateOfBirth: p.dateOfBirth ?? undefined, bloodType: p.bloodType ?? undefined, phone: p.phone ?? undefined }); setMsg("Profile saved."); onSaved(); }
     finally { setSaving(false); }
   };
-  if (!p) return <section><h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Profile</h3><Skeleton className="h-64" /></section>;
   return (
     <section>
       <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Profile</h3>
+      <Reveal loading={!p} skeleton={
+        <Card className="space-y-4">
+          <div className="flex items-center gap-3"><SkeletonCircle size={64} /><Skeleton className="h-9 w-32 rounded-full" /></div>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="space-y-1.5"><SkeletonLine w="30%" h="xs" /><Skeleton className="h-10 w-full rounded-xl" /></div>
+          ))}
+          <div className="flex flex-wrap gap-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-8 w-14 rounded-full" />)}</div>
+          <Skeleton className="h-11 w-full rounded-full" />
+        </Card>
+      }>
+        {p && (
       <Card className="space-y-4">
         <div className="flex items-center gap-3">
           <Avatar name={p.displayName} src={p.avatarUrl} seed={p.avatarSeed} className="size-16" />
@@ -213,6 +223,8 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
         <Button size="lg" className="w-full" disabled={saving || p.displayName.trim().length < 1} onClick={() => void save()}>{saving ? "Saving…" : "Save profile"}</Button>
         {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
       </Card>
+        )}
+      </Reveal>
     </section>
   );
 }
@@ -257,16 +269,25 @@ function MarketplaceSection() {
 
   const setMarket = async (patch: { enabled?: boolean; selfRegister?: boolean }) => { setMarketplace((m) => ({ ...m, ...patch })); await api.patch("/api/settings", { marketplace: patch }); };
 
-  if (!loaded) return <Skeleton className="h-40" />;
-
   return (
     <section>
       <SectionHead title="Marketplace" scope="tenant" />
-      <Card className="space-y-3">
-        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Store /></div><div><div className="font-medium">Public storefront</div><div className="text-sm text-muted-foreground">A shareable page with your packages and blog.</div></div></div>
-        <div className="flex items-center justify-between"><span className="text-sm">Enable storefront</span><Switch checked={!!marketplace.enabled} onCheckedChange={(v) => void setMarket({ enabled: v })} /></div>
-        <div className="flex items-center justify-between"><span className="text-sm">Allow self sign-up</span><Switch checked={!!marketplace.selfRegister} onCheckedChange={(v) => void setMarket({ selfRegister: v })} /></div>
-      </Card>
+      <Reveal loading={!loaded} skeleton={
+        <Card className="space-y-3">
+          <div className="flex items-center gap-2.5"><Skeleton className="size-9 rounded-xl" /><div className="flex-1 space-y-1.5"><SkeletonLine w="45%" h="text" /><SkeletonLine w="70%" h="xs" /></div></div>
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="flex items-center justify-between"><SkeletonLine w="40%" h="text" /><Skeleton className="h-6 w-11 rounded-full" /></div>
+          ))}
+        </Card>
+      }>
+        {loaded && (
+        <Card className="space-y-3">
+          <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Store /></div><div><div className="font-medium">Public storefront</div><div className="text-sm text-muted-foreground">A shareable page with your packages and blog.</div></div></div>
+          <div className="flex items-center justify-between"><span className="text-sm">Enable storefront</span><Switch checked={!!marketplace.enabled} onCheckedChange={(v) => void setMarket({ enabled: v })} /></div>
+          <div className="flex items-center justify-between"><span className="text-sm">Allow self sign-up</span><Switch checked={!!marketplace.selfRegister} onCheckedChange={(v) => void setMarket({ selfRegister: v })} /></div>
+        </Card>
+        )}
+      </Reveal>
     </section>
   );
 }
@@ -316,9 +337,8 @@ function DomainSection() {
   const refresh = async (h: string) => { await api.post(`/api/domains/${encodeURIComponent(h)}/refresh`); await load(); };
   const remove = async (h: string) => { await api.del(`/api/domains/${encodeURIComponent(h)}`); await load(); };
 
-  if (!domains) return <Skeleton className="h-32" />;
   // Platform hasn't turned on Cloudflare for SaaS — hide the section entirely.
-  if (!configured && domains.length === 0) return null;
+  if (domains && !configured && domains.length === 0) return null;
 
   const tone = (s: string) => (s === "active" ? "success" : s === "error" ? "danger" : "warning");
   const label = (s: string) => (s === "active" ? "Live" : s === "error" ? "Needs attention" : "Pending DNS");
@@ -326,6 +346,13 @@ function DomainSection() {
   return (
     <section>
       <SectionHead title="Custom domain" scope="tenant" />
+      <Reveal loading={!domains} skeleton={
+        <Card className="space-y-4">
+          <div className="flex items-center gap-2.5"><Skeleton className="size-9 rounded-xl" /><div className="flex-1 space-y-1.5"><SkeletonLine w="45%" h="text" /><SkeletonLine w="70%" h="xs" /></div></div>
+          <div className="flex gap-2"><Skeleton className="h-9 flex-1 rounded-lg" /><Skeleton className="h-9 w-16 rounded-full" /></div>
+        </Card>
+      }>
+        {domains && (
       <Card className="space-y-4">
         <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Globe /></div><div><div className="font-medium">Your own domain</div><div className="text-sm text-muted-foreground">Run the app on your domain — e.g. train.yourgym.com.</div></div></div>
 
@@ -363,6 +390,8 @@ function DomainSection() {
         {err && <p className="text-sm text-danger">{err}</p>}
         <p className="text-xs text-muted-foreground">You'll sign in with a passkey again on the new domain (each domain keeps its own secure sign-in).</p>
       </Card>
+        )}
+      </Reveal>
     </section>
   );
 }
@@ -403,12 +432,30 @@ function IntegrationsSection() {
     setOpen(null); setMsg(`${p.label} connected.`);
   };
 
-  if (!providers) return <Skeleton className="h-40" />;
   const groups: { key: "food" | "exercise"; label: string }[] = [{ key: "food", label: "Nutrition" }, { key: "exercise", label: "Exercises" }];
 
   return (
     <section>
       <SectionHead title="Integrations" scope="tenant" />
+      <Reveal loading={!providers} skeleton={
+        <Card className="space-y-4">
+          <div className="flex items-center gap-2.5"><Skeleton className="size-9 rounded-xl" /><div className="flex-1 space-y-1.5"><SkeletonLine w="40%" h="text" /><SkeletonLine w="70%" h="xs" /></div></div>
+          {Array.from({ length: 2 }).map((_, g) => (
+            <div key={g} className="space-y-2">
+              <SkeletonLine w="25%" h="xs" />
+              {Array.from({ length: 2 }).map((_, r) => (
+                <div key={r} className="rounded-xl bg-surface-2 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1 space-y-1.5"><SkeletonLine w="45%" h="text" /><SkeletonLine w="75%" h="xs" /></div>
+                    <Skeleton className="h-6 w-11 shrink-0 rounded-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </Card>
+      }>
+        {providers && (
       <Card className="space-y-4">
         <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Plug /></div><div><div className="font-medium">Data providers</div><div className="text-sm text-muted-foreground">Turn on sources so builders pull ready-made foods & exercises.</div></div></div>
         {groups.map((g) => (
@@ -448,6 +495,8 @@ function IntegrationsSection() {
         ))}
         {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
       </Card>
+        )}
+      </Reveal>
     </section>
   );
 }

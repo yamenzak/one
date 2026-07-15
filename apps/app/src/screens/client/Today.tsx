@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fmtVolume, fmtEnergy, fmtWeight, type UnitPrefs } from "@mossa/domain";
 import {
   Button, Card, Skeleton, MacroBar, IconBadge, Sheet, EmptyState,
+  Reveal, SkeletonHero, SkeletonList, SkeletonHeader,
   Page, Stagger, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
   Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, Sparkles, Utensils, Croissant, Soup, Apple,
   ChevronLeft, ChevronRight, type Tone, type LucideIcon,
@@ -89,68 +90,79 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   }, [clientId, date]);
   useEffect(() => void load(), [load]);
 
-  if (!data || !agenda) {
-    return (
-      <div className="mx-auto max-w-xl space-y-4 p-4">
-        <Skeleton className="h-52" />
-        <Skeleton className="h-14" />
-        <Skeleton className="h-36" />
-      </div>
-    );
-  }
-
-  const targets = data.goal?.targets ?? null;
-  const widgetData: ClientWidgetData = { clientId, units, bundle: data };
+  const targets = data?.goal?.targets ?? null;
+  const widgetData: ClientWidgetData | null = data ? { clientId, units, bundle: data } : null;
 
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
-      <Stagger>
-        <WidgetCarousel catalog={CLIENT_WIDGETS} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
-      </Stagger>
+      <Reveal loading={!data || !agenda} className="space-y-5" skeleton={
+        <>
+          <SkeletonHero height={208} />
+          <Skeleton className="h-16 rounded-2xl" />
+          <div className="flex items-center gap-2.5">
+            <Skeleton className="h-11 flex-1 rounded-xl" />
+            <Skeleton className="h-11 flex-1 rounded-xl" />
+            <Skeleton className="size-11 rounded-xl" />
+          </div>
+          <SkeletonList card rows={3} />
+          <div className="space-y-2">
+            <SkeletonHeader />
+            <SkeletonList card rows={3} />
+          </div>
+        </>
+      }>
+        {data && agenda && widgetData && (
+        <>
+          <Stagger>
+            <WidgetCarousel catalog={CLIENT_WIDGETS} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
+          </Stagger>
 
-      <Stagger>
-        <MacroBar
-          proteinG={data.nutrition.proteinG}
-          carbsG={data.nutrition.carbsG}
-          fatG={data.nutrition.fatG}
-          targets={targets ? { proteinG: targets.targetProteinG, carbsG: targets.targetCarbsG, fatG: targets.targetFatG } : null}
-        />
-      </Stagger>
+          <Stagger>
+            <MacroBar
+              proteinG={data.nutrition.proteinG}
+              carbsG={data.nutrition.carbsG}
+              fatG={data.nutrition.fatG}
+              targets={targets ? { proteinG: targets.targetProteinG, carbsG: targets.targetCarbsG, fatG: targets.targetFatG } : null}
+            />
+          </Stagger>
 
-      <Stagger className="flex items-center gap-2.5">
-        <Button size="lg" className="flex-1" onClick={() => setLogOpen(true)}>
-          <Plus /> Log
-        </Button>
-        <Button size="lg" variant="tonal" className="flex-1" onClick={onStart} disabled={!data.publishedWorkoutPlan}>
-          <Play /> Start
-        </Button>
-        <Button size="icon" variant="secondary" aria-label="Customize widgets" onClick={() => setWidgetsOpen(true)}>
-          <PencilLine />
-        </Button>
-      </Stagger>
+          <Stagger className="flex items-center gap-2.5">
+            <Button size="lg" className="flex-1" onClick={() => setLogOpen(true)}>
+              <Plus /> Log
+            </Button>
+            <Button size="lg" variant="tonal" className="flex-1" onClick={onStart} disabled={!data.publishedWorkoutPlan}>
+              <Play /> Start
+            </Button>
+            <Button size="icon" variant="secondary" aria-label="Customize widgets" onClick={() => setWidgetsOpen(true)}>
+              <PencilLine />
+            </Button>
+          </Stagger>
 
-      <Stagger>
-        <TodayAgenda clientId={clientId} date={date} bundle={data} agenda={agenda} onChanged={() => void load()} onNavigate={onOpen} onCheckIn={() => setCheckInOpen(true)} onStartWorkout={onStart} />
-      </Stagger>
+          <Stagger>
+            <TodayAgenda clientId={clientId} date={date} bundle={data} agenda={agenda} onChanged={() => void load()} onNavigate={onOpen} onCheckIn={() => setCheckInOpen(true)} onStartWorkout={onStart} />
+          </Stagger>
 
-      {/* Today's activity — everything logged today; older days live in History. */}
-      <Stagger className="space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today's activity</h3>
-          <button onClick={() => setHistoryOpen(true)} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><History /> History</button>
-        </div>
-        {!feed ? (
-          <Skeleton className="h-32" />
-        ) : feed.length === 0 ? (
-          <Card className="text-center text-sm text-muted-foreground">Your day fills in here as you log — meals, workouts, check-ins and more.</Card>
-        ) : (
-          <Card className="divide-y divide-border/40 py-0.5">
-            {feed.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} onOpen={onOpen} />)}
-          </Card>
+          {/* Today's activity — everything logged today; older days live in History. */}
+          <Stagger className="space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today's activity</h3>
+              <button onClick={() => setHistoryOpen(true)} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><History /> History</button>
+            </div>
+            <Reveal loading={!feed} skeleton={<SkeletonList card rows={3} />}>
+              {feed && (feed.length === 0 ? (
+                <Card className="text-center text-sm text-muted-foreground">Your day fills in here as you log — meals, workouts, check-ins and more.</Card>
+              ) : (
+                <Card className="divide-y divide-border/40 py-0.5">
+                  {feed.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} onOpen={onOpen} />)}
+                </Card>
+              ))}
+            </Reveal>
+          </Stagger>
+
+          <Stagger><CoachNote clientId={clientId} surface="home" /></Stagger>
+        </>
         )}
-      </Stagger>
-
-      <Stagger><CoachNote clientId={clientId} surface="home" /></Stagger>
+      </Reveal>
 
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} clientId={clientId} onLogged={() => void load()} />
       {checkInOpen && <LogSheet open initialKind="checkin" onClose={() => setCheckInOpen(false)} clientId={clientId} onLogged={() => { setCheckInOpen(false); void load(); }} />}
@@ -240,13 +252,13 @@ function HistorySheet({ clientId, onClose, onOpen }: { clientId: string; onClose
           <button onClick={() => setDay((d) => (d < today ? shiftDay(d, 1) : d))} disabled={day >= today} className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40 [&_svg]:size-4" aria-label="Next day"><ChevronRight /></button>
         </div>
         <div className="text-center text-sm font-semibold text-muted-foreground">{dayLabel(day, today)}</div>
-        {!events ? (
-          <Skeleton className="h-40" />
-        ) : events.length === 0 ? (
-          <EmptyState icon={Clock} title="Nothing logged" description="No activity recorded on this day." />
-        ) : (
-          <Card className="divide-y divide-border/40 py-0.5">{events.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} onOpen={onOpen ? (r) => { onClose(); onOpen(r); } : undefined} />)}</Card>
-        )}
+        <Reveal loading={!events} skeleton={<SkeletonList card rows={5} />}>
+          {events && (events.length === 0 ? (
+            <EmptyState icon={Clock} title="Nothing logged" description="No activity recorded on this day." />
+          ) : (
+            <Card className="divide-y divide-border/40 py-0.5">{events.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} onOpen={onOpen ? (r) => { onClose(); onOpen(r); } : undefined} />)}</Card>
+          ))}
+        </Reveal>
       </div>
     </Sheet>
   );

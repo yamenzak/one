@@ -12,6 +12,7 @@ import { prescribedSetsForDay, type WorkoutBody } from "@mossa/protocol";
 import { sessionTonnage, sessionLoad, epley1Rm, DEFAULT_WEEKLY_LOAD_TARGET, activityByKey, fmtEnergy, fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
 import {
   Card, Badge, Button, Chip, Skeleton, Page, Stagger, EmptyState, StatCard, WeekDots, Sparkline, MiniBars, IconBadge,
+  Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
   Dumbbell, Play, Moon, ChevronRight, Plus, Footprints, Flame, TrendingUp, Trophy, Activity,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
@@ -119,14 +120,32 @@ export function Train({ clientId }: { clientId: string }) {
 
   const start = (day?: number) => nav(day != null ? `/train/session/${day}` : "/train/session");
 
-  if (!plans) return <Skeleton className="m-4 h-64" />;
-  const published = plans.find((p) => p.status === "published");
+  const published = plans?.find((p) => p.status === "published");
   const hasData = week.activeCount > 0 || week.weekTonnage > 0 || recent.length > 0;
 
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       <h1 className="text-2xl font-bold tracking-tight">Train</h1>
 
+      <Reveal loading={!plans} className="space-y-5" skeleton={
+        <>
+          <SkeletonHero height={128} />
+          <div className="flex flex-wrap gap-2">
+            <Skeleton className="h-9 w-32 rounded-full" />
+            <Skeleton className="h-9 w-28 rounded-full" />
+          </div>
+          <div className="space-y-2">
+            <SkeletonLine w="6rem" h="xs" />
+            <SkeletonStatGrid count={4} />
+          </div>
+          <div className="space-y-2">
+            <SkeletonLine w="4rem" h="xs" />
+            <SkeletonList card rows={3} />
+          </div>
+        </>
+      }>
+        {plans && (
+        <>
       {published ? (
         <Stagger>
           <button onClick={() => start()} className="w-full text-left">
@@ -225,6 +244,9 @@ export function Train({ clientId }: { clientId: string }) {
       )}
 
       <Stagger><CoachNote clientId={clientId} surface="train" /></Stagger>
+        </>
+        )}
+      </Reveal>
 
       {activityOpen && <LogSheet open initialKind="activity" clientId={clientId} onClose={() => setActivityOpen(false)} onLogged={load} />}
     </Page>

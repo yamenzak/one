@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy, kcalToDisplay } from "@mossa/domain";
-import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Utensils, ShoppingCart, Plus, Minus, Sparkles, Check, ArrowLeft, History, Croissant, Soup, Apple, Dumbbell } from "@mossa/ui";
+import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, Utensils, ShoppingCart, Plus, Minus, Sparkles, Check, ArrowLeft, History, Croissant, Soup, Apple, Dumbbell } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
@@ -161,9 +161,32 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
       </div>
 
       <div className="mx-auto max-w-xl space-y-5 p-4 pb-28">
-        {plan === undefined ? (
-          <div className="space-y-3"><Skeleton className="h-28 rounded-2xl" /><Skeleton className="h-40 rounded-2xl" /></div>
-        ) : !active ? (
+        <Reveal loading={plan === undefined} className="space-y-5" skeleton={
+          <>
+            <SkeletonHero height={128} />
+            <Skeleton className="h-10 w-full rounded-full" />
+            {[0, 1].map((s) => (
+              <div key={s} className="space-y-2.5">
+                <div className="flex items-center gap-2 px-1">
+                  <Skeleton className="size-7 rounded-xl" />
+                  <SkeletonLine w="6rem" h="text" />
+                </div>
+                <div className="flex gap-3 overflow-hidden py-2">
+                  {[0, 1].map((i) => (
+                    <div key={i} className="w-[74%] shrink-0 overflow-hidden rounded-2xl bg-card sm:w-[52%]">
+                      <Skeleton className="h-36 w-full rounded-none" />
+                      <div className="space-y-2.5 p-2.5">
+                        <Skeleton className="h-1.5 w-full rounded-full" />
+                        <Skeleton className="h-8 w-full rounded-xl" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </>
+        }>
+          {plan !== undefined && (!active ? (
           <EmptyState icon={Utensils} title="No meal plan yet" description="Your coach hasn't published a meal plan. You can still log food from the Eat tab." />
         ) : (
           <>
@@ -269,7 +292,8 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
               </div>
             )}
           </>
-        )}
+          ))}
+        </Reveal>
       </div>
 
       {detail && (

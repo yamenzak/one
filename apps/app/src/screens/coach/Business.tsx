@@ -1,7 +1,7 @@
 /** Owner Business — tabbed: overview (plan + credits + AI usage), packages, staff. */
 
 import { useEffect, useState } from "react";
-import { Card, Badge, Skeleton, StatCard, SegmentedControl, Page, Stagger, ChartCard, SectionHeader, IconBadge, cn, toneVar, Sparkles, CreditCard, History, Plus, Minus } from "@mossa/ui";
+import { Card, Badge, StatCard, SegmentedControl, Page, Stagger, ChartCard, SectionHeader, IconBadge, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Sparkles, CreditCard, History, Plus, Minus } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { Staff } from "./Staff.js";
@@ -41,8 +41,6 @@ function Overview() {
     void api.get<Billing>("/api/billing").then(setBilling);
     void api.get<AiUsage>("/api/settings/ai-usage").then((r) => setAiUsage(r.usage)).catch(() => undefined);
   }, []);
-  if (!billing) return <Skeleton className="m-4 h-64" />;
-
   const top = [...aiUsage].sort((a, b) => b.credits - a.credits).slice(0, 7);
   const maxCr = Math.max(...top.map((u) => u.credits), 1);
   const totalCr = aiUsage.reduce((n, u) => n + u.credits, 0);
@@ -52,64 +50,77 @@ function Overview() {
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <h1 className="text-2xl font-bold tracking-tight">Business</h1>
 
-      <Stagger className="grid grid-cols-2 gap-3">
-        <StatCard stack label="Plan" value={billing.subscription.planName} icon={CreditCard} tone="primary"
-          badge={<Badge tone={billing.subscription.status === "active" ? "success" : "warning"}>{billing.subscription.comp ? "Comped" : billing.subscription.status}</Badge>} />
-        <StatCard stack label="AI credits" value={billing.balance.available.toLocaleString()} unit="left" icon={Sparkles} tone="warning"
-          badge={<Badge tone="neutral">1 cr = $0.001</Badge>} />
-      </Stagger>
+      <Reveal loading={!billing} className="space-y-4" skeleton={
+        <>
+          <SkeletonStatGrid count={2} foot />
+          <SkeletonChart height={140} />
+          <SkeletonList card rows={4} thumb={0} />
+          <SkeletonList card rows={5} thumb={32} />
+        </>
+      }>
+        {billing && (
+        <>
+          <Stagger className="grid grid-cols-2 gap-3">
+            <StatCard stack label="Plan" value={billing.subscription.planName} icon={CreditCard} tone="primary"
+              badge={<Badge tone={billing.subscription.status === "active" ? "success" : "warning"}>{billing.subscription.comp ? "Comped" : billing.subscription.status}</Badge>} />
+            <StatCard stack label="AI credits" value={billing.balance.available.toLocaleString()} unit="left" icon={Sparkles} tone="warning"
+              badge={<Badge tone="neutral">1 cr = $0.001</Badge>} />
+          </Stagger>
 
-      {top.length > 0 && (
-        <Stagger>
-          <ChartCard title="AI usage" icon={Sparkles} tone="warning" value={totalCr.toLocaleString()} unit="cr" delta={<Badge tone="neutral">30 days · {totalCalls} runs</Badge>}>
-            <div className="space-y-2.5">
-              {top.map((u) => (
-                <div key={u.feature} className="min-w-0">
-                  <div className="flex items-center justify-between gap-2 text-sm">
-                    <span className="truncate">{featLabel(u.feature)}</span>
-                    <span className="numeral shrink-0 text-muted-foreground">{u.credits.toLocaleString()} cr <span className="text-muted-foreground/60">· {u.calls}×</span></span>
-                  </div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2">
-                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(4, (u.credits / maxCr) * 100)}%`, backgroundColor: toneVar.warning }} />
-                  </div>
+          {top.length > 0 && (
+            <Stagger>
+              <ChartCard title="AI usage" icon={Sparkles} tone="warning" value={totalCr.toLocaleString()} unit="cr" delta={<Badge tone="neutral">30 days · {totalCalls} runs</Badge>}>
+                <div className="space-y-2.5">
+                  {top.map((u) => (
+                    <div key={u.feature} className="min-w-0">
+                      <div className="flex items-center justify-between gap-2 text-sm">
+                        <span className="truncate">{featLabel(u.feature)}</span>
+                        <span className="numeral shrink-0 text-muted-foreground">{u.credits.toLocaleString()} cr <span className="text-muted-foreground/60">· {u.calls}×</span></span>
+                      </div>
+                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2">
+                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(4, (u.credits / maxCr) * 100)}%`, backgroundColor: toneVar.warning }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </ChartCard>
-        </Stagger>
-      )}
+              </ChartCard>
+            </Stagger>
+          )}
 
-      <Stagger>
-        <Card className="space-y-3">
-          <SectionHeader icon={CreditCard} tone="primary" title="Credit packs" />
-          <div className="space-y-1.5">
-            {billing.packs.map((p) => (
-              <div key={p.id} className="flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2.5">
-                <div><div className="text-sm font-medium">{p.name}</div><div className="numeral text-xs text-muted-foreground">{p.credits.toLocaleString()} credits</div></div>
-                <Badge tone="primary">${p.price_usd}</Badge>
+          <Stagger>
+            <Card className="space-y-3">
+              <SectionHeader icon={CreditCard} tone="primary" title="Credit packs" />
+              <div className="space-y-1.5">
+                {billing.packs.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2.5">
+                    <div><div className="text-sm font-medium">{p.name}</div><div className="numeral text-xs text-muted-foreground">{p.credits.toLocaleString()} credits</div></div>
+                    <Badge tone="primary">${p.price_usd}</Badge>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground">Purchasing arrives with the Stripe phase.</p>
-        </Card>
-      </Stagger>
+              <p className="text-xs text-muted-foreground">Purchasing arrives with the Stripe phase.</p>
+            </Card>
+          </Stagger>
 
-      {billing.ledger.length > 0 && (
-        <Stagger>
-          <Card className="space-y-3">
-            <SectionHeader icon={History} tone="cardio" title="Recent credit activity" />
-            <div className="divide-y divide-border/40">
-              {billing.ledger.slice(-8).reverse().map((e, i) => (
-                <div key={i} className="flex items-center gap-3 py-2">
-                  <IconBadge icon={e.delta >= 0 ? Plus : Minus} tone={e.delta >= 0 ? "success" : "danger"} size="sm" />
-                  <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{e.reason}</span>
-                  <span className={cn("numeral text-sm font-semibold", e.delta >= 0 ? "text-success" : "text-danger")}>{e.delta >= 0 ? "+" : ""}{e.delta.toLocaleString()}</span>
+          {billing.ledger.length > 0 && (
+            <Stagger>
+              <Card className="space-y-3">
+                <SectionHeader icon={History} tone="cardio" title="Recent credit activity" />
+                <div className="divide-y divide-border/40">
+                  {billing.ledger.slice(-8).reverse().map((e, i) => (
+                    <div key={i} className="flex items-center gap-3 py-2">
+                      <IconBadge icon={e.delta >= 0 ? Plus : Minus} tone={e.delta >= 0 ? "success" : "danger"} size="sm" />
+                      <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{e.reason}</span>
+                      <span className={cn("numeral text-sm font-semibold", e.delta >= 0 ? "text-success" : "text-danger")}>{e.delta >= 0 ? "+" : ""}{e.delta.toLocaleString()}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </Card>
-        </Stagger>
-      )}
+              </Card>
+            </Stagger>
+          )}
+        </>
+        )}
+      </Reveal>
     </Page>
   );
 }

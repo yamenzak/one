@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PERMISSION_CATALOG } from "@mossa/domain";
-import { Button, Card, Badge, Field, Sheet, Skeleton, Avatar, Select, Chip, Page, Stagger, SectionHeader, Users, Mail, ShieldCheck, Plus } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, Reveal, SkeletonRow, Users, Mail, ShieldCheck, Plus } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Member { userId: string; role: string; name: string | null; email: string | null; customGrant?: Record<string, string[]> | null }
@@ -30,26 +30,36 @@ export function Staff() {
     catch { setMsg("Invite failed — check the email and try again."); }
   };
 
-  if (!members) return <Skeleton className="m-4 h-64" />;
-
   return (
     <Page className="mx-auto max-w-xl space-y-3 p-4 pb-28">
       <SectionHeader icon={Users} tone="cardio" title="Staff" action={<Button size="sm" onClick={() => setInviteOpen(true)}><Plus /> Invite</Button>} />
       {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
-      <Stagger className="space-y-2">
-        {members.filter((m) => m.role !== "client").map((m) => (
-          <Card key={m.userId} className="flex items-center gap-3">
-            <Avatar name={m.name || m.email || "?"} seed={m.email ?? m.userId} className="size-10" />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2"><span className="truncate font-medium">{m.name || m.email}</span>{m.customGrant && <Badge tone="warning">Custom</Badge>}</div>
-              <div className="truncate text-xs text-muted-foreground">{m.email}</div>
-            </div>
-            {m.role !== "owner" && <Button size="icon" variant="secondary" aria-label="Permissions" onClick={() => setPermMember(m)}><ShieldCheck /></Button>}
-            <div className="w-28"><Select value={m.role} onChange={(v) => void changeRole(m.userId, v)} options={ROLES} /></div>
-          </Card>
-        ))}
-      </Stagger>
-      <p className="pt-1 text-xs text-muted-foreground">Clients appear in the Clients tab, not here.</p>
+      <Reveal loading={!members} className="space-y-3" skeleton={
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="rounded-2xl bg-card p-4"><SkeletonRow thumb={40} /></div>
+          ))}
+        </div>
+      }>
+        {members && (
+        <>
+          <Stagger className="space-y-2">
+            {members.filter((m) => m.role !== "client").map((m) => (
+              <Card key={m.userId} className="flex items-center gap-3">
+                <Avatar name={m.name || m.email || "?"} seed={m.email ?? m.userId} className="size-10" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2"><span className="truncate font-medium">{m.name || m.email}</span>{m.customGrant && <Badge tone="warning">Custom</Badge>}</div>
+                  <div className="truncate text-xs text-muted-foreground">{m.email}</div>
+                </div>
+                {m.role !== "owner" && <Button size="icon" variant="secondary" aria-label="Permissions" onClick={() => setPermMember(m)}><ShieldCheck /></Button>}
+                <div className="w-28"><Select value={m.role} onChange={(v) => void changeRole(m.userId, v)} options={ROLES} /></div>
+              </Card>
+            ))}
+          </Stagger>
+          <p className="pt-1 text-xs text-muted-foreground">Clients appear in the Clients tab, not here.</p>
+        </>
+        )}
+      </Reveal>
 
       <Sheet open={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite staff">
         <div className="space-y-4">

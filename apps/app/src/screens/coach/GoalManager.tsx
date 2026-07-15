@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fmtEnergy, fmtVolume, weightLabel, displayToKg, feetInchesToCm } from "@mossa/domain";
-import { Button, Card, Badge, Field, Select, Skeleton, Page, Stagger, SectionHeader, METRICS, toneVar, Target, History, type MetricKey } from "@mossa/ui";
+import { Button, Card, Badge, Field, Select, Reveal, SkeletonStatGrid, SkeletonList, Page, Stagger, SectionHeader, METRICS, toneVar, Target, History, type MetricKey } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 
@@ -38,14 +38,20 @@ export function GoalManager({ clientId }: { clientId: string }) {
     } catch { /* validation surfaces via disabled */ } finally { setBusy(false); }
   };
 
-  if (!goals) return <Skeleton className="m-4 h-64" />;
-  const active = goals.find((g) => g.status === "active");
-  const history = goals.filter((g) => g.status !== "active");
+  const active = goals?.find((g) => g.status === "active");
+  const history = goals?.filter((g) => g.status !== "active") ?? [];
   const heightOk = units.height === "ft_in" ? form.heightFt : form.heightCm;
   const valid = form.ageYears && heightOk && form.weightKg;
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+      <Reveal loading={!goals} className="space-y-4" skeleton={
+        <>
+          <SkeletonStatGrid count={6} cols={3} />
+          <SkeletonList card rows={6} thumb={0} />
+        </>
+      }>
+      {goals && (<>
       {active?.targets && (
         <Stagger>
           <Card className="space-y-3">
@@ -110,6 +116,8 @@ export function GoalManager({ clientId }: { clientId: string }) {
           </Card>
         </Stagger>
       )}
+      </>)}
+      </Reveal>
     </Page>
   );
 }

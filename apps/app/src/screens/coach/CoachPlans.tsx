@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SegmentedControl, Page, Stagger, EmptyState, SectionHeader, cn, Dumbbell, Utensils, Plus, Ellipsis, Trash2, Archive, History, Zap, PencilLine } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Reveal, SkeletonList, SegmentedControl, Page, Stagger, EmptyState, SectionHeader, cn, Dumbbell, Utensils, Plus, Ellipsis, Trash2, Archive, History, Zap, PencilLine } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Plan { id: string; name: string; status: string; publishedAt: string | null }
@@ -27,21 +27,23 @@ export function CoachPlans({ clientId }: { clientId: string }) {
     <Page className="mx-auto max-w-xl space-y-3 p-4 pb-28">
       <SegmentedControl options={[{ value: "workout", label: "Workout" }, { value: "meal", label: "Meal" }]} value={kind} onChange={setKind} />
       <SectionHeader icon={kind === "workout" ? Dumbbell : Utensils} tone={kind === "workout" ? "activity" : "nutrition"} title={`${kind === "workout" ? "Workout" : "Meal"} plans`} action={<Button size="sm" onClick={() => setCreateOpen(true)}><Plus /> New</Button>} />
-      {!plans ? <Skeleton className="h-64" /> : plans.length === 0 ? (
-        <EmptyState icon={kind === "workout" ? Dumbbell : Utensils} title={`No ${kind} plans`} description={kind === "workout" ? "Create one and build it — or use the AI draft inside the builder." : "Create one and build the options bank."} />
-      ) : (
-        <Stagger className="space-y-2">
-          {plans.map((p) => (
-            <Card key={p.id} interactive onClick={() => open(p.id)} className="flex items-center justify-between gap-2">
-              <div className="min-w-0"><div className="truncate font-semibold">{p.name}</div>{p.publishedAt && <div className="text-xs text-muted-foreground">Published {new Date(p.publishedAt).toLocaleDateString()}</div>}</div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                <Badge tone={p.status === "published" ? "success" : p.status === "draft" ? "neutral" : "warning"}>{p.status}</Badge>
-                <button onClick={(e) => { e.stopPropagation(); setMenuFor(p); }} aria-label="Plan actions" className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><Ellipsis /></button>
-              </div>
-            </Card>
-          ))}
-        </Stagger>
-      )}
+      <Reveal loading={!plans} skeleton={<SkeletonList card rows={5} thumb={0} />}>
+        {plans && (plans.length === 0 ? (
+          <EmptyState icon={kind === "workout" ? Dumbbell : Utensils} title={`No ${kind} plans`} description={kind === "workout" ? "Create one and build it — or use the AI draft inside the builder." : "Create one and build the options bank."} />
+        ) : (
+          <Stagger className="space-y-2">
+            {plans.map((p) => (
+              <Card key={p.id} interactive onClick={() => open(p.id)} className="flex items-center justify-between gap-2">
+                <div className="min-w-0"><div className="truncate font-semibold">{p.name}</div>{p.publishedAt && <div className="text-xs text-muted-foreground">Published {new Date(p.publishedAt).toLocaleDateString()}</div>}</div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <Badge tone={p.status === "published" ? "success" : p.status === "draft" ? "neutral" : "warning"}>{p.status}</Badge>
+                  <button onClick={(e) => { e.stopPropagation(); setMenuFor(p); }} aria-label="Plan actions" className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><Ellipsis /></button>
+                </div>
+              </Card>
+            ))}
+          </Stagger>
+        ))}
+      </Reveal>
       <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title={`New ${kind} plan`}>
         <div className="space-y-4">
           <Field label="Plan name" icon={kind === "workout" ? Dumbbell : Utensils} value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "workout" ? "Push Pull Legs" : "Cutting Plan"} />

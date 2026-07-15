@@ -8,7 +8,8 @@ import { AnimatePresence, motion } from "motion/react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet } from "@mossa/protocol";
 import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, type ExerciseBests } from "@mossa/domain";
 import {
-  Button, Card, Badge, Field, Sheet, Skeleton, SubCard, ProgressRing, EmptyState,
+  Button, Card, Badge, Field, Sheet, SubCard, ProgressRing, EmptyState,
+  Reveal, SkeletonLine, SkeletonList,
   ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, cn,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
@@ -634,22 +635,27 @@ function SwapDrawer({ clientId, planId, dayIndex, coords, currentName, onClose, 
   return (
     <Sheet open onClose={onClose} title={`Swap ${currentName}`}>
       <div className="space-y-4">
-        {alts === null ? (
-          <Skeleton className="h-24" />
-        ) : alts.length > 0 ? (
+        <Reveal loading={alts === null} skeleton={
           <div>
-            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Instant swaps — coach-approved alternatives</div>
-            <div className="space-y-1">
-              {alts.map((e) => (
-                <button key={e.id} disabled={busy} onClick={() => void swapTo(e)} className="w-full rounded-xl bg-surface-2 px-2.5 py-2 text-left transition-colors hover:bg-surface-3 disabled:opacity-50">
-                  <ExerciseRow ex={e} thumbSize={40} trailing={<ArrowLeftRight className="size-4 shrink-0 text-activity" />} />
-                </button>
-              ))}
-            </div>
+            <SkeletonLine w="70%" h="xs" className="mb-2.5" />
+            <SkeletonList rows={3} thumb={40} />
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No instant alternatives set for this exercise.</p>
-        )}
+        }>
+          {alts !== null && (alts.length > 0 ? (
+            <div>
+              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Instant swaps — coach-approved alternatives</div>
+              <div className="space-y-1">
+                {alts.map((e) => (
+                  <button key={e.id} disabled={busy} onClick={() => void swapTo(e)} className="w-full rounded-xl bg-surface-2 px-2.5 py-2 text-left transition-colors hover:bg-surface-3 disabled:opacity-50">
+                    <ExerciseRow ex={e} thumbSize={40} trailing={<ArrowLeftRight className="size-4 shrink-0 text-activity" />} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No instant alternatives set for this exercise.</p>
+          ))}
+        </Reveal>
 
         <div className="border-t border-border/50 pt-4">
           <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ask your coach</div>

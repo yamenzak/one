@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fmtEnergy, fmtVolume, volumeDisplayToMl, kcalToDisplay } from "@mossa/domain";
 import {
   Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MetricChip, ProgressRing, METRICS, toneSoft, Page, Stagger, EmptyState, motion,
+  Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
   Plus, Utensils, Croissant, Soup, Apple, Dumbbell, Droplet, Beef, Trash2, type LucideIcon,
 } from "@mossa/ui";
 import type { UnitPrefs } from "@mossa/domain";
@@ -69,12 +70,10 @@ export function Eat({ clientId }: { clientId: string }) {
 
   const openLog = (meal?: string) => { setLogMeal(meal); setLogOpen(true); };
 
-  if (!entries) return <Skeleton className="m-4 h-64" />;
-
   const byMeal = new Map<string, Entry[]>();
-  for (const e of entries) byMeal.set(e.meal_type, [...(byMeal.get(e.meal_type) ?? []), e]);
+  for (const e of entries ?? []) byMeal.set(e.meal_type, [...(byMeal.get(e.meal_type) ?? []), e]);
   const meals = [...MEAL_ORDER.filter((m) => byMeal.has(m)), ...[...byMeal.keys()].filter((m) => !MEAL_ORDER.includes(m))];
-  const sum = (f: (e: Entry) => number) => entries.reduce((n, e) => n + (f(e) || 0), 0);
+  const sum = (f: (e: Entry) => number) => (entries ?? []).reduce((n, e) => n + (f(e) || 0), 0);
   const total = sum((e) => e.calories);
   const proteinTotal = Math.round(sum((e) => e.protein_g));
   const proteinTarget = targets?.targetProteinG ?? 0;
@@ -87,6 +86,26 @@ export function Eat({ clientId }: { clientId: string }) {
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       <h1 className="text-2xl font-bold tracking-tight">Eat</h1>
 
+      <Reveal loading={!entries} className="space-y-5" skeleton={
+        <>
+          <SkeletonHero height={104} />
+          <div className="flex flex-wrap gap-2">
+            <Skeleton className="h-9 w-28 rounded-full" />
+            <Skeleton className="h-9 w-24 rounded-full" />
+          </div>
+          <div className="space-y-2">
+            <SkeletonLine w="4rem" h="xs" />
+            <SkeletonHero height={150} />
+            <SkeletonStatGrid count={2} />
+          </div>
+          <div className="space-y-2">
+            <SkeletonLine w="6rem" h="xs" />
+            <SkeletonList card rows={3} />
+          </div>
+        </>
+      }>
+        {entries && (
+        <>
       {/* Your meal plan — the primary entry (parity with Train's active-plan hero) */}
       {mealPlan && (
         <Stagger>
@@ -211,6 +230,9 @@ export function Eat({ clientId }: { clientId: string }) {
       )}
 
       <Stagger><CoachNote clientId={clientId} surface="eat" /></Stagger>
+        </>
+        )}
+      </Reveal>
 
       {logOpen && <FoodSearchSheet clientId={clientId} mealType={logMeal} onClose={() => setLogOpen(false)} onLogged={() => void load()} />}
       {planOpen && <MealPlanDrawer clientId={clientId} onClose={() => setPlanOpen(false)} onLogged={() => void load()} />}

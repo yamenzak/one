@@ -11,7 +11,8 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, type RangePreset, type SeriesDelta } from "@mossa/domain";
 import {
-  Card, Badge, Skeleton, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger,
+  Card, Badge, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger,
+  Reveal, SkeletonHero, SkeletonChart,
   AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, METRICS, cn, toneVar,
   Scale, Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, type Tone, type LucideIcon,
 } from "@mossa/ui";
@@ -52,17 +53,7 @@ export function Progress({ clientId }: { clientId: string }) {
     void api.get<ProgressData>(`/api/progress/${clientId}?range=${range}&today=${today}`).then(setData).catch(() => setData(null));
   }, [clientId, range, today]);
 
-  if (!data) return (
-    <div className="mx-auto max-w-xl space-y-4 p-4">
-      <Skeleton className="h-9 w-40" />
-      <Skeleton className="h-10" />
-      <Skeleton className="h-44" />
-      <Skeleton className="h-56" />
-      <Skeleton className="h-40" />
-    </div>
-  );
-
-  const days = data.range.days;
+  const days = data?.range.days ?? [];
   const dateLabel = (i: number) => shortDate(days[i] ?? today);
 
   return (
@@ -73,14 +64,24 @@ export function Progress({ clientId }: { clientId: string }) {
         <SegmentedControl className="ml-auto" options={[{ value: "7d", label: "7d" }, { value: "30d", label: "30d" }, { value: "90d", label: "90d" }]} value={range} onChange={(v) => setRange(v as RangePreset)} />
       </div>
 
-      {/* Keyed remount per tab → each lens re-staggers in; no AnimatePresence
-          wait-handshake (which could strand the incoming tab unmounted). */}
-      <motion.div key={tab} variants={stagger} initial="hidden" animate="show" className="space-y-4">
-        {tab === "overview" && <Overview data={data} dateLabel={dateLabel} />}
-        {tab === "body" && <Body data={data} units={units} dateLabel={dateLabel} />}
-        {tab === "training" && <Training data={data} units={units} />}
-        {tab === "wellness" && <Wellness data={data} dateLabel={dateLabel} />}
-      </motion.div>
+      <Reveal loading={!data} className="space-y-4" skeleton={
+        <>
+          <SkeletonHero height={150} />
+          <SkeletonChart height={160} />
+          <SkeletonChart height={140} />
+        </>
+      }>
+        {data && (
+          /* Keyed remount per tab → each lens re-staggers in; no AnimatePresence
+             wait-handshake (which could strand the incoming tab unmounted). */
+          <motion.div key={tab} variants={stagger} initial="hidden" animate="show" className="space-y-4">
+            {tab === "overview" && <Overview data={data} dateLabel={dateLabel} />}
+            {tab === "body" && <Body data={data} units={units} dateLabel={dateLabel} />}
+            {tab === "training" && <Training data={data} units={units} />}
+            {tab === "wellness" && <Wellness data={data} dateLabel={dateLabel} />}
+          </motion.div>
+        )}
+      </Reveal>
 
       <CoachNote clientId={clientId} surface="progress" />
     </Page>

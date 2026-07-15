@@ -3,7 +3,7 @@
  *  fresh article cards, and an immersive reader with a cover-bleed header. */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Card, Badge, Chip, Field, Button, Skeleton, Page, Stagger, EmptyState, motion, cn, ArrowLeft, Search, Clock, BookOpen, Utensils, Dumbbell } from "@mossa/ui";
+import { Card, Badge, Chip, Field, Button, Page, Stagger, EmptyState, motion, cn, ArrowLeft, Search, Clock, BookOpen, Utensils, Dumbbell, Reveal, SkeletonHero, SkeletonList } from "@mossa/ui";
 import { api } from "../../api.js";
 import { Markdown } from "../../Markdown.js";
 
@@ -53,20 +53,29 @@ export function Explore({ clientId, onBack }: { clientId: string; onBack: () => 
         </div>
       )}
 
-      {!items ? (
-        <div className="space-y-3"><Skeleton className="h-52 rounded-3xl" /><Skeleton className="h-28 rounded-2xl" /><Skeleton className="h-28 rounded-2xl" /></div>
-      ) : filtered.length === 0 ? (
-        <EmptyState icon={BookOpen} title={q || cat ? "Nothing matches" : "Nothing here yet"} description={q || cat ? "Try another search or category." : "Your coach hasn't published articles or routines yet."} />
-      ) : (
-        <div className="space-y-5">
-          {featured && <FeaturedCard r={featured} onOpen={() => setOpen(featured)} />}
-          {rest.length > 0 && (
-            <Stagger className="space-y-3">
-              {rest.map((r) => <ArticleCard key={r.id} r={r} onOpen={() => setOpen(r)} />)}
-            </Stagger>
-          )}
-        </div>
-      )}
+      <Reveal loading={!items} className="space-y-5" skeleton={
+        <>
+          <SkeletonHero height={224} />
+          <div className="space-y-3">
+            <SkeletonList card rows={1} thumb={96} />
+            <SkeletonList card rows={1} thumb={96} />
+            <SkeletonList card rows={1} thumb={96} />
+          </div>
+        </>
+      }>
+        {items && (filtered.length === 0 ? (
+          <EmptyState icon={BookOpen} title={q || cat ? "Nothing matches" : "Nothing here yet"} description={q || cat ? "Try another search or category." : "Your coach hasn't published articles or routines yet."} />
+        ) : (
+          <div className="space-y-5">
+            {featured && <FeaturedCard r={featured} onOpen={() => setOpen(featured)} />}
+            {rest.length > 0 && (
+              <Stagger className="space-y-3">
+                {rest.map((r) => <ArticleCard key={r.id} r={r} onOpen={() => setOpen(r)} />)}
+              </Stagger>
+            )}
+          </div>
+        ))}
+      </Reveal>
     </Page>
   );
 }

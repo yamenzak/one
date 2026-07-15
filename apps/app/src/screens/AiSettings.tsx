@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from "react";
 import type { AiSettingsPayload, AiFeatureMeta, AiModelMeta, TenantAiConfig, AiFeatureConfig, AiTone } from "@mossa/protocol";
-import { Card, Badge, Skeleton, Switch, Button, Textarea, Chip, IconBadge, cn, Sparkles, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, type Tone, type LucideIcon } from "@mossa/ui";
+import { Card, Badge, Skeleton, Reveal, SkeletonLine, Switch, Button, Textarea, Chip, IconBadge, cn, Sparkles, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, type Tone, type LucideIcon } from "@mossa/ui";
 import { api } from "../api.js";
 
 const TONE_LABEL: Record<string, string> = {
@@ -64,32 +64,77 @@ export function AiConfigSection() {
     await api.patch("/api/settings/ai", { features: patches }).catch(() => undefined);
   };
 
-  if (!data) return <Skeleton className="h-64" />;
-  const trainer = data.features.filter((f) => f.audience === "trainer");
-  const client = data.features.filter((f) => f.audience === "client");
+  const trainer = data?.features.filter((f) => f.audience === "trainer") ?? [];
+  const client = data?.features.filter((f) => f.audience === "client") ?? [];
 
   return (
     <section className="mb-6 space-y-4">
-      <div>
-        <div className="mb-2 flex items-center justify-between gap-2 px-1">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">AI assistant</h3>
-          <Badge tone="primary"><Building2 /> Studio</Badge>
-        </div>
-        <Card className="space-y-3">
-          <div className="flex items-center gap-2.5">
-            <IconBadge icon={Sparkles} tone="primary" size="sm" />
-            <div><div className="font-medium">House voice</div><div className="text-sm text-muted-foreground">The tone every personalized message is written in.</div></div>
+      <Reveal loading={!data} className="space-y-4" skeleton={
+        <>
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-2 px-1">
+              <SkeletonLine w="7rem" h="xs" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+            <Card className="space-y-3">
+              <div className="flex items-center gap-2.5">
+                <Skeleton className="size-9 rounded-xl" />
+                <div className="flex-1 space-y-1.5"><SkeletonLine w="35%" h="text" /><SkeletonLine w="60%" h="xs" /></div>
+              </div>
+              <div className="flex flex-wrap gap-2">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-8 w-20 rounded-full" />)}</div>
+            </Card>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {data.tones.map((t) => <Chip key={t} selected={(config.tone ?? "professional") === t} onClick={() => void saveHouseTone(t)}>{TONE_LABEL[t] ?? t}</Chip>)}
+          <div>
+            <SkeletonLine w="8rem" h="xs" className="mb-2 px-1" />
+            <Card className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5"><Skeleton className="size-9 rounded-xl" /><div className="min-w-0 flex-1 space-y-1.5"><SkeletonLine w="40%" h="text" /><SkeletonLine w="65%" h="xs" /></div></div>
+                  <Skeleton className="h-8 w-28 shrink-0 rounded-lg" />
+                </div>
+              ))}
+            </Card>
           </div>
-        </Card>
-      </div>
+          {Array.from({ length: 2 }).map((_, g) => (
+            <div key={g}>
+              <SkeletonLine w="6rem" h="xs" className="mb-2 px-1" />
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Card key={i} className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1 space-y-1.5"><SkeletonLine w="45%" h="text" /><SkeletonLine w="75%" h="xs" /></div>
+                    <Skeleton className="h-6 w-11 shrink-0 rounded-full" />
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ))}
+        </>
+      }>
+        {data && (
+          <>
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">AI assistant</h3>
+                <Badge tone="primary"><Building2 /> Studio</Badge>
+              </div>
+              <Card className="space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <IconBadge icon={Sparkles} tone="primary" size="sm" />
+                  <div><div className="font-medium">House voice</div><div className="text-sm text-muted-foreground">The tone every personalized message is written in.</div></div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {data.tones.map((t) => <Chip key={t} selected={(config.tone ?? "professional") === t} onClick={() => void saveHouseTone(t)}>{TONE_LABEL[t] ?? t}</Chip>)}
+                </div>
+              </Card>
+            </div>
 
-      <DefaultModels features={data.features} models={data.models} config={config} onApply={saveFeatures} />
+            <DefaultModels features={data.features} models={data.models} config={config} onApply={saveFeatures} />
 
-      <FeatureGroup title="For trainers" icon={Users} features={trainer} models={data.models} config={config} tones={data.tones} onSave={saveFeature} />
-      <FeatureGroup title="For clients" icon={HeartPulse} features={client} models={data.models} config={config} tones={data.tones} onSave={saveFeature} />
+            <FeatureGroup title="For trainers" icon={Users} features={trainer} models={data.models} config={config} tones={data.tones} onSave={saveFeature} />
+            <FeatureGroup title="For clients" icon={HeartPulse} features={client} models={data.models} config={config} tones={data.tones} onSave={saveFeature} />
+          </>
+        )}
+      </Reveal>
     </section>
   );
 }

@@ -1,7 +1,7 @@
 /** Platform admin console — tenants (comp/topup/seed), Stripe config. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SegmentedControl, Switch, Chip, Page, Stagger, ShieldCheck, Sparkles, ArrowLeft, KeyRound, Globe, cn, LayoutGrid } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, Reveal, SkeletonLine, SegmentedControl, Switch, Chip, Page, Stagger, ShieldCheck, Sparkles, ArrowLeft, KeyRound, Globe, cn, LayoutGrid } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Tenant { id: string; name: string; slug: string; plan_id: string | null; status: string | null; comp: number | null }
@@ -80,18 +80,31 @@ function PlansConfig() {
   const [edit, setEdit] = useState<PlanFull | null>(null);
   const load = useCallback(() => void api.get<{ plans: PlanFull[] } & EntMeta>("/api/admin/plans").then(setData).catch(() => undefined), []);
   useEffect(load, [load]);
-  if (!data) return <Skeleton className="h-64" />;
   return (
-    <Stagger className="space-y-3">
-      <p className="px-1 text-xs text-muted-foreground">Compose each plan from every feature flag. Raising a limit or enabling a feature applies to all tenants on the plan instantly; lowering grandfathers existing tenants automatically.</p>
-      {data.plans.map((p) => (
-        <Card key={p.id} className="flex items-center justify-between">
-          <div><div className="font-semibold">{p.name} <span className="ml-1 text-xs font-normal text-muted-foreground">${p.priceUsdMonth}/mo{p.active ? "" : " · off"}</span></div><div className="text-xs text-muted-foreground">{p.tenantCount} tenant{p.tenantCount === 1 ? "" : "s"}</div></div>
-          <Button size="sm" variant="secondary" onClick={() => setEdit(p)}><LayoutGrid /> Edit</Button>
-        </Card>
-      ))}
-      {edit && <PlanEditSheet plan={edit} meta={data} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); load(); }} />}
-    </Stagger>
+    <Reveal loading={!data} className="space-y-3" skeleton={
+      <>
+        <SkeletonLine w="90%" h="xs" className="px-1" />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i} className="flex items-center justify-between">
+            <div className="space-y-1.5"><SkeletonLine w="8rem" h="text" /><SkeletonLine w="5rem" h="xs" /></div>
+            <Skeleton className="h-8 w-16 rounded-full" />
+          </Card>
+        ))}
+      </>
+    }>
+      {data && (
+      <Stagger className="space-y-3">
+        <p className="px-1 text-xs text-muted-foreground">Compose each plan from every feature flag. Raising a limit or enabling a feature applies to all tenants on the plan instantly; lowering grandfathers existing tenants automatically.</p>
+        {data.plans.map((p) => (
+          <Card key={p.id} className="flex items-center justify-between">
+            <div><div className="font-semibold">{p.name} <span className="ml-1 text-xs font-normal text-muted-foreground">${p.priceUsdMonth}/mo{p.active ? "" : " · off"}</span></div><div className="text-xs text-muted-foreground">{p.tenantCount} tenant{p.tenantCount === 1 ? "" : "s"}</div></div>
+            <Button size="sm" variant="secondary" onClick={() => setEdit(p)}><LayoutGrid /> Edit</Button>
+          </Card>
+        ))}
+        {edit && <PlanEditSheet plan={edit} meta={data} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); load(); }} />}
+      </Stagger>
+      )}
+    </Reveal>
   );
 }
 
@@ -134,7 +147,25 @@ function GiftSheet({ tenantId, name, onClose }: { tenantId: string; name: string
   const reset = async () => { setBusy(true); setMsg(null); try { const r = await api.patch<{ effective: Ent }>(`/api/admin/tenants/${tenantId}/overrides`, { reset: true }); setEnt(r.effective); setMsg("Gifts cleared — back to plan."); } finally { setBusy(false); } };
   return (
     <Sheet open onClose={onClose} title={`Gift — ${name}`}>
-      {!data || !ent ? <Skeleton className="h-64" /> : (
+      <Reveal loading={!data || !ent} className="space-y-4" skeleton={
+        <>
+          <SkeletonLine w="90%" h="xs" />
+          <div className="space-y-4">
+            <div className="space-y-2.5">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-2"><div className="min-w-0 flex-1 space-y-1.5"><SkeletonLine w="45%" h="text" /><SkeletonLine w="65%" h="xs" /></div><Skeleton className="h-9 w-20 shrink-0 rounded-lg" /></div>
+              ))}
+            </div>
+            <div className="space-y-2.5">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between gap-3"><div className="min-w-0 flex-1 space-y-1.5"><SkeletonLine w="40%" h="text" /><SkeletonLine w="55%" h="xs" /></div><Skeleton className="h-6 w-11 shrink-0 rounded-full" /></div>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2"><Skeleton className="h-10 flex-1 rounded-full" /><Skeleton className="h-10 w-28 rounded-full" /></div>
+        </>
+      }>
+        {data && ent && (
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground">On the <span className="font-medium capitalize">{data.planId}</span> plan. You can raise limits and unlock features — never lower or disable (a value below the plan simply won't apply).</p>
           <EntitlementFields ent={ent} meta={data} onChange={setEnt} />
@@ -144,7 +175,8 @@ function GiftSheet({ tenantId, name, onClose }: { tenantId: string; name: string
           </div>
           {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
         </div>
-      )}
+        )}
+      </Reveal>
     </Sheet>
   );
 }
@@ -198,8 +230,27 @@ function AiConfig() {
         {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
       </Card>
 
-      {models === null ? <Skeleton className="h-40" /> : (
-        Object.entries(grouped).map(([provider, rows]) => (
+      <Reveal loading={models === null} className="space-y-4" skeleton={
+        <>
+          {Array.from({ length: 2 }).map((_, g) => (
+            <Card key={g} className="space-y-2">
+              <div className="flex items-center justify-between"><SkeletonLine w="8rem" h="text" /><Skeleton className="h-5 w-8 rounded-full" /></div>
+              <div className="divide-y divide-border/40">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-2 py-2">
+                    <Skeleton className="size-5 shrink-0 rounded-full" />
+                    <div className="min-w-0 flex-1 space-y-1.5"><SkeletonLine w="50%" h="text" /><SkeletonLine w="35%" h="xs" /></div>
+                    <Skeleton className="h-6 w-11 shrink-0 rounded-full" />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ))}
+        </>
+      }>
+        {models !== null && (
+        <>
+        {Object.entries(grouped).map(([provider, rows]) => (
           <Card key={provider} className="space-y-2">
             <div className="flex items-center justify-between"><h3 className="text-sm font-semibold capitalize">{provider === "google" ? "Gemini (Google)" : "Workers AI"}</h3><Badge tone="neutral">{rows.length}</Badge></div>
             <div className="divide-y divide-border/40">
@@ -217,8 +268,10 @@ function AiConfig() {
               ))}
             </div>
           </Card>
-        ))
-      )}
+        ))}
+        </>
+        )}
+      </Reveal>
     </Stagger>
   );
 }
@@ -275,8 +328,19 @@ function Tenants() {
   const topUp = async () => { const c = Number(credits); if (topUpId && c) await api.post(`/api/admin/tenants/${topUpId}/topup`, { credits: c }); setTopUpId(null); setCredits(""); setMsg(c ? `Added ${c} credits.` : null); };
   const seedDemo = async () => { setBusy("demo"); setMsg(null); try { const r = await api.post<{ seeded?: number; skipped?: string }>("/api/admin/seed-demo"); setMsg(r.skipped ? `Skipped: ${r.skipped}` : `Seeded ${r.seeded} sample clients.`); } finally { setBusy(null); } };
 
-  if (!tenants) return <Skeleton className="h-64" />;
   return (
+    <Reveal loading={!tenants} className="space-y-3" skeleton={
+      <>
+        <Skeleton className="h-10 w-full rounded-full" />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i} className="space-y-2.5">
+            <div className="flex items-center justify-between"><div className="space-y-1.5"><SkeletonLine w="7rem" h="text" /><SkeletonLine w="4rem" h="xs" /></div><Skeleton className="h-6 w-16 rounded-full" /></div>
+            <div className="flex flex-wrap gap-2">{Array.from({ length: 6 }).map((_, j) => <Skeleton key={j} className="h-7 w-16 rounded-full" />)}</div>
+          </Card>
+        ))}
+      </>
+    }>
+      {tenants && (
     <Stagger className="space-y-3">
       <Button variant="tonal" className="w-full" disabled={busy === "demo"} onClick={() => void seedDemo()}><Sparkles /> {busy === "demo" ? "Seeding…" : "Seed demo data into my tenant"}</Button>
       {msg && <p className="text-center text-sm text-muted-foreground">{msg}</p>}
@@ -298,6 +362,8 @@ function Tenants() {
         </div>
       </Sheet>
     </Stagger>
+      )}
+    </Reveal>
   );
 }
 

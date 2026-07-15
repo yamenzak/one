@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@mossa/protocol";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, cn, colorToHex, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, Save, History, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, cn, colorToHex, Reveal, SkeletonLine, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, Save, History, X } from "@mossa/ui";
 import { api, ApiError } from "../../api.js";
 import { AiErrorBox } from "../../AiError.js";
 import { ExerciseRow, splitList, pretty, type ExerciseInfo } from "../exercise.js";
@@ -163,14 +163,33 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
     setCopyWeekOpen(false);
   };
 
-  if (!plan) return <Skeleton className="m-4 h-96" />;
-  const readOnly = plan.status === "superseded" || plan.status === "archived";
+  const readOnly = plan?.status === "superseded" || plan?.status === "archived";
   const day = days[dayIdx];
   const exOf = (id: string) => library.find((e) => e.id === id);
   const nameOf = (id: string) => exOf(id)?.name ?? "Exercise";
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-32">
+      <Reveal loading={!plan} className="space-y-4" skeleton={
+        <>
+          <div className="flex items-center gap-3">
+            <Skeleton className="size-9 rounded-xl" />
+            <SkeletonLine w="40%" h="title" className="flex-1" />
+            <Skeleton className="h-6 w-16 rounded-full" />
+            <Skeleton className="size-9 rounded-xl" />
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="aspect-[16/10] rounded-2xl" />)}
+          </div>
+          <div className="flex flex-wrap gap-2"><Skeleton className="h-9 w-20 rounded-full" /><Skeleton className="h-9 w-24 rounded-full" /></div>
+          <div className="space-y-3 rounded-2xl bg-card p-4">
+            <SkeletonLine w="50%" h="title" />
+            <Skeleton className="h-24 rounded-2xl" />
+          </div>
+        </>
+      }>
+        {plan && (
+        <>
       <div className="flex items-center gap-3">
         <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
         <h1 className="flex-1 truncate text-xl font-bold tracking-tight">{plan.name}</h1>
@@ -281,10 +300,13 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
           </div>
         </div>
       </div>
+        </>
+        )}
+      </Reveal>
 
       {picker && <ExercisePicker library={library} reloadLibrary={load} onClose={() => setPicker(null)} onPick={(id) => { mutate((d) => d[dayIdx]!.blocks[picker.blockIdx]!.slots.push(emptySlot(id))); setPicker(null); }} />}
       {aiOpen && <AiDraftSheet onClose={() => setAiOpen(false)} onRun={runAi} />}
-      {exportOpen && <ExportTemplateSheet body={{ days }} defaultName={plan.name} onClose={() => setExportOpen(false)} />}
+      {exportOpen && plan && <ExportTemplateSheet body={{ days }} defaultName={plan.name} onClose={() => setExportOpen(false)} />}
       {copyWeekOpen && <CopyWeekSheet dayCount={days.length} onClose={() => setCopyWeekOpen(false)} onCopy={copyWeek} />}
     </Page>
   );

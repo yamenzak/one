@@ -1,7 +1,7 @@
 /** Package editor + redemption codes + promo codes. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Switch, Sheet, Skeleton, Chip, Page, Stagger, EmptyState, IconBadge, SectionHeader, CreditCard, Ticket, Tag, Trash2, Plus, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Switch, Sheet, Chip, Page, Stagger, EmptyState, IconBadge, SectionHeader, Reveal, SkeletonHeader, SkeletonList, CreditCard, Ticket, Tag, Trash2, Plus, X } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Pkg { id: string; name: string; one_time_price_cents: number | null; monthly_price_cents?: number | null; budgets: { feature: string; days: number }[]; visibility: string }
@@ -31,14 +31,20 @@ export function Packages() {
   useEffect(() => void load(), [load]);
   const deletePromo = async (id: string) => { await api.del(`/api/promo-codes/${id}`); await load(); };
 
-  if (!packages) return (
-    <div className="mx-auto max-w-xl space-y-4 p-4">
-      <Skeleton className="h-9 w-40" /><Skeleton className="h-20" /><Skeleton className="h-20" />
-    </div>
-  );
-
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+      <Reveal loading={!packages} className="space-y-4" skeleton={
+        <>
+          <SkeletonHeader action />
+          <SkeletonList card rows={2} thumb={0} />
+          <SkeletonHeader action className="pt-2" />
+          <SkeletonList card rows={2} thumb={36} />
+          <SkeletonHeader action className="pt-2" />
+          <SkeletonList card rows={2} thumb={36} />
+        </>
+      }>
+        {packages && (
+        <>
       <SectionHeader icon={CreditCard} tone="primary" title="Packages" action={<Button size="sm" onClick={() => setPkgOpen(true)}><Plus /> New</Button>} />
       {packages.length === 0 ? (
         <EmptyState icon={CreditCard} title="No packages yet" description="Build a package — feature budgets (workout/meal/all) sold once or as installments. $0 packages are comps you grant directly." />
@@ -75,6 +81,9 @@ export function Packages() {
           ))}
         </Stagger>
       )}
+        </>
+        )}
+      </Reveal>
 
       {pkgOpen && <PackageSheet onClose={() => setPkgOpen(false)} onSaved={() => { setPkgOpen(false); void load(); }} />}
       {codeOpen && <CodeSheet onClose={() => setCodeOpen(false)} onSaved={() => { setCodeOpen(false); void load(); }} />}

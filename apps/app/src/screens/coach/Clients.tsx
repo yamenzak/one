@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Sheet, Skeleton, Avatar, SegmentedControl, Page, Stagger, EmptyState, Users, Mail, User, ArrowLeft, Plus } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, SegmentedControl, Page, Stagger, EmptyState, Reveal, SkeletonList, Users, Mail, User, ArrowLeft, Plus } from "@mossa/ui";
 import { api } from "../../api.js";
 import { Today } from "../client/Today.js";
 import { Progress } from "../client/Progress.js";
@@ -44,22 +44,24 @@ export function Clients() {
         <Button onClick={() => setCreateOpen(true)}><Plus /> New</Button>
       </div>
 
-      {!clients ? <Skeleton className="h-64" /> : clients.length === 0 ? (
-        <EmptyState icon={Users} title="No clients yet" description="Add your first client. With an email set, they sign in the moment you do — no codes, no passwords." action={<Button onClick={() => setCreateOpen(true)}><Plus /> Add client</Button>} />
-      ) : (
-        <Stagger className="space-y-2">
-          {clients.map((c) => (
-            <Card key={c.id} interactive onClick={() => nav(`/clients/${c.id}/today`)} className="flex items-center gap-3.5 py-3.5">
-              <Avatar name={c.displayName} src={c.avatarUrl} seed={c.avatarSeed ?? c.id} className="size-11" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 truncate font-semibold">{c.displayName}{pending.has(c.id) && <span className="size-2 shrink-0 rounded-full bg-cardio" title="Needs action" />}</div>
-                <div className="truncate text-sm text-muted-foreground">{c.email ?? "no email"}</div>
-              </div>
-              {pending.has(c.id) ? <Badge tone="cardio">Swap</Badge> : c.hasLogin ? <Badge tone="success">Active</Badge> : <Badge tone="neutral">Invited</Badge>}
-            </Card>
-          ))}
-        </Stagger>
-      )}
+      <Reveal loading={!clients} skeleton={<SkeletonList card rows={6} thumb={44} />}>
+        {clients && (clients.length === 0 ? (
+          <EmptyState icon={Users} title="No clients yet" description="Add your first client. With an email set, they sign in the moment you do — no codes, no passwords." action={<Button onClick={() => setCreateOpen(true)}><Plus /> Add client</Button>} />
+        ) : (
+          <Stagger className="space-y-2">
+            {clients.map((c) => (
+              <Card key={c.id} interactive onClick={() => nav(`/clients/${c.id}/today`)} className="flex items-center gap-3.5 py-3.5">
+                <Avatar name={c.displayName} src={c.avatarUrl} seed={c.avatarSeed ?? c.id} className="size-11" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 truncate font-semibold">{c.displayName}{pending.has(c.id) && <span className="size-2 shrink-0 rounded-full bg-cardio" title="Needs action" />}</div>
+                  <div className="truncate text-sm text-muted-foreground">{c.email ?? "no email"}</div>
+                </div>
+                {pending.has(c.id) ? <Badge tone="cardio">Swap</Badge> : c.hasLogin ? <Badge tone="success">Active</Badge> : <Badge tone="neutral">Invited</Badge>}
+              </Card>
+            ))}
+          </Stagger>
+        ))}
+      </Reveal>
 
       <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title="New client">
         <div className="space-y-4">

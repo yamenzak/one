@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, cn, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Sparkles, Ellipsis, Send, History } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, cn, Reveal, SkeletonRow, SkeletonLine, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Sparkles, Ellipsis, Send, History } from "@mossa/ui";
 import { api } from "../../api.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { AiErrorBox } from "../../AiError.js";
@@ -50,7 +50,10 @@ function Exercises() {
         <Field className="flex-1" label="Search exercises" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
         <Button variant="tonal" aria-label="New exercise" onClick={() => setEditor({})}><Plus /></Button>
       </div>
-      {!items ? <Skeleton className="h-40" /> : items.length === 0 ? <EmptyState icon={Dumbbell} title="No matches" /> : (
+      <Reveal loading={!items} skeleton={
+        <div className="space-y-1">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="rounded-2xl bg-card px-3 py-2.5"><SkeletonRow thumb={40} /></div>)}</div>
+      }>
+        {items && (items.length === 0 ? <EmptyState icon={Dumbbell} title="No matches" /> : (
         <Stagger className="space-y-1">{items.map((e) => (
           <div key={e.id} className="rounded-2xl bg-card px-3 py-2.5">
             <ExerciseRow ex={e} thumbSize={40} onClick={() => open(e)} trailing={
@@ -63,7 +66,8 @@ function Exercises() {
             } />
           </div>
         ))}</Stagger>
-      )}
+        ))}
+      </Reveal>
       {/* After a NEW add, clear any active search so the new row is actually visible (not filtered out by a stale query). */}
       {editor && <ExerciseEditor exerciseId={editor.exerciseId} initial={editor.initial} onClose={() => setEditor(null)} onSaved={() => { const wasNew = !editor.exerciseId; setEditor(null); if (wasNew && q) setQ(""); else void load(); }} />}
       {altFor && <AlternativesSheet exercise={altFor} onClose={() => setAltFor(null)} />}
@@ -91,15 +95,19 @@ function AlternativesSheet({ exercise, onClose }: { exercise: ExerciseInfo; onCl
     <Sheet open onClose={onClose} title={`Alternatives · ${exercise.name}`}>
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">Bound alternatives let clients swap instantly — no approval. Binding is two-way.</p>
-        {!alts ? <Skeleton className="h-20" /> : alts.length === 0 ? <p className="text-sm text-muted-foreground">No alternatives yet.</p> : (
-          <div className="space-y-1">{alts.map((a) => (
-            <div key={a.id} className="rounded-xl bg-surface-2 px-2.5 py-2">
-              <ExerciseRow ex={a} thumbSize={36} trailing={
-                <button onClick={() => void remove(a.id)} aria-label="Remove" className="text-muted-foreground hover:text-danger [&_svg]:size-4"><Trash2 /></button>
-              } />
-            </div>
-          ))}</div>
-        )}
+        <Reveal loading={!alts} skeleton={
+          <div className="space-y-1">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="rounded-xl bg-surface-2 px-2.5 py-2"><SkeletonRow thumb={36} trailing={false} /></div>)}</div>
+        }>
+          {alts && (alts.length === 0 ? <p className="text-sm text-muted-foreground">No alternatives yet.</p> : (
+            <div className="space-y-1">{alts.map((a) => (
+              <div key={a.id} className="rounded-xl bg-surface-2 px-2.5 py-2">
+                <ExerciseRow ex={a} thumbSize={36} trailing={
+                  <button onClick={() => void remove(a.id)} aria-label="Remove" className="text-muted-foreground hover:text-danger [&_svg]:size-4"><Trash2 /></button>
+                } />
+              </div>
+            ))}</div>
+          ))}
+        </Reveal>
         <div className="border-t border-border/50 pt-3">
           <Field label="Add an alternative" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
           <div className="mt-1 max-h-56 space-y-1 overflow-y-auto">
@@ -169,7 +177,10 @@ function Foods() {
         <Field className="flex-1" label="Search foods" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
         <Button variant="tonal" aria-label="New food" onClick={() => setEditor({})}><Plus /></Button>
       </div>
-      {!items ? <Skeleton className="h-40" /> : items.length === 0 ? <EmptyState icon={Utensils} title="No foods yet" description="Add one, or build your library from the Eat tab." action={<Button onClick={() => setEditor({})}><Plus /> New food</Button>} /> : (
+      <Reveal loading={!items} skeleton={
+        <div className="space-y-1">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="rounded-2xl bg-card p-4"><SkeletonRow thumb={40} /></div>)}</div>
+      }>
+        {items && (items.length === 0 ? <EmptyState icon={Utensils} title="No foods yet" description="Add one, or build your library from the Eat tab." action={<Button onClick={() => setEditor({})}><Plus /> New food</Button>} /> : (
         <Stagger className="space-y-1">{items.map((f) => (
           <Card key={f.id} className="py-3">
             <FoodRowUI
@@ -187,7 +198,8 @@ function Foods() {
             />
           </Card>
         ))}</Stagger>
-      )}
+        ))}
+      </Reveal>
       {editor && (
         <FoodEditor
           foodId={editor.id}
@@ -211,14 +223,23 @@ function Templates() {
   return (
     <div className="space-y-3">
       <SegmentedControl options={[{ value: "workout", label: "Workout" }, { value: "meal", label: "Meal" }]} value={kind} onChange={setKind} />
-      {!items ? <Skeleton className="h-40" /> : items.length === 0 ? <EmptyState icon={LayoutGrid} title="No templates yet" description="Save any plan as a template from its builder to reuse it across clients." /> : (
+      <Reveal loading={!items} skeleton={
+        <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="flex items-center justify-between rounded-2xl bg-card p-4">
+            <div className="space-y-1.5"><SkeletonLine w="9rem" h="text" /><SkeletonLine w="5rem" h="xs" /></div>
+            <Skeleton className="size-8 rounded-full" />
+          </div>
+        ))}</div>
+      }>
+        {items && (items.length === 0 ? <EmptyState icon={LayoutGrid} title="No templates yet" description="Save any plan as a template from its builder to reuse it across clients." /> : (
         <Stagger className="space-y-2">{items.map((t) => (
           <Card key={t.id} className="flex items-center justify-between py-3">
             <div className="min-w-0"><div className="truncate font-medium">{t.name}</div><div className="text-xs text-muted-foreground">{t.visibility === "tenant" ? "Shared with team" : "Private"}</div></div>
             <button onClick={() => void remove(t.id)} className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button>
           </Card>
         ))}</Stagger>
-      )}
+        ))}
+      </Reveal>
     </div>
   );
 }
@@ -241,7 +262,16 @@ function Content() {
   return (
     <div className="space-y-3">
       <div className="flex justify-end"><Button size="sm" onClick={() => setSheet({})}><PencilLine /> Write article</Button></div>
-      {!items ? <Skeleton className="h-40" /> : items.length === 0 ? <EmptyState icon={PencilLine} title="Content hub is empty" description="Publish articles, recipes, and routines — public ones become your marketplace blog." /> : (
+      <Reveal loading={!items} skeleton={
+        <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="flex items-center justify-between gap-2 rounded-2xl bg-card p-4">
+            <div className="min-w-0 flex-1 space-y-1.5"><SkeletonLine w="70%" h="text" /><SkeletonLine w="45%" h="xs" /></div>
+            <Skeleton className="h-6 w-16 rounded-full" />
+            <Skeleton className="size-8 rounded-full" />
+          </div>
+        ))}</div>
+      }>
+        {items && (items.length === 0 ? <EmptyState icon={PencilLine} title="Content hub is empty" description="Publish articles, recipes, and routines — public ones become your marketplace blog." /> : (
         <Stagger className="space-y-2">{items.map((r) => (
           <Card key={r.id} className="flex items-center justify-between gap-2 py-3">
             <button onClick={() => setSheet({ id: r.id })} className="min-w-0 flex-1 text-left">
@@ -256,7 +286,8 @@ function Content() {
             <button onClick={() => setMenuFor(r)} aria-label="Article actions" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><Ellipsis /></button>
           </Card>
         ))}</Stagger>
-      )}
+        ))}
+      </Reveal>
       {sheet && <ArticleEditor id={sheet.id} clients={clients} onClose={() => setSheet(null)} onSaved={() => { setSheet(null); void load(); }} />}
       {menuFor && <ArticleActions article={menuFor} onClose={() => setMenuFor(null)} onEdit={() => { const id = menuFor.id; setMenuFor(null); setSheet({ id }); }} onChanged={() => { setMenuFor(null); void load(); }} />}
     </div>
@@ -306,7 +337,17 @@ function ArticleEditor({ id, clients, onClose, onSaved }: { id?: string; clients
 
   return (
     <Sheet open onClose={onClose} title={id ? "Edit article" : "Write article"}>
-      {loading ? <Skeleton className="h-64" /> : (
+      <Reveal loading={loading} skeleton={
+        <div className="space-y-4">
+          <Skeleton className="h-11 rounded-xl" />
+          <Skeleton className="h-11 rounded-xl" />
+          <div className="grid grid-cols-2 gap-3"><Skeleton className="h-11 rounded-xl" /><Skeleton className="h-11 rounded-xl" /></div>
+          <Skeleton className="h-24 rounded-xl" />
+          <Skeleton className="h-32 rounded-xl" />
+          <Skeleton className="h-11 rounded-xl" />
+        </div>
+      }>
+        {!loading && (
         <div className="space-y-4">
           {!id && (
             <div className="space-y-2 rounded-2xl bg-primary/10 p-3">
@@ -351,7 +392,8 @@ function ArticleEditor({ id, clients, onClose, onSaved }: { id?: string; clients
             <Button className="flex-1" disabled={busy || title.trim().length < 2} onClick={() => void save("published")}><Send /> Publish</Button>
           </div>
         </div>
-      )}
+        )}
+      </Reveal>
     </Sheet>
   );
 }
