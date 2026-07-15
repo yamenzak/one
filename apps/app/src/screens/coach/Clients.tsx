@@ -12,6 +12,7 @@ import { Progress } from "../client/Progress.js";
 import { CoachPlans } from "./CoachPlans.js";
 import { GoalManager } from "./GoalManager.js";
 import { ClientManage } from "./ClientManage.js";
+import { ClientReport } from "./ClientReport.js";
 
 export interface ClientSummary { id: string; displayName: string; email: string | null; status: string; hasLogin: boolean; avatarUrl?: string | null; avatarSeed?: string | null }
 
@@ -76,6 +77,7 @@ const TABS = [
   { value: "plans", label: "Plans" },
   { value: "goals", label: "Goals" },
   { value: "progress", label: "Progress" },
+  { value: "report", label: "Report" },
   { value: "manage", label: "Manage" },
 ] as const;
 type Tab = (typeof TABS)[number]["value"];
@@ -111,6 +113,7 @@ export function ClientDetail() {
       {tab === "plans" && <CoachPlans clientId={clientId} />}
       {tab === "goals" && <GoalManager clientId={clientId} />}
       {tab === "progress" && <Progress clientId={clientId} />}
+      {tab === "report" && <ClientReport clientId={clientId} />}
       {tab === "manage" && <ClientManage clientId={clientId} />}
     </div>
   );
