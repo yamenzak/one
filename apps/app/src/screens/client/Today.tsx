@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { fmtVolume, fmtEnergy, fmtWeight, type UnitPrefs } from "@mossa/domain";
 import {
-  Button, Card, Skeleton, MacroBar, IconBadge, Sheet, EmptyState,
+  Button, Card, Skeleton, MacroBar, IconBadge, Sheet, EmptyState, ProgressRing,
   Reveal, SkeletonHero, SkeletonList, SkeletonHeader,
   Page, Stagger, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
   Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, Sparkles, Utensils, Croissant, Soup, Apple,
@@ -131,23 +131,33 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
       }>
         {data && agenda && widgetData && (
         <>
-          {data.profile && !data.profile.complete && (
-            <Stagger>
-              <Card className="space-y-3 border border-warning/25 bg-warning-soft/50">
-                <div className="flex items-start gap-3">
-                  <IconBadge icon={ClipboardList} tone="warning" />
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold">{ownView ? "Finish your profile" : "Profile incomplete"}</div>
-                    <p className="text-sm text-muted-foreground">{ownView ? "A few details let your coach build accurate goals, workouts and meals for you." : "Ask this client to complete their profile in Settings for accurate targets."}</p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {data.profile.gaps.map((g) => <span key={g} className="rounded-full bg-warning-soft px-2.5 py-1 text-xs font-medium text-warning">{GAP_LABELS[g] ?? g}</span>)}
-                </div>
-                {ownView && <Button size="sm" variant="tonal" onClick={() => nav("/settings")}><ClipboardList /> Complete profile</Button>}
-              </Card>
-            </Stagger>
-          )}
+          {data.profile && !data.profile.complete && (() => {
+            const total = Object.keys(GAP_LABELS).length;
+            const done = total - data.profile.gaps.length;
+            const pct = total ? done / total : 0;
+            return (
+              <Stagger>
+                <button onClick={ownView ? () => nav("/settings") : undefined} disabled={!ownView} className="block w-full text-left">
+                  <Card interactive={ownView} className="relative overflow-hidden">
+                    <div className="pointer-events-none absolute -right-12 -top-14 size-44 rounded-full bg-primary/15 blur-3xl" />
+                    <div className="relative flex items-center gap-4">
+                      <ProgressRing size={66} strokeWidth={7} tone="primary" progress={pct || 0.001} value={<span className="text-sm font-bold">{done}/{total}</span>} softTrack tintValue />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-medium uppercase tracking-wide text-primary">{ownView ? "Finish setting up" : "Profile incomplete"}</div>
+                        <h3 className="mt-0.5 text-lg font-semibold tracking-tight">Complete your profile</h3>
+                        <p className="mt-0.5 text-sm text-muted-foreground">{ownView ? "A few details let your coach tailor your plans and targets to you." : "Ask this client to finish their profile for accurate targets."}</p>
+                      </div>
+                      {ownView && <ChevronRight className="size-5 shrink-0 self-center text-muted-foreground" />}
+                    </div>
+                    <div className="relative mt-3.5 flex flex-wrap gap-1.5">
+                      {data.profile.gaps.slice(0, 6).map((g) => <span key={g} className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium">{GAP_LABELS[g] ?? g}</span>)}
+                      {data.profile.gaps.length > 6 && <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">+{data.profile.gaps.length - 6} more</span>}
+                    </div>
+                  </Card>
+                </button>
+              </Stagger>
+            );
+          })()}
 
           <Stagger data-tour="today-hero">
             <WidgetCarousel catalog={CLIENT_WIDGETS} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />

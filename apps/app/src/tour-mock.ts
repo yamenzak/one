@@ -65,16 +65,33 @@ const supplements = {
 };
 const suppLogs = { taken: [{ supplement_id: "s1", slot: "morning" }] };
 
+// Food library the meal plan resolves names/macros/images from.
+const FOODS = [
+  { id: "fd0", name: "Rolled oats", brand: null, serving_size: 40, serving_unit: "g", calories: 150, protein_g: 5, carbs_g: 27, fat_g: 3, fiber_g: 4, sugar_g: 1, image_url: null },
+  { id: "fd1", name: "Whey protein", brand: "Optimum", serving_size: 30, serving_unit: "g", calories: 120, protein_g: 24, carbs_g: 3, fat_g: 2, fiber_g: 0, sugar_g: 2, image_url: null },
+  { id: "fd2", name: "Chicken breast", brand: null, serving_size: 100, serving_unit: "g", calories: 165, protein_g: 31, carbs_g: 0, fat_g: 4, fiber_g: 0, sugar_g: 0, image_url: null },
+  { id: "fd3", name: "White rice, cooked", brand: null, serving_size: 100, serving_unit: "g", calories: 130, protein_g: 3, carbs_g: 28, fat_g: 0, fiber_g: 0, sugar_g: 0, image_url: null },
+  { id: "fd4", name: "Broccoli", brand: null, serving_size: 100, serving_unit: "g", calories: 34, protein_g: 3, carbs_g: 7, fat_g: 0, fiber_g: 3, sugar_g: 2, image_url: null },
+  { id: "fd5", name: "Greek yogurt", brand: null, serving_size: 100, serving_unit: "g", calories: 59, protein_g: 10, carbs_g: 4, fat_g: 0, fiber_g: 0, sugar_g: 4, image_url: null },
+  { id: "fd6", name: "Almonds", brand: null, serving_size: 28, serving_unit: "g", calories: 164, protein_g: 6, carbs_g: 6, fat_g: 14, fiber_g: 4, sugar_g: 1, image_url: null },
+  { id: "fd7", name: "Salmon fillet", brand: null, serving_size: 100, serving_unit: "g", calories: 208, protein_g: 20, carbs_g: 0, fat_g: 13, fiber_g: 0, sugar_g: 0, image_url: null },
+  { id: "fd8", name: "Sweet potato", brand: null, serving_size: 100, serving_unit: "g", calories: 86, protein_g: 2, carbs_g: 20, fat_g: 0, fiber_g: 3, sugar_g: 4, image_url: null },
+];
+const foods = { foods: FOODS };
 const mealPlans = {
   plans: [
     {
       id: "demo-meal",
       name: "Lean bulk — 2,400 kcal",
       status: "published",
+      publishedAt: at(20, 9),
       body: {
         mealOptions: [
-          { mealType: "breakfast" }, { mealType: "breakfast" },
-          { mealType: "lunch" }, { mealType: "dinner" }, { mealType: "snack" },
+          { mealType: "breakfast", mealName: "Oats & whey", foods: [{ foodId: "fd0", quantity: 80, unit: "g" }, { foodId: "fd1", quantity: 30, unit: "g" }] },
+          { mealType: "breakfast", mealName: "Greek yogurt bowl", foods: [{ foodId: "fd5", quantity: 200, unit: "g" }, { foodId: "fd6", quantity: 30, unit: "g" }] },
+          { mealType: "lunch", mealName: "Chicken, rice & greens", foods: [{ foodId: "fd2", quantity: 200, unit: "g" }, { foodId: "fd3", quantity: 150, unit: "g" }, { foodId: "fd4", quantity: 100, unit: "g" }] },
+          { mealType: "dinner", mealName: "Salmon & sweet potato", foods: [{ foodId: "fd7", quantity: 180, unit: "g" }, { foodId: "fd8", quantity: 200, unit: "g" }] },
+          { mealType: "snack", mealName: "Yogurt & almonds", foods: [{ foodId: "fd5", quantity: 150, unit: "g" }, { foodId: "fd6", quantity: 20, unit: "g" }] },
         ],
       },
     },
@@ -115,9 +132,20 @@ const checkIns = {
 const labs = { labs: [{ id: "l1", display_name: "Full blood panel", status: "reviewed", values: [{ marker: "Vitamin D", value: "42", unit: "ng/mL", flag: "normal" }, { marker: "Ferritin", value: "38", unit: "ng/mL", flag: "low" }], reviewed_at: at(10, 12) }] };
 
 // ── Train ────────────────────────────────────────────────────────────────
-// A block whose slots each carry a `sets` array — matching WorkoutBody so
-// prescribedSetsForDay (reads slot.sets.length) and the day cards render.
-const blk = (slots: number, sets = 3) => ({ type: "single", slots: range(slots).map((s) => ({ exerciseId: `ex${s}`, measurementMode: "reps", sets: range(sets).map(() => ({ reps: 10 })) })) });
+// Exercise library the session player resolves names/thumbs/how-to from.
+const EX = [
+  { id: "ex0", name: "Barbell Bench Press", muscle_groups: "chest", secondary_muscle_groups: "triceps,shoulders", equipment: "barbell", difficulty: "intermediate", force: "push", mechanic: "compound", category: "strength", instructions_md: "Lie flat, grip just outside shoulder width. Lower the bar to mid-chest, then press up until arms lock out.", thumb_url: null, thumb2_url: null, video_url: null, active: 1 },
+  { id: "ex1", name: "Bent-over Row", muscle_groups: "back", secondary_muscle_groups: "biceps", equipment: "barbell", difficulty: "intermediate", force: "pull", mechanic: "compound", category: "strength", instructions_md: "Hinge at the hips, back flat. Row the bar to your lower ribs, squeezing the shoulder blades.", thumb_url: null, thumb2_url: null, video_url: null, active: 1 },
+  { id: "ex2", name: "Overhead Press", muscle_groups: "shoulders", secondary_muscle_groups: "triceps", equipment: "barbell", difficulty: "intermediate", force: "push", mechanic: "compound", category: "strength", instructions_md: "Brace your core and press the bar overhead until your arms lock out, then lower under control.", thumb_url: null, thumb2_url: null, video_url: null, active: 1 },
+  { id: "ex3", name: "Lat Pulldown", muscle_groups: "back", secondary_muscle_groups: "biceps", equipment: "cable", difficulty: "beginner", force: "pull", mechanic: "compound", category: "strength", instructions_md: "Pull the bar to your upper chest, driving the elbows down and back. Control the return.", thumb_url: null, thumb2_url: null, video_url: null, active: 1 },
+  { id: "ex4", name: "Dumbbell Curl", muscle_groups: "biceps", secondary_muscle_groups: "forearms", equipment: "dumbbell", difficulty: "beginner", force: "pull", mechanic: "isolation", category: "strength", instructions_md: "Curl the dumbbells without swinging, squeeze at the top, lower slowly.", thumb_url: null, thumb2_url: null, video_url: null, active: 1 },
+];
+const exercises = { exercises: EX };
+
+// A block whose slots each carry a rich `sets` array — matching WorkoutBody so
+// the session player renders dots, targets, rest clocks and modifiers.
+const wset = (i: number) => ({ setType: "working", weightMode: "absolute", weightValue: 40 + i * 10, reps: 8, restAfterSec: 90, rpe: 8 });
+const blk = (slots: number, sets = 3) => ({ type: "single", slots: range(slots).map((s) => ({ exerciseId: `ex${s}`, measurementMode: "reps", sets: range(sets).map(() => wset(s)) })) });
 const workoutPlans = {
   plans: [
     {
@@ -212,6 +240,8 @@ export function tourInterceptor(method: string, path: string): unknown | undefin
   if (p === "/api/fasting") return fasting;
   if (p === "/api/wellness/score") return wellnessScore;
   if (p === "/api/workout-plans") return workoutPlans;
+  if (p === "/api/exercises") return exercises;
+  if (p === "/api/foods") return foods;
   if (p === "/api/logs/workout-sessions") return workoutSessions;
   if (p === "/api/logs/activities") return activityLogs;
   if (p === "/api/sessions") return sessions;

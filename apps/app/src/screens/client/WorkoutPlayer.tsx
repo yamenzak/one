@@ -50,6 +50,14 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
     return () => clearTimeout(t);
   }, [dayIndex, plan, tourActive, startIfNew]);
 
+  // During the tour, land on a real training day of the (sample) plan so the
+  // exercise/set/timer highlights always have something to point at.
+  useEffect(() => {
+    if (!tourActive || !plan) return;
+    const training = plan.body.days.findIndex((d) => !d.isRestDay);
+    setDayIndex(training >= 0 ? training : 0);
+  }, [tourActive, plan]);
+
   const load = useCallback(async () => {
     const [plansRes, exRes, sessRes] = await Promise.all([
       api.get<{ plans: PlanRow[] }>(`/api/workout-plans?clientId=${clientId}`),
@@ -63,7 +71,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
     for (const s of sessRes.sessions) for (const e of s.entries) sess.set(`${e.blockIndex}:${e.slotIndex}`, e.sets);
     setSession(sess);
   }, [clientId, date]);
-  useEffect(() => void load(), [load]);
+  useEffect(() => void load(), [load, tourActive]); // reload through the api interceptor when a tour toggles
 
   useEffect(() => {
     void api.get<{ sessions: { entries: SessionEntry[] }[] }>(`/api/logs/workout-sessions?clientId=${clientId}&from=2000-01-01&to=${date}`).then((r) => {

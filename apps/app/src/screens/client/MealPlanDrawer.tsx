@@ -79,7 +79,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
     setTargets(today.goal?.targets ?? null);
     setLoggedIdx(new Set((log.entries ?? []).filter((e) => e.meal_plan_id === published?.id && e.meal_option_index != null).map((e) => e.meal_option_index as number)));
   }, [clientId, date]);
-  useEffect(() => void load(), [load]);
+  useEffect(() => void load(), [load, tourActive]); // reload through the api interceptor when a tour toggles
 
   const foodMap = useMemo(() => new Map([...foods.entries()].map(([id, f]) => [id, { id: f.id, servingSize: f.serving_size, caloriesPerServing: f.calories, proteinG: f.protein_g, carbsG: f.carbs_g, fatG: f.fat_g } as FoodLike])), [foods]);
 

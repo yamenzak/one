@@ -62,7 +62,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<{ tour: TourId; idx: number } | null>(null);
   const active = state !== null;
   const start = useCallback((id: TourId) => {
-    if (id === "app") setApiInterceptor(tourInterceptor); // only the app tour fakes data
+    setApiInterceptor(tourInterceptor); // every tour runs on sample data
     setState({ tour: id, idx: 0 });
   }, []);
   const startIfNew = useCallback((id: TourId) => { if (!tourSeen(id)) start(id); }, [start]);
