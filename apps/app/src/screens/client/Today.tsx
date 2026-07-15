@@ -13,7 +13,6 @@ import {
 import type { WidgetItem } from "@mossa/protocol";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
-import { useSession } from "../../session.js";
 import { LogSheet } from "./LogSheet.js";
 import { WidgetCarousel, WidgetCustomizeSheet } from "../widget-kit.js";
 import { CLIENT_WIDGETS, DEFAULT_CLIENT_WIDGETS, type ClientWidgetData } from "./HomeWidgets.js";
@@ -41,6 +40,7 @@ export interface TodayBundle {
   checkInDates?: string[];
   pendingLabs?: number;
   weightSeries?: { kg: number; date: string }[];
+  widgets?: WidgetItem[] | null;
 }
 
 /** The route (with any deep-link query) a feed event opens — client context
@@ -67,15 +67,16 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [widgetsOpen, setWidgetsOpen] = useState(false);
-  const { ctx, refresh } = useSession();
-  const [widgetItems, setWidgetItems] = useState<WidgetItem[] | null>(ctx?.user.widgets?.home ?? null);
+  // The home widget layout is CLIENT-scoped (stored on the client's dashboard
+  // prefs, surfaced in the today bundle), so a coach viewing a client edits the
+  // client's own hero — not their own — and both see the same arrangement.
+  const [widgetItems, setWidgetItems] = useState<WidgetItem[] | null>(null);
   const units = useUnits();
   const date = todayLocal();
 
   const saveWidgets = async (items: WidgetItem[]) => {
     setWidgetItems(items);
-    await api.patch("/api/me/widgets", { surface: "home", items }).catch(() => undefined);
-    void refresh();
+    await api.patch(`/api/clients/${clientId}`, { dashboardPrefs: { widgets: items } }).catch(() => undefined);
   };
 
   const load = useCallback(async () => {
@@ -84,7 +85,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
       api.get<{ events: FeedEvent[] }>(`/api/activity-history?clientId=${clientId}&from=${date}&to=${date}`),
       fetchAgenda(clientId, date),
     ]);
-    setData(bundle); setFeed(hist.events); setAgenda(ag);
+    setData(bundle); setWidgetItems(bundle.widgets ?? null); setFeed(hist.events); setAgenda(ag);
   }, [clientId, date]);
   useEffect(() => void load(), [load]);
 

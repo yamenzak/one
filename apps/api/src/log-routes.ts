@@ -799,5 +799,8 @@ export const logRoutes = new Hono<AppEnv>()
       checkInDates: (checkInDates.results ?? []).map((r) => r.date_local),
       pendingLabs: pendingLabs?.n ?? 0,
       weightSeries: (weights.results ?? []).map((r) => ({ kg: r.weight_kg, date: r.date_local })).reverse(),
+      // Client-scoped home widget layout (editable by the client OR their coach),
+      // so a coach can arrange a client's hero on their behalf.
+      widgets: parseJson<{ widgets?: unknown[] }>(access.client.dashboard_prefs_json, {}).widgets ?? null,
     });
   });

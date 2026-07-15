@@ -733,6 +733,19 @@ describe("reports", () => {
   });
 });
 
+describe("client-scoped home widgets (coach configures on the client's behalf)", () => {
+  it("a coach sets a client's dashboard widget layout; it surfaces in the client's today bundle", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "WidgetWill" }) })).json()) as { client: { id: string } };
+    const layout = [{ id: "calories", size: "big" }, { id: "protein", size: "small" }];
+    const patched = await SELF.fetch(`http://x/api/clients/${client.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ dashboardPrefs: { widgets: layout } }) });
+    expect(patched.status).toBe(200);
+    const today = new Date().toISOString().slice(0, 10);
+    const bundle = (await (await SELF.fetch(`http://x/api/today?clientId=${client.id}&date=${today}`, { headers: auth(ownerCookie) })).json()) as { widgets: { id: string; size: string }[] | null };
+    expect(bundle.widgets).toEqual(layout);
+  });
+});
+
 describe("progress analytics aggregation", () => {
   it("returns per-day body + wellness series, deltas, radar and a consistency heatmap", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
