@@ -164,17 +164,20 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
     : { top: "50%", left: 16, right: 16, transform: "translateY(-50%)" };
 
   return createPortal(
-    <div className="fixed inset-0 z-[200]">
+    // Root is click-through; each layer opts back in. This is what lets an
+    // action step's spotlit target stay live — only the dimmed panes (and, for
+    // info steps, a full catcher) actually intercept clicks.
+    <div className="pointer-events-none fixed inset-0 z-[200]">
       {/* Info steps block interaction (Next to advance). Action steps leave the
           spotlit target live so the user can actually tap it. */}
-      {!step.action && <div className="absolute inset-0" />}
+      {!step.action && <div className="pointer-events-auto absolute inset-0" />}
 
       {rect ? (
         <>
-          <div className="absolute inset-x-0 top-0 bg-black/65 backdrop-blur-[1px]" style={{ height: Math.max(0, rect.top - PAD) }} />
-          <div className="absolute inset-x-0 bottom-0 bg-black/65 backdrop-blur-[1px]" style={{ top: rect.bottom + PAD }} />
-          <div className="absolute bg-black/65 backdrop-blur-[1px]" style={{ top: rect.top - PAD, height: rect.height + PAD * 2, left: 0, width: Math.max(0, rect.left - PAD) }} />
-          <div className="absolute bg-black/65 backdrop-blur-[1px]" style={{ top: rect.top - PAD, height: rect.height + PAD * 2, left: rect.right + PAD, right: 0 }} />
+          <div className="pointer-events-auto absolute inset-x-0 top-0 bg-black/65 backdrop-blur-[1px]" style={{ height: Math.max(0, rect.top - PAD) }} />
+          <div className="pointer-events-auto absolute inset-x-0 bottom-0 bg-black/65 backdrop-blur-[1px]" style={{ top: rect.bottom + PAD }} />
+          <div className="pointer-events-auto absolute bg-black/65 backdrop-blur-[1px]" style={{ top: rect.top - PAD, height: rect.height + PAD * 2, left: 0, width: Math.max(0, rect.left - PAD) }} />
+          <div className="pointer-events-auto absolute bg-black/65 backdrop-blur-[1px]" style={{ top: rect.top - PAD, height: rect.height + PAD * 2, left: rect.right + PAD, right: 0 }} />
           <motion.div
             aria-hidden
             className="pointer-events-none absolute rounded-2xl"
@@ -185,7 +188,7 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
           />
         </>
       ) : (
-        <div className="absolute inset-0 bg-black/70 backdrop-blur-[1px]" />
+        <div className="pointer-events-auto absolute inset-0 bg-black/70 backdrop-blur-[1px]" />
       )}
 
       <div className="pointer-events-none absolute" style={tipStyle}>
