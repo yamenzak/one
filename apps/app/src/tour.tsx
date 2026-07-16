@@ -14,7 +14,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { Button, ArrowRight, ArrowLeft, X, Sparkles, Hand, toneVar, type Tone } from "@mossa/ui";
+import { Button, ArrowRight, ArrowLeft, X, Sparkles, Hand, CircleCheck, toneVar, type Tone } from "@mossa/ui";
 import { setApiInterceptor } from "./api.js";
 import { tourInterceptor } from "./tour-mock.js";
 
@@ -24,7 +24,13 @@ const doneKey = (id: TourId) => `mossa.tour.v1.${id}.done`;
 export const tourSeen = (id: TourId): boolean => { try { return localStorage.getItem(doneKey(id)) === "1"; } catch { return true; } };
 const markSeen = (id: TourId): void => { try { localStorage.setItem(doneKey(id), "1"); } catch { /* private mode */ } };
 
-interface TourStep { route?: string; routeMatch?: string; selector?: string; action?: boolean; title: string; body: string; tone?: Tone }
+interface TourStep {
+  route?: string; routeMatch?: string; selector?: string; action?: boolean;
+  title: string; body: string; tone?: Tone;
+  /** For action steps: shown once the user does the thing — a beat that explains
+   *  what just happened before they move on (instead of silently advancing). */
+  after?: { title: string; body: string };
+}
 
 // `action: true` → the highlighted element is live: doing the thing (tapping
 // it) advances the tour. Beginner-friendly "now you try it" beats.
@@ -48,17 +54,22 @@ const TOURS: Record<TourId, TourStep[]> = {
     { route: "/train/session/0", routeMatch: "/train/session", selector: "wp-exercise", title: "Your workout, guided", body: "Each exercise in order with everything you need to train it — no guessing. Here's the first.", tone: "activity" },
     { selector: "wp-details", title: "Know every move", body: "Tap the exercise name anytime for a demo, the muscles it works, and step-by-step how-to.", tone: "activity" },
     { selector: "wp-sets", title: "Your prescribed sets", body: "Each dot is a set with its target reps and weight. They fill in as you log.", tone: "activity" },
-    { selector: "wp-timer", action: true, title: "Now you try — start a rest", body: "Between exercises there's a rest clock. Tap it to start your countdown.", tone: "activity" },
+    { selector: "wp-timer", action: true, title: "Now you try — start a rest", body: "Between exercises there's a rest clock. Tap it to start your countdown.", tone: "activity",
+      after: { title: "That's your rest running", body: "The clock is counting down your recovery — when it hits zero you're set for the next round. It keeps ticking even if you scroll away." } },
     { selector: "wp-progress", title: "Track your session", body: "This ring fills as you log — when it's full, you're done. Head back with the arrow any time.", tone: "activity" },
-    { selector: "wp-log", action: true, title: "Log a set", body: "Ready? Tap Log to record your reps, weight and how it felt — that's it, you're training!", tone: "activity" },
+    { selector: "wp-log", action: true, title: "Now you try — log a set", body: "Ready? Tap Log to record your reps, weight and how it felt.", tone: "activity",
+      after: { title: "Set logged — you're training!", body: "Your reps, weight and how it felt are saved, and the session ring just ticked up. Log every set this way and you'll finish the whole workout." } },
   ],
   meal: [
     { route: "/eat?tour=meal", routeMatch: "/eat", selector: "mp-hero", title: "Your meal plan", body: "Everything your coach designed for you, with your daily calorie and protein targets right up top.", tone: "nutrition" },
     { selector: "mp-section", title: "Options for every meal", body: "Each meal comes with options — swipe through and tap one to see its foods, full macros and even an AI recipe.", tone: "nutrition" },
-    { selector: "mp-log", action: true, title: "Now you try — log a meal", body: "Eating this one? Tap Log to add it to today.", tone: "nutrition" },
+    { selector: "mp-log", action: true, title: "Now you try — log a meal", body: "Eating this one? Tap Log to add it to today.", tone: "nutrition",
+      after: { title: "Meal logged", body: "Its calories and macros just landed in today's intake — your rings on Today and Eat move to match. That's all it takes to stay on target." } },
     { selector: "mp-tabs", title: "Meals & shopping list", body: "Two views: your meals, and a Shopping list that totals every ingredient you need for the week.", tone: "nutrition" },
-    { selector: "mp-shop-add", action: true, title: "Plan your week", body: "Switch to the shopping list. Tap + to add a day of this meal — we'll build your list.", tone: "nutrition" },
-    { selector: "mp-shop-item", action: true, title: "Check it off", body: "There's your list. Tap an item to mark it as bought — it's saved on your device.", tone: "nutrition" },
+    { selector: "mp-shop-add", action: true, title: "Now you try — plan your week", body: "Here's your shopping list. Tap + to add another day of this meal.", tone: "nutrition",
+      after: { title: "Added to your list", body: "We tallied every ingredient in that meal into your shopping list. Add more days and the quantities add up for you automatically." } },
+    { selector: "mp-shop-item", action: true, title: "Now you try — check it off", body: "There's your list. Tap an item to mark it as bought.", tone: "nutrition",
+      after: { title: "Crossed off", body: "It's marked done and saved on your device, so your list remembers what you've already got — even next time you open it." } },
     { selector: "mp-shop-reset", title: "Fresh start each week", body: "When a new week rolls around, hit Start over to clear it and plan again.", tone: "nutrition" },
   ],
 };
@@ -101,10 +112,16 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
   const nav = useNavigate();
   const loc = useLocation();
   const [rect, setRect] = useState<DOMRect | null>(null);
+  // For action steps with an `after` beat: flips true once the user does the
+  // thing, swapping the card to the "here's what just happened" explanation.
+  const [done, setDone] = useState(false);
+  useEffect(() => { setDone(false); }, [idx]);
   const accent = toneVar[step.tone ?? "primary"];
   const last = idx === steps.length - 1;
   const next = () => (last ? stop() : setIdx(idx + 1));
   const back = () => idx > 0 && setIdx(idx - 1);
+  // The copy currently on the card — the explanation once the action fired.
+  const shown = done && step.after ? step.after : step;
 
   // Navigate to the step's route before highlighting. Compare on pathname only
   // so a query (e.g. ?tour=meal, used to open the Eat meal drawer) doesn't loop.
@@ -119,7 +136,9 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
   useEffect(() => {
     if (!step.action || !step.selector) return;
     let raf = 0, tries = 0, el: Element | null = null;
-    const onClick = () => window.setTimeout(next, 60);
+    // Let the element's own handler run, then either explain what happened
+    // (steps with an `after` beat) or move straight on.
+    const onClick = () => window.setTimeout(() => (step.after ? setDone(true) : next()), 60);
     const attach = () => {
       el = pickEl(step.selector!);
       if (el) el.addEventListener("click", onClick, { once: true });
@@ -171,8 +190,9 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
     // info steps, a full catcher) actually intercept clicks.
     <div className="pointer-events-none fixed inset-0 z-[200]">
       {/* Info steps block interaction (Next to advance). Action steps leave the
-          spotlit target live so the user can actually tap it. */}
-      {!step.action && <div className="pointer-events-auto absolute inset-0" />}
+          spotlit target live so the user can actually tap it — but once they've
+          done it (the `after` beat), we re-block so they read, not double-tap. */}
+      {(!step.action || done) && <div className="pointer-events-auto absolute inset-0" />}
 
       {rect ? (
         <>
@@ -184,8 +204,8 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
             aria-hidden
             className="pointer-events-none absolute rounded-2xl"
             initial={{ opacity: 0 }}
-            animate={step.action ? { opacity: 1, boxShadow: [`0 0 0 2px ${accent}, 0 0 0 4px color-mix(in oklch, ${accent} 35%, transparent)`, `0 0 0 2px ${accent}, 0 0 0 12px color-mix(in oklch, ${accent} 0%, transparent)`] } : { opacity: 1 }}
-            transition={step.action ? { boxShadow: { duration: 1.4, repeat: Infinity, ease: "easeOut" }, opacity: { duration: 0.2 } } : { duration: 0.2 }}
+            animate={step.action && !done ? { opacity: 1, boxShadow: [`0 0 0 2px ${accent}, 0 0 0 4px color-mix(in oklch, ${accent} 35%, transparent)`, `0 0 0 2px ${accent}, 0 0 0 12px color-mix(in oklch, ${accent} 0%, transparent)`] } : { opacity: 1 }}
+            transition={step.action && !done ? { boxShadow: { duration: 1.4, repeat: Infinity, ease: "easeOut" }, opacity: { duration: 0.2 } } : { duration: 0.2 }}
             style={{ top: rect.top - PAD, left: rect.left - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2, boxShadow: `0 0 0 2px ${accent}, 0 0 0 6px color-mix(in oklch, ${accent} 30%, transparent)` }}
           />
         </>
@@ -196,28 +216,25 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
       <div className="pointer-events-none absolute" style={tipStyle}>
         <AnimatePresence mode="wait">
           <motion.div
-            key={idx}
+            key={`${idx}:${done ? 1 : 0}`}
             initial={{ opacity: 0, y: below ? -8 : 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             className="pointer-events-auto mx-auto max-w-md rounded-3xl border border-border/50 bg-card p-5 shadow-[0_24px_60px_-20px_oklch(0_0_0/0.6)]"
           >
             <div className="flex items-start gap-3">
-              <div className="grid size-9 shrink-0 place-items-center rounded-xl [&_svg]:size-[1.1rem]" style={{ backgroundColor: `color-mix(in oklch, ${accent} 16%, transparent)`, color: accent }}>{step.action ? <Hand /> : <Sparkles />}</div>
+              <div className="grid size-9 shrink-0 place-items-center rounded-xl [&_svg]:size-[1.1rem]" style={{ backgroundColor: `color-mix(in oklch, ${accent} 16%, transparent)`, color: accent }}>{done ? <CircleCheck /> : step.action ? <Hand /> : <Sparkles />}</div>
               <div className="min-w-0 flex-1">
-                <div className="font-semibold leading-tight">{step.title}</div>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{step.body}</p>
+                <div className="font-semibold leading-tight">{shown.title}</div>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{shown.body}</p>
               </div>
-              <button onClick={stop} aria-label="Skip tour" className="-mr-1 -mt-1 grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground [&_svg]:size-4"><X /></button>
+              <button onClick={stop} aria-label="Close tour" className="-mr-1 -mt-1 grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground [&_svg]:size-4"><X /></button>
             </div>
             <div className="mt-4 flex items-center justify-between gap-3">
               <div className="flex gap-1.5">{steps.map((_, i) => <span key={i} className="h-1.5 rounded-full transition-all" style={{ width: i === idx ? 18 : 6, backgroundColor: i === idx ? accent : "var(--surface-3)" }} />)}</div>
               <div className="flex items-center gap-2">
-                {idx > 0 && <Button size="sm" variant="ghost" onClick={back}><ArrowLeft /> Back</Button>}
-                {step.action ? (
-                  <div className="flex items-center gap-1.5">
-                    <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: accent }}><Hand className="size-3.5" /> Try it</span>
-                    <Button size="sm" variant="ghost" onClick={next}>Skip</Button>
-                  </div>
+                {idx > 0 && !done && <Button size="sm" variant="ghost" onClick={back}><ArrowLeft /> Back</Button>}
+                {step.action && !done ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold" style={{ color: accent, backgroundColor: `color-mix(in oklch, ${accent} 12%, transparent)` }}><Hand className="size-3.5" /> Your turn — give it a tap</span>
                 ) : (
                   <Button size="sm" onClick={next} style={{ backgroundColor: accent }}>{last ? "Finish" : "Next"} {!last && <ArrowRight />}</Button>
                 )}
