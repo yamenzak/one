@@ -50,6 +50,7 @@ interface SubRow {
   flags_json: string | null;
   source: string;
   started_at: string;
+  stripe_sub_id?: string | null;
 }
 
 function subView(row: SubRow, nowIsoStr: string) {
@@ -65,6 +66,8 @@ function subView(row: SubRow, nowIsoStr: string) {
     addOns: parseJson(row.addons_json, []),
     source: row.source,
     startedAt: row.started_at,
+    // Auto-renews while a live Stripe subscription id is pinned to the row.
+    autoRenew: Boolean(row.stripe_sub_id),
   };
 }
 

@@ -302,6 +302,37 @@ describe("connect rail — webhook idempotency + grant", () => {
     const notif = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE tenant_id = ? AND type = 'payment_refunded'").bind(ctx.active.tenantId).first<{ n: number }>())!;
     expect(notif.n).toBeGreaterThanOrEqual(1);
   });
+
+  it("recurring: subscription checkout grants period one + a renewal cycle tops up", async () => {
+    const db = env.DB as D1Database;
+    const secret = "whsec_connect_test";
+    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.connect_webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "RecurBuyer" }) })).json()) as { client: { id: string } };
+    const pkgId = "pkg_recur_1";
+    await db.prepare("INSERT INTO packages (id, tenant_id, name, monthly_price_cents, budgets_json, currency, active, created_at) VALUES (?, ?, ?, ?, ?, 'usd', 1, ?)")
+      .bind(pkgId, ctx.active.tenantId, "Monthly Coaching", 4900, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
+
+    const post = async (payload: string) => SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
+
+    // Period one via subscription-mode checkout.
+    const created = JSON.stringify({ id: "evt_sub_create", type: "checkout.session.completed", data: { object: { id: "cs_sub_1", mode: "subscription", subscription: "sub_recur_1", metadata: { mossa_tenant: ctx.active.tenantId, mossa_client: client.id, mossa_package: pkgId } } } });
+    expect((await post(created)).status).toBe(200);
+    const days1 = (await (await SELF.fetch(`http://x/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number; autoRenew?: boolean; budgets: unknown[] }[] };
+    const sub1 = days1.subscriptions.find((s) => (s.budgets?.length ?? 0) > 0)!;
+    expect(sub1.autoRenew).toBe(true);
+    expect(sub1.daysRemaining).toBeGreaterThan(20);
+    const budgetsAfterCreate = sub1.budgets.length;
+
+    // A renewal cycle tops the budget up (queued behind the current period).
+    const renew = JSON.stringify({ id: "evt_sub_cycle", type: "invoice.paid", data: { object: { subscription: "sub_recur_1", billing_reason: "subscription_cycle" } } });
+    expect((await post(renew)).status).toBe(200);
+    const days2 = (await (await SELF.fetch(`http://x/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number; budgets: unknown[] }[] };
+    const sub2 = days2.subscriptions.find((s) => (s.budgets?.length ?? 0) > 0)!;
+    expect(sub2.budgets.length).toBeGreaterThan(budgetsAfterCreate); // another period queued
+    expect(sub2.daysRemaining).toBeGreaterThan(sub1.daysRemaining);
+  });
 });
 
 describe("platform rail — dunning notifies the owner", () => {

@@ -43,7 +43,7 @@ export async function stripeCall<T = unknown>(
   secretKey: string,
   path: string,
   body?: Record<string, string | number | undefined>,
-  opts?: { connectedAccount?: string; idempotencyKey?: string },
+  opts?: { connectedAccount?: string; idempotencyKey?: string; method?: "GET" | "POST" | "DELETE" },
 ): Promise<T> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${secretKey}`,
@@ -52,7 +52,7 @@ export async function stripeCall<T = unknown>(
   if (opts?.connectedAccount) headers["Stripe-Account"] = opts.connectedAccount;
   if (opts?.idempotencyKey) headers["Idempotency-Key"] = opts.idempotencyKey;
   const res = await fetch(`https://api.stripe.com/v1/${path}`, {
-    method: body ? "POST" : "GET",
+    method: opts?.method ?? (body ? "POST" : "GET"),
     headers,
     body: body ? encodeForm(body) : undefined,
   });

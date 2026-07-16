@@ -11,7 +11,7 @@ import { resolveEntitlements, buildBudgetsForPurchase, mergeAddOnBalances, type 
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { getSubscription, listPacks, listPlans, seedBilling, hasFeature, getConfig } from "./billing-store.js";
 import { requireClientAccess } from "./clients.js";
-import { notifyTenantOwners } from "./inbox-do.js";
+import { notifyTenantOwners, notifyUser } from "./inbox-do.js";
 import {
   ensureCustomer,
   stripeCall,
@@ -133,35 +133,75 @@ export const stripeRoutes = new Hono<AppEnv>()
     if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
     // The account must actually be able to accept charges (onboarding done).
     if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
-    const pkg = await c.env.DB.prepare("SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; currency: string }>();
+    const pkg = await c.env.DB.prepare("SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; currency: string }>();
     if (!pkg) return c.json({ error: "package not found" }, 404);
-    const amount = pkg.one_time_price_cents ?? 0;
+    // A monthly price makes the package auto-renewing (a Stripe subscription on
+    // the connected account); otherwise it's a one-time day-pack. Either way the
+    // budget model is the source of truth — recurring just re-buys each period.
+    const monthly = pkg.monthly_price_cents ?? 0;
+    const recurring = monthly > 0;
+    const amount = recurring ? monthly : (pkg.one_time_price_cents ?? 0);
     if (amount <= 0) return c.json({ error: "use /subscriptions/grant for $0 packages" }, 400);
 
     // Optional platform cut — a basis-points application fee set by the platform
     // admin (default 0 = zero markup, tenant keeps 100%). Direct charge on the
     // connected account, so the fee routes to the platform on this payment.
     const feeBps = Number((await getConfig(c.env.DB))["stripe.platform_fee_bps"] ?? "0");
-    const feeAmount = feeBps > 0 ? Math.round((amount * feeBps) / 10000) : 0;
-    const session = await stripeCall<{ url: string }>(
-      cfg.secretKey,
-      "checkout/sessions",
-      {
-        mode: "payment",
-        "line_items[0][price_data][currency]": pkg.currency || "usd",
-        "line_items[0][price_data][product_data][name]": pkg.name,
-        "line_items[0][price_data][unit_amount]": amount,
-        "line_items[0][quantity]": 1,
-        ...(feeAmount > 0 ? { "payment_intent_data[application_fee_amount]": feeAmount } : {}),
-        success_url: `${body.data.returnUrl}?purchase=success`,
-        cancel_url: `${body.data.returnUrl}?purchase=cancel`,
-        "metadata[mossa_tenant]": who.tenantId,
-        "metadata[mossa_client]": access.client.id,
-        "metadata[mossa_package]": pkg.id,
-      },
-      { connectedAccount: settings.stripe_account_id },
-    );
+    const meta = {
+      "metadata[mossa_tenant]": who.tenantId,
+      "metadata[mossa_client]": access.client.id,
+      "metadata[mossa_package]": pkg.id,
+    };
+    const priceData = {
+      "line_items[0][price_data][currency]": pkg.currency || "usd",
+      "line_items[0][price_data][product_data][name]": pkg.name,
+      "line_items[0][price_data][unit_amount]": amount,
+      "line_items[0][quantity]": 1,
+    };
+    const params: Record<string, string | number | undefined> = recurring
+      ? {
+          mode: "subscription",
+          ...priceData,
+          "line_items[0][price_data][recurring][interval]": "month",
+          ...(feeBps > 0 ? { "subscription_data[application_fee_percent]": feeBps / 100 } : {}),
+          // Carry the mapping on the subscription too, so renewals resolve it.
+          "subscription_data[metadata][mossa_tenant]": who.tenantId,
+          "subscription_data[metadata][mossa_client]": access.client.id,
+          "subscription_data[metadata][mossa_package]": pkg.id,
+          success_url: `${body.data.returnUrl}?purchase=success`,
+          cancel_url: `${body.data.returnUrl}?purchase=cancel`,
+          ...meta,
+        }
+      : {
+          mode: "payment",
+          ...priceData,
+          ...(feeBps > 0 ? { "payment_intent_data[application_fee_amount]": Math.round((amount * feeBps) / 10000) } : {}),
+          success_url: `${body.data.returnUrl}?purchase=success`,
+          cancel_url: `${body.data.returnUrl}?purchase=cancel`,
+          ...meta,
+        };
+    const session = await stripeCall<{ url: string }>(cfg.secretKey, "checkout/sessions", params, { connectedAccount: settings.stripe_account_id });
     return c.json({ url: session.url });
+  })
+
+  // Cancel a client's auto-renewing package (stops future billing; the current
+  // period's budget still runs out naturally). Client, their coach, or owner.
+  .post("/connect/cancel-subscription", async (c) => {
+    const who = requireTenant(c)!;
+    const body = z.object({ clientId: z.string() }).safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, body.data.clientId);
+    if ("response" in access) return access.response;
+    const sub = await c.env.DB.prepare("SELECT id, stripe_sub_id FROM client_subscriptions WHERE client_id = ? AND status = 'active' AND stripe_sub_id IS NOT NULL ORDER BY started_at DESC LIMIT 1").bind(access.client.id).first<{ id: string; stripe_sub_id: string | null }>();
+    if (!sub?.stripe_sub_id) return c.json({ error: "no auto-renewing subscription" }, 404);
+    const settings = await c.env.DB.prepare("SELECT stripe_account_id FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null }>();
+    const cfg = await stripeConfig(c.env.DB);
+    if (settings?.stripe_account_id && stripeEnabled(cfg)) {
+      await stripeCall(cfg.secretKey, `subscriptions/${sub.stripe_sub_id}`, undefined, { connectedAccount: settings.stripe_account_id, method: "DELETE" }).catch(() => undefined);
+    }
+    // Clear the renewal marker; access continues until the current budget lapses.
+    await c.env.DB.prepare("UPDATE client_subscriptions SET stripe_sub_id = NULL, payment_status = 'canceled', updated_at = ? WHERE id = ?").bind(nowIso(), sub.id).run();
+    return c.json({ ok: true });
   })
 
   // Live Connect account status (owner) — fetch from Stripe when configured,
@@ -192,11 +232,40 @@ export const stripeRoutes = new Hono<AppEnv>()
     const event = JSON.parse(payload) as { id?: string; account?: string; type: string; data: { object: Record<string, unknown> } };
     if (!(await firstSeen(c.env.DB, event.id))) return c.json({ received: true, duplicate: true });
     if (event.type === "checkout.session.completed") {
-      const s = event.data.object as { id?: string; metadata?: Record<string, string> };
+      const s = event.data.object as { id?: string; mode?: string; subscription?: string; metadata?: Record<string, string> };
       const m = s.metadata ?? {};
       if (m.mossa_client && m.mossa_package) {
-        await grantClientPackage(c.env.DB, m.mossa_tenant!, m.mossa_client, m.mossa_package, s.id ?? null);
+        // First period for both one-time and recurring; for recurring we also
+        // pin the Stripe subscription id so later invoices renew this same row.
+        await grantClientPackage(c.env.DB, m.mossa_tenant!, m.mossa_client, m.mossa_package, s.id ?? null, s.mode === "subscription" ? s.subscription ?? null : null);
       }
+    } else if (event.type === "invoice.paid") {
+      // Renewal cycles top up the budget; the first invoice (subscription_create)
+      // is skipped — checkout.session.completed already granted period one.
+      const inv = event.data.object as { subscription?: string; billing_reason?: string };
+      if (inv.subscription && inv.billing_reason === "subscription_cycle") {
+        await renewClientSubscription(c.env.DB, inv.subscription);
+      }
+    } else if (event.type === "invoice.payment_failed") {
+      // Auto-renew charge failed — mark past_due + nudge the client to fix their
+      // card. Access still runs until the current budget lapses (grace by design).
+      const inv = event.data.object as { subscription?: string };
+      if (inv.subscription) {
+        const row = await c.env.DB.prepare("SELECT id, tenant_id, client_id FROM client_subscriptions WHERE stripe_sub_id = ? LIMIT 1").bind(inv.subscription).first<{ id: string; tenant_id: string; client_id: string }>();
+        if (row) {
+          await c.env.DB.prepare("UPDATE client_subscriptions SET payment_status = 'past_due', updated_at = ? WHERE id = ?").bind(nowIso(), row.id).run();
+          const cl = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null }>();
+          if (cl?.user_id) {
+            await c.env.DB.prepare("INSERT OR IGNORE INTO notifications (id, tenant_id, recipient_user_id, type, title, message, link, created_at) VALUES (?, ?, ?, 'sub_payment_failed', 'Renewal payment failed', 'Update your card to keep your plan from pausing.', '/shop', ?)").bind(`ntf_pf_${row.id}`, row.tenant_id, cl.user_id, nowIso()).run().catch(() => undefined);
+            await notifyUser(c.env, cl.user_id);
+          }
+        }
+      }
+    } else if (event.type === "customer.subscription.deleted") {
+      // Auto-renew ended (client canceled or Stripe gave up). No more top-ups;
+      // the current budget simply runs out. Clear the renewal marker.
+      const subObj = event.data.object as { id?: string };
+      if (subObj.id) await c.env.DB.prepare("UPDATE client_subscriptions SET stripe_sub_id = NULL, payment_status = 'canceled', updated_at = ? WHERE stripe_sub_id = ?").bind(nowIso(), subObj.id).run();
     } else if (event.type === "account.updated") {
       // Onboarding / capability changes for a connected account.
       const a = event.data.object as { id?: string; charges_enabled?: boolean; payouts_enabled?: boolean; details_submitted?: boolean };
@@ -401,9 +470,9 @@ async function planForTenant(db: D1Database, tenantId: string | null): Promise<s
 }
 
 /** Shared with commerce: create/extend a client subscription from a package.
- *  `checkoutId` is the Stripe Checkout Session id (audit trail); event-level
- *  idempotency (firstSeen) already prevents a redelivery reaching here twice. */
-async function grantClientPackage(db: D1Database, tenantId: string, clientId: string, packageId: string, checkoutId: string | null = null): Promise<void> {
+ *  `checkoutId`/`subId` are the Stripe Checkout Session / Subscription ids;
+ *  event-level idempotency (firstSeen) already prevents a redelivery twice. */
+async function grantClientPackage(db: D1Database, tenantId: string, clientId: string, packageId: string, checkoutId: string | null = null, subId: string | null = null): Promise<void> {
   const pkg = await db.prepare("SELECT budgets_json, addons_json, flags_json FROM packages WHERE id = ?").bind(packageId).first<{ budgets_json: string | null; addons_json: string | null; flags_json: string | null }>();
   if (!pkg) return;
   const now = nowIso();
@@ -414,12 +483,29 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
     const existing = parseJson<Budget[]>(current.budgets_json, []);
     const added = buildBudgetsForPurchase(existing, specs, now);
     const balances = mergeAddOnBalances(parseJson(current.addons_json, []), addOns);
-    await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, payment_status = 'paid', stripe_checkout_id = COALESCE(?, stripe_checkout_id), updated_at = ? WHERE id = ?").bind(j([...existing, ...added]), j(balances), checkoutId, now, current.id).run();
+    await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, payment_status = 'paid', stripe_checkout_id = COALESCE(?, stripe_checkout_id), stripe_sub_id = COALESCE(?, stripe_sub_id), updated_at = ? WHERE id = ?").bind(j([...existing, ...added]), j(balances), checkoutId, subId, now, current.id).run();
   } else {
     await db.prepare(
-      "INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, ?, 'stripe', ?, ?, ?)",
+      "INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, ?, 'stripe', ?, ?, ?, ?)",
     )
-      .bind(newId("csub"), tenantId, clientId, packageId, j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, now, now)
+      .bind(newId("csub"), tenantId, clientId, packageId, j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, subId, now, now)
       .run();
   }
+}
+
+/** Renew an auto-renewing client subscription on each paid cycle: top the same
+ *  row's budget up by another period. Resolved by the Stripe subscription id so
+ *  it always hits the right row. Budgets stay the source of truth. */
+async function renewClientSubscription(db: D1Database, stripeSubId: string): Promise<void> {
+  const sub = await db.prepare("SELECT id, tenant_id, client_id, package_id, budgets_json, addons_json FROM client_subscriptions WHERE stripe_sub_id = ? ORDER BY started_at DESC LIMIT 1").bind(stripeSubId).first<{ id: string; tenant_id: string; client_id: string; package_id: string | null; budgets_json: string | null; addons_json: string | null }>();
+  if (!sub?.package_id) return;
+  const pkg = await db.prepare("SELECT budgets_json, addons_json FROM packages WHERE id = ?").bind(sub.package_id).first<{ budgets_json: string | null; addons_json: string | null }>();
+  if (!pkg) return;
+  const now = nowIso();
+  const specs = parseJson<{ feature: Budget["feature"]; days: number }[]>(pkg.budgets_json, []);
+  const addOns = parseJson<{ addOnTypeId: string; quantity: number }[]>(pkg.addons_json, []);
+  const existing = parseJson<Budget[]>(sub.budgets_json, []);
+  const added = buildBudgetsForPurchase(existing, specs, now);
+  const balances = mergeAddOnBalances(parseJson(sub.addons_json, []), addOns);
+  await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, status = 'active', payment_status = 'paid', updated_at = ? WHERE id = ?").bind(j([...existing, ...added]), j(balances), now, sub.id).run();
 }
