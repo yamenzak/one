@@ -69,3 +69,31 @@ export async function notifyUser(env: Env, userId: string | null | undefined, pa
     /* polling covers it */
   }
 }
+
+/**
+ * Drop an in-app notification to every OWNER of a tenant and nudge their
+ * sockets. `dedupeKey` makes the row id deterministic so a repeated sweep /
+ * webhook redelivery can't spam the bell (INSERT OR IGNORE). Best-effort.
+ */
+export async function notifyTenantOwners(
+  env: Env,
+  tenantId: string,
+  n: { type: string; title: string; message: string; link?: string; dedupeKey?: string },
+): Promise<void> {
+  const owners = await env.DB.prepare("SELECT userId FROM member WHERE organizationId = ? AND role = 'owner'")
+    .bind(tenantId)
+    .all<{ userId: string | null }>()
+    .catch(() => ({ results: [] as { userId: string | null }[] }));
+  const now = new Date().toISOString();
+  for (const o of owners.results ?? []) {
+    if (!o.userId) continue;
+    const id = n.dedupeKey ? `ntf_${n.dedupeKey}_${o.userId}` : `ntf_${crypto.randomUUID()}`;
+    await env.DB.prepare(
+      "INSERT OR IGNORE INTO notifications (id, tenant_id, recipient_user_id, type, title, message, link, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+      .bind(id, tenantId, o.userId, n.type, n.title, n.message, n.link ?? null, now)
+      .run()
+      .catch(() => undefined);
+    await notifyUser(env, o.userId);
+  }
+}

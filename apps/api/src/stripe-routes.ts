@@ -11,6 +11,7 @@ import { resolveEntitlements, buildBudgetsForPurchase, mergeAddOnBalances, type 
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { getSubscription, listPacks, listPlans, seedBilling, hasFeature, getConfig } from "./billing-store.js";
 import { requireClientAccess } from "./clients.js";
+import { notifyTenantOwners } from "./inbox-do.js";
 import {
   ensureCustomer,
   stripeCall,
@@ -82,7 +83,7 @@ export const stripeRoutes = new Hono<AppEnv>()
     }
     const event = JSON.parse(payload) as { id?: string; type: string; data: { object: Record<string, unknown> } };
     if (!(await firstSeen(c.env.DB, event.id))) return c.json({ received: true, duplicate: true });
-    await handlePlatformEvent(c.env.DB, c.env.BILLING, event);
+    await handlePlatformEvent(c.env, event);
     return c.json({ received: true });
   })
 
@@ -262,10 +263,11 @@ export const stripeAdminRoutes = new Hono<AppEnv>()
 
 // ── Webhook handlers ───────────────────────────────────────────────────────
 async function handlePlatformEvent(
-  db: D1Database,
-  billing: AppEnv["Bindings"]["BILLING"],
+  env: AppEnv["Bindings"],
   event: { type: string; data: { object: Record<string, unknown> } },
 ): Promise<void> {
+  const db = env.DB;
+  const billing = env.BILLING;
   const obj = event.data.object;
   const meta = (obj.metadata as Record<string, string> | undefined) ?? {};
   switch (event.type) {
@@ -298,7 +300,16 @@ async function handlePlatformEvent(
     case "invoice.payment_failed": {
       const tenantId = meta.mossa_tenant ?? (await tenantByCustomer(db, obj.customer as string));
       // Seed the grace window; never clobber a later suspend/cancel.
-      if (tenantId) await db.prepare("UPDATE subscriptions SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?) WHERE tenant_id = ? AND status NOT IN ('suspended','canceled')").bind(nowIso(), tenantId).run();
+      if (tenantId) {
+        await db.prepare("UPDATE subscriptions SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?) WHERE tenant_id = ? AND status NOT IN ('suspended','canceled')").bind(nowIso(), tenantId).run();
+        await notifyTenantOwners(env, tenantId, {
+          type: "billing_past_due",
+          title: "Payment failed",
+          message: "We couldn't charge your card. Update your payment method to keep your studio running — you have a short grace period before features pause.",
+          link: "/business",
+          dedupeKey: typeof obj.id === "string" ? `pf_${obj.id}` : undefined,
+        });
+      }
       break;
     }
     case "customer.subscription.created":

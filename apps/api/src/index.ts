@@ -37,7 +37,7 @@ import { sessionRoutes, promoRoutes } from "./session-routes.js";
 import { domainRoutes, domainAdminRoutes } from "./domain-routes.js";
 import type { Env } from "./env.js";
 
-import { notifyUser } from "./inbox-do.js";
+import { notifyUser, notifyTenantOwners } from "./inbox-do.js";
 
 export { TenantBillingDO } from "./billing-do.js";
 export { InboxDO } from "./inbox-do.js";
@@ -111,23 +111,48 @@ async function dailySweep(env: Env): Promise<void> {
     await dobj.grantMonthly(grant, key).catch(() => undefined);
   }
 
-  // 2) Dunning: past_due older than the grace window → suspended.
+  // 2) Dunning: past_due older than the grace window → suspended. Select first
+  //    so we can notify each owner that their studio just went dark.
   const graceCutoff = new Date(nowMs - GRACE_DAYS * 86_400_000).toISOString();
+  const toSuspend = await env.DB.prepare(
+    "SELECT tenant_id FROM subscriptions WHERE status = 'past_due' AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?",
+  ).bind(graceCutoff).all<{ tenant_id: string }>().catch(() => ({ results: [] as { tenant_id: string }[] }));
   await env.DB.prepare(
     "UPDATE subscriptions SET status = 'suspended', suspend_at = ?, delete_at = ? WHERE status = 'past_due' AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?",
   )
     .bind(nowIso, new Date(nowMs + DELETE_DAYS * 86_400_000).toISOString(), graceCutoff)
     .run()
     .catch(() => undefined);
+  for (const s of toSuspend.results ?? []) {
+    await notifyTenantOwners(env, s.tenant_id, {
+      type: "billing_suspended",
+      title: "Your studio is suspended",
+      message: "Your Mossa subscription lapsed, so paid features are paused for you and your clients. Update your payment to restore everything.",
+      link: "/business",
+      dedupeKey: `susp_${s.tenant_id}`,
+    });
+  }
 
   // 3) Suspended past the delete window → drop to free (data-wipe hook lives
   //    here; v1 resets the plan, retaining coaching data until wired).
+  const toCancel = await env.DB.prepare(
+    "SELECT tenant_id FROM subscriptions WHERE status = 'suspended' AND comp = 0 AND delete_at IS NOT NULL AND delete_at < ?",
+  ).bind(nowIso).all<{ tenant_id: string }>().catch(() => ({ results: [] as { tenant_id: string }[] }));
   await env.DB.prepare(
     "UPDATE subscriptions SET status = 'canceled', plan_id = 'free', suspend_at = NULL, delete_at = NULL WHERE status = 'suspended' AND comp = 0 AND delete_at IS NOT NULL AND delete_at < ?",
   )
     .bind(nowIso)
     .run()
     .catch(() => undefined);
+  for (const s of toCancel.results ?? []) {
+    await notifyTenantOwners(env, s.tenant_id, {
+      type: "billing_canceled",
+      title: "Subscription canceled",
+      message: "Your studio dropped to the free plan after non-payment. Resubscribe any time to bring back paid features.",
+      link: "/business",
+      dedupeKey: `cancel_${s.tenant_id}`,
+    });
+  }
 }
 
 /**
@@ -140,22 +165,37 @@ async function reminderSweep(env: Env): Promise<void> {
   const subs = await env.DB.prepare(
     "SELECT id, tenant_id, client_id, budgets_json, notes FROM client_subscriptions WHERE status = 'active'",
   ).all<{ id: string; tenant_id: string; client_id: string; budgets_json: string | null; notes: string | null }>();
+  const now = Date.now();
   for (const sub of subs.results ?? []) {
-    if ((sub.notes ?? "").includes("expiry-notified")) continue;
+    const notes = sub.notes ?? "";
     const budgets = JSON.parse(sub.budgets_json ?? "[]") as { expiresAt: string }[];
+    if (!budgets.length) continue;
     const latest = Math.max(0, ...budgets.map((b) => Date.parse(b.expiresAt)));
-    if (latest > Date.now() && latest < soon) {
-      const client = await env.DB.prepare("SELECT user_id, display_name FROM clients WHERE id = ?").bind(sub.client_id).first<{ user_id: string | null; display_name: string }>();
+    const clientRow = async () => env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(sub.client_id).first<{ user_id: string | null }>();
+    const notify = async (type: string, title: string, message: string, marker: string) => {
+      const client = await clientRow();
       if (client?.user_id) {
         await env.DB.prepare(
-          "INSERT INTO notifications (id, tenant_id, recipient_user_id, type, title, message, link, created_at) VALUES (?, ?, ?, 'sub_expiring', 'Your plan is expiring soon', 'Renew to keep your coaching access.', '/marketplace', ?)",
+          "INSERT OR IGNORE INTO notifications (id, tenant_id, recipient_user_id, type, title, message, link, created_at) VALUES (?, ?, ?, ?, ?, ?, '/shop', ?)",
         )
-          .bind(`ntf_${sub.id}`, sub.tenant_id, client.user_id, new Date().toISOString())
+          .bind(`ntf_${marker}_${sub.id}`, sub.tenant_id, client.user_id, type, title, message, new Date().toISOString())
           .run()
           .catch(() => undefined);
         await notifyUser(env, client.user_id);
       }
-      await env.DB.prepare("UPDATE client_subscriptions SET notes = ? WHERE id = ?").bind(`${sub.notes ?? ""} expiry-notified`, sub.id).run().catch(() => undefined);
+      await env.DB.prepare("UPDATE client_subscriptions SET notes = ? WHERE id = ?").bind(`${notes} ${marker}`.trim(), sub.id).run().catch(() => undefined);
+    };
+    // Fully lapsed → one "expired" nudge, and reconcile the status.
+    if (latest > 0 && latest <= now) {
+      if (!notes.includes("expired-notified")) {
+        await notify("sub_expired", "Your access has expired", "Renew to pick your plan back up where you left off.", "expired-notified");
+        await env.DB.prepare("UPDATE client_subscriptions SET status = 'expired' WHERE id = ?").bind(sub.id).run().catch(() => undefined);
+      }
+      continue;
+    }
+    // Within 3 days of lapsing → one "expiring soon" nudge.
+    if (latest > now && latest < soon && !notes.includes("expiry-notified")) {
+      await notify("sub_expiring", "Your plan is expiring soon", "Renew to keep your coaching access.", "expiry-notified");
     }
   }
 }
