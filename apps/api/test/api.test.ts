@@ -218,6 +218,35 @@ describe("credits + AI metering", () => {
     expect(labelOut.food.name.length).toBeGreaterThan(0);
     expect(labelOut.food.calories).toBeGreaterThan(0);
   });
+
+  it("delinquency clamp: a suspended tenant loses paid entitlements (AI 403), recovers on reactivation", async () => {
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    // Studio One is on `team` (from beforeAll) → AI entitled.
+    const { client } = (await (
+      await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "ClampTest" }) })
+    ).json()) as { client: { id: string } };
+    const ok = await SELF.fetch("http://x/api/ai/parse-food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
+    expect(ok.status).toBe(200);
+
+    // Suspend the tenant (what the dunning cron does after grace). Status alone
+    // must clamp entitlements to free — no plan_id change needed.
+    await db.prepare("UPDATE subscriptions SET status = 'suspended' WHERE tenant_id = ?").bind(ctx.active.tenantId).run();
+    const blocked = await SELF.fetch("http://x/api/ai/parse-food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
+    expect(blocked.status).toBe(403); // clamp bites
+    const billing = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { subscription: { status: string } };
+    expect(billing.subscription.status).toBe("suspended");
+
+    // Passthrough: the tenant's client loses the tenant-derived AI capability.
+    const cflags = (await (await SELF.fetch(`http://x/api/context?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { clientFlags: { canUseAi: boolean } | null };
+    if (cflags.clientFlags) expect(cflags.clientFlags.canUseAi).toBe(false);
+
+    // Reactivate → capability returns immediately.
+    await db.prepare("UPDATE subscriptions SET status = 'active' WHERE tenant_id = ?").bind(ctx.active.tenantId).run();
+    const recovered = await SELF.fetch("http://x/api/ai/parse-food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
+    expect(recovered.status).toBe(200);
+  });
 });
 
 describe("AI config (per-tenant model / prompt / tone / enable)", () => {

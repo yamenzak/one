@@ -100,6 +100,24 @@ export const QUOTA_META: Record<string, { label: string; hint: string; unit?: st
   storageMb: { label: "Storage", hint: "Media budget", unit: "MB" },
 };
 
+/**
+ * Subscription statuses that SUSPEND paid service: the tenant falls back to
+ * free capabilities until they settle billing. `past_due` is deliberately NOT
+ * here — that's the grace window (full service while dunning). This is the
+ * enforcement teeth behind the me→tenant lifecycle, and — because a client's
+ * capability is `entitlements ∩ clientFlags` — the passthrough to that tenant's
+ * clients: a suspended tenant's clients lose every tenant-derived paid feature
+ * (AI, commerce, …) automatically, with no per-client bookkeeping.
+ */
+export const SUSPENDED_STATUSES: ReadonlySet<string> = new Set(["suspended", "canceled", "unpaid"]);
+
+/** Clamp resolved entitlements down to free when the subscription status
+ *  suspends service. Applied once, in `tenantEntitlements`, so every gate and
+ *  the client-flag intersection inherit the passthrough for free. */
+export function clampEntitlementsForStatus(resolved: Entitlements, status: string): Entitlements {
+  return SUSPENDED_STATUSES.has(status) ? FREE_ENTITLEMENTS : resolved;
+}
+
 /** Deep-ish merge of a stored (possibly partial) blob onto the free baseline. */
 export function resolveEntitlements(json: string | null | undefined): Entitlements {
   if (!json) return FREE_ENTITLEMENTS;

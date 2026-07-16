@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   FREE_ENTITLEMENTS, resolveEntitlements, mergeOverrides, snapshotDowngrade, raiseOverride, raiseQuota,
+  clampEntitlementsForStatus, SUSPENDED_STATUSES,
   FEATURE_KEYS, QUOTA_KEYS, type Entitlements, type Quotas, type Features,
 } from "../src/entitlements.js";
 
@@ -74,6 +75,35 @@ describe("grandfather on plan downgrade", () => {
     expect(parsed.quotas.activeClients).toBe(300); // kept the higher gift
     expect(parsed.features.chat).toBe(true);
     expect(parsed.aiCredits.monthlyGrant).toBe(5000);
+  });
+});
+
+describe("status clamp (delinquency teeth + client passthrough)", () => {
+  const paid = plan({ features: { aiSuite: true, commerce: true, branding: true }, quotas: { activeClients: 100 }, aiCredits: { monthlyGrant: 2500 } });
+
+  it("keeps full entitlements while active / trialing / past_due (grace)", () => {
+    for (const s of ["active", "trialing", "past_due"]) {
+      const e = clampEntitlementsForStatus(paid, s);
+      expect(e.features.aiSuite, s).toBe(true);
+      expect(e.features.commerce, s).toBe(true);
+      expect(e.quotas.activeClients, s).toBe(100);
+    }
+  });
+
+  it("clamps to free when suspended / canceled / unpaid", () => {
+    for (const s of ["suspended", "canceled", "unpaid"]) {
+      const e = clampEntitlementsForStatus(paid, s);
+      expect(e, s).toEqual(FREE_ENTITLEMENTS);
+      expect(e.features.aiSuite, s).toBe(false);
+      expect(e.features.commerce, s).toBe(false);
+      expect(e.aiCredits.monthlyGrant, s).toBe(0);
+    }
+  });
+
+  it("SUSPENDED_STATUSES is exactly the suspending set (past_due excluded)", () => {
+    expect([...SUSPENDED_STATUSES].sort()).toEqual(["canceled", "suspended", "unpaid"]);
+    expect(SUSPENDED_STATUSES.has("past_due")).toBe(false);
+    expect(SUSPENDED_STATUSES.has("active")).toBe(false);
   });
 });
 

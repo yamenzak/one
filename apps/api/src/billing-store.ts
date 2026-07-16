@@ -4,7 +4,7 @@
  * admin-editable at runtime; these are the ship defaults.
  */
 
-import { resolveEntitlements, mergeOverrides, type Entitlements } from "@mossa/domain";
+import { resolveEntitlements, mergeOverrides, clampEntitlementsForStatus, type Entitlements } from "@mossa/domain";
 import { newId, nowIso, nowMs } from "./ids.js";
 import { j } from "./db.js";
 
@@ -186,14 +186,19 @@ export async function getSubscription(db: D1Database, tenantId: string): Promise
   return fresh;
 }
 
-/** Resolve a tenant's effective entitlements: plan blob + per-tenant overrides. */
+/** Resolve a tenant's effective entitlements: plan blob + per-tenant overrides,
+ *  then CLAMPED by subscription status — a suspended/canceled/unpaid tenant
+ *  falls back to free (see `clampEntitlementsForStatus`). This clamp is the one
+ *  place delinquency bites: every `hasFeature`/`withinQuota` gate and the
+ *  client-flag intersection resolve through here, so the passthrough is total. */
 export async function tenantEntitlements(db: D1Database, tenantId: string): Promise<Entitlements> {
   const sub = await getSubscription(db, tenantId);
   const plan = await db
     .prepare("SELECT entitlements_json FROM plans WHERE id = ?")
     .bind(sub.plan_id)
     .first<{ entitlements_json: string | null }>();
-  return mergeOverrides(resolveEntitlements(plan?.entitlements_json), sub.overrides_json);
+  const resolved = mergeOverrides(resolveEntitlements(plan?.entitlements_json), sub.overrides_json);
+  return clampEntitlementsForStatus(resolved, sub.status);
 }
 
 /** True when the tenant's plan (or a gift) includes `feature`. The single gate

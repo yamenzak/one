@@ -224,6 +224,9 @@ async function handlePlatformEvent(
       }
       if (meta.mossa_plan && meta.mossa_tenant) {
         await activatePlan(db, billing, meta.mossa_tenant, meta.mossa_plan);
+        if (typeof obj.subscription === "string") {
+          await db.prepare("UPDATE subscriptions SET stripe_sub_id = ? WHERE tenant_id = ?").bind(obj.subscription, meta.mossa_tenant).run();
+        }
       }
       break;
     }
@@ -231,11 +234,23 @@ async function handlePlatformEvent(
       const tenantId = meta.mossa_tenant ?? (await tenantByCustomer(db, obj.customer as string));
       const planId = await planForTenant(db, tenantId);
       if (tenantId && planId) await activatePlan(db, billing, tenantId, planId);
+      // Capture the Stripe subscription id + the renewal date this invoice covers.
+      if (tenantId) {
+        const subId = typeof obj.subscription === "string" ? obj.subscription : null;
+        const cpe = typeof obj.period_end === "number" ? new Date(obj.period_end * 1000).toISOString() : null;
+        await db.prepare("UPDATE subscriptions SET stripe_sub_id = COALESCE(?, stripe_sub_id), current_period_end = COALESCE(?, current_period_end) WHERE tenant_id = ?").bind(subId, cpe, tenantId).run();
+      }
       break;
     }
     case "invoice.payment_failed": {
       const tenantId = meta.mossa_tenant ?? (await tenantByCustomer(db, obj.customer as string));
-      if (tenantId) await db.prepare("UPDATE subscriptions SET status = 'past_due', past_due_at = ? WHERE tenant_id = ?").bind(nowIso(), tenantId).run();
+      // Seed the grace window; never clobber a later suspend/cancel.
+      if (tenantId) await db.prepare("UPDATE subscriptions SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?) WHERE tenant_id = ? AND status NOT IN ('suspended','canceled')").bind(nowIso(), tenantId).run();
+      break;
+    }
+    case "customer.subscription.created":
+    case "customer.subscription.updated": {
+      await syncStripeSubscription(db, obj);
       break;
     }
     case "customer.subscription.deleted": {
@@ -246,9 +261,43 @@ async function handlePlatformEvent(
   }
 }
 
+/**
+ * Reconcile our subscription row against Stripe's authoritative subscription
+ * object (fired on `customer.subscription.created|updated`). Stripe owns the raw
+ * payment state (active / past_due / unpaid / canceled); our daily cron owns the
+ * grace→suspend→delete escalation layered on `past_due_at`, so here we only seed
+ * or clear those markers — never fight the cron's windows.
+ */
+async function syncStripeSubscription(db: D1Database, obj: Record<string, unknown>): Promise<void> {
+  const tenantId = await tenantByCustomer(db, obj.customer as string);
+  if (!tenantId) return;
+  const subId = typeof obj.id === "string" ? obj.id : null;
+  const cpe = typeof obj.current_period_end === "number" ? new Date(obj.current_period_end * 1000).toISOString() : null;
+  const now = nowIso();
+  await db.prepare("UPDATE subscriptions SET stripe_sub_id = COALESCE(?, stripe_sub_id), current_period_end = COALESCE(?, current_period_end), updated_at = ? WHERE tenant_id = ?").bind(subId, cpe, now, tenantId).run();
+  switch (obj.status as string) {
+    case "canceled":
+      await db.prepare("UPDATE subscriptions SET status = 'canceled', plan_id = 'free' WHERE tenant_id = ?").bind(tenantId).run();
+      break;
+    case "unpaid":
+      await db.prepare("UPDATE subscriptions SET status = 'unpaid' WHERE tenant_id = ?").bind(tenantId).run();
+      break;
+    case "past_due":
+      await db.prepare("UPDATE subscriptions SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?) WHERE tenant_id = ? AND status NOT IN ('suspended','canceled')").bind(now, tenantId).run();
+      break;
+    case "active":
+    case "trialing":
+      await db.prepare("UPDATE subscriptions SET status = ?, past_due_at = NULL, suspend_at = NULL, delete_at = NULL WHERE tenant_id = ?").bind((obj.status as string) === "trialing" ? "trialing" : "active", tenantId).run();
+      break;
+    // incomplete / incomplete_expired / paused → leave status untouched.
+  }
+}
+
 async function activatePlan(db: D1Database, billing: AppEnv["Bindings"]["BILLING"], tenantId: string, planId: string): Promise<void> {
   await getSubscription(db, tenantId);
-  await db.prepare("UPDATE subscriptions SET plan_id = ?, status = 'active', past_due_at = NULL, updated_at = ? WHERE tenant_id = ?").bind(planId, nowIso(), tenantId).run();
+  // A successful payment fully recovers the tenant: clear every dunning marker
+  // so the status clamp lifts and service (theirs + their clients') resumes.
+  await db.prepare("UPDATE subscriptions SET plan_id = ?, status = 'active', past_due_at = NULL, suspend_at = NULL, delete_at = NULL, updated_at = ? WHERE tenant_id = ?").bind(planId, nowIso(), tenantId).run();
   const plan = await db.prepare("SELECT entitlements_json FROM plans WHERE id = ?").bind(planId).first<{ entitlements_json: string | null }>();
   const grant = resolveEntitlements(plan?.entitlements_json).aiCredits.monthlyGrant;
   if (grant > 0) {
