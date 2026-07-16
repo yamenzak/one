@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy, kcalToDisplay } from "@mossa/domain";
-import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, Utensils, ShoppingCart, Plus, Minus, Sparkles, Check, ArrowLeft, History, Croissant, Soup, Apple, Dumbbell, RotateCcw } from "@mossa/ui";
+import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, Utensils, ShoppingCart, Plus, Minus, Sparkles, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
@@ -54,7 +54,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   const [recipeBusy, setRecipeBusy] = useState<number | null>(null);
   const units = useUnits();
   const { ctx } = useSession();
-  const { startIfNew, active: tourActive, tour, stepSelector } = useTour();
+  const { startIfNew, start: startTour, active: tourActive, tour, stepSelector } = useTour();
   const aiSuite = !!ctx?.entitlements?.features?.aiSuite;
   const date = todayLocal();
   const shopKey = plan ? `mossa.shop.${plan.id}` : null;
@@ -205,6 +205,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border/40 bg-background/85 px-4 py-3 backdrop-blur-xl">
         <button onClick={onClose} aria-label="Close" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><ArrowLeft /></button>
         <div className="min-w-0 flex-1"><div className="truncate text-base font-bold tracking-tight">{isPast ? "Past plan" : "Meal plan"}</div>{active && <div className="truncate text-xs text-muted-foreground">{active.name}</div>}</div>
+        <button onClick={() => startTour("meal")} aria-label="Replay meal plan tour" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><LifeBuoy /></button>
         {pastPlans.length > 0 && <button onClick={() => setHistOpen(true)} aria-label="Past plans" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><History /></button>}
       </div>
 

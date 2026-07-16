@@ -10,7 +10,7 @@ import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmt
 import {
   Button, Card, Badge, Field, Sheet, SubCard, ProgressRing, EmptyState,
   Reveal, SkeletonLine, SkeletonList,
-  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, cn,
+  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, LifeBuoy, cn,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -41,7 +41,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   const [bests, setBests] = useState<Map<string, ExerciseBests>>(new Map());
   const units = useUnits();
   const date = todayLocal();
-  const { startIfNew, active: tourActive } = useTour();
+  const { startIfNew, start: startTour, active: tourActive } = useTour();
 
   // First time a client actually trains, walk them through the session player.
   useEffect(() => {
@@ -112,7 +112,12 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
     return (
       <PlanShell>
         <HeaderBar title={isPast ? "Past plan" : "Workout plan"} subtitle={active?.name} onBack={onExit}
-          right={pastPlans.length > 0 ? <button onClick={() => setHistOpen(true)} aria-label="Past plans" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><History /></button> : undefined} />
+          right={
+            <div className="flex items-center gap-2">
+              <button onClick={() => startTour("workout")} aria-label="Replay workout plan tour" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><LifeBuoy /></button>
+              {pastPlans.length > 0 && <button onClick={() => setHistOpen(true)} aria-label="Past plans" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><History /></button>}
+            </div>
+          } />
         <div className="mx-auto max-w-xl space-y-5 p-4 pb-28">
         {/* Hero — the plan at a glance. */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
