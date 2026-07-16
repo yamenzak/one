@@ -188,7 +188,8 @@ export const stripeRoutes = new Hono<AppEnv>()
     const sig = c.req.header("stripe-signature") ?? "";
     const secret = cfg.connectWebhookSecret || cfg.webhookSecret;
     if (!secret || !(await verifyWebhook(payload, sig, secret))) return c.json({ error: "bad signature" }, 400);
-    const event = JSON.parse(payload) as { id?: string; type: string; data: { object: Record<string, unknown> } };
+    // Connect events carry the connected account id at the top level.
+    const event = JSON.parse(payload) as { id?: string; account?: string; type: string; data: { object: Record<string, unknown> } };
     if (!(await firstSeen(c.env.DB, event.id))) return c.json({ received: true, duplicate: true });
     if (event.type === "checkout.session.completed") {
       const s = event.data.object as { id?: string; metadata?: Record<string, string> };
@@ -200,6 +201,24 @@ export const stripeRoutes = new Hono<AppEnv>()
       // Onboarding / capability changes for a connected account.
       const a = event.data.object as { id?: string; charges_enabled?: boolean; payouts_enabled?: boolean; details_submitted?: boolean };
       if (a.id) await syncConnectAccount(c.env.DB, a);
+    } else if (event.type === "charge.refunded" || event.type === "charge.dispute.created") {
+      // Money-safe: don't guess which budget days to claw back (partial refunds,
+      // elapsed time) — surface it to the tenant to adjust the client's access.
+      const tenantId = event.account
+        ? (await c.env.DB.prepare("SELECT tenant_id FROM tenant_settings WHERE stripe_account_id = ?").bind(event.account).first<{ tenant_id: string }>())?.tenant_id
+        : undefined;
+      if (tenantId) {
+        const disputed = event.type === "charge.dispute.created";
+        await notifyTenantOwners(c.env, tenantId, {
+          type: disputed ? "payment_disputed" : "payment_refunded",
+          title: disputed ? "A client payment was disputed" : "A client payment was refunded",
+          message: disputed
+            ? "A client opened a dispute on a package payment. Review it in Stripe and adjust their access if needed."
+            : "A client package payment was refunded. Review whether their access should be adjusted.",
+          link: "/clients",
+          dedupeKey: `${event.type}_${(event.data.object as { id?: string }).id ?? event.id}`,
+        });
+      }
     }
     return c.json({ received: true });
   });

@@ -288,6 +288,20 @@ describe("connect rail — webhook idempotency + grant", () => {
     const bad = await SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": "t=1,v1=deadbeef" }, body: payload });
     expect(bad.status).toBe(400);
   });
+
+  it("a refund on a connected account notifies the tenant owner", async () => {
+    const db = env.DB as D1Database;
+    const secret = "whsec_connect_test";
+    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.connect_webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    // Pin a connected account to this tenant so event.account maps back.
+    await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_ref_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_ref_1'").bind(ctx.active.tenantId, new Date().toISOString()).run();
+    const payload = JSON.stringify({ id: "evt_refund_1", account: "acct_ref_1", type: "charge.refunded", data: { object: { id: "ch_test_1" } } });
+    const r = await SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
+    expect(r.status).toBe(200);
+    const notif = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE tenant_id = ? AND type = 'payment_refunded'").bind(ctx.active.tenantId).first<{ n: number }>())!;
+    expect(notif.n).toBeGreaterThanOrEqual(1);
+  });
 });
 
 describe("platform rail — dunning notifies the owner", () => {
