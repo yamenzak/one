@@ -249,6 +249,47 @@ describe("credits + AI metering", () => {
   });
 });
 
+describe("connect rail — webhook idempotency + grant", () => {
+  async function stripeSig(payload: string, secret: string): Promise<string> {
+    const t = Math.floor(Date.now() / 1000);
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${payload}`));
+    const hex = [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    return `t=${t},v1=${hex}`;
+  }
+
+  it("grants a client package once; a redelivered event is a no-op", async () => {
+    const db = env.DB as D1Database;
+    const secret = "whsec_connect_test";
+    for (const [k, v] of [["stripe.mode", "test"], ["stripe.secret_key", "sk_test_x"], ["stripe.connect_webhook_secret", secret]] as const) {
+      await db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v).run();
+    }
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "WebhookBuyer" }) })).json()) as { client: { id: string } };
+    const pkgId = "pkg_wh_test";
+    await db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, active, created_at) VALUES (?, ?, ?, ?, ?, 'usd', 1, ?)")
+      .bind(pkgId, ctx.active.tenantId, "Webhook Pack", 5000, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
+
+    const payload = JSON.stringify({ id: "evt_conn_dedup_1", type: "checkout.session.completed", data: { object: { id: "cs_test_1", metadata: { mossa_tenant: ctx.active.tenantId, mossa_client: client.id, mossa_package: pkgId } } } });
+    const post = async () => SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
+
+    const r1 = await post();
+    expect(r1.status).toBe(200);
+    const n1 = (await db.prepare("SELECT COUNT(*) AS n FROM client_subscriptions WHERE client_id = ? AND status = 'active'").bind(client.id).first<{ n: number }>())!.n;
+    expect(n1).toBe(1); // granted
+
+    const r2 = await post();
+    expect((await r2.json() as { duplicate?: boolean }).duplicate).toBe(true); // dedup fired
+    const n2 = (await db.prepare("SELECT COUNT(*) AS n FROM client_subscriptions WHERE client_id = ? AND status = 'active'").bind(client.id).first<{ n: number }>())!.n;
+    expect(n2).toBe(1); // no double grant
+
+    // A bad signature is rejected outright.
+    const bad = await SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": "t=1,v1=deadbeef" }, body: payload });
+    expect(bad.status).toBe(400);
+  });
+});
+
 describe("AI config (per-tenant model / prompt / tone / enable)", () => {
   it("exposes the registry + catalog and drives generation via per-feature overrides", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

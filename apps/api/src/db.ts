@@ -38,6 +38,9 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "CREATE TABLE IF NOT EXISTS credit_ledger (id TEXT PRIMARY KEY, tenant_id TEXT, delta INTEGER, balance INTEGER, reason TEXT, ref TEXT, at INTEGER);",
           "CREATE INDEX IF NOT EXISTS idx_ledger_tenant ON credit_ledger(tenant_id, at);",
           "CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT);",
+          // Webhook idempotency — first insert of a Stripe event id wins; a
+          // redelivery is a no-op (changes = 0), so no handler double-applies.
+          "CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, at INTEGER);",
 
           // ── AI suite (SPEC §6) ─────────────────────────────────────────────
           "CREATE TABLE IF NOT EXISTS ai_models (id TEXT PRIMARY KEY, task TEXT, label TEXT, provider TEXT, input_rate REAL, output_rate REAL, unit_rate REAL, unit_kind TEXT, markup REAL, enabled INTEGER DEFAULT 1, is_default INTEGER DEFAULT 0);",
@@ -171,6 +174,12 @@ export function ensureSchema(db: D1Database): Promise<void> {
           // Body composition recomputed on every weight/body-fat entry.
           "ALTER TABLE measurements ADD COLUMN bmi REAL",
           "ALTER TABLE measurements ADD COLUMN bmr REAL",
+          // Stripe Connect account status (synced from account.updated + a live
+          // refresh). `charges_enabled` is the truth gate for selling — a row's
+          // mere existence no longer means the account can accept payments.
+          "ALTER TABLE tenant_settings ADD COLUMN charges_enabled INTEGER DEFAULT 0",
+          "ALTER TABLE tenant_settings ADD COLUMN payouts_enabled INTEGER DEFAULT 0",
+          "ALTER TABLE tenant_settings ADD COLUMN details_submitted INTEGER DEFAULT 0",
         ];
         for (const sql of alters) await db.exec(sql).catch(() => undefined);
       })

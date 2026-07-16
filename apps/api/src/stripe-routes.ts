@@ -9,7 +9,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { resolveEntitlements, buildBudgetsForPurchase, mergeAddOnBalances, type Budget } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
-import { getSubscription, listPacks, listPlans, seedBilling, hasFeature } from "./billing-store.js";
+import { getSubscription, listPacks, listPlans, seedBilling, hasFeature, getConfig } from "./billing-store.js";
 import { requireClientAccess } from "./clients.js";
 import {
   ensureCustomer,
@@ -20,7 +20,7 @@ import {
   verifyWebhook,
   setConfig,
 } from "./stripe.js";
-import { newId, nowIso, periodKey } from "./ids.js";
+import { newId, nowIso, nowMs, periodKey } from "./ids.js";
 import { parseJson, j } from "./db.js";
 
 export const stripeRoutes = new Hono<AppEnv>()
@@ -80,7 +80,8 @@ export const stripeRoutes = new Hono<AppEnv>()
     if (!cfg.webhookSecret || !(await verifyWebhook(payload, sig, cfg.webhookSecret))) {
       return c.json({ error: "bad signature" }, 400);
     }
-    const event = JSON.parse(payload) as { type: string; data: { object: Record<string, unknown> } };
+    const event = JSON.parse(payload) as { id?: string; type: string; data: { object: Record<string, unknown> } };
+    if (!(await firstSeen(c.env.DB, event.id))) return c.json({ received: true, duplicate: true });
     await handlePlatformEvent(c.env.DB, c.env.BILLING, event);
     return c.json({ received: true });
   })
@@ -127,14 +128,20 @@ export const stripeRoutes = new Hono<AppEnv>()
     if (!body.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, body.data.clientId);
     if ("response" in access) return access.response;
-    const settings = await c.env.DB.prepare("SELECT stripe_account_id FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null }>();
+    const settings = await c.env.DB.prepare("SELECT stripe_account_id, charges_enabled FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null }>();
     if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
+    // The account must actually be able to accept charges (onboarding done).
+    if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
     const pkg = await c.env.DB.prepare("SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; currency: string }>();
     if (!pkg) return c.json({ error: "package not found" }, 404);
     const amount = pkg.one_time_price_cents ?? 0;
     if (amount <= 0) return c.json({ error: "use /subscriptions/grant for $0 packages" }, 400);
 
-    // Checkout ON the connected account — no application_fee (zero markup).
+    // Optional platform cut — a basis-points application fee set by the platform
+    // admin (default 0 = zero markup, tenant keeps 100%). Direct charge on the
+    // connected account, so the fee routes to the platform on this payment.
+    const feeBps = Number((await getConfig(c.env.DB))["stripe.platform_fee_bps"] ?? "0");
+    const feeAmount = feeBps > 0 ? Math.round((amount * feeBps) / 10000) : 0;
     const session = await stripeCall<{ url: string }>(
       cfg.secretKey,
       "checkout/sessions",
@@ -144,6 +151,7 @@ export const stripeRoutes = new Hono<AppEnv>()
         "line_items[0][price_data][product_data][name]": pkg.name,
         "line_items[0][price_data][unit_amount]": amount,
         "line_items[0][quantity]": 1,
+        ...(feeAmount > 0 ? { "payment_intent_data[application_fee_amount]": feeAmount } : {}),
         success_url: `${body.data.returnUrl}?purchase=success`,
         cancel_url: `${body.data.returnUrl}?purchase=cancel`,
         "metadata[mossa_tenant]": who.tenantId,
@@ -155,6 +163,23 @@ export const stripeRoutes = new Hono<AppEnv>()
     return c.json({ url: session.url });
   })
 
+  // Live Connect account status (owner) — fetch from Stripe when configured,
+  // sync the stored flags, and report whether the tenant can sell yet.
+  .get("/connect/status", async (c) => {
+    const who = requireTenant(c)!;
+    const row = await c.env.DB.prepare("SELECT stripe_account_id, charges_enabled, payouts_enabled, details_submitted FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null; payouts_enabled: number | null; details_submitted: number | null }>();
+    if (!row?.stripe_account_id) return c.json({ connected: false, chargesEnabled: false, payoutsEnabled: false, detailsSubmitted: false });
+    const cfg = await stripeConfig(c.env.DB);
+    if (stripeEnabled(cfg)) {
+      try {
+        const a = await stripeCall<{ charges_enabled?: boolean; payouts_enabled?: boolean; details_submitted?: boolean }>(cfg.secretKey, `accounts/${row.stripe_account_id}`);
+        await syncConnectAccount(c.env.DB, { id: row.stripe_account_id, ...a });
+        return c.json({ connected: true, chargesEnabled: !!a.charges_enabled, payoutsEnabled: !!a.payouts_enabled, detailsSubmitted: !!a.details_submitted });
+      } catch { /* fall back to stored flags below */ }
+    }
+    return c.json({ connected: true, chargesEnabled: !!row.charges_enabled, payoutsEnabled: !!row.payouts_enabled, detailsSubmitted: !!row.details_submitted });
+  })
+
   // Connect webhook — grants the client package on successful payment.
   .post("/connect/webhook", async (c) => {
     const cfg = await stripeConfig(c.env.DB);
@@ -162,16 +187,37 @@ export const stripeRoutes = new Hono<AppEnv>()
     const sig = c.req.header("stripe-signature") ?? "";
     const secret = cfg.connectWebhookSecret || cfg.webhookSecret;
     if (!secret || !(await verifyWebhook(payload, sig, secret))) return c.json({ error: "bad signature" }, 400);
-    const event = JSON.parse(payload) as { type: string; data: { object: Record<string, unknown> } };
+    const event = JSON.parse(payload) as { id?: string; type: string; data: { object: Record<string, unknown> } };
+    if (!(await firstSeen(c.env.DB, event.id))) return c.json({ received: true, duplicate: true });
     if (event.type === "checkout.session.completed") {
-      const s = event.data.object as { metadata?: Record<string, string> };
+      const s = event.data.object as { id?: string; metadata?: Record<string, string> };
       const m = s.metadata ?? {};
       if (m.mossa_client && m.mossa_package) {
-        await grantClientPackage(c.env.DB, m.mossa_tenant!, m.mossa_client, m.mossa_package);
+        await grantClientPackage(c.env.DB, m.mossa_tenant!, m.mossa_client, m.mossa_package, s.id ?? null);
       }
+    } else if (event.type === "account.updated") {
+      // Onboarding / capability changes for a connected account.
+      const a = event.data.object as { id?: string; charges_enabled?: boolean; payouts_enabled?: boolean; details_submitted?: boolean };
+      if (a.id) await syncConnectAccount(c.env.DB, a);
     }
     return c.json({ received: true });
   });
+
+/** Webhook idempotency: the first insert of a Stripe event id processes; a
+ *  redelivery finds the row already present (changes = 0) and short-circuits. */
+async function firstSeen(db: D1Database, eventId: string | undefined): Promise<boolean> {
+  if (!eventId) return true; // no id (shouldn't happen) → process, don't drop
+  const r = await db.prepare("INSERT OR IGNORE INTO stripe_events (id, at) VALUES (?, ?)").bind(eventId, nowMs()).run();
+  return (r.meta?.changes ?? 0) > 0;
+}
+
+/** Mirror a connected account's capability flags onto tenant_settings. */
+async function syncConnectAccount(db: D1Database, a: { id?: string; charges_enabled?: boolean; payouts_enabled?: boolean; details_submitted?: boolean }): Promise<void> {
+  if (!a.id) return;
+  await db.prepare("UPDATE tenant_settings SET charges_enabled = ?, payouts_enabled = ?, details_submitted = ?, updated_at = ? WHERE stripe_account_id = ?")
+    .bind(a.charges_enabled ? 1 : 0, a.payouts_enabled ? 1 : 0, a.details_submitted ? 1 : 0, nowIso(), a.id)
+    .run();
+}
 
 /** Admin Stripe config + catalog sync (platform-admin lane). */
 export const stripeAdminRoutes = new Hono<AppEnv>()
@@ -182,6 +228,10 @@ export const stripeAdminRoutes = new Hono<AppEnv>()
         secretKey: z.string().optional(),
         publishableKey: z.string().optional(),
         webhookSecret: z.string().optional(),
+        connectWebhookSecret: z.string().optional(),
+        /** Platform application fee on client→tenant purchases, in basis points
+         *  (0–10000 = 0–100%). Default 0 = tenant keeps everything. */
+        platformFeeBps: z.number().int().min(0).max(10000).optional(),
       })
       .safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
@@ -190,6 +240,8 @@ export const stripeAdminRoutes = new Hono<AppEnv>()
     if (d.secretKey) await setConfig(c.env.DB, "stripe.secret_key", d.secretKey);
     if (d.publishableKey) await setConfig(c.env.DB, "stripe.publishable_key", d.publishableKey);
     if (d.webhookSecret) await setConfig(c.env.DB, "stripe.webhook_secret", d.webhookSecret);
+    if (d.connectWebhookSecret) await setConfig(c.env.DB, "stripe.connect_webhook_secret", d.connectWebhookSecret);
+    if (d.platformFeeBps !== undefined) await setConfig(c.env.DB, "stripe.platform_fee_bps", String(d.platformFeeBps));
     return c.json({ ok: true });
   })
 
@@ -204,7 +256,8 @@ export const stripeAdminRoutes = new Hono<AppEnv>()
   .get("/admin/stripe/status", async (c) => {
     if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
     const cfg = await stripeConfig(c.env.DB);
-    return c.json({ mode: cfg.mode, enabled: stripeEnabled(cfg) });
+    const feeBps = Number((await getConfig(c.env.DB))["stripe.platform_fee_bps"] ?? "0");
+    return c.json({ mode: cfg.mode, enabled: stripeEnabled(cfg), platformFeeBps: feeBps });
   });
 
 // ── Webhook handlers ───────────────────────────────────────────────────────
@@ -317,8 +370,10 @@ async function planForTenant(db: D1Database, tenantId: string | null): Promise<s
   return row?.plan_id ?? null;
 }
 
-/** Shared with commerce: create/extend a client subscription from a package. */
-async function grantClientPackage(db: D1Database, tenantId: string, clientId: string, packageId: string): Promise<void> {
+/** Shared with commerce: create/extend a client subscription from a package.
+ *  `checkoutId` is the Stripe Checkout Session id (audit trail); event-level
+ *  idempotency (firstSeen) already prevents a redelivery reaching here twice. */
+async function grantClientPackage(db: D1Database, tenantId: string, clientId: string, packageId: string, checkoutId: string | null = null): Promise<void> {
   const pkg = await db.prepare("SELECT budgets_json, addons_json, flags_json FROM packages WHERE id = ?").bind(packageId).first<{ budgets_json: string | null; addons_json: string | null; flags_json: string | null }>();
   if (!pkg) return;
   const now = nowIso();
@@ -329,12 +384,12 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
     const existing = parseJson<Budget[]>(current.budgets_json, []);
     const added = buildBudgetsForPurchase(existing, specs, now);
     const balances = mergeAddOnBalances(parseJson(current.addons_json, []), addOns);
-    await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, payment_status = 'paid', updated_at = ? WHERE id = ?").bind(j([...existing, ...added]), j(balances), now, current.id).run();
+    await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, payment_status = 'paid', stripe_checkout_id = COALESCE(?, stripe_checkout_id), updated_at = ? WHERE id = ?").bind(j([...existing, ...added]), j(balances), checkoutId, now, current.id).run();
   } else {
     await db.prepare(
-      "INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, ?, 'stripe', ?, ?)",
+      "INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, ?, 'stripe', ?, ?, ?)",
     )
-      .bind(newId("csub"), tenantId, clientId, packageId, j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, now, now)
+      .bind(newId("csub"), tenantId, clientId, packageId, j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, now, now)
       .run();
   }
 }
