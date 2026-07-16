@@ -76,6 +76,34 @@ describe("client flags resolver", () => {
     // Unknown keys are ignored, defaults intact elsewhere.
     expect(f.showMacroBreakdown).toBe(DEFAULT_CLIENT_FLAGS.showMacroBreakdown);
   });
+
+  it("plan-access follows the budget: workout-only package hides the meal plan", () => {
+    // A workout-only package = a workout budget, no meal budget.
+    const workoutOnly: Budget[] = [{ feature: "workout", daysTotal: 30, startedAt: days(-5), expiresAt: days(25) }];
+    const f = resolveClientFlags({ entitlements: paidEnt, budgets: workoutOnly, nowIso: NOW });
+    expect(f.canAccessWorkoutPlan).toBe(true);
+    expect(f.canAccessMealPlan).toBe(false); // no meal budget → gated off
+    // ...and the mirror: a meal-only package.
+    const mealOnly: Budget[] = [{ feature: "meal", daysTotal: 30, startedAt: days(-5), expiresAt: days(25) }];
+    const g = resolveClientFlags({ entitlements: paidEnt, budgets: mealOnly, nowIso: NOW });
+    expect(g.canAccessMealPlan).toBe(true);
+    expect(g.canAccessWorkoutPlan).toBe(false);
+  });
+
+  it("AI groups are decomposable and bounded by the master + aiSuite", () => {
+    // No aiSuite → master off → every AI group off.
+    const none = resolveClientFlags({ entitlements: FREE_ENTITLEMENTS, nowIso: NOW });
+    expect(none.canUseAi).toBe(false);
+    expect(none.aiMealTools).toBe(false);
+    expect(none.aiCoachInsights).toBe(false);
+    // aiSuite on, but a package sells food tools only (insights off).
+    const foodOnly = resolveClientFlags({ packageFlags: { aiCoachInsights: false }, entitlements: paidEnt, nowIso: NOW });
+    expect(foodOnly.aiMealTools).toBe(true);
+    expect(foodOnly.aiCoachInsights).toBe(false);
+    // Master kill cascades to the groups even if a group was set true.
+    const masterOff = resolveClientFlags({ packageFlags: { canUseAi: false, aiMealTools: true }, entitlements: paidEnt, nowIso: NOW });
+    expect(masterOff.aiMealTools).toBe(false);
+  });
 });
 
 describe("permissions", () => {

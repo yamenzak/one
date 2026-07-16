@@ -10,6 +10,7 @@ import { WorkoutBody, MUSCLE_GROUPS, EQUIPMENT_TYPES, normalizeMuscle, normalize
 import { resolveUnits } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
+import { requireClientFlag, resolveClientFlagsFor } from "./client-flags.js";
 import { tenantEntitlements, getConfig, setConfig } from "./billing-store.js";
 import { generate, generateImage, extractJson, listModels } from "./ai.js";
 import { buildClientContext } from "./ai-context.js";
@@ -131,6 +132,7 @@ export const aiRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    { const fg = await requireClientFlag(c, access.client.id, "aiMealTools"); if (fg) return fg; }
 
     const result = await generate(c.env, {
       tenantId: who.tenantId,
@@ -289,6 +291,7 @@ export const aiRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    { const fg = await requireClientFlag(c, access.client.id, "aiMealTools"); if (fg) return fg; }
     // The image must be a same-tenant R2 object.
     if (!parsed.data.imageKey.startsWith(`t/${who.tenantId}/`)) return c.json({ error: "invalid image" }, 400);
     // Load the photo for the vision model (mock lane ignores it).
@@ -473,6 +476,7 @@ export const aiRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    { const fg = await requireClientFlag(c, access.client.id, "aiCoachInsights"); if (fg) return fg; }
     const result = await generate(c.env, {
       tenantId: who.tenantId,
       actorUserId: who.userId,
@@ -708,6 +712,7 @@ export const aiRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    { const fg = await requireClientFlag(c, access.client.id, "aiMealTools"); if (fg) return fg; }
     const foodList = parsed.data.foods.map((f) => `- ${f.name}${f.quantity ? ` (${Math.round(f.quantity)}${f.unit ?? "g"})` : ""}`).join("\n");
     const result = await generate(c.env, {
       tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
@@ -838,6 +843,12 @@ export const aiRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid query" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    // AI insights are a per-package client capability — a client whose plan
+    // excludes them simply gets no note (graceful, not a 403). Staff bypass.
+    if (c.get("role") === "client") {
+      const flags = await resolveClientFlagsFor(c.env.DB, who.tenantId, access.client.id);
+      if (!flags.aiCoachInsights) return c.json({ message: null });
+    }
     const surface = parsed.data.surface;
     const today = parsed.data.today ?? new Date().toISOString().slice(0, 10);
     const hour = parsed.data.hour ?? 12;

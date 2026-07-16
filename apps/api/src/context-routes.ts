@@ -7,15 +7,13 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import {
-  resolveClientFlags,
-  parseFlagsJson,
-  type Budget,
   type PersonaRefRole,
 } from "./context-helpers.js";
 import type { PersonaRef, SessionContext } from "@mossa/protocol";
 import { resolveUnits, type UnitPrefs } from "@mossa/domain";
 import { type AppEnv, isPlatformAdmin, requireTenant } from "./auth-context.js";
 import { clientForUser } from "./clients.js";
+import { resolveClientFlagsFor } from "./client-flags.js";
 import { tenantEntitlements, seedBilling } from "./billing-store.js";
 import { parseJson, j } from "./db.js";
 import { nowIso } from "./ids.js";
@@ -86,26 +84,8 @@ export const contextRoutes = new Hono<AppEnv>()
     if (active) {
       entitlements = await tenantEntitlements(c.env.DB, active.tenantId);
       if (active.clientId) {
-        // Resolve flags off the client's current subscription (if any).
-        const sub = await c.env.DB.prepare(
-          "SELECT budgets_json, flags_json, package_id FROM client_subscriptions WHERE client_id = ? AND status IN ('active','paused') ORDER BY started_at DESC LIMIT 1",
-        )
-          .bind(active.clientId)
-          .first<{ budgets_json: string | null; flags_json: string | null; package_id: string | null }>();
-        let packageFlags = null;
-        if (sub?.package_id) {
-          const pkg = await c.env.DB.prepare("SELECT flags_json FROM packages WHERE id = ?")
-            .bind(sub.package_id)
-            .first<{ flags_json: string | null }>();
-          packageFlags = parseFlagsJson(pkg?.flags_json);
-        }
-        clientFlags = resolveClientFlags({
-          packageFlags,
-          subscriptionFlags: parseFlagsJson(sub?.flags_json),
-          budgets: sub ? parseJson<Budget[]>(sub.budgets_json, []) : null,
-          entitlements,
-          nowIso: new Date().toISOString(),
-        });
+        // Resolve flags off the client's current subscription (shared resolver).
+        clientFlags = await resolveClientFlagsFor(c.env.DB, active.tenantId, active.clientId);
       }
     }
 

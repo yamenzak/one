@@ -2,19 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Badge, Field, Switch, Sheet, Chip, Page, Stagger, EmptyState, IconBadge, SectionHeader, Reveal, SkeletonHeader, SkeletonList, CreditCard, Ticket, Tag, Trash2, Plus, X } from "@mossa/ui";
+import { CLIENT_FLAG_META, CLIENT_FLAG_CATEGORIES, CLIENT_FLAG_KEYS, DEFAULT_CLIENT_FLAGS, type ClientFlags } from "@mossa/domain";
 import { api } from "../../api.js";
+import { useSession } from "../../session.js";
 
 interface Pkg { id: string; name: string; one_time_price_cents: number | null; monthly_price_cents?: number | null; budgets: { feature: string; days: number }[]; visibility: string }
 interface Code { id: string; code: string; days_to_add: number; target_feature: string; used_count: number; max_uses: number }
 interface Promo { id: string; code: string; discount_type: string; percent_off: number | null; amount_off_cents: number | null; redemption_count: number; max_redemptions: number | null; active: number }
-
-const FLAG_OPTIONS: { key: string; label: string }[] = [
-  { key: "canUseAi", label: "AI features" },
-  { key: "canRequestExerciseSwap", label: "Exercise swaps" },
-  { key: "canTrackFasting", label: "Fasting timer" },
-  { key: "checkInIncludesPhotos", label: "Progress photos" },
-  { key: "showNutritionReports", label: "Nutrition reports" },
-];
 
 export function Packages() {
   const [packages, setPackages] = useState<Pkg[] | null>(null);
@@ -100,21 +94,26 @@ function PackageSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   const [budgets, setBudgets] = useState<{ feature: "all" | "workout" | "meal"; days: number }[]>([{ feature: "all", days: 30 }]);
   const [visibility, setVisibility] = useState<"private" | "marketplace">("marketplace");
   const [oncePerCustomer, setOncePerCustomer] = useState(false);
-  const [flags, setFlags] = useState<Record<string, boolean>>({});
+  // Only keys the tenant explicitly toggled land here — untouched flags fall
+  // back to the client defaults at resolve time (so a package needn't restate
+  // everything). Explicit `false` IS persisted, which is how a tenant carves
+  // out a bespoke bundle (e.g. turn AI insights off).
+  const [flags, setFlags] = useState<Partial<Record<keyof ClientFlags, boolean>>>({});
   const [busy, setBusy] = useState(false);
+  const { ctx } = useSession();
+  const entFeatures = (ctx?.entitlements?.features ?? {}) as Record<string, boolean>;
   const cents = price ? Math.round(Number(price) * 100) : null;
   const setBudget = (i: number, p: Partial<{ feature: "all" | "workout" | "meal"; days: number }>) => setBudgets((b) => b.map((r, idx) => (idx === i ? { ...r, ...p } : r)));
   const save = async () => {
     setBusy(true);
     try {
-      const activeFlags = Object.fromEntries(Object.entries(flags).filter(([, v]) => v));
       await api.post("/api/packages", {
         name,
         oneTimePriceCents: priceMode === "one_time" || priceMode === "installment" ? cents : null,
         monthlyPriceCents: priceMode === "monthly" ? cents : null,
         installmentMonths: priceMode === "installment" ? Number(installmentMonths) : null,
         budgets,
-        flags: Object.keys(activeFlags).length ? activeFlags : null,
+        flags: Object.keys(flags).length ? flags : null,
         oncePerCustomer,
         visibility,
       });
@@ -141,11 +140,32 @@ function PackageSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () =
           ))}
         </div>
 
-        <div className="space-y-2">
-          <span className="text-sm text-muted-foreground">Unlocks</span>
-          {FLAG_OPTIONS.map((f) => (
-            <div key={f.key} className="flex items-center justify-between"><span className="text-sm">{f.label}</span><Switch checked={!!flags[f.key]} onCheckedChange={(v) => setFlags((p) => ({ ...p, [f.key]: v }))} /></div>
-          ))}
+        <div className="space-y-3">
+          <div>
+            <span className="text-sm text-muted-foreground">Client capabilities</span>
+            <p className="text-xs text-muted-foreground/80">What this package includes. Plan access also follows the budgets above — a workout-only budget already hides the meal plan.</p>
+          </div>
+          {CLIENT_FLAG_CATEGORIES.map((cat) => {
+            const keys = CLIENT_FLAG_KEYS.filter(
+              (k) => CLIENT_FLAG_META[k].category === cat.key && (!CLIENT_FLAG_META[k].requiresFeature || entFeatures[CLIENT_FLAG_META[k].requiresFeature as string]),
+            );
+            if (!keys.length) return null;
+            return (
+              <div key={cat.key} className="space-y-1.5 rounded-2xl bg-card p-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{cat.label}</div>
+                {keys.map((k) => {
+                  const m = CLIENT_FLAG_META[k];
+                  const checked = flags[k] ?? DEFAULT_CLIENT_FLAGS[k];
+                  return (
+                    <div key={k} className="flex items-center justify-between gap-3">
+                      <div className="min-w-0"><div className="text-sm">{m.label}</div><div className="text-xs text-muted-foreground">{m.hint}</div></div>
+                      <Switch checked={checked} onCheckedChange={(v) => setFlags((p) => ({ ...p, [k]: v }))} />
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
 
         <div className="flex items-center justify-between"><span className="text-sm">Once per customer</span><Switch checked={oncePerCustomer} onCheckedChange={setOncePerCustomer} /></div>
