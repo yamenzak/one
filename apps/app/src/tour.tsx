@@ -130,9 +130,11 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
   }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Find + track the target element (it may still be loading in after nav).
+  // NB: don't null the rect up front for selector steps — keep the previous
+  // spotlight painted until the new target resolves, so hopping between steps
+  // glides instead of flashing the whole screen fully-dimmed for a frame.
   useEffect(() => {
     if (!step.selector) { setRect(null); return; }
-    setRect(null);
     let raf = 0, tries = 0, scrolled = false;
     const find = () => {
       const el = pickEl(step.selector!);

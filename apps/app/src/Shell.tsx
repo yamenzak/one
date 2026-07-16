@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNod
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
-  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, type TabDef,
+  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, LifeBuoy, toneVar, type TabDef, type Tone,
 } from "@mossa/ui";
 import { useSession, useActiveClientId } from "./session.js";
 import { useTheme } from "./theme.js";
@@ -32,7 +32,7 @@ import { Shop } from "./screens/client/Shop.js";
 import { Explore } from "./screens/client/Explore.js";
 import { AdminConsole } from "./screens/admin/AdminConsole.js";
 import { NotificationBell } from "./NotificationBell.js";
-import { TourProvider, useTour } from "./tour.js";
+import { TourProvider, useTour, type TourId } from "./tour.js";
 
 const CLIENT_TABS: TabDef[] = [
   { key: "today", label: "Today", icon: Home, tone: "primary" },
@@ -40,6 +40,13 @@ const CLIENT_TABS: TabDef[] = [
   { key: "eat", label: "Eat", icon: Utensils, tone: "nutrition" },
   { key: "wellness", label: "Wellness", icon: HeartPulse, tone: "sleep" },
   { key: "progress", label: "Progress", icon: LineChart, tone: "cardio" },
+];
+
+/** The guided tours offered from the Help menu (client surface). */
+const HELP_TOURS: { id: TourId; icon: typeof Home; tone: Tone; title: string; sub: string }[] = [
+  { id: "app", icon: Sparkles, tone: "primary", title: "App walkthrough", sub: "A hands-on tour of everything, with sample data." },
+  { id: "workout", icon: Dumbbell, tone: "activity", title: "Workout player", sub: "Days, sets, rest timers and logging." },
+  { id: "meal", icon: Utensils, tone: "nutrition", title: "Meal plan & shopping", sub: "Options, macros, recipes and your list." },
 ];
 
 /** Am I currently looking at the client surface? (client role, or train mode.) */
@@ -199,6 +206,29 @@ function TabLayout() {
                 <BookOpen className="size-[1.15rem]" />
               </button>
             )}
+            {clientSurface && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="grid size-9 place-items-center rounded-full text-muted-foreground outline-none ring-ring transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-2" aria-label="Help &amp; guided tours">
+                    <LifeBuoy className="size-[1.15rem]" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>Guided tours</DropdownMenuLabel>
+                  {HELP_TOURS.map((t) => (
+                    <DropdownMenuItem key={t.id} onSelect={() => startTour(t.id)}>
+                      <span className="grid size-8 shrink-0 place-items-center rounded-lg" style={{ backgroundColor: `color-mix(in oklch, ${toneVar[t.tone]} 15%, transparent)` }}>
+                        <t.icon style={{ color: toneVar[t.tone] }} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block font-medium leading-tight">{t.title}</span>
+                        <span className="block text-xs text-muted-foreground">{t.sub}</span>
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <NotificationBell />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -225,12 +255,6 @@ function TabLayout() {
                         {p.tenantId === active.tenantId && <Check className="ml-auto size-4 text-primary" />}
                       </DropdownMenuItem>
                     ))}
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-                {clientSurface && (
-                  <>
-                    <DropdownMenuItem onSelect={() => startTour("app")}><Sparkles /> Replay app tour</DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>
                 )}
