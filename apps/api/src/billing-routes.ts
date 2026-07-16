@@ -8,7 +8,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import {
   checkDowngrade, resolveEntitlements, mergeOverrides, snapshotDowngrade, raiseOverride,
-  FEATURE_KEYS, QUOTA_KEYS, FEATURE_META, QUOTA_META, type Entitlements, type EntitlementGrants,
+  isFullyExpired, overallDaysRemaining,
+  FEATURE_KEYS, QUOTA_KEYS, FEATURE_META, QUOTA_META, type Entitlements, type EntitlementGrants, type Budget,
 } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import {
@@ -18,7 +19,9 @@ import {
   seedBilling,
   tenantEntitlements,
 } from "./billing-store.js";
+import { stripeConfig, stripeEnabled, stripeCall } from "./stripe.js";
 import { nowIso, periodKey } from "./ids.js";
+import { parseJson } from "./db.js";
 
 function billingDO(c: { env: AppEnv["Bindings"] }, tenantId: string) {
   const stub = c.env.BILLING.get(c.env.BILLING.idFromName(tenantId));
@@ -40,6 +43,23 @@ export const billingRoutes = new Hono<AppEnv>()
     const balance = await dobj.view();
     const ledger = await dobj.recentLedger();
     const plan = plans.find((p) => p.id === sub.plan_id) ?? null;
+
+    // Connect account + the tenant's own client-delinquency roll-up, so the
+    // owner's Business surface can nudge onboarding and flag lapsing clients.
+    const cfg = await stripeConfig(c.env.DB);
+    const [connectRow, csubs] = await Promise.all([
+      c.env.DB.prepare("SELECT stripe_account_id, charges_enabled, details_submitted FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null; details_submitted: number | null }>(),
+      c.env.DB.prepare("SELECT budgets_json FROM client_subscriptions WHERE tenant_id = ? AND status IN ('active','paused')").bind(who.tenantId).all<{ budgets_json: string | null }>(),
+    ]);
+    const now = nowIso();
+    let lapsed = 0, expiringSoon = 0;
+    for (const r of csubs.results ?? []) {
+      const budgets = parseJson<Budget[]>(r.budgets_json, []);
+      if (!budgets.length) continue;
+      if (isFullyExpired(budgets, now)) lapsed++;
+      else if (overallDaysRemaining(budgets, now) <= 7) expiringSoon++;
+    }
+
     return c.json({
       subscription: {
         planId: sub.plan_id,
@@ -59,8 +79,31 @@ export const billingRoutes = new Hono<AppEnv>()
       })),
       packs,
       entitlements,
-      stripeEnabled: false, // platform Stripe rail lands in the commerce phase
+      stripeEnabled: stripeEnabled(cfg),
+      connect: {
+        connected: Boolean(connectRow?.stripe_account_id),
+        chargesEnabled: Boolean(connectRow?.charges_enabled),
+        detailsSubmitted: Boolean(connectRow?.details_submitted),
+      },
+      clientBilling: { lapsed, expiringSoon, active: (csubs.results ?? []).length },
     });
+  })
+
+  // Stripe Billing Portal — the owner manages card / invoices / cancel there.
+  .post("/billing/portal", async (c) => {
+    const who = requireTenant(c)!;
+    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
+    const cfg = await stripeConfig(c.env.DB);
+    if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
+    const body = z.object({ returnUrl: z.string().url() }).safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body" }, 400);
+    const sub = await getSubscription(c.env.DB, who.tenantId);
+    if (!sub.stripe_customer_id) return c.json({ error: "no billing account yet" }, 409);
+    const session = await stripeCall<{ url: string }>(cfg.secretKey, "billing_portal/sessions", {
+      customer: sub.stripe_customer_id,
+      return_url: body.data.returnUrl,
+    });
+    return c.json({ url: session.url });
   })
 
   // Downgrade eligibility probe (SPEC §5) — usage vs target entitlements.
