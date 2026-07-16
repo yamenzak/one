@@ -8,8 +8,8 @@ import {
   Button, Card, Skeleton, MacroBar, IconBadge, Sheet, EmptyState, ProgressRing,
   Reveal, SkeletonHero, SkeletonList, SkeletonHeader,
   Page, Stagger, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
-  Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, Sparkles, Utensils, Croissant, Soup, Apple,
-  ChevronLeft, ChevronRight, type Tone, type LucideIcon,
+  Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Sparkles, Utensils, Croissant, Soup, Apple,
+  Store, Ticket, AlertTriangle, toneVar, ChevronLeft, ChevronRight, type Tone, type LucideIcon,
 } from "@mossa/ui";
 import type { WidgetItem } from "@mossa/protocol";
 import { useNavigate } from "react-router-dom";
@@ -45,6 +45,30 @@ export interface TodayBundle {
   weightSeries?: { kg: number; date: string }[];
   widgets?: WidgetItem[] | null;
   profile?: { complete: boolean; gaps: string[] } | null;
+  access?: {
+    hasSubscription: boolean;
+    daysRemaining: number | null;
+    expired: boolean;
+    workoutActive: boolean;
+    mealActive: boolean;
+    sellsPackages: boolean;
+    tenantDelinquent: boolean;
+  } | null;
+}
+
+/** The access lifecycle notice for Today, derived from the today bundle. Null
+ *  when there's nothing to say (healthy access, or a tenancy that doesn't sell). */
+function accessNotice(a: TodayBundle["access"]): { tone: Tone; icon: LucideIcon; eyebrow: string; title: string; body: string; cta: string | null } | null {
+  if (!a) return null;
+  if (a.tenantDelinquent)
+    return { tone: "warning", icon: AlertTriangle, eyebrow: "Access paused", title: "Some features are paused", body: "Your coach's account needs attention. Your data is safe — everything comes back once it's sorted.", cta: null };
+  if (a.hasSubscription && a.expired && a.sellsPackages)
+    return { tone: "danger", icon: Ticket, eyebrow: "Access expired", title: "Renew to keep your plan", body: "Your training & meal access has ended. Renew to pick up right where you left off.", cta: "Renew access" };
+  if (a.hasSubscription && !a.expired && a.daysRemaining != null && a.daysRemaining <= 7)
+    return { tone: "warning", icon: Clock, eyebrow: "Ending soon", title: `${a.daysRemaining} day${a.daysRemaining === 1 ? "" : "s"} of access left`, body: "Extend now so your plan doesn't pause when it lapses.", cta: "Extend access" };
+  if (!a.hasSubscription && a.sellsPackages)
+    return { tone: "primary", icon: Store, eyebrow: "Get started", title: "Unlock your coaching plan", body: "Browse your coach's packages to start training and eating on plan.", cta: "Browse packages" };
+  return null;
 }
 
 const GAP_LABELS: Record<string, string> = {
@@ -131,6 +155,36 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
       }>
         {data && agenda && widgetData && (
         <>
+          {(() => {
+            const notice = accessNotice(data.access);
+            if (!notice) return null;
+            const tappable = !!notice.cta && ownView;
+            const tint = toneVar[notice.tone];
+            return (
+              <Stagger>
+                <button onClick={tappable ? () => nav("/shop") : undefined} disabled={!tappable} className="block w-full text-left">
+                  <Card interactive={tappable} className="relative overflow-hidden">
+                    <div className="pointer-events-none absolute -right-12 -top-14 size-44 rounded-full blur-3xl" style={{ backgroundColor: `color-mix(in oklch, ${tint} 18%, transparent)` }} />
+                    <div className="relative flex items-center gap-4">
+                      <div className="grid size-12 shrink-0 place-items-center rounded-2xl [&_svg]:size-6" style={{ backgroundColor: `color-mix(in oklch, ${tint} 15%, transparent)`, color: tint }}><notice.icon /></div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-medium uppercase tracking-wide" style={{ color: tint }}>{notice.eyebrow}</div>
+                        <h3 className="mt-0.5 text-lg font-semibold tracking-tight">{notice.title}</h3>
+                        <p className="mt-0.5 text-sm text-muted-foreground">{notice.body}</p>
+                      </div>
+                      {tappable && <ChevronRight className="size-5 shrink-0 self-center text-muted-foreground" />}
+                    </div>
+                    {tappable && (
+                      <div className="relative mt-3">
+                        <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold" style={{ color: tint, backgroundColor: `color-mix(in oklch, ${tint} 12%, transparent)` }}>{notice.cta} <ArrowRight className="size-3.5" /></span>
+                      </div>
+                    )}
+                  </Card>
+                </button>
+              </Stagger>
+            );
+          })()}
+
           {data.profile && !data.profile.complete && (() => {
             const total = Object.keys(GAP_LABELS).length;
             const done = total - data.profile.gaps.length;

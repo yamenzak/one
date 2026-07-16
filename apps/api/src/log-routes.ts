@@ -19,7 +19,7 @@ import {
   SubmitCheckIn,
   type LoggedSet,
 } from "@mossa/protocol";
-import { activityByKey, estimateBurnedCalories, calculateBMI, calculateBMR, ageFromDob, profileGaps, type ClientPreferences } from "@mossa/domain";
+import { activityByKey, estimateBurnedCalories, calculateBMI, calculateBMR, ageFromDob, profileGaps, overallDaysRemaining, isFullyExpired, hasActiveBudget, SUSPENDED_STATUSES, type ClientPreferences, type Budget } from "@mossa/domain";
 import { type AppEnv } from "./auth-context.js";
 import { requireClientAccess, type ClientRow } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
@@ -795,6 +795,29 @@ export const logRoutes = new Hono<AppEnv>()
         .all<{ weight_kg: number; date_local: string }>(),
     ]);
 
+    // Access lifecycle — powers the client's no-plan / expiring / expired /
+    // coach-account notices. Only surfaces a "buy" prompt in tenancies that
+    // actually sell packages (`sellsPackages`); generous tenancies stay silent.
+    const nowInstant = new Date().toISOString();
+    const [accessSub, sells, tenantSub] = await Promise.all([
+      db.prepare("SELECT status, budgets_json FROM client_subscriptions WHERE client_id = ? AND status IN ('active','paused','expired') ORDER BY started_at DESC LIMIT 1").bind(clientId).first<{ status: string; budgets_json: string | null }>(),
+      db.prepare("SELECT COUNT(*) AS n FROM packages WHERE tenant_id = ? AND active = 1 AND visibility = 'marketplace'").bind(access.client.tenant_id).first<{ n: number }>(),
+      db.prepare("SELECT status FROM subscriptions WHERE tenant_id = ?").bind(access.client.tenant_id).first<{ status: string }>(),
+    ]);
+    const accessBudgets = parseJson<Budget[]>(accessSub?.budgets_json, []);
+    const accessSummary = {
+      hasSubscription: Boolean(accessSub),
+      daysRemaining: accessSub ? overallDaysRemaining(accessBudgets, nowInstant) : null,
+      expired: Boolean(accessSub) && isFullyExpired(accessBudgets, nowInstant),
+      workoutActive: !accessSub || hasActiveBudget(accessBudgets, "workout", nowInstant),
+      mealActive: !accessSub || hasActiveBudget(accessBudgets, "meal", nowInstant),
+      sellsPackages: (sells?.n ?? 0) > 0,
+      // Passthrough: when the tenant is suspended for non-payment to Mossa, the
+      // client's tenant-derived paid features are already clamped off upstream —
+      // this flag lets the app explain why, gently.
+      tenantDelinquent: SUSPENDED_STATUSES.has(tenantSub?.status ?? "active"),
+    };
+
     const workoutSets = (workout.results ?? []).reduce((n, row) => {
       const entries = parseJson<SessionEntry[]>(row.entries_json, []);
       return n + entries.reduce((m, e) => m + e.sets.filter((s) => s.completed !== false).length, 0);
@@ -824,6 +847,7 @@ export const logRoutes = new Hono<AppEnv>()
             body: parseJson(plans.results![0]!.body_json, { days: [] }),
           }
         : null,
+      access: accessSummary,
       checkInDates: (checkInDates.results ?? []).map((r) => r.date_local),
       pendingLabs: pendingLabs?.n ?? 0,
       weightSeries: (weights.results ?? []).map((r) => ({ kg: r.weight_kg, date: r.date_local })).reverse(),
