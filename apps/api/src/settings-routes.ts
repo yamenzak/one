@@ -8,11 +8,15 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { AI_TONES } from "@mossa/protocol";
+import { categoriesForRole, resolveAllChannels, parseNotifPrefs, type NotifRole, type StoredNotifPrefs } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
-import { tenantEntitlements } from "./billing-store.js";
+import { tenantEntitlements, getConfig } from "./billing-store.js";
 import { nowIso, periodKey } from "./ids.js";
 import { parseJson, j } from "./db.js";
 import { PROVIDERS, resolveIntegrations, maskIntegrations } from "./integrations.js";
+import { resolveEmailConfig, maskEmailConfig } from "./email-provider.js";
+
+const notifRole = (r: string | null | undefined): NotifRole => (r === "owner" || r === "trainer" || r === "assistant" || r === "client" ? r : "member");
 import { AI_FEATURES } from "./ai-features.js";
 import { listModels } from "./ai.js";
 
@@ -21,14 +25,17 @@ export const settingsRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const row = await c.env.DB.prepare("SELECT * FROM tenant_settings WHERE tenant_id = ?")
       .bind(who.tenantId)
-      .first<{ branding_json: string | null; ai_toggles_json: string | null; marketplace_json: string | null; integrations_json: string | null; stripe_account_id: string | null }>();
+      .first<{ branding_json: string | null; ai_toggles_json: string | null; marketplace_json: string | null; integrations_json: string | null; email_config_json: string | null; stripe_account_id: string | null }>();
     const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    const platformFrom = (await getConfig(c.env.DB))["email.platform_from"] || "Mossa <noreply@fourdegreelabs.com>";
     return c.json({
       branding: parseJson(row?.branding_json, { accent: null, logoUrl: null, welcome: null }),
       aiToggles: parseJson(row?.ai_toggles_json, {}),
       marketplace: parseJson(row?.marketplace_json, { enabled: false, selfRegister: false }),
       integrations: maskIntegrations(resolveIntegrations(parseJson(row?.integrations_json ?? null, {}))),
       integrationProviders: PROVIDERS,
+      email: maskEmailConfig(resolveEmailConfig(parseJson(row?.email_config_json ?? null, {}))),
+      emailPlatformFrom: platformFrom,
       stripeConnected: Boolean(row?.stripe_account_id),
       entitlements: ent,
     });
@@ -62,6 +69,13 @@ export const settingsRoutes = new Hono<AppEnv>()
         marketplace: z.object({ enabled: z.boolean().optional(), selfRegister: z.boolean().optional() }).optional(),
         // Per-provider: { enabled?, <keyField>?: string }. Empty string clears a key.
         integrations: z.record(z.string(), z.record(z.string(), z.union([z.boolean(), z.string().max(200)]))).optional(),
+        // Email provider: platform (metered) | brevo (own key) | off.
+        email: z.object({
+          provider: z.enum(["platform", "brevo", "off"]).optional(),
+          brevoApiKey: z.string().max(200).optional(),
+          senderEmail: z.string().max(200).optional(),
+          senderName: z.string().max(120).optional(),
+        }).optional(),
       })
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
@@ -93,6 +107,46 @@ export const settingsRoutes = new Hono<AppEnv>()
     )
       .bind(who.tenantId, j(branding), j(aiToggles), j(marketplace), j(integrations), nowIso(), j(branding), j(aiToggles), j(marketplace), j(integrations), nowIso())
       .run();
+
+    // Email provider config, merged so a blank key doesn't wipe a set one unless
+    // explicitly cleared (empty string clears; undefined keeps).
+    if (d.email) {
+      const cur = resolveEmailConfig(parseJson((await c.env.DB.prepare("SELECT email_config_json FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ email_config_json: string | null }>())?.email_config_json ?? null, {}));
+      const next = {
+        provider: d.email.provider ?? cur.provider,
+        brevoApiKey: d.email.brevoApiKey !== undefined ? d.email.brevoApiKey : cur.brevoApiKey,
+        senderEmail: d.email.senderEmail !== undefined ? d.email.senderEmail : cur.senderEmail,
+        senderName: d.email.senderName !== undefined ? d.email.senderName : cur.senderName,
+      };
+      await c.env.DB.prepare("UPDATE tenant_settings SET email_config_json = ?, updated_at = ? WHERE tenant_id = ?").bind(j(next), nowIso(), who.tenantId).run();
+    }
+    return c.json({ ok: true });
+  })
+
+  // Per-user notification preferences (any member; scoped to their own row).
+  .get("/notification-prefs", async (c) => {
+    const who = requireTenant(c)!;
+    const role = notifRole(c.get("role"));
+    const row = await c.env.DB.prepare("SELECT notif_json FROM user_prefs WHERE user_id = ?").bind(who.userId).first<{ notif_json: string | null }>();
+    return c.json({
+      categories: categoriesForRole(role),
+      prefs: resolveAllChannels(role, parseNotifPrefs(row?.notif_json ?? null)),
+    });
+  })
+
+  .patch("/notification-prefs", async (c) => {
+    const who = requireTenant(c)!;
+    const parsed = z.record(z.string(), z.object({ inbox: z.boolean().optional(), email: z.boolean().optional() }))
+      .safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const row = await c.env.DB.prepare("SELECT notif_json FROM user_prefs WHERE user_id = ?").bind(who.userId).first<{ notif_json: string | null }>();
+    const cur = parseNotifPrefs(row?.notif_json ?? null) as StoredNotifPrefs;
+    for (const [cat, patch] of Object.entries(parsed.data)) {
+      cur[cat as keyof StoredNotifPrefs] = { ...(cur[cat as keyof StoredNotifPrefs] ?? {}), ...patch };
+    }
+    await c.env.DB.prepare(
+      "INSERT INTO user_prefs (user_id, notif_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET notif_json = ?, updated_at = ?",
+    ).bind(who.userId, j(cur), nowIso(), j(cur), nowIso()).run();
     return c.json({ ok: true });
   })
 

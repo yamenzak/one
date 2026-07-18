@@ -18,6 +18,8 @@ import {
   listPlans,
   seedBilling,
   tenantEntitlements,
+  getConfig,
+  setConfig,
 } from "./billing-store.js";
 import { stripeConfig, stripeEnabled, stripeCall } from "./stripe.js";
 import { nowIso, periodKey } from "./ids.js";
@@ -281,4 +283,33 @@ export const adminRoutes = new Hono<AppEnv>()
     return c.json({ ok: true, effective: mergeOverrides(resolveEntitlements(plan?.entitlements_json), newOverride) });
   })
 
-  .get("/admin/whoami", (c) => c.json({ admin: isPlatformAdmin(c), email: c.get("user")?.email }));
+  .get("/admin/whoami", (c) => c.json({ admin: isPlatformAdmin(c), email: c.get("user")?.email }))
+
+  // Platform email config: the metered-sender address, delivery provider, and
+  // the per-email credit price charged to tenants on the platform rail.
+  .get("/admin/email", async (c) => {
+    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    const cfg = await getConfig(c.env.DB);
+    return c.json({
+      provider: cfg["email.provider"] ?? "mock",
+      from: cfg["email.from"] ?? "Mossa <noreply@mossa.local>",
+      platformFrom: cfg["email.platform_from"] ?? "Mossa <noreply@fourdegreelabs.com>",
+      creditsPerEmail: Number(cfg["email.credits_per_email"] ?? "1"),
+    });
+  })
+  .post("/admin/email", async (c) => {
+    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    const parsed = z.object({
+      provider: z.enum(["disabled", "mock", "cloudflare"]).optional(),
+      from: z.string().max(200).optional(),
+      platformFrom: z.string().max(200).optional(),
+      creditsPerEmail: z.number().min(0).max(1000).optional(),
+    }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const d = parsed.data;
+    if (d.provider) await setConfig(c.env.DB, "email.provider", d.provider);
+    if (d.from) await setConfig(c.env.DB, "email.from", d.from);
+    if (d.platformFrom) await setConfig(c.env.DB, "email.platform_from", d.platformFrom);
+    if (d.creditsPerEmail !== undefined) await setConfig(c.env.DB, "email.credits_per_email", String(d.creditsPerEmail));
+    return c.json({ ok: true });
+  });

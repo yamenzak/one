@@ -180,6 +180,12 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "ALTER TABLE tenant_settings ADD COLUMN charges_enabled INTEGER DEFAULT 0",
           "ALTER TABLE tenant_settings ADD COLUMN payouts_enabled INTEGER DEFAULT 0",
           "ALTER TABLE tenant_settings ADD COLUMN details_submitted INTEGER DEFAULT 0",
+          // Per-tenant email provider (platform-metered | brevo | off).
+          "ALTER TABLE tenant_settings ADD COLUMN email_config_json TEXT",
+          // Notification category → channel preferences (per user).
+          "ALTER TABLE user_prefs ADD COLUMN notif_json TEXT",
+          // Notification category (check-ins | plans-goals | billing | …).
+          "ALTER TABLE notifications ADD COLUMN category TEXT",
         ];
         for (const sql of alters) await db.exec(sql).catch(() => undefined);
       })

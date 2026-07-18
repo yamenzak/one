@@ -37,7 +37,7 @@ import { sessionRoutes, promoRoutes } from "./session-routes.js";
 import { domainRoutes, domainAdminRoutes } from "./domain-routes.js";
 import type { Env } from "./env.js";
 
-import { notifyUser, notifyTenantOwners } from "./inbox-do.js";
+import { notify, notifyOwners } from "./notify.js";
 
 export { TenantBillingDO } from "./billing-do.js";
 export { InboxDO } from "./inbox-do.js";
@@ -124,7 +124,8 @@ async function dailySweep(env: Env): Promise<void> {
     .run()
     .catch(() => undefined);
   for (const s of toSuspend.results ?? []) {
-    await notifyTenantOwners(env, s.tenant_id, {
+    await notifyOwners(env, s.tenant_id, {
+      category: "billing",
       type: "billing_suspended",
       title: "Your studio is suspended",
       message: "Your Mossa subscription lapsed, so paid features are paused for you and your clients. Update your payment to restore everything.",
@@ -145,7 +146,8 @@ async function dailySweep(env: Env): Promise<void> {
     .run()
     .catch(() => undefined);
   for (const s of toCancel.results ?? []) {
-    await notifyTenantOwners(env, s.tenant_id, {
+    await notifyOwners(env, s.tenant_id, {
+      category: "billing",
       type: "billing_canceled",
       title: "Subscription canceled",
       message: "Your studio dropped to the free plan after non-payment. Resubscribe any time to bring back paid features.",
@@ -171,31 +173,24 @@ async function reminderSweep(env: Env): Promise<void> {
     const budgets = JSON.parse(sub.budgets_json ?? "[]") as { expiresAt: string }[];
     if (!budgets.length) continue;
     const latest = Math.max(0, ...budgets.map((b) => Date.parse(b.expiresAt)));
-    const clientRow = async () => env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(sub.client_id).first<{ user_id: string | null }>();
-    const notify = async (type: string, title: string, message: string, marker: string) => {
-      const client = await clientRow();
+    const nudge = async (type: string, title: string, message: string, marker: string) => {
+      const client = await env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(sub.client_id).first<{ user_id: string | null }>();
       if (client?.user_id) {
-        await env.DB.prepare(
-          "INSERT OR IGNORE INTO notifications (id, tenant_id, recipient_user_id, type, title, message, link, created_at) VALUES (?, ?, ?, ?, ?, ?, '/shop', ?)",
-        )
-          .bind(`ntf_${marker}_${sub.id}`, sub.tenant_id, client.user_id, type, title, message, new Date().toISOString())
-          .run()
-          .catch(() => undefined);
-        await notifyUser(env, client.user_id);
+        await notify(env, { tenantId: sub.tenant_id, userId: client.user_id, category: "commerce", type, title, message, link: "/shop", dedupeKey: `${marker}_${sub.id}` });
       }
       await env.DB.prepare("UPDATE client_subscriptions SET notes = ? WHERE id = ?").bind(`${notes} ${marker}`.trim(), sub.id).run().catch(() => undefined);
     };
     // Fully lapsed → one "expired" nudge, and reconcile the status.
     if (latest > 0 && latest <= now) {
       if (!notes.includes("expired-notified")) {
-        await notify("sub_expired", "Your access has expired", "Renew to pick your plan back up where you left off.", "expired-notified");
+        await nudge("sub_expired", "Your access has expired", "Renew to pick your plan back up where you left off.", "expired-notified");
         await env.DB.prepare("UPDATE client_subscriptions SET status = 'expired' WHERE id = ?").bind(sub.id).run().catch(() => undefined);
       }
       continue;
     }
     // Within 3 days of lapsing → one "expiring soon" nudge.
     if (latest > now && latest < soon && !notes.includes("expiry-notified")) {
-      await notify("sub_expiring", "Your plan is expiring soon", "Renew to keep your coaching access.", "expiry-notified");
+      await nudge("sub_expiring", "Your plan is expiring soon", "Renew to keep your coaching access.", "expiry-notified");
     }
   }
 }

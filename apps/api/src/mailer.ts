@@ -36,20 +36,24 @@ const bareAddress = (from: string): string => {
   return m?.[1] ?? from;
 };
 
+export { bareAddress };
+
 export async function sendEmail(
   db: D1Database,
   msg: { to: string; subject: string; html?: string; text?: string },
   binding?: SendEmailBinding,
+  fromOverride?: string,
 ): Promise<SendResult> {
   const cfg = await getEmailConfig(db);
+  const from = fromOverride || cfg.from;
   if (cfg.provider === "disabled") return { ok: false, error: "email disabled" };
   if (cfg.provider === "cloudflare" && binding) {
     try {
       // Cloudflare's send_email binding takes an EmailMessage with a raw MIME
       // body — NOT a plain object. Build proper MIME and send that.
       const { EmailMessage } = await import("cloudflare:email");
-      const raw = buildMime({ from: cfg.from, to: msg.to, subject: msg.subject, html: msg.html, text: msg.text });
-      await binding.send(new EmailMessage(bareAddress(cfg.from), msg.to, raw));
+      const raw = buildMime({ from, to: msg.to, subject: msg.subject, html: msg.html, text: msg.text });
+      await binding.send(new EmailMessage(bareAddress(from), msg.to, raw));
       return { ok: true };
     } catch (err) {
       console.warn("email send failed", err);

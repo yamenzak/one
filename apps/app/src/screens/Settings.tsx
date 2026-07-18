@@ -3,12 +3,12 @@
  * branding editor: pick a brand preset + radius that themes the app for clients.
  */
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { motion } from "motion/react";
 import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
-  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2,
+  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, Mail,
   type Branding, type BrandTokens, type NeutralTint, type LucideIcon,
 } from "@mossa/ui";
 import { resolveUnits, cmToFeetInches, feetInchesToCm } from "@mossa/domain";
@@ -82,6 +82,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
           <>
             <UnitsSection />
             <AppearanceSection />
+            <NotificationsSection />
           </>
         )}
 
@@ -90,6 +91,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
             <p className="px-1 text-sm text-muted-foreground">Studio-wide settings you control as the owner — your brand, your AI and your business. The <span className="font-medium text-primary">Studio</span> badge marks them apart from your personal settings.</p>
             {canBrand && <BrandingEditor initial={(ctx?.branding ?? null) as Branding | null} onPreview={preview} onSaved={() => void refresh()} />}
             {aiSuite && <AiConfigSection />}
+            <EmailSection />
             <MarketplaceSection />
             <IntegrationsSection />
             {canBrand && <DomainSection />}
@@ -152,6 +154,89 @@ function ToggleRow({ icon: Icon, title, desc, checked, onChange }: { icon: Lucid
       </div>
       <Switch checked={checked} onCheckedChange={onChange} />
     </div>
+  );
+}
+
+/** Per-user notification channels — inbox + email, per category, role-scoped. */
+function NotificationsSection() {
+  const [data, setData] = useState<{ categories: { key: string; label: string; blurb: string }[]; prefs: Record<string, { inbox: boolean; email: boolean }> } | null>(null);
+  const load = useCallback(async () => setData(await api.get("/api/notification-prefs")), []);
+  useEffect(() => { void load(); }, [load]);
+  const toggle = async (cat: string, channel: "inbox" | "email", v: boolean) => {
+    setData((d) => (d ? { ...d, prefs: { ...d.prefs, [cat]: { ...d.prefs[cat]!, [channel]: v } } } : d));
+    await api.patch("/api/notification-prefs", { [cat]: { [channel]: v } }).catch(() => void load());
+  };
+  return (
+    <section>
+      <SectionHead title="Notifications" />
+      <Card className="divide-y divide-border/50 p-0">
+        <div className="flex items-center justify-end gap-6 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <span className="inline-flex items-center gap-1"><Bell className="size-3.5" /> App</span>
+          <span className="inline-flex items-center gap-1"><Mail className="size-3.5" /> Email</span>
+        </div>
+        {!data
+          ? [0, 1, 2, 3].map((i) => <div key={i} className="p-4"><SkeletonLine w="8rem" h="text" /></div>)
+          : data.categories.map((cat) => (
+              <div key={cat.key} className="flex items-center justify-between gap-3 p-4">
+                <div className="min-w-0"><div className="text-sm font-medium">{cat.label}</div><div className="text-xs text-muted-foreground">{cat.blurb}</div></div>
+                <div className="flex shrink-0 items-center gap-6">
+                  {cat.key === "digest" ? <span className="w-9" /> : <Switch checked={data.prefs[cat.key]?.inbox ?? false} onCheckedChange={(v) => void toggle(cat.key, "inbox", v)} />}
+                  <Switch checked={data.prefs[cat.key]?.email ?? false} onCheckedChange={(v) => void toggle(cat.key, "email", v)} />
+                </div>
+              </div>
+            ))}
+      </Card>
+    </section>
+  );
+}
+
+/** Owner: how the studio sends email — the metered platform sender or your Brevo. */
+function EmailSection() {
+  const [cfg, setCfg] = useState<{ email: { provider: string; senderEmail: string; senderName: string; brevoKeySet: boolean; ready: boolean }; emailPlatformFrom: string } | null>(null);
+  const [brevoKey, setBrevoKey] = useState("");
+  const [senderEmail, setSenderEmail] = useState("");
+  const [senderName, setSenderName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => {
+    const r = await api.get<{ email: { provider: string; senderEmail: string; senderName: string; brevoKeySet: boolean; ready: boolean }; emailPlatformFrom: string }>("/api/settings");
+    setCfg(r); setSenderEmail(r.email.senderEmail); setSenderName(r.email.senderName);
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  if (!cfg) return null;
+  const provider = cfg.email.provider;
+  const setProvider = async (p: string) => { setCfg((c) => (c ? { ...c, email: { ...c.email, provider: p } } : c)); await api.patch("/api/settings", { email: { provider: p } }).catch(() => void load()); };
+  const saveBrevo = async () => {
+    setBusy(true);
+    try { await api.patch("/api/settings", { email: { senderEmail, senderName, ...(brevoKey ? { brevoApiKey: brevoKey } : {}) } }); setBrevoKey(""); await load(); }
+    finally { setBusy(false); }
+  };
+  return (
+    <section>
+      <SectionHead title="Email delivery" scope="tenant" />
+      <Card className="space-y-3">
+        <SegmentedControl
+          options={[{ value: "platform", label: "Mossa" }, { value: "brevo", label: "Brevo" }, { value: "off", label: "Off" }]}
+          value={provider}
+          onChange={(v) => void setProvider(v)}
+        />
+        {provider === "platform" && (
+          <p className="text-sm text-muted-foreground">Sends from <span className="font-medium text-foreground">{cfg.emailPlatformFrom.replace(/.*<|>.*/g, "")}</span> and is metered against your studio credits — no setup needed.</p>
+        )}
+        {provider === "off" && <p className="text-sm text-muted-foreground">Email is off — members still get in-app notifications. Login codes always send.</p>}
+        {provider === "brevo" && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Send through your own Brevo account — your sender, your bill, no credits.</p>
+            <Field label="Sender email" value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} placeholder="coach@yourstudio.com" />
+            <Field label="Sender name" value={senderName} onChange={(e) => setSenderName(e.target.value)} placeholder="Your Studio" />
+            <Field label={cfg.email.brevoKeySet ? "Brevo API key (set — leave blank to keep)" : "Brevo API key"} value={brevoKey} onChange={(e) => setBrevoKey(e.target.value)} type="password" placeholder="xkeysib-…" />
+            <div className="flex items-center justify-between">
+              <Badge tone={cfg.email.ready ? "success" : "warning"}>{cfg.email.ready ? "Ready" : "Needs key + sender"}</Badge>
+              <Button size="sm" disabled={busy} onClick={() => void saveBrevo()}>{busy ? "Saving…" : "Save"}</Button>
+            </div>
+          </div>
+        )}
+      </Card>
+    </section>
   );
 }
 

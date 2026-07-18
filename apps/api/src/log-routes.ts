@@ -23,7 +23,7 @@ import { activityByKey, estimateBurnedCalories, calculateBMI, calculateBMR, ageF
 import { type AppEnv } from "./auth-context.js";
 import { requireClientAccess, type ClientRow } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
-import { notifyUser } from "./inbox-do.js";
+import { notify } from "./notify.js";
 import { parseJson, j } from "./db.js";
 
 /** Every log payload arrives wrapped with the target clientId. */
@@ -598,21 +598,7 @@ export const logRoutes = new Hono<AppEnv>()
       .bind(access.client.id)
       .first<{ trainer_user_id: string }>();
     if (primary && primary.trainer_user_id !== c.get("user")?.id) {
-      await c.env.DB.prepare(
-        "INSERT INTO notifications (id, tenant_id, recipient_user_id, type, title, message, link, created_at) VALUES (?, ?, ?, 'check_in', ?, ?, ?, ?)",
-      )
-        .bind(
-          newId("ntf"),
-          access.client.tenant_id,
-          primary.trainer_user_id,
-          `${access.client.display_name} checked in`,
-          d.notes ?? "",
-          `/clients/${access.client.id}/manage`,
-          nowIso(),
-        )
-        .run()
-        .catch(() => undefined);
-      await notifyUser(c.env, primary.trainer_user_id);
+      await notify(c.env, { tenantId: access.client.tenant_id, userId: primary.trainer_user_id, category: "check-ins", type: "check_in", title: `${access.client.display_name} checked in`, message: d.notes ?? "", link: `/clients/${access.client.id}/manage` });
     }
     return c.json({ ok: true, id }, 201);
   })
@@ -647,13 +633,7 @@ export const logRoutes = new Hono<AppEnv>()
       .bind(parsed.data.feedback, user.id, nowIso(), c.req.param("id"), access.client.id)
       .run();
     if (access.client.user_id) {
-      await c.env.DB.prepare(
-        "INSERT INTO notifications (id, tenant_id, recipient_user_id, type, title, message, link, created_at) VALUES (?, ?, ?, 'feedback', 'Coach feedback on your check-in', ?, '/progress', ?)",
-      )
-        .bind(newId("ntf"), access.client.tenant_id, access.client.user_id, parsed.data.feedback.slice(0, 200), nowIso())
-        .run()
-        .catch(() => undefined);
-      await notifyUser(c.env, access.client.user_id);
+      await notify(c.env, { tenantId: access.client.tenant_id, userId: access.client.user_id, category: "check-ins", type: "feedback", title: "Coach feedback on your check-in", message: parsed.data.feedback.slice(0, 200), link: "/progress" });
     }
     return c.json({ ok: true });
   })

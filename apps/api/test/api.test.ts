@@ -335,6 +335,32 @@ describe("connect rail — webhook idempotency + grant", () => {
   });
 });
 
+describe("notifications — email provider + per-user preferences", () => {
+  it("owner sets Brevo (key masked) and tunes notification channels", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    // Configure Brevo as the tenant email provider.
+    const patch = await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ email: { provider: "brevo", brevoApiKey: "xkeysib-secret", senderEmail: "coach@studio.com", senderName: "Studio" } }) });
+    expect(patch.status).toBe(200);
+    const settings = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as { email: { provider: string; brevoKeySet: boolean; ready: boolean; senderEmail: string }; emailPlatformFrom: string };
+    expect(settings.email.provider).toBe("brevo");
+    expect(settings.email.brevoKeySet).toBe(true); // masked — the key itself never returns
+    expect(settings.email.ready).toBe(true);
+    expect(settings.email.senderEmail).toBe("coach@studio.com");
+    expect(settings.emailPlatformFrom).toContain("fourdegreelabs.com");
+
+    // Notification preferences: categories scoped to the owner role + defaults.
+    const prefs0 = (await (await SELF.fetch("http://x/api/notification-prefs", { headers: auth(ownerCookie) })).json()) as { categories: { key: string }[]; prefs: Record<string, { inbox: boolean; email: boolean }> };
+    expect(prefs0.categories.some((c) => c.key === "billing")).toBe(true);
+    expect(prefs0.categories.some((c) => c.key === "commerce")).toBe(false); // client-only
+    expect(prefs0.prefs["check-ins"].email).toBe(false); // coach default: digest-only
+
+    // Turn coach check-in emails on; the change round-trips.
+    await SELF.fetch("http://x/api/notification-prefs", { method: "PATCH", headers: H, body: JSON.stringify({ "check-ins": { email: true } }) });
+    const prefs1 = (await (await SELF.fetch("http://x/api/notification-prefs", { headers: auth(ownerCookie) })).json()) as { prefs: Record<string, { email: boolean }> };
+    expect(prefs1.prefs["check-ins"].email).toBe(true);
+  });
+});
+
 describe("platform rail — dunning notifies the owner", () => {
   async function stripeSig(payload: string, secret: string): Promise<string> {
     const t = Math.floor(Date.now() / 1000);

@@ -11,7 +11,7 @@ import { resolveEntitlements, buildBudgetsForPurchase, mergeAddOnBalances, type 
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { getSubscription, listPacks, listPlans, seedBilling, hasFeature, getConfig } from "./billing-store.js";
 import { requireClientAccess } from "./clients.js";
-import { notifyTenantOwners, notifyUser } from "./inbox-do.js";
+import { notify, notifyOwners } from "./notify.js";
 import {
   ensureCustomer,
   stripeCall,
@@ -255,10 +255,7 @@ export const stripeRoutes = new Hono<AppEnv>()
         if (row) {
           await c.env.DB.prepare("UPDATE client_subscriptions SET payment_status = 'past_due', updated_at = ? WHERE id = ?").bind(nowIso(), row.id).run();
           const cl = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null }>();
-          if (cl?.user_id) {
-            await c.env.DB.prepare("INSERT OR IGNORE INTO notifications (id, tenant_id, recipient_user_id, type, title, message, link, created_at) VALUES (?, ?, ?, 'sub_payment_failed', 'Renewal payment failed', 'Update your card to keep your plan from pausing.', '/shop', ?)").bind(`ntf_pf_${row.id}`, row.tenant_id, cl.user_id, nowIso()).run().catch(() => undefined);
-            await notifyUser(c.env, cl.user_id);
-          }
+          if (cl?.user_id) await notify(c.env, { tenantId: row.tenant_id, userId: cl.user_id, category: "commerce", type: "sub_payment_failed", title: "Renewal payment failed", message: "Update your card to keep your plan from pausing.", link: "/shop", dedupeKey: `pf_${row.id}` });
         }
       }
     } else if (event.type === "customer.subscription.deleted") {
@@ -278,7 +275,8 @@ export const stripeRoutes = new Hono<AppEnv>()
         : undefined;
       if (tenantId) {
         const disputed = event.type === "charge.dispute.created";
-        await notifyTenantOwners(c.env, tenantId, {
+        await notifyOwners(c.env, tenantId, {
+          category: "sales",
           type: disputed ? "payment_disputed" : "payment_refunded",
           title: disputed ? "A client payment was disputed" : "A client payment was refunded",
           message: disputed
@@ -390,7 +388,8 @@ async function handlePlatformEvent(
       // Seed the grace window; never clobber a later suspend/cancel.
       if (tenantId) {
         await db.prepare("UPDATE subscriptions SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?) WHERE tenant_id = ? AND status NOT IN ('suspended','canceled')").bind(nowIso(), tenantId).run();
-        await notifyTenantOwners(env, tenantId, {
+        await notifyOwners(env, tenantId, {
+          category: "billing",
           type: "billing_past_due",
           title: "Payment failed",
           message: "We couldn't charge your card. Update your payment method to keep your studio running — you have a short grace period before features pause.",

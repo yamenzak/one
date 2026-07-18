@@ -16,7 +16,7 @@ import { hasFeature } from "./billing-store.js";
 import { requireClientAccess } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
-import { notifyUser } from "./inbox-do.js";
+import { notify } from "./notify.js";
 
 interface SessionEntry { exerciseId: string; sets: LoggedSetLike[] }
 
@@ -183,13 +183,7 @@ export const healthRoutes = new Hono<AppEnv>()
       .run();
     // Notify the client to complete the request.
     if (access.client.user_id) {
-      await c.env.DB.prepare(
-        "INSERT INTO notifications (id, tenant_id, recipient_user_id, type, title, message, link, created_at) VALUES (?, ?, ?, 'lab_requested', ?, ?, '/progress', ?)",
-      )
-        .bind(newId("ntf"), who.tenantId, access.client.user_id, "New lab test requested", d.displayName ?? d.type, nowIso())
-        .run()
-        .catch(() => undefined);
-      await notifyUser(c.env, access.client.user_id);
+      await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, category: "labs", type: "lab_requested", title: "New lab test requested", message: d.displayName ?? d.type, link: "/progress" });
     }
     return c.json({ ok: true, id }, 201);
   })
@@ -214,13 +208,7 @@ export const healthRoutes = new Hono<AppEnv>()
       .bind(access.client.id)
       .first<{ trainer_user_id: string }>();
     if (primary) {
-      await c.env.DB.prepare(
-        "INSERT INTO notifications (id, tenant_id, recipient_user_id, type, title, message, link, created_at) VALUES (?, ?, ?, 'lab_uploaded', ?, '', ?, ?)",
-      )
-        .bind(newId("ntf"), access.client.tenant_id, primary.trainer_user_id, `${access.client.display_name} uploaded a lab result`, `/clients/${access.client.id}/manage`, nowIso())
-        .run()
-        .catch(() => undefined);
-      await notifyUser(c.env, primary.trainer_user_id);
+      await notify(c.env, { tenantId: access.client.tenant_id, userId: primary.trainer_user_id, category: "labs", type: "lab_uploaded", title: `${access.client.display_name} uploaded a lab result`, link: `/clients/${access.client.id}/manage` });
     }
     return c.json({ ok: true });
   })
@@ -456,13 +444,7 @@ export const healthRoutes = new Hono<AppEnv>()
         .bind(access.client.id)
         .first<{ trainer_user_id: string }>();
       if (primary) {
-        await c.env.DB.prepare(
-          "INSERT INTO notifications (id, tenant_id, recipient_user_id, type, title, message, link, created_at) VALUES (?, ?, ?, 'swap_request', ?, '', ?, ?)",
-        )
-          .bind(newId("ntf"), access.client.tenant_id, primary.trainer_user_id, `${access.client.display_name} requested an exercise swap`, `/clients/${access.client.id}/manage`, nowIso())
-          .run()
-          .catch(() => undefined);
-        await notifyUser(c.env, primary.trainer_user_id);
+        await notify(c.env, { tenantId: access.client.tenant_id, userId: primary.trainer_user_id, category: "swaps", type: "swap_request", title: `${access.client.display_name} requested an exercise swap`, link: `/clients/${access.client.id}/manage` });
       }
     }
     return c.json({ ok: true, id, autoApproved: autoApprove }, 201);
@@ -495,16 +477,12 @@ export const healthRoutes = new Hono<AppEnv>()
         suggestedExerciseId: replacement,
       });
       // Notify the client their swap was applied.
-      const client = await c.env.DB.prepare("SELECT user_id, display_name FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null; display_name: string }>();
-      if (client?.user_id) {
-        await c.env.DB.prepare(
-          "INSERT INTO notifications (id, tenant_id, recipient_user_id, type, title, message, link, created_at) VALUES (?, ?, ?, 'swap_approved', 'Your exercise swap was applied', '', '/train', ?)",
-        )
-          .bind(newId("ntf"), who.tenantId, client.user_id, nowIso())
-          .run()
-          .catch(() => undefined);
-        await notifyUser(c.env, client.user_id);
-      }
+      const client = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null }>();
+      if (client?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: client.user_id, category: "swaps", type: "swap_approved", title: "Your exercise swap was applied", link: "/train" });
+    } else if (parsed.data.status === "rejected") {
+      // Previously silent — the client was left waiting. Tell them the coach kept the original.
+      const client = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null }>();
+      if (client?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: client.user_id, category: "swaps", type: "swap_rejected", title: "Your coach kept the original exercise", message: parsed.data.trainerNote ?? "", link: "/train" });
     }
     return c.json({ ok: true });
   });
