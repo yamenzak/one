@@ -59,7 +59,13 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   const { startIfNew, start: startTour, active: tourActive, tour, stepSelector } = useTour();
   const aiSuite = !!ctx?.entitlements?.features?.aiSuite;
   const date = todayLocal();
-  const shopKey = plan ? `mossa.shop.${plan.id}` : null;
+  // `active` is the plan being viewed — the current published one by default, or
+  // a past (superseded) plan the client picked from history. The shopping list is
+  // keyed to the plan being VIEWED, so editing a past plan's list (or the act of
+  // switching to one) can never overwrite the current plan's saved list.
+  const active = (viewId ? allPlans.find((p) => p.id === viewId) : plan) ?? plan ?? null;
+  const isPast = !!active && !!plan && active.id !== plan.id;
+  const shopKey = active ? `mossa.shop.${active.id}` : null;
   const shopReady = useRef<string | null>(null);
 
   // First time a client opens their meal plan, walk them through it.
@@ -129,14 +135,12 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
 
   const foodMap = useMemo(() => new Map([...foods.entries()].map(([id, f]) => [id, { id: f.id, servingSize: f.serving_size, caloriesPerServing: f.calories, proteinG: f.protein_g, carbsG: f.carbs_g, fatG: f.fat_g } as FoodLike])), [foods]);
 
-  // `active` is the plan being viewed — the current published one by default, or
-  // a past (superseded) plan the client picked from history. Logging always
-  // targets the current plan, so past plans render read-only.
-  const active = (viewId ? allPlans.find((p) => p.id === viewId) : plan) ?? plan ?? null;
-  const isPast = !!active && !!plan && active.id !== plan.id;
+  // Logging always targets the current plan, so past plans render read-only.
   const firstShopIdx = (active?.body.mealOptions ?? []).findIndex((o) => !o.isFree);
   const pastPlans = allPlans.filter((p) => p.status === "superseded");
-  const pickPlan = (id: string | null) => { setViewId(id); setHistOpen(false); setView("plan"); setCounts({}); setChecked(new Set()); };
+  // Don't clear counts/checked here — the shopping list is keyed to `active.id`,
+  // so switching plans re-hydrates the target plan's own saved list (or empty).
+  const pickPlan = (id: string | null) => { setViewId(id); setHistOpen(false); setView("plan"); };
 
   const groups = useMemo(() => {
     const g = new Map<string, { opt: MealOption; index: number }[]>();

@@ -62,6 +62,7 @@ export function useModalOverlay(onClose?: () => void) {
   useEffect(() => { closeRef.current = onClose; });
   useEffect(() => {
     const el = ref.current;
+    const prevFocus = document.activeElement as HTMLElement | null;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const initial = el?.querySelector<HTMLElement>("[data-autofocus]") ?? el;
@@ -80,7 +81,7 @@ export function useModalOverlay(onClose?: () => void) {
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     };
     document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = prevOverflow; };
+    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = prevOverflow; prevFocus?.focus?.(); };
   }, []);
   return ref;
 }
@@ -302,10 +303,11 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
 }
 
 // ── Select ───────────────────────────────────────────────────────────────────
-export function Select<T extends string>({ value, onChange, options, placeholder, className }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; placeholder?: string; className?: string }) {
+export function Select<T extends string>({ value, onChange, options, placeholder, className, "aria-label": ariaLabel }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; placeholder?: string; className?: string; "aria-label"?: string }) {
   return (
     <SelectPrimitive.Root value={value} onValueChange={(v) => onChange(v as T)}>
       <SelectPrimitive.Trigger
+        aria-label={ariaLabel}
         className={cn(
           "inline-flex h-11 w-full items-center justify-between gap-2 rounded-xl border border-input bg-secondary/50 px-3.5 text-sm outline-none transition-colors focus:border-primary/70 data-[placeholder]:text-muted-foreground",
           className,

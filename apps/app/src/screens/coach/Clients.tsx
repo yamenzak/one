@@ -118,12 +118,12 @@ export function ClientDetail() {
           <SegmentedControl fill options={TABS.map((t) => ({ value: t.value, label: t.label }))} value={tab} onChange={(v) => nav(`/clients/${clientId}/${v}`)} />
         </div>
       </div>
-      {tab === "today" && <Today clientId={clientId} />}
-      {tab === "plans" && <CoachPlans clientId={clientId} />}
-      {tab === "goals" && <GoalManager clientId={clientId} />}
-      {tab === "progress" && <Progress clientId={clientId} />}
-      {tab === "report" && <ClientReport clientId={clientId} />}
-      {tab === "manage" && <ClientManage clientId={clientId} />}
+      {tab === "today" && <Today key={clientId} clientId={clientId} />}
+      {tab === "plans" && <CoachPlans key={clientId} clientId={clientId} />}
+      {tab === "goals" && <GoalManager key={clientId} clientId={clientId} />}
+      {tab === "progress" && <Progress key={clientId} clientId={clientId} />}
+      {tab === "report" && <ClientReport key={clientId} clientId={clientId} />}
+      {tab === "manage" && <ClientManage key={clientId} clientId={clientId} />}
     </div>
   );
 }

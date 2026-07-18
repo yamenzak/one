@@ -6,7 +6,7 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { motion } from "motion/react";
 import {
-  Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger,
+  Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger, ConfirmDialog,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
   KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, Mail,
   type Branding, type BrandTokens, type NeutralTint, type LucideIcon,
@@ -453,6 +453,7 @@ function DomainSection() {
   const [hostname, setHostname] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [domainToRemove, setDomainToRemove] = useState<string | null>(null);
 
   const load = async () => {
     const r = await api.get<{ domains: DomainInfo[]; configured: boolean }>("/api/domains");
@@ -519,7 +520,7 @@ function DomainSection() {
               {d.status === "active"
                 ? <Button size="sm" variant="secondary" onClick={() => window.open(`https://${d.hostname}`, "_blank")}><Globe /> Visit</Button>
                 : <Button size="sm" variant="secondary" onClick={() => void refresh(d.hostname)}>Check now</Button>}
-              <Button size="icon" variant="ghost" aria-label="Remove domain" onClick={() => void remove(d.hostname)}><Trash2 /></Button>
+              <Button size="icon" variant="ghost" aria-label="Remove domain" onClick={() => setDomainToRemove(d.hostname)}><Trash2 /></Button>
             </div>
           </div>
           );
@@ -540,6 +541,16 @@ function DomainSection() {
       </Card>
         )}
       </Reveal>
+
+      <ConfirmDialog
+        open={!!domainToRemove}
+        onOpenChange={(o) => !o && setDomainToRemove(null)}
+        title={domainToRemove ? `Remove ${domainToRemove}?` : "Remove domain?"}
+        description="The app will stop serving on this domain and its SSL certificate is released. You can add it again later."
+        confirmLabel="Remove"
+        destructive
+        onConfirm={() => { if (domainToRemove) void remove(domainToRemove); }}
+      />
     </section>
   );
 }
@@ -672,11 +683,12 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
 
   const uploadAsset = async (file: File, setter: (url: string) => void) => {
     setMsg(null);
-    const fd = new FormData(); fd.append("file", file); fd.append("purpose", "brand");
-    const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
-    if (!up.ok) { setMsg("Upload failed."); return; }
-    const { key } = (await up.json()) as { key?: string };
-    if (key) setter(`/api/media/${key}`);
+    // Tenant asset (no clientId) — route through uploadMedia for 401 handling +
+    // error surfacing instead of a bare fetch that silently no-ops.
+    try {
+      const key = await uploadMedia(file, "brand", file.name);
+      setter(`/api/media/${key}`);
+    } catch { setMsg("Couldn't upload that image — try again."); }
   };
 
   const extractFromLogo = () => {

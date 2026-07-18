@@ -1,7 +1,7 @@
 /** Client Shop — marketplace packages, Stripe Connect buy, redeem codes. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Page, Stagger, IconBadge, ArrowLeft, Ticket, Store, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
+import { Button, Card, Badge, Field, Page, Stagger, IconBadge, ConfirmDialog, ArrowLeft, Ticket, Store, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Pkg { id: string; name: string; description: string | null; one_time_price_cents: number | null; monthly_price_cents?: number | null; budgets: { feature: string; days: number }[]; visibility: string }
@@ -13,6 +13,7 @@ export function Shop({ clientId, onBack }: { clientId: string; onBack: () => voi
   const [code, setCode] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const load = useCallback(async () => {
     const [p, s] = await Promise.all([api.get<{ packages: Pkg[] }>("/api/packages"), api.get<{ subscriptions: Sub[] }>(`/api/subscriptions?clientId=${clientId}`)]);
@@ -41,7 +42,7 @@ export function Shop({ clientId, onBack }: { clientId: string; onBack: () => voi
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <div className="flex items-center gap-3">
-        <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
+        <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
         <h1 className="text-xl font-bold tracking-tight">Plans &amp; access</h1>
       </div>
 
@@ -65,7 +66,7 @@ export function Shop({ clientId, onBack }: { clientId: string; onBack: () => voi
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Badge tone={sub.daysRemaining <= 7 ? "warning" : "success"}>{sub.daysRemaining} days left</Badge>
-            {sub.autoRenew && <Button size="sm" variant="ghost" disabled={busy} onClick={() => void cancelRenew()}>Cancel</Button>}
+            {sub.autoRenew && <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirmCancel(true)}>Cancel</Button>}
           </div>
         </Card>
       )}
@@ -110,6 +111,17 @@ export function Shop({ clientId, onBack }: { clientId: string; onBack: () => voi
         </>
         )}
       </Reveal>
+
+      <ConfirmDialog
+        open={confirmCancel}
+        onOpenChange={setConfirmCancel}
+        title="Cancel auto-renew?"
+        description="Your access stays active until the current period runs out, then it won't renew. You can resubscribe anytime."
+        confirmLabel="Cancel auto-renew"
+        cancelLabel="Keep it"
+        destructive
+        onConfirm={() => void cancelRenew()}
+      />
     </Page>
   );
 }

@@ -83,3 +83,49 @@ Status legend: **✅ fixed** · **◑ hardened (residual noted)** · **⊘ accep
 *Verification: `pnpm typecheck` clean across the workspace; 96 domain + 83 API
 integration tests pass (3 added for the trainer lane, DO settle invariants, and
 redemption over-redemption); the app typechecks and builds.*
+
+---
+
+# Round 2 — independent re-audit (adversarial + fresh sweep)
+
+A second independent pass: four agents (adversarial review of the round-1 diff, a
+fresh security re-audit, a fresh backend sweep of under-covered routes, and a
+fresh frontend/a11y re-audit that also adversarially verified the round-1 UI
+machinery). Round-1's core money-path/concurrency logic and security fixes were
+**independently confirmed correct**. Round 2 found three regressions the changes
+introduced, plus the same bug classes recurring in areas round 1 hadn't touched.
+
+## Regressions introduced by round 1 (fixed)
+
+| Finding | Resolution |
+|---------|-----------|
+| **Redemption stranding** — the compensating rollback ran only on the cap-reached branch, so a transient failure in the grant write left the slot consumed + claim held + no days (permanent lockout). `commerce-routes.ts`. | ✅ Grant wrapped in try/catch that releases the slot (`used_count-1`) and the claim on any failure, so a retry redeems cleanly. |
+| **Host cache no invalidation** — the 60s KV cache was never purged, so a deactivated domain kept routing/white-labeling for up to 60s (mild isolation) and branding renames lagged. `host-context.ts`. | ✅ `invalidateHostCache` called on domain (de)activation (`domain-routes.ts`) and branding change (`settings-routes.ts`). |
+| **Activity-history clamp dropped recent rows** — anchoring the span on `from` meant a far-future `to` clamped away the newest rows. `log-routes.ts`. | ✅ Anchor on `min(to, today)` and clamp `from` up — keeps the most-recent window; a far-past `from` is pulled forward, recent rows always kept. |
+| **useModalOverlay lost focus on close** — never restored `document.activeElement`. `overlays.tsx`. | ✅ Capture at mount, restore in cleanup. |
+| **ClientManage stale-guard never actually added** (round-1 claimed but didn't) — back/forward between clients could commit client A's PHI under client B. `Clients.tsx`. | ✅ `key={clientId}` on all six ClientDetail tab renders forces a remount per client (fixes GoalManager prefill leak too). |
+
+## New (fixed)
+
+| Sev | Finding | Resolution |
+|-----|---------|-----------|
+| HIGH | Trainer-session completion: RMW add-on race + double-consume on concurrent completes + no atomicity. `session-routes.ts`. | ✅ Atomic guarded status transition (`WHERE status != 'completed'`), consume/refund only on the real transition, add-on balance via CAS retry. |
+| HIGH | Cross-tenant exercise coupling — global `UNIQUE(source, source_id)` + tenant-blind dedup let tenant B bind to (and write) tenant A's exercise row, with dangling refs. `db.ts`, `library-resolve.ts`, `external-routes.ts`. | ✅ Index now `(tenant_id, source, source_id)`; dedup selects scoped to own-or-global; reactivation scoped to own tenant. |
+| MED | Owner-role self-escalation — a non-owner custom-granted `member:update` could PATCH their own role to owner. `member-routes.ts`. | ✅ Assigning the `owner` role now requires the caller to be an owner (or platform admin). |
+| MED | Mock mailer logged OTP + defaulted on — a prod deploy left on `mock` wrote the sole auth factor to logs. `mailer.ts`. | ✅ Mock gated on `ENVIRONMENT=development`; fails closed in prod (no log, no silent-success). |
+| MED | Frontend NaN/PHI/UX: WorkoutPlayer weight NaN → bogus PRs; MealPlanDrawer shopping-list wipe on past-plan view; Eat NaN quantity + one-tap delete; raw uploads bypassing 401 handling; missing destructive confirms (Shop/Staff/Packages/Settings-domain); stale-fetch guards + error states (permanent-skeleton); addWater rollback; a11y labels. | ✅ All fixed in `apps/app`/`packages/ui`. |
+| LOW | Global exercise-alternative deletable by any tenant; PR-name lookup not tenant-scoped; `member` roster bare `JSON.parse`; `notify()` could 500 a committed mutation; demo idempotency off-by-one; progress week-bucket naked-local date parse; unbounded `resources`/`sessions` lists. | ✅ All fixed (`library-routes.ts`, `progress-routes.ts`, `member-routes.ts`, `notify.ts`, `demo-routes.ts`, `content-routes.ts`, `session-routes.ts`). |
+
+## Confirmed correct by the adversarial pass (no change needed)
+Credit-DO `settle` (cap + idempotency), water-log atomic SQL, entitlement strict
+coercion, budget `all`-split, clientFlags `requiresFeature` loop, media per-client
+key gating + inline-image rendering, the set-log CAS, and the Stripe
+webhook brace/try-catch balance were each traced and verified sound.
+
+## Round-2 residuals (documented follow-ups, need migrations or FE+BE coordination)
+- **⊘ Plan-body / tenant-settings lost-update** (`plan-routes.ts`, `settings-routes.ts`): owner/coach-only, low concurrency; a proper fix needs an `updated_at`/version round-trip through the UI (optimistic concurrency).
+- **⊘ `exercise_alternatives` PK / `foods` import UNIQUE**: folding `tenant_id` into the PK and adding a foods `UNIQUE(tenant_id, source, source_id)` need data-migration care on existing rows; the query-level cross-tenant writes are already closed.
+- **⊘ Food-by-id visibility**: the by-id route is intentionally permissive so a plan can open a referenced private food; tightening it would break referenced-row loads.
+
+*Verification: `pnpm typecheck` clean; 96 domain + 7 protocol + 83 API tests pass;
+app typechecks and builds.*

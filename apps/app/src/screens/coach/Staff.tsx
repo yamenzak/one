@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PERMISSION_CATALOG } from "@mossa/domain";
-import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, Reveal, SkeletonRow, Users, Mail, ShieldCheck, Plus } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, Plus } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Member { userId: string; role: string; name: string | null; email: string | null; customGrant?: Record<string, string[]> | null }
@@ -17,6 +17,7 @@ export function Staff() {
   const [role, setRole] = useState<"trainer" | "assistant">("trainer");
   const [msg, setMsg] = useState<string | null>(null);
   const [permMember, setPermMember] = useState<Member | null>(null);
+  const [pendingRole, setPendingRole] = useState<{ member: Member; role: string } | null>(null);
 
   const load = useCallback(async () => setMembers((await api.get<{ members: Member[] }>("/api/members")).members), []);
   useEffect(() => void load(), [load]);
@@ -25,6 +26,7 @@ export function Staff() {
     try { await api.patch(`/api/members/${userId}/role`, { role: newRole }); await load(); }
     catch (e) { setMsg(e instanceof Error && e.message.includes("last owner") ? "Can't demote the last owner." : "Couldn't change role."); }
   };
+  const ROLE_LABEL = (r: string) => ROLES.find((x) => x.value === r)?.label ?? r;
   const invite = async () => {
     try { await api.post("/api/auth/organization/invite-member", { email, role }); setMsg(`Invite sent to ${email}.`); setInviteOpen(false); setEmail(""); }
     catch { setMsg("Invite failed — check the email and try again."); }
@@ -52,7 +54,7 @@ export function Staff() {
                   <div className="truncate text-xs text-muted-foreground">{m.email}</div>
                 </div>
                 {m.role !== "owner" && <Button size="icon" variant="secondary" aria-label="Permissions" onClick={() => setPermMember(m)}><ShieldCheck /></Button>}
-                <div className="w-28"><Select value={m.role} onChange={(v) => void changeRole(m.userId, v)} options={ROLES} /></div>
+                <div className="w-28"><Select aria-label="Role" value={m.role} onChange={(v) => v !== m.role && setPendingRole({ member: m, role: v })} options={ROLES} /></div>
               </Card>
             ))}
           </Stagger>
@@ -71,6 +73,16 @@ export function Staff() {
       </Sheet>
 
       {permMember && <PermissionSheet member={permMember} onClose={() => setPermMember(null)} onSaved={() => { setPermMember(null); void load(); }} />}
+
+      <ConfirmDialog
+        open={!!pendingRole}
+        onOpenChange={(o) => !o && setPendingRole(null)}
+        title={pendingRole ? `Change role to ${ROLE_LABEL(pendingRole.role)}?` : "Change role?"}
+        description={pendingRole ? `${pendingRole.member.name || pendingRole.member.email || "This member"} will have the ${ROLE_LABEL(pendingRole.role)} role. This changes what they can access${pendingRole.role === "client" ? " and removes their staff powers" : ""}.` : undefined}
+        confirmLabel="Change role"
+        destructive={pendingRole?.role === "client" || pendingRole?.role === "assistant"}
+        onConfirm={() => { if (pendingRole) void changeRole(pendingRole.member.userId, pendingRole.role); }}
+      />
     </Page>
   );
 }

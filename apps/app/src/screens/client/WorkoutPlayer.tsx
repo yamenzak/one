@@ -529,12 +529,15 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
 
   const save = async () => {
     const wasEditing = editing;
+    // Guard a bad decimal (e.g. "70.5.5" → NaN): drop it rather than posting NaN
+    // and feeding a bogus PR into detectPrs.
+    const wNum = Number(weight);
     await onSave({
       setIndex,
       reps: needsReps(mode) ? (reps ? Number(reps) : prescribed?.reps ?? null) : null,
       durationSeconds: needsDuration(mode) ? (duration ? Number(duration) : prescribed?.timeSec ?? null) : null,
       distanceM: needsDistance(mode) ? (distance ? Number(distance) : prescribed?.distanceM ?? null) : null,
-      weightKg: showWeight && weight ? Math.round(displayToKg(Number(weight), units) * 100) / 100 : null,
+      weightKg: showWeight && weight && Number.isFinite(wNum) ? Math.round(displayToKg(wNum, units) * 100) / 100 : null,
       effortLabel: effort,
       completed: true,
     });
@@ -563,7 +566,7 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
           {needsReps(mode) && <Field label="Reps" inputMode="numeric" value={reps} onChange={(e) => setReps(e.target.value.replace(/\D/g, ""))} />}
           {needsDuration(mode) && <Field label="Duration (sec)" inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value.replace(/\D/g, ""))} />}
           {needsDistance(mode) && <Field label="Distance (m)" inputMode="numeric" value={distance} onChange={(e) => setDistance(e.target.value.replace(/\D/g, ""))} />}
-          {showWeight && <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={weight} onChange={(e) => setWeight(e.target.value)} />}
+          {showWeight && <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={weight} onChange={(e) => setWeight(setDec(e.target.value))} />}
         </div>
         <div>
           <div className="mb-2 text-sm text-muted-foreground">How did it feel?</div>
@@ -596,6 +599,7 @@ function RoundLogDrawer({ block, roundIndex, exercises, onClose, onSave }: { blo
         const prescribed = slot.sets[Math.min(roundIndex, slot.sets.length - 1)];
         const v = vals[si] ?? { reps: "", duration: "", distance: "", weight: "" };
         const showWeight = prescribed?.weightMode !== "bodyweight";
+        const wNum = Number(v.weight);
         return {
           slotIndex: si,
           exerciseId: slot.exerciseId,
@@ -604,7 +608,7 @@ function RoundLogDrawer({ block, roundIndex, exercises, onClose, onSave }: { blo
             reps: needsReps(mode) ? (v.reps ? Number(v.reps) : prescribed?.reps ?? null) : null,
             durationSeconds: needsDuration(mode) ? (v.duration ? Number(v.duration) : prescribed?.timeSec ?? null) : null,
             distanceM: needsDistance(mode) ? (v.distance ? Number(v.distance) : prescribed?.distanceM ?? null) : null,
-            weightKg: showWeight && v.weight ? Math.round(displayToKg(Number(v.weight), units) * 100) / 100 : null,
+            weightKg: showWeight && v.weight && Number.isFinite(wNum) ? Math.round(displayToKg(wNum, units) * 100) / 100 : null,
             effortLabel: null,
             completed: true,
           } as LoggedSet,
@@ -633,7 +637,7 @@ function RoundLogDrawer({ block, roundIndex, exercises, onClose, onSave }: { blo
                 {needsReps(mode) && <Field label="Reps" inputMode="numeric" value={v.reps} onChange={(e) => setV(si, { reps: e.target.value.replace(/\D/g, "") })} />}
                 {needsDuration(mode) && <Field label="Duration (sec)" inputMode="numeric" value={v.duration} onChange={(e) => setV(si, { duration: e.target.value.replace(/\D/g, "") })} />}
                 {needsDistance(mode) && <Field label="Distance (m)" inputMode="numeric" value={v.distance} onChange={(e) => setV(si, { distance: e.target.value.replace(/\D/g, "") })} />}
-                {showWeight && <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={v.weight} onChange={(e) => setV(si, { weight: e.target.value })} />}
+                {showWeight && <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={v.weight} onChange={(e) => setV(si, { weight: setDec(e.target.value) })} />}
               </div>
             </SubCard>
           );
@@ -715,6 +719,9 @@ type MeasureMode = ExerciseSlot["measurementMode"];
 const needsReps = (m: MeasureMode) => m === "reps" || m === "reps_in_time";
 const needsDuration = (m: MeasureMode) => m === "time" || m === "reps_in_time";
 const needsDistance = (m: MeasureMode) => m === "distance";
+
+/** Sanitize a decimal weight field: digits + a single dot, mirroring Eat's LogSheet. */
+const setDec = (v: string) => v.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1");
 
 /** Seconds → "45s" or "1:30". */
 function fmtDuration(sec: number): string {

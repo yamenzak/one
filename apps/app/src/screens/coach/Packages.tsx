@@ -1,7 +1,7 @@
 /** Package editor + redemption codes + promo codes. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Switch, Sheet, Chip, Page, Stagger, EmptyState, IconBadge, SectionHeader, Reveal, SkeletonHeader, SkeletonList, CreditCard, Ticket, Tag, Trash2, Plus, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Switch, Sheet, Chip, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonHeader, SkeletonList, CreditCard, Ticket, Tag, Trash2, Plus, X } from "@mossa/ui";
 import { CLIENT_FLAG_META, CLIENT_FLAG_CATEGORIES, CLIENT_FLAG_KEYS, DEFAULT_CLIENT_FLAGS, type ClientFlags } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -17,6 +17,7 @@ export function Packages() {
   const [pkgOpen, setPkgOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
+  const [promoToDelete, setPromoToDelete] = useState<Promo | null>(null);
 
   const load = useCallback(async () => {
     const [p, c, pr] = await Promise.all([api.get<{ packages: Pkg[] }>("/api/packages"), api.get<{ codes: Code[] }>("/api/redemption-codes"), api.get<{ codes: Promo[] }>("/api/promo-codes").catch(() => ({ codes: [] }))]);
@@ -70,7 +71,7 @@ export function Packages() {
           {promos.map((p) => (
             <Card key={p.id} className={`flex items-center justify-between ${p.active ? "" : "opacity-50"}`}>
               <div className="flex items-center gap-2.5"><IconBadge icon={Tag} tone="nutrition" size="sm" /><div><div className="font-mono font-semibold">{p.code}</div><div className="text-xs text-muted-foreground">{p.discount_type === "percent" ? `${p.percent_off}% off` : `$${((p.amount_off_cents ?? 0) / 100).toFixed(0)} off`} · used {p.redemption_count}{p.max_redemptions ? `/${p.max_redemptions}` : ""}</div></div></div>
-              {p.active ? <button onClick={() => void deletePromo(p.id)} className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button> : <Badge tone="neutral">inactive</Badge>}
+              {p.active ? <button onClick={() => setPromoToDelete(p)} aria-label="Delete promo code" className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button> : <Badge tone="neutral">inactive</Badge>}
             </Card>
           ))}
         </Stagger>
@@ -82,6 +83,16 @@ export function Packages() {
       {pkgOpen && <PackageSheet onClose={() => setPkgOpen(false)} onSaved={() => { setPkgOpen(false); void load(); }} />}
       {codeOpen && <CodeSheet onClose={() => setCodeOpen(false)} onSaved={() => { setCodeOpen(false); void load(); }} />}
       {promoOpen && <PromoSheet onClose={() => setPromoOpen(false)} onSaved={() => { setPromoOpen(false); void load(); }} />}
+
+      <ConfirmDialog
+        open={!!promoToDelete}
+        onOpenChange={(o) => !o && setPromoToDelete(null)}
+        title={promoToDelete ? `Delete promo ${promoToDelete.code}?` : "Delete promo code?"}
+        description="This deactivates the code so it can no longer be redeemed at checkout."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => { if (promoToDelete) void deletePromo(promoToDelete.id); }}
+      />
     </Page>
   );
 }
