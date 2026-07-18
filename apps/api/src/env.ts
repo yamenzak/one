@@ -20,6 +20,9 @@ export interface Env {
 
   /** Platform super-admin allowlist (comma-separated emails). */
   ADMIN_EMAILS?: string;
+  /** Deploy environment. Only an explicit "development" opens the admin lane when
+   *  ADMIN_EMAILS is empty; anything else (incl. unset) fails closed. */
+  ENVIRONMENT?: string;
 
   // ── Better Auth ───────────────────────────────────────────────────────────
   /** Signing/encryption key. MUST be set in production. */

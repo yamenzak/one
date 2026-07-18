@@ -11,7 +11,7 @@ import { resolveChannels, parseNotifPrefs, type NotifCategory, type NotifRole } 
 import type { Env } from "./env.js";
 import { notifyUser } from "./inbox-do.js";
 import { sendTenantEmail } from "./email-provider.js";
-import { emailShell } from "./mailer.js";
+import { emailShell, escapeHtml } from "./mailer.js";
 import { nowIso } from "./ids.js";
 
 export interface NotifyInput {
@@ -50,9 +50,9 @@ function notifEmailHtml(env: Env, brand: string, input: NotifyInput): string {
   const base = env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
   const href = input.link && base ? `${base}${input.link.startsWith("/") ? "" : "/"}${input.link}` : null;
   const button = href
-    ? `<div style="margin-top:20px"><a href="${href}" style="display:inline-block;background:#22c55e;color:#0b0c0e;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:9999px;font-size:14px">Open ${brand}</a></div>`
+    ? `<div style="margin-top:20px"><a href="${encodeURI(href)}" style="display:inline-block;background:#22c55e;color:#0b0c0e;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:9999px;font-size:14px">Open ${escapeHtml(brand)}</a></div>`
     : "";
-  return emailShell(input.title, `${input.message ? `<p style="margin:0">${input.message}</p>` : ""}${button}`);
+  return emailShell(escapeHtml(input.title), `${input.message ? `<p style="margin:0">${escapeHtml(input.message)}</p>` : ""}${button}`);
 }
 
 /** Deliver a notification to one user, honoring their preferences. */

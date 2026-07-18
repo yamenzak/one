@@ -118,7 +118,10 @@ export function clampEntitlementsForStatus(resolved: Entitlements, status: strin
   return SUSPENDED_STATUSES.has(status) ? FREE_ENTITLEMENTS : resolved;
 }
 
-/** Deep-ish merge of a stored (possibly partial) blob onto the free baseline. */
+/** Deep-ish merge of a stored (possibly partial) blob onto the free baseline.
+ *  Values are coerced by type — a feature is enabled ONLY by a literal `true`,
+ *  a quota only by a finite number — so a typo in admin JSON (`"aiSuite":1`,
+ *  `"true"`) can't silently switch on a paid feature (fail closed). */
 export function resolveEntitlements(json: string | null | undefined): Entitlements {
   if (!json) return FREE_ENTITLEMENTS;
   let raw: Partial<Entitlements>;
@@ -127,10 +130,25 @@ export function resolveEntitlements(json: string | null | undefined): Entitlemen
   } catch {
     return FREE_ENTITLEMENTS;
   }
+  const rawFeatures = (raw.features ?? {}) as Record<string, unknown>;
+  const features = { ...FREE_ENTITLEMENTS.features };
+  for (const k of Object.keys(features) as (keyof Features)[]) {
+    if (k in rawFeatures) features[k] = rawFeatures[k] === true;
+  }
+  const rawQuotas = (raw.quotas ?? {}) as Record<string, unknown>;
+  const quotas = { ...FREE_ENTITLEMENTS.quotas };
+  for (const k of Object.keys(quotas) as (keyof Quotas)[]) {
+    const v = rawQuotas[k];
+    if (typeof v === "number" && Number.isFinite(v)) quotas[k] = v;
+  }
+  const grant = (raw.aiCredits as { monthlyGrant?: unknown } | undefined)?.monthlyGrant;
   return {
-    quotas: { ...FREE_ENTITLEMENTS.quotas, ...(raw.quotas ?? {}) },
-    features: { ...FREE_ENTITLEMENTS.features, ...(raw.features ?? {}) },
-    aiCredits: { ...FREE_ENTITLEMENTS.aiCredits, ...(raw.aiCredits ?? {}) },
+    quotas,
+    features,
+    aiCredits: {
+      ...FREE_ENTITLEMENTS.aiCredits,
+      monthlyGrant: typeof grant === "number" && Number.isFinite(grant) ? grant : FREE_ENTITLEMENTS.aiCredits.monthlyGrant,
+    },
   };
 }
 

@@ -4,7 +4,7 @@
  * hook to toggle mode + preview a brand preset (used by the branding editor).
  */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { applyBranding, applyMode, resolveMode, type Branding, type ThemeMode } from "@mossa/ui";
 import { useSession } from "./session.js";
 
@@ -38,11 +38,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // back to that domain's tenant so the login screen is already branded.
   const branding = ((ctx?.branding ?? host?.tenant?.branding) ?? null) as Branding | null;
   const [mode, setMode] = useState<ThemeMode>(() => resolveMode(branding?.defaultMode));
+  // Track whether the user has explicitly picked a mode this session — a manual
+  // toggle must win over the tenant's default even after branding resolves.
+  const userChoseMode = useRef(false);
 
   // Apply the tenant branding whenever it changes.
   useEffect(() => {
     applyBranding(branding);
   }, [branding]);
+
+  // Branding often lands after first paint (it flows through /api/context). Once
+  // the tenant's defaultMode is available, sync to it — unless the user has
+  // already toggled the mode themselves, in which case their choice stands.
+  useEffect(() => {
+    if (userChoseMode.current || !branding?.defaultMode) return;
+    setMode(resolveMode(branding.defaultMode));
+  }, [branding?.defaultMode]);
 
   // Point the browser-tab favicon at the tenant's app icon.
   useEffect(() => {
@@ -64,7 +75,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [ambient, setAmbientState] = useState<boolean>(() => readBool(AMBIENT_KEY, true));
   const setAmbient = useCallback((v: boolean) => { setAmbientState(v); writeBool(AMBIENT_KEY, v); }, []);
 
-  const toggleMode = useCallback(() => setMode((m) => (m === "dark" ? "light" : "dark")), []);
+  const toggleMode = useCallback(() => { userChoseMode.current = true; setMode((m) => (m === "dark" ? "light" : "dark")); }, []);
   const preview = useCallback((b: Branding | null) => applyBranding(b ?? branding), [branding]);
 
   const value = useMemo(() => ({ mode, toggleMode, preview, tintedNav, setTintedNav, ambient, setAmbient }), [mode, toggleMode, preview, tintedNav, setTintedNav, ambient, setAmbient]);

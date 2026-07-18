@@ -74,43 +74,68 @@ export const logRoutes = new Hono<AppEnv>()
     const d = parsed.data.data;
     const db = c.env.DB;
 
-    let log = await db
-      .prepare(
-        "SELECT id, entries_json FROM exercise_logs WHERE client_id = ? AND workout_plan_id = ? AND plan_day_index = ? AND date_local = ?",
-      )
-      .bind(access.client.id, d.workoutPlanId, d.planDayIndex, d.date)
-      .first<{ id: string; entries_json: string | null }>();
-
-    if (!log) {
-      const id = newId("elog");
-      await db
+    // Read-merge-write under optimistic concurrency. Two devices (or an offline
+    // batch flush) logging the same session must not clobber each other's sets
+    // (last-writer-wins) or 500 on the unique-session index. Each attempt
+    // re-reads, merges its sets, and commits only if the row is unchanged since
+    // the read (compare-and-swap on entries_json); a lost race re-reads and
+    // retries so both writers' sets survive.
+    const MAX_ATTEMPTS = 5;
+    for (let attempt = 1; ; attempt++) {
+      let log = await db
         .prepare(
-          "INSERT INTO exercise_logs (id, tenant_id, client_id, date_local, workout_plan_id, plan_day_index, entries_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          "SELECT id, entries_json FROM exercise_logs WHERE client_id = ? AND workout_plan_id = ? AND plan_day_index = ? AND date_local = ?",
         )
-        .bind(id, access.client.tenant_id, access.client.id, d.date, d.workoutPlanId, d.planDayIndex, j([]), nowIso(), nowIso())
-        .run();
-      log = { id, entries_json: "[]" };
-    }
+        .bind(access.client.id, d.workoutPlanId, d.planDayIndex, d.date)
+        .first<{ id: string; entries_json: string | null }>();
 
-    const entries = parseJson<SessionEntry[]>(log.entries_json, []);
-    let entry = entries.find(
-      (e) => e.blockIndex === d.blockIndex && e.slotIndex === d.slotIndex && e.exerciseId === d.exerciseId,
-    );
-    if (!entry) {
-      entry = { blockIndex: d.blockIndex, slotIndex: d.slotIndex, exerciseId: d.exerciseId, sets: [] };
-      entries.push(entry);
+      if (!log) {
+        const id = newId("elog");
+        // OR IGNORE: if a concurrent request created the session first, this is a
+        // no-op and we re-select the winner below rather than throwing on the
+        // unique index.
+        await db
+          .prepare(
+            "INSERT OR IGNORE INTO exercise_logs (id, tenant_id, client_id, date_local, workout_plan_id, plan_day_index, entries_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          )
+          .bind(id, access.client.tenant_id, access.client.id, d.date, d.workoutPlanId, d.planDayIndex, j([]), nowIso(), nowIso())
+          .run();
+        log = await db
+          .prepare(
+            "SELECT id, entries_json FROM exercise_logs WHERE client_id = ? AND workout_plan_id = ? AND plan_day_index = ? AND date_local = ?",
+          )
+          .bind(access.client.id, d.workoutPlanId, d.planDayIndex, d.date)
+          .first<{ id: string; entries_json: string | null }>();
+        if (!log) {
+          if (attempt < MAX_ATTEMPTS) continue;
+          return c.json({ error: "could not create session, retry" }, 409);
+        }
+      }
+
+      const prev = log.entries_json ?? "[]";
+      const entries = parseJson<SessionEntry[]>(prev, []);
+      let entry = entries.find(
+        (e) => e.blockIndex === d.blockIndex && e.slotIndex === d.slotIndex && e.exerciseId === d.exerciseId,
+      );
+      if (!entry) {
+        entry = { blockIndex: d.blockIndex, slotIndex: d.slotIndex, exerciseId: d.exerciseId, sets: [] };
+        entries.push(entry);
+      }
+      for (const s of d.sets) {
+        const idx = entry.sets.findIndex((x) => x.setIndex === s.setIndex);
+        if (idx >= 0) entry.sets[idx] = s;
+        else entry.sets.push(s);
+      }
+      entry.sets.sort((a, b) => a.setIndex - b.setIndex);
+      const nextJson = j(entries);
+      const res = await db
+        .prepare("UPDATE exercise_logs SET entries_json = ?, updated_at = ? WHERE id = ? AND entries_json IS ?")
+        .bind(nextJson, nowIso(), log.id, log.entries_json)
+        .run();
+      if ((res.meta?.changes ?? 0) > 0) return c.json({ ok: true, logId: log.id, entries });
+      // CAS lost (a concurrent writer changed the row) — retry the merge.
+      if (attempt >= MAX_ATTEMPTS) return c.json({ error: "conflict, retry" }, 409);
     }
-    for (const s of d.sets) {
-      const idx = entry.sets.findIndex((x) => x.setIndex === s.setIndex);
-      if (idx >= 0) entry.sets[idx] = s;
-      else entry.sets.push(s);
-    }
-    entry.sets.sort((a, b) => a.setIndex - b.setIndex);
-    await db
-      .prepare("UPDATE exercise_logs SET entries_json = ?, updated_at = ? WHERE id = ?")
-      .bind(j(entries), nowIso(), log.id)
-      .run();
-    return c.json({ ok: true, logId: log.id, entries });
   })
 
   .get("/logs/workout-sessions", async (c) => {
@@ -361,12 +386,23 @@ export const logRoutes = new Hono<AppEnv>()
   .get("/activity-history", async (c) => {
     const clientId = c.req.query("clientId");
     const from = c.req.query("from");
-    const to = c.req.query("to");
-    if (!clientId || !from || !to) return c.json({ error: "clientId + from + to required" }, 400);
+    const toRaw = c.req.query("to");
+    if (!clientId || !from || !toRaw) return c.json({ error: "clientId + from + to required" }, 400);
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
     const db = c.env.DB;
     const cid = access.client.id;
+    // Bound the window span server-side (~13 months) so a wide range can't scan
+    // years of rows into memory. Anchor on `from` and pull `to` in — a far-future
+    // `to` (used to "catch everything recent") stays valid because recent rows
+    // sit just after `from`. The day-bucketed queries below use this clamped `to`.
+    const MAX_SPAN_DAYS = 400;
+    const to = (() => {
+      const f = Date.parse(`${from}T00:00:00Z`);
+      if (Number.isNaN(f)) return toRaw;
+      const ceil = new Date(f + MAX_SPAN_DAYS * 86_400_000).toISOString().slice(0, 10);
+      return toRaw > ceil ? ceil : toRaw;
+    })();
     const inRange = (day: string | null | undefined) => !!day && day >= from && day <= to;
     const dayOf = (ts: string | null | undefined) => (ts ? ts.slice(0, 10) : null);
 
@@ -447,20 +483,20 @@ export const logRoutes = new Hono<AppEnv>()
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
     const d = parsed.data.data;
-    const existing = await c.env.DB.prepare(
-      "SELECT total_ml, entries_json FROM water_logs WHERE client_id = ? AND date_local = ?",
+    // Atomic increment: the conflict clause adds THIS amount to the stored total
+    // and appends the entry via json_insert, so two near-simultaneous logs can't
+    // both read the same base and lose one increment (last-writer-wins). The new
+    // total is returned by RETURNING so we never round-trip a stale read.
+    const now = nowIso();
+    const entry = JSON.stringify({ amountMl: d.amountMl, at: now });
+    const row = await c.env.DB.prepare(
+      "INSERT INTO water_logs (client_id, date_local, tenant_id, total_ml, entries_json, updated_at) VALUES (?, ?, ?, ?, json_array(json(?)), ?) " +
+        "ON CONFLICT(client_id, date_local) DO UPDATE SET total_ml = water_logs.total_ml + excluded.total_ml, entries_json = json_insert(COALESCE(water_logs.entries_json, '[]'), '$[#]', json(?)), updated_at = excluded.updated_at " +
+        "RETURNING total_ml",
     )
-      .bind(access.client.id, d.date)
-      .first<{ total_ml: number; entries_json: string | null }>();
-    const entries = parseJson<{ amountMl: number; at: string }[]>(existing?.entries_json, []);
-    entries.push({ amountMl: d.amountMl, at: nowIso() });
-    const total = (existing?.total_ml ?? 0) + d.amountMl;
-    await c.env.DB.prepare(
-      "INSERT INTO water_logs (client_id, date_local, tenant_id, total_ml, entries_json, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(client_id, date_local) DO UPDATE SET total_ml = ?, entries_json = ?, updated_at = ?",
-    )
-      .bind(access.client.id, d.date, access.client.tenant_id, total, j(entries), nowIso(), total, j(entries), nowIso())
-      .run();
-    return c.json({ ok: true, totalMl: total });
+      .bind(access.client.id, d.date, access.client.tenant_id, d.amountMl, entry, now, entry)
+      .first<{ total_ml: number }>();
+    return c.json({ ok: true, totalMl: row?.total_ml ?? d.amountMl });
   })
 
   .post("/logs/sleep", async (c) => {

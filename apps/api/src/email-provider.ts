@@ -92,13 +92,19 @@ export async function sendTenantEmail(env: Env, tenantId: string, msg: EmailMsg)
   // Platform: meter credits first (no-op charge skips the send when short).
   const conf = await getConfig(env.DB);
   const perEmail = Number(conf["email.credits_per_email"] ?? "1");
-  if (perEmail > 0) {
-    const dobj = env.BILLING.get(env.BILLING.idFromName(tenantId));
+  const dobj = perEmail > 0 ? env.BILLING.get(env.BILLING.idFromName(tenantId)) : null;
+  if (dobj) {
     await dobj.bind(tenantId);
     const charged = await dobj.charge(perEmail, "email.send", tenantId);
     if (!charged.ok) return { ok: false, skipped: "no_credits" };
   }
   const platformFrom = conf["email.platform_from"] || "Mossa <noreply@fourdegreelabs.com>";
   const from = msg.brandName ? `${msg.brandName} <${bareAddress(platformFrom)}>` : platformFrom;
-  return sendEmail(env.DB, msg, env.EMAIL, from);
+  const result = await sendEmail(env.DB, msg, env.EMAIL, from);
+  // Refund the metered credit if the send didn't actually go out — a charged-but-
+  // failed email should never silently spend a tenant's credits.
+  if (dobj && !result.ok) {
+    await dobj.topUp(perEmail, "email.refund", tenantId).catch(() => undefined);
+  }
+  return result;
 }

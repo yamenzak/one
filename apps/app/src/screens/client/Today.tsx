@@ -2,7 +2,7 @@
  * Client Today — hero ring + metric pills, action row, timeline feed.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fmtVolume, fmtEnergy, fmtWeight, type UnitPrefs } from "@mossa/domain";
 import {
   Button, Card, Skeleton, MacroBar, IconBadge, Sheet, EmptyState, ProgressRing,
@@ -122,15 +122,23 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
     await api.patch(`/api/clients/${clientId}`, { dashboardPrefs: { widgets: items } }).catch(() => undefined);
   };
 
+  // Only the newest load may commit — guards against an out-of-order resolve
+  // when the scoped clientId changes (coach switching between clients).
+  const reqRef = useRef(0);
   const load = useCallback(async () => {
+    const rid = ++reqRef.current;
     const [bundle, hist, ag] = await Promise.all([
       api.get<TodayBundle>(`/api/today?clientId=${clientId}&date=${date}`),
       api.get<{ events: FeedEvent[] }>(`/api/activity-history?clientId=${clientId}&from=${date}&to=${date}`),
       fetchAgenda(clientId, date),
     ]);
+    if (rid !== reqRef.current) return;
     setData(bundle); setWidgetItems(bundle.widgets ?? null); setFeed(hist.events); setAgenda(ag);
   }, [clientId, date]);
-  useEffect(() => void load(), [load]);
+  // Reset to the skeleton when the scoped client changes so the previous
+  // client's data doesn't linger; then (re)load. Manual refreshes reuse `load`
+  // without resetting, so they don't flash the skeleton.
+  useEffect(() => { setData(null); setAgenda(null); setFeed(null); void load(); }, [load]);
 
   const targets = data?.goal?.targets ?? null;
   const widgetData: ClientWidgetData | null = data ? { clientId, units, bundle: data } : null;
@@ -340,8 +348,10 @@ function HistorySheet({ clientId, onClose, onOpen }: { clientId: string; onClose
   const [day, setDay] = useState(shiftDay(today, -1));
   const [events, setEvents] = useState<FeedEvent[] | null>(null);
   useEffect(() => {
+    let alive = true;
     setEvents(null);
-    void api.get<{ events: FeedEvent[] }>(`/api/activity-history?clientId=${clientId}&from=${day}&to=${day}`).then((r) => setEvents(r.events));
+    void api.get<{ events: FeedEvent[] }>(`/api/activity-history?clientId=${clientId}&from=${day}&to=${day}`).then((r) => { if (alive) setEvents(r.events); });
+    return () => { alive = false; };
   }, [clientId, day]);
   return (
     <Sheet open onClose={onClose} title="History">

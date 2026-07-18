@@ -114,6 +114,27 @@ export interface PackageBudgetSpec {
   days: number;
 }
 
+/** The concrete features an `all` purchase covers. */
+const ALL_SUBFEATURES: BudgetFeature[] = ["workout", "meal"];
+
+/**
+ * Expand an `all` spec into one spec per concrete feature so each queues behind
+ * ITS OWN runway. A single queued `all` budget starts behind the LONGEST
+ * existing runway, which strands every shorter-runway feature: e.g. with a meal
+ * budget active now→day40 and no workout budget, an `all` purchase would start
+ * at day40 and leave workout — which the client just paid for — uncovered until
+ * then. Per-feature queueing fills the gap (workout starts now) while still
+ * extending, not pooling, the meal runway.
+ */
+function expandSpecs(specs: PackageBudgetSpec[]): PackageBudgetSpec[] {
+  const out: PackageBudgetSpec[] = [];
+  for (const s of specs) {
+    if (s.feature === "all") for (const f of ALL_SUBFEATURES) out.push({ feature: f, days: s.days });
+    else out.push(s);
+  }
+  return out;
+}
+
 /** Budgets created by purchasing a package — each queued independently. */
 export function buildBudgetsForPurchase(
   existing: Budget[],
@@ -122,9 +143,9 @@ export function buildBudgetsForPurchase(
 ): Budget[] {
   const out: Budget[] = [];
   // Work against a growing pool so two same-feature specs in one package queue
-  // behind each other too.
+  // behind each other too. `all` specs are expanded per-feature first.
   const pool = [...existing];
-  for (const spec of specs) {
+  for (const spec of expandSpecs(specs)) {
     if (spec.days <= 0) continue;
     const startedAt = computeBudgetStart(pool, spec.feature, nowIso);
     const expiresAt = new Date(t(startedAt) + spec.days * DAY_MS).toISOString();

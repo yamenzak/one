@@ -122,10 +122,13 @@ export const DEFAULT_PACKS: PackRow[] = [
   { id: "pack_100k", name: "130,000 credits", credits: 130_000, price_usd: 100, ord: 3, active: 1 },
 ];
 
-/** Idempotent seed: INSERT OR IGNORE so admin edits survive redeploys. Runs on
- *  demand with no module-level guard, so it stays correct across isolated
- *  per-test storage (a leaked guard would skip seeding into a fresh frame). */
+/** Idempotent seed: INSERT OR IGNORE so admin edits survive redeploys. No
+ *  module-level guard (would skip seeding into fresh per-test storage); instead a
+ *  cheap storage-scoped existence check skips the 8-write batch once the catalog
+ *  is populated, so the /api/context hot path doesn't re-attempt writes each load. */
 export async function seedBilling(db: D1Database): Promise<void> {
+  const already = await db.prepare("SELECT 1 AS x FROM plans LIMIT 1").first<{ x: number }>().catch(() => null);
+  if (already) return;
   const stmts = [
     ...DEFAULT_PLANS.map((p) =>
       db

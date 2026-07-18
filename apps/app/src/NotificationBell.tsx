@@ -8,9 +8,10 @@ interface Notification { id: string; type: string; title: string; message: strin
 
 export function NotificationBell() {
   const [items, setItems] = useState<Notification[]>([]);
+  const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
-    try { setItems((await api.get<{ notifications: Notification[] }>("/api/notifications")).notifications); } catch { /* ignore */ }
+    try { setItems((await api.get<{ notifications: Notification[] }>("/api/notifications")).notifications); setFailed(false); } catch { setFailed(true); }
   }, []);
 
   // Real-time via the per-user InboxDO WebSocket; a slow poll stays as a
@@ -56,7 +57,9 @@ export function NotificationBell() {
       <DropdownMenuContent className="max-h-96 w-80 overflow-y-auto">
         <DropdownMenuLabel>Notifications</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {items.length === 0 ? (
+        {failed && items.length === 0 ? (
+          <div className="px-3 py-6 text-center text-sm text-warning">Couldn't load notifications. We'll keep trying.</div>
+        ) : items.length === 0 ? (
           <div className="px-3 py-6 text-center text-sm text-muted-foreground">You're all caught up.</div>
         ) : (
           items.slice(0, 20).map((n) => (

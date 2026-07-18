@@ -14,7 +14,7 @@
 import { useEffect, useState } from "react";
 import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Sparkles, Globe, PencilLine, ArrowLeft, Search, Plus, Trash2 } from "@mossa/ui";
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@mossa/protocol";
-import { api, ApiError } from "../../api.js";
+import { api, ApiError, uploadMedia } from "../../api.js";
 import { useSession } from "../../session.js";
 import { AiImageField } from "../../AiImageField.js";
 import { splitWideImageToHalves } from "../../imageSplit.js";
@@ -142,13 +142,11 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
   };
 
   const uploadVideo = async (file: File) => {
-    setVideoBusy(true);
+    setVideoBusy(true); setErr(null);
     try {
-      const fd = new FormData(); fd.append("file", file); fd.append("purpose", "exercise");
-      const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
-      const { key } = (await up.json()) as { key?: string };
-      if (key) setVideo(`/api/media/${key}`);
-    } finally { setVideoBusy(false); }
+      const key = await uploadMedia(file, "exercise");
+      setVideo(`/api/media/${key}`);
+    } catch (e) { setErr(errText(e)); } finally { setVideoBusy(false); }
   };
 
   const save = async () => {

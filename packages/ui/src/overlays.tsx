@@ -14,6 +14,7 @@ import { Drawer } from "vaul";
 import { motion } from "motion/react";
 import { Check, ChevronDown, X } from "./lib/icons.js";
 import { cn } from "./lib/utils.js";
+import { Button } from "./primitives.js";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 const overlayCls =
@@ -45,6 +46,43 @@ function useKeyboardInset(active: boolean) {
     };
   }, [active]);
   return inset;
+}
+
+/**
+ * Modal a11y for hand-rolled full-screen overlays (the workout/meal plan
+ * surfaces) that can't use the Dialog/Sheet primitives. Returns a ref to spread
+ * on the overlay element; it moves focus into the modal on mount, keeps Tab
+ * focus inside it (yielding to nested portaled drawers, which manage their own
+ * focus), locks body scroll, and closes on Escape. Give the initial-focus
+ * target a `data-autofocus` attribute, else the container itself is focused.
+ */
+export function useModalOverlay(onClose?: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; });
+  useEffect(() => {
+    const el = ref.current;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const initial = el?.querySelector<HTMLElement>("[data-autofocus]") ?? el;
+    initial?.focus?.();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || !el) return; // a nested drawer already handled it
+      if (e.key === "Escape") { closeRef.current?.(); return; }
+      if (e.key !== "Tab") return;
+      if (!el.contains(document.activeElement)) return; // nested portal owns focus
+      const nodes = el.querySelectorAll<HTMLElement>(
+        'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])',
+      );
+      if (nodes.length === 0) return;
+      const first = nodes[0]!, last = nodes[nodes.length - 1]!;
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = prevOverflow; };
+  }, []);
+  return ref;
 }
 
 // ── Dialog (centered modal) ─────────────────────────────────────────────────
@@ -80,6 +118,25 @@ export function DialogContent({ title, children, className }: { title?: string; 
 
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.Close;
+
+/** Lightweight confirm step for consequential/destructive actions — a centered
+ *  Dialog with a cancel + confirm pair. Confirming runs `onConfirm` and closes. */
+export function ConfirmDialog({ open, onOpenChange, title, description, confirmLabel = "Confirm", cancelLabel = "Cancel", destructive, onConfirm }: {
+  open: boolean; onOpenChange: (o: boolean) => void; title: string; description?: ReactNode;
+  confirmLabel?: string; cancelLabel?: string; destructive?: boolean; onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent title={title}>
+        {description && <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>}
+        <div className="mt-5 flex gap-3">
+          <Button variant="ghost" className="flex-1" onClick={() => onOpenChange(false)}>{cancelLabel}</Button>
+          <Button variant={destructive ? "destructive" : "default"} className="flex-1" onClick={() => { onConfirm(); onOpenChange(false); }}>{confirmLabel}</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // ── FixedDrawer — fixed-height bottom drawer with a sticky header + footer.
 // Use for multi-step forms: set `dismissible={false}` so an accidental

@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy, kcalToDisplay } from "@mossa/domain";
-import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, Utensils, ShoppingCart, Plus, Minus, Sparkles, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw } from "@mossa/ui";
+import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, ConfirmDialog, useModalOverlay, Utensils, ShoppingCart, Plus, Minus, Sparkles, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
@@ -52,6 +52,8 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   const [detail, setDetail] = useState<{ opt: MealOption; index: number } | null>(null);
   const [recipe, setRecipe] = useState<{ title: string; text: string } | null>(null);
   const [recipeBusy, setRecipeBusy] = useState<number | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const reqRef = useRef(0);
   const units = useUnits();
   const { ctx } = useSession();
   const { startIfNew, start: startTour, active: tourActive, tour, stepSelector } = useTour();
@@ -104,12 +106,14 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   }, [tour, stepSelector, plan]);
 
   const load = useCallback(async () => {
+    const rid = ++reqRef.current;
     const [pl, f, today, log] = await Promise.all([
       api.get<{ plans: Plan[] }>(`/api/meal-plans?clientId=${clientId}`),
       api.get<{ foods: FoodRow[] }>("/api/foods?scope=all"),
       api.get<{ goal: { targets: Targets | null } | null }>(`/api/today?clientId=${clientId}&date=${date}`).catch(() => ({ goal: null })),
       api.get<{ entries: { meal_plan_id?: string | null; meal_option_index?: number | null }[] }>(`/api/logs/food?clientId=${clientId}&date=${date}`).catch(() => ({ entries: [] })),
     ]);
+    if (rid !== reqRef.current) return; // superseded by a newer client/date
     const published = pl.plans.find((p) => p.status === "published") ?? null;
     setPlan(published);
     setAllPlans(pl.plans);
@@ -118,6 +122,10 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
     setLoggedIdx(new Set((log.entries ?? []).filter((e) => e.meal_plan_id === published?.id && e.meal_option_index != null).map((e) => e.meal_option_index as number)));
   }, [clientId, date]);
   useEffect(() => void load(), [load, tourActive]); // reload through the api interceptor when a tour toggles
+
+  // On a client switch, reset to the loading state so the previous client's plan
+  // doesn't linger under the new one while the reload is in flight.
+  useEffect(() => { setPlan(undefined); setViewId(null); }, [clientId]);
 
   const foodMap = useMemo(() => new Map([...foods.entries()].map(([id, f]) => [id, { id: f.id, servingSize: f.serving_size, caloriesPerServing: f.calories, proteinG: f.protein_g, carbsG: f.carbs_g, fatG: f.fat_g } as FoodLike])), [foods]);
 
@@ -200,8 +208,10 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
     return { cal, pro, days };
   }, [active, counts, foodMap]);
 
+  const overlayRef = useModalOverlay(onClose);
+
   return (
-    <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-background">
+    <motion.div ref={overlayRef} role="dialog" aria-modal="true" aria-label="Meal plan" tabIndex={-1} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-background outline-none">
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border/40 bg-background/85 px-4 py-3 backdrop-blur-xl">
         <button onClick={onClose} aria-label="Close" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><ArrowLeft /></button>
         <div className="min-w-0 flex-1"><div className="truncate text-base font-bold tracking-tight">{isPast ? "Past plan" : "Meal plan"}</div>{active && <div className="truncate text-xs text-muted-foreground">{active.name}</div>}</div>
@@ -320,7 +330,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                 <div className="flex items-center justify-between px-1 pt-1">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Shopping list</div>
                   <div className="flex items-center gap-2">
-                    {(weekTotals.days > 0 || checked.size > 0) && <button data-tour="mp-shop-reset" onClick={resetShop} className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-3.5"><RotateCcw /> Start over</button>}
+                    {(weekTotals.days > 0 || checked.size > 0) && <button data-tour="mp-shop-reset" onClick={() => setConfirmReset(true)} className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-3.5"><RotateCcw /> Start over</button>}
                     {grocery.length > 0 && <Badge tone="nutrition">{grocery.filter((g) => !checked.has(g.id)).length} to buy</Badge>}
                   </div>
                 </div>
@@ -396,6 +406,16 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
           )}
         </Sheet>
       )}
+
+      <ConfirmDialog
+        open={confirmReset}
+        onOpenChange={setConfirmReset}
+        title="Start over?"
+        description="This clears the days you've set and unchecks everything on this plan's shopping list."
+        confirmLabel="Start over"
+        destructive
+        onConfirm={resetShop}
+      />
     </motion.div>
   );
 }

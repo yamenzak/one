@@ -28,7 +28,11 @@ export function Onboarding({ clientId, displayName, onDone }: { clientId: string
     } finally { setSaving(false); }
   };
 
-  const canNext = (step === 0 && f.gender && f.dateOfBirth && heightCm != null && heightCm >= 50) || step > 0;
+  // Height must parse to a sane range — guards against an empty/absurd value
+  // (e.g. a fat-fingered "1800") posting a nonsense heightCm.
+  const heightValid = heightCm != null && heightCm >= 50 && heightCm <= 300;
+  const heightEntered = units.height === "ft_in" ? !!f.heightFt : !!f.heightCm;
+  const canNext = (step === 0 && !!f.gender && !!f.dateOfBirth && heightValid) || step > 0;
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-5 px-6 py-8">
@@ -49,6 +53,7 @@ export function Onboarding({ clientId, displayName, onDone }: { clientId: string
               ) : (
                 <Field label="Height (cm)" icon={Ruler} inputMode="numeric" value={f.heightCm} onChange={(e) => set("heightCm", e.target.value.replace(/\D/g, ""))} />
               )}
+              {heightEntered && !heightValid && <p className="text-xs text-warning">Enter a realistic height.</p>}
             </Card>
           )}
           {step === 1 && (

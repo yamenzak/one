@@ -122,8 +122,11 @@ export function requirePermission(
 
 /**
  * Platform super-admin — ADMIN_EMAILS allowlist, separate from tenant RBAC.
- * Requires a signed-in session. When ADMIN_EMAILS is unset (dev), any
- * signed-in user passes; production always sets it.
+ * Requires a signed-in session. Fails CLOSED when the allowlist is empty: the
+ * dev convenience (any signed-in user passes) is now gated on an explicit
+ * ENVIRONMENT=development, not the mere absence of config — an unset/empty
+ * ADMIN_EMAILS in production must never silently promote every user to platform
+ * super-admin (full platform compromise from one missing env var).
  */
 export function isPlatformAdmin(c: AppContext): boolean {
   const email = (c.get("user")?.email || "").trim().toLowerCase();
@@ -132,6 +135,6 @@ export function isPlatformAdmin(c: AppContext): boolean {
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
-  if (list.length === 0) return true;
-  return list.includes(email);
+  if (list.length > 0) return list.includes(email);
+  return c.env.ENVIRONMENT === "development";
 }

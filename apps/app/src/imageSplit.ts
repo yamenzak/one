@@ -5,6 +5,8 @@
  * tainted. Each cropped half is re-uploaded and its media url returned.
  */
 
+import { uploadMedia } from "./api.js";
+
 function loadImg(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -75,12 +77,8 @@ function toBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 }
 
 async function uploadBlob(blob: Blob): Promise<string> {
-  const fd = new FormData();
-  fd.append("file", new File([blob], "frame.png", { type: "image/png" }));
-  fd.append("purpose", "exercise");
-  const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
-  const { key } = (await up.json()) as { key?: string };
-  if (!key) throw new Error("upload failed");
+  // uploadMedia throws (surfacing to the caller) on a non-OK upload response.
+  const key = await uploadMedia(new File([blob], "frame.png", { type: "image/png" }), "exercise", "frame.png");
   return `/api/media/${key}`;
 }
 

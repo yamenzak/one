@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, PhotoGrid, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, PhotoGrid, ConfirmDialog, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
@@ -39,6 +39,7 @@ export function ClientManage({ clientId }: { clientId: string }) {
   const [reviewLab, setReviewLab] = useState<Lab | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [exercises, setExercises] = useState<ExerciseInfo[]>([]);
+  const [suppToDiscontinue, setSuppToDiscontinue] = useState<Supp | null>(null);
 
   const load = useCallback(async () => {
     const [s, p, sw, l, su, ci, ex] = await Promise.all([
@@ -122,7 +123,7 @@ export function ClientManage({ clientId }: { clientId: string }) {
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => void setSuppStatus(s.id, s.status === "paused" ? "active" : "paused")} className="rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground">{s.status === "paused" ? "Resume" : "Pause"}</button>
-                  <button onClick={() => void discontinueSupp(s.id)} className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:text-danger [&_svg]:size-4"><X /></button>
+                  <button onClick={() => setSuppToDiscontinue(s)} aria-label="Discontinue supplement" className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:text-danger [&_svg]:size-4"><X /></button>
                 </div>
               </div>
               {s.schedule && s.schedule.length > 0 && <div className="flex flex-wrap gap-1.5">{s.schedule.map((sc, i) => <span key={i} className="rounded-full bg-surface-3 px-2 py-0.5 text-[0.65rem] font-medium capitalize text-muted-foreground">{sc.slot.replace(/_/g, " ")}</span>)}</div>}
@@ -163,6 +164,16 @@ export function ClientManage({ clientId }: { clientId: string }) {
       {labOpen && <RequestLabSheet clientId={clientId} onClose={() => setLabOpen(false)} onDone={() => { setLabOpen(false); void load(); }} />}
       {reviewLab && <ReviewLabSheet clientId={clientId} lab={reviewLab} onClose={() => setReviewLab(null)} onDone={() => { setReviewLab(null); void load(); }} />}
       {reportOpen && <ReportSheet clientId={clientId} onClose={() => setReportOpen(false)} />}
+
+      <ConfirmDialog
+        open={!!suppToDiscontinue}
+        onOpenChange={(o) => !o && setSuppToDiscontinue(null)}
+        title={suppToDiscontinue ? `Discontinue ${suppToDiscontinue.name}?` : "Discontinue supplement?"}
+        description="This stops the prescription for this client. You can prescribe it again later if needed."
+        confirmLabel="Discontinue"
+        destructive
+        onConfirm={() => { if (suppToDiscontinue) void discontinueSupp(suppToDiscontinue.id); }}
+      />
     </Page>
   );
 }
@@ -173,6 +184,7 @@ function SwapResolver({ swap, exercises, onResolve }: { swap: Swap; exercises: E
   const current = swap.current_exercise_id ? exMap.get(swap.current_exercise_id) : undefined;
   const [choice, setChoice] = useState<ExerciseInfo | null>(swap.suggested_exercise_id ? exMap.get(swap.suggested_exercise_id) ?? null : null);
   const [picking, setPicking] = useState(false);
+  const [confirmReject, setConfirmReject] = useState(false);
   const [q, setQ] = useState("");
   const filtered = exercises.filter((e) => e.id !== swap.current_exercise_id && e.name.toLowerCase().includes(q.toLowerCase())).slice(0, 20);
   return (
@@ -201,8 +213,17 @@ function SwapResolver({ swap, exercises, onResolve }: { swap: Swap; exercises: E
       )}
       <div className="flex gap-2">
         <Button size="sm" className="flex-1" disabled={!choice} onClick={() => void onResolve(swap.id, "approved", choice?.id)}><Check /> Approve</Button>
-        <Button size="sm" variant="outline" className="flex-1" onClick={() => void onResolve(swap.id, "rejected")}><X /> Reject</Button>
+        <Button size="sm" variant="outline" className="flex-1" onClick={() => setConfirmReject(true)}><X /> Reject</Button>
       </div>
+      <ConfirmDialog
+        open={confirmReject}
+        onOpenChange={setConfirmReject}
+        title="Reject this swap request?"
+        description="The client keeps their current exercise and is told the request was declined."
+        confirmLabel="Reject request"
+        destructive
+        onConfirm={() => void onResolve(swap.id, "rejected")}
+      />
     </div>
   );
 }
@@ -344,10 +365,12 @@ function RequestLabSheet({ clientId, onClose, onDone }: { clientId: string; onCl
   );
 }
 
-interface LabValue { marker: string; value: string; unit: string; flag: "low" | "normal" | "high" }
+interface LabValue { _id: string; marker: string; value: string; unit: string; flag: "low" | "normal" | "high" }
 const isLabImage = (key: string) => /\.(png|jpe?g|webp|gif|heic)$/i.test(key);
+/** Stable client-side id so editable rows key by identity, not array index. */
+const rowId = (): string => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
 function ReviewLabSheet({ clientId, lab, onClose, onDone }: { clientId: string; lab: Lab; onClose: () => void; onDone: () => void }) {
-  const [values, setValues] = useState<LabValue[]>(() => (lab.values && lab.values.length ? lab.values.map((v) => ({ marker: v.marker, value: v.value, unit: v.unit ?? "", flag: (v.flag as LabValue["flag"]) ?? "normal" })) : [{ marker: "", value: "", unit: "", flag: "normal" }]));
+  const [values, setValues] = useState<LabValue[]>(() => (lab.values && lab.values.length ? lab.values.map((v) => ({ _id: rowId(), marker: v.marker, value: v.value, unit: v.unit ?? "", flag: (v.flag as LabValue["flag"]) ?? "normal" })) : [{ _id: rowId(), marker: "", value: "", unit: "", flag: "normal" }]));
   const [feedback, setFeedback] = useState(lab.trainer_feedback ?? "");
   const [busy, setBusy] = useState(false);
   const [extracting, setExtracting] = useState(false);
@@ -357,7 +380,7 @@ function ReviewLabSheet({ clientId, lab, onClose, onDone }: { clientId: string; 
     setExtracting(true); setExtractErr(null);
     try {
       const r = await api.post<{ values: { marker: string; value: string; unit?: string; flag?: string }[] }>("/api/ai/lab-extract", { clientId, labId: lab.id });
-      if (r.values?.length) setValues(r.values.map((v) => ({ marker: v.marker, value: String(v.value), unit: v.unit ?? "", flag: (v.flag as LabValue["flag"]) ?? "normal" })));
+      if (r.values?.length) setValues(r.values.map((v) => ({ _id: rowId(), marker: v.marker, value: String(v.value), unit: v.unit ?? "", flag: (v.flag as LabValue["flag"]) ?? "normal" })));
     } catch (e) { setExtractErr(e); }
     finally { setExtracting(false); }
   };
@@ -365,7 +388,7 @@ function ReviewLabSheet({ clientId, lab, onClose, onDone }: { clientId: string; 
   const save = async () => {
     setBusy(true);
     try {
-      const clean = values.filter((v) => v.marker.trim() && v.value.trim());
+      const clean = values.filter((v) => v.marker.trim() && v.value.trim()).map(({ _id, ...rest }) => rest);
       await api.patch(`/api/labs/${lab.id}`, { status: "reviewed", values: clean.length ? clean : undefined, trainerFeedback: feedback || undefined });
       onDone();
     } finally { setBusy(false); }
@@ -389,14 +412,14 @@ function ReviewLabSheet({ clientId, lab, onClose, onDone }: { clientId: string; 
         <div className="space-y-2">
           <label className="block text-sm font-medium text-muted-foreground">Values</label>
           {values.map((v, i) => (
-            <div key={i} className="flex items-center gap-1.5 text-sm">
+            <div key={v._id} className="flex items-center gap-1.5 text-sm">
               <input value={v.marker} onChange={(e) => setRow(i, { marker: e.target.value })} placeholder="Marker" className="min-w-0 flex-1 rounded-lg bg-surface-3 px-2.5 py-1.5 outline-none" />
               <input value={v.value} onChange={(e) => setRow(i, { value: e.target.value })} placeholder="Value" className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 outline-none" />
               <input value={v.unit} onChange={(e) => setRow(i, { unit: e.target.value })} placeholder="unit" className="w-14 rounded-lg bg-surface-3 px-2 py-1.5 outline-none" />
               <select value={v.flag} onChange={(e) => setRow(i, { flag: e.target.value as LabValue["flag"] })} className="rounded-lg bg-surface-3 px-1.5 py-1.5 outline-none"><option value="low">low</option><option value="normal">ok</option><option value="high">high</option></select>
             </div>
           ))}
-          <button onClick={() => setValues((v) => [...v, { marker: "", value: "", unit: "", flag: "normal" }])} className="text-xs font-medium text-primary">+ Row</button>
+          <button onClick={() => setValues((v) => [...v, { _id: rowId(), marker: "", value: "", unit: "", flag: "normal" }])} className="text-xs font-medium text-primary">+ Row</button>
         </div>
         <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Feedback</label><Textarea rows={3} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="What this means and next steps…" /></div>
         <Button size="lg" className="w-full" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Mark reviewed"}</Button>
@@ -417,7 +440,13 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
   const [report, setReport] = useState<Report | null>(null);
   const [exNames, setExNames] = useState<Map<string, string>>(new Map());
   const units = useUnits();
-  useEffect(() => { setReport(null); const today = new Date().toISOString().slice(0, 10); void api.get<Report>(`/api/reports/client/${clientId}?range=${range}&today=${today}`).then(setReport); }, [clientId, range]);
+  useEffect(() => {
+    let alive = true;
+    setReport(null);
+    const today = new Date().toISOString().slice(0, 10);
+    void api.get<Report>(`/api/reports/client/${clientId}?range=${range}&today=${today}`).then((r) => { if (alive) setReport(r); });
+    return () => { alive = false; };
+  }, [clientId, range]);
   useEffect(() => { void api.get<{ exercises: { id: string; name: string }[] }>("/api/exercises?scope=all").then((r) => setExNames(new Map(r.exercises.map((e) => [e.id, e.name])))).catch(() => undefined); }, []);
   const weight = report?.weightSeries ?? [];
   const wDelta = weight.length >= 2 ? Math.round((kgToDisplay(weight.at(-1)!.kg, units) - kgToDisplay(weight[0]!.kg, units)) * 10) / 10 : null;

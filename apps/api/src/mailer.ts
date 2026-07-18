@@ -103,6 +103,12 @@ function buildMime(m: { from: string; to: string; subject: string; html?: string
   return [...base, `Content-Type: text/html; charset="utf-8"`, ``, m.html ?? m.text ?? ""].join("\r\n");
 }
 
+/** Escape user-supplied text before interpolating it into email HTML — check-in
+ *  notes, trainer feedback, brand names etc. are attacker-influenced. */
+export function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
+}
+
 export function emailShell(heading: string, bodyHtml: string): string {
   return `<!doctype html><html><body style="margin:0;background:#0b0c0e;padding:32px 16px;font-family:ui-sans-serif,system-ui,sans-serif">
   <div style="max-width:480px;margin:0 auto;background:#16181b;border-radius:24px;padding:32px;color:#e8eaed">

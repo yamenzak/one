@@ -9,6 +9,7 @@ import * as LabelPrimitive from "@radix-ui/react-label";
 import { cva, type VariantProps } from "class-variance-authority";
 import {
   forwardRef,
+  useId,
   type ButtonHTMLAttributes,
   type HTMLAttributes,
   type InputHTMLAttributes,
@@ -207,7 +208,10 @@ interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
 
 /** Labeled input with an optional leading icon + hint. */
 export const Field = forwardRef<HTMLInputElement, FieldProps>(({ label, icon: Icon, hint, error, className, id, ...props }, ref) => {
-  const fieldId = id ?? label.replace(/\s+/g, "-").toLowerCase();
+  // A stable, guaranteed-unique fallback id so repeated labels (e.g. superset
+  // round rows) never collide into duplicate DOM ids. Explicit `id` still wins.
+  const generatedId = useId();
+  const fieldId = id ?? generatedId;
   return (
     <div className={className}>
       <Label htmlFor={fieldId} className="mb-1.5 block">

@@ -13,6 +13,12 @@ export function BarcodeScanner({ onDetected, onClose }: { onDetected: (code: str
   const [status, setStatus] = useState<"starting" | "scanning" | "denied">("starting");
   const [manual, setManual] = useState("");
 
+  // Keep the latest onDetected in a ref so the parent passing an inline arrow
+  // doesn't retrigger the camera-init effect (which would restart the camera on
+  // every render). The effect below runs once and reads through the ref.
+  const onDetectedRef = useRef(onDetected);
+  useEffect(() => { onDetectedRef.current = onDetected; }, [onDetected]);
+
   useEffect(() => {
     let controls: IScannerControls | null = null;
     let stopped = false;
@@ -29,7 +35,7 @@ export function BarcodeScanner({ onDetected, onClose }: { onDetected: (code: str
             stopped = true;
             const code = result.getText().replace(/\D/g, "");
             controls?.stop();
-            onDetected(code);
+            onDetectedRef.current(code);
           },
         );
         if (!stopped) setStatus("scanning");
@@ -38,7 +44,7 @@ export function BarcodeScanner({ onDetected, onClose }: { onDetected: (code: str
       }
     })();
     return () => { stopped = true; try { controls?.stop(); } catch { /* ignore */ } };
-  }, [onDetected]);
+  }, []);
 
   const submitManual = () => { const digits = manual.replace(/\D/g, ""); if (digits.length >= 6) onDetected(digits); };
 

@@ -10,7 +10,6 @@ import { Hono } from "hono";
 import { z } from "zod";
 import {
   buildBudgetsForPurchase,
-  buildRedemptionBudget,
   isFullyExpired,
   mergeAddOnBalances,
   overallDaysRemaining,
@@ -306,9 +305,33 @@ export const commerceRoutes = new Hono<AppEnv>()
     // Disabled/unknown/expired all read as "not found" — no oracle.
     if (!code) return c.json({ error: "code not found" }, 404);
     if (code.expires_at && code.expires_at < now) return c.json({ error: "code not found" }, 404);
-    if (code.used_count >= code.max_uses) return c.json({ error: "code fully used" }, 409);
-    const usedBy = parseJson<string[]>(code.used_by_json, []);
-    if (usedBy.includes(access.client.id)) return c.json({ error: "already redeemed" }, 409);
+
+    // Per-client claim (atomic): the UNIQUE(code_id, client_id) child row dedupes
+    // a second redemption by the same client without a lost-update on a JSON
+    // array — a concurrent double-submit inserts once, the loser gets changes=0.
+    const claim = await c.env.DB.prepare(
+      "INSERT OR IGNORE INTO redemption_uses (code_id, client_id, at) VALUES (?, ?, ?)",
+    )
+      .bind(code.id, access.client.id, now)
+      .run();
+    if ((claim.meta?.changes ?? 0) === 0) return c.json({ error: "already redeemed" }, 409);
+
+    // Consume a use slot atomically. The guarded UPDATE (used_count < max_uses)
+    // is what actually enforces the cap: two concurrent redemptions can't both
+    // pass a read-then-check (TOCTOU over-redemption). If none is left, release
+    // this client's claim so the code isn't wrongly marked redeemed for them.
+    const slot = await c.env.DB.prepare(
+      "UPDATE redemption_codes SET used_count = used_count + 1 WHERE id = ? AND used_count < max_uses",
+    )
+      .bind(code.id)
+      .run();
+    if ((slot.meta?.changes ?? 0) === 0) {
+      await c.env.DB.prepare("DELETE FROM redemption_uses WHERE code_id = ? AND client_id = ?")
+        .bind(code.id, access.client.id)
+        .run()
+        .catch(() => undefined);
+      return c.json({ error: "code fully used" }, 409);
+    }
 
     const current = await c.env.DB.prepare(
       "SELECT * FROM client_subscriptions WHERE client_id = ? AND status IN ('active','expired') ORDER BY started_at DESC LIMIT 1",
@@ -316,9 +339,12 @@ export const commerceRoutes = new Hono<AppEnv>()
       .bind(access.client.id)
       .first<SubRow>();
 
+    // buildBudgetsForPurchase (not buildRedemptionBudget) so an `all` code splits
+    // per feature and never leaves a covered feature with a gap.
+    const codeSpec = [{ feature: code.target_feature, days: code.days_to_add }];
     if (current) {
       const budgets = parseJson<Budget[]>(current.budgets_json, []);
-      budgets.push(buildRedemptionBudget(budgets, code.target_feature, code.days_to_add, now));
+      budgets.push(...buildBudgetsForPurchase(budgets, codeSpec, now));
       await c.env.DB.prepare(
         "UPDATE client_subscriptions SET budgets_json = ?, status = 'active', updated_at = ? WHERE id = ?",
       )
@@ -331,15 +357,17 @@ export const commerceRoutes = new Hono<AppEnv>()
       )
         .bind(
           newId("csub"), who.tenantId, access.client.id,
-          j([buildRedemptionBudget([], code.target_feature, code.days_to_add, now)]), now, now,
+          j(buildBudgetsForPurchase([], codeSpec, now)), now, now,
         )
         .run();
     }
-    usedBy.push(access.client.id);
+    // Mirror the client into used_by_json for display (atomic append via
+    // json_insert — no lost write). The slot count was already consumed above.
     await c.env.DB.prepare(
-      "UPDATE redemption_codes SET used_count = used_count + 1, used_by_json = ? WHERE id = ?",
+      "UPDATE redemption_codes SET used_by_json = json_insert(COALESCE(used_by_json, '[]'), '$[#]', ?) WHERE id = ?",
     )
-      .bind(j(usedBy), code.id)
-      .run();
+      .bind(access.client.id, code.id)
+      .run()
+      .catch(() => undefined);
     return c.json({ ok: true, daysAdded: code.days_to_add, feature: code.target_feature });
   });

@@ -12,7 +12,7 @@
 
 import { useState, type CSSProperties } from "react";
 import { Button, cn, Camera, Sparkles, ImageIcon } from "@mossa/ui";
-import { api, ApiError } from "./api.js";
+import { api, ApiError, uploadMedia } from "./api.js";
 
 type ImageFeature = "food-image" | "exercise-image";
 
@@ -43,10 +43,10 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
   const upload = async (file: File) => {
     setUploading(true); setErr(null);
     try {
-      const fd = new FormData(); fd.append("file", file); fd.append("purpose", purpose);
-      const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
-      const { key } = (await up.json()) as { key?: string };
-      if (key) onChange(`/api/media/${key}`);
+      const key = await uploadMedia(file, purpose);
+      onChange(`/api/media/${key}`);
+    } catch {
+      setErr("Couldn't upload that image — try again.");
     } finally { setUploading(false); }
   };
 
