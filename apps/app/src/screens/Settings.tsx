@@ -410,16 +410,33 @@ interface DomainInfo {
   txt: { name: string; value: string } | null;
 }
 
-function Copyable({ label, value }: { label: string; value: string }) {
+/** A single copyable DNS field (label + monospace value + copy affordance). */
+function CopyField({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
-  const copy = () => { void navigator.clipboard?.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); }); };
+  const copy = () => void navigator.clipboard?.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); });
   return (
-    <div className="space-y-1">
-      <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</div>
-      <button onClick={copy} className="flex w-full items-center gap-2 rounded-lg bg-surface-3 px-2.5 py-2 text-left transition-colors hover:bg-surface-2">
+    <div className="min-w-0">
+      <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</div>
+      <button onClick={copy} className="flex w-full items-center gap-1.5 text-left" title="Copy">
         <code className="min-w-0 flex-1 truncate font-mono text-xs">{value}</code>
-        {copied ? <Check className="size-3.5 shrink-0 text-success" /> : <Copy className="size-3.5 shrink-0 text-muted-foreground" />}
+        {copied ? <Check className="size-3 shrink-0 text-success" /> : <Copy className="size-3 shrink-0 text-muted-foreground" />}
       </button>
+    </div>
+  );
+}
+
+/** A DNS record laid out the way providers ask for it: Type · Name · Value. */
+function DnsRecord({ type, name, value, hint }: { type: string; name: string; value: string; hint: string }) {
+  return (
+    <div className="rounded-xl bg-surface-3 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="rounded-md bg-primary/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">{type}</span>
+        <span className="text-xs text-muted-foreground">{hint}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <CopyField label="Name / Host" value={name} />
+        <CopyField label={type === "CNAME" ? "Target" : "Value"} value={value} />
+      </div>
     </div>
   );
 }
@@ -465,16 +482,31 @@ function DomainSection() {
       <Card className="space-y-4">
         <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Globe /></div><div><div className="font-medium">Your own domain</div><div className="text-sm text-muted-foreground">Run the app on your domain — e.g. train.yourgym.com.</div></div></div>
 
-        {domains.map((d) => (
+        {domains.map((d) => {
+          const isApex = d.hostname.split(".").length <= 2;
+          return (
           <div key={d.hostname} className="space-y-3 rounded-xl bg-surface-2 p-3">
             <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0"><div className="truncate font-medium">{d.hostname}</div><div className="text-xs text-muted-foreground">{d.status === "active" ? "Secured and serving." : "Add the records below at your DNS provider."}</div></div>
+              <div className="min-w-0"><div className="truncate font-medium">{d.hostname}</div><div className="text-xs text-muted-foreground">{d.status === "active" ? "Secured and serving." : d.status === "error" ? "We couldn't verify the records — double-check them below." : "Waiting for your DNS records."}</div></div>
               <Badge tone={tone(d.status)}>{label(d.status)}</Badge>
             </div>
             {d.status !== "active" && (
-              <div className="space-y-2.5">
-                {d.cname.target && <Copyable label="CNAME record — points your domain here" value={`${d.cname.name}  CNAME  ${d.cname.target}`} />}
-                {d.txt && <Copyable label="TXT record — proves ownership for the certificate" value={`${d.txt.name}  TXT  ${d.txt.value}`} />}
+              <div className="space-y-3">
+                {/* Step 1 — add the records. */}
+                <div className="flex gap-2.5">
+                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">1</span>
+                  <div className="min-w-0 space-y-2">
+                    <p className="text-sm">In your domain's DNS settings (GoDaddy, Namecheap, Cloudflare…), add {d.txt ? "these records" : "this record"}:</p>
+                    {d.cname.target && <DnsRecord type="CNAME" name={d.cname.name} value={d.cname.target} hint="Routes your domain to the app" />}
+                    {d.txt && <DnsRecord type="TXT" name={d.txt.name} value={d.txt.value} hint="Proves you own it (for the SSL certificate)" />}
+                    {isApex && <p className="text-xs text-warning">Tip: use a subdomain like <span className="font-mono">app.{d.hostname}</span> — most providers can't point a root domain with a CNAME.</p>}
+                  </div>
+                </div>
+                {/* Step 2 — verify. */}
+                <div className="flex gap-2.5">
+                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">2</span>
+                  <p className="text-sm">Save at your provider, then tap <span className="font-medium">Check now</span>. DNS can take a few minutes (up to an hour); the SSL certificate then issues automatically.</p>
+                </div>
               </div>
             )}
             <div className="flex gap-2">
@@ -484,7 +516,8 @@ function DomainSection() {
               <Button size="icon" variant="ghost" aria-label="Remove domain" onClick={() => void remove(d.hostname)}><Trash2 /></Button>
             </div>
           </div>
-        ))}
+          );
+        })}
 
         <div className="flex gap-2">
           <input
@@ -497,7 +530,7 @@ function DomainSection() {
           <Button size="sm" disabled={busy || !hostname.includes(".")} onClick={() => void add()}><Plus /> Add</Button>
         </div>
         {err && <p className="text-sm text-danger">{err}</p>}
-        <p className="text-xs text-muted-foreground">You'll sign in with a passkey again on the new domain (each domain keeps its own secure sign-in).</p>
+        <p className="text-xs text-muted-foreground">Use a subdomain you own, like <span className="font-mono">app.yourgym.com</span> — we'll show the exact DNS records to add. You'll sign in with a passkey again on the new domain (each keeps its own secure sign-in).</p>
       </Card>
         )}
       </Reveal>
