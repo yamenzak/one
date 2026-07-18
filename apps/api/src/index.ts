@@ -10,7 +10,7 @@
 import { Hono } from "hono";
 import { sessionMiddleware, type AppEnv } from "./auth-context.js";
 import { routeGuard } from "./route-guard.js";
-import { ensureSchema } from "./db.js";
+import { ensureSchema, parseJson } from "./db.js";
 import { seedBilling, listPlans, getSubscription } from "./billing-store.js";
 import { resolveEntitlements } from "@mossa/domain";
 import { periodKey } from "./ids.js";
@@ -170,8 +170,11 @@ async function reminderSweep(env: Env): Promise<void> {
   ).all<{ id: string; tenant_id: string; client_id: string; budgets_json: string | null; notes: string | null }>();
   const now = Date.now();
   for (const sub of subs.results ?? []) {
+   try {
     const notes = sub.notes ?? "";
-    const budgets = JSON.parse(sub.budgets_json ?? "[]") as { expiresAt: string }[];
+    // parseJson (never bare JSON.parse): one malformed budgets_json row must not
+    // abort the sweep for every remaining tenant.
+    const budgets = parseJson<{ expiresAt: string }[]>(sub.budgets_json, []);
     if (!budgets.length) continue;
     const latest = Math.max(0, ...budgets.map((b) => Date.parse(b.expiresAt)));
     const nudge = async (type: string, title: string, message: string, marker: string) => {
@@ -193,6 +196,7 @@ async function reminderSweep(env: Env): Promise<void> {
     if (latest > now && latest < soon && !notes.includes("expiry-notified")) {
       await nudge("sub_expiring", "Your plan is expiring soon", "Renew to keep your coaching access.", "expiry-notified");
     }
+   } catch { /* skip this row; a bad record can't stall the whole sweep */ }
   }
 }
 

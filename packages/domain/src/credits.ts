@@ -29,7 +29,9 @@ export const DEFAULT_MARKUP = 3;
  * `ceil` so a sub-credit call still costs at least 1 credit (never free).
  */
 export function creditsForNeurons(neurons: number, markup = DEFAULT_MARKUP): number {
-  if (!(neurons > 0)) return 0;
+  // Guard non-finite too: a NaN/Infinity slipping in from provider usage must
+  // not become 0 (undercharge) or Infinity credits.
+  if (!Number.isFinite(neurons) || neurons <= 0) return 0;
   const m = markup > 0 ? markup : DEFAULT_MARKUP;
   return Math.max(1, Math.ceil(neurons * NEURON_COST_USD * m * CREDITS_PER_DOLLAR));
 }
@@ -78,17 +80,21 @@ export interface Usage {
   audioSec?: number;
 }
 
+/** Clamp a provider-reported usage field to a non-negative finite number so a
+ *  negative (undercharge) or NaN/Infinity (poison) value can't corrupt the cost. */
+const pos = (v: number | undefined): number => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0);
+
 /** Neurons consumed for `usage` under `rate` — the exact Cloudflare cost basis. */
 export function neuronsForUsage(usage: Usage, rate: ModelRate): number {
   let n = 0;
-  if (usage.inputTokens && rate.inputRate) n += (usage.inputTokens / 1_000_000) * rate.inputRate;
-  if (usage.outputTokens && rate.outputRate) n += (usage.outputTokens / 1_000_000) * rate.outputRate;
+  if (rate.inputRate) n += (pos(usage.inputTokens) / 1_000_000) * rate.inputRate;
+  if (rate.outputRate) n += (pos(usage.outputTokens) / 1_000_000) * rate.outputRate;
   if (rate.unitRate) {
-    if (usage.chars && rate.unitKind === "chars_1k") n += (usage.chars / 1000) * rate.unitRate;
-    if (usage.tiles && rate.unitKind === "tile") n += usage.tiles * rate.unitRate;
-    if (usage.images && rate.unitKind === "image") n += usage.images * rate.unitRate;
-    if (usage.audioMin && rate.unitKind === "audio_min") n += usage.audioMin * rate.unitRate;
-    if (usage.audioSec && rate.unitKind === "audio_sec") n += usage.audioSec * rate.unitRate;
+    if (rate.unitKind === "chars_1k") n += (pos(usage.chars) / 1000) * rate.unitRate;
+    if (rate.unitKind === "tile") n += pos(usage.tiles) * rate.unitRate;
+    if (rate.unitKind === "image") n += pos(usage.images) * rate.unitRate;
+    if (rate.unitKind === "audio_min") n += pos(usage.audioMin) * rate.unitRate;
+    if (rate.unitKind === "audio_sec") n += pos(usage.audioSec) * rate.unitRate;
   }
   return n;
 }

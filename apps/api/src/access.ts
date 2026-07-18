@@ -10,7 +10,7 @@
  * permission editor; this file feeds Better Auth's org plugin.
  */
 import { createAccessControl } from "better-auth/plugins/access";
-import { defaultStatements, adminAc, ownerAc } from "better-auth/plugins/organization/access";
+import { defaultStatements, ownerAc } from "better-auth/plugins/organization/access";
 
 export const statement = {
   ...defaultStatements, // organization · member · invitation · team · ac
@@ -51,9 +51,12 @@ export const owner = ac.newRole({
   ai: ["use"],
 });
 
-/** Trainer: full coaching surface for ASSIGNED clients (rows gated in routes). */
+/** Trainer: full coaching surface for ASSIGNED clients (rows gated in routes).
+ *  Deliberately NO org-admin statements (no member/invitation management) — the
+ *  domain preset (perms.ts) grants a trainer zero staff powers, and spreading
+ *  adminAc here would let a trainer hit Better Auth's own /organization/* member
+ *  endpoints to remove, re-role, or invite staff. Keep org-admin to owner only. */
 export const trainer = ac.newRole({
-  ...adminAc.statements, // may manage members/invites per org plugin defaults
   client: ["create", "read", "update"],
   plan: ["create", "read", "update", "publish", "delete"],
   library: ["create", "read", "update", "delete"],

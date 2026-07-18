@@ -158,10 +158,14 @@ const DEFAULT_MODELS: Omit<AiModelRow, "enabled" | "is_default">[] = [
   },
 ];
 
-/** Idempotent catalog seed (INSERT OR IGNORE by id). Runs on demand — no
- *  module-level guard, so it stays correct across isolated-storage test runs
- *  and picks up newly-added catalog entries without wiping admin edits. */
+/** Idempotent catalog seed (INSERT OR IGNORE by id). No module-level guard (so
+ *  it re-seeds into fresh per-test storage); a cheap storage-scoped existence
+ *  check skips the ~11-write batch once populated, so a single generate() (which
+ *  resolves models 2-3×) doesn't re-attempt the whole seed each time. New
+ *  catalog entries are picked up by an explicit admin re-sync. */
 export async function seedAiModels(db: D1Database): Promise<void> {
+  const already = await db.prepare("SELECT 1 AS x FROM ai_models LIMIT 1").first<{ x: number }>().catch(() => null);
+  if (already) return;
   await db
     .batch(
       DEFAULT_MODELS.map((m, i) =>
@@ -266,6 +270,13 @@ export type GenerateResult =
   | { ok: false; error: "unavailable"; detail?: string };
 
 const RUN_TIMEOUT_MS = 120_000;
+
+// Worst-case input tokens an inline image contributes to a vision call. The
+// char-count estimate can't see the image, but the provider bills it (Gemini
+// tiles a photo into ~258-token blocks), so the reserve must budget for it or
+// the hold under-reserves and the settle cap (billing-do) silently eats the
+// overrun. 2048 covers a high-resolution photo with margin.
+const IMAGE_TOKEN_EST = 2048;
 
 function withTimeout<T>(p: Promise<T>): Promise<T> {
   return Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), RUN_TIMEOUT_MS))]);
@@ -395,9 +406,11 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   const canRunReal = isGoogle ? !!geminiKey : !!env.AI;
   const useMock = mockMode === "on" || (mockMode !== "off" && !canRunReal);
 
-  // Worst-case estimate for the hold: prompt tokens (~chars/4) in, cap out.
+  // Worst-case estimate for the hold: prompt tokens (~chars/4) in, cap out, plus
+  // a worst-case image allowance so a vision call reserves for the image tokens
+  // the char count can't see (keeps the reserve a true upper bound).
   const estUsage: Usage = {
-    inputTokens: Math.ceil((system.length + input.prompt.length) / 4),
+    inputTokens: Math.ceil((system.length + input.prompt.length) / 4) + (input.image ? IMAGE_TOKEN_EST : 0),
     outputTokens: input.maxOutputTokens ?? 1024,
   };
   const estimate = creditsForUsage(estUsage, rate);
@@ -454,7 +467,11 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   }
 
   const credits = creditsForUsage(usage, rate);
-  await dobj.settle(hold.hold, credits, `ai.${input.feature}`, model.id);
+  // The generation already succeeded — never let a transient settle failure
+  // discard the output. A leaked hold self-reaps via HOLD_TTL_MS.
+  try {
+    await dobj.settle(hold.hold, credits, `ai.${input.feature}`, model.id);
+  } catch { /* DO transient — hold reaps on TTL; return the successful output */ }
   await audit(env, input, model.id, credits, usage.outputTokens ?? 0, true, null);
   return { ok: true, output, credits, mocked };
 }
@@ -548,7 +565,11 @@ export async function generateImage(env: Env, input: GenerateImageInput): Promis
   const mediaKey = `t/${input.tenantId}/ai/${newId("img")}.${ext}`;
   await env.MEDIA.put(mediaKey, bytes, { httpMetadata: { contentType: mimeType } });
   const credits = creditsForUsage(usage, rate);
-  await dobj.settle(hold.hold, credits, `ai.${input.feature}`, model.id);
+  // Image is stored and returned regardless — a settle failure must not orphan
+  // the R2 object or lose the result; the hold self-reaps via HOLD_TTL_MS.
+  try {
+    await dobj.settle(hold.hold, credits, `ai.${input.feature}`, model.id);
+  } catch { /* DO transient — hold reaps on TTL; return the stored image */ }
   await audit(env, { ...imageAuditInput(input), task: "image" } as GenerateInput, model.id, credits, 0, true, null);
   return { ok: true, key: mediaKey, credits, mocked };
 }

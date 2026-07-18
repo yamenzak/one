@@ -8,6 +8,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { type AppEnv, requireTenant } from "./auth-context.js";
+import { requireClientAccess } from "./clients.js";
 import { notify } from "./notify.js";
 import { hasFeature } from "./billing-store.js";
 import { newId, nowIso } from "./ids.js";
@@ -93,6 +94,12 @@ export const contentHubRoutes = new Hono<AppEnv>()
   .get("/resources/feed", async (c) => {
     const who = requireTenant(c)!;
     const clientId = c.req.query("clientId");
+    // A clientId filters the "assigned" audience — verify the caller may act for
+    // that client, so a member can't enumerate another client's assigned content.
+    if (clientId) {
+      const access = await requireClientAccess(c, clientId);
+      if ("response" in access) return access.response;
+    }
     const rows = await c.env.DB.prepare(
       "SELECT * FROM resources WHERE tenant_id = ? AND status = 'published' ORDER BY published_at DESC LIMIT 60",
     )

@@ -79,7 +79,10 @@ export type CalculatorError =
   | "missing_weight"
   | "missing_height"
   | "invalid_age"
-  | "invalid_body_fat";
+  | "invalid_body_fat"
+  | "invalid_activity"
+  | "invalid_goal"
+  | "invalid_diet";
 
 export function validateCalculatorInputs(i: Partial<CalculatorInputs>): CalculatorError[] {
   const errors: CalculatorError[] = [];
@@ -90,6 +93,13 @@ export function validateCalculatorInputs(i: Partial<CalculatorInputs>): Calculat
   if (i.bodyFatPercent != null && (i.bodyFatPercent <= 0 || i.bodyFatPercent >= 75)) {
     errors.push("invalid_body_fat");
   }
+  // The enum lookups below drive the math; an unrecognized value would otherwise
+  // produce silent NaN targets (bad activity/goal) or throw (bad diet → the
+  // macro-split destructure). Validate them here so a caller that trusts an empty
+  // result never persists garbage.
+  if (!i.activityLevel || !(i.activityLevel in ACTIVITY_MULTIPLIERS)) errors.push("invalid_activity");
+  if (!i.primaryGoal || !(i.primaryGoal in GOAL_ADJUSTMENTS)) errors.push("invalid_goal");
+  if (!i.dietaryApproach || !(i.dietaryApproach in MACRO_SPLITS)) errors.push("invalid_diet");
   return errors;
 }
 
@@ -111,12 +121,14 @@ export function calculateNutritionTargets(i: CalculatorInputs): NutritionTargets
     bmrFormula = "mifflin_st_jeor";
   }
 
-  const activityMultiplier = ACTIVITY_MULTIPLIERS[i.activityLevel];
+  // Defensive defaults so an unvalidated bad enum can't NaN-poison every target
+  // or throw on the destructure (validateCalculatorInputs catches these upstream).
+  const activityMultiplier = ACTIVITY_MULTIPLIERS[i.activityLevel] ?? ACTIVITY_MULTIPLIERS.moderate;
   const tdee = bmr * activityMultiplier;
-  const goalAdjustment = GOAL_ADJUSTMENTS[i.primaryGoal];
+  const goalAdjustment = GOAL_ADJUSTMENTS[i.primaryGoal] ?? 0;
   const targetCalories = Math.round(tdee * (1 + goalAdjustment));
 
-  const macroSplit = MACRO_SPLITS[i.dietaryApproach];
+  const macroSplit = MACRO_SPLITS[i.dietaryApproach] ?? MACRO_SPLITS.balanced;
   const [pPct, cPct, fPct] = macroSplit;
   const targetProteinG = Math.round((targetCalories * pPct) / 4);
   const targetCarbsG = Math.round((targetCalories * cPct) / 4);

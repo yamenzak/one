@@ -11,7 +11,9 @@
 
 import type { LoggedSetLike } from "./activity.js";
 
-/** Epley estimated 1-rep max. Reps of 1 returns the weight itself. */
+/** Epley estimated 1-rep max: weight · (1 + reps/30). Note this is the standard
+ *  Epley curve with no special case at reps=1 (e1Rm(w,1) = w·31/30 ≈ 1.033·w),
+ *  matching how e1Rm is compared across rep ranges for PR tracking. */
 export function epley1Rm(weightKg: number, reps: number): number | null {
   if (!(weightKg > 0) || !(reps > 0)) return null;
   return Math.round(weightKg * (1 + reps / 30) * 10) / 10;

@@ -61,12 +61,20 @@ export async function stripeCall<T = unknown>(
   return data;
 }
 
+/** Max age of a webhook signature we'll accept (Stripe's own default tolerance);
+ *  rejects replay of an old-but-validly-signed payload. */
+const WEBHOOK_TOLERANCE_S = 300;
+
 /** HMAC-SHA256 webhook signature verification (t + v1 scheme). */
 export async function verifyWebhook(payload: string, sigHeader: string, secret: string): Promise<boolean> {
   const parts = Object.fromEntries(sigHeader.split(",").map((p) => p.split("=") as [string, string]));
   const t = parts["t"];
   const v1 = parts["v1"];
   if (!t || !v1) return false;
+  // Timestamp tolerance: a captured, validly-signed payload must not be
+  // replayable indefinitely (not every handler is idempotent by event id).
+  const ts = Number(t);
+  if (!Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > WEBHOOK_TOLERANCE_S) return false;
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${payload}`));
   const expected = [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");

@@ -108,21 +108,18 @@ export const healthRoutes = new Hono<AppEnv>()
     if ("response" in access) return access.response;
     const { clientId, date, slot } = parsed.data;
     const supId = c.req.param("id");
-    const existing = await c.env.DB.prepare(
-      "SELECT 1 AS x FROM supplement_logs WHERE client_id = ? AND supplement_id = ? AND date_local = ? AND slot = ?",
+    // Atomic toggle: DELETE first (idempotent) — if it removed a row the slot was
+    // taken, so it's now cleared. Otherwise INSERT OR IGNORE marks it taken. This
+    // avoids the SELECT-then-INSERT TOCTOU that 500s on a double-tap (both taps
+    // saw "not logged" and the second INSERT hit the composite PK).
+    const del = await c.env.DB.prepare(
+      "DELETE FROM supplement_logs WHERE client_id = ? AND supplement_id = ? AND date_local = ? AND slot = ?",
     )
       .bind(clientId, supId, date, slot)
-      .first();
-    if (existing) {
-      await c.env.DB.prepare(
-        "DELETE FROM supplement_logs WHERE client_id = ? AND supplement_id = ? AND date_local = ? AND slot = ?",
-      )
-        .bind(clientId, supId, date, slot)
-        .run();
-      return c.json({ ok: true, taken: false });
-    }
+      .run();
+    if ((del.meta?.changes ?? 0) > 0) return c.json({ ok: true, taken: false });
     await c.env.DB.prepare(
-      "INSERT INTO supplement_logs (client_id, supplement_id, date_local, slot, tenant_id, taken_at) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT OR IGNORE INTO supplement_logs (client_id, supplement_id, date_local, slot, tenant_id, taken_at) VALUES (?, ?, ?, ?, ?, ?)",
     )
       .bind(clientId, supId, date, slot, access.client.tenant_id, nowIso())
       .run();

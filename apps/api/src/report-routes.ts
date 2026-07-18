@@ -108,17 +108,27 @@ export const reportRoutes = new Hono<AppEnv>()
 
     const today = new Date().toISOString().slice(0, 10);
     const atRisk: { clientId: string; name: string; daysSinceLog: number | null; reason: string }[] = [];
-    for (const client of clients.results ?? []) {
-      const last = await c.env.DB.prepare(
-        `SELECT MAX(d) AS last FROM (
-           SELECT MAX(date_local) AS d FROM check_ins WHERE client_id = ?
-           UNION SELECT MAX(date_local) FROM exercise_logs WHERE client_id = ?
-           UNION SELECT MAX(date_local) FROM food_entries WHERE client_id = ?
-         )`,
+    const roster = clients.results ?? [];
+    // One grouped query for the whole roster instead of a per-client round trip
+    // (owner scope = every active client — that was N sequential D1 reads).
+    const ids = roster.map((r) => r.id);
+    const lastByClient = new Map<string, string | null>();
+    if (ids.length) {
+      const ph = ids.map(() => "?").join(",");
+      const lastRows = await c.env.DB.prepare(
+        `SELECT client_id, MAX(d) AS last FROM (
+           SELECT client_id, MAX(date_local) AS d FROM check_ins WHERE client_id IN (${ph}) GROUP BY client_id
+           UNION ALL SELECT client_id, MAX(date_local) FROM exercise_logs WHERE client_id IN (${ph}) GROUP BY client_id
+           UNION ALL SELECT client_id, MAX(date_local) FROM food_entries WHERE client_id IN (${ph}) GROUP BY client_id
+         ) GROUP BY client_id`,
       )
-        .bind(client.id, client.id, client.id)
-        .first<{ last: string | null }>();
-      const daysSince = last?.last ? Math.round((Date.parse(today) - Date.parse(last.last)) / 86_400_000) : null;
+        .bind(...ids, ...ids, ...ids)
+        .all<{ client_id: string; last: string | null }>();
+      for (const r of lastRows.results ?? []) lastByClient.set(r.client_id, r.last);
+    }
+    for (const client of roster) {
+      const last = lastByClient.get(client.id) ?? null;
+      const daysSince = last ? Math.round((Date.parse(today) - Date.parse(last)) / 86_400_000) : null;
       if (daysSince === null || daysSince >= 5) {
         atRisk.push({
           clientId: client.id,

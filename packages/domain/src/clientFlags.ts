@@ -185,7 +185,12 @@ export function resolveClientFlags(input: ResolveFlagsInput): ClientFlags {
   let flags = applyPartial(DEFAULT_CLIENT_FLAGS, input.packageFlags);
   flags = applyPartial(flags, input.subscriptionFlags);
 
-  // Budget gating — only when the client actually has a subscription.
+  // Budget gating. Contract: `budgets` present (any array, incl. empty) means
+  // this client HAS an access subscription, so plan flags are gated by whether a
+  // covering budget is currently active — an empty/all-lapsed array correctly
+  // revokes plan access. `null`/`undefined` means "no subscription context"
+  // (e.g. a preview) and skips gating. `[]` and `null` are deliberately NOT the
+  // same: one is a lapsed subscriber, the other is no subscriber.
   if (input.budgets) {
     if (!hasActiveBudget(input.budgets, "workout", input.nowIso)) {
       for (const k of WORKOUT_GATED) flags[k] = false;
@@ -195,16 +200,19 @@ export function resolveClientFlags(input: ResolveFlagsInput): ClientFlags {
     }
   }
 
-  // ∩ tenant entitlements — the tenant can't grant what Mossa didn't sell them.
-  if (!input.entitlements.features.aiSuite) flags.canUseAi = false;
+  // ∩ tenant entitlements — the tenant can't grant a client capability Mossa
+  // didn't sell them. Driven by each flag's declared `requiresFeature` (not a
+  // single hardcoded aiSuite check), so any new gated flag is enforced
+  // automatically instead of silently slipping through.
+  for (const key of CLIENT_FLAG_KEYS) {
+    const req = CLIENT_FLAG_META[key].requiresFeature;
+    if (req && !input.entitlements.features[req]) flags[key] = false;
+  }
   // AI groups are bounded by the master switch: no master → no groups. This
   // makes the master both a tenant-entitlement gate and a package-level kill.
   if (!flags.canUseAi) {
     flags.aiMealTools = false;
     flags.aiCoachInsights = false;
-  }
-  if (!input.entitlements.features.supplementsLabs) {
-    // no client-facing flags today for supplements/labs; routes gate directly
   }
 
   return flags;

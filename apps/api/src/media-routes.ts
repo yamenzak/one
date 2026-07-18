@@ -10,13 +10,19 @@
 
 import { Hono } from "hono";
 import { type AppEnv, requireTenant } from "./auth-context.js";
+import { requireClientAccess } from "./clients.js";
 import { newId } from "./ids.js";
 
 const MAX_BYTES = 15 * 1024 * 1024; // 15 MB
-const ALLOWED = /^(image\/(png|jpe?g|webp|gif|svg\+xml)|application\/pdf|video\/(mp4|webm))$/;
+// No image/svg+xml: an SVG served same-origin can carry <script> and run in the
+// app's origin (stored XSS). Raster images + pdf + video only.
+const ALLOWED = /^(image\/(png|jpe?g|webp|gif)|application\/pdf|video\/(mp4|webm))$/;
+const INLINE_SAFE = /^image\/(png|jpe?g|webp|gif)$/;
 
 export const mediaRoutes = new Hono<AppEnv>()
-  // Upload a private asset. Returns the storage key.
+  // Upload a private asset. Returns the storage key. Pass `clientId` for
+  // client-owned media (progress photos, lab files) so reads are assignment-
+  // gated via a per-client key prefix; tenant assets (avatars, branding) omit it.
   .post("/media/upload", async (c) => {
     const who = requireTenant(c)!;
     const form = await c.req.formData().catch(() => null);
@@ -29,26 +35,48 @@ export const mediaRoutes = new Hono<AppEnv>()
     if (!ALLOWED.test(file.type ?? "")) return c.json({ error: "unsupported type" }, 415);
 
     const ext = ((file.name ?? "").split(".").pop() ?? "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
-    const key = `t/${who.tenantId}/${purpose}/${newId("m")}.${ext}`;
+    // Client-scoped key when a clientId is supplied — but only after confirming
+    // the uploader may act for that client.
+    const clientId = form?.get("clientId") ? String(form.get("clientId")) : null;
+    let prefix = `t/${who.tenantId}/${purpose}`;
+    if (clientId) {
+      const access = await requireClientAccess(c, clientId);
+      if ("response" in access) return access.response;
+      prefix = `t/${who.tenantId}/c/${access.client.id}/${purpose}`;
+    }
+    const key = `${prefix}/${newId("m")}.${ext}`;
     await c.env.MEDIA.put(key, await file.arrayBuffer(), {
       httpMetadata: { contentType: file.type ?? "application/octet-stream" },
-      customMetadata: { tenant: who.tenantId, uploadedBy: who.userId, purpose },
+      customMetadata: { tenant: who.tenantId, uploadedBy: who.userId, purpose, ...(clientId ? { client: clientId } : {}) },
     });
     return c.json({ key }, 201);
   })
 
-  // Authed proxy read. Only same-tenant callers; the route guard already
-  // requires an authenticated member, and we re-check the tenant prefix.
+  // Authed proxy read. Same-tenant callers only; client-scoped keys are
+  // additionally gated per client assignment (a client / non-assigned trainer
+  // must not read another client's photos or lab files just by holding the key).
   .get("/media/:key{.+}", async (c) => {
     const who = requireTenant(c);
     if (!who) return c.json({ error: "unauthenticated" }, 401);
     const key = c.req.param("key");
     // Tenant isolation: the key must belong to the caller's tenant.
     if (!key.startsWith(`t/${who.tenantId}/`)) return c.json({ error: "forbidden" }, 403);
+    const scoped = key.match(/^t\/[^/]+\/c\/([^/]+)\//);
+    if (scoped) {
+      const access = await requireClientAccess(c, scoped[1]!);
+      if ("response" in access) return access.response;
+    }
     const obj = await c.env.MEDIA.get(key);
     if (!obj) return c.json({ error: "not found" }, 404);
+    const ct = obj.httpMetadata?.contentType || "application/octet-stream";
     const headers = new Headers();
-    if (obj.httpMetadata?.contentType) headers.set("content-type", obj.httpMetadata.contentType);
+    headers.set("content-type", ct);
     headers.set("cache-control", "private, max-age=3600");
+    // Defence-in-depth: never sniff, sandbox on direct navigation, and force a
+    // download for anything that isn't an inline-safe raster image so a crafted
+    // file can't execute as a document in our origin.
+    headers.set("x-content-type-options", "nosniff");
+    headers.set("content-security-policy", "default-src 'none'; sandbox");
+    if (!INLINE_SAFE.test(ct)) headers.set("content-disposition", "attachment");
     return new Response(obj.body, { headers });
   });

@@ -27,6 +27,9 @@ export function ensureSchema(db: D1Database): Promise<void> {
           'CREATE TABLE IF NOT EXISTS "verification" (id TEXT PRIMARY KEY, identifier TEXT, value TEXT, expiresAt DATE, createdAt DATE, updatedAt DATE);',
           'CREATE TABLE IF NOT EXISTS "organization" (id TEXT PRIMARY KEY, name TEXT, slug TEXT UNIQUE, logo TEXT, createdAt DATE, metadata TEXT);',
           'CREATE TABLE IF NOT EXISTS "member" (id TEXT PRIMARY KEY, organizationId TEXT, userId TEXT, role TEXT, permissions_json TEXT, createdAt DATE);',
+          // Resolved on EVERY authenticated request (role + permissions lookup) —
+          // without this the member table is full-scanned per request.
+          'CREATE INDEX IF NOT EXISTS idx_member_org_user ON "member"(organizationId, userId);',
           'CREATE TABLE IF NOT EXISTS "invitation" (id TEXT PRIMARY KEY, organizationId TEXT, email TEXT, role TEXT, status TEXT, expiresAt DATE, inviterId TEXT, createdAt DATE);',
           // Passkey plugin (WebAuthn credentials; multiple per user).
           'CREATE TABLE IF NOT EXISTS "passkey" (id TEXT PRIMARY KEY, name TEXT, publicKey TEXT, userId TEXT, credentialID TEXT, counter INTEGER, deviceType TEXT, backedUp INTEGER, transports TEXT, createdAt DATE, aaguid TEXT);',
@@ -34,6 +37,9 @@ export function ensureSchema(db: D1Database): Promise<void> {
           // ── Platform billing (SPEC §5, §6) ─────────────────────────────────
           "CREATE TABLE IF NOT EXISTS plans (id TEXT PRIMARY KEY, name TEXT, price_usd_month REAL, entitlements_json TEXT, stripe_product_id TEXT, stripe_price_id TEXT, ord INTEGER, active INTEGER DEFAULT 1);",
           "CREATE TABLE IF NOT EXISTS subscriptions (tenant_id TEXT PRIMARY KEY, plan_id TEXT, status TEXT, comp INTEGER DEFAULT 0, stripe_customer_id TEXT, stripe_sub_id TEXT, pending_plan_id TEXT, current_period_end TEXT, past_due_at TEXT, suspend_at TEXT, delete_at TEXT, overrides_json TEXT, updated_at TEXT);",
+          // dailySweep scans by status (grant to active/trialing tenants).
+          "CREATE INDEX IF NOT EXISTS idx_subs_status ON subscriptions(status);",
+          "CREATE INDEX IF NOT EXISTS idx_subs_customer ON subscriptions(stripe_customer_id);",
           "CREATE TABLE IF NOT EXISTS credit_packs (id TEXT PRIMARY KEY, name TEXT, credits INTEGER, price_usd REAL, stripe_product_id TEXT, stripe_price_id TEXT, ord INTEGER, active INTEGER DEFAULT 1);",
           "CREATE TABLE IF NOT EXISTS credit_ledger (id TEXT PRIMARY KEY, tenant_id TEXT, delta INTEGER, balance INTEGER, reason TEXT, ref TEXT, at INTEGER);",
           "CREATE INDEX IF NOT EXISTS idx_ledger_tenant ON credit_ledger(tenant_id, at);",
@@ -57,6 +63,9 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "CREATE TABLE IF NOT EXISTS clients (id TEXT PRIMARY KEY, tenant_id TEXT, user_id TEXT, display_name TEXT, email TEXT, status TEXT DEFAULT 'active', gender TEXT, date_of_birth TEXT, height_cm REAL, timezone TEXT, weight_unit TEXT DEFAULT 'kg', length_unit TEXT DEFAULT 'cm', volume_unit TEXT DEFAULT 'ml', intake_json TEXT, dashboard_prefs_json TEXT, onboarding_complete INTEGER DEFAULT 0, avatar_url TEXT, avatar_seed TEXT, created_at TEXT, archived_at TEXT);",
           "CREATE INDEX IF NOT EXISTS idx_clients_tenant ON clients(tenant_id, status);",
           "CREATE INDEX IF NOT EXISTS idx_clients_user ON clients(user_id);",
+          // /api/context auto-links an unclaimed client by lowercased email on
+          // every boot; an expression index makes that a lookup, not a full scan.
+          "CREATE INDEX IF NOT EXISTS idx_clients_email_lower ON clients(LOWER(email));",
           "CREATE TABLE IF NOT EXISTS client_trainers (client_id TEXT, trainer_user_id TEXT, tenant_id TEXT, is_primary INTEGER DEFAULT 0, created_at TEXT, PRIMARY KEY (client_id, trainer_user_id));",
           "CREATE INDEX IF NOT EXISTS idx_ct_trainer ON client_trainers(tenant_id, trainer_user_id);",
 
@@ -111,8 +120,16 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "CREATE INDEX IF NOT EXISTS idx_packages_tenant ON packages(tenant_id, active);",
           "CREATE TABLE IF NOT EXISTS client_subscriptions (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, package_id TEXT, status TEXT DEFAULT 'active', payment_status TEXT DEFAULT 'none', budgets_json TEXT, addons_json TEXT, flags_json TEXT, source TEXT DEFAULT 'admin', installments_paid INTEGER, installments_total INTEGER, stripe_sub_id TEXT, stripe_checkout_id TEXT, started_at TEXT, updated_at TEXT, notes TEXT);",
           "CREATE INDEX IF NOT EXISTS idx_csubs_client ON client_subscriptions(client_id, status);",
+          // reminderSweep scans active subs platform-wide; renew/cancel resolve by
+          // the Stripe subscription id.
+          "CREATE INDEX IF NOT EXISTS idx_csubs_status ON client_subscriptions(status);",
+          "CREATE INDEX IF NOT EXISTS idx_csubs_stripe_sub ON client_subscriptions(stripe_sub_id);",
           "CREATE TABLE IF NOT EXISTS redemption_codes (id TEXT PRIMARY KEY, tenant_id TEXT, code TEXT, days_to_add INTEGER, target_feature TEXT DEFAULT 'all', max_uses INTEGER DEFAULT 1, used_count INTEGER DEFAULT 0, used_by_json TEXT, expires_at TEXT, active INTEGER DEFAULT 1, created_by TEXT, created_at TEXT);",
           "CREATE UNIQUE INDEX IF NOT EXISTS idx_redemption_code ON redemption_codes(tenant_id, code);",
+          // Per-(code,client) redemption claim — the UNIQUE PK is what atomically
+          // dedupes a client's second redemption (see /redeem), replacing the
+          // lost-update-prone used_by_json array check.
+          "CREATE TABLE IF NOT EXISTS redemption_uses (code_id TEXT, client_id TEXT, at TEXT, PRIMARY KEY (code_id, client_id));",
           // Promo codes = Stripe checkout discounts (distinct from redemption day top-ups).
           "CREATE TABLE IF NOT EXISTS promo_codes (id TEXT PRIMARY KEY, tenant_id TEXT, code TEXT, discount_type TEXT DEFAULT 'percent', percent_off INTEGER, amount_off_cents INTEGER, restricted_package_id TEXT, max_redemptions INTEGER, redemption_count INTEGER DEFAULT 0, expires_at TEXT, active INTEGER DEFAULT 1, stripe_coupon_id TEXT, stripe_promo_id TEXT, created_by TEXT, created_at TEXT);",
           "CREATE UNIQUE INDEX IF NOT EXISTS idx_promo_code ON promo_codes(tenant_id, code);",
@@ -126,6 +143,13 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "CREATE INDEX IF NOT EXISTS idx_resources_tenant ON resources(tenant_id, status);",
           "CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, tenant_id TEXT, recipient_user_id TEXT, type TEXT, title TEXT, message TEXT, link TEXT, read INTEGER DEFAULT 0, created_at TEXT);",
           "CREATE INDEX IF NOT EXISTS idx_notif_recipient ON notifications(recipient_user_id, read);",
+          // The bell lists a recipient's notifications ORDER BY created_at DESC.
+          "CREATE INDEX IF NOT EXISTS idx_notif_recipient_time ON notifications(recipient_user_id, created_at);",
+          // Weekly-digest idempotency: one row per (user, week, role) gates the
+          // send, so an at-least-once cron redelivery can't re-email — and a run
+          // that timed out mid-sweep resumes on the next fire (already-sent users
+          // are skipped) instead of starting over.
+          "CREATE TABLE IF NOT EXISTS digest_sent (user_id TEXT, period TEXT, kind TEXT, at TEXT, PRIMARY KEY (user_id, period, kind));",
 
           // ── Tenant settings (branding, AI toggles, marketplace, Connect) ───
           "CREATE TABLE IF NOT EXISTS tenant_settings (tenant_id TEXT PRIMARY KEY, branding_json TEXT, ai_toggles_json TEXT, marketplace_json TEXT, integrations_json TEXT, stripe_account_id TEXT, updated_at TEXT);",

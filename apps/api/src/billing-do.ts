@@ -96,10 +96,21 @@ export class TenantBillingDO extends DurableObject<Env> {
    * Finalize a hold: debit the *actual* credits (from real Workers AI usage),
    * release the reserved remainder, append a ledger entry. Never drives the
    * balance below zero.
+   *
+   * Two invariants make this safe:
+   *  - **Idempotent.** If the hold is already gone (a retried/replayed settle,
+   *    or one the reaper freed), this is a no-op — a settle never debits twice.
+   *  - **Capped at the reservation.** The charge can never exceed what `reserve`
+   *    held, so an `actual` that overruns the estimate (e.g. vision image tokens
+   *    the char-count estimate can't see) can't push the tenant past what was
+   *    reserved. This is what makes "a burst can never overspend" true even when
+   *    the real usage beats the estimate — the platform eats the small overrun.
    */
   async settle(hold: string, actual: number, reason = "ai.generation", ref?: string): Promise<BalanceView> {
     const holds = (await this.ctx.storage.get<Record<string, Hold>>("holds")) ?? {};
-    const charge = Math.max(0, Math.ceil(actual));
+    const held = holds[hold];
+    if (!held) return this.view(); // already settled/released/reaped — no double charge
+    const charge = Math.min(held.credits, Math.max(0, Math.ceil(actual)));
     const balance = (await this.ctx.storage.get<number>("balance")) ?? 0;
     const next = Math.max(0, balance - charge);
     delete holds[hold];

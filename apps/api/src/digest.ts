@@ -8,7 +8,7 @@
 import { resolveChannels, parseNotifPrefs, type NotifRole } from "@mossa/domain";
 import type { Env } from "./env.js";
 import { sendTenantEmail } from "./email-provider.js";
-import { emailShell } from "./mailer.js";
+import { emailShell, escapeHtml } from "./mailer.js";
 
 interface Stat { label: string; value: string | number }
 
@@ -27,22 +27,36 @@ async function digestOn(db: D1Database, userId: string, role: NotifRole): Promis
 
 const num = (v: unknown): number => Number((v as { n?: number })?.n ?? 0);
 
+/** Idempotency + resume gate: claim this (user, week, role) send. Returns true
+ *  only the first time — a cron redelivery or a re-run skips already-sent users
+ *  instead of re-emailing. On a DB error it proceeds (at-least-once). */
+async function claimSend(db: D1Database, userId: string, period: string, kind: string, at: string): Promise<boolean> {
+  try {
+    const r = await db.prepare("INSERT OR IGNORE INTO digest_sent (user_id, period, kind, at) VALUES (?, ?, ?, ?)").bind(userId, period, kind, at).run();
+    return (r.meta?.changes ?? 0) > 0;
+  } catch {
+    return true;
+  }
+}
+
 export async function runWeeklyDigest(env: Env): Promise<void> {
   const db = env.DB;
   const nowMs = Date.now();
   const weekAgoDate = new Date(nowMs - 7 * 86_400_000).toISOString().slice(0, 10);
   const weekAgoIso = new Date(nowMs - 7 * 86_400_000).toISOString();
+  const period = new Date(nowMs).toISOString().slice(0, 10); // the run's Monday
 
   const tenants = await db.prepare("SELECT id, name FROM organization").all<{ id: string; name: string }>().catch(() => ({ results: [] as { id: string; name: string }[] }));
   for (const t of tenants.results ?? []) {
     try {
-      await digestForTenant(env, t.id, t.name, weekAgoDate, weekAgoIso);
+      await digestForTenant(env, t.id, t.name, weekAgoDate, weekAgoIso, period);
     } catch { /* one tenant's failure never stops the sweep */ }
   }
 }
 
-async function digestForTenant(env: Env, tenantId: string, brand: string, weekAgoDate: string, weekAgoIso: string): Promise<void> {
+async function digestForTenant(env: Env, tenantId: string, brand: string, weekAgoDate: string, weekAgoIso: string, period: string): Promise<void> {
   const db = env.DB;
+  const sentAt = new Date().toISOString();
 
   // ── Owners: studio health ─────────────────────────────────────────────────
   const [activeClients, activeThisWeek, checkIns, newSales, sub] = await Promise.all([
@@ -58,9 +72,10 @@ async function digestForTenant(env: Env, tenantId: string, brand: string, weekAg
   const owners = await db.prepare("SELECT userId FROM member WHERE organizationId = ? AND role = 'owner'").bind(tenantId).all<{ userId: string | null }>();
   for (const o of owners.results ?? []) {
     if (!o.userId || !(await digestOn(db, o.userId, "owner"))) continue;
+    if (!(await claimSend(db, o.userId, period, "owner", sentAt))) continue;
     const email = (await db.prepare('SELECT email FROM "user" WHERE id = ?').bind(o.userId).first<{ email: string | null }>())?.email;
     if (!email) continue;
-    const html = digestHtml("Your studio this week", `Here's how ${brand} did over the last 7 days.`, [
+    const html = digestHtml("Your studio this week", `Here's how ${escapeHtml(brand)} did over the last 7 days.`, [
       { label: "Active clients", value: active },
       { label: "Engaged this week", value: engaged },
       { label: "Quiet (no logs 7d)", value: atRisk },
@@ -75,6 +90,7 @@ async function digestForTenant(env: Env, tenantId: string, brand: string, weekAg
   const trainers = await db.prepare("SELECT DISTINCT trainer_user_id FROM client_trainers WHERE tenant_id = ?").bind(tenantId).all<{ trainer_user_id: string }>();
   for (const tr of trainers.results ?? []) {
     if (!tr.trainer_user_id || !(await digestOn(db, tr.trainer_user_id, "trainer"))) continue;
+    if (!(await claimSend(db, tr.trainer_user_id, period, "trainer", sentAt))) continue;
     const email = (await db.prepare('SELECT email FROM "user" WHERE id = ?').bind(tr.trainer_user_id).first<{ email: string | null }>())?.email;
     if (!email) continue;
     const [assigned, awaiting, quiet] = await Promise.all([
@@ -95,6 +111,7 @@ async function digestForTenant(env: Env, tenantId: string, brand: string, weekAg
   for (const cl of clients.results ?? []) {
     try {
       if (!(await digestOn(db, cl.user_id, "client"))) continue;
+      if (!(await claimSend(db, cl.user_id, period, "client", sentAt))) continue;
       const email = (await db.prepare('SELECT email FROM "user" WHERE id = ?').bind(cl.user_id).first<{ email: string | null }>())?.email;
       if (!email) continue;
       const [workoutDays, foodDays, checkInCount, labs] = await Promise.all([

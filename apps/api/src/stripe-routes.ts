@@ -83,7 +83,16 @@ export const stripeRoutes = new Hono<AppEnv>()
     }
     const event = JSON.parse(payload) as { id?: string; type: string; data: { object: Record<string, unknown> } };
     if (!(await firstSeen(c.env.DB, event.id))) return c.json({ received: true, duplicate: true });
-    await handlePlatformEvent(c.env, event);
+    try {
+      await handlePlatformEvent(c.env, event);
+    } catch (err) {
+      // We claimed the event id before processing; a failure here (DO/D1
+      // transient) must NOT leave it marked seen, or Stripe's retry would be
+      // dropped as a duplicate — money captured, nothing granted. Release the
+      // claim and 500 so Stripe redelivers and we process it cleanly.
+      await unmarkSeen(c.env.DB, event.id);
+      throw err;
+    }
     return c.json({ received: true });
   })
 
@@ -231,6 +240,7 @@ export const stripeRoutes = new Hono<AppEnv>()
     // Connect events carry the connected account id at the top level.
     const event = JSON.parse(payload) as { id?: string; account?: string; type: string; data: { object: Record<string, unknown> } };
     if (!(await firstSeen(c.env.DB, event.id))) return c.json({ received: true, duplicate: true });
+    try {
     if (event.type === "checkout.session.completed") {
       const s = event.data.object as { id?: string; mode?: string; subscription?: string; metadata?: Record<string, string> };
       const m = s.metadata ?? {};
@@ -287,6 +297,12 @@ export const stripeRoutes = new Hono<AppEnv>()
         });
       }
     }
+    } catch (err) {
+      // Same contract as the platform webhook: a failed handler must release the
+      // event-id claim so Stripe's retry re-processes instead of being dropped.
+      await unmarkSeen(c.env.DB, event.id);
+      throw err;
+    }
     return c.json({ received: true });
   });
 
@@ -296,6 +312,14 @@ async function firstSeen(db: D1Database, eventId: string | undefined): Promise<b
   if (!eventId) return true; // no id (shouldn't happen) → process, don't drop
   const r = await db.prepare("INSERT OR IGNORE INTO stripe_events (id, at) VALUES (?, ?)").bind(eventId, nowMs()).run();
   return (r.meta?.changes ?? 0) > 0;
+}
+
+/** Release a claimed event id (see the webhook try/catch): a handler that threw
+ *  after `firstSeen` claimed the id must delete the row so Stripe's redelivery
+ *  is processed instead of short-circuited as a duplicate. Best-effort. */
+async function unmarkSeen(db: D1Database, eventId: string | undefined): Promise<void> {
+  if (!eventId) return;
+  await db.prepare("DELETE FROM stripe_events WHERE id = ?").bind(eventId).run().catch(() => undefined);
 }
 
 /** Mirror a connected account's capability flags onto tenant_settings. */
@@ -477,17 +501,43 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
   const now = nowIso();
   const specs = parseJson<{ feature: Budget["feature"]; days: number }[]>(pkg.budgets_json, []);
   const addOns = parseJson<{ addOnTypeId: string; quantity: number }[]>(pkg.addons_json, []);
-  const current = await db.prepare("SELECT id, budgets_json, addons_json FROM client_subscriptions WHERE client_id = ? AND status = 'active' ORDER BY started_at DESC LIMIT 1").bind(clientId).first<{ id: string; budgets_json: string | null; addons_json: string | null }>();
+
+  // Recurring purchase (a Stripe subscription): each subscription gets its OWN
+  // row keyed by stripe_sub_id, carrying its own package_id. Folding it into a
+  // pre-existing active row would drop the new sub id (COALESCE) and renew off
+  // the wrong package — the client would be charged monthly with no top-up.
+  if (subId) {
+    const bySub = await db.prepare("SELECT id, budgets_json, addons_json FROM client_subscriptions WHERE stripe_sub_id = ? LIMIT 1").bind(subId).first<{ id: string; budgets_json: string | null; addons_json: string | null }>();
+    if (bySub) {
+      // A redelivered checkout for this same sub (before firstSeen dedup) — top
+      // up its own runway rather than create a duplicate.
+      const existing = parseJson<Budget[]>(bySub.budgets_json, []);
+      const added = buildBudgetsForPurchase(existing, specs, now);
+      const balances = mergeAddOnBalances(parseJson(bySub.addons_json, []), addOns);
+      await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, payment_status = 'paid', stripe_checkout_id = COALESCE(?, stripe_checkout_id), updated_at = ? WHERE id = ?").bind(j([...existing, ...added]), j(balances), checkoutId, now, bySub.id).run();
+    } else {
+      await db.prepare(
+        "INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, ?, 'stripe', ?, ?, ?, ?)",
+      )
+        .bind(newId("csub"), tenantId, clientId, packageId, j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, subId, now, now)
+        .run();
+    }
+    return;
+  }
+
+  // One-time purchase: fold into the client's active NON-recurring runway (never
+  // a recurring row — that row belongs to its own Stripe subscription).
+  const current = await db.prepare("SELECT id, budgets_json, addons_json FROM client_subscriptions WHERE client_id = ? AND status = 'active' AND stripe_sub_id IS NULL ORDER BY started_at DESC LIMIT 1").bind(clientId).first<{ id: string; budgets_json: string | null; addons_json: string | null }>();
   if (current) {
     const existing = parseJson<Budget[]>(current.budgets_json, []);
     const added = buildBudgetsForPurchase(existing, specs, now);
     const balances = mergeAddOnBalances(parseJson(current.addons_json, []), addOns);
-    await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, payment_status = 'paid', stripe_checkout_id = COALESCE(?, stripe_checkout_id), stripe_sub_id = COALESCE(?, stripe_sub_id), updated_at = ? WHERE id = ?").bind(j([...existing, ...added]), j(balances), checkoutId, subId, now, current.id).run();
+    await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, payment_status = 'paid', stripe_checkout_id = COALESCE(?, stripe_checkout_id), updated_at = ? WHERE id = ?").bind(j([...existing, ...added]), j(balances), checkoutId, now, current.id).run();
   } else {
     await db.prepare(
       "INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, ?, 'stripe', ?, ?, ?, ?)",
     )
-      .bind(newId("csub"), tenantId, clientId, packageId, j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, subId, now, now)
+      .bind(newId("csub"), tenantId, clientId, packageId, j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, null, now, now)
       .run();
   }
 }
