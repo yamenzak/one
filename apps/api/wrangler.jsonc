@@ -27,7 +27,7 @@
   // 15-min tick: reminder/notification sweeps. Daily 00:10 UTC: monthly credit
   // grants + platform dunning lifecycle (SPEC §3). No domain cron — client
   // subscription expiry is derived at read time.
-  "triggers": { "crons": ["*/15 * * * *", "10 0 * * *"] },
+  "triggers": { "crons": ["*/15 * * * *", "10 0 * * *", "0 8 * * 1"] },
 
   "vars": {
     // Platform super-admin allowlist (separate axis from tenant RBAC).

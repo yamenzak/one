@@ -38,6 +38,7 @@ import { domainRoutes, domainAdminRoutes } from "./domain-routes.js";
 import type { Env } from "./env.js";
 
 import { notify, notifyOwners } from "./notify.js";
+import { runWeeklyDigest } from "./digest.js";
 
 export { TenantBillingDO } from "./billing-do.js";
 export { InboxDO } from "./inbox-do.js";
@@ -200,5 +201,6 @@ export default {
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     if (controller.cron === "10 0 * * *") await dailySweep(env);
     else if (controller.cron === "*/15 * * * *") await reminderSweep(env);
+    else if (controller.cron === "0 8 * * 1") await runWeeklyDigest(env);
   },
 } satisfies ExportedHandler<Env>;
