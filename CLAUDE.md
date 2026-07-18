@@ -35,14 +35,17 @@ packages/
 
 - `pnpm dev` — turbo: api (`wrangler dev` on :8787) + app (vite on :5173, proxies /api)
 - `pnpm typecheck` / `pnpm test` — across the workspace
-- `pnpm --filter @mossa/api test` — the Miniflare integration suite
+- `pnpm --filter @mossa/api test` — the Miniflare integration suite. **Build the
+  SPA first** (`pnpm --filter @mossa/app build`) — the worker's `assets` dir is
+  `apps/app/dist`, and Miniflare aborts (reporting "no tests") without it. The
+  root `pnpm test` handles this automatically (turbo builds the app first).
 - `pnpm --filter @mossa/app build` — build the SPA (the api worker serves `apps/app/dist`)
 
 **Local dev needs no Cloudflare account:** D1/KV/R2 are Miniflare-simulated, the
 AI suite falls back to a deterministic mock (`ai.mock` config), and the mailer
-logs OTP codes to the `wrangler dev` console. The `ai` binding is commented out
-in `wrangler.jsonc` because `wrangler dev` requires credentials for it —
-**uncomment it before the first remote deploy.**
+logs OTP codes to the `wrangler dev` console. The `ai` binding is enabled in
+`wrangler.jsonc`; for a fully credential-free `wrangler dev` you can re-comment
+it (the mock lane covers local dev either way).
 
 ## Architecture notes (read before changing these)
 
@@ -78,7 +81,7 @@ in `wrangler.jsonc` because `wrangler dev` requires credentials for it —
 ## Status
 
 Foundation through AI suite + commerce + content + reports + media are built and
-tested (77 tests). Recently added: **tenant custom domains** (Cloudflare for
+tested (96 domain + 83 API + protocol/pricing/normalizer tests). Recently added: **tenant custom domains** (Cloudflare for
 SaaS, white-label per domain — SPEC §14.1), **passkey autofill** on login
 (WebAuthn conditional UI), and the **vision suite** (Snap-a-Meal + Label Reader)
 on a real Gemini provider path (mock lane in dev), **InboxDO real-time

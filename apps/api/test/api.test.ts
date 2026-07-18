@@ -975,8 +975,12 @@ describe("access economy", () => {
     const subs = (await (await SELF.fetch(`http://x/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as {
       subscriptions: { daysRemaining: number; budgets: unknown[] }[];
     };
+    // Queue-not-sum: two 30-day grants → 60 days of runway, not 30 (pooled) and
+    // not 30-only. An `all` package splits per feature (workout + meal) so no
+    // feature is left with a coverage gap, so two grants yield 4 queued budgets
+    // (workout×2, meal×2) — the daysRemaining (60) is the queue-not-sum proof.
     expect(subs.subscriptions[0]!.daysRemaining).toBe(60);
-    expect(subs.subscriptions[0]!.budgets.length).toBe(2);
+    expect(subs.subscriptions[0]!.budgets.length).toBe(4);
   });
 });
 
@@ -1564,5 +1568,88 @@ describe("client preferences + body metrics + goal staleness", () => {
     await SELF.fetch(`http://x/api/clients/${id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ preferences: { targetWeightKg: 78, primaryGoal: "maintain", activityLevel: "light", workoutsPerWeek: 3, mealsPerDay: 3, workoutLocation: "home" } }) });
     const after = (await (await SELF.fetch(`http://x/api/today?clientId=${id}&date=2026-01-10`, { headers: H() })).json()) as { profile: { complete: boolean } };
     expect(after.profile.complete).toBe(true);
+  });
+});
+
+// The row-level security invariant (clients.ts requireClientAccess). The rest of
+// the suite authenticates as owners (the easy tenant-match lane); this exercises
+// the trainer lane — the one that must gate on a client_trainers assignment.
+describe("requireClientAccess — trainer assignment lane", () => {
+  it("a trainer reaches only ASSIGNED clients; an unassigned same-tenant client is 403", async () => {
+    const db = env.DB as D1Database;
+    // Studio One's tenant + a trainer user (created via their own org, then added
+    // to Studio One as a trainer member and switched into it).
+    const studioOne = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = studioOne.active.tenantId;
+    const trainerCookie = await signInFlow("trainer-lane@test.dev", "Trainer Lane Org");
+    const trainerUser = await db.prepare('SELECT id FROM "user" WHERE email = ?').bind("trainer-lane@test.dev").first<{ id: string }>();
+    await db.prepare('INSERT INTO "member" (id, organizationId, userId, role, createdAt) VALUES (?, ?, ?, ?, ?)')
+      .bind("mbr_trainer_lane", tenantId, trainerUser!.id, "trainer", "2026-01-01")
+      .run();
+
+    // Owner creates two clients; assigns the trainer to A only.
+    const mk = async (name: string) =>
+      ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ displayName: name }) })).json()) as { client: { id: string } }).client.id;
+    const clientA = await mk("Assigned");
+    const clientB = await mk("Unassigned");
+    await SELF.fetch(`http://x/api/clients/${clientA}/trainers`, { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ trainerUserId: trainerUser!.id }) });
+
+    // Trainer switches their active workspace to Studio One (membership required).
+    const sw = await SELF.fetch("http://x/api/context/switch", { method: "POST", headers: { "content-type": "application/json", ...auth(trainerCookie) }, body: JSON.stringify({ tenantId }) });
+    expect(sw.status).toBe(200);
+
+    // Assigned → 200; unassigned same-tenant → 403 (NOT 404 — the guard, not tenant scope).
+    expect((await SELF.fetch(`http://x/api/clients/${clientA}`, { headers: auth(trainerCookie) })).status).toBe(200);
+    expect((await SELF.fetch(`http://x/api/clients/${clientB}`, { headers: auth(trainerCookie) })).status).toBe(403);
+
+    // Roster scope: the trainer sees only the assigned client, not the whole tenant.
+    const roster = (await (await SELF.fetch("http://x/api/clients", { headers: auth(trainerCookie) })).json()) as { clients: { id: string }[] };
+    const ids = roster.clients.map((r) => r.id);
+    expect(ids).toContain(clientA);
+    expect(ids).not.toContain(clientB);
+  });
+});
+
+describe("billing DO — reserve/settle invariants", () => {
+  it("caps the charge at the hold, is idempotent on replay, and rejects when short", async () => {
+    const BILLING = (env as unknown as { BILLING: DurableObjectNamespace }).BILLING;
+    const stub = BILLING.get(BILLING.idFromName("do-invariant-tenant")) as unknown as {
+      bind: (t: string) => Promise<void>;
+      topUp: (c: number) => Promise<{ balance: number }>;
+      reserve: (e: number) => Promise<{ ok: boolean; hold?: string; available: number; needed?: number }>;
+      settle: (h: string, a: number) => Promise<{ balance: number }>;
+    };
+    await stub.bind("do-invariant-tenant");
+    await stub.topUp(100);
+    const h = await stub.reserve(60);
+    expect(h.ok).toBe(true);
+    // Actual overruns the estimate (100 > 60) — the charge is CAPPED at the hold,
+    // so the tenant is never driven past what was reserved (overspend invariant).
+    const settled = await stub.settle(h.hold!, 100);
+    expect(settled.balance).toBe(40);
+    // Replaying the same settle must not debit again (idempotent).
+    const replay = await stub.settle(h.hold!, 100);
+    expect(replay.balance).toBe(40);
+    // Reserve rejects when the estimate exceeds the available balance.
+    const broke = await stub.reserve(1000);
+    expect(broke.ok).toBe(false);
+    expect(broke.needed).toBe(1000);
+  });
+});
+
+describe("redemption codes — atomic over-redemption guard", () => {
+  it("a max_uses=1 code is spent once: a second client and a re-redeem both 409", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const mk = async (name: string) =>
+      ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: name }) })).json()) as { client: { id: string } }).client.id;
+    const a = await mk("RedeemA");
+    const b = await mk("RedeemB");
+    await SELF.fetch("http://x/api/redemption-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "ONESHOT1", daysToAdd: 10, maxUses: 1 }) });
+    // First client redeems it.
+    expect((await SELF.fetch("http://x/api/redeem", { method: "POST", headers: H, body: JSON.stringify({ clientId: a, code: "ONESHOT1" }) })).status).toBe(200);
+    // Second client can't — the single slot is spent.
+    expect((await SELF.fetch("http://x/api/redeem", { method: "POST", headers: H, body: JSON.stringify({ clientId: b, code: "ONESHOT1" }) })).status).toBe(409);
+    // The first client can't redeem twice either.
+    expect((await SELF.fetch("http://x/api/redeem", { method: "POST", headers: H, body: JSON.stringify({ clientId: a, code: "ONESHOT1" }) })).status).toBe(409);
   });
 });

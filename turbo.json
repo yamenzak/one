@@ -13,6 +13,13 @@
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
     },
+    "@mossa/api#test": {
+      "dependsOn": ["^build", "@mossa/app#build"],
+      "outputs": ["coverage/**"]
+    },
+    "@mossa/domain#build": { "outputs": [] },
+    "@mossa/protocol#build": { "outputs": [] },
+    "@mossa/ui#build": { "outputs": [] },
     "lint": {},
     "dev": {
       "cache": false,
