@@ -12,6 +12,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { type AppEnv, type AppContext, requireTenant } from "./auth-context.js";
 import { withinQuota } from "./billing-store.js";
+import { notify } from "./notify.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
 import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps } from "@mossa/domain";
@@ -399,6 +400,10 @@ export const clientRoutes = new Hono<AppEnv>()
     )
       .bind(access.client.id, body.data.trainerUserId, access.client.tenant_id, body.data.isPrimary ? 1 : 0, nowIso())
       .run();
+    // Tell the newly-assigned trainer they've got a new client.
+    if (body.data.trainerUserId !== c.get("user")?.id) {
+      await notify(c.env, { tenantId: access.client.tenant_id, userId: body.data.trainerUserId, category: "roster", type: "client_assigned", title: "You've been assigned a client", message: access.client.display_name, link: `/clients/${access.client.id}` });
+    }
     return c.json({ ok: true });
   })
 

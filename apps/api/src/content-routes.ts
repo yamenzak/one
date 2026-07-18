@@ -8,6 +8,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { type AppEnv, requireTenant } from "./auth-context.js";
+import { notify } from "./notify.js";
 import { hasFeature } from "./billing-store.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
@@ -179,6 +180,17 @@ export const contentHubRoutes = new Hono<AppEnv>()
     )
       .bind(parsed.data.status, publishedAt, nowIso(), c.req.param("id"), who.tenantId)
       .run();
+    // On publish of a client-assigned resource, notify each assigned client.
+    if (parsed.data.status === "published") {
+      const res = await c.env.DB.prepare("SELECT title, audience, assigned_json FROM resources WHERE id = ? AND tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ title: string; audience: string; assigned_json: string | null }>();
+      const ids = res?.audience === "assigned" ? parseJson<string[]>(res.assigned_json, []) : [];
+      if (ids.length) {
+        const rows = await c.env.DB.prepare(`SELECT user_id FROM clients WHERE id IN (${ids.map(() => "?").join(",")}) AND tenant_id = ?`).bind(...ids, who.tenantId).all<{ user_id: string | null }>();
+        for (const r of rows.results ?? []) {
+          if (r.user_id) await notify(c.env, { tenantId: who.tenantId, userId: r.user_id, category: "content", type: "content_assigned", title: "Your coach shared something with you", message: res!.title, link: "/explore" });
+        }
+      }
+    }
     return c.json({ ok: true });
   })
 

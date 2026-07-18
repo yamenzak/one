@@ -352,12 +352,12 @@ describe("notifications — email provider + per-user preferences", () => {
     const prefs0 = (await (await SELF.fetch("http://x/api/notification-prefs", { headers: auth(ownerCookie) })).json()) as { categories: { key: string }[]; prefs: Record<string, { inbox: boolean; email: boolean }> };
     expect(prefs0.categories.some((c) => c.key === "billing")).toBe(true);
     expect(prefs0.categories.some((c) => c.key === "commerce")).toBe(false); // client-only
-    expect(prefs0.prefs["check-ins"].email).toBe(false); // coach default: digest-only
+    expect(prefs0.prefs["check-ins"]!.email).toBe(false); // coach default: digest-only
 
     // Turn coach check-in emails on; the change round-trips.
     await SELF.fetch("http://x/api/notification-prefs", { method: "PATCH", headers: H, body: JSON.stringify({ "check-ins": { email: true } }) });
     const prefs1 = (await (await SELF.fetch("http://x/api/notification-prefs", { headers: auth(ownerCookie) })).json()) as { prefs: Record<string, { email: boolean }> };
-    expect(prefs1.prefs["check-ins"].email).toBe(true);
+    expect(prefs1.prefs["check-ins"]!.email).toBe(true);
   });
 });
 

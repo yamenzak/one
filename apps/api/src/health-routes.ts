@@ -72,6 +72,9 @@ export const healthRoutes = new Hono<AppEnv>()
     )
       .bind(id, who.tenantId, access.client.id, who.userId, d.name, d.brand ?? null, d.kind, d.dose ?? null, j(d.schedule), d.notes ?? null, d.startDate ?? null, d.endDate ?? null, nowIso())
       .run();
+    if (access.client.user_id) {
+      await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, category: "labs", type: "supplement_added", title: "New supplement added", message: `${d.name}${d.dose ? ` — ${d.dose}` : ""}`, link: "/wellness" });
+    }
     return c.json({ ok: true, id }, 201);
   })
 
@@ -239,6 +242,10 @@ export const healthRoutes = new Hono<AppEnv>()
     await c.env.DB.prepare(`UPDATE lab_tests SET ${sets.join(", ")} WHERE id = ? AND tenant_id = ?`)
       .bind(...binds, c.req.param("id"), who.tenantId)
       .run();
+    if (d.status === "reviewed") {
+      const lab = await c.env.DB.prepare("SELECT c.user_id AS user_id, l.display_name AS name FROM lab_tests l JOIN clients c ON c.id = l.client_id WHERE l.id = ? AND l.tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ user_id: string | null; name: string | null }>();
+      if (lab?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: lab.user_id, category: "labs", type: "lab_reviewed", title: "Your coach reviewed your lab results", message: lab.name ?? "", link: "/progress" });
+    }
     return c.json({ ok: true });
   })
 

@@ -12,6 +12,7 @@ import { WorkoutBody, MealBody, stripBodyForTemplate } from "@mossa/protocol";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { requireClientFlag } from "./client-flags.js";
+import { notify } from "./notify.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
 
@@ -177,6 +178,10 @@ function makePlanRoutes(kind: Kind): Hono<AppEnv> {
         ).bind(now, goal?.targets_json ?? null, now, row.id),
       ]);
       const updated = await c.env.DB.prepare(`SELECT * FROM ${table} WHERE id = ?`).bind(row.id).first<PlanRow>();
+      // Let the client know a fresh plan dropped.
+      if (access.client.user_id) {
+        await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, category: "plans-goals", type: "plan_published", title: `Your new ${kind} plan is ready`, message: row.name, link: kind === "workout" ? "/train" : "/eat" });
+      }
       return c.json({ plan: planView(updated!) });
     })
 

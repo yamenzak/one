@@ -17,6 +17,7 @@ import {
 } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
+import { notify } from "./notify.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
 
@@ -131,5 +132,8 @@ export const goalRoutes = new Hono<AppEnv>()
         now,
       ),
     ]);
+    if (access.client.user_id) {
+      await notify(c.env, { tenantId: access.client.tenant_id, userId: access.client.user_id, category: "plans-goals", type: "goal_set", title: "Your coach set a new goal", message: d.label, link: "/progress" });
+    }
     return c.json({ ok: true, id, targets, derivation }, 201);
   });

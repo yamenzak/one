@@ -10,6 +10,7 @@ import { remainingAddOnQuantity, type AddOnBalance } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { hasFeature } from "./billing-store.js";
 import { requireClientAccess } from "./clients.js";
+import { notify } from "./notify.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
 
@@ -66,6 +67,9 @@ export const sessionRoutes = new Hono<AppEnv>()
     await c.env.DB.prepare("INSERT INTO trainer_sessions (id, tenant_id, client_id, trainer_user_id, subscription_id, addon_type_id, scheduled_at, duration_minutes, status, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?)")
       .bind(id, who.tenantId, access.client.id, who.userId, sub?.id ?? null, b.data.addOnTypeId, b.data.scheduledAt, b.data.durationMinutes, b.data.notes ?? null, nowIso())
       .run();
+    if (access.client.user_id) {
+      await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, category: "sessions", type: "session_booked", title: "Session booked", message: new Date(b.data.scheduledAt).toLocaleString(), link: "/wellness" });
+    }
     return c.json({ ok: true, id }, 201);
   })
 
@@ -75,7 +79,7 @@ export const sessionRoutes = new Hono<AppEnv>()
     if (!staff(c)) return c.json({ error: "forbidden" }, 403);
     const b = z.object({ status: z.enum(["scheduled", "completed", "cancelled", "no_show"]) }).safeParse(await c.req.json().catch(() => null));
     if (!b.success) return c.json({ error: "invalid body" }, 400);
-    const row = await c.env.DB.prepare("SELECT * FROM trainer_sessions WHERE id = ? AND tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ status: string; subscription_id: string | null; addon_type_id: string }>();
+    const row = await c.env.DB.prepare("SELECT * FROM trainer_sessions WHERE id = ? AND tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ status: string; subscription_id: string | null; addon_type_id: string; client_id: string; scheduled_at: string }>();
     if (!row) return c.json({ error: "not found" }, 404);
 
     const consume = row.status !== "completed" && b.data.status === "completed";
@@ -92,6 +96,10 @@ export const sessionRoutes = new Hono<AppEnv>()
     await c.env.DB.prepare("UPDATE trainer_sessions SET status = ?, completed_at = ? WHERE id = ?")
       .bind(b.data.status, b.data.status === "completed" ? nowIso() : null, c.req.param("id"))
       .run();
+    if ((b.data.status === "cancelled" || b.data.status === "no_show") && row.status !== b.data.status) {
+      const cl = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null }>();
+      if (cl?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: cl.user_id, category: "sessions", type: "session_cancelled", title: "Your session was cancelled", message: new Date(row.scheduled_at).toLocaleString(), link: "/wellness" });
+    }
     return c.json({ ok: true });
   });
 
