@@ -33,6 +33,14 @@ export function isPlatformHost(hostname: string, env: { BETTER_AUTH_URL?: string
   return hostname === platform;
 }
 
+/** Drop the cached host→tenant resolution for a hostname. Call this whenever a
+ *  domain is (de)activated or a tenant's branding changes, so the 60s TTL isn't
+ *  the only path back to correctness (a deactivated domain must stop routing at
+ *  once, not up to a minute later). Best-effort. */
+export async function invalidateHostCache(env: { CACHE?: KVNamespace }, hostname: string): Promise<void> {
+  if (env.CACHE && hostname) await env.CACHE.delete(`host:${hostname}`).catch(() => undefined);
+}
+
 /** How long a host→tenant resolution is cached in KV. The mapping is near-static
  *  (a domain is activated once), so a short TTL keeps every branded-domain
  *  request from paying 3 serial D1 reads while staying fresh within a minute. */

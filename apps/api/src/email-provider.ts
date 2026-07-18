@@ -100,7 +100,7 @@ export async function sendTenantEmail(env: Env, tenantId: string, msg: EmailMsg)
   }
   const platformFrom = conf["email.platform_from"] || "Mossa <noreply@fourdegreelabs.com>";
   const from = msg.brandName ? `${msg.brandName} <${bareAddress(platformFrom)}>` : platformFrom;
-  const result = await sendEmail(env.DB, msg, env.EMAIL, from);
+  const result = await sendEmail(env.DB, msg, env.EMAIL, from, env.ENVIRONMENT === "development");
   // Refund the metered credit if the send didn't actually go out — a charged-but-
   // failed email should never silently spend a tenant's credits.
   if (dobj && !result.ok) {

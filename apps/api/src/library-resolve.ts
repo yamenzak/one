@@ -72,8 +72,11 @@ export async function resolveFoodId(
 // ── Exercises ────────────────────────────────────────────────────────────────
 
 async function importExercise(db: D1Database, tenantId: string, userId: string, e: NormExercise): Promise<string> {
-  const existing = await db.prepare("SELECT id FROM exercises WHERE source = ? AND source_id = ?").bind(e.source, e.sourceId).first<{ id: string }>();
-  if (existing) { await db.prepare("UPDATE exercises SET active = 1 WHERE id = ?").bind(existing.id).run(); return existing.id; }
+  // Tenant-scoped dedup: reuse THIS tenant's copy or a shared global (tenant NULL)
+  // one — never bind to another tenant's row (that both leaks a dangling ref and
+  // lets us write into their data). Prefer the tenant's own row over the global.
+  const existing = await db.prepare("SELECT id FROM exercises WHERE source = ? AND source_id = ? AND (tenant_id = ? OR tenant_id IS NULL) ORDER BY tenant_id IS NULL LIMIT 1").bind(e.source, e.sourceId, tenantId).first<{ id: string }>();
+  if (existing) { await db.prepare("UPDATE exercises SET active = 1 WHERE id = ? AND tenant_id = ?").bind(existing.id, tenantId).run(); return existing.id; }
   const id = newId("exr");
   const force = e.force === "push" || e.force === "pull" || e.force === "static" ? e.force : null;
   const diff = ["beginner", "intermediate", "advanced"].includes(e.difficulty ?? "") ? e.difficulty : e.difficulty === "expert" ? "advanced" : null;

@@ -43,6 +43,7 @@ export async function sendEmail(
   msg: { to: string; subject: string; html?: string; text?: string },
   binding?: SendEmailBinding,
   fromOverride?: string,
+  isDev = false,
 ): Promise<SendResult> {
   const cfg = await getEmailConfig(db);
   const from = fromOverride || cfg.from;
@@ -60,7 +61,11 @@ export async function sendEmail(
       return { ok: false, error: String(err) };
     }
   }
-  // Mock: log so devs can read the OTP from `wrangler dev` output.
+  // Mock: DEV ONLY. It logs the message body (incl. sign-in OTPs) so devs can
+  // read the code from `wrangler dev`. In production this must fail closed — a
+  // deploy left on `mock` must not (a) write the sole auth factor to retained
+  // Workers logs or (b) silently "succeed" without delivering. Surface it.
+  if (!isDev) return { ok: false, error: "mock email provider is disabled outside development — configure a real provider" };
   console.log(`[mail:mock] to=${msg.to} subject="${msg.subject}" text="${msg.text ?? ""}"`);
   return { ok: true, mocked: true };
 }

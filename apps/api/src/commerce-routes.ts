@@ -333,33 +333,41 @@ export const commerceRoutes = new Hono<AppEnv>()
       return c.json({ error: "code fully used" }, 409);
     }
 
-    const current = await c.env.DB.prepare(
-      "SELECT * FROM client_subscriptions WHERE client_id = ? AND status IN ('active','expired') ORDER BY started_at DESC LIMIT 1",
-    )
-      .bind(access.client.id)
-      .first<SubRow>();
-
-    // buildBudgetsForPurchase (not buildRedemptionBudget) so an `all` code splits
-    // per feature and never leaves a covered feature with a gap.
+    // Grant the days. If this write fails after we've consumed the slot + claim,
+    // COMPENSATE (release the slot and the claim) so a retry redeems cleanly —
+    // otherwise a transient D1 error would strand the client (slot burned, claim
+    // held, no days). buildBudgetsForPurchase (not buildRedemptionBudget) so an
+    // `all` code splits per feature and never leaves a covered feature with a gap.
     const codeSpec = [{ feature: code.target_feature, days: code.days_to_add }];
-    if (current) {
-      const budgets = parseJson<Budget[]>(current.budgets_json, []);
-      budgets.push(...buildBudgetsForPurchase(budgets, codeSpec, now));
-      await c.env.DB.prepare(
-        "UPDATE client_subscriptions SET budgets_json = ?, status = 'active', updated_at = ? WHERE id = ?",
+    try {
+      const current = await c.env.DB.prepare(
+        "SELECT * FROM client_subscriptions WHERE client_id = ? AND status IN ('active','expired') ORDER BY started_at DESC LIMIT 1",
       )
-        .bind(j(budgets), now, current.id)
-        .run();
-    } else {
-      await c.env.DB.prepare(
-        `INSERT INTO client_subscriptions (id, tenant_id, client_id, status, payment_status, budgets_json, addons_json, source, started_at, updated_at)
-         VALUES (?, ?, ?, 'active', 'none', ?, '[]', 'redemption', ?, ?)`,
-      )
-        .bind(
-          newId("csub"), who.tenantId, access.client.id,
-          j(buildBudgetsForPurchase([], codeSpec, now)), now, now,
+        .bind(access.client.id)
+        .first<SubRow>();
+      if (current) {
+        const budgets = parseJson<Budget[]>(current.budgets_json, []);
+        budgets.push(...buildBudgetsForPurchase(budgets, codeSpec, now));
+        await c.env.DB.prepare(
+          "UPDATE client_subscriptions SET budgets_json = ?, status = 'active', updated_at = ? WHERE id = ?",
         )
-        .run();
+          .bind(j(budgets), now, current.id)
+          .run();
+      } else {
+        await c.env.DB.prepare(
+          `INSERT INTO client_subscriptions (id, tenant_id, client_id, status, payment_status, budgets_json, addons_json, source, started_at, updated_at)
+           VALUES (?, ?, ?, 'active', 'none', ?, '[]', 'redemption', ?, ?)`,
+        )
+          .bind(
+            newId("csub"), who.tenantId, access.client.id,
+            j(buildBudgetsForPurchase([], codeSpec, now)), now, now,
+          )
+          .run();
+      }
+    } catch (err) {
+      await c.env.DB.prepare("UPDATE redemption_codes SET used_count = used_count - 1 WHERE id = ? AND used_count > 0").bind(code.id).run().catch(() => undefined);
+      await c.env.DB.prepare("DELETE FROM redemption_uses WHERE code_id = ? AND client_id = ?").bind(code.id, access.client.id).run().catch(() => undefined);
+      throw err;
     }
     // Mirror the client into used_by_json for display (atomic append via
     // json_insert — no lost write). The slot count was already consumed above.

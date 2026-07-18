@@ -8,8 +8,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { sanitizePermissions } from "@mossa/domain";
-import { type AppEnv, requireTenant } from "./auth-context.js";
-import { j } from "./db.js";
+import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
+import { j, parseJson } from "./db.js";
 
 const ROLES = ["owner", "trainer", "assistant", "client"] as const;
 
@@ -27,7 +27,7 @@ export const memberRoutes = new Hono<AppEnv>()
         id: r.id,
         userId: r.userId,
         role: r.role,
-        customGrant: r.permissions_json ? sanitizePermissions(JSON.parse(r.permissions_json)) : null,
+        customGrant: r.permissions_json ? sanitizePermissions(parseJson(r.permissions_json, {})) : null,
         name: r.name,
         email: r.email,
       })),
@@ -38,6 +38,13 @@ export const memberRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const body = z.object({ role: z.enum(ROLES) }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
+    // Only an actual owner (or platform admin) may HAND OUT the owner role. The
+    // route is gated by member:update, which an owner can custom-grant to staff —
+    // without this a trainer/assistant holding that grant could PATCH their own
+    // role to owner (full billing/settings/staff control) and self-escalate.
+    if (body.data.role === "owner" && c.get("role") !== "owner" && !isPlatformAdmin(c)) {
+      return c.json({ error: "only an owner can assign the owner role" }, 403);
+    }
     // Protect the last owner.
     if (body.data.role !== "owner") {
       const target = await c.env.DB.prepare(

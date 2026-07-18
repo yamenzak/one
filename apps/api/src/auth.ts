@@ -136,6 +136,8 @@ export function createAuth(env: Env, origin?: string) {
               text: `Your Mossa code is ${otp} (expires in 10 minutes).`,
             },
             env.EMAIL,
+            undefined,
+            env.ENVIRONMENT === "development",
           ).catch(() => undefined);
         },
       }),

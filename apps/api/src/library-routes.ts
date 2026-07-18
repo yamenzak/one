@@ -211,7 +211,9 @@ export const libraryRoutes = new Hono<AppEnv>()
     const id = c.req.param("id");
     const other = c.req.param("otherId");
     const [a, b] = id < other ? [id, other] : [other, id];
-    await c.env.DB.prepare("DELETE FROM exercise_alternatives WHERE exercise_a = ? AND exercise_b = ? AND (tenant_id = ? OR tenant_id IS NULL)").bind(a, b, who.tenantId).run();
+    // Own-tenant only: a tenant must not delete a platform-seed (global) pairing
+    // shared by every tenant.
+    await c.env.DB.prepare("DELETE FROM exercise_alternatives WHERE exercise_a = ? AND exercise_b = ? AND tenant_id = ?").bind(a, b, who.tenantId).run();
     return c.json({ ok: true });
   })
 
