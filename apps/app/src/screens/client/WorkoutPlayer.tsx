@@ -3,13 +3,13 @@
  * client-side Epley PR detection. Premium, animated.
  */
 
-import { useCallback, useEffect, useMemo, useState, Fragment, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Fragment, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet } from "@mossa/protocol";
 import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, type ExerciseBests } from "@mossa/domain";
 import {
   Button, Card, Badge, Field, Sheet, SubCard, ProgressRing, EmptyState,
-  Reveal, SkeletonLine, SkeletonList,
+  Reveal, SkeletonLine, SkeletonList, useModalOverlay,
   ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, LifeBuoy, cn,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
@@ -58,12 +58,17 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
     setDayIndex(training >= 0 ? training : 0);
   }, [tourActive, plan]);
 
+  // Guards stale writes when clientId/date change mid-flight (fast client swap
+  // in coach view): only the newest request is allowed to commit its result.
+  const reqRef = useRef(0);
   const load = useCallback(async () => {
+    const rid = ++reqRef.current;
     const [plansRes, exRes, sessRes] = await Promise.all([
       api.get<{ plans: PlanRow[] }>(`/api/workout-plans?clientId=${clientId}`),
       api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all"),
       api.get<{ sessions: { entries: SessionEntry[] }[] }>(`/api/logs/workout-sessions?clientId=${clientId}&from=${date}&to=${date}`),
     ]);
+    if (rid !== reqRef.current) return;
     setPlan(plansRes.plans.find((p) => p.status === "published") ?? null);
     setAllPlans(plansRes.plans);
     setExercises(new Map(exRes.exercises.map((e) => [e.id, e])));
@@ -73,7 +78,14 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   }, [clientId, date]);
   useEffect(() => void load(), [load, tourActive]); // reload through the api interceptor when a tour toggles
 
+  // On a client switch, clear the previous client's plan/session/bests so their
+  // data can't linger under the new client while the reload is in flight.
   useEffect(() => {
+    setPlan(null); setAllPlans([]); setSession(new Map()); setBests(new Map()); setViewId(null);
+  }, [clientId]);
+
+  useEffect(() => {
+    let alive = true;
     void api.get<{ sessions: { entries: SessionEntry[] }[] }>(`/api/logs/workout-sessions?clientId=${clientId}&from=2000-01-01&to=${date}`).then((r) => {
       const map = new Map<string, ExerciseBests>();
       for (const s of r.sessions) for (const e of s.entries) {
@@ -81,8 +93,9 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
         for (const set of e.sets) b = detectPrs(b, set).bests;
         map.set(e.exerciseId, b);
       }
-      setBests(map);
+      if (alive) setBests(map);
     });
+    return () => { alive = false; };
   }, [clientId, date]);
 
   const recommendedDay = useMemo(() => {
@@ -101,7 +114,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   const pickPlan = (id: string | null) => { setViewId(id); setHistOpen(false); };
 
   if (!plan) return (
-    <PlanShell>
+    <PlanShell onEscape={onExit}>
       <HeaderBar title="Workout plan" onBack={onExit} />
       <div className="mx-auto max-w-xl p-4"><EmptyState icon={Dumbbell} title="No published plan" description="Your coach hasn't published a workout plan yet." /></div>
     </PlanShell>
@@ -110,7 +123,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   if (dayIndex === null) {
     const trainingDays = active ? active.body.days.filter((d) => !d.isRestDay).length : 0;
     return (
-      <PlanShell>
+      <PlanShell onEscape={onExit}>
         <HeaderBar title={isPast ? "Past plan" : "Workout plan"} subtitle={active?.name} onBack={onExit}
           right={
             <div className="flex items-center gap-2">
@@ -242,7 +255,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   });
 
   return (
-    <PlanShell>
+    <PlanShell onEscape={() => setDayIndex(null)}>
       <HeaderBar title={day.name || `Day ${dayIndex + 1}`} subtitle={`${loggedSets} of ${totalSets} set${totalSets === 1 ? "" : "s"} logged`} onBack={() => setDayIndex(null)}
         right={<span data-tour="wp-progress"><ProgressRing progress={totalSets ? loggedSets / totalSets : 0} size={40} strokeWidth={5} tone="activity" value={<span className="text-xs font-semibold">{loggedSets}</span>} /></span>} />
 
@@ -357,9 +370,10 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
 /** Full-screen focused plan overlay — covers the app chrome (top bar + tab bar)
  *  and owns its own scroll, exactly like the meal-plan drawer, so a plan is a
  *  distraction-free surface rather than a page inside the shell. */
-function PlanShell({ children }: { children: ReactNode }) {
+function PlanShell({ children, onEscape }: { children: ReactNode; onEscape?: () => void }) {
+  const ref = useModalOverlay(onEscape);
   return (
-    <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-background">
+    <motion.div ref={ref} role="dialog" aria-modal="true" aria-label="Workout plan" tabIndex={-1} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-background outline-none">
       {children}
     </motion.div>
   );

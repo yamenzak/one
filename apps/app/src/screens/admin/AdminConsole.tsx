@@ -1,7 +1,7 @@
 /** Platform admin console — tenants (comp/topup/seed), Stripe config. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Sheet, Skeleton, Reveal, SkeletonLine, SegmentedControl, Switch, Chip, Page, Stagger, ShieldCheck, Sparkles, ArrowLeft, KeyRound, Globe, cn, LayoutGrid } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, Reveal, SkeletonLine, SegmentedControl, Switch, Chip, Page, Stagger, ConfirmDialog, ShieldCheck, Sparkles, ArrowLeft, KeyRound, Globe, Gift, cn, LayoutGrid } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Tenant { id: string; name: string; slug: string; plan_id: string | null; status: string | null; comp: number | null }
@@ -321,6 +321,7 @@ function Tenants() {
   const [topUpId, setTopUpId] = useState<string | null>(null);
   const [credits, setCredits] = useState("");
   const [gift, setGift] = useState<{ id: string; name: string } | null>(null);
+  const [compTarget, setCompTarget] = useState<{ id: string; name: string; planId: string } | null>(null);
   const load = useCallback(async () => setTenants((await api.get<{ tenants: Tenant[] }>("/api/admin/tenants")).tenants), []);
   useEffect(() => void load(), [load]);
 
@@ -348,13 +349,21 @@ function Tenants() {
         <Card key={t.id} className="space-y-2.5">
           <div className="flex items-center justify-between"><div><div className="font-semibold">{t.name}</div><div className="text-xs text-muted-foreground">/{t.slug}</div></div><Badge tone={t.comp ? "sleep" : t.status === "active" ? "success" : "neutral"}>{t.comp ? "comped " : ""}{t.plan_id ?? "free"}</Badge></div>
           <div className="flex flex-wrap gap-2">
-            {PLANS.map((p) => <button key={p} disabled={busy === t.id} onClick={() => void comp(t.id, p)} className="rounded-full bg-secondary px-3 py-1 text-xs capitalize transition-all active:scale-95 hover:bg-surface-3">{p}</button>)}
+            {PLANS.map((p) => <button key={p} disabled={busy === t.id} onClick={() => setCompTarget({ id: t.id, name: t.name, planId: p })} className="rounded-full bg-secondary px-3 py-1 text-xs capitalize transition-all active:scale-95 hover:bg-surface-3">{p}</button>)}
             <button onClick={() => setTopUpId(t.id)} className="rounded-full bg-primary/15 px-3 py-1 text-xs text-primary transition-transform active:scale-95">+ credits</button>
-            <button onClick={() => setGift({ id: t.id, name: t.name })} className="rounded-full bg-primary/15 px-3 py-1 text-xs text-primary transition-transform active:scale-95">🎁 gift</button>
+            <button onClick={() => setGift({ id: t.id, name: t.name })} className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-3 py-1 text-xs text-primary transition-transform active:scale-95 [&_svg]:size-3.5"><Gift /> gift</button>
           </div>
         </Card>
       ))}
       {gift && <GiftSheet tenantId={gift.id} name={gift.name} onClose={() => setGift(null)} />}
+      <ConfirmDialog
+        open={!!compTarget}
+        onOpenChange={(o) => !o && setCompTarget(null)}
+        title={compTarget ? `Comp ${compTarget.name} to ${compTarget.planId}?` : "Comp plan?"}
+        description="This immediately moves the tenant onto this plan as a comp — no charge. It takes effect right away."
+        confirmLabel="Comp plan"
+        onConfirm={() => { if (compTarget) void comp(compTarget.id, compTarget.planId); }}
+      />
       <Sheet open={!!topUpId} onClose={() => setTopUpId(null)} title="Add credits">
         <div className="space-y-4">
           <Field label="Credits to add" inputMode="numeric" value={credits} onChange={(e) => setCredits(e.target.value.replace(/\D/g, ""))} autoFocus />

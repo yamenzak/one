@@ -16,7 +16,7 @@ import { useUnits } from "../units.js";
 import { useSession } from "../session.js";
 import { PreferencesEditorCard } from "./PreferencesEditor.js";
 import { useTheme } from "../theme.js";
-import { api } from "../api.js";
+import { api, uploadMedia } from "../api.js";
 import { enrollPasskey, listPasskeys, passkeySupported } from "../passkey.js";
 import { AiConfigSection } from "./AiSettings.js";
 
@@ -263,10 +263,16 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
   const set = (patch: Partial<ClientProfile>) => setP((c) => (c ? { ...c, ...patch } : c));
   const hFt = p?.heightCm != null ? cmToFeetInches(p.heightCm) : null;
   const uploadAvatar = async (file: File) => {
-    const fd = new FormData(); fd.append("file", file); fd.append("purpose", "avatar");
-    const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
-    const { key } = (await up.json()) as { key?: string };
-    if (key) { const url = `/api/media/${key}`; await api.post(`/api/clients/${clientId}/avatar`, { avatarUrl: url }); set({ avatarUrl: url, avatarSeed: null }); onSaved(); }
+    setMsg(null);
+    try {
+      const key = await uploadMedia(file, "avatar");
+      const url = `/api/media/${key}`;
+      await api.post(`/api/clients/${clientId}/avatar`, { avatarUrl: url });
+      set({ avatarUrl: url, avatarSeed: null });
+      onSaved();
+    } catch {
+      setMsg("Couldn't upload that image — try again.");
+    }
   };
   const save = async () => {
     if (!p) return; setSaving(true); setMsg(null);

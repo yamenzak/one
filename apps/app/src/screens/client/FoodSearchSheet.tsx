@@ -19,6 +19,10 @@ import { FoodEditor, type EditableFood } from "./FoodEditor.js";
 /** A food the vision model detected in a snapped meal (pre-log, reviewable). */
 interface SnapEntry { label: string; mealType?: string; calories: number; proteinG: number; carbsG: number; fatG: number; quantity?: number | null; unit?: string | null }
 
+/** A stable client-side id — for keying editable/removable rows without
+ *  falling back to array indices (which shift when rows are deleted). */
+const uid = (): string => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
+
 interface Food {
   id?: string; name: string; brand?: string | null; description?: string | null;
   serving_size?: number; servingSize?: number; serving_unit?: string; servingUnit?: string;
@@ -288,7 +292,8 @@ function SnapReview({ entries, note, defaultMeal, units, onCancel, onRetake, onC
   entries: SnapEntry[]; note: string | null; defaultMeal: string; units: UnitPrefs;
   onCancel: () => void; onRetake: () => void; onConfirm: (items: SnapEntry[], mealType: string) => Promise<void>;
 }) {
-  const [items, setItems] = useState<SnapEntry[]>(entries);
+  // Each row carries a stable `_key` so removing one doesn't rekey the rest.
+  const [items, setItems] = useState<(SnapEntry & { _key: string })[]>(() => entries.map((e) => ({ ...e, _key: uid() })));
   const [meal, setMeal] = useState(defaultMeal);
   const [busy, setBusy] = useState(false);
   const totals = items.reduce((t, e) => ({ calories: t.calories + e.calories, proteinG: t.proteinG + e.proteinG, carbsG: t.carbsG + e.carbsG, fatG: t.fatG + e.fatG }), { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 });
@@ -313,12 +318,12 @@ function SnapReview({ entries, note, defaultMeal, units, onCancel, onRetake, onC
         </div>
 
         <div className="space-y-1.5">
-          {items.map((e, i) => (
-            <div key={i} className="rounded-xl bg-surface-2 px-3 py-2.5">
+          {items.map((e) => (
+            <div key={e._key} className="rounded-xl bg-surface-2 px-3 py-2.5">
               <FoodRow
                 {...normFood(e)}
                 sub={e.quantity ? `${Math.round(e.quantity)} ${e.unit ?? "g"}` : undefined}
-                trailing={<button onClick={() => setItems((xs) => xs.filter((_, j) => j !== i))} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:text-danger [&_svg]:size-4" aria-label={`Remove ${e.label}`}><X /></button>}
+                trailing={<button onClick={() => setItems((xs) => xs.filter((x) => x._key !== e._key))} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:text-danger [&_svg]:size-4" aria-label={`Remove ${e.label}`}><X /></button>}
               />
             </div>
           ))}

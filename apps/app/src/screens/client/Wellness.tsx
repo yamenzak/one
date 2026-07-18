@@ -14,7 +14,7 @@ import {
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList,
   ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Bed, Flame, Plus, ChevronRight, Smile, Upload, type Tone,
 } from "@mossa/ui";
-import { api, todayLocal } from "../../api.js";
+import { api, todayLocal, uploadMedia } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { LogSheet } from "./LogSheet.js";
 import { CheckInDetailSheet, LabDetailSheet, labStatus, isLabImage, type CheckInFull, type LabFull } from "./WellnessDetails.js";
@@ -354,6 +354,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
 function LabRow({ lab, clientId, onOpen, onUploaded }: { lab: LabFull; clientId: string; onOpen: () => void; onUploaded: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const canUpload = lab.status === "requested" || lab.status === "scheduled";
   const st = labStatus(lab.status);
   const thumb = lab.file_key && isLabImage(lab.file_key) ? `/api/media/${lab.file_key}` : null;
@@ -366,15 +367,15 @@ function LabRow({ lab, clientId, onOpen, onUploaded }: { lab: LabFull; clientId:
     : lab.status === "cancelled" ? "Cancelled by your coach"
     : "Tap for details";
   const upload = async (file: File) => {
-    setBusy(true);
+    setBusy(true); setErr(null);
     try {
-      const fd = new FormData(); fd.append("file", file); fd.append("purpose", "lab");
-      const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
-      const { key } = (await up.json()) as { key?: string };
-      if (key) { await api.post(`/api/labs/${lab.id}/upload`, { clientId, fileKey: key }); onUploaded(); }
-    } finally { setBusy(false); }
+      const key = await uploadMedia(file, "lab");
+      await api.post(`/api/labs/${lab.id}/upload`, { clientId, fileKey: key });
+      onUploaded();
+    } catch { setErr("Couldn't upload that result — try again."); } finally { setBusy(false); }
   };
   return (
+    <div>
     <Card interactive className="flex items-center gap-3 py-3">
       {thumb
         ? <img src={thumb} alt="" className="size-10 shrink-0 rounded-xl object-cover" />
@@ -392,5 +393,7 @@ function LabRow({ lab, clientId, onOpen, onUploaded }: { lab: LabFull; clientId:
         <Badge tone={lab.status === "reviewed" && flagged ? "danger" : st.tone}>{lab.status === "reviewed" && flagged ? `${flagged} flagged` : st.label}</Badge>
       )}
     </Card>
+    {err && <p className="mt-1 px-1 text-xs text-warning">{err}</p>}
+    </div>
   );
 }

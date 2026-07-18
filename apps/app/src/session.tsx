@@ -6,7 +6,17 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { SessionContext, TenantBranding } from "@mossa/protocol";
-import { api } from "./api.js";
+import { api, setUnauthorizedHandler } from "./api.js";
+
+/** Remove the app's own localStorage keys (mode, ambient/nav prefs, per-plan
+ *  shopping lists) — all `mossa`-prefixed — so nothing leaks across accounts. */
+function clearAppStorage(): void {
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith("mossa")) localStorage.removeItem(k);
+    }
+  } catch { /* private mode */ }
+}
 
 type Mode = "coach" | "train";
 
@@ -59,6 +69,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
+  // An expired cookie surfaces as a 401 on any data route. Clear the session so
+  // the app drops back to Login instead of showing blank screens / failing
+  // saves silently. Auth endpoints are excluded in the api layer (no loop).
+  useEffect(() => {
+    setUnauthorizedHandler(() => { setCtx(null); setLoading(false); });
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
   const setMode = useCallback((m: Mode) => {
     setModeState(m);
     localStorage.setItem("mossa-mode", m);
@@ -74,6 +92,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await api.post("/api/auth/sign-out").catch(() => undefined);
+    clearAppStorage();
     setCtx(null);
   }, []);
 

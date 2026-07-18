@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNod
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
-  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, LifeBuoy, toneVar, type TabDef, type Tone,
+  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, LifeBuoy, Spinner, toneVar, type TabDef, type Tone,
 } from "@mossa/ui";
 import { useSession, useActiveClientId } from "./session.js";
 import { useTheme } from "./theme.js";
@@ -66,6 +66,9 @@ export function Shell() {
     void api.get<{ client: { onboardingComplete: boolean } }>(`/api/clients/${gateClientId}`).then((r) => setNeedsOnboarding(!r.client.onboardingComplete)).catch(() => setNeedsOnboarding(false));
   }, [gateClientId]);
 
+  // Hold a boot screen until the onboarding check resolves — otherwise the full
+  // app renders for a frame before we know whether to show the intake wizard.
+  if (gateClientId && needsOnboarding === null) return <div className="grid min-h-dvh place-items-center"><Spinner /></div>;
   if (gateClientId && needsOnboarding) return <Onboarding clientId={gateClientId} displayName={ctx!.user.name || "there"} onDone={() => setNeedsOnboarding(false)} />;
 
   return (

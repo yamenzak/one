@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from "react";
 import { kcalToDisplay, displayToKcal, energyLabel, type UnitPrefs } from "@mossa/domain";
 import { FixedDrawer, Button, Field, Chip, SegmentedControl, cn, toneSoft, METRICS, Utensils, Barcode, ChevronDown, Sparkles, Globe, PencilLine, Search, Plus, X, ArrowLeft } from "@mossa/ui";
-import { api } from "../../api.js";
+import { api, uploadMedia } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
@@ -113,10 +113,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
   const scanLabel = async (file: File) => {
     setScanning(true); setErr(null);
     try {
-      const fd = new FormData(); fd.append("file", file); fd.append("purpose", "label");
-      const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
-      const { key } = (await up.json()) as { key?: string };
-      if (!key) throw new Error("upload failed");
+      const key = await uploadMedia(file, "label");
       const r = await api.post<{ food: Record<string, unknown> }>("/api/ai/label-reader", { imageKey: key });
       const g = r.food;
       const str = (v: unknown) => (v == null ? "" : String(v));
