@@ -15,7 +15,7 @@ import { z } from "zod";
 import { type AppEnv, requireTenant, requirePermission, isPlatformAdmin } from "./auth-context.js";
 import { setConfig, hasFeature } from "./billing-store.js";
 import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostname, type CustomHostname } from "./cloudflare.js";
-import { hostnameOf, isPlatformHost } from "./host-context.js";
+import { hostnameOf, isPlatformHost, invalidateHostCache } from "./host-context.js";
 import { nowIso } from "./ids.js";
 
 const HOSTNAME = z
@@ -42,12 +42,14 @@ function present(row: DomainRow) {
 }
 
 /** Fold a CF poll result into our row + return the derived status. */
-async function syncStatus(db: D1Database, row: DomainRow, ch: CustomHostname): Promise<string> {
+async function syncStatus(env: { DB: D1Database; CACHE?: KVNamespace }, row: DomainRow, ch: CustomHostname): Promise<string> {
   const status = ch.status === "active" && ch.sslStatus === "active" ? "active" : ch.errors.length ? "error" : "pending";
-  await db
+  await env.DB
     .prepare("UPDATE tenant_domains SET status = ?, ssl_status = ?, verify_name = ?, verify_value = ?, updated_at = ? WHERE hostname = ?")
     .bind(status, ch.sslStatus, ch.verify.name ?? row.verify_name, ch.verify.value ?? row.verify_value, nowIso(), row.hostname)
     .run();
+  // A status flip (esp. active→pending/error) must not linger in the host cache.
+  await invalidateHostCache(env, row.hostname);
   return status;
 }
 
@@ -74,7 +76,7 @@ export const domainRoutes = new Hono<AppEnv>()
     for (const row of rows) {
       if (cfg && row.cf_hostname_id && row.status !== "active") {
         const ch = await getCustomHostname(cfg, row.cf_hostname_id).catch(() => null);
-        if (ch) { row.status = await syncStatus(c.env.DB, row, ch); row.ssl_status = ch.sslStatus; if (ch.verify.name) { row.verify_name = ch.verify.name; row.verify_value = ch.verify.value; } }
+        if (ch) { row.status = await syncStatus(c.env, row, ch); row.ssl_status = ch.sslStatus; if (ch.verify.name) { row.verify_name = ch.verify.name; row.verify_value = ch.verify.value; } }
       }
       out.push(present(row));
     }
@@ -126,7 +128,7 @@ export const domainRoutes = new Hono<AppEnv>()
     const cfg = await saasConfig(c.env.DB);
     if (cfg && row.cf_hostname_id) {
       const ch = await getCustomHostname(cfg, row.cf_hostname_id).catch(() => null);
-      if (ch) { row.status = await syncStatus(c.env.DB, row, ch); row.ssl_status = ch.sslStatus; if (ch.verify.name) { row.verify_name = ch.verify.name; row.verify_value = ch.verify.value; } }
+      if (ch) { row.status = await syncStatus(c.env, row, ch); row.ssl_status = ch.sslStatus; if (ch.verify.name) { row.verify_name = ch.verify.name; row.verify_value = ch.verify.value; } }
     }
     return c.json({ domain: present(row) });
   })
@@ -141,6 +143,7 @@ export const domainRoutes = new Hono<AppEnv>()
     const cfg = await saasConfig(c.env.DB);
     if (cfg && row.cf_hostname_id) await deleteCustomHostname(cfg, row.cf_hostname_id);
     await c.env.DB.prepare("DELETE FROM tenant_domains WHERE hostname = ? AND tenant_id = ?").bind(row.hostname, who.tenantId).run();
+    await invalidateHostCache(c.env, row.hostname);
     return c.json({ ok: true });
   });
 

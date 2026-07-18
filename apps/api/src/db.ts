@@ -76,7 +76,13 @@ export function ensureSchema(db: D1Database): Promise<void> {
           // ── Workout system (SPEC §8.3) ─────────────────────────────────────
           "CREATE TABLE IF NOT EXISTS exercises (id TEXT PRIMARY KEY, tenant_id TEXT, visibility TEXT DEFAULT 'tenant', name TEXT, slug TEXT, muscle_groups TEXT, secondary_muscle_groups TEXT, equipment TEXT, difficulty TEXT, force TEXT, mechanic TEXT, category TEXT, instructions_md TEXT, thumb_url TEXT, thumb2_url TEXT, video_url TEXT, source TEXT, source_id TEXT, active INTEGER DEFAULT 1, created_by TEXT, created_at TEXT);",
           "CREATE INDEX IF NOT EXISTS idx_exercises_tenant ON exercises(tenant_id, active);",
-          "CREATE UNIQUE INDEX IF NOT EXISTS idx_exercises_source ON exercises(source, source_id) WHERE source_id IS NOT NULL;",
+          // Dedup is PER TENANT (+ shared globals), so the uniqueness must include
+          // tenant_id — a global (source, source_id) unique index made per-tenant
+          // copies impossible and forced imports to share one tenant's row. DROP
+          // the old global index and recreate scoped. (The new index is strictly
+          // more permissive, so this can't fail on existing data.)
+          "DROP INDEX IF EXISTS idx_exercises_source;",
+          "CREATE UNIQUE INDEX IF NOT EXISTS idx_exercises_source ON exercises(tenant_id, source, source_id) WHERE source_id IS NOT NULL;",
           "CREATE TABLE IF NOT EXISTS exercise_alternatives (exercise_a TEXT, exercise_b TEXT, PRIMARY KEY (exercise_a, exercise_b));",
           "CREATE TABLE IF NOT EXISTS workout_plans (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, name TEXT, description TEXT, status TEXT DEFAULT 'draft', published_at TEXT, target_goal_json TEXT, body_json TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
           "CREATE INDEX IF NOT EXISTS idx_wplans_client ON workout_plans(client_id, status);",

@@ -385,23 +385,28 @@ export const logRoutes = new Hono<AppEnv>()
   //    Today feed (last N days) and the day-history browser. ──────────────────
   .get("/activity-history", async (c) => {
     const clientId = c.req.query("clientId");
-    const from = c.req.query("from");
+    const fromRaw = c.req.query("from");
     const toRaw = c.req.query("to");
-    if (!clientId || !from || !toRaw) return c.json({ error: "clientId + from + to required" }, 400);
+    if (!clientId || !fromRaw || !toRaw) return c.json({ error: "clientId + from + to required" }, 400);
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
     const db = c.env.DB;
     const cid = access.client.id;
     // Bound the window span server-side (~13 months) so a wide range can't scan
-    // years of rows into memory. Anchor on `from` and pull `to` in — a far-future
-    // `to` (used to "catch everything recent") stays valid because recent rows
-    // sit just after `from`. The day-bucketed queries below use this clamped `to`.
+    // years of rows into memory. Anchor on the effective upper bound (min(to,
+    // today) — there are no future rows) and clamp `from` UP to that minus the
+    // span. This keeps the MOST RECENT window: a far-past `from` is pulled
+    // forward, and a far-future `to` still catches recent rows (unlike anchoring
+    // on `from`, which would drop everything after from+span).
     const MAX_SPAN_DAYS = 400;
-    const to = (() => {
-      const f = Date.parse(`${from}T00:00:00Z`);
-      if (Number.isNaN(f)) return toRaw;
-      const ceil = new Date(f + MAX_SPAN_DAYS * 86_400_000).toISOString().slice(0, 10);
-      return toRaw > ceil ? ceil : toRaw;
+    const to = toRaw;
+    const from = (() => {
+      const today = new Date().toISOString().slice(0, 10);
+      const upper = toRaw < today ? toRaw : today;
+      const u = Date.parse(`${upper}T00:00:00Z`);
+      if (Number.isNaN(u)) return fromRaw;
+      const floor = new Date(u - MAX_SPAN_DAYS * 86_400_000).toISOString().slice(0, 10);
+      return fromRaw < floor ? floor : fromRaw;
     })();
     const inRange = (day: string | null | undefined) => !!day && day >= from && day <= to;
     const dayOf = (ts: string | null | undefined) => (ts ? ts.slice(0, 10) : null);

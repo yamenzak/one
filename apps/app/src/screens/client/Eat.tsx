@@ -1,11 +1,11 @@
 /** Eat tab — the nutrition diary: intake vs target, meals, per-entry macros. */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fmtEnergy, fmtVolume, volumeDisplayToMl, kcalToDisplay } from "@mossa/domain";
 import {
-  Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MetricChip, ProgressRing, METRICS, toneSoft, Page, Stagger, EmptyState, motion,
+  Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MetricChip, ProgressRing, METRICS, toneSoft, Page, Stagger, EmptyState, motion, ConfirmDialog,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
-  Plus, Utensils, Croissant, Soup, Apple, Dumbbell, Droplet, Beef, Trash2, type LucideIcon,
+  Plus, Utensils, Croissant, Soup, Apple, Dumbbell, Droplet, Beef, Trash2, AlertTriangle, type LucideIcon,
 } from "@mossa/ui";
 import type { UnitPrefs } from "@mossa/domain";
 import { api, todayLocal } from "../../api.js";
@@ -42,21 +42,33 @@ export function Eat({ clientId }: { clientId: string }) {
   const [planOpen, setPlanOpen] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tour") === "meal");
   const [mealPlan, setMealPlan] = useState<{ name: string; meals: number; options: number } | null>(null);
   const [edit, setEdit] = useState<Entry | null>(null);
+  const [error, setError] = useState(false);
+  const reqRef = useRef(0);
   const units = useUnits();
   const date = todayLocal();
 
+  // Guards stale writes (fast client swap in coach view) and surfaces a load
+  // failure instead of stranding the screen on the skeleton forever.
   const load = useCallback(async () => {
-    const [e, today, wk, mp] = await Promise.all([
-      api.get<{ entries: Entry[] }>(`/api/logs/food?clientId=${clientId}&date=${date}`),
-      api.get<{ goal: { targets: Targets | null } | null }>(`/api/today?clientId=${clientId}&date=${date}`),
-      api.get<Week>(`/api/logs/nutrition/week?clientId=${clientId}&date=${date}`),
-      api.get<{ plans: { status: string; name: string; body?: { mealOptions?: { mealType: string }[] } }[] }>(`/api/meal-plans?clientId=${clientId}`).catch(() => ({ plans: [] })),
-    ]);
-    setEntries(e.entries); setTargets(today.goal?.targets ?? null);
-    setWeek(wk); setWaterMl(wk.days[wk.days.length - 1]?.waterMl ?? 0);
-    const published = mp.plans.find((p) => p.status === "published");
-    const opts = published?.body?.mealOptions ?? [];
-    setMealPlan(published ? { name: published.name, meals: new Set(opts.map((o) => o.mealType)).size, options: opts.length } : null);
+    const rid = ++reqRef.current;
+    setError(false);
+    try {
+      const [e, today, wk, mp] = await Promise.all([
+        api.get<{ entries: Entry[] }>(`/api/logs/food?clientId=${clientId}&date=${date}`),
+        api.get<{ goal: { targets: Targets | null } | null }>(`/api/today?clientId=${clientId}&date=${date}`),
+        api.get<Week>(`/api/logs/nutrition/week?clientId=${clientId}&date=${date}`),
+        api.get<{ plans: { status: string; name: string; body?: { mealOptions?: { mealType: string }[] } }[] }>(`/api/meal-plans?clientId=${clientId}`).catch(() => ({ plans: [] })),
+      ]);
+      if (rid !== reqRef.current) return;
+      setEntries(e.entries); setTargets(today.goal?.targets ?? null);
+      setWeek(wk); setWaterMl(wk.days[wk.days.length - 1]?.waterMl ?? 0);
+      const published = mp.plans.find((p) => p.status === "published");
+      const opts = published?.body?.mealOptions ?? [];
+      setMealPlan(published ? { name: published.name, meals: new Set(opts.map((o) => o.mealType)).size, options: opts.length } : null);
+    } catch {
+      if (rid !== reqRef.current) return;
+      setError(true);
+    }
   }, [clientId, date]);
   useEffect(() => void load(), [load]);
 
@@ -65,7 +77,9 @@ export function Eat({ clientId }: { clientId: string }) {
   const addWater = async (displayAmount: number) => {
     const ml = Math.round(volumeDisplayToMl(displayAmount, units));
     setWaterMl((w) => w + ml);
-    await api.post("/api/logs/water", { clientId, data: { date, amountMl: ml } });
+    // Roll the optimistic bump back if the write fails, so no phantom water sticks.
+    try { await api.post("/api/logs/water", { clientId, data: { date, amountMl: ml } }); }
+    catch { setWaterMl((w) => w - ml); }
   };
 
   const openLog = (meal?: string) => { setLogMeal(meal); setLogOpen(true); };
@@ -86,6 +100,9 @@ export function Eat({ clientId }: { clientId: string }) {
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       <h1 className="text-2xl font-bold tracking-tight">Eat</h1>
 
+      {error && !entries ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load your day" description="Something went wrong loading your diary. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
+      ) : (
       <Reveal loading={!entries} className="space-y-5" skeleton={
         <>
           <SkeletonHero height={104} />
@@ -233,6 +250,7 @@ export function Eat({ clientId }: { clientId: string }) {
         </>
         )}
       </Reveal>
+      )}
 
       {logOpen && <FoodSearchSheet clientId={clientId} mealType={logMeal} onClose={() => setLogOpen(false)} onLogged={() => void load()} />}
       {planOpen && <MealPlanDrawer clientId={clientId} onClose={() => setPlanOpen(false)} onLogged={() => void load()} />}
@@ -305,15 +323,20 @@ function EditEntrySheet({ entry, clientId, units, onClose, onSaved }: { entry: E
   const [qty, setQty] = useState(entry.quantity != null ? String(entry.quantity) : "");
   const [meal, setMeal] = useState(entry.meal_type);
   const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const scalable = entry.quantity != null && entry.quantity > 0;
-  const factor = scalable && qty ? Number(qty) / entry.quantity! : 1;
+  const qtyNum = Number(qty);
+  const qtyValid = !!qty && Number.isFinite(qtyNum) && qtyNum > 0;
+  const factor = scalable && qtyValid ? qtyNum / entry.quantity! : 1;
   const s = (v: number) => Math.round(v * factor);
 
   const save = async () => {
+    // A malformed quantity (e.g. "1.2.3" → NaN) must never reach the API.
+    if (scalable && qty && !qtyValid) return;
     setBusy(true);
     try {
       const body: Record<string, unknown> = { clientId, mealType: meal };
-      if (scalable && qty) { body.quantity = Number(qty); body.calories = s(entry.calories); body.proteinG = s(entry.protein_g); body.carbsG = s(entry.carbs_g); body.fatG = s(entry.fat_g); }
+      if (scalable && qtyValid) { body.quantity = qtyNum; body.calories = s(entry.calories); body.proteinG = s(entry.protein_g); body.carbsG = s(entry.carbs_g); body.fatG = s(entry.fat_g); }
       await api.patch(`/api/logs/food/${entry.id}`, body);
       onSaved(); onClose();
     } finally { setBusy(false); }
@@ -335,7 +358,7 @@ function EditEntrySheet({ entry, clientId, units, onClose, onSaved }: { entry: E
           </div>
         </div>
 
-        {scalable && <Field label={`Quantity (${entry.unit ?? "g"})`} inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d.]/g, ""))} />}
+        {scalable && <Field label={`Quantity (${entry.unit ?? "g"})`} inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1"))} />}
 
         <div>
           <div className="mb-1.5 text-sm text-muted-foreground">Meal</div>
@@ -343,10 +366,20 @@ function EditEntrySheet({ entry, clientId, units, onClose, onSaved }: { entry: E
         </div>
 
         <div className="flex gap-3">
-          <Button variant="ghost" className="text-danger" disabled={busy} onClick={() => void remove()}><Trash2 /> Delete</Button>
-          <Button size="lg" className="flex-1" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</Button>
+          <Button variant="ghost" className="text-danger" disabled={busy} onClick={() => setConfirmDelete(true)}><Trash2 /> Delete</Button>
+          <Button size="lg" className="flex-1" disabled={busy || (scalable && !!qty && !qtyValid)} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</Button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title={entry.label ? `Delete ${entry.label}?` : "Delete this entry?"}
+        description="This removes the logged food from your diary."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => void remove()}
+      />
     </Sheet>
   );
 }

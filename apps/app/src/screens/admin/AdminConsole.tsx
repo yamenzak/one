@@ -256,7 +256,7 @@ function AiConfig() {
             <div className="divide-y divide-border/40">
               {rows.map((m) => (
                 <div key={m.id} className="flex items-center gap-2 py-2">
-                  <button onClick={() => void patchModel(m.id, { isDefault: true })} title="Set as default for its task" className="shrink-0">
+                  <button onClick={() => void patchModel(m.id, { isDefault: true })} aria-label="Set as default" title="Set as default for its task" className="shrink-0">
                     {m.is_default ? <Badge tone="primary">default</Badge> : <span className="grid size-5 place-items-center rounded-full border border-border text-transparent hover:border-primary" />}
                   </button>
                   <div className="min-w-0 flex-1">

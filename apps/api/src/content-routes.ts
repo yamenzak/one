@@ -83,7 +83,7 @@ export const contentHubRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     if (!staffOnly(c)) return c.json({ error: "forbidden" }, 403);
     const rows = await c.env.DB.prepare(
-      "SELECT * FROM resources WHERE tenant_id = ? ORDER BY updated_at DESC",
+      "SELECT * FROM resources WHERE tenant_id = ? ORDER BY updated_at DESC LIMIT 500",
     )
       .bind(who.tenantId)
       .all<ResourceRow>();

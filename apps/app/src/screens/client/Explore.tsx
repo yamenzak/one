@@ -2,8 +2,8 @@
  *  a premium magazine surface: search + category chips, a featured cover hero,
  *  fresh article cards, and an immersive reader with a cover-bleed header. */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Card, Badge, Chip, Field, Button, Page, Stagger, EmptyState, motion, cn, ArrowLeft, Search, Clock, BookOpen, Utensils, Dumbbell, Reveal, SkeletonHero, SkeletonList } from "@mossa/ui";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Card, Badge, Chip, Field, Button, Page, Stagger, EmptyState, motion, cn, ArrowLeft, Search, Clock, BookOpen, Utensils, Dumbbell, AlertTriangle, Reveal, SkeletonHero, SkeletonList } from "@mossa/ui";
 import { api } from "../../api.js";
 import { Markdown } from "../../Markdown.js";
 
@@ -22,7 +22,18 @@ export function Explore({ clientId, onBack }: { clientId: string; onBack: () => 
   const [open, setOpen] = useState<Resource | null>(null);
   const [cat, setCat] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const load = useCallback(async () => setItems((await api.get<{ resources: Resource[] }>(`/api/resources/feed?clientId=${clientId}`)).resources), [clientId]);
+  const [error, setError] = useState(false);
+  const reqRef = useRef(0);
+  const load = useCallback(async () => {
+    const rid = ++reqRef.current;
+    setError(false);
+    try {
+      const r = await api.get<{ resources: Resource[] }>(`/api/resources/feed?clientId=${clientId}`);
+      if (rid === reqRef.current) setItems(r.resources);
+    } catch {
+      if (rid === reqRef.current) setError(true);
+    }
+  }, [clientId]);
   useEffect(() => void load(), [load]);
 
   const categories = useMemo(() => [...new Set((items ?? []).map((r) => r.category).filter((x): x is string => !!x))], [items]);
@@ -35,7 +46,7 @@ export function Explore({ clientId, onBack }: { clientId: string; onBack: () => 
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       <div className="flex items-center gap-3">
-        <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
+        <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
         <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight">Explore</h1>
           <p className="text-sm text-muted-foreground">Guides &amp; recipes from your coach</p>
@@ -53,6 +64,9 @@ export function Explore({ clientId, onBack }: { clientId: string; onBack: () => 
         </div>
       )}
 
+      {error && !items ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load Explore" description="Something went wrong loading content. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
+      ) : (
       <Reveal loading={!items} className="space-y-5" skeleton={
         <>
           <SkeletonHero height={224} />
@@ -76,6 +90,7 @@ export function Explore({ clientId, onBack }: { clientId: string; onBack: () => 
           </div>
         ))}
       </Reveal>
+      )}
     </Page>
   );
 }
@@ -136,7 +151,7 @@ function Reader({ r, onBack }: { r: Resource; onBack: () => void }) {
           <button onClick={onBack} aria-label="Back" className="absolute left-4 top-4 grid size-9 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md transition-colors hover:bg-black/60 [&_svg]:size-5"><ArrowLeft /></button>
         </div>
       ) : (
-        <div className="p-4"><Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button></div>
+        <div className="p-4"><Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button></div>
       )}
       <motion.div
         initial={{ opacity: 0, y: 14 }}

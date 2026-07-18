@@ -1,7 +1,7 @@
 /** Owner Business — tabbed: overview (plan + credits + AI usage), packages, staff. */
 
 import { useEffect, useState } from "react";
-import { Button, Card, Badge, StatCard, SegmentedControl, Page, Stagger, ChartCard, SectionHeader, IconBadge, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Sparkles, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, CheckCheck } from "@mossa/ui";
+import { Button, Card, Badge, StatCard, SegmentedControl, Page, Stagger, ChartCard, SectionHeader, IconBadge, EmptyState, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Sparkles, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, CheckCheck } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { Staff } from "./Staff.js";
@@ -57,10 +57,15 @@ function Overview() {
   const [billing, setBilling] = useState<Billing | null>(null);
   const [aiUsage, setAiUsage] = useState<AiUsage["usage"]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
-    void api.get<Billing>("/api/billing").then(setBilling);
-    void api.get<AiUsage>("/api/settings/ai-usage").then((r) => setAiUsage(r.usage)).catch(() => undefined);
-  }, []);
+    let alive = true;
+    setError(false);
+    api.get<Billing>("/api/billing").then((b) => { if (alive) setBilling(b); }).catch(() => { if (alive) setError(true); });
+    api.get<AiUsage>("/api/settings/ai-usage").then((r) => { if (alive) setAiUsage(r.usage); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [reloadKey]);
   // Hosted-redirect flows — Stripe returns the user right back to this page.
   const redirectTo = async (path: string, key: string) => {
     setBusy(key);
@@ -78,6 +83,9 @@ function Overview() {
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <h1 className="text-2xl font-bold tracking-tight">Business</h1>
 
+      {error && !billing ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load your business" description="Something went wrong. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />
+      ) : (
       <Reveal loading={!billing} className="space-y-4" skeleton={
         <>
           <SkeletonStatGrid count={2} foot />
@@ -200,6 +208,7 @@ function Overview() {
         </>
         )}
       </Reveal>
+      )}
     </Page>
   );
 }

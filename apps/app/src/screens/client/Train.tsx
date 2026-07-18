@@ -5,7 +5,7 @@
  * logged sessions + activities), and a recent-activity feed with WeekDots.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { prescribedSetsForDay, type WorkoutBody } from "@mossa/protocol";
@@ -13,7 +13,7 @@ import { sessionTonnage, sessionLoad, epley1Rm, DEFAULT_WEEKLY_LOAD_TARGET, acti
 import {
   Card, Badge, Button, Chip, Skeleton, Page, Stagger, EmptyState, StatCard, WeekDots, Sparkline, MiniBars, IconBadge,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
-  Dumbbell, Play, Moon, ChevronRight, Plus, Footprints, Flame, TrendingUp, Trophy, Activity,
+  Dumbbell, Play, Moon, ChevronRight, Plus, Footprints, Flame, TrendingUp, Trophy, Activity, AlertTriangle,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -40,14 +40,29 @@ export function Train({ clientId }: { clientId: string }) {
   const nav = useNavigate();
   const units = useUnits();
   const [activityOpen, setActivityOpen] = useState(false);
+  const [error, setError] = useState(false);
+  const reqRef = useRef(0);
   const today = todayLocal();
 
-  const load = () => {
-    void api.get<{ plans: Plan[] }>(`/api/workout-plans?clientId=${clientId}`).then((r) => setPlans(r.plans));
-    void api.get<{ sessions: Session[] }>(`/api/logs/workout-sessions?clientId=${clientId}&from=${shift(today, -89)}&to=${today}`).then((r) => setSessions(r.sessions));
-    void api.get<{ activities: ActivityLog[] }>(`/api/logs/activities?clientId=${clientId}&from=${shift(today, -29)}&to=${today}`).then((r) => setActivities(r.activities));
-  };
-  useEffect(load, [clientId]);
+  // Load the three feeds together so one guard covers them, and surface a load
+  // failure with a retry instead of an endless skeleton.
+  const load = useCallback(async () => {
+    const rid = ++reqRef.current;
+    setError(false);
+    try {
+      const [p, s, a] = await Promise.all([
+        api.get<{ plans: Plan[] }>(`/api/workout-plans?clientId=${clientId}`),
+        api.get<{ sessions: Session[] }>(`/api/logs/workout-sessions?clientId=${clientId}&from=${shift(today, -89)}&to=${today}`),
+        api.get<{ activities: ActivityLog[] }>(`/api/logs/activities?clientId=${clientId}&from=${shift(today, -29)}&to=${today}`),
+      ]);
+      if (rid !== reqRef.current) return;
+      setPlans(p.plans); setSessions(s.sessions); setActivities(a.activities);
+    } catch {
+      if (rid !== reqRef.current) return;
+      setError(true);
+    }
+  }, [clientId, today]);
+  useEffect(() => void load(), [load]);
 
   const week = useMemo(() => {
     const days = Array.from({ length: 7 }, (_, i) => shift(today, -(6 - i)));
@@ -127,6 +142,9 @@ export function Train({ clientId }: { clientId: string }) {
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       <h1 className="text-2xl font-bold tracking-tight">Train</h1>
 
+      {error && !plans ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load your training" description="Something went wrong. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
+      ) : (
       <Reveal loading={!plans} className="space-y-5" skeleton={
         <>
           <SkeletonHero height={128} />
@@ -247,8 +265,9 @@ export function Train({ clientId }: { clientId: string }) {
         </>
         )}
       </Reveal>
+      )}
 
-      {activityOpen && <LogSheet open initialKind="activity" clientId={clientId} onClose={() => setActivityOpen(false)} onLogged={load} />}
+      {activityOpen && <LogSheet open initialKind="activity" clientId={clientId} onClose={() => setActivityOpen(false)} onLogged={() => void load()} />}
     </Page>
   );
 }

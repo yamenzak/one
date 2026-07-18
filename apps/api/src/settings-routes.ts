@@ -13,6 +13,7 @@ import { type AppEnv, requireTenant } from "./auth-context.js";
 import { tenantEntitlements, getConfig } from "./billing-store.js";
 import { nowIso, periodKey } from "./ids.js";
 import { parseJson, j } from "./db.js";
+import { invalidateHostCache } from "./host-context.js";
 import { PROVIDERS, resolveIntegrations, maskIntegrations } from "./integrations.js";
 import { resolveEmailConfig, maskEmailConfig } from "./email-provider.js";
 
@@ -107,6 +108,13 @@ export const settingsRoutes = new Hono<AppEnv>()
     )
       .bind(who.tenantId, j(branding), j(aiToggles), j(marketplace), j(integrations), nowIso(), j(branding), j(aiToggles), j(marketplace), j(integrations), nowIso())
       .run();
+
+    // Branding changed → drop cached host resolutions for this tenant's custom
+    // domains so white-label branding refreshes without waiting out the 60s TTL.
+    if (d.branding) {
+      const domains = await c.env.DB.prepare("SELECT hostname FROM tenant_domains WHERE tenant_id = ?").bind(who.tenantId).all<{ hostname: string }>().catch(() => ({ results: [] as { hostname: string }[] }));
+      for (const dom of domains.results ?? []) await invalidateHostCache(c.env, dom.hostname);
+    }
 
     // Email provider config, merged so a blank key doesn't wipe a set one unless
     // explicitly cleared (empty string clears; undefined keeps).

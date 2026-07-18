@@ -381,8 +381,9 @@ export const externalRoutes = new Hono<AppEnv>()
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const d = parsed.data;
-    const existing = await c.env.DB.prepare("SELECT id FROM exercises WHERE source = ? AND source_id = ?").bind(d.source, d.sourceId).first<{ id: string }>();
-    if (existing) { await c.env.DB.prepare("UPDATE exercises SET active = 1 WHERE id = ?").bind(existing.id).run(); return c.json({ ok: true, id: existing.id, imported: false }); }
+    // Tenant-scoped dedup (own copy or a shared global), never another tenant's row.
+    const existing = await c.env.DB.prepare("SELECT id FROM exercises WHERE source = ? AND source_id = ? AND (tenant_id = ? OR tenant_id IS NULL) ORDER BY tenant_id IS NULL LIMIT 1").bind(d.source, d.sourceId, who.tenantId).first<{ id: string }>();
+    if (existing) { await c.env.DB.prepare("UPDATE exercises SET active = 1 WHERE id = ? AND tenant_id = ?").bind(existing.id, who.tenantId).run(); return c.json({ ok: true, id: existing.id, imported: false }); }
     const id = newId("exr");
     const force = d.force === "push" || d.force === "pull" || d.force === "static" ? d.force : null;
     const diff = ["beginner", "intermediate", "advanced"].includes(d.difficulty ?? "") ? d.difficulty : (d.difficulty === "expert" ? "advanced" : null);

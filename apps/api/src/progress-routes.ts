@@ -28,10 +28,11 @@ import { parseJson } from "./db.js";
 
 interface SessionEntry { exerciseId: string; sets: LoggedSetLike[] }
 
-/** Monday (local) of the ISO week containing `date`, as YYYY-MM-DD. */
+/** Monday (UTC) of the ISO week containing `date`, as YYYY-MM-DD. Pinned to UTC
+ *  (not the runtime-local naked parse) so week bucketing is stable off-UTC. */
 function weekStart(date: string): string {
-  const d = new Date(`${date}T00:00:00`);
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
   return d.toISOString().slice(0, 10);
 }
 
@@ -104,7 +105,7 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
   const prIds = [...bestByExercise.keys()];
   const nameById = new Map<string, { name: string; thumb: string | null }>();
   if (prIds.length) {
-    const rows = await db.prepare(`SELECT id, name, thumb_url FROM exercises WHERE id IN (${prIds.map(() => "?").join(",")})`).bind(...prIds).all<{ id: string; name: string; thumb_url: string | null }>();
+    const rows = await db.prepare(`SELECT id, name, thumb_url FROM exercises WHERE id IN (${prIds.map(() => "?").join(",")}) AND (tenant_id = ? OR tenant_id IS NULL)`).bind(...prIds, access.client.tenant_id).all<{ id: string; name: string; thumb_url: string | null }>();
     for (const r of rows.results ?? []) nameById.set(r.id, { name: r.name, thumb: r.thumb_url });
   }
   const prs = [...bestByExercise.entries()].map(([id, v]) => ({ exerciseId: id, name: nameById.get(id)?.name ?? "Exercise", thumb: nameById.get(id)?.thumb ?? null, e1rm: Math.round(v.e1rm * 10) / 10, weight: v.weight, reps: v.reps })).sort((a, b) => b.e1rm - a.e1rm).slice(0, 12);

@@ -11,10 +11,10 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, type RangePreset, type SeriesDelta } from "@mossa/domain";
 import {
-  Card, Badge, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger,
+  Card, Badge, Button, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger, EmptyState,
   Reveal, SkeletonHero, SkeletonChart,
   AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, METRICS, cn, toneVar,
-  Scale, Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, type Tone, type LucideIcon,
+  Scale, Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, type Tone, type LucideIcon,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -45,13 +45,23 @@ export function Progress({ clientId }: { clientId: string }) {
   const [data, setData] = useState<ProgressData | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
   const [range, setRange] = useState<RangePreset>("30d");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const units = useUnits();
   const today = todayLocal();
 
+  // Don't clear data on a range toggle — keep the current lens rendered (dimmed)
+  // while the next range loads, so 7d/30d/90d doesn't flash the full skeleton.
+  // An alive guard drops a stale response; a failure surfaces a retry.
   useEffect(() => {
-    setData(null);
-    void api.get<ProgressData>(`/api/progress/${clientId}?range=${range}&today=${today}`).then(setData).catch(() => setData(null));
-  }, [clientId, range, today]);
+    let alive = true;
+    setLoading(true); setError(false);
+    api.get<ProgressData>(`/api/progress/${clientId}?range=${range}&today=${today}`)
+      .then((d) => { if (alive) { setData(d); setLoading(false); } })
+      .catch(() => { if (alive) { setError(true); setLoading(false); } });
+    return () => { alive = false; };
+  }, [clientId, range, today, reloadKey]);
 
   const days = data?.range.days ?? [];
   const dateLabel = (i: number) => shortDate(days[i] ?? today);
@@ -64,6 +74,9 @@ export function Progress({ clientId }: { clientId: string }) {
         <SegmentedControl className="ml-auto" options={[{ value: "7d", label: "7d" }, { value: "30d", label: "30d" }, { value: "90d", label: "90d" }]} value={range} onChange={(v) => setRange(v as RangePreset)} />
       </div>
 
+      {error && !data ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load progress" description="Something went wrong loading your analytics. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />
+      ) : (
       <Reveal loading={!data} className="space-y-4" skeleton={
         <>
           <SkeletonHero height={150} />
@@ -73,8 +86,9 @@ export function Progress({ clientId }: { clientId: string }) {
       }>
         {data && (
           /* Keyed remount per tab → each lens re-staggers in; no AnimatePresence
-             wait-handshake (which could strand the incoming tab unmounted). */
-          <motion.div key={tab} variants={stagger} initial="hidden" animate="show" className="space-y-4">
+             wait-handshake (which could strand the incoming tab unmounted).
+             Dim while a new range loads (prior data stays put — no skeleton flash). */
+          <motion.div key={tab} variants={stagger} initial="hidden" animate="show" className={cn("space-y-4 transition-opacity", loading && "pointer-events-none opacity-50")}>
             {tab === "overview" && <Overview data={data} dateLabel={dateLabel} />}
             {tab === "body" && <Body data={data} units={units} dateLabel={dateLabel} />}
             {tab === "training" && <Training data={data} units={units} />}
@@ -82,6 +96,7 @@ export function Progress({ clientId }: { clientId: string }) {
           </motion.div>
         )}
       </Reveal>
+      )}
 
       <CoachNote clientId={clientId} surface="progress" />
     </Page>

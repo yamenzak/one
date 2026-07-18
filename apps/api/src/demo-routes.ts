@@ -24,7 +24,7 @@ export const demoRoutes = new Hono<AppEnv>().post("/admin/seed-demo", async (c) 
   await seedExercises(db);
 
   const existing = await db.prepare("SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ?").bind(who.tenantId).first<{ n: number }>();
-  if ((existing?.n ?? 0) > 1) return c.json({ ok: true, skipped: "clients already exist" });
+  if ((existing?.n ?? 0) > 0) return c.json({ ok: true, skipped: "clients already exist" });
 
   const now = nowIso();
   const exerciseIds = (

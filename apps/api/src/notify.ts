@@ -59,6 +59,10 @@ function notifEmailHtml(env: Env, brand: string, input: NotifyInput): string {
 export async function notify(env: Env, input: NotifyInput): Promise<void> {
   if (!input.userId) return;
   const userId = input.userId;
+  // Best-effort in full: notification delivery must NEVER reject its caller — a
+  // transient error in the preference lookup would otherwise 500 an operation
+  // (plan publish, goal set, …) that already committed. Swallow everything.
+  try {
   let channels = { inbox: true, email: false };
   if (input.force) {
     channels = { inbox: true, email: true };
@@ -91,6 +95,7 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
       }).catch(() => undefined);
     }
   }
+  } catch { /* notification is best-effort; never surface to the caller */ }
 }
 
 /** Fan a notification out to every OWNER of a tenant (billing / sales / roster). */

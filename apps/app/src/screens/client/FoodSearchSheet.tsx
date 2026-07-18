@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { kcalToDisplay, type UnitPrefs } from "@mossa/domain";
 import { Button, Field, Sheet, Chip, SegmentedControl, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, X } from "@mossa/ui";
-import { api, todayLocal } from "../../api.js";
+import { api, todayLocal, uploadMedia } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { FoodRow, normFood } from "../food.js";
@@ -135,11 +135,9 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   const snapMeal = async (photo: File) => {
     setAiBusy(true); setAiError(null); setSnapErr(null);
     try {
-      const fd = new FormData(); fd.append("file", photo); fd.append("purpose", "meal-snap");
-      const up = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
-      if (!up.ok) throw new Error("Couldn't upload that photo — try again.");
-      const { key } = (await up.json()) as { key?: string };
-      if (!key) throw new Error("Couldn't upload that photo — try again.");
+      // Client-owned media — route through uploadMedia so the 401 hook + error
+      // surfacing fire (instead of a bare fetch that silently no-ops).
+      const key = await uploadMedia(photo, "meal-snap", photo.name, clientId);
       const r = await api.post<{ entries: SnapEntry[]; note: string | null }>("/api/ai/snap-meal", { clientId, imageKey: key, hint: q });
       if (!r.entries?.length) throw new Error("No foods detected in that photo — try another angle or search instead.");
       // Show the AI's read for review — logging happens only on confirm.

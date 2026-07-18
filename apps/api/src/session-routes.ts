@@ -43,10 +43,10 @@ export const sessionRoutes = new Hono<AppEnv>()
     if (clientId) {
       const access = await requireClientAccess(c, clientId);
       if ("response" in access) return access.response;
-      const rows = await c.env.DB.prepare("SELECT * FROM trainer_sessions WHERE client_id = ? ORDER BY scheduled_at DESC").bind(clientId).all();
+      const rows = await c.env.DB.prepare("SELECT * FROM trainer_sessions WHERE client_id = ? ORDER BY scheduled_at DESC LIMIT 500").bind(clientId).all();
       return c.json({ sessions: rows.results ?? [] });
     }
-    const rows = await c.env.DB.prepare("SELECT * FROM trainer_sessions WHERE tenant_id = ? AND status = 'scheduled' ORDER BY scheduled_at").bind(who.tenantId).all();
+    const rows = await c.env.DB.prepare("SELECT * FROM trainer_sessions WHERE tenant_id = ? AND status = 'scheduled' ORDER BY scheduled_at LIMIT 500").bind(who.tenantId).all();
     return c.json({ sessions: rows.results ?? [] });
   })
 
@@ -79,24 +79,43 @@ export const sessionRoutes = new Hono<AppEnv>()
     if (!staff(c)) return c.json({ error: "forbidden" }, 403);
     const b = z.object({ status: z.enum(["scheduled", "completed", "cancelled", "no_show"]) }).safeParse(await c.req.json().catch(() => null));
     if (!b.success) return c.json({ error: "invalid body" }, 400);
-    const row = await c.env.DB.prepare("SELECT * FROM trainer_sessions WHERE id = ? AND tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ status: string; subscription_id: string | null; addon_type_id: string; client_id: string; scheduled_at: string }>();
+    const sessionId = c.req.param("id");
+    const row = await c.env.DB.prepare("SELECT * FROM trainer_sessions WHERE id = ? AND tenant_id = ?").bind(sessionId, who.tenantId).first<{ status: string; subscription_id: string | null; addon_type_id: string; client_id: string; scheduled_at: string }>();
     if (!row) return c.json({ error: "not found" }, 404);
+    const target = b.data.status;
 
-    const consume = row.status !== "completed" && b.data.status === "completed";
-    const refund = row.status === "completed" && b.data.status !== "completed";
+    // Atomic status transition. The completed<->not-completed boundary is guarded
+    // so two concurrent requests can't both flip the same session and each burn
+    // an add-on unit — only the request that ACTUALLY transitions consumes/refunds.
+    let changed: boolean;
+    if (target === "completed" && row.status !== "completed") {
+      const r = await c.env.DB.prepare("UPDATE trainer_sessions SET status = 'completed', completed_at = ? WHERE id = ? AND tenant_id = ? AND status != 'completed'").bind(nowIso(), sessionId, who.tenantId).run();
+      changed = (r.meta?.changes ?? 0) > 0;
+    } else if (target !== "completed" && row.status === "completed") {
+      const r = await c.env.DB.prepare("UPDATE trainer_sessions SET status = ?, completed_at = NULL WHERE id = ? AND tenant_id = ? AND status = 'completed'").bind(target, sessionId, who.tenantId).run();
+      changed = (r.meta?.changes ?? 0) > 0;
+    } else {
+      const r = await c.env.DB.prepare("UPDATE trainer_sessions SET status = ?, completed_at = ? WHERE id = ? AND tenant_id = ?").bind(target, target === "completed" ? nowIso() : null, sessionId, who.tenantId).run();
+      changed = (r.meta?.changes ?? 0) > 0;
+    }
+
+    const consume = changed && target === "completed" && row.status !== "completed";
+    const refund = changed && target !== "completed" && row.status === "completed";
     if ((consume || refund) && row.subscription_id) {
-      const sub = await c.env.DB.prepare("SELECT addons_json FROM client_subscriptions WHERE id = ?").bind(row.subscription_id).first<{ addons_json: string | null }>();
-      const balances = parseJson<AddOnBalance[]>(sub?.addons_json, []);
-      const bal = balances.find((x) => x.addOnTypeId === row.addon_type_id);
-      if (bal) {
+      // CAS retry on addons_json so two different sessions completing concurrently
+      // on the same subscription can't lose one decrement (last-writer-wins).
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        const sub = await c.env.DB.prepare("SELECT addons_json FROM client_subscriptions WHERE id = ?").bind(row.subscription_id).first<{ addons_json: string | null }>();
+        const prev = sub?.addons_json ?? null;
+        const balances = parseJson<AddOnBalance[]>(prev, []);
+        const bal = balances.find((x) => x.addOnTypeId === row.addon_type_id);
+        if (!bal) break;
         bal.quantityUsed = Math.max(0, bal.quantityUsed + (consume ? 1 : -1));
-        await c.env.DB.prepare("UPDATE client_subscriptions SET addons_json = ? WHERE id = ?").bind(j(balances), row.subscription_id).run();
+        const w = await c.env.DB.prepare("UPDATE client_subscriptions SET addons_json = ? WHERE id = ? AND addons_json IS ?").bind(j(balances), row.subscription_id, prev).run();
+        if ((w.meta?.changes ?? 0) > 0) break;
       }
     }
-    await c.env.DB.prepare("UPDATE trainer_sessions SET status = ?, completed_at = ? WHERE id = ?")
-      .bind(b.data.status, b.data.status === "completed" ? nowIso() : null, c.req.param("id"))
-      .run();
-    if ((b.data.status === "cancelled" || b.data.status === "no_show") && row.status !== b.data.status) {
+    if (changed && (target === "cancelled" || target === "no_show")) {
       const cl = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null }>();
       if (cl?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: cl.user_id, category: "sessions", type: "session_cancelled", title: "Your session was cancelled", message: new Date(row.scheduled_at).toLocaleString(), link: "/wellness" });
     }
