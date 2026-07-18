@@ -70,10 +70,14 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
  * (and fires the session-expiry hook on 401) so every call site surfaces the
  * failure instead of silently no-oping with an undefined key.
  */
-export async function uploadMedia(file: Blob, purpose: string, filename = "upload"): Promise<string> {
+export async function uploadMedia(file: Blob, purpose: string, filename = "upload", clientId?: string): Promise<string> {
   const fd = new FormData();
   fd.append("file", file instanceof File ? file : new File([file], filename));
   fd.append("purpose", purpose);
+  // Client-owned media (progress photos, lab files) carries the owning client id
+  // so the server scopes the key per client and gates reads on assignment — a
+  // client / non-assigned trainer can't read another client's file by key.
+  if (clientId) fd.append("clientId", clientId);
   const res = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
   const data = (await res.json().catch(() => ({}))) as { key?: string; error?: string; message?: string };
   if (!res.ok || !data.key) {

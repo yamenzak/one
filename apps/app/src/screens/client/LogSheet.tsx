@@ -71,7 +71,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
   const uploadPhoto = async (file: File) => {
     setPhotoErr(null);
     try {
-      const key = await uploadMedia(file, "progress");
+      const key = await uploadMedia(file, "progress", "upload", clientId);
       setPhotos((p) => [...p, { key, consentToFeature: false }]);
     } catch {
       setPhotoErr("Couldn't upload that photo — try again.");

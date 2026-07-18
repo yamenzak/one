@@ -44,7 +44,7 @@ Status legend: **✅ fixed** · **◑ hardened (residual noted)** · **⊘ accep
 | Area | Finding | Resolution |
 |------|---------|-----------|
 | Media (XSS) | `image/svg+xml` uploads served same-origin → stored XSS. | ✅ SVG dropped from `ALLOWED`; reads set `nosniff` + CSP `sandbox` + `Content-Disposition: attachment` for non-image types. `media-routes.ts`. |
-| Media (IDOR) | Read enforced only the tenant prefix, not per-client assignment. | ◑ Per-client key scoping added (`t/<tenant>/c/<clientId>/…`, read gated via `requireClientAccess`); upload accepts `clientId`. Existing tenant-prefixed keys still tenant-checked. Wiring the client upload call-sites to pass `clientId` is the remaining step to fully close it. |
+| Media (IDOR) | Read enforced only the tenant prefix, not per-client assignment. | ✅ Per-client key scoping (`t/<tenant>/c/<clientId>/…`, read gated via `requireClientAccess`); the sensitive client-owned uploads (progress photos, lab files) now pass `clientId`. Existing tenant-prefixed keys still tenant-checked (backward compatible). `media-routes.ts`, `api.ts`, `LogSheet.tsx`, `Wellness.tsx`. |
 | Stripe replay | Webhook verification had no timestamp tolerance. | ✅ Rejects `|now − t| > 300s`. `stripe.ts`. |
 | Content feed | `/resources/feed` accepted an arbitrary `clientId` without an access check. | ✅ `requireClientAccess` when `clientId` present. `content-routes.ts`. |
 | Email | Platform email charged credits before send with no refund on failure. | ✅ Refund (`topUp`) when `sendEmail` fails. `email-provider.ts`. |
@@ -74,7 +74,6 @@ Status legend: **✅ fixed** · **◑ hardened (residual noted)** · **⊘ accep
 
 - **⊘ `once_per_customer` grant TOCTOU** (`commerce-routes.ts`): staff-initiated, negligible concurrency; left as check-then-insert.
 - **⊘ Mock mailer logs OTP** (`mailer.ts`): the `mock` provider is dev-only by definition; production uses `cloudflare`/`brevo`. No env in scope to gate further.
-- **◑ Media IDOR**: mechanism landed; wiring client upload call-sites to pass `clientId` remains.
 - **⊘ `daysRemainingForFeature` across gaps**: documented "runway end" semantics kept.
 - **⊘ Gemini key as query param** / provider keys plaintext at rest: by design; noted for a future encryption-at-rest pass.
 - **⊘ Digest horizontal fan-out**: idempotency + resume landed; a Cloudflare Queues fan-out is the follow-up for very large tenant counts.

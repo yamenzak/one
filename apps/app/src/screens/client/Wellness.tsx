@@ -369,7 +369,7 @@ function LabRow({ lab, clientId, onOpen, onUploaded }: { lab: LabFull; clientId:
   const upload = async (file: File) => {
     setBusy(true); setErr(null);
     try {
-      const key = await uploadMedia(file, "lab");
+      const key = await uploadMedia(file, "lab", "upload", clientId);
       await api.post(`/api/labs/${lab.id}/upload`, { clientId, fileKey: key });
       onUploaded();
     } catch { setErr("Couldn't upload that result — try again."); } finally { setBusy(false); }
