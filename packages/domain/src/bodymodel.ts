@@ -278,9 +278,11 @@ function sampleProfile(slices: BodySlice[], n: number, pick: (s: BodySlice) => n
 }
 
 /**
- * Build a closed silhouette polygon (normalized to a width×height box) from the
- * profile. `view: "front"` uses half-WIDTH, `"side"` uses half-DEPTH. The figure
- * is centered and scaled to fit the box with a small margin.
+ * Build a closed silhouette polygon from the profile, NORMALIZED to 0..1 in both
+ * axes (the same coordinate space the stored capture contours use, so it's a
+ * drop-in for the same renderer). `box`'s aspect (width:height) is how the figure
+ * is fit; `view: "front"` uses half-WIDTH, `"side"` uses half-DEPTH. Centered,
+ * with a small margin.
  */
 export function profileToSilhouette(
   profile: BodyProfile,
@@ -300,10 +302,10 @@ export function profileToSilhouette(
   const right: Pt[] = [];
   const left: Pt[] = [];
   for (const r of rowsArr) {
-    const y = topY + r.t * profile.heightCm * scale;
-    const half = r.half * scale;
-    right.push([cx + half, y]);
-    left.push([cx - half, y]);
+    const y = (topY + r.t * profile.heightCm * scale) / box.height;
+    const half = (r.half * scale) / box.width;
+    right.push([cx / box.width + half, y]);
+    left.push([cx / box.width - half, y]);
   }
   return [...right, ...left.reverse()];
 }

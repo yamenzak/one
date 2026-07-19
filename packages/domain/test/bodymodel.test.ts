@@ -94,9 +94,13 @@ describe("body profile", () => {
     expect(wl.halfWidthCm / wl.halfDepthCm).toBeGreaterThan(ws.halfWidthCm / ws.halfDepthCm);
   });
 
-  it("renders a closed, in-bounds silhouette polygon", () => {
+  it("renders a closed, in-bounds silhouette polygon normalized to 0..1", () => {
     const pts = profileToSilhouette(prof, { width: 190, height: 300 }, "front");
     expect(pts.length).toBeGreaterThan(100);
-    expect(pts.every(([x, y]) => x >= 0 && x <= 190 && y >= 0 && y <= 300)).toBe(true);
+    expect(pts.every(([x, y]) => x >= 0 && x <= 1 && y >= 0 && y <= 1)).toBe(true);
+    // Centered horizontally around 0.5.
+    const xs = pts.map(([x]) => x);
+    expect(Math.min(...xs)).toBeGreaterThan(0.05);
+    expect(Math.max(...xs)).toBeLessThan(0.95);
   });
 });
