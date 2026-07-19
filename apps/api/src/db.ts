@@ -111,6 +111,14 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "CREATE TABLE IF NOT EXISTS mood_logs (client_id TEXT, date_local TEXT, tenant_id TEXT, mood INTEGER, energy INTEGER, stress INTEGER, notes TEXT, updated_at TEXT, PRIMARY KEY (client_id, date_local));",
           "CREATE TABLE IF NOT EXISTS measurements (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, weight_kg REAL, body_fat_percent REAL, neck_cm REAL, waist_cm REAL, hips_cm REAL, chest_cm REAL, notes TEXT, created_at TEXT);",
           "CREATE UNIQUE INDEX IF NOT EXISTS idx_meas_day ON measurements(client_id, date_local);",
+          // Camera body-scan history (SPEC §8.5). Circumferences + the ensemble
+          // result + confidence; contour_*_json are de-identified outlines kept
+          // only on consent (for the progress morph). One scan per client-day.
+          "CREATE TABLE IF NOT EXISTS body_scans (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, body_fat_percent REAL, low REAL, high REAL, confidence TEXT, neck_cm REAL, waist_cm REAL, hips_cm REAL, chest_cm REAL, weight_kg REAL, height_cm REAL, methods_json TEXT, contour_front_json TEXT, contour_side_json TEXT, created_at TEXT);",
+          "CREATE UNIQUE INDEX IF NOT EXISTS idx_body_scans_day ON body_scans(client_id, date_local);",
+          // Tenant-cached TTS cue audio (generate once via Gemini, reuse forever).
+          // Key = (tenant, voice, lang, phrase id, version) → an R2 media key.
+          "CREATE TABLE IF NOT EXISTS tts_cues (tenant_id TEXT, voice TEXT, lang TEXT, phrase_id TEXT, version INTEGER DEFAULT 1, media_key TEXT, created_at TEXT, PRIMARY KEY (tenant_id, voice, lang, phrase_id, version));",
           "CREATE TABLE IF NOT EXISTS check_ins (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, weight_kg REAL, mood INTEGER, energy INTEGER, stress INTEGER, sleep_quality INTEGER, sleep_hours REAL, water_ml INTEGER, steps_count INTEGER, notes TEXT, photos_json TEXT, trainer_feedback TEXT, feedback_by TEXT, feedback_at TEXT, created_at TEXT, updated_at TEXT);",
           "CREATE UNIQUE INDEX IF NOT EXISTS idx_checkins_day ON check_ins(client_id, date_local);",
           "CREATE TABLE IF NOT EXISTS fasting_sessions (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, started_at TEXT, ended_at TEXT, duration_minutes INTEGER, target_hours INTEGER DEFAULT 16, created_at TEXT);",
