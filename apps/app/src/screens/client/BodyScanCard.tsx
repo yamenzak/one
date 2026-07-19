@@ -13,12 +13,14 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Card, Button, Badge, Spinner, IconBadge, EmptyState, cn, toneVar,
-  AreaChart, ScanLine, Camera, Sparkles, Percent,
+  AreaChart, ScanLine, Camera, Sparkles, Percent, History,
 } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
+import { useUnits } from "../../units.js";
 import { morphPoly, Silhouette } from "./bodyscan/Silhouette.js";
 import { BodyScanLauncher } from "./bodyscan/BodyScanLauncher.js";
+import { BodyScanHistory } from "./bodyscan/BodyScanHistory.js";
 
 interface Scan {
   id: string;
@@ -38,8 +40,10 @@ const CONF_LABEL = { high: "High confidence", medium: "Medium confidence", low: 
 
 export function BodyScanCard({ clientId }: { clientId: string }) {
   const { ctx } = useSession();
+  const units = useUnits();
   const [scans, setScans] = useState<Scan[] | null>(null);
   const [blocked, setBlocked] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // Known-off flag → render nothing (Progress just skips the section). The
   // launcher enforces the same gate; we mirror it here to skip the scans fetch.
@@ -67,6 +71,7 @@ export function BodyScanCard({ clientId }: { clientId: string }) {
   return (
     <BodyScanLauncher clientId={clientId} onSaved={() => void load()}>
       {({ open, loading, profileReady }) => (
+        <>
         <Card className="space-y-4">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
@@ -90,7 +95,7 @@ export function BodyScanCard({ clientId }: { clientId: string }) {
               Add your sex, birth date and height in your profile to use the body scan.
             </div>
           ) : latest ? (
-            <ScanSummary scans={scans} latest={latest} />
+            <ScanSummary scans={scans} latest={latest} onOpenHistory={() => setHistoryOpen(true)} />
           ) : (
             <EmptyState
               icon={Sparkles}
@@ -100,12 +105,14 @@ export function BodyScanCard({ clientId }: { clientId: string }) {
             />
           )}
         </Card>
+        {historyOpen && scans && <BodyScanHistory scans={scans} units={units} onClose={() => setHistoryOpen(false)} />}
+        </>
       )}
     </BodyScanLauncher>
   );
 }
 
-function ScanSummary({ scans, latest }: { scans: Scan[]; latest: Scan }) {
+function ScanSummary({ scans, latest, onOpenHistory }: { scans: Scan[]; latest: Scan; onOpenHistory: () => void }) {
   const chrono = useMemo(() => [...scans].filter((s) => s.bodyFatPercent != null).reverse(), [scans]);
   const bfValues = chrono.map((s) => s.bodyFatPercent!);
   const withContour = useMemo(() => chrono.filter((s) => s.contourFront && s.contourFront.length > 3), [chrono]);
@@ -147,6 +154,10 @@ function ScanSummary({ scans, latest }: { scans: Scan[]; latest: Scan }) {
 
       {/* Silhouette morph */}
       {withContour.length >= 2 && <SilhouetteMorph scans={withContour} />}
+
+      <Button variant="secondary" className="w-full" onClick={onOpenHistory}>
+        <History /> Body composition history{withContour.length > 0 ? " · front, side & 3D" : ""}
+      </Button>
     </div>
   );
 }
