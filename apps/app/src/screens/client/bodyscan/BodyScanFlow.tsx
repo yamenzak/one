@@ -386,33 +386,57 @@ function CaptureStep({ phase, cue, onCaptured, onFallback }: {
   );
 }
 
-/** Draw a light landmark skeleton on the overlay canvas (guidance only). */
+/** Draw a light landmark skeleton on the overlay canvas (guidance only).
+ *
+ * The <video> is `object-cover` (16:9 frame cropped to fill the 3:4 box), so
+ * landmarks — normalized to the FULL frame — must be mapped through that same
+ * cover transform, or the skeleton lands in the wrong place (squished inward,
+ * so shoulders/hips look mis-detected). We size the canvas buffer to the
+ * displayed box and project each point with the cover scale + crop offset. */
 function drawOverlay(canvas: HTMLCanvasElement | null, video: HTMLVideoElement, lm: NormLandmark[] | null) {
   if (!canvas) return;
-  const w = video.videoWidth || canvas.clientWidth;
-  const h = video.videoHeight || canvas.clientHeight;
-  if (canvas.width !== w) canvas.width = w;
-  if (canvas.height !== h) canvas.height = h;
+  const cw = canvas.clientWidth;
+  const ch = canvas.clientHeight;
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (!cw || !ch || !vw || !vh) return;
+  const dpr = Math.min(2, (typeof window !== "undefined" && window.devicePixelRatio) || 1);
+  const bw = Math.round(cw * dpr);
+  const bh = Math.round(ch * dpr);
+  if (canvas.width !== bw) canvas.width = bw;
+  if (canvas.height !== bh) canvas.height = bh;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  ctx.clearRect(0, 0, w, h);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // draw in CSS px; buffer is dpr-scaled
+  ctx.clearRect(0, 0, cw, ch);
   if (!lm) return;
+
+  // object-cover: scale the frame to cover the box, then center-crop the overflow.
+  const scale = Math.max(cw / vw, ch / vh);
+  const dw = vw * scale;
+  const dh = vh * scale;
+  const ox = (cw - dw) / 2;
+  const oy = (ch - dh) / 2;
+  const X = (nx: number) => ox + nx * dw;
+  const Y = (ny: number) => oy + ny * dh;
+
   const pts = [LM.lShoulder, LM.rShoulder, LM.lHip, LM.rHip, LM.lElbow, LM.rElbow, LM.lWrist, LM.rWrist, LM.lAnkle, LM.rAnkle, LM.nose];
+  const r = Math.max(3, cw * 0.013);
   ctx.fillStyle = "rgba(109,211,194,0.9)";
   for (const i of pts) {
     const p = lm[i];
     if (!p || (p.visibility ?? 1) < 0.4) continue;
     ctx.beginPath();
-    ctx.arc(p.x * w, p.y * h, Math.max(3, w * 0.006), 0, Math.PI * 2);
+    ctx.arc(X(p.x), Y(p.y), r, 0, Math.PI * 2);
     ctx.fill();
   }
   const bone = (a: number, b: number) => {
     const p = lm[a]; const q = lm[b];
     if (!p || !q) return;
-    ctx.beginPath(); ctx.moveTo(p.x * w, p.y * h); ctx.lineTo(q.x * w, q.y * h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(X(p.x), Y(p.y)); ctx.lineTo(X(q.x), Y(q.y)); ctx.stroke();
   };
   ctx.strokeStyle = "rgba(109,211,194,0.55)";
-  ctx.lineWidth = Math.max(2, w * 0.004);
+  ctx.lineWidth = Math.max(2, cw * 0.008);
   bone(LM.lShoulder, LM.rShoulder); bone(LM.lShoulder, LM.lHip); bone(LM.rShoulder, LM.rHip); bone(LM.lHip, LM.rHip);
   bone(LM.lShoulder, LM.lElbow); bone(LM.lElbow, LM.lWrist); bone(LM.rShoulder, LM.rElbow); bone(LM.rElbow, LM.rWrist);
   bone(LM.lHip, LM.lAnkle); bone(LM.rHip, LM.rAnkle);

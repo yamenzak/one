@@ -128,10 +128,14 @@ export function analyzeAlignment(lm: NormLandmark[], phase: ScanPhase): Alignmen
     return { ok: false, cue: "step_back", message: FEET_MSG };
   }
 
-  // 2. Distance — body should fill most of the frame height.
+  // 2. Distance — the nose→ankle span should fill a good part of the frame.
+  // Calibrated for a WHOLE body in frame: nose sits ~0.07 below the head top and
+  // the ankle ~0.05 above the sole, so a well-framed full body spans ~0.45–0.75
+  // here. (Demanding more would force stepping closer until the feet clip out —
+  // the exact deadlock that stalled capture.)
   const bodyFrac = ankleY - nose.y;
-  if (bodyFrac < 0.62) return { ok: false, cue: "step_forward", message: "Step a little closer" };
-  if (bodyFrac > 0.94) return { ok: false, cue: "step_back", message: "Step back a little" };
+  if (bodyFrac < 0.45) return { ok: false, cue: "step_forward", message: "Step a little closer" };
+  if (bodyFrac > 0.82) return { ok: false, cue: "step_back", message: "Step back a little" };
 
   // 3. Centered.
   const midHipX = (lHip.x + rHip.x) / 2;
@@ -164,7 +168,7 @@ export function analyzeAlignment(lm: NormLandmark[], phase: ScanPhase): Alignmen
     const half = shoulderSpan / 2;
     const lOut = lWr ? Math.abs(lWr.x - midShX) : 0;
     const rOut = rWr ? Math.abs(rWr.x - midShX) : 0;
-    if (lOut < half * 1.1 || rOut < half * 1.1) {
+    if (lOut < half || rOut < half) {
       return { ok: false, cue: "arms", message: "Raise your arms slightly away from your sides" };
     }
   }
