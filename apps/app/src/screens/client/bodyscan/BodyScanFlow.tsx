@@ -279,7 +279,7 @@ function CaptureStep({ phase, cue, onCaptured, onFallback }: {
       const ts = performance.now();
       const seg = await scanner.segment(video, ts);
       if (seg && !stopped) {
-        onCapturedRef.current({ mask: seg.mask, width: seg.width, height: seg.height, landmarks: lm });
+        onCapturedRef.current({ mask: seg.mask, width: seg.width, height: seg.height, landmarks: lm, frameW: video.videoWidth, frameH: video.videoHeight });
       } else {
         capturingRef.current = false;
       }
@@ -349,7 +349,7 @@ function CaptureStep({ phase, cue, onCaptured, onFallback }: {
     const ts = performance.now();
     const lm = latestLmRef.current ?? scanner.pose(video, ts);
     const seg = await scanner.segment(video, ts);
-    if (seg && lm) onCapturedRef.current({ mask: seg.mask, width: seg.width, height: seg.height, landmarks: lm });
+    if (seg && lm) onCapturedRef.current({ mask: seg.mask, width: seg.width, height: seg.height, landmarks: lm, frameW: video.videoWidth, frameH: video.videoHeight });
     else capturingRef.current = false;
   })(); };
 

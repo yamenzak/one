@@ -55,6 +55,14 @@ function buildMesh(front: Pt[], side: Pt[] | null): { verts: Vert[]; faces: Face
       verts.push({ x: r.cx + a * Math.cos(t), y: yy, z: b * Math.sin(t) });
     }
   }
+  // The outlines are bbox-normalized (aspect lost), so width≈height → a squat
+  // blob. Rescale the horizontal so the body reads at a natural proportion
+  // (~this many × taller than its widest point) instead of a barrel.
+  const TARGET_ASPECT = 3.4;
+  let maxR = 1e-4, maxYv = 1e-4;
+  for (const v of verts) { const r = Math.hypot(v.x, v.z); if (r > maxR) maxR = r; if (Math.abs(v.y) > maxYv) maxYv = Math.abs(v.y); }
+  const sxz = (maxYv / TARGET_ASPECT) / maxR;
+  for (const v of verts) { v.x *= sxz; v.z *= sxz; }
   const faces: Face[] = [];
   const nRows = rows.length;
   for (let i = 0; i < nRows - 1; i++) {

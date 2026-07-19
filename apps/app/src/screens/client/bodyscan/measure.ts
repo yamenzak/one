@@ -28,6 +28,11 @@ export interface Capture {
   width: number;
   height: number;
   landmarks: NormLandmark[];
+  /** The SOURCE video frame's pixel dims. The mask is square (model input) but
+   *  the frame usually isn't, so a horizontal width and a vertical (height-scale)
+   *  span are squished by different factors — we correct widths by the aspect. */
+  frameW: number;
+  frameH: number;
 }
 
 /** Front OR side per-site widths in cm, plus the normalized outline. */
@@ -247,7 +252,7 @@ export function fullBodyContour(cap: Capture): [number, number][] {
  * captures self-calibrate independently.
  */
 export function measureCapture(cap: Capture, heightCm: number): SiteWidths {
-  const { mask, width: w, height: h, landmarks: lm } = cap;
+  const { mask, width: w, height: h, landmarks: lm, frameW, frameH } = cap;
 
   const nose = lm[LM.nose];
   const lAnk = lm[LM.lAnkle];
@@ -285,7 +290,14 @@ export function measureCapture(cap: Capture, heightCm: number): SiteWidths {
   let pxPerCm: number | null = ankleY > noseY ? pixelScaleFromHeight(ankleY - noseY, heightCm) : null;
   if (!pxPerCm && hipY > noseY && heightCm > 0) pxPerCm = (hipY - noseY) / (heightCm * NOSE_TO_HIP_FRACTION);
 
-  const toCm = (px: number): number | null => (pxPerCm && px > 0 ? clampF(px / pxPerCm) : null);
+  // Aspect correction: pxPerCm is derived from a VERTICAL span (nose→ankle) in
+  // mask-y px, but the sites are HORIZONTAL widths in mask-x px. The square mask
+  // squishes the (non-square) frame differently per axis, so convert an x-width
+  // into the y-scale's space by (real-px-per-mask-x)/(real-px-per-mask-y) before
+  // dividing by pxPerCm. Without this, a portrait frame inflates every girth
+  // ~frameH/frameW× (≈1.7), which read a 90 kg frame as 38 % body-fat.
+  const aspect = frameW > 0 && frameH > 0 ? (frameW / w) / (frameH / h) : 1;
+  const toCm = (px: number): number | null => (pxPerCm && px > 0 ? clampF((px * aspect) / pxPerCm) : null);
 
   // Neck: narrowest row just above the shoulders (between head and shoulders).
   const neck = extremeWidthRow(mask, w, h, shoulderY - torso * 0.28, shoulderY - torso * 0.04, "min", midX, maxHalf);
