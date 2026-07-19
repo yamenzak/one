@@ -8,11 +8,45 @@
  * for personalized messages (fresh on every real update, cheap otherwise).
  */
 
-import { sessionLoad, epley1Rm, activityByKey, currentStreak, fmtWeight, kgToDisplay, weightLabel, type LoggedSetLike, type UnitPrefs } from "@mossa/domain";
+import { sessionLoad, epley1Rm, activityByKey, currentStreak, fmtWeight, kgToDisplay, weightLabel, bodyComposition, classifyBodyFat, type BodyFatCategory, type LoggedSetLike, type UnitPrefs } from "@mossa/domain";
 import type { Env } from "./env.js";
 import { parseJson } from "./db.js";
 
-interface ClientRow { id: string; tenant_id: string; display_name: string; gender: string | null; intake_json: string | null }
+interface ClientRow { id: string; tenant_id: string; display_name: string; gender: string | null; height_cm: number | null; intake_json: string | null }
+
+const BF_CAT_LABEL: Record<BodyFatCategory, string> = {
+  essential: "very lean", athletic: "athletic", fitness: "fit", average: "average", above_average: "above average",
+};
+
+/**
+ * A compact body-composition line for AI prompts: the client's most recent
+ * body-fat reading (from `measurements` — the canonical table both manual logs
+ * and body-scans mirror into), its category, and — when weight + height are
+ * known — lean/fat mass and FFMI. Returns null when there's no body-fat on file
+ * so callers can omit it cleanly. Shared so every AI surface reads body
+ * composition the same way.
+ */
+export async function bodyCompLine(
+  db: Env["DB"],
+  client: { id: string; gender: string | null; height_cm: number | null },
+): Promise<string | null> {
+  const bf = await db
+    .prepare("SELECT date_local, body_fat_percent, weight_kg FROM measurements WHERE client_id=? AND body_fat_percent IS NOT NULL ORDER BY date_local DESC LIMIT 1")
+    .bind(client.id)
+    .first<{ date_local: string; body_fat_percent: number; weight_kg: number | null }>();
+  if (!bf?.body_fat_percent) return null;
+  const gender = client.gender === "female" ? "female" : "male";
+  const cat = classifyBodyFat(bf.body_fat_percent, gender);
+  let weightKg = bf.weight_kg;
+  if (weightKg == null) {
+    const w = await db.prepare("SELECT weight_kg FROM measurements WHERE client_id=? AND weight_kg IS NOT NULL ORDER BY date_local DESC LIMIT 1").bind(client.id).first<{ weight_kg: number }>();
+    weightKg = w?.weight_kg ?? null;
+  }
+  const comp = weightKg != null && client.height_cm != null ? bodyComposition(weightKg, bf.body_fat_percent, client.height_cm) : null;
+  const parts = [`${bf.body_fat_percent.toFixed(1)}% body fat${cat ? ` (${BF_CAT_LABEL[cat]})` : ""}`];
+  if (comp) parts.push(`lean ${comp.leanMassKg}kg`, `fat ${comp.fatMassKg}kg`, `FFMI ${comp.ffmi}`);
+  return `BODY COMPOSITION (as of ${bf.date_local}): ${parts.join(", ")}.`;
+}
 interface SessionEntry { exerciseId: string; sets: LoggedSetLike[] }
 
 const shiftDay = (date: string, delta: number): string => {
@@ -113,6 +147,7 @@ export async function buildClientContext(
     return `${l.display_name} (${l.status}${flagged.length ? `; ${flagged.join(", ")}` : ""})`;
   });
 
+  const compLine = await bodyCompLine(db, client);
   const cal = Math.round(todayFood?.cal ?? 0), pro = Math.round(todayFood?.pro ?? 0);
   const lines = [
     `NOW: ${new Date(`${today}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" })} ${today}, ${partOfDay(hour)}.`,
@@ -121,6 +156,7 @@ export async function buildClientContext(
     `TODAY: ${checkedIn ? "checked in" : "not checked in"}; ${cal} kcal / ${pro}g protein logged; ${water?.total_ml ?? 0}ml water; ${todaySets.results?.length ? "workout logged" : "no workout logged yet"}; supplements ${suppLogs?.n ?? 0}/${suppSlots} taken.`,
     `THIS WEEK: ${activeDays.size} active days; training load ${Math.round(weekLoad)}; ${prsThisWeek} new PR${prsThisWeek === 1 ? "" : "s"}; check-ins on ${checkinDates.size} days (streak ${currentStreak(checkinDates, today)}); avg sleep ${avgSleep ?? "?"}h.`,
     weightLine ? `BODY: ${weightLine}.` : null,
+    compLine,
     wplan ? `WORKOUT PLAN: "${wplan.name}" — ${wplanDays.filter((d) => !d.isRestDay).length} training days.` : `WORKOUT PLAN: none published.`,
     mplan ? `MEAL PLAN: "${mplan.name}" — meals: ${mealTypes.join(", ") || "n/a"}.` : `MEAL PLAN: none published.`,
     (supps.results ?? []).length ? `SUPPLEMENTS: ${(supps.results ?? []).map((s) => s.name + (s.dose ? ` ${s.dose}` : "")).join(", ")}.` : null,
