@@ -13,7 +13,7 @@ import { requireClientAccess } from "./clients.js";
 import { requireClientFlag, resolveClientFlagsFor } from "./client-flags.js";
 import { tenantEntitlements, getConfig, setConfig } from "./billing-store.js";
 import { generate, generateImage, extractJson, listModels } from "./ai.js";
-import { buildClientContext } from "./ai-context.js";
+import { buildClientContext, bodyCompLine } from "./ai-context.js";
 import { featureDef } from "./ai-features.js";
 import { parseWorkersAiPricing, parseGeminiPricing } from "./ai-pricing.js";
 import { tenantIntegrations, type Integrations } from "./integrations.js";
@@ -181,8 +181,10 @@ export const aiRoutes = new Hono<AppEnv>()
     const nameOf = new Map((library.results ?? []).map((e) => [e.id, e.name]));
     // Few-shot: this studio's recent published plans as a style reference.
     const examples = await workoutPlanExamples(c.env.DB, who.tenantId, nameOf);
+    const compLine = await bodyCompLine(c.env.DB, access.client);
     const prompt = [
       `CLIENT: ${access.client.display_name}; gender=${access.client.gender ?? "?"}; intake=${JSON.stringify(intake)}`,
+      compLine,
       `EXERCISE LIBRARY (id: name [muscles] {equipment}):`,
       ...(library.results ?? []).map(
         (e) => `${e.id}: ${e.name} [${e.muscle_groups ?? ""}] {${e.equipment ?? ""}}`,
@@ -405,6 +407,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const intake = parseJson<Record<string, unknown>>(access.client.intake_json, {});
     // Few-shot: this studio's recent published meal plans as a style reference.
     const examples = await mealPlanExamples(c.env.DB, who.tenantId);
+    const compLine = await bodyCompLine(c.env.DB, access.client);
 
     const result = await generate(c.env, {
       tenantId: who.tenantId,
@@ -414,7 +417,7 @@ export const aiRoutes = new Hono<AppEnv>()
       task: "text",
       expectsJson: true,
       system: sys("draft-meal"),
-      prompt: [`TARGETS: ${JSON.stringify(targets)}`, `INTAKE: ${JSON.stringify(intake)}`, examples, parsed.data.instructions].filter(Boolean).join("\n"),
+      prompt: [`TARGETS: ${JSON.stringify(targets)}`, `INTAKE: ${JSON.stringify(intake)}`, compLine, examples, parsed.data.instructions].filter(Boolean).join("\n"),
       maxOutputTokens: 1536,
       mock: () => JSON.stringify({ mealOptions: [
         { mealType: "breakfast", mealName: "Oats, whey & berries", isFree: false, foods: [{ query: "rolled oats", quantity: 80, unit: "g", calories: 304, proteinG: 11, carbsG: 54, fatG: 6 }, { query: "whey protein", quantity: 30, unit: "g", calories: 120, proteinG: 24, carbsG: 3, fatG: 2 }, { query: "blueberries", quantity: 100, unit: "g", calories: 57, proteinG: 1, carbsG: 14, fatG: 0 }] },
@@ -448,6 +451,7 @@ export const aiRoutes = new Hono<AppEnv>()
     if ("response" in access) return access.response;
     const rows = await c.env.DB.prepare("SELECT date_local, weight_kg, mood, energy, stress, sleep_hours, notes FROM check_ins WHERE client_id = ? ORDER BY date_local DESC LIMIT 14").bind(access.client.id).all();
     if ((rows.results ?? []).length === 0) return c.json({ error: "no check-ins yet" }, 404);
+    const compLine = await bodyCompLine(c.env.DB, access.client);
 
     const result = await generate(c.env, {
       tenantId: who.tenantId,
@@ -457,7 +461,7 @@ export const aiRoutes = new Hono<AppEnv>()
       task: "text-small",
       expectsJson: true,
       system: sys("checkin-reply"),
-      prompt: JSON.stringify(rows.results),
+      prompt: [compLine, `CHECK-INS: ${JSON.stringify(rows.results)}`].filter(Boolean).join("\n"),
       maxOutputTokens: 400,
       mock: () => JSON.stringify({ summary: `${access.client.display_name} checked in ${(rows.results ?? []).length} times recently. Mood and sleep look steady; weight trending as expected.`, suggestedReply: "Great consistency this week — keep the sleep dialed in and let's push the next session." }),
     });
@@ -477,6 +481,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
     { const fg = await requireClientFlag(c, access.client.id, "aiCoachInsights"); if (fg) return fg; }
+    const compLine = await bodyCompLine(c.env.DB, access.client);
     const result = await generate(c.env, {
       tenantId: who.tenantId,
       actorUserId: who.userId,
@@ -484,7 +489,7 @@ export const aiRoutes = new Hono<AppEnv>()
       feature: "narrative",
       task: "text-small",
       system: sys("narrative"),
-      prompt: JSON.stringify(parsed.data.stats),
+      prompt: [compLine, `STATS: ${JSON.stringify(parsed.data.stats)}`].filter(Boolean).join("\n"),
       maxOutputTokens: 300,
       mock: () => `You've been remarkably consistent this month. Your logging streak and steady weight trend show the habits are sticking — that's the hard part. Keep the momentum, and let's build on this next phase.`,
     });
@@ -547,7 +552,8 @@ export const aiRoutes = new Hono<AppEnv>()
     ]);
     const labText = (labs.results ?? []).map((l) => `${l.display_name}: ${(parseJson<{ marker: string; value: string; unit?: string; flag?: string }[]>(l.values_json, [])).map((v) => `${v.marker} ${v.value}${v.unit ?? ""}${v.flag && v.flag !== "normal" ? ` (${v.flag})` : ""}`).join(", ")}`).join("\n");
     const primaryGoal = parseJson<{ primaryGoal?: string }>(goal?.derivation_json, {}).primaryGoal ?? "general fitness";
-    const prompt = `GOAL: ${primaryGoal}\nCURRENT SUPPLEMENTS: ${(supps.results ?? []).map((s) => s.name + (s.dose ? ` ${s.dose}` : "")).join(", ") || "none"}\nREVIEWED LABS:\n${labText || "none on file"}`;
+    const compLine = await bodyCompLine(c.env.DB, access.client);
+    const prompt = [`GOAL: ${primaryGoal}`, compLine, `CURRENT SUPPLEMENTS: ${(supps.results ?? []).map((s) => s.name + (s.dose ? ` ${s.dose}` : "")).join(", ") || "none"}`, `REVIEWED LABS:\n${labText || "none on file"}`].filter(Boolean).join("\n");
 
     const result = await generate(c.env, {
       tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
