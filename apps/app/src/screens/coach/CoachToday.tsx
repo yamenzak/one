@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fmtWeight } from "@mossa/domain";
-import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, type Tone, type LucideIcon } from "@mossa/ui";
+import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, CountUp, type Tone, type LucideIcon } from "@mossa/ui";
 import type { WidgetItem } from "@mossa/protocol";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -141,11 +141,11 @@ export function CoachToday() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <div className="text-xs text-muted-foreground">Trending down</div>
-                  <div className="numeral text-2xl font-bold">{analytics.composition.improving}<span className="text-sm font-medium text-muted-foreground"> / {analytics.composition.withTrend}</span></div>
+                  <div className="numeral text-2xl font-bold"><CountUp value={analytics.composition.improving} /><span className="text-sm font-medium text-muted-foreground"> / {analytics.composition.withTrend}</span></div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Avg body-fat Δ · 90d</div>
-                  <div className="numeral text-2xl font-bold">{analytics.composition.avgDeltaPct != null ? `${analytics.composition.avgDeltaPct > 0 ? "+" : ""}${analytics.composition.avgDeltaPct}%` : "—"}</div>
+                  <div className="numeral text-2xl font-bold">{analytics.composition.avgDeltaPct != null ? <CountUp value={analytics.composition.avgDeltaPct} decimals={1} prefix={analytics.composition.avgDeltaPct > 0 ? "+" : ""} suffix="%" /> : "—"}</div>
                 </div>
               </div>
               {analytics.composition.mostImproved && (

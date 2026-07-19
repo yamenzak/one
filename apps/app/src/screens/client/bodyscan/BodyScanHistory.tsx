@@ -11,7 +11,7 @@ import { createPortal } from "react-dom";
 import { cmToLengthDisplay, lengthLabel, kgToDisplay, weightLabel, bodyComposition, type UnitPrefs } from "@mossa/domain";
 import {
   Button, Badge, IconBadge, SegmentedControl, AreaChart, cn, toneVar, useModalOverlay,
-  ScanLine, X, Percent, RotateCcw, User,
+  ScanLine, X, Percent, RotateCcw, User, motion, stagger, popIn, CountUp,
 } from "@mossa/ui";
 import { Silhouette } from "./Silhouette.js";
 import { Body3D } from "./Body3D.js";
@@ -127,11 +127,11 @@ export function BodyScanHistory({ scans, units, onClose }: { scans: HistoryScan[
             if (!comp) return null;
             const wl = weightLabel(units);
             return (
-              <div className="grid grid-cols-3 gap-2">
-                <Stat label="Lean mass" value={kgToDisplay(comp.leanMassKg, units).toFixed(1)} unit={wl} />
-                <Stat label="Fat mass" value={kgToDisplay(comp.fatMassKg, units).toFixed(1)} unit={wl} />
-                <Stat label="FFMI" value={comp.ffmi.toFixed(1)} unit="kg/m²" />
-              </div>
+              <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-3 gap-2">
+                <Stat label="Lean mass" value={kgToDisplay(comp.leanMassKg, units)} unit={wl} />
+                <Stat label="Fat mass" value={kgToDisplay(comp.fatMassKg, units)} unit={wl} />
+                <Stat label="FFMI" value={comp.ffmi} unit="kg/m²" />
+              </motion.div>
             );
           })()}
 
@@ -196,11 +196,11 @@ function Meas({ label, cm, units }: { label: string; cm: number | null; units: U
   );
 }
 
-function Stat({ label, value, unit }: { label: string; value: string; unit: string }) {
+function Stat({ label, value, unit }: { label: string; value: number; unit: string }) {
   return (
-    <div className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
+    <motion.div variants={popIn} className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
       <div className="text-[0.65rem] font-medium text-muted-foreground">{label}</div>
-      <div className="numeral mt-0.5 text-sm font-bold">{value}<span className="ml-0.5 text-[0.55rem] text-muted-foreground">{unit}</span></div>
-    </div>
+      <div className="numeral mt-0.5 text-sm font-bold"><CountUp value={value} decimals={1} /><span className="ml-0.5 text-[0.55rem] text-muted-foreground">{unit}</span></div>
+    </motion.div>
   );
 }
