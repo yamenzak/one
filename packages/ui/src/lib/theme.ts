@@ -173,7 +173,17 @@ export function applyBranding(branding: Branding | null | undefined): void {
 
   const dark: Record<string, string> = {};
   const light: Record<string, string> = {};
-  if (primary) { dark["--primary"] = primary; dark["--ring"] = primary; light["--primary"] = primary; light["--ring"] = primary; }
+  if (primary) {
+    // In light mode, deepen the primary fill just enough that a light on-primary
+    // foreground (white text on a brand button/pill) clears WCAG AA — several
+    // presets pair a near-white foreground with a mid-light primary that reads
+    // only ~3.5:1. Keeps the "white-on-brand" look (vs flipping to dark text) and
+    // sharpens `text-primary` accents on white too. Dark mode keeps the brighter
+    // primary so accents stay vivid on the dark surface.
+    const primaryLight = primaryFg ? deepenPrimaryForLightFg(primary, primaryFg) : primary;
+    dark["--primary"] = primary; dark["--ring"] = primary;
+    light["--primary"] = primaryLight; light["--ring"] = primaryLight;
+  }
   if (primaryFg) { dark["--primary-foreground"] = primaryFg; light["--primary-foreground"] = primaryFg; }
   Object.assign(dark, branding?.tokens?.dark ?? {});
   Object.assign(light, branding?.tokens?.light ?? {});
@@ -267,6 +277,27 @@ function relLuminance(r: number, g: number, b: number): number {
   return 0.2126 * srgbToLinear(r) + 0.7152 * srgbToLinear(g) + 0.0722 * srgbToLinear(b);
 }
 const contrastRatio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+const oklchLum = (l: number, c: number, h: number): number => { const { r, g, b } = oklchToRgb(l, c, h); return relLuminance(r, g, b); };
+
+/**
+ * Deepen a primary just enough that a LIGHT on-primary foreground (white-ish
+ * text) clears WCAG AA (4.5:1) against it — used for the light-mode fill so brand
+ * buttons/pills stay "white text on brand color" and remain readable. A dark
+ * foreground wants a light primary, so those are left untouched. Only ever
+ * lowers lightness; hue and chroma are preserved.
+ */
+function deepenPrimaryForLightFg(primary: string, fg: string): string {
+  const p = parseColor(primary), f = parseColor(fg);
+  if (!p || !f) return primary;
+  const fgLum = oklchLum(f.l, f.c, f.h);
+  if (fgLum < 0.5) return primary; // dark foreground → needs a light primary; leave as-is
+  let L = p.l;
+  for (let i = 0; i < 60 && contrastRatio(fgLum, oklchLum(L, p.c, p.h)) < 4.5; i++) {
+    L -= 0.01;
+    if (L <= 0.32) break;
+  }
+  return L < p.l ? ok(L, p.c, p.h) : primary;
+}
 
 /**
  * Pick the on-color (near-white or near-dark, hue-matched) that has the higher
