@@ -335,6 +335,24 @@ describe("connect rail — webhook idempotency + grant", () => {
   });
 });
 
+describe("auth — sign-out revokes the session", () => {
+  it("POST /api/auth/sign-out clears the cookie; the same cookie is then 401", async () => {
+    const cookie = await signInFlow("logout-tester@test.dev", "Logout Studio");
+    // Same-origin requests (URL host must match the Origin header, exactly as a
+    // real browser sends — Better Auth rejects a missing/untrusted origin).
+    expect((await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(cookie) })).status).toBe(200);
+    // Sign out exactly as the client does — a well-formed POST with a body.
+    const out = await SELF.fetch(`${ORIGIN}/api/auth/sign-out`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...auth(cookie) },
+      body: "{}",
+    });
+    expect(out.status).toBe(200);
+    // The session is revoked server-side — the same cookie no longer authenticates.
+    expect((await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(cookie) })).status).toBe(401);
+  });
+});
+
 describe("notifications — email provider + per-user preferences", () => {
   it("owner sets Brevo (key masked) and tunes notification channels", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

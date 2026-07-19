@@ -226,6 +226,10 @@ function progress(rangeKey: string) {
  *  through to the network (unknown GETs); swallows every write. */
 export function tourInterceptor(method: string, path: string): unknown | undefined {
   const p = path.split("?")[0] ?? path;
+  // Auth ceremonies (sign-out especially) must always hit the network — never
+  // fake them, or a sign-out started during/after a tour is silently discarded
+  // and the user stays logged in.
+  if (p.startsWith("/api/auth/")) return undefined;
   if (method !== "GET") {
     // Swallow writes so tapping around during the tour never persists.
     return { ok: true };
