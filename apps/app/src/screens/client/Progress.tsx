@@ -19,6 +19,7 @@ import {
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { CoachNote } from "./CoachNote.js";
+import { BodyScanCard } from "./BodyScanCard.js";
 
 // ── API shapes ──
 interface Pt { date: string; v: number }
@@ -90,7 +91,7 @@ export function Progress({ clientId }: { clientId: string }) {
              Dim while a new range loads (prior data stays put — no skeleton flash). */
           <motion.div key={tab} variants={stagger} initial="hidden" animate="show" className={cn("space-y-4 transition-opacity", loading && "pointer-events-none opacity-50")}>
             {tab === "overview" && <Overview data={data} dateLabel={dateLabel} />}
-            {tab === "body" && <Body data={data} units={units} dateLabel={dateLabel} />}
+            {tab === "body" && <Body data={data} units={units} dateLabel={dateLabel} clientId={clientId} />}
             {tab === "training" && <Training data={data} units={units} />}
             {tab === "wellness" && <Wellness data={data} dateLabel={dateLabel} />}
           </motion.div>
@@ -139,7 +140,7 @@ function Overview({ data, dateLabel }: { data: ProgressData; dateLabel: (i: numb
 }
 
 // ── Body ──
-function Body({ data, units, dateLabel }: { data: ProgressData; units: ReturnType<typeof useUnits>; dateLabel: (i: number) => string }) {
+function Body({ data, units, dateLabel, clientId }: { data: ProgressData; units: ReturnType<typeof useUnits>; dateLabel: (i: number) => string; clientId: string }) {
   const days = data.range.days;
   const { body } = data;
   const wl = weightLabel(units), ll = lengthLabel(units);
@@ -148,6 +149,7 @@ function Body({ data, units, dateLabel }: { data: ProgressData; units: ReturnTyp
   const bfVals = dense(body.bodyFat, days);
   return (
     <>
+      <Stagger><BodyScanCard clientId={clientId} /></Stagger>
       <Stagger>
         <ChartCard title="Weight" icon={METRICS.weight.icon} tone="cardio" value={body.latest.weightKg != null ? kgToDisplay(body.latest.weightKg, units).toFixed(1) : "—"} unit={wl} delta={<DeltaBadge d={body.deltas.weight} convert={(v) => kgToDisplay(v, units)} unit={wl} />}>
           <AreaChart values={weightVals} tone="cardio" trend label={dateLabel} format={(v) => v.toFixed(1)} />
