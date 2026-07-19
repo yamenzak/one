@@ -70,27 +70,43 @@ const THRESH = 0.5; // person cutoff — the DeepLab mask is a clean 0/1 body ma
 const NOSE_TO_HIP_FRACTION = 0.4;
 const clampF = (n: number): number => Math.round(n * 10) / 10;
 
-/** Left/right body extent (px) of one mask row, or null if the row is empty. */
-function rowExtent(mask: Float32Array, w: number, h: number, y: number): { min: number; max: number } | null {
+/**
+ * The contiguous body run on row `y` that contains the torso — seeded at the body
+ * midline `midX` and grown left/right only through connected body pixels, clipped
+ * to a torso window `[midX ± maxHalf]`. This is the crux of getting a real girth:
+ * it drops a disconnected out-held hand/forearm blob entirely, AND caps a limb
+ * that touches the torso, so arm pixels stop inflating waist/hip/chest widths
+ * (an outstretched arm was reading a 293 cm "hip"). Returns null if no body sits
+ * near the midline on this row.
+ */
+function torsoRun(mask: Float32Array, w: number, h: number, y: number, midX: number, maxHalf: number): { min: number; max: number } | null {
   const yi = Math.round(y);
   if (yi < 0 || yi >= h) return null;
   const base = yi * w;
-  let min = -1;
-  let max = -1;
-  for (let x = 0; x < w; x++) {
-    if (mask[base + x]! > THRESH) {
-      if (min < 0) min = x;
-      max = x;
+  const lo = Math.max(0, Math.round(midX - maxHalf));
+  const hi = Math.min(w - 1, Math.round(midX + maxHalf));
+  let cx = Math.max(lo, Math.min(hi, Math.round(midX)));
+  if (!(mask[base + cx]! > THRESH)) {
+    // Midline landed on a segmentation gap — seed from the nearest body pixel.
+    let seed = -1;
+    for (let d = 1; d <= hi - lo; d++) {
+      if (cx - d >= lo && mask[base + cx - d]! > THRESH) { seed = cx - d; break; }
+      if (cx + d <= hi && mask[base + cx + d]! > THRESH) { seed = cx + d; break; }
     }
+    if (seed < 0) return null;
+    cx = seed;
   }
-  return min < 0 ? null : { min, max };
+  let min = cx, max = cx;
+  while (min - 1 >= lo && mask[base + min - 1]! > THRESH) min--;
+  while (max + 1 <= hi && mask[base + max + 1]! > THRESH) max++;
+  return { min, max };
 }
 
-/** Median body width (px) across a few rows centered on y — robust to noise. */
-function widthAt(mask: Float32Array, w: number, h: number, y: number): number {
+/** Median torso width (px) across a few rows centered on y — robust to noise. */
+function widthAt(mask: Float32Array, w: number, h: number, y: number, midX: number, maxHalf: number): number {
   const widths: number[] = [];
   for (let dy = -2; dy <= 2; dy++) {
-    const ext = rowExtent(mask, w, h, y + dy);
+    const ext = torsoRun(mask, w, h, y + dy, midX, maxHalf);
     if (ext) widths.push(ext.max - ext.min + 1);
   }
   if (widths.length === 0) return 0;
@@ -98,14 +114,14 @@ function widthAt(mask: Float32Array, w: number, h: number, y: number): number {
   return widths[Math.floor(widths.length / 2)]!;
 }
 
-/** Scan a vertical band for the row of extreme (min|max) body width. */
-function extremeWidthRow(mask: Float32Array, w: number, h: number, yA: number, yB: number, mode: "min" | "max"): { y: number; width: number } {
+/** Scan a vertical band for the row of extreme (min|max) torso width. */
+function extremeWidthRow(mask: Float32Array, w: number, h: number, yA: number, yB: number, mode: "min" | "max", midX: number, maxHalf: number): { y: number; width: number } {
   const lo = Math.max(0, Math.min(yA, yB));
   const hi = Math.min(h - 1, Math.max(yA, yB));
   let bestY = (lo + hi) / 2;
   let best = mode === "min" ? Infinity : -1;
   for (let y = Math.round(lo); y <= Math.round(hi); y++) {
-    const ext = rowExtent(mask, w, h, y);
+    const ext = torsoRun(mask, w, h, y, midX, maxHalf);
     if (!ext) continue;
     const width = ext.max - ext.min + 1;
     if ((mode === "min" && width < best) || (mode === "max" && width > best)) {
@@ -118,38 +134,52 @@ function extremeWidthRow(mask: Float32Array, w: number, h: number, yA: number, y
 
 const vis = (lm: NormLandmark | undefined): number => lm?.visibility ?? 1;
 
+/** 1-D moving-average smooth of a per-row edge series (odd window) — softens the
+ *  row-to-row jaggedness of a low-res mask so the outline reads clean. */
+function smooth(vals: number[], win = 5): number[] {
+  const r = (win - 1) / 2;
+  return vals.map((_, i) => {
+    let s = 0, n = 0;
+    for (let k = -r; k <= r; k++) { const j = i + k; if (j >= 0 && j < vals.length) { s += vals[j]!; n++; } }
+    return s / n;
+  });
+}
+
 /**
- * Trace a de-identified outline from the mask: sample rows across the body
- * bounding box, take each row's left & right edge, and stitch a closed polygon
- * (down the left edges, back up the right). Normalized into the bbox so scans at
- * different camera distances still overlay for the morph. ≤600 points.
+ * Trace a de-identified torso outline from the mask: sample rows across the body,
+ * take each row's midline-anchored torso run (arms excluded), smooth the left &
+ * right edges, and stitch a closed polygon (down the left, back up the right).
+ * Normalized into the bbox so scans at different distances overlay for the morph.
+ * ≤600 points.
  */
-function extractContour(mask: Float32Array, w: number, h: number, sampleRows = 140): [number, number][] {
-  let minX = w;
-  let maxX = -1;
-  let minY = h;
-  let maxY = -1;
+function extractContour(mask: Float32Array, w: number, h: number, midX: number, maxHalf: number, sampleRows = 160): [number, number][] {
+  // Vertical body extent along the torso run (so arm-only rows don't extend it).
+  let minY = h, maxY = -1;
   for (let y = 0; y < h; y++) {
-    const ext = rowExtent(mask, w, h, y);
-    if (!ext) continue;
-    if (y < minY) minY = y;
-    if (y > maxY) maxY = y;
-    if (ext.min < minX) minX = ext.min;
-    if (ext.max > maxX) maxX = ext.max;
+    if (torsoRun(mask, w, h, y, midX, maxHalf)) { if (y < minY) minY = y; if (y > maxY) maxY = y; }
   }
-  if (maxX < 0 || maxY <= minY) return [];
-  const bw = Math.max(1, maxX - minX);
-  const bh = Math.max(1, maxY - minY);
-  const left: [number, number][] = [];
-  const right: [number, number][] = [];
+  if (maxY <= minY) return [];
   const rows = Math.min(sampleRows, Math.max(8, Math.floor((maxY - minY) / 2)));
+  const ys: number[] = [], lx: number[] = [], rx: number[] = [];
   for (let i = 0; i <= rows; i++) {
     const y = minY + ((maxY - minY) * i) / rows;
-    const ext = rowExtent(mask, w, h, y);
+    const ext = torsoRun(mask, w, h, y, midX, maxHalf);
     if (!ext) continue;
-    const ny = (y - minY) / bh;
-    left.push([Math.round(((ext.min - minX) / bw) * 1000) / 1000, Math.round(ny * 1000) / 1000]);
-    right.push([Math.round(((ext.max - minX) / bw) * 1000) / 1000, Math.round(ny * 1000) / 1000]);
+    ys.push(y); lx.push(ext.min); rx.push(ext.max);
+  }
+  if (ys.length < 3) return [];
+  const sl = smooth(lx), sr = smooth(rx);
+  let minX = w, maxX = -1;
+  for (let i = 0; i < ys.length; i++) { if (sl[i]! < minX) minX = sl[i]!; if (sr[i]! > maxX) maxX = sr[i]!; }
+  const bw = Math.max(1, maxX - minX);
+  const bh = Math.max(1, maxY - minY);
+  const q = (v: number) => Math.round(v * 1000) / 1000;
+  const left: [number, number][] = [];
+  const right: [number, number][] = [];
+  for (let i = 0; i < ys.length; i++) {
+    const ny = (ys[i]! - minY) / bh;
+    left.push([q((sl[i]! - minX) / bw), q(ny)]);
+    right.push([q((sr[i]! - minX) / bw), q(ny)]);
   }
   const poly = [...left, ...right.reverse()];
   // Cap at 600 points (protocol limit) by even decimation.
@@ -168,7 +198,6 @@ function extractContour(mask: Float32Array, w: number, h: number, sampleRows = 1
  */
 export function measureCapture(cap: Capture, heightCm: number): SiteWidths {
   const { mask, width: w, height: h, landmarks: lm } = cap;
-  const contour = extractContour(mask, w, h);
 
   const nose = lm[LM.nose];
   const lAnk = lm[LM.lAnkle];
@@ -177,12 +206,25 @@ export function measureCapture(cap: Capture, heightCm: number): SiteWidths {
   const rSh = lm[LM.rShoulder];
   const lHip = lm[LM.lHip];
   const rHip = lm[LM.rHip];
-  if (!nose || !lSh || !rSh || !lHip || !rHip) return { pxPerCm: null, neckCm: null, chestCm: null, waistCm: null, hipsCm: null, contour };
+  if (!nose || !lSh || !rSh || !lHip || !rHip) return { pxPerCm: null, neckCm: null, chestCm: null, waistCm: null, hipsCm: null, contour: [] };
 
   const noseY = nose.y * h;
   const shoulderY = ((lSh.y + rSh.y) / 2) * h;
   const hipY = ((lHip.y + rHip.y) / 2) * h;
   const torso = Math.max(1, hipY - shoulderY);
+
+  // Torso midline + horizontal search window. Arms reach past the shoulder/hip
+  // joints, so bound every width/contour scan to a window sized from those joints
+  // (frontal) and grow the run only through connected pixels. A SIDE capture has
+  // a near-zero shoulder span (joints overlap in x) — don't clip it; the
+  // contiguous run alone is enough and dropping disconnected blobs still applies.
+  const midX = Math.max(0, Math.min(w - 1, ((lSh.x + rSh.x + lHip.x + rHip.x) / 4) * w));
+  const shHalf = (Math.abs(lSh.x - rSh.x) / 2) * w;
+  const hipHalf = (Math.abs(lHip.x - rHip.x) / 2) * w;
+  const frontal = shHalf > w * 0.06;
+  const maxHalf = frontal ? Math.max(shHalf, hipHalf) * 1.5 : w;
+
+  const contour = extractContour(mask, w, h, midX, maxHalf);
 
   // px/cm scale. Prefer the full nose→ankle span (domain applies the 0.86 height
   // factor). But feet are very often out of frame on a phone held at chest
@@ -196,13 +238,13 @@ export function measureCapture(cap: Capture, heightCm: number): SiteWidths {
   const toCm = (px: number): number | null => (pxPerCm && px > 0 ? clampF(px / pxPerCm) : null);
 
   // Neck: narrowest row just above the shoulders (between head and shoulders).
-  const neck = extremeWidthRow(mask, w, h, shoulderY - torso * 0.28, shoulderY - torso * 0.04, "min");
+  const neck = extremeWidthRow(mask, w, h, shoulderY - torso * 0.28, shoulderY - torso * 0.04, "min", midX, maxHalf);
   // Chest: just below the shoulder line.
-  const chestPx = widthAt(mask, w, h, shoulderY + torso * 0.2);
+  const chestPx = widthAt(mask, w, h, shoulderY + torso * 0.2, midX, maxHalf);
   // Waist: narrowest torso row in the lower-mid torso.
-  const waist = extremeWidthRow(mask, w, h, shoulderY + torso * 0.45, hipY - torso * 0.05, "min");
+  const waist = extremeWidthRow(mask, w, h, shoulderY + torso * 0.45, hipY - torso * 0.05, "min", midX, maxHalf);
   // Hips: widest row around the hip landmark level.
-  const hips = extremeWidthRow(mask, w, h, hipY - torso * 0.05, hipY + torso * 0.15, "max");
+  const hips = extremeWidthRow(mask, w, h, hipY - torso * 0.05, hipY + torso * 0.15, "max", midX, maxHalf);
 
   // Widths come ONLY from the person silhouette. We deliberately do NOT synthesize
   // them from pose-landmark breadths as a fallback: the hip landmarks sit at the
