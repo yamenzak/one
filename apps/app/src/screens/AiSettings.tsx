@@ -67,6 +67,28 @@ export function AiConfigSection() {
     } catch { /* preview needs the body-scan entitlement + credits; ignore */ }
     finally { setPreviewing(null); }
   };
+
+  // Voice pack: cues are generated once, on the OWNER'S explicit action (the
+  // billed moment) — never silently by a client's scan. Status tracks the saved voice.
+  const selectedVoice = config.ttsVoice ?? "Kore";
+  const [pack, setPack] = useState<{ ready: boolean; count: number; total: number } | null>(null);
+  const [genBusy, setGenBusy] = useState(false);
+  const [genNote, setGenNote] = useState<string | null>(null);
+  useEffect(() => {
+    setGenNote(null);
+    void api.get<{ ready: boolean; count: number; total: number }>(`/api/body-scan/voice-pack?voice=${encodeURIComponent(selectedVoice)}`).then(setPack).catch(() => setPack(null));
+  }, [selectedVoice]);
+  const generatePack = async () => {
+    setGenBusy(true); setGenNote(null);
+    try {
+      const r = await api.post<{ ready: boolean; generated: number; credits: number }>("/api/body-scan/voice-pack", { voice: selectedVoice });
+      setPack((p) => ({ ready: r.ready, total: p?.total ?? 10, count: r.ready ? (p?.total ?? 10) : (p?.count ?? 0) + r.generated }));
+      setGenNote(r.generated > 0 ? `Generated ${r.generated} cue${r.generated === 1 ? "" : "s"} — ${r.credits} credit${r.credits === 1 ? "" : "s"}.` : "Voice pack already up to date.");
+    } catch (e) {
+      const status = (e as { status?: number }).status;
+      setGenNote(status === 402 ? "Not enough credits to generate the voice pack." : status === 403 ? "The body-scan add-on isn't in your plan." : "Couldn't generate the voice pack — try again.");
+    } finally { setGenBusy(false); }
+  };
   const saveFeature = async (key: string, patch: AiFeatureConfig) => {
     setConfig((c) => ({ ...c, features: { ...(c.features ?? {}), [key]: { ...(c.features?.[key] ?? {}), ...patch } } }));
     await api.patch("/api/settings/ai", { features: { [key]: patch } }).catch(() => undefined);
@@ -164,6 +186,21 @@ export function AiConfigSection() {
                       </span>
                     );
                   })}
+                </div>
+                <div className="rounded-xl bg-muted/40 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 text-sm">
+                      {pack?.ready
+                        ? <span className="text-foreground">Voice pack ready — clients hear your <b>{selectedVoice}</b> voice.</span>
+                        : <span className="text-muted-foreground">Not generated yet. Until you generate it, clients hear a generic device voice.</span>}
+                    </div>
+                    <Button size="sm" variant={pack?.ready ? "secondary" : "default"} disabled={genBusy} onClick={() => void generatePack()}>
+                      {genBusy ? "Generating…" : pack?.ready ? "Regenerate" : "Generate voice pack"}
+                    </Button>
+                  </div>
+                  <div className="mt-1.5 text-xs text-muted-foreground">
+                    {genNote ?? "Generated once and cached — you're billed in credits for the cue pack, not per scan."}
+                  </div>
                 </div>
               </Card>
             </div>

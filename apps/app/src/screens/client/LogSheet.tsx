@@ -14,6 +14,7 @@ import {
 import { api, todayLocal, uploadMedia } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
+import { BodyScanLauncher } from "./bodyscan/BodyScanLauncher.js";
 
 type LogKind = "food" | "activity" | "water" | "weight" | "body" | "sleep" | "mood" | "checkin";
 const CHIPS: { kind: LogKind; label: string; icon: LucideIcon; tone: Tone }[] = [
@@ -139,6 +140,18 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
           </>)}
           {kind === "body" && (<>
             <h2 className="text-lg font-semibold">Body measurements</h2>
+            <BodyScanLauncher clientId={clientId} onSaved={() => { onLogged(); close(); }}>
+              {({ open, loading, profileReady }) =>
+                profileReady ? (
+                  <div className="space-y-2">
+                    <Button className="w-full" onClick={open}><Camera /> Scan with camera</Button>
+                    <div className="text-center text-xs text-muted-foreground">Or enter your measurements manually</div>
+                  </div>
+                ) : loading ? null : (
+                  <p className="text-xs text-muted-foreground">Add your sex, birth date and height in your profile to scan with the camera.</p>
+                )
+              }
+            </BodyScanLauncher>
             <div className="grid grid-cols-2 gap-3">
               <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={f.weight ?? ""} onChange={(e) => setDec("weight", e.target.value)} />
               <Field label="Body fat %" inputMode="decimal" value={f.bf ?? ""} onChange={(e) => setDec("bf", e.target.value)} />

@@ -64,6 +64,9 @@ export const LM = {
 } as const;
 
 const THRESH = 0.5; // person-confidence cutoff
+/** nose→hip is ~0.40 of standing height — the fallback scale when feet are out
+ *  of frame (nose ≈0.93·H, hip/greater-trochanter ≈0.53·H). */
+const NOSE_TO_HIP_FRACTION = 0.4;
 const clampF = (n: number): number => Math.round(n * 10) / 10;
 
 /** Left/right body extent (px) of one mask row, or null if the row is empty. */
@@ -175,15 +178,19 @@ export function measureCapture(cap: Capture, heightCm: number): SiteWidths {
   const rHip = lm[LM.rHip];
   if (!nose || !lSh || !rSh || !lHip || !rHip) return { pxPerCm: null, neckCm: null, chestCm: null, waistCm: null, hipsCm: null, contour };
 
-  // px/cm from the nose→ankle span (domain applies the 0.86 height factor).
-  const ankleY = Math.max(vis(lAnk) > 0.4 ? (lAnk?.y ?? 0) : 0, vis(rAnk) > 0.4 ? (rAnk?.y ?? 0) : 0) * h;
   const noseY = nose.y * h;
-  const bodyPx = ankleY - noseY;
-  const pxPerCm = pixelScaleFromHeight(bodyPx, heightCm);
-
   const shoulderY = ((lSh.y + rSh.y) / 2) * h;
   const hipY = ((lHip.y + rHip.y) / 2) * h;
   const torso = Math.max(1, hipY - shoulderY);
+
+  // px/cm scale. Prefer the full nose→ankle span (domain applies the 0.86 height
+  // factor). But feet are very often out of frame on a phone held at chest
+  // height, so fall back to the nose→hip span (nose ≈0.93·H, hip ≈0.53·H →
+  // ≈0.40·H) — that lets a head-to-thigh capture still calibrate instead of
+  // failing outright. (Both are self-calibrated per frame.)
+  const ankleY = Math.max(vis(lAnk) > 0.5 ? (lAnk?.y ?? 0) : 0, vis(rAnk) > 0.5 ? (rAnk?.y ?? 0) : 0) * h;
+  let pxPerCm: number | null = ankleY > noseY ? pixelScaleFromHeight(ankleY - noseY, heightCm) : null;
+  if (!pxPerCm && hipY > noseY && heightCm > 0) pxPerCm = (hipY - noseY) / (heightCm * NOSE_TO_HIP_FRACTION);
 
   const toCm = (px: number): number | null => (pxPerCm && px > 0 ? clampF(px / pxPerCm) : null);
 

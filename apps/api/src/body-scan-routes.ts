@@ -119,33 +119,65 @@ export const bodyScanRoutes = new Hono<AppEnv>()
     return c.json({ scans: (rows.results ?? []).map(scanView) });
   })
 
-  // The tenant's cue audio set — cached; missing phrases are generated + stored.
+  // The tenant's cue audio set — SERVE-ONLY (never generates here). A client's
+  // scan must not silently bill the owner: the owner generates the voice pack
+  // explicitly (POST /body-scan/voice-pack). Missing cues come back with an empty
+  // url and the client speaks them with the browser's free speechSynthesis.
   .get("/body-scan/cues", async (c) => {
     const who = requireTenant(c)!;
     if (!(await hasFeature(c.env.DB, who.tenantId, "bfCamera"))) return c.json({ error: "body scan not in your plan" }, 403);
     const voice = await resolveVoice(c.env.DB, who.tenantId, c.req.query("voice"));
-    const lang = (c.req.query("lang") || "en").slice(0, 10).replace(/[^A-Za-z-]/g, "");
-    const cues: { id: string; url: string; text: string }[] = [];
+    const lang = "en";
+    const rows = await c.env.DB.prepare("SELECT phrase_id, media_key FROM tts_cues WHERE tenant_id=? AND voice=? AND lang=? AND version=?")
+      .bind(who.tenantId, voice, lang, TTS_VERSION)
+      .all<{ phrase_id: string; media_key: string }>();
+    const byId = new Map((rows.results ?? []).map((r) => [r.phrase_id, r.media_key]));
+    const cues = CUE_PHRASES.map((p) => ({ id: p.id, url: byId.has(p.id) ? `/api/media/${byId.get(p.id)}` : "", text: p.text }));
+    return c.json({ voice, lang, cues });
+  })
+
+  // Owner: how many cues are voiced for the current (or ?voice=) voice.
+  .get("/body-scan/voice-pack", async (c) => {
+    const who = requireTenant(c)!;
+    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
+    const voice = await resolveVoice(c.env.DB, who.tenantId, c.req.query("voice"));
+    const rows = await c.env.DB.prepare("SELECT phrase_id FROM tts_cues WHERE tenant_id=? AND voice=? AND lang='en' AND version=?")
+      .bind(who.tenantId, voice, TTS_VERSION)
+      .all<{ phrase_id: string }>();
+    const have = new Set((rows.results ?? []).map((r) => r.phrase_id));
+    const count = CUE_PHRASES.filter((p) => have.has(p.id)).length;
+    return c.json({ voice, total: CUE_PHRASES.length, count, ready: count >= CUE_PHRASES.length });
+  })
+
+  // Owner: generate + cache the whole cue pack for a voice. THIS is the billed
+  // moment — clear, owner-initiated, one-time. Idempotent (skips cached cues).
+  .post("/body-scan/voice-pack", async (c) => {
+    const who = requireTenant(c)!;
+    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
+    if (!(await hasFeature(c.env.DB, who.tenantId, "bfCamera"))) return c.json({ error: "body scan not in your plan" }, 403);
+    const body = (await c.req.json().catch(() => ({}))) as { voice?: string };
+    const voice = await resolveVoice(c.env.DB, who.tenantId, body.voice);
+    const lang = "en";
+    let generated = 0, credits = 0;
     for (const phrase of CUE_PHRASES) {
       const existing = await c.env.DB.prepare("SELECT media_key FROM tts_cues WHERE tenant_id=? AND voice=? AND lang=? AND phrase_id=? AND version=?")
         .bind(who.tenantId, voice, lang, phrase.id, TTS_VERSION)
         .first<{ media_key: string }>();
-      let key = existing?.media_key ?? null;
-      if (!key) {
-        const speech = await generateSpeech(c.env, { tenantId: who.tenantId, feature: "body_scan_cue", text: phrase.text, voice });
-        if (speech.ok) {
-          key = `t/${who.tenantId}/tts/${voice}-${lang}-${phrase.id}-v${TTS_VERSION}.wav`;
-          await c.env.MEDIA.put(key, speech.bytes, { httpMetadata: { contentType: "audio/wav" } });
-          await c.env.DB.prepare("INSERT OR IGNORE INTO tts_cues (tenant_id, voice, lang, phrase_id, version, media_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-            .bind(who.tenantId, voice, lang, phrase.id, TTS_VERSION, key, nowIso())
-            .run();
-        }
+      if (existing) continue;
+      const speech = await generateSpeech(c.env, { tenantId: who.tenantId, feature: "body_scan_cue", text: phrase.text, voice });
+      if (!speech.ok) {
+        if (speech.error === "insufficient_credits") return c.json({ error: "insufficient_credits", generated, credits, needed: speech.needed }, 402);
+        continue; // one provider hiccup shouldn't abort the whole pack
       }
-      // `text` lets the client fall back to the browser's speechSynthesis if a
-      // cue couldn't be generated (no credits / provider down).
-      cues.push({ id: phrase.id, url: key ? `/api/media/${key}` : "", text: phrase.text });
+      const key = `t/${who.tenantId}/tts/${voice}-${lang}-${phrase.id}-v${TTS_VERSION}.wav`;
+      await c.env.MEDIA.put(key, speech.bytes, { httpMetadata: { contentType: "audio/wav" } });
+      await c.env.DB.prepare("INSERT OR IGNORE INTO tts_cues (tenant_id, voice, lang, phrase_id, version, media_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .bind(who.tenantId, voice, lang, phrase.id, TTS_VERSION, key, nowIso())
+        .run();
+      generated++; credits += speech.credits;
     }
-    return c.json({ voice, lang, cues });
+    const total = (await c.env.DB.prepare("SELECT COUNT(*) AS n FROM tts_cues WHERE tenant_id=? AND voice=? AND lang='en' AND version=? AND phrase_id != 'preview'").bind(who.tenantId, voice, TTS_VERSION).first<{ n: number }>())?.n ?? 0;
+    return c.json({ ok: true, voice, generated, credits, ready: total >= CUE_PHRASES.length });
   })
 
   // Owner voice preview for the settings picker — one short sample per voice,
