@@ -31,6 +31,7 @@ interface Scan {
   confidence: "high" | "medium" | "low" | null;
   circumferences: { neckCm: number | null; waistCm: number | null; hipsCm: number | null; chestCm: number | null };
   weightKg: number | null;
+  heightCm: number | null;
   contourFront: [number, number][] | null;
   contourSide: [number, number][] | null;
   createdAt: string;

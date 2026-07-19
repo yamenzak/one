@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  estimateBodyFat, classifyBodyFat, type BodyFatEstimate, type BodyFatCategory,
+  estimateBodyFat, classifyBodyFat, bodyComposition, type BodyFatEstimate, type BodyFatCategory,
   displayToKg, kgToDisplay, lengthDisplayToCm, weightLabel, lengthLabel, type UnitPrefs,
 } from "@mossa/domain";
 import {
@@ -623,6 +623,20 @@ function ResultStep({ clientId, result, profile, units, onSaved, onRetry }: {
         </div>
       </details>
 
+      {/* Body composition — lean/fat mass + FFMI derived from weight × body-fat. */}
+      {(() => {
+        const comp = bodyComposition(result.weightKg, estimate.bodyFatPercent, profile.heightCm);
+        if (!comp) return null;
+        const wl = weightLabel(units);
+        return (
+          <div className="grid grid-cols-3 gap-2">
+            <CompBox label="Lean mass" value={kgToDisplay(comp.leanMassKg, units).toFixed(1)} unit={wl} />
+            <CompBox label="Fat mass" value={kgToDisplay(comp.fatMassKg, units).toFixed(1)} unit={wl} />
+            <CompBox label="FFMI" value={comp.ffmi.toFixed(1)} unit="kg/m²" />
+          </div>
+        );
+      })()}
+
       {/* Measurements */}
       <div className="grid grid-cols-4 gap-2">
         <MeasBox label="Neck" cm={circumferences.neckCm} units={units} />
@@ -672,6 +686,15 @@ function MeasBox({ label, cm, units }: { label: string; cm: number | null | unde
     <div className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
       <div className="text-[0.65rem] font-medium text-muted-foreground">{label}</div>
       <div className="numeral mt-0.5 text-sm font-bold">{cm != null ? Math.round(cmToLengthDisplayLocal(cm, units)) : "—"}<span className="ml-0.5 text-[0.55rem] text-muted-foreground">{cm != null ? lengthLabel(units) : ""}</span></div>
+    </div>
+  );
+}
+
+function CompBox({ label, value, unit }: { label: string; value: string; unit: string }) {
+  return (
+    <div className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
+      <div className="text-[0.65rem] font-medium text-muted-foreground">{label}</div>
+      <div className="numeral mt-0.5 text-sm font-bold">{value}<span className="ml-0.5 text-[0.55rem] text-muted-foreground">{unit}</span></div>
     </div>
   );
 }

@@ -80,6 +80,11 @@ export const CLIENT_WIDGETS: WidgetDef<ClientWidgetData>[] = [
     renderSmall: (d) => <MiniCard icon={METRICS.weight.icon} tone={METRICS.weight.tone} label={`Weight 7d ${weightLabel(d.units)}`} value={weightDelta(d.bundle.weightSeries, d.units)} />,
   },
   {
+    id: "bodyfat", title: "Body fat", icon: METRICS.bodyFat.icon,
+    renderBig: (d) => <BodyFatWidget clientId={d.clientId} size="big" />,
+    renderSmall: (d) => <BodyFatWidget clientId={d.clientId} size="small" />,
+  },
+  {
     id: "sets", title: "Sets logged today", icon: METRICS.sets.icon,
     renderBig: (d) => <RingCard tone={METRICS.sets.tone} progress={0.001} value={d.bundle.workout.loggedSets} label="Sets" sublabel="today" />,
     renderSmall: (d) => <MiniCard icon={METRICS.sets.icon} tone={METRICS.sets.tone} label="Sets today" value={d.bundle.workout.loggedSets} />,
@@ -100,6 +105,24 @@ export const CLIENT_WIDGETS: WidgetDef<ClientWidgetData>[] = [
     renderSmall: (d) => <FastingWidget clientId={d.clientId} size="small" />,
   },
 ];
+
+// ── Body fat (self-fetched from the camera/manual scans) ─────────────────────
+function BodyFatWidget({ clientId, size }: { clientId: string; size: WidgetSize }) {
+  const [scans, setScans] = useState<{ bodyFatPercent: number | null }[] | null>(null);
+  useEffect(() => {
+    void api.get<{ scans: { bodyFatPercent: number | null }[] }>(`/api/body-scans?clientId=${clientId}`)
+      .then((r) => setScans(r.scans)).catch(() => setScans([]));
+  }, [clientId]);
+  if (!scans) return <div className="h-full animate-pulse rounded-2xl bg-surface-2" />;
+  const withBf = scans.filter((s) => s.bodyFatPercent != null); // newest-first
+  const latest = withBf[0]?.bodyFatPercent ?? null;
+  const prev = withBf[1]?.bodyFatPercent ?? null;
+  const delta = latest != null && prev != null ? Math.round((latest - prev) * 10) / 10 : null;
+  const sub = latest == null ? "no scans yet" : delta != null ? `${delta > 0 ? "+" : ""}${delta}% vs last` : "estimate";
+  return size === "big"
+    ? <RingCard tone={METRICS.bodyFat.tone} progress={latest != null ? Math.min(1, latest / 40) || 0.001 : 0.001} value={latest != null ? latest.toFixed(1) : "—"} label="Body fat" sublabel={sub} />
+    : <MiniCard icon={METRICS.bodyFat.icon} tone={METRICS.bodyFat.tone} label="Body fat" value={latest != null ? `${latest.toFixed(1)}%` : "—"} />;
+}
 
 // ── Wellness Score ───────────────────────────────────────────────────────────
 const BAND_LABEL: Record<string, string> = { start: "Just starting", building: "Building", solid: "Solid", strong: "Strong", peak: "Peak" };
