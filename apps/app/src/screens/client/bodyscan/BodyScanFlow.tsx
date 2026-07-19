@@ -88,6 +88,14 @@ export default function BodyScanFlow({
         const s = side ? measureCapture(side, profile.heightCm) : f;
         const circ = computeCircumferences(f, s);
         if (!circ) throw new Error("measure failed");
+        // Plausibility gate: a waist far outside the human range for this height
+        // means a bad read (occlusion, loose clothing, a partial mask) — surface
+        // manual entry rather than a confidently-wrong estimate (e.g. a 59 cm
+        // waist reading 5% body-fat on a 90 kg frame). ~0.35–0.95 × height spans
+        // very lean to very high girth.
+        if (circ.waistCm < profile.heightCm * 0.35 || circ.waistCm > profile.heightCm * 0.95) {
+          throw new Error("implausible measurement");
+        }
         const estimate = estimateBodyFat({
           gender: profile.gender, ageYears: profile.ageYears, heightCm: profile.heightCm,
           weightKg: latestWeightKg ?? 75,
@@ -113,7 +121,7 @@ export default function BodyScanFlow({
       role="dialog"
       aria-modal="true"
       aria-label="Body scan"
-      className="fixed inset-0 z-[60] flex flex-col bg-background text-foreground outline-none"
+      className="fixed inset-0 z-[70] flex flex-col bg-background text-foreground outline-none"
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-2">
