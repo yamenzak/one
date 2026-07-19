@@ -30,7 +30,11 @@ export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activi
   const p = Math.min(1, Math.max(0, progress));
   const gradId = useId();
   const color = toneVar[tone];
-  const track = softTrack ? `color-mix(in oklch, ${color} 22%, var(--surface-3))` : "var(--surface-3)";
+  // A soft track is the tone at low alpha over the card — a genuine faint tint of
+  // the tone's OWN hue. Mixing against surface-3 instead let the neutral surface's
+  // hue dominate (78% weight), so on a tinted-neutral theme the track drifted off
+  // the tone (e.g. a cardio-blue ring with a green track).
+  const track = softTrack ? `color-mix(in oklch, ${color} 24%, transparent)` : "var(--surface-3)";
 
   return (
     <div className={cn("relative shrink-0", className)} style={{ width: size, height: size }}>
