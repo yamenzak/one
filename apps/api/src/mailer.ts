@@ -165,57 +165,63 @@ export function safeColor(value: string | null | undefined, fallback: string): s
   return ok ? v : fallback;
 }
 
+// Palette lifted from the app tokens (DESIGN.md): near-black canvas, cards one
+// tonal step lighter, a nested step again. Separation is TONE, not borders.
 const T = {
-  bg: "#0b0c0e", card: "#16181b", inset: "#1e2126", border: "#23262c",
-  fg: "#f2f3f5", body: "#c8cbd0", muted: "#8b9099",
+  bg: "#0b0c0e", card: "#17191c", inset: "#1e2126",
+  fg: "#f5f6f7", body: "#b6bbc2", muted: "#767b83", hair: "rgba(255,255,255,0.06)",
 } as const;
 
-const EMAIL_FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const EMAIL_FONT = "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
-/** A bulletproof, brand-accented pill CTA. */
+/** A restrained, brand-accented CTA — softly rounded, left-aligned to sit in the
+ *  message flow (not a centered candy pill). */
 export function emailButton(label: string, href: string, brand: BrandKit = MOSSA_BRAND): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px auto 4px"><tr><td align="center" style="border-radius:9999px;background:${brand.accent}">
-    <a href="${encodeURI(href)}" style="display:inline-block;padding:14px 34px;font-family:${EMAIL_FONT};font-size:15px;font-weight:700;line-height:1;color:${brand.accentFg};text-decoration:none;border-radius:9999px">${escapeHtml(label)}</a>
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:26px 0 2px"><tr><td style="border-radius:12px;background:${brand.accent}">
+    <a href="${encodeURI(href)}" style="display:inline-block;padding:13px 24px;font-family:${EMAIL_FONT};font-size:15px;font-weight:600;line-height:1;color:${brand.accentFg};text-decoration:none;border-radius:12px">${escapeHtml(label)}</a>
   </td></tr></table>`;
 }
 
-/** The premium, tenant-branded wrapper. `heading`/`bodyHtml` are pre-escaped by
- *  the caller; `brand` skins it; `preheader` is the inbox preview line; `footnote`
- *  overrides the small print under the card. Dark-first to match the app
- *  (DESIGN.md), with a tenant-accent header rule and a wordmark chip. */
+/** The tenant-branded wrapper. `heading`/`bodyHtml` are pre-escaped by the
+ *  caller; `brand` skins it; `preheader` is the inbox preview line; `eyebrow` is
+ *  an optional muted kicker above the heading; `footnote` overrides the small
+ *  print. Dark-first, borderless, left-aligned — the app's own surface language
+ *  (DESIGN.md), not a generic centered template. */
 export function emailShell(
   heading: string,
   bodyHtml: string,
-  opts: { brand?: BrandKit; preheader?: string; footnote?: string } = {},
+  opts: { brand?: BrandKit; preheader?: string; footnote?: string; eyebrow?: string } = {},
 ): string {
   const brand = opts.brand ?? MOSSA_BRAND;
   const font = EMAIL_FONT;
-  // Wordmark: the tenant's public logo, else a rounded accent chip carrying the
-  // studio name — either way it reads as the tenant's own identity, not Mossa's.
+  // Wordmark: the tenant's public logo, else the studio name set clean in the
+  // foreground — a quiet, confident mark, not a coloured chip.
   const mark = brand.logoUrl
-    ? `<img src="${encodeURI(brand.logoUrl)}" alt="${escapeHtml(brand.name)}" height="34" style="height:34px;max-height:34px;width:auto;border:0;display:block;margin:0 auto">`
-    : `<span style="display:inline-block;padding:9px 18px;border-radius:9999px;background:${brand.accent};font-size:15px;font-weight:800;letter-spacing:0.02em;color:${brand.accentFg}">${escapeHtml(brand.name)}</span>`;
+    ? `<img src="${encodeURI(brand.logoUrl)}" alt="${escapeHtml(brand.name)}" height="26" style="height:26px;max-height:26px;width:auto;border:0;display:block">`
+    : `<span style="font-size:17px;font-weight:600;letter-spacing:-0.01em;color:${T.fg}">${escapeHtml(brand.name)}</span>`;
   const preheader = opts.preheader ?? heading;
   const isMossa = brand.name === MOSSA_BRAND.name;
-  const footnote = opts.footnote ?? (isMossa ? "Coaching, organized." : `Sent by ${escapeHtml(brand.name)} · manage notifications in your account settings.`);
+  const footnote = opts.footnote ?? (isMossa ? "Mossa · coaching, organized." : `Sent by ${escapeHtml(brand.name)}. Manage notifications in your account settings.`);
+  const eyebrow = opts.eyebrow
+    ? `<div style="font-size:12px;font-weight:600;letter-spacing:0.01em;color:${brand.accent};margin:0 0 10px">${escapeHtml(opts.eyebrow)}</div>`
+    : "";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"><meta name="supported-color-schemes" content="dark light"></head>
 <body style="margin:0;padding:0;background:${T.bg};-webkit-font-smoothing:antialiased">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${T.bg};font-size:1px;line-height:1px">${escapeHtml(preheader)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${T.bg};padding:36px 16px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${T.bg};padding:40px 16px">
   <tr><td align="center">
-    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px">
-      <tr><td align="center" style="padding:6px 0 24px">${mark}</td></tr>
-      <tr><td style="background:${T.card};border:1px solid ${T.border};border-radius:28px;overflow:hidden">
+    <table role="presentation" width="516" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:516px">
+      <tr><td style="padding:2px 6px 20px">${mark}</td></tr>
+      <tr><td style="background:${T.card};border-radius:22px">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-          <tr><td style="height:4px;background:${brand.accent};line-height:4px;font-size:4px">&nbsp;</td></tr>
-          <tr><td style="padding:38px 38px 42px;font-family:${font}">
-            <div style="font-size:23px;line-height:1.28;font-weight:700;color:${T.fg};margin:0 0 12px">${heading}</div>
-            <div style="width:36px;height:3px;background:${brand.accent};border-radius:9999px;margin:0 0 18px;line-height:3px;font-size:3px">&nbsp;</div>
-            <div style="font-size:15px;line-height:1.65;color:${T.body}">${bodyHtml}</div>
+          <tr><td style="padding:34px 34px 36px;font-family:${font}">
+            ${eyebrow}
+            <div style="font-size:21px;line-height:1.35;font-weight:600;letter-spacing:-0.01em;color:${T.fg};margin:0">${heading}</div>
+            <div style="font-size:15px;line-height:1.65;color:${T.body};margin:13px 0 0">${bodyHtml}</div>
           </td></tr>
         </table>
       </td></tr>
-      <tr><td style="padding:20px 36px 8px;font-family:${font};font-size:12px;line-height:1.6;color:${T.muted};text-align:center">
+      <tr><td style="padding:18px 8px 0;font-family:${font};font-size:12px;line-height:1.6;color:${T.muted}">
         ${escapeHtml(footnote)}
       </td></tr>
     </table>
