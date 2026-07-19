@@ -15,6 +15,7 @@ import {
 } from "@mossa/ui";
 import { Silhouette } from "./Silhouette.js";
 import { Body3D } from "./Body3D.js";
+import { scanProfile, modelSilhouette } from "./model.js";
 
 type Pt = [number, number];
 export interface HistoryScan {
@@ -46,8 +47,11 @@ export function BodyScanHistory({ scans, units, onClose }: { scans: HistoryScan[
 
   if (!scan) return null;
 
-  const front = hasPts(scan.contourFront) ? scan.contourFront : null;
-  const side = hasPts(scan.contourSide) ? scan.contourSide : null;
+  // Prefer the clean measurement-driven model; fall back to the raw stored
+  // capture outline for older scans that predate the numbers it needs.
+  const profile = scanProfile(scan);
+  const front = profile ? modelSilhouette(profile, "front") : hasPts(scan.contourFront) ? scan.contourFront : null;
+  const side = profile ? modelSilhouette(profile, "side") : hasPts(scan.contourSide) ? scan.contourSide : null;
   const viewOpts = [
     ...(front ? [{ value: "front" as const, label: "Front" }] : []),
     ...(side ? [{ value: "side" as const, label: "Side" }] : []),
@@ -80,7 +84,7 @@ export function BodyScanHistory({ scans, units, onClose }: { scans: HistoryScan[
             )}
             <div className="grid min-h-[300px] place-items-center py-1">
               {activeView === "3d" && front ? (
-                <Body3D front={front} side={side} width={230} height={300} />
+                <Body3D slices={profile?.slices} heightCm={scan.heightCm} front={front} side={side} width={230} height={300} />
               ) : activeView === "side" && side ? (
                 <Silhouette points={side} tone={toneVar.sleep} width={190} height={300} />
               ) : front ? (
@@ -93,7 +97,7 @@ export function BodyScanHistory({ scans, units, onClose }: { scans: HistoryScan[
               )}
             </div>
             {activeView === "3d" && (
-              <p className="text-center text-xs text-muted-foreground">Drag to rotate · reconstructed from your front &amp; side outlines</p>
+              <p className="text-center text-xs text-muted-foreground">Drag to rotate · a proportional model from your measurements</p>
             )}
 
             <div className="mt-3 flex items-end justify-between">
@@ -157,6 +161,8 @@ export function BodyScanHistory({ scans, units, onClose }: { scans: HistoryScan[
             <div className="space-y-2">
               {list.map((s) => {
                 const on = s.id === scan.id;
+                const sp = scanProfile(s);
+                const thumbPts = sp ? modelSilhouette(sp, "front") : hasPts(s.contourFront) ? s.contourFront : null;
                 return (
                   <button
                     key={s.id}
@@ -165,7 +171,7 @@ export function BodyScanHistory({ scans, units, onClose }: { scans: HistoryScan[
                     className={cn("flex w-full items-center gap-3 rounded-2xl p-3 text-left transition-colors", on ? "bg-sleep/15 ring-1 ring-sleep/40" : "bg-card hover:bg-surface-2")}
                   >
                     <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-surface-2">
-                      {hasPts(s.contourFront) ? <Silhouette points={s.contourFront} tone={toneVar.sleep} width={30} height={44} /> : <User className="size-5 text-muted-foreground" />}
+                      {thumbPts ? <Silhouette points={thumbPts} tone={toneVar.sleep} width={30} height={44} /> : <User className="size-5 text-muted-foreground" />}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium">{fmtDate(s.date)}</div>

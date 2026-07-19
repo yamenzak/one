@@ -27,6 +27,7 @@ import { loadScanner, analyzeAlignment, type Scanner, type ScanPhase, type Align
 import { measureCapture, computeCircumferences, fullBodyContour, LM, type Capture, type NormLandmark, type Circumferences } from "./measure.js";
 import { CuePlayer } from "./cues.js";
 import { Silhouette } from "./Silhouette.js";
+import { scanProfile, modelSilhouette } from "./model.js";
 
 export interface ScanProfile { gender: "male" | "female"; ageYears: number; heightCm: number }
 
@@ -546,6 +547,9 @@ function ResultStep({ clientId, result, profile, units, onSaved, onRetry }: {
 }) {
   const { estimate, circumferences, contourFront } = result;
   const category = classifyBodyFat(estimate.bodyFatPercent, profile.gender);
+  // Clean, measurement-driven silhouette (falls back to the raw capture outline).
+  const bodyProf = scanProfile({ heightCm: profile.heightCm, bodyFatPercent: estimate.bodyFatPercent, circumferences });
+  const modelFront = bodyProf ? modelSilhouette(bodyProf, "front") : null;
   const count = useCountUp(estimate.bodyFatPercent);
   const [storeSilhouette, setStoreSilhouette] = useState(false);
   const [weight, setWeight] = useState(() => String(kgToDisplay(result.weightKg, units)));
@@ -578,7 +582,9 @@ function ResultStep({ clientId, result, profile, units, onSaved, onRetry }: {
     <div className="mx-auto max-w-md space-y-5 px-5 py-4">
       {/* Silhouette + big number */}
       <div className="flex flex-col items-center">
-        {hasContour ? (
+        {modelFront ? (
+          <Silhouette points={modelFront} trace tone={toneVar.sleep} width={140} height={230} />
+        ) : hasContour ? (
           <Silhouette points={contourFront!} trace tone={toneVar.sleep} width={140} height={230} />
         ) : (
           <div className="grid h-[180px] w-[120px] place-items-center rounded-3xl bg-sleep/10"><User className="size-16" style={{ color: toneVar.sleep }} /></div>

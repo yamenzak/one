@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useMemo, useRef } from "react";
+import type { BodySlice } from "@mossa/domain";
 
 type Pt = [number, number];
 interface Vert { x: number; y: number; z: number }
@@ -20,6 +21,42 @@ interface Face { i: number[]; }
 const LEVELS = 34; // vertical slices
 const ANG = 24; // points around each slice
 const DEPTH_RATIO = 0.6; // deepest slice depth as a fraction of widest width
+const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
+
+/**
+ * Preferred mesh path: the measurement-driven profile carries TRUE width & depth
+ * in cm per height, so we build ellipses directly — no bbox-normalization, no
+ * aspect guessing. Vertical is cm too, so proportions come out right on their own.
+ */
+function meshFromSlices(slices: BodySlice[], heightCm: number): { verts: Vert[]; faces: Face[] } {
+  const verts: Vert[] = [];
+  for (let i = 0; i <= LEVELS; i++) {
+    const t = i / LEVELS;
+    let a = slices[0]!, b = slices[slices.length - 1]!;
+    for (let k = 0; k < slices.length - 1; k++) {
+      if (t >= slices[k]!.t && t <= slices[k + 1]!.t) { a = slices[k]!; b = slices[k + 1]!; break; }
+    }
+    const span = b.t - a.t || 1;
+    const f = clamp01((t - a.t) / span);
+    const fs = f * f * (3 - 2 * f); // smoothstep — gentle shoulders/waist
+    const halfW = a.halfWidthCm + (b.halfWidthCm - a.halfWidthCm) * fs;
+    const depthHalf = a.halfDepthCm + (b.halfDepthCm - a.halfDepthCm) * fs;
+    const yy = (0.5 - t) * heightCm; // head up, in cm so it shares scale with widths
+    for (let j = 0; j < ANG; j++) {
+      const th = (j / ANG) * Math.PI * 2;
+      verts.push({ x: halfW * Math.cos(th), y: yy, z: depthHalf * Math.sin(th) });
+    }
+  }
+  const faces: Face[] = [];
+  const nRows = LEVELS + 1;
+  for (let i = 0; i < nRows - 1; i++) {
+    for (let j = 0; j < ANG; j++) {
+      const j2 = (j + 1) % ANG;
+      faces.push({ i: [i * ANG + j, i * ANG + j2, (i + 1) * ANG + j2, (i + 1) * ANG + j] });
+    }
+  }
+  return { verts, faces };
+}
 
 /** Left/right (or front/back) extent of an outline at height y, within a band. */
 function sliceAt(contour: Pt[], y: number, band = 0.03): [number, number] | null {
@@ -75,16 +112,23 @@ function buildMesh(front: Pt[], side: Pt[] | null): { verts: Vert[]; faces: Face
   return { verts, faces };
 }
 
-export function Body3D({ front, side, width = 220, height = 320, className }: {
-  front: Pt[];
-  side: Pt[] | null;
+export function Body3D({ front, side, slices, heightCm, width = 220, height = 320, className }: {
+  /** Legacy path — reconstruct from the two stored outlines. */
+  front?: Pt[] | null;
+  side?: Pt[] | null;
+  /** Preferred path — the measurement-driven profile (true cm proportions). */
+  slices?: BodySlice[] | null;
+  heightCm?: number | null;
   width?: number;
   height?: number;
   className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const colorRef = useRef<HTMLDivElement>(null);
-  const mesh = useMemo(() => buildMesh(front, side), [front, side]);
+  const mesh = useMemo(
+    () => (slices && slices.length > 1 && heightCm ? meshFromSlices(slices, heightCm) : buildMesh(front ?? [], side ?? null)),
+    [slices, heightCm, front, side],
+  );
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -185,8 +229,9 @@ export function Body3D({ front, side, width = 220, height = 320, className }: {
 
   return (
     <div className={className} style={{ width, height, position: "relative" }}>
-      {/* Resolves the accent CSS var to rgb for canvas shading. */}
-      <div ref={colorRef} style={{ color: "var(--color-sleep)", width: 0, height: 0, position: "absolute" }} />
+      {/* A neutral clay gray reads as a clean anatomical model (the accent tint
+          looked garish); Lambert shading below gives it form. */}
+      <div ref={colorRef} style={{ color: "rgb(166,170,182)", width: 0, height: 0, position: "absolute" }} />
       <canvas ref={canvasRef} style={{ width, height, touchAction: "none", cursor: "grab" }} aria-label="Rotatable 3-D body from your silhouettes" />
     </div>
   );

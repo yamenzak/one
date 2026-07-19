@@ -19,6 +19,7 @@ import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { morphPoly, Silhouette } from "./bodyscan/Silhouette.js";
+import { scanProfile, modelSilhouette } from "./bodyscan/model.js";
 import { BodyScanLauncher } from "./bodyscan/BodyScanLauncher.js";
 import { BodyScanHistory } from "./bodyscan/BodyScanHistory.js";
 
@@ -116,7 +117,8 @@ export function BodyScanCard({ clientId }: { clientId: string }) {
 function ScanSummary({ scans, latest, onOpenHistory }: { scans: Scan[]; latest: Scan; onOpenHistory: () => void }) {
   const chrono = useMemo(() => [...scans].filter((s) => s.bodyFatPercent != null).reverse(), [scans]);
   const bfValues = chrono.map((s) => s.bodyFatPercent!);
-  const withContour = useMemo(() => chrono.filter((s) => s.contourFront && s.contourFront.length > 3), [chrono]);
+  // Renderable = has a measurement-driven model, or a stored capture outline.
+  const withContour = useMemo(() => chrono.filter((s) => scanProfile(s) || (s.contourFront && s.contourFront.length > 3)), [chrono]);
 
   return (
     <div className="space-y-4">
@@ -169,7 +171,10 @@ function SilhouetteMorph({ scans }: { scans: Scan[] }) {
   const first = scans[0]!;
   const last = scans[scans.length - 1]!;
   const [t, setT] = useState(1);
-  const poly = useMemo(() => morphPoly(first.contourFront!, last.contourFront!, t), [first, last, t]);
+  const ptsOf = (s: Scan) => { const p = scanProfile(s); return p ? modelSilhouette(p, "front") : s.contourFront!; };
+  const fPts = useMemo(() => ptsOf(first), [first]);
+  const lPts = useMemo(() => ptsOf(last), [last]);
+  const poly = useMemo(() => morphPoly(fPts, lPts, t), [fPts, lPts, t]);
   const fmt = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   return (
     <div className="rounded-2xl bg-surface-2 p-3">
