@@ -1570,6 +1570,21 @@ describe("plan lifecycle — publish supersedes, restore, draft-only delete", ()
     expect(s.get(b)).toBe("superseded");
   });
 
+  it("creates a client plan from a template, copying the template body", async () => {
+    const client = await mkClient();
+    const tpl = (await (await SELF.fetch("http://x/api/workout-templates", { method: "POST", headers: H(), body: JSON.stringify({ name: "PPL Template", visibility: "tenant", body: { days: [{ name: "Push", blocks: [] }, { name: "Pull", blocks: [] }] } }) })).json()) as { template: { id: string } };
+    const res = await SELF.fetch("http://x/api/workout-plans/from-template", { method: "POST", headers: H(), body: JSON.stringify({ clientId: client, templateId: tpl.template.id }) });
+    expect(res.status).toBe(201);
+    const { plan } = (await res.json()) as { plan: { id: string; name: string } };
+    expect(plan.name).toBe("PPL Template");
+    // The instantiated plan is a fresh draft carrying the template's body.
+    const back = (await (await SELF.fetch(`http://x/api/workout-plans/${plan.id}`, { headers: auth(ownerCookie) })).json()) as { plan: { status: string; body: { days: { name: string }[] } } };
+    expect(back.plan.status).toBe("draft");
+    expect(back.plan.body.days.map((d) => d.name)).toEqual(["Push", "Pull"]);
+    // Unknown template id → 404.
+    expect((await SELF.fetch("http://x/api/workout-plans/from-template", { method: "POST", headers: H(), body: JSON.stringify({ clientId: client, templateId: "wtp_missing" }) })).status).toBe(404);
+  });
+
   it("only drafts can be deleted; published plans must be archived instead", async () => {
     const client = await mkClient();
     const draft = await mkPlan(client, "Deletable");

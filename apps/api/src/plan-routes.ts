@@ -106,6 +106,34 @@ function makePlanRoutes(kind: Kind): Hono<AppEnv> {
       return c.json({ plan: planView(row!) }, 201);
     })
 
+    // Instantiate a plan for a client FROM a template — copies the template's
+    // body into a new draft. Template must be same-tenant and either shared or
+    // the caller's own (mirrors the template list's visibility rule).
+    .post(`${prefix}/from-template`, async (c) => {
+      const who = requireTenant(c)!;
+      const parsed = z
+        .object({ clientId: z.string().min(1), templateId: z.string().min(1), name: z.string().min(1).max(120).optional() })
+        .safeParse(await c.req.json().catch(() => null));
+      if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+      const access = await requireClientAccess(c, parsed.data.clientId);
+      if ("response" in access) return access.response;
+      const tpl = await c.env.DB.prepare(
+        `SELECT * FROM ${templateTable[kind]} WHERE id = ? AND tenant_id = ? AND (visibility = 'tenant' OR created_by = ?)`,
+      )
+        .bind(parsed.data.templateId, who.tenantId, who.userId)
+        .first<TemplateRow>();
+      if (!tpl) return c.json({ error: "template not found" }, 404);
+      const id = newId(kind === "workout" ? "wpl" : "mpl");
+      await c.env.DB.prepare(
+        `INSERT INTO ${table} (id, tenant_id, client_id, name, description, status, body_json, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
+      )
+        .bind(id, who.tenantId, parsed.data.clientId, parsed.data.name ?? tpl.name, tpl.description ?? null, tpl.body_json, who.userId, nowIso(), nowIso())
+        .run();
+      const row = await c.env.DB.prepare(`SELECT * FROM ${table} WHERE id = ?`).bind(id).first<PlanRow>();
+      return c.json({ plan: planView(row!) }, 201);
+    })
+
     .get(`${prefix}/:id`, async (c) => {
       const who = requireTenant(c)!;
       const row = await c.env.DB.prepare(`SELECT * FROM ${table} WHERE id = ? AND tenant_id = ?`)
