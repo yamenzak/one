@@ -7,7 +7,7 @@
  * transactional (invites, receipts).
  */
 
-import { resolveChannels, parseNotifPrefs, type NotifCategory, type NotifRole } from "@mossa/domain";
+import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, type NotifCategory, type NotifRole } from "@mossa/domain";
 import type { Env } from "./env.js";
 import { notifyUser } from "./inbox-do.js";
 import { sendTenantEmail } from "./email-provider.js";
@@ -76,11 +76,17 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
   if (input.force) {
     channels = { inbox: true, email: true };
   } else {
-    const [role, prefRow] = await Promise.all([
+    const [role, prefRow, polRow] = await Promise.all([
       userRole(env.DB, input.tenantId, userId),
       env.DB.prepare("SELECT notif_json FROM user_prefs WHERE user_id = ?").bind(userId).first<{ notif_json: string | null }>(),
+      env.DB.prepare("SELECT notif_policy_json FROM tenant_settings WHERE tenant_id = ?").bind(input.tenantId).first<{ notif_policy_json: string | null }>(),
     ]);
     channels = resolveChannels(role, parseNotifPrefs(prefRow?.notif_json ?? null), input.category);
+    // The owner can globally disable email for a category studio-wide; the
+    // member's inbox choice is never overridden, only their email channel.
+    if (channels.email && !emailAllowedByPolicy(parseNotifPolicy(polRow?.notif_policy_json ?? null), input.category)) {
+      channels.email = false;
+    }
   }
 
   if (channels.inbox) {

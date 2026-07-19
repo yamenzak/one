@@ -359,6 +359,52 @@ describe("notifications — email provider + per-user preferences", () => {
     const prefs1 = (await (await SELF.fetch("http://x/api/notification-prefs", { headers: auth(ownerCookie) })).json()) as { prefs: Record<string, { email: boolean }> };
     expect(prefs1.prefs["check-ins"]!.email).toBe(true);
   });
+
+  it("a body-fat reading notifies the primary trainer (never the logger), deduped per day", async () => {
+    const db = env.DB as D1Database;
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "BodyFatBella", heightCm: 170 }) })).json()) as { client: { id: string } };
+
+    // The owner created the client → they are its primary trainer AND the logger,
+    // so logging a reading themself must NOT self-notify.
+    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-03-01", weightKg: 68, bodyFatPercent: 24 } }) });
+    const selfN = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE tenant_id = ? AND type = 'body_fat_logged'").bind(tenantId).first<{ n: number }>())!;
+    expect(selfN.n).toBe(0);
+
+    // Re-point the primary trainer to a different (real) staff member → the next
+    // reading, logged by the owner, notifies that trainer under body-composition.
+    await db.prepare("INSERT OR IGNORE INTO member (id, organizationId, userId, role, createdAt) VALUES ('mem_ghostcoach', ?, 'usr_ghostcoach', 'trainer', '2026-01-01')").bind(tenantId).run();
+    await db.prepare("UPDATE client_trainers SET trainer_user_id = 'usr_ghostcoach' WHERE client_id = ?").bind(client.id).run();
+    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-03-02", bodyFatPercent: 23 } }) });
+    const ghost = (await db.prepare("SELECT category, title, message FROM notifications WHERE recipient_user_id = 'usr_ghostcoach' AND type = 'body_fat_logged'").first<{ category: string; title: string; message: string }>())!;
+    expect(ghost.category).toBe("body-composition");
+    expect(ghost.title).toContain("BodyFatBella");
+    expect(ghost.message).toContain("23% body fat");
+
+    // Dedupe: re-logging the same day upserts the reading but doesn't re-notify.
+    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-03-02", bodyFatPercent: 22 } }) });
+    const dup = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE recipient_user_id = 'usr_ghostcoach' AND type = 'body_fat_logged'").first<{ n: number }>())!;
+    expect(dup.n).toBe(1);
+  });
+
+  it("owner governs the studio-wide email allow-list, per category", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const s0 = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as { notifCategories: { key: string }[]; notifPolicy: Record<string, boolean> };
+    expect(s0.notifCategories.some((c) => c.key === "body-composition")).toBe(true);
+    expect(s0.notifPolicy["body-composition"]).toBe(true); // default: allowed
+
+    // Disable one category's email studio-wide; junk keys are dropped.
+    await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ notifPolicy: { "body-composition": false, "nonsense-cat": true } }) });
+    const s1 = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as { notifPolicy: Record<string, boolean> };
+    expect(s1.notifPolicy["body-composition"]).toBe(false);
+    expect(s1.notifPolicy["labs"]).toBe(true); // untouched stays allowed
+    expect("nonsense-cat" in s1.notifPolicy).toBe(false);
+
+    // Re-enable so the flag doesn't leak into other suites.
+    await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ notifPolicy: { "body-composition": true } }) });
+  });
 });
 
 describe("platform rail — dunning notifies the owner", () => {

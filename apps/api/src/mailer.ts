@@ -70,7 +70,21 @@ export async function sendEmail(
   return { ok: true, mocked: true };
 }
 
-/** RFC 5322 message. Multipart when both html + text are present. */
+/** Base64 a UTF-8 string (btoa is latin1-only), CRLF-wrapped at 76 cols per MIME. */
+function base64Utf8(s: string): string {
+  const bytes = new TextEncoder().encode(s);
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return (btoa(bin).match(/.{1,76}/g) ?? []).join("\r\n");
+}
+
+/**
+ * RFC 5322 message. Multipart when both html + text are present. Bodies are
+ * base64-encoded: our HTML is a single very long line with literal `=` and `"`,
+ * which is invalid as 7bit (RFC line-length) and mangled if wrongly labelled
+ * quoted-printable — either corrupts the markup so clients strip the styling.
+ * Base64 (declared as such) is transport-safe and renders the HTML intact.
+ */
 function buildMime(m: { from: string; to: string; subject: string; html?: string; text?: string }): string {
   const date = new Date().toUTCString();
   const domain = bareAddress(m.from).split("@")[1] ?? "mossa";
@@ -78,10 +92,16 @@ function buildMime(m: { from: string; to: string; subject: string; html?: string
   const base = [
     `From: ${m.from}`,
     `To: ${m.to}`,
-    `Subject: ${m.subject}`,
+    `Subject: ${encodeHeader(m.subject)}`,
     `Message-ID: ${messageId}`,
     `Date: ${date}`,
     `MIME-Version: 1.0`,
+  ];
+  const part = (contentType: string, body: string): string[] => [
+    `Content-Type: ${contentType}; charset="utf-8"`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    base64Utf8(body),
   ];
   if (m.html && m.text) {
     const boundary = `b_${crypto.randomUUID().replace(/-/g, "")}`;
@@ -90,22 +110,22 @@ function buildMime(m: { from: string; to: string; subject: string; html?: string
       `Content-Type: multipart/alternative; boundary="${boundary}"`,
       ``,
       `--${boundary}`,
-      `Content-Type: text/plain; charset="utf-8"`,
-      `Content-Transfer-Encoding: quoted-printable`,
-      ``,
-      m.text,
+      ...part("text/plain", m.text),
       ``,
       `--${boundary}`,
-      `Content-Type: text/html; charset="utf-8"`,
-      `Content-Transfer-Encoding: quoted-printable`,
-      ``,
-      m.html,
+      ...part("text/html", m.html),
       ``,
       `--${boundary}--`,
       ``,
     ].join("\r\n");
   }
-  return [...base, `Content-Type: text/html; charset="utf-8"`, ``, m.html ?? m.text ?? ""].join("\r\n");
+  return [...base, ...part("text/html", m.html ?? m.text ?? "")].join("\r\n");
+}
+
+/** RFC 2047 encode a header value when it carries non-ASCII (accented brand names). */
+function encodeHeader(s: string): string {
+  // eslint-disable-next-line no-control-regex
+  return /^[\x00-\x7F]*$/.test(s) ? s : `=?UTF-8?B?${btoa(String.fromCharCode(...new TextEncoder().encode(s)))}?=`;
 }
 
 /** Escape user-supplied text before interpolating it into email HTML — check-in
@@ -147,44 +167,56 @@ export function safeColor(value: string | null | undefined, fallback: string): s
 
 const T = {
   bg: "#0b0c0e", card: "#16181b", inset: "#1e2126", border: "#23262c",
-  fg: "#e8eaed", body: "#c8cbd0", muted: "#8b9099",
+  fg: "#f2f3f5", body: "#c8cbd0", muted: "#8b9099",
 } as const;
+
+const EMAIL_FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
 /** A bulletproof, brand-accented pill CTA. */
 export function emailButton(label: string, href: string, brand: BrandKit = MOSSA_BRAND): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:26px auto 6px"><tr><td align="center" style="border-radius:9999px;background:${brand.accent}">
-    <a href="${encodeURI(href)}" style="display:inline-block;padding:13px 30px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;line-height:1;color:${brand.accentFg};text-decoration:none;border-radius:9999px">${escapeHtml(label)}</a>
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px auto 4px"><tr><td align="center" style="border-radius:9999px;background:${brand.accent}">
+    <a href="${encodeURI(href)}" style="display:inline-block;padding:14px 34px;font-family:${EMAIL_FONT};font-size:15px;font-weight:700;line-height:1;color:${brand.accentFg};text-decoration:none;border-radius:9999px">${escapeHtml(label)}</a>
   </td></tr></table>`;
 }
 
 /** The premium, tenant-branded wrapper. `heading`/`bodyHtml` are pre-escaped by
- *  the caller; `brand` skins it; `preheader` is the inbox preview line. */
+ *  the caller; `brand` skins it; `preheader` is the inbox preview line; `footnote`
+ *  overrides the small print under the card. Dark-first to match the app
+ *  (DESIGN.md), with a tenant-accent header rule and a wordmark chip. */
 export function emailShell(
   heading: string,
   bodyHtml: string,
-  opts: { brand?: BrandKit; preheader?: string } = {},
+  opts: { brand?: BrandKit; preheader?: string; footnote?: string } = {},
 ): string {
   const brand = opts.brand ?? MOSSA_BRAND;
-  const font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+  const font = EMAIL_FONT;
+  // Wordmark: the tenant's public logo, else a rounded accent chip carrying the
+  // studio name — either way it reads as the tenant's own identity, not Mossa's.
   const mark = brand.logoUrl
-    ? `<img src="${encodeURI(brand.logoUrl)}" alt="${escapeHtml(brand.name)}" height="30" style="height:30px;max-height:30px;width:auto;border:0;display:block;margin:0 auto">`
-    : `<span style="font-size:16px;font-weight:800;letter-spacing:0.04em;color:${brand.accent}">${escapeHtml(brand.name)}</span>`;
+    ? `<img src="${encodeURI(brand.logoUrl)}" alt="${escapeHtml(brand.name)}" height="34" style="height:34px;max-height:34px;width:auto;border:0;display:block;margin:0 auto">`
+    : `<span style="display:inline-block;padding:9px 18px;border-radius:9999px;background:${brand.accent};font-size:15px;font-weight:800;letter-spacing:0.02em;color:${brand.accentFg}">${escapeHtml(brand.name)}</span>`;
   const preheader = opts.preheader ?? heading;
+  const isMossa = brand.name === MOSSA_BRAND.name;
+  const footnote = opts.footnote ?? (isMossa ? "Coaching, organized." : `Sent by ${escapeHtml(brand.name)} · manage notifications in your account settings.`);
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"><meta name="supported-color-schemes" content="dark light"></head>
 <body style="margin:0;padding:0;background:${T.bg};-webkit-font-smoothing:antialiased">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${T.bg};font-size:1px;line-height:1px">${escapeHtml(preheader)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${T.bg};padding:32px 16px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${T.bg};padding:36px 16px">
   <tr><td align="center">
     <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px">
-      <tr><td align="center" style="padding:8px 0 22px">${mark}</td></tr>
-      <tr><td style="background:${T.card};border:1px solid ${T.border};border-radius:28px;padding:40px 36px">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="font-family:${font}">
-          <div style="font-size:22px;line-height:1.25;font-weight:700;color:${T.fg};margin:0 0 14px">${heading}</div>
-          <div style="font-size:15px;line-height:1.65;color:${T.body}">${bodyHtml}</div>
-        </td></tr></table>
+      <tr><td align="center" style="padding:6px 0 24px">${mark}</td></tr>
+      <tr><td style="background:${T.card};border:1px solid ${T.border};border-radius:28px;overflow:hidden">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr><td style="height:4px;background:${brand.accent};line-height:4px;font-size:4px">&nbsp;</td></tr>
+          <tr><td style="padding:38px 38px 42px;font-family:${font}">
+            <div style="font-size:23px;line-height:1.28;font-weight:700;color:${T.fg};margin:0 0 12px">${heading}</div>
+            <div style="width:36px;height:3px;background:${brand.accent};border-radius:9999px;margin:0 0 18px;line-height:3px;font-size:3px">&nbsp;</div>
+            <div style="font-size:15px;line-height:1.65;color:${T.body}">${bodyHtml}</div>
+          </td></tr>
+        </table>
       </td></tr>
-      <tr><td style="padding:22px 36px 8px;font-family:${font};font-size:12px;line-height:1.6;color:${T.muted};text-align:center">
-        ${escapeHtml(brand.name)}${brand.name === MOSSA_BRAND.name ? " — coaching, organized." : ""}
+      <tr><td style="padding:20px 36px 8px;font-family:${font};font-size:12px;line-height:1.6;color:${T.muted};text-align:center">
+        ${escapeHtml(footnote)}
       </td></tr>
     </table>
   </td></tr>
