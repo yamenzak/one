@@ -19,7 +19,7 @@
 import type { NormLandmark } from "./measure.js";
 import { LM } from "./measure.js";
 
-export type ScanPhase = "front" | "side";
+export type ScanPhase = "front" | "side" | "relax";
 /** The full cue set the API voices. */
 export type CueId =
   | "intro" | "step_back" | "step_forward" | "center" | "arms"
@@ -164,8 +164,8 @@ export function analyzeAlignment(lm: NormLandmark[], phase: ScanPhase): Alignmen
   const midShX = (lSh.x + rSh.x) / 2;
   const shoulderSpan = Math.abs(lSh.x - rSh.x);
 
-  // 4. Facing the right way for this pose.
-  if (phase === "front") {
+  // 4. Facing the right way for this pose. (front + relax both face the camera.)
+  if (phase !== "side") {
     if (shoulderSpan < 0.12) return { ok: false, cue: "straighten", message: "Turn to face the camera" };
   } else {
     // Side profile: the shoulders overlap horizontally.
@@ -176,12 +176,13 @@ export function analyzeAlignment(lm: NormLandmark[], phase: ScanPhase): Alignmen
   const shoulderTilt = Math.abs(lSh.y - rSh.y);
   const hipTilt = Math.abs(lHip.y - rHip.y);
   const lean = Math.abs(midShX - midHipX);
-  if (phase === "front" && (shoulderTilt > 0.06 || hipTilt > 0.06)) {
+  if (phase !== "side" && (shoulderTilt > 0.06 || hipTilt > 0.06)) {
     return { ok: false, cue: "straighten", message: "Stand up straight and level your shoulders" };
   }
   if (lean > 0.08) return { ok: false, cue: "straighten", message: "Stand up straight" };
 
-  // 6. Arms slightly abducted (front only — a clean torso silhouette).
+  // 6. Arms slightly abducted — FRONT only (needed to separate the torso from the
+  // arms for measurement). The relax pass wants arms DOWN for a natural outline.
   if (phase === "front") {
     const lWr = lm[LM.lWrist];
     const rWr = lm[LM.rWrist];

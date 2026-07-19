@@ -190,6 +190,56 @@ function extractContour(mask: Float32Array, w: number, h: number, midX: number, 
   return out;
 }
 
+/** Full left→right body extent of a row — INCLUDES the arms (across the armpit
+ *  gap), unlike the midline torso run. For the VISUALIZATION outline only. */
+function rowExtentFull(mask: Float32Array, w: number, h: number, y: number): { min: number; max: number } | null {
+  const yi = Math.round(y);
+  if (yi < 0 || yi >= h) return null;
+  const base = yi * w;
+  let min = -1, max = -1;
+  for (let x = 0; x < w; x++) if (mask[base + x]! > THRESH) { if (min < 0) min = x; max = x; }
+  return min < 0 ? null : { min, max };
+}
+
+/**
+ * Trace the FULL de-identified body outline — arms included — for the silhouette
+ * and 3-D visualization. Meant for the arms-down "relax"/side capture (a natural
+ * human shape), NOT for measurement (which stays torso-only). Same smoothing +
+ * bbox-normalization as the torso outline so the two overlay for the morph.
+ */
+export function fullBodyContour(cap: Capture): [number, number][] {
+  const { mask, width: w, height: h } = cap;
+  let minY = h, maxY = -1;
+  for (let y = 0; y < h; y++) if (rowExtentFull(mask, w, h, y)) { if (y < minY) minY = y; if (y > maxY) maxY = y; }
+  if (maxY <= minY) return [];
+  const rows = Math.min(160, Math.max(8, Math.floor((maxY - minY) / 2)));
+  const ys: number[] = [], lx: number[] = [], rx: number[] = [];
+  for (let i = 0; i <= rows; i++) {
+    const y = minY + ((maxY - minY) * i) / rows;
+    const ext = rowExtentFull(mask, w, h, y);
+    if (!ext) continue;
+    ys.push(y); lx.push(ext.min); rx.push(ext.max);
+  }
+  if (ys.length < 3) return [];
+  const sl = smooth(lx), sr = smooth(rx);
+  let minX = w, maxX = -1;
+  for (let i = 0; i < ys.length; i++) { if (sl[i]! < minX) minX = sl[i]!; if (sr[i]! > maxX) maxX = sr[i]!; }
+  const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
+  const q = (val: number) => Math.round(val * 1000) / 1000;
+  const left: [number, number][] = [], right: [number, number][] = [];
+  for (let i = 0; i < ys.length; i++) {
+    const ny = (ys[i]! - minY) / bh;
+    left.push([q((sl[i]! - minX) / bw), q(ny)]);
+    right.push([q((sr[i]! - minX) / bw), q(ny)]);
+  }
+  const poly: [number, number][] = [...left, ...right.reverse()];
+  if (poly.length <= 600) return poly;
+  const step = poly.length / 600;
+  const out: [number, number][] = [];
+  for (let i = 0; i < 600; i++) out.push(poly[Math.floor(i * step)]!);
+  return out;
+}
+
 /**
  * Measure one captured pose. Returns per-site widths (cm) + the outline. Sites
  * that can't be located (off-frame, occluded) come back null and are dropped by
