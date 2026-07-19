@@ -10,18 +10,15 @@
  * real boundary, this just hides the surface when the flag is known-off.
  */
 
-import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Card, Button, Badge, Spinner, IconBadge, EmptyState, cn, toneVar,
   AreaChart, ScanLine, Camera, Sparkles, Percent,
 } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
-import { useUnits } from "../../units.js";
 import { morphPoly, Silhouette } from "./bodyscan/Silhouette.js";
-import type { ScanProfile, ScanResult } from "./bodyscan/BodyScanFlow.js";
-
-const BodyScanFlow = lazy(() => import("./bodyscan/BodyScanFlow.js"));
+import { BodyScanLauncher } from "./bodyscan/BodyScanLauncher.js";
 
 interface Scan {
   id: string;
@@ -36,23 +33,16 @@ interface Scan {
   contourSide: [number, number][] | null;
   createdAt: string;
 }
-interface ClientProfile {
-  client: { gender: string | null; heightCm: number | null; dateOfBirth: string | null };
-  metrics: { ageYears: number | null; weightKg: number | null };
-}
-
 const CONF_TONE = { high: "success", medium: "warning", low: "danger" } as const;
 const CONF_LABEL = { high: "High confidence", medium: "Medium confidence", low: "Lower confidence" } as const;
 
 export function BodyScanCard({ clientId }: { clientId: string }) {
   const { ctx } = useSession();
-  const units = useUnits();
   const [scans, setScans] = useState<Scan[] | null>(null);
-  const [profile, setProfile] = useState<{ p: ScanProfile | null; latestWeightKg: number | null } | null>(null);
-  const [open, setOpen] = useState(false);
   const [blocked, setBlocked] = useState(false);
 
-  // Known-off flag → render nothing (Progress just skips the section).
+  // Known-off flag → render nothing (Progress just skips the section). The
+  // launcher enforces the same gate; we mirror it here to skip the scans fetch.
   const flagOff = ctx?.clientFlags?.canUseBodyScan === false;
 
   const load = async () => {
@@ -67,70 +57,51 @@ export function BodyScanCard({ clientId }: { clientId: string }) {
   useEffect(() => {
     if (flagOff) return;
     void load();
-    void api.get<ClientProfile>(`/api/clients/${clientId}`).then((r) => {
-      const g = r.client.gender;
-      const p: ScanProfile | null = (g === "male" || g === "female") && r.metrics.ageYears != null && r.client.heightCm != null
-        ? { gender: g, ageYears: r.metrics.ageYears, heightCm: r.client.heightCm }
-        : null;
-      setProfile({ p, latestWeightKg: r.metrics.weightKg });
-    }).catch(() => setProfile({ p: null, latestWeightKg: null }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, flagOff]);
 
   if (flagOff) return null;
 
   const latest = scans?.find((s) => s.bodyFatPercent != null) ?? null;
-  const profileReady = !!profile?.p;
 
   return (
-    <>
-      <Card className="space-y-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5">
-            <IconBadge icon={ScanLine} tone="cardio" size="sm" />
-            <div>
-              <div className="font-semibold">Body scan</div>
-              <div className="text-xs text-muted-foreground">Camera body-fat estimate</div>
+    <BodyScanLauncher clientId={clientId} onSaved={() => void load()}>
+      {({ open, loading, profileReady }) => (
+        <Card className="space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <IconBadge icon={ScanLine} tone="cardio" size="sm" />
+              <div>
+                <div className="font-semibold">Body scan</div>
+                <div className="text-xs text-muted-foreground">Camera body-fat estimate</div>
+              </div>
             </div>
+            {profileReady && !blocked && (
+              <Button size="sm" onClick={open}><Camera /> {latest ? "New scan" : "Scan"}</Button>
+            )}
           </div>
-          {profileReady && !blocked && (
-            <Button size="sm" onClick={() => setOpen(true)}><Camera /> {latest ? "New scan" : "Scan"}</Button>
+
+          {blocked ? (
+            <div className="rounded-2xl bg-surface-2 px-4 py-3 text-sm text-muted-foreground">Body scan isn't part of your current plan.</div>
+          ) : scans == null || loading ? (
+            <div className="grid h-24 place-items-center"><Spinner /></div>
+          ) : !profileReady ? (
+            <div className="rounded-2xl bg-warning-soft/40 px-4 py-3 text-sm text-warning">
+              Add your sex, birth date and height in your profile to use the body scan.
+            </div>
+          ) : latest ? (
+            <ScanSummary scans={scans} latest={latest} />
+          ) : (
+            <EmptyState
+              icon={Sparkles}
+              title="No scans yet"
+              description="Take a private, on-device scan to estimate your body composition and track the trend."
+              action={<Button onClick={open}><Camera /> Start body scan</Button>}
+            />
           )}
-        </div>
-
-        {blocked ? (
-          <div className="rounded-2xl bg-surface-2 px-4 py-3 text-sm text-muted-foreground">Body scan isn't part of your current plan.</div>
-        ) : scans == null || profile == null ? (
-          <div className="grid h-24 place-items-center"><Spinner /></div>
-        ) : !profileReady ? (
-          <div className="rounded-2xl bg-warning-soft/40 px-4 py-3 text-sm text-warning">
-            Add your sex, birth date and height in your profile to use the body scan.
-          </div>
-        ) : latest ? (
-          <ScanSummary scans={scans} latest={latest} />
-        ) : (
-          <EmptyState
-            icon={Sparkles}
-            title="No scans yet"
-            description="Take a private, on-device scan to estimate your body composition and track the trend."
-            action={<Button onClick={() => setOpen(true)}><Camera /> Start body scan</Button>}
-          />
-        )}
-      </Card>
-
-      {open && profile?.p && (
-        <Suspense fallback={<div className="fixed inset-0 z-[60] grid place-items-center bg-background"><Spinner className="size-8" /></div>}>
-          <BodyScanFlow
-            clientId={clientId}
-            profile={profile.p}
-            latestWeightKg={profile.latestWeightKg}
-            units={units}
-            onClose={() => setOpen(false)}
-            onSaved={(r: ScanResult & { id: string }) => { setOpen(false); void load(); }}
-          />
-        </Suspense>
+        </Card>
       )}
-    </>
+    </BodyScanLauncher>
   );
 }
 
