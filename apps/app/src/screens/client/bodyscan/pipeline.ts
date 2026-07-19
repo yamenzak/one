@@ -115,10 +115,17 @@ export function analyzeAlignment(lm: NormLandmark[], phase: ScanPhase): Alignmen
   if (!nose || !lSh || !rSh || !lHip || !rHip || v(nose) < 0.5 || v(lSh) < 0.5 || v(rSh) < 0.5) {
     return { ok: false, cue: "straighten", message: "Face the camera so your whole body shows" };
   }
-  const ankleVisible = v(lAnk) > 0.4 || v(rAnk) > 0.4;
-  const ankleY = Math.max(v(lAnk) > 0.4 ? (lAnk?.y ?? 0) : 0, v(rAnk) > 0.4 ? (rAnk?.y ?? 0) : 0);
-  if (!ankleVisible || ankleY > 0.99 || nose.y < 0.02) {
-    return { ok: false, cue: "step_back", message: "Step back — get your whole body in frame" };
+  // Feet must be genuinely in-frame so the reliable nose→ankle scale can be used
+  // (measure.ts only falls back to the shorter nose→hip span as a last resort).
+  // Require solid ankle confidence AND an ankle y that sits inside the frame —
+  // MediaPipe extrapolates off-frame joints (y past 1, or pinned to the bottom
+  // edge) with low confidence, so a lax threshold lets a feet-cut-off capture
+  // auto-fire and then fail to calibrate.
+  const FEET_MSG = "Step back until your feet are in the frame";
+  const ankleVisible = v(lAnk) > 0.6 || v(rAnk) > 0.6;
+  const ankleY = Math.max(v(lAnk) > 0.6 ? (lAnk?.y ?? 0) : 0, v(rAnk) > 0.6 ? (rAnk?.y ?? 0) : 0);
+  if (!ankleVisible || ankleY <= 0 || ankleY > 0.98 || nose.y < 0.02) {
+    return { ok: false, cue: "step_back", message: FEET_MSG };
   }
 
   // 2. Distance — body should fill most of the frame height.
