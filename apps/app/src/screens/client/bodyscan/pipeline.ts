@@ -19,13 +19,24 @@
 import type { NormLandmark } from "./measure.js";
 import { LM } from "./measure.js";
 
-export type ScanPhase = "front" | "side" | "relax";
+/**
+ * Each orientation is captured twice: once with arms OUT (a clean torso for the
+ * measurement) and once with arms DOWN (a natural full-body outline for the
+ * silhouette + 3-D). The side profile barely changes with arm position, so it's
+ * captured once, arms down, and serves both.
+ *   front      → face camera, arms out  (torso measurement)
+ *   frontShape → face camera, arms down (full-body silhouette)
+ *   side       → turn side,   arms down (torso depth + full-body silhouette)
+ */
+export type ScanPhase = "front" | "frontShape" | "side";
 /** The full cue set the API voices. */
 export type CueId =
-  | "intro" | "step_back" | "step_forward" | "center" | "arms"
-  | "straighten" | "hold" | "captured_front" | "turn_side" | "captured_side";
+  | "intro" | "pose_front" | "pose_side"
+  | "step_back" | "step_forward" | "center" | "feet"
+  | "arms_out" | "arms_down" | "straighten" | "hold"
+  | "captured" | "done";
 /** The subset an alignment check can emit as live guidance. */
-export type AlignCue = Exclude<CueId, "intro" | "captured_front" | "captured_side">;
+export type AlignCue = Exclude<CueId, "intro" | "captured" | "done">;
 
 export interface Alignment {
   ok: boolean;
@@ -131,9 +142,11 @@ export function analyzeAlignment(lm: NormLandmark[], phase: ScanPhase): Alignmen
   const lAnk = lm[LM.lAnkle];
   const rAnk = lm[LM.rAnkle];
 
+  const facing = phase === "side" ? "pose_side" : "pose_front";
+
   // 1. Whole body present — need head, shoulders, hips and at least one ankle.
   if (!nose || !lSh || !rSh || !lHip || !rHip || v(nose) < 0.5 || v(lSh) < 0.5 || v(rSh) < 0.5) {
-    return { ok: false, cue: "straighten", message: "Face the camera so your whole body shows" };
+    return { ok: false, cue: facing, message: phase === "side" ? "Turn side-on so your whole body shows" : "Face the camera so your whole body shows" };
   }
   // Feet must be genuinely in-frame so the reliable nose→ankle scale can be used
   // (measure.ts only falls back to the shorter nose→hip span as a last resort).
@@ -141,11 +154,10 @@ export function analyzeAlignment(lm: NormLandmark[], phase: ScanPhase): Alignmen
   // MediaPipe extrapolates off-frame joints (y past 1, or pinned to the bottom
   // edge) with low confidence, so a lax threshold lets a feet-cut-off capture
   // auto-fire and then fail to calibrate.
-  const FEET_MSG = "Step back until your feet are in the frame";
   const ankleVisible = v(lAnk) > 0.6 || v(rAnk) > 0.6;
   const ankleY = Math.max(v(lAnk) > 0.6 ? (lAnk?.y ?? 0) : 0, v(rAnk) > 0.6 ? (rAnk?.y ?? 0) : 0);
   if (!ankleVisible || ankleY <= 0 || ankleY > 0.98 || nose.y < 0.02) {
-    return { ok: false, cue: "step_back", message: FEET_MSG };
+    return { ok: false, cue: "feet", message: "Step back until both feet are in the frame" };
   }
 
   // 2. Distance — the nose→ankle span should fill a good part of the frame.
@@ -159,17 +171,19 @@ export function analyzeAlignment(lm: NormLandmark[], phase: ScanPhase): Alignmen
 
   // 3. Centered.
   const midHipX = (lHip.x + rHip.x) / 2;
-  if (midHipX < 0.4 || midHipX > 0.6) return { ok: false, cue: "center", message: "Move to the center of the frame" };
+  if (midHipX < 0.4 || midHipX > 0.6) return { ok: false, cue: "center", message: "Move into the middle of the frame" };
 
   const midShX = (lSh.x + rSh.x) / 2;
   const shoulderSpan = Math.abs(lSh.x - rSh.x);
+  const shoulderY = (lSh.y + rSh.y) / 2;
+  const hipY = (lHip.y + rHip.y) / 2;
 
-  // 4. Facing the right way for this pose. (front + relax both face the camera.)
+  // 4. Facing the right way for this pose. (front + frontShape face the camera.)
   if (phase !== "side") {
-    if (shoulderSpan < 0.12) return { ok: false, cue: "straighten", message: "Turn to face the camera" };
+    if (shoulderSpan < 0.12) return { ok: false, cue: "pose_front", message: "Turn to face the camera" };
   } else {
     // Side profile: the shoulders overlap horizontally.
-    if (shoulderSpan > 0.09) return { ok: false, cue: "turn_side", message: "Turn so your side faces the camera" };
+    if (shoulderSpan > 0.09) return { ok: false, cue: "pose_side", message: "Turn so your side faces the camera" };
   }
 
   // 5. Standing straight — shoulders & hips level, spine vertical.
@@ -181,16 +195,25 @@ export function analyzeAlignment(lm: NormLandmark[], phase: ScanPhase): Alignmen
   }
   if (lean > 0.08) return { ok: false, cue: "straighten", message: "Stand up straight" };
 
-  // 6. Arms slightly abducted — FRONT only (needed to separate the torso from the
-  // arms for measurement). The relax pass wants arms DOWN for a natural outline.
+  // 6. Arm position. The FRONT (measurement) pass wants arms held OUT to separate
+  // the torso from the arms; the shape/side passes want them DOWN for a clean,
+  // natural full-body outline. Enforce so the silhouette isn't spiky.
+  const lWr = lm[LM.lWrist];
+  const rWr = lm[LM.rWrist];
+  const torso = Math.max(0.05, hipY - shoulderY);
   if (phase === "front") {
-    const lWr = lm[LM.lWrist];
-    const rWr = lm[LM.rWrist];
     const half = shoulderSpan / 2;
     const lOut = lWr ? Math.abs(lWr.x - midShX) : 0;
     const rOut = rWr ? Math.abs(rWr.x - midShX) : 0;
     if (lOut < half || rOut < half) {
-      return { ok: false, cue: "arms", message: "Raise your arms slightly away from your sides" };
+      return { ok: false, cue: "arms_out", message: "Hold your arms out, away from your sides" };
+    }
+  } else {
+    // Arms down: both wrists should sit well below the shoulders (hanging, not
+    // raised or held out at shoulder height).
+    const down = (wr: NormLandmark | undefined) => wr != null && wr.y > shoulderY + torso * 0.45;
+    if (!down(lWr) || !down(rWr)) {
+      return { ok: false, cue: "arms_down", message: "Relax your arms straight down at your sides" };
     }
   }
 
