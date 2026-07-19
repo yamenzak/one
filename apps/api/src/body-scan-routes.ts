@@ -12,7 +12,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { estimateBodyFat, ageFromDob, type Gender } from "@mossa/domain";
-import { SubmitBodyScan } from "@mossa/protocol";
+import { SubmitBodyScan, TTS_VOICE_IDS } from "@mossa/protocol";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { hasFeature } from "./billing-store.js";
@@ -34,6 +34,16 @@ const CUE_PHRASES: { id: string; text: string }[] = [
   { id: "captured_side", text: "All done. Calculating your results now." },
 ];
 const TTS_VERSION = 1;
+
+/** The tenant's configured coach voice (ai_config.ttsVoice), validated against
+ *  the allowed set; falls back to the default. An explicit query overrides it. */
+async function resolveVoice(db: D1Database, tenantId: string, override?: string | null): Promise<string> {
+  const ok = (v: string | null | undefined): v is string => !!v && (TTS_VOICE_IDS as string[]).includes(v);
+  if (ok(override)) return override;
+  const row = await db.prepare("SELECT ai_config_json FROM tenant_settings WHERE tenant_id = ?").bind(tenantId).first<{ ai_config_json: string | null }>();
+  const configured = parseJson<{ ttsVoice?: string | null }>(row?.ai_config_json, {}).ttsVoice;
+  return ok(configured) ? configured : DEFAULT_TTS_VOICE;
+}
 
 interface ScanRow {
   id: string; date_local: string; body_fat_percent: number | null; low: number | null; high: number | null;
@@ -113,7 +123,7 @@ export const bodyScanRoutes = new Hono<AppEnv>()
   .get("/body-scan/cues", async (c) => {
     const who = requireTenant(c)!;
     if (!(await hasFeature(c.env.DB, who.tenantId, "bfCamera"))) return c.json({ error: "body scan not in your plan" }, 403);
-    const voice = (c.req.query("voice") || DEFAULT_TTS_VOICE).slice(0, 40).replace(/[^A-Za-z0-9_-]/g, "");
+    const voice = await resolveVoice(c.env.DB, who.tenantId, c.req.query("voice"));
     const lang = (c.req.query("lang") || "en").slice(0, 10).replace(/[^A-Za-z-]/g, "");
     const cues: { id: string; url: string; text: string }[] = [];
     for (const phrase of CUE_PHRASES) {
@@ -136,4 +146,26 @@ export const bodyScanRoutes = new Hono<AppEnv>()
       cues.push({ id: phrase.id, url: key ? `/api/media/${key}` : "", text: phrase.text });
     }
     return c.json({ voice, lang, cues });
+  })
+
+  // Owner voice preview for the settings picker — one short sample per voice,
+  // cached like a cue (so previewing every voice costs a handful of credits once).
+  .get("/body-scan/voice-preview", async (c) => {
+    const who = requireTenant(c)!;
+    if (!(await hasFeature(c.env.DB, who.tenantId, "bfCamera"))) return c.json({ error: "body scan not in your plan" }, 403);
+    const voice = await resolveVoice(c.env.DB, who.tenantId, c.req.query("voice"));
+    const existing = await c.env.DB.prepare("SELECT media_key FROM tts_cues WHERE tenant_id=? AND voice=? AND lang='en' AND phrase_id='preview' AND version=?")
+      .bind(who.tenantId, voice, TTS_VERSION)
+      .first<{ media_key: string }>();
+    let key = existing?.media_key ?? null;
+    if (!key) {
+      const speech = await generateSpeech(c.env, { tenantId: who.tenantId, feature: "voice_preview", text: "Hi, I'm your coach — let's do a quick body scan.", voice });
+      if (!speech.ok) return c.json({ error: speech.error }, speech.error === "insufficient_credits" ? 402 : 502);
+      key = `t/${who.tenantId}/tts/${voice}-en-preview-v${TTS_VERSION}.wav`;
+      await c.env.MEDIA.put(key, speech.bytes, { httpMetadata: { contentType: "audio/wav" } });
+      await c.env.DB.prepare("INSERT OR IGNORE INTO tts_cues (tenant_id, voice, lang, phrase_id, version, media_key, created_at) VALUES (?, ?, 'en', 'preview', ?, ?, ?)")
+        .bind(who.tenantId, voice, TTS_VERSION, key, nowIso())
+        .run();
+    }
+    return c.json({ voice, url: `/api/media/${key}` });
   });

@@ -1693,3 +1693,18 @@ describe("body scan (camera body-fat)", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("coach voice (TTS) picker", () => {
+  it("owner sets a voice, it persists + lists, drives the cue voice, and rejects unknowns", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    expect((await SELF.fetch("http://x/api/settings/ai", { method: "PATCH", headers: H, body: JSON.stringify({ ttsVoice: "Puck" }) })).status).toBe(200);
+    const ai = (await (await SELF.fetch("http://x/api/settings/ai", { headers: auth(ownerCookie) })).json()) as { voices: { id: string; style: string }[]; config: { ttsVoice?: string } };
+    expect(ai.voices.length).toBeGreaterThan(3);
+    expect(ai.config.ttsVoice).toBe("Puck");
+    // The cue set is now voiced with the tenant's choice (client sends no voice).
+    const cues = (await (await SELF.fetch("http://x/api/body-scan/cues", { headers: auth(ownerCookie) })).json()) as { voice: string };
+    expect(cues.voice).toBe("Puck");
+    // Unknown voices are rejected by the schema.
+    expect((await SELF.fetch("http://x/api/settings/ai", { method: "PATCH", headers: H, body: JSON.stringify({ ttsVoice: "NotARealVoice" }) })).status).toBe(400);
+  });
+});

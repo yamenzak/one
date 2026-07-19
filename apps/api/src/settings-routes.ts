@@ -7,7 +7,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { AI_TONES } from "@mossa/protocol";
+import { AI_TONES, TTS_VOICES, TTS_VOICE_IDS } from "@mossa/protocol";
 import { categoriesForRole, resolveAllChannels, parseNotifPrefs, type NotifRole, type StoredNotifPrefs } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { tenantEntitlements, getConfig } from "./billing-store.js";
@@ -168,7 +168,7 @@ export const settingsRoutes = new Hono<AppEnv>()
       .bind(who.tenantId)
       .first<{ ai_config_json: string | null }>();
     const models = (await listModels(c.env.DB)).map((m) => ({ id: m.id, label: m.label, task: m.task, provider: m.provider }));
-    return c.json({ features: AI_FEATURES, models, tones: AI_TONES, config: parseJson(row?.ai_config_json, {}) });
+    return c.json({ features: AI_FEATURES, models, tones: AI_TONES, voices: TTS_VOICES, config: parseJson(row?.ai_config_json, {}) });
   })
 
   // Save AI config: house tone + per-feature enable/model/prompt/tone. Owner-only.
@@ -182,7 +182,7 @@ export const settingsRoutes = new Hono<AppEnv>()
       tone: z.string().max(40).nullish(),
     });
     const parsed = z
-      .object({ tone: z.string().max(40).nullish(), features: z.record(z.string(), featurePatch).optional() })
+      .object({ tone: z.string().max(40).nullish(), ttsVoice: z.enum(TTS_VOICE_IDS as [string, ...string[]]).nullish(), features: z.record(z.string(), featurePatch).optional() })
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const d = parsed.data;
@@ -190,9 +190,10 @@ export const settingsRoutes = new Hono<AppEnv>()
     const row = await c.env.DB.prepare("SELECT ai_config_json FROM tenant_settings WHERE tenant_id = ?")
       .bind(who.tenantId)
       .first<{ ai_config_json: string | null }>();
-    const existing = parseJson<{ tone?: string | null; features?: Record<string, Record<string, unknown>> }>(row?.ai_config_json, {});
-    const merged: { tone?: string | null; features: Record<string, Record<string, unknown>> } = {
+    const existing = parseJson<{ tone?: string | null; ttsVoice?: string | null; features?: Record<string, Record<string, unknown>> }>(row?.ai_config_json, {});
+    const merged: { tone?: string | null; ttsVoice?: string | null; features: Record<string, Record<string, unknown>> } = {
       tone: d.tone !== undefined ? d.tone : existing.tone ?? null,
+      ttsVoice: d.ttsVoice !== undefined ? d.ttsVoice : existing.ttsVoice ?? null,
       features: { ...(existing.features ?? {}) },
     };
     for (const [key, patch] of Object.entries(d.features ?? {})) {

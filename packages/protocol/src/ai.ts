@@ -9,6 +9,27 @@
 export const AI_TONES = ["professional", "motivating", "friendly", "direct", "funny", "tough-love"] as const;
 export type AiTone = (typeof AI_TONES)[number];
 
+/** Gemini prebuilt TTS voices the tenant can pick for the spoken coach cues
+ *  (body scan). `id` is the provider voice name; `style` is its documented feel.
+ *  Curated for coaching — the full catalog is larger. */
+export interface TtsVoiceMeta { id: string; style: string }
+export const TTS_VOICES: readonly TtsVoiceMeta[] = [
+  { id: "Kore", style: "Firm" },
+  { id: "Puck", style: "Upbeat" },
+  { id: "Charon", style: "Informative" },
+  { id: "Aoede", style: "Breezy" },
+  { id: "Callirrhoe", style: "Easy-going" },
+  { id: "Achird", style: "Friendly" },
+  { id: "Sulafat", style: "Warm" },
+  { id: "Leda", style: "Youthful" },
+  { id: "Orus", style: "Steady" },
+  { id: "Sadachbia", style: "Lively" },
+  { id: "Vindemiatrix", style: "Gentle" },
+  { id: "Zephyr", style: "Bright" },
+] as const;
+export const TTS_VOICE_IDS = TTS_VOICES.map((v) => v.id);
+export const DEFAULT_TTS_VOICE = "Kore";
+
 export type AiAudience = "trainer" | "client";
 export type AiTask = "text" | "text-small" | "vision" | "image";
 
@@ -48,6 +69,8 @@ export interface AiFeatureConfig {
 export interface TenantAiConfig {
   /** House tone applied to all tonable features unless a feature overrides it. */
   tone?: AiTone | null;
+  /** Prebuilt Gemini voice for the spoken body-scan cues (a TTS_VOICES id). */
+  ttsVoice?: string | null;
   features?: Record<string, AiFeatureConfig>;
 }
 
@@ -56,5 +79,6 @@ export interface AiSettingsPayload {
   features: AiFeatureMeta[];
   models: AiModelMeta[];
   tones: readonly AiTone[];
+  voices: readonly TtsVoiceMeta[];
   config: TenantAiConfig;
 }

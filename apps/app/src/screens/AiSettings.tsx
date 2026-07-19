@@ -5,9 +5,9 @@
  * so it never drifts from what the engine actually runs.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AiSettingsPayload, AiFeatureMeta, AiModelMeta, TenantAiConfig, AiFeatureConfig, AiTone } from "@mossa/protocol";
-import { Card, Badge, Skeleton, Reveal, SkeletonLine, Switch, Button, Textarea, Chip, IconBadge, cn, Sparkles, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, type Tone, type LucideIcon } from "@mossa/ui";
+import { Card, Badge, Skeleton, Reveal, SkeletonLine, Switch, Button, Textarea, Chip, IconBadge, cn, Sparkles, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, Play, type Tone, type LucideIcon } from "@mossa/ui";
 import { api } from "../api.js";
 
 const TONE_LABEL: Record<string, string> = {
@@ -52,6 +52,20 @@ export function AiConfigSection() {
   const saveHouseTone = async (tone: AiTone | null) => {
     setConfig((c) => ({ ...c, tone }));
     await api.patch("/api/settings/ai", { tone }).catch(() => undefined);
+  };
+  const saveTtsVoice = async (ttsVoice: string) => {
+    setConfig((c) => ({ ...c, ttsVoice }));
+    await api.patch("/api/settings/ai", { ttsVoice }).catch(() => undefined);
+  };
+  const [previewing, setPreviewing] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const previewVoice = async (voice: string) => {
+    setPreviewing(voice);
+    try {
+      const r = await api.get<{ url: string }>(`/api/body-scan/voice-preview?voice=${encodeURIComponent(voice)}`);
+      if (r.url) { audioRef.current?.pause(); const a = new Audio(r.url); audioRef.current = a; await a.play().catch(() => undefined); }
+    } catch { /* preview needs the body-scan entitlement + credits; ignore */ }
+    finally { setPreviewing(null); }
   };
   const saveFeature = async (key: string, patch: AiFeatureConfig) => {
     setConfig((c) => ({ ...c, features: { ...(c.features ?? {}), [key]: { ...(c.features?.[key] ?? {}), ...patch } } }));
@@ -124,6 +138,32 @@ export function AiConfigSection() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {data.tones.map((t) => <Chip key={t} selected={(config.tone ?? "professional") === t} onClick={() => void saveHouseTone(t)}>{TONE_LABEL[t] ?? t}</Chip>)}
+                </div>
+              </Card>
+
+              <Card className="mt-2 space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <IconBadge icon={Camera} tone="primary" size="sm" />
+                  <div><div className="font-medium">Coach voice</div><div className="text-sm text-muted-foreground">The spoken voice for body-scan cues (“step back”, “hold still”). Tap <Play className="inline size-3 align-[-1px]" /> to preview.</div></div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(data.voices ?? []).map((v) => {
+                    const selected = (config.ttsVoice ?? "Kore") === v.id;
+                    return (
+                      <span key={v.id} className="inline-flex items-center">
+                        <Chip selected={selected} onClick={() => void saveTtsVoice(v.id)}>{v.id} · {v.style}</Chip>
+                        <button
+                          type="button"
+                          aria-label={`Preview ${v.id} voice`}
+                          disabled={previewing === v.id}
+                          onClick={() => void previewVoice(v.id)}
+                          className="ml-1 grid size-7 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
+                        >
+                          <Play className="size-3.5" />
+                        </button>
+                      </span>
+                    );
+                  })}
                 </div>
               </Card>
             </div>
