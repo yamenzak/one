@@ -81,33 +81,44 @@ export default function BodyScanFlow({
     setStep("measuring");
     // Defer so the "measuring" frame paints before the synchronous pixel crunch.
     setTimeout(() => {
+      const { front, side } = capturesRef.current;
+      // Diagnostic: what fraction of the frame the person mask covers, and its
+      // dims. 0% ⇒ segmentation produced no body (model/delegate); a healthy
+      // % that still fails ⇒ a site/scale problem, not the mask. Surfaced on the
+      // manual-fallback notice so a failed scan is debuggable from a screenshot.
+      const coverage = (c?: Capture): string => {
+        if (!c) return "no capture";
+        let px = 0;
+        for (let i = 0; i < c.mask.length; i++) if (c.mask[i]! > 0.5) px++;
+        return `${c.mask.length ? Math.round((px / c.mask.length) * 100) : 0}% · ${c.width}×${c.height}`;
+      };
       try {
-        const { front, side } = capturesRef.current;
         if (!front) throw new Error("no front capture");
         const f = measureCapture(front, profile.heightCm);
         const s = side ? measureCapture(side, profile.heightCm) : f;
         const circ = computeCircumferences(f, s);
-        if (!circ) throw new Error("measure failed");
+        if (!circ) throw new Error(`sites not found · outline ${coverage(front)}`);
         // Plausibility gate: a waist far outside the human range for this height
         // means a bad read (occlusion, loose clothing, a partial mask) — surface
         // manual entry rather than a confidently-wrong estimate (e.g. a 59 cm
         // waist reading 5% body-fat on a 90 kg frame). ~0.35–0.95 × height spans
         // very lean to very high girth.
         if (circ.waistCm < profile.heightCm * 0.35 || circ.waistCm > profile.heightCm * 0.95) {
-          throw new Error("implausible measurement");
+          throw new Error(`waist ${Math.round(circ.waistCm)}cm implausible · outline ${coverage(front)}`);
         }
         const estimate = estimateBodyFat({
           gender: profile.gender, ageYears: profile.ageYears, heightCm: profile.heightCm,
           weightKg: latestWeightKg ?? 75,
           neckCm: circ.neckCm, waistCm: circ.waistCm, hipsCm: circ.hipsCm ?? null,
         });
-        if (!estimate) throw new Error("estimate failed");
+        if (!estimate) throw new Error(`estimate failed · outline ${coverage(front)}`);
         // Discard the masks now — we keep only numbers + the outline.
         capturesRef.current = {};
         setResult({ estimate, circumferences: circ, contourFront: f.contour, contourSide: s.contour, weightKg: latestWeightKg ?? 75 });
         setStep("result");
-      } catch {
-        setFatalError("We couldn't read your measurements from the capture. You can enter them by hand instead.");
+      } catch (err) {
+        const why = err instanceof Error ? err.message : coverage(front);
+        setFatalError(`We couldn't read your measurements from the capture. Enter them by hand below.\n\nDiagnostic: ${why}`);
         setStep("manual");
       }
     }, 60);
@@ -502,7 +513,7 @@ function ManualStep({ profile, latestWeightKg, units, notice, onResult }: {
         <h2 className="text-xl font-bold tracking-tight">Enter your measurements</h2>
         <p className="text-sm text-muted-foreground">Use a tape measure. We'll estimate your body-fat percentage from these.</p>
       </div>
-      {notice && <div className="rounded-2xl bg-warning-soft/50 px-4 py-3 text-sm text-warning">{notice}</div>}
+      {notice && <div className="whitespace-pre-line rounded-2xl bg-warning-soft/50 px-4 py-3 text-sm text-warning">{notice}</div>}
       <div className="space-y-3">
         <Field label={`Neck circumference (${ll})`} icon={Ruler} inputMode="decimal" value={f.neck ?? ""} onChange={(e) => set("neck", e.target.value)} placeholder="e.g. 38" />
         <Field label={`Waist circumference (${ll})`} icon={Ruler} inputMode="decimal" value={f.waist ?? ""} onChange={(e) => set("waist", e.target.value)} placeholder="e.g. 82" hint="Measured at the narrowest point, at the navel." />
