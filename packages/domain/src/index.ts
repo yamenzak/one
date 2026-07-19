@@ -6,6 +6,7 @@ export * from "./clientFlags.js";
 export * from "./nutrition.js";
 export * from "./body.js";
 export * from "./bodyfat.js";
+export * from "./bodymodel.js";
 export * from "./units.js";
 export * from "./activity.js";
 export * from "./workout.js";
