@@ -1653,3 +1653,43 @@ describe("redemption codes — atomic over-redemption guard", () => {
     expect((await SELF.fetch("http://x/api/redeem", { method: "POST", headers: H, body: JSON.stringify({ clientId: a, code: "ONESHOT1" }) })).status).toBe(409);
   });
 });
+
+describe("body scan (camera body-fat)", () => {
+  it("recomputes an ensemble estimate server-side, stores it, mirrors to measurements, and lists it", async () => {
+    const db = env.DB as D1Database;
+    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ displayName: "ScanTest" }) })).json()) as { client: { id: string } }).client.id;
+    // Body scan needs sex + birth date + height to run the formulas.
+    await db.prepare("UPDATE clients SET gender='male', date_of_birth='1990-01-01', height_cm=180 WHERE id=?").bind(clientId).run();
+    const res = await SELF.fetch("http://x/api/body-scans", { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ clientId, date: "2026-02-01", weightKg: 80, circumferences: { neckCm: 38, waistCm: 85 }, storeSilhouette: false }) });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { bodyFatPercent: number; low: number; high: number; confidence: string; methods: unknown[] };
+    expect(body.bodyFatPercent).toBeGreaterThan(5);
+    expect(body.bodyFatPercent).toBeLessThan(40);
+    expect(body.low).toBeLessThan(body.bodyFatPercent);
+    expect(body.high).toBeGreaterThan(body.bodyFatPercent);
+    expect(body.methods.length).toBeGreaterThanOrEqual(2); // navy + rfm + deurenberg
+    // Listed for the progress morph.
+    const list = (await (await SELF.fetch(`http://x/api/body-scans?clientId=${clientId}`, { headers: auth(ownerCookie) })).json()) as { scans: { date: string; bodyFatPercent: number }[] };
+    expect(list.scans.length).toBe(1);
+    expect(list.scans[0]!.date).toBe("2026-02-01");
+    // Mirrored into the measurements body-fat series.
+    const meas = await db.prepare("SELECT body_fat_percent FROM measurements WHERE client_id=? AND date_local='2026-02-01'").bind(clientId).first<{ body_fat_percent: number }>();
+    expect(meas?.body_fat_percent).toBeCloseTo(body.bodyFatPercent, 1);
+  });
+
+  it("caches TTS cues (mock lane) and returns playable urls + fallback text", async () => {
+    const cues = (await (await SELF.fetch("http://x/api/body-scan/cues", { headers: auth(ownerCookie) })).json()) as { cues: { id: string; url: string; text: string }[] };
+    expect(cues.cues.length).toBeGreaterThan(5);
+    expect(cues.cues[0]!.url).toContain("/api/media/");
+    expect(cues.cues[0]!.text.length).toBeGreaterThan(0);
+    // Second call is served from cache (no error, same keys).
+    const again = (await (await SELF.fetch("http://x/api/body-scan/cues", { headers: auth(ownerCookie) })).json()) as { cues: { url: string }[] };
+    expect(again.cues[0]!.url).toBe(cues.cues[0]!.url);
+  });
+
+  it("requires the bfCamera entitlement (free tenant → 403)", async () => {
+    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: { "content-type": "application/json", ...auth(otherCookie) }, body: JSON.stringify({ displayName: "NoScan" }) })).json()) as { client: { id: string } }).client.id;
+    const res = await SELF.fetch("http://x/api/body-scans", { method: "POST", headers: { "content-type": "application/json", ...auth(otherCookie) }, body: JSON.stringify({ clientId, date: "2026-02-01", weightKg: 80, circumferences: { neckCm: 38, waistCm: 85 }, storeSilhouette: false }) });
+    expect(res.status).toBe(403);
+  });
+});

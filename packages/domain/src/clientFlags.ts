@@ -38,6 +38,8 @@ export interface ClientFlags {
   canLogWater: boolean;
   canLogMeasurements: boolean;
   canTrackFasting: boolean;
+  /** Camera body-fat scan. Gated by the tenant's `bfCamera` entitlement. */
+  canUseBodyScan: boolean;
   // Check-ins
   checkInRequired: boolean;
   checkInIncludesMood: boolean;
@@ -70,6 +72,7 @@ export const DEFAULT_CLIENT_FLAGS: ClientFlags = {
   canLogWater: true,
   canLogMeasurements: true,
   canTrackFasting: false, // the one default-off logging flag (ByShujaa parity)
+  canUseBodyScan: true, // capability default; forced off without the bfCamera entitlement
   checkInRequired: false,
   checkInIncludesMood: true,
   checkInIncludesSleep: true,
@@ -121,6 +124,7 @@ export const CLIENT_FLAG_META: Record<keyof ClientFlags, ClientFlagMeta> = {
   canLogWater: { label: "Log water", hint: "Hydration tracking", category: "wellness" },
   canLogMeasurements: { label: "Log measurements", hint: "Body measurements", category: "wellness" },
   canTrackFasting: { label: "Fasting timer", hint: "Intermittent-fasting tracker", category: "wellness" },
+  canUseBodyScan: { label: "Body scan", hint: "Camera body-fat estimator", category: "wellness", requiresFeature: "bfCamera" },
   checkInRequired: { label: "Require check-ins", hint: "Client must submit check-ins", category: "checkin" },
   checkInIncludesMood: { label: "Check-in: mood", hint: "Mood in the check-in form", category: "checkin" },
   checkInIncludesSleep: { label: "Check-in: sleep", hint: "Sleep in the check-in form", category: "checkin" },
