@@ -38,8 +38,11 @@ wide band. Circumferences come from front+side silhouette widths via
 ## On-device pipeline (browser, open-source models)
 
 1. **Capture** — `getUserMedia` + **MediaPipe PoseLandmarker** (33 landmarks) for
-   alignment/anatomical heights + **ImageSegmenter** (selfie) for the body mask.
-   Models are self-hosted (`apps/app/public/models/`) — no runtime CDN.
+   alignment/anatomical heights + **ImageSegmenter** (DeepLab v3, Pascal-VOC
+   `person` class) for the body mask — a general person segmenter, far more
+   reliable than the selfie model for a whole body at 2–3 m. Models are
+   self-hosted (`apps/app/public/models/`) — no runtime CDN. A pose-landmark
+   breadth fallback keeps the estimate alive if a frame's mask comes back empty.
 2. **Auto-align** — deterministic geometry on landmarks (in frame, facing
    front/side, upright, arms abducted, right distance, stable ~1s) → auto-capture
    front then side. Manual fallback always available.

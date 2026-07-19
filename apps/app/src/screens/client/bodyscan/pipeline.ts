@@ -1,10 +1,16 @@
 /**
  * On-device ML wrapper (MediaPipe Tasks Vision). Loads PoseLandmarker (33
- * landmarks → alignment + anatomical heights) and ImageSegmenter (selfie person
- * mask → body outline + widths). Everything runs in-browser: the model + wasm
- * are self-hosted same-origin (`/models/…`, `/mediapipe/wasm`), and NO frame,
- * mask, or landmark is ever uploaded — only the derived numbers (and, on
+ * landmarks → alignment + anatomical heights) and ImageSegmenter (DeepLab v3
+ * person mask → body outline + widths). Everything runs in-browser: the model +
+ * wasm are self-hosted same-origin (`/models/…`, `/mediapipe/wasm`), and NO
+ * frame, mask, or landmark is ever uploaded — only the derived numbers (and, on
  * consent, a de-identified outline) leave the device.
+ *
+ * We use DeepLab v3 (general Pascal-VOC person segmentation) rather than the
+ * selfie segmenter: the silhouette is a WHOLE body standing 2–3 m away, which
+ * the selfie model (tuned for close-up head-and-shoulders) segments poorly on
+ * low-contrast/cluttered backgrounds. DeepLab returns a category mask; the body
+ * is every pixel classified `person`.
  *
  * The heavy `@mediapipe/tasks-vision` import lives here so it's only pulled when
  * the scan flow is dynamically imported — it never touches the main bundle.
@@ -29,7 +35,9 @@ export interface Alignment {
 
 const WASM_PATH = "/mediapipe/wasm";
 const POSE_MODEL = "/models/pose_landmarker_lite.task";
-const SEG_MODEL = "/models/selfie_segmenter.tflite";
+const SEG_MODEL = "/models/deeplab_v3.tflite";
+/** DeepLab v3 is trained on Pascal VOC; class 15 is `person`. */
+const PERSON_CLASS = 15;
 
 export interface Scanner {
   /** Detect the single pose in a video frame → 33 landmarks, or null. */
@@ -59,8 +67,8 @@ export async function loadScanner(): Promise<Scanner> {
   const segmenter = await ImageSegmenter.createFromOptions(fileset, {
     baseOptions: { modelAssetPath: SEG_MODEL, delegate: "GPU" },
     runningMode: "VIDEO",
-    outputConfidenceMasks: true,
-    outputCategoryMask: false,
+    outputCategoryMask: true,
+    outputConfidenceMasks: false,
   });
 
   return {
@@ -73,12 +81,14 @@ export async function loadScanner(): Promise<Scanner> {
       return new Promise((resolve) => {
         try {
           segmenter.segmentForVideo(video, tsMs, (result) => {
-            const m = result.confidenceMasks?.[0];
+            const m = result.categoryMask;
             if (!m) return resolve(null);
-            // Copy off the mask before it's recycled by the next call.
-            const src = m.getAsFloat32Array();
+            // DeepLab returns a per-pixel class index; project it to a 0/1 person
+            // mask (1 = body) so the pure measurement code stays mask-agnostic.
+            // Copy off before MediaPipe recycles the buffer on the next call.
+            const src = m.getAsUint8Array();
             const mask = new Float32Array(src.length);
-            mask.set(src);
+            for (let i = 0; i < src.length; i++) if (src[i] === PERSON_CLASS) mask[i] = 1;
             const out = { mask, width: m.width, height: m.height };
             m.close?.();
             resolve(out);
