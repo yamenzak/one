@@ -457,8 +457,8 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
         {(ex?.thumb2_url || ex?.thumb_url) && (
           <div className="flex gap-2">
             {([["Start", ex?.thumb_url], ["End", ex?.thumb2_url]] as const).filter(([, src]) => src).map(([label, src]) => (
-              <div key={label} className="relative min-w-0 flex-1 overflow-hidden rounded-2xl">
-                <img src={src!} alt="" className="h-40 w-full object-cover" />
+              <div key={label} className="relative min-w-0 flex-1 overflow-hidden rounded-2xl bg-surface-2">
+                <img src={src!} alt="" className="h-40 w-full object-contain" />
                 {ex?.thumb_url && ex?.thumb2_url && <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[0.65rem] font-semibold text-white">{label}</span>}
               </div>
             ))}

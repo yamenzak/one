@@ -63,7 +63,7 @@ export function ExerciseThumb({ thumb, thumb2, size = 40, className = "" }: { th
   const frames = [thumb, thumb2].filter(Boolean) as string[];
   return (
     <div className={`relative grid shrink-0 place-items-center overflow-hidden rounded-lg bg-activity-soft text-activity ${className}`} style={{ width: size, height: size }}>
-      {frames.length > 1 ? <AnimatedFrames frames={frames} /> : frames.length === 1 ? <img src={frames[0]} alt="" className="size-full object-cover" /> : <Dumbbell className="size-1/2" />}
+      {frames.length > 1 ? <AnimatedFrames frames={frames} /> : frames.length === 1 ? <img src={frames[0]} alt="" className="size-full object-contain" /> : <Dumbbell className="size-1/2" />}
     </div>
   );
 }
@@ -75,7 +75,7 @@ function AnimatedFrames({ frames }: { frames: string[] }) {
   return (
     <>
       {frames.map((f, i) => (
-        <img key={i} src={f} alt="" className={cn("absolute inset-0 size-full object-cover transition-opacity duration-700", i === active ? "opacity-100" : "opacity-0")} />
+        <img key={i} src={f} alt="" className={cn("absolute inset-0 size-full object-contain transition-opacity duration-700", i === active ? "opacity-100" : "opacity-0")} />
       ))}
     </>
   );
