@@ -156,6 +156,22 @@ const DEFAULT_MODELS: Omit<AiModelRow, "enabled" | "is_default">[] = [
     unit_kind: "image",
     markup: 3,
   },
+  {
+    // Gemini 2.5 Flash TTS — the body-scan voice cues. Google list price is
+    // $0.50/1M text-in and $10/1M audio-out; expressed as neuron-equivalents
+    // ($0.011/1k) so it meters through the same markup math as every other model
+    // (admin-tunable via ai.markup). Cues are generated once and cached, so a
+    // tenant pays for the set once, not per scan.
+    id: "gemini-2.5-flash-preview-tts",
+    task: "speech",
+    label: "Gemini 2.5 Flash TTS (voice)",
+    provider: "google",
+    input_rate: 45_455, // $0.50 / 1M text tokens
+    output_rate: 909_091, // $10.00 / 1M audio tokens
+    unit_rate: null,
+    unit_kind: null,
+    markup: 3,
+  },
 ];
 
 /** Idempotent catalog seed (INSERT OR IGNORE by id). No module-level guard (so
@@ -366,7 +382,7 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   const compatible = (m: AiModelRow) =>
     input.task === "image" ? imageCapable(m)
       : input.task === "vision" ? visionCapable(m)
-        : m.task !== "vision" && m.task !== "image";
+        : m.task !== "vision" && m.task !== "image" && m.task !== "speech";
   let model: AiModelRow | null = null;
   if (fcfg.model) { const m = await modelById(env.DB, fcfg.model); if (m && compatible(m)) model = m; }
   // No explicit override: when a Gemini key is configured, prefer Gemini — it's
@@ -612,11 +628,14 @@ function silentWav(): Uint8Array {
   return pcmToWav(new Uint8Array(24_000 * 2 * 0.35 | 0), 24_000);
 }
 
-interface GeminiTtsResponse { candidates?: { content?: { parts?: { inlineData?: { mimeType?: string; data?: string } }[] } }[] }
+interface GeminiTtsResponse {
+  candidates?: { content?: { parts?: { inlineData?: { mimeType?: string; data?: string } }[] } }[];
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+}
 
-async function runGeminiTts(key: string, text: string, voice: string): Promise<{ pcm: Uint8Array; rate: number }> {
+async function runGeminiTts(key: string, modelId: string, text: string, voice: string): Promise<{ pcm: Uint8Array; sampleRate: number; inputTokens: number; outputTokens: number }> {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${encodeURIComponent(key)}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`,
     {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -630,34 +649,58 @@ async function runGeminiTts(key: string, text: string, voice: string): Promise<{
   const json = (await res.json()) as GeminiTtsResponse;
   const part = (json.candidates?.[0]?.content?.parts ?? []).find((p) => p.inlineData?.data);
   if (!part?.inlineData?.data) throw new Error("no audio");
-  const rate = Number(part.inlineData.mimeType?.match(/rate=(\d+)/)?.[1] ?? 24_000);
-  return { pcm: b64ToBytes(part.inlineData.data), rate };
+  const sampleRate = Number(part.inlineData.mimeType?.match(/rate=(\d+)/)?.[1] ?? 24_000);
+  return {
+    pcm: b64ToBytes(part.inlineData.data),
+    sampleRate,
+    inputTokens: json.usageMetadata?.promptTokenCount ?? Math.ceil(text.length / 4),
+    outputTokens: json.usageMetadata?.candidatesTokenCount ?? 0,
+  };
 }
 
+/** Fallback TTS rate if the catalog model isn't resolvable (Flash TTS list price). */
+const TTS_FALLBACK_RATE: ModelRate = { inputRate: 45_455, outputRate: 909_091, markup: DEFAULT_MODELS.find((m) => m.task === "speech")?.markup ?? 3 };
+
 /**
- * Generate spoken audio (WAV) for a short cue phrase. Charged pay-as-you-go
- * (small fixed cost by length) and refunded if the provider call fails; the
- * caller stores the bytes to R2 and reuses them. Mock lane returns silence.
+ * Generate spoken audio (WAV) for a short cue phrase, metered through the model
+ * catalog exactly like text/image generation: reserve a worst-case hold →
+ * run → settle the exact credits from real token usage (input text + output
+ * audio tokens × the model's neuron rate × the admin markup). Refunds via the
+ * hold on failure. Caller stores + reuses the bytes; mock lane returns silence.
  */
 export async function generateSpeech(env: Env, input: { tenantId: string; feature: string; text: string; voice?: string }): Promise<GenerateSpeechResult> {
   const cfg = await getConfig(env.DB);
   const geminiKey = cfg["google.gemini_key"];
   const useMock = (cfg["ai.mock"] ?? "auto") === "on" || ((cfg["ai.mock"] ?? "auto") !== "off" && !geminiKey);
-  const cost = Math.max(2, Math.ceil(input.text.length / 20));
 
+  const model = await modelForTask(env.DB, "speech");
+  const rate = model ? rateOf(model) : TTS_FALLBACK_RATE;
+  const modelId = model?.id ?? TTS_MODEL;
+
+  // Worst-case reserve: text tokens in + a generous audio-token cap out (a short
+  // cue is a few seconds of audio); the settle uses the provider's real counts.
+  const estUsage: Usage = { inputTokens: Math.ceil(input.text.length / 4), outputTokens: Math.max(200, input.text.length * 12) };
   const dobj = env.BILLING.get(env.BILLING.idFromName(input.tenantId));
   await dobj.bind(input.tenantId);
-  const charged = await dobj.charge(cost, `tts.${input.feature}`, input.feature);
-  if (!charged.ok) return { ok: false, error: "insufficient_credits", available: charged.available, needed: cost };
+  const hold = await dobj.reserve(creditsForUsage(estUsage, rate));
+  if (!hold.ok) return { ok: false, error: "insufficient_credits", available: hold.available, needed: hold.needed };
 
+  let bytes: Uint8Array, usage: Usage, mocked = false;
   try {
-    if (useMock) return { ok: true, bytes: silentWav(), mimeType: "audio/wav", credits: cost, mocked: true };
-    const { pcm, rate } = await withTimeout(runGeminiTts(geminiKey!, input.text, input.voice ?? DEFAULT_TTS_VOICE));
-    return { ok: true, bytes: pcmToWav(pcm, rate), mimeType: "audio/wav", credits: cost, mocked: false };
+    if (useMock) { bytes = silentWav(); usage = estUsage; mocked = true; }
+    else {
+      const r = await withTimeout(runGeminiTts(geminiKey!, modelId, input.text, input.voice ?? DEFAULT_TTS_VOICE));
+      bytes = pcmToWav(r.pcm, r.sampleRate);
+      usage = { inputTokens: r.inputTokens, outputTokens: r.outputTokens };
+    }
   } catch (err) {
-    await dobj.topUp(cost, "tts.refund", input.feature).catch(() => undefined);
+    await dobj.release(hold.hold);
     return { ok: false, error: "unavailable", detail: err instanceof Error ? err.message : String(err) };
   }
+  const credits = creditsForUsage(usage, rate);
+  try { await dobj.settle(hold.hold, credits, `tts.${input.feature}`, modelId); }
+  catch { /* DO transient — hold self-reaps; still return the audio */ }
+  return { ok: true, bytes, mimeType: "audio/wav", credits, mocked };
 }
 
 async function audit(
