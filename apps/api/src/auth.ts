@@ -16,7 +16,7 @@ import { organization, emailOTP } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import type { Env } from "./env.js";
 import { ac, roles } from "./access.js";
-import { sendEmail, emailShell } from "./mailer.js";
+import { sendEmail, emailShell, MOSSA_BRAND } from "./mailer.js";
 import { newId, nowMs } from "./ids.js";
 
 /** Best-effort auth audit trail — also the rate-limiter's backing store. */
@@ -128,10 +128,13 @@ export function createAuth(env: Env, origin?: string) {
               to: email,
               subject: `${otp} is your Mossa code`,
               html: emailShell(
-                "Your Mossa sign-in code",
-                `<p>Enter this code to continue. It expires in 10 minutes and can be used once.</p>
-                 <div style="font-size:32px;font-weight:800;letter-spacing:8px;margin:16px 0;font-family:ui-monospace,monospace">${otp}</div>
-                 <p style="color:#9aa0a6;font-size:13px">If you didn't request this, you can ignore it.</p>`,
+                "Your sign-in code",
+                `<p style="margin:0 0 20px">Enter this code to finish signing in. It expires in 10 minutes and works once.</p>
+                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="background:#1e2126;border:1px solid #23262c;border-radius:18px;padding:22px 0">
+                   <div style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:34px;font-weight:800;letter-spacing:10px;color:#e8eaed;padding-left:10px">${otp}</div>
+                 </td></tr></table>
+                 <p style="margin:20px 0 0;color:#8b9099;font-size:13px;line-height:1.6">If you didn't request this, you can safely ignore it — no changes will be made.</p>`,
+                { brand: MOSSA_BRAND, preheader: `${otp} is your Mossa sign-in code (expires in 10 minutes).` },
               ),
               text: `Your Mossa code is ${otp} (expires in 10 minutes).`,
             },

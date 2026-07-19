@@ -11,7 +11,7 @@ import { resolveChannels, parseNotifPrefs, type NotifCategory, type NotifRole } 
 import type { Env } from "./env.js";
 import { notifyUser } from "./inbox-do.js";
 import { sendTenantEmail } from "./email-provider.js";
-import { emailShell, escapeHtml } from "./mailer.js";
+import { emailShell, emailButton, escapeHtml, safeColor, MOSSA_BRAND, type BrandKit } from "./mailer.js";
 import { nowIso } from "./ids.js";
 
 export interface NotifyInput {
@@ -36,23 +36,32 @@ async function userRole(db: D1Database, tenantId: string, userId: string): Promi
   return r === "owner" || r === "trainer" || r === "assistant" || r === "client" ? r : "member";
 }
 
-async function tenantBrand(db: D1Database, tenantId: string): Promise<string> {
+/** Resolve a tenant's full email brand kit — name + accent + foreground + a
+ *  PUBLIC logo (authed /api/media keys can't load in email, so those fall back
+ *  to the wordmark). Every branded email is skinned from this. */
+export async function tenantBrandKit(db: D1Database, tenantId: string): Promise<BrandKit> {
   const row = await db.prepare("SELECT branding_json FROM tenant_settings WHERE tenant_id = ?").bind(tenantId).first<{ branding_json: string | null }>();
+  let name: string | null = null;
+  let accent = MOSSA_BRAND.accent;
+  let accentFg = MOSSA_BRAND.accentFg;
+  let logoUrl: string | null = null;
   try {
-    const name = row?.branding_json ? (JSON.parse(row.branding_json) as { name?: string }).name : null;
-    if (name) return name;
-  } catch { /* fall through */ }
-  const org = await db.prepare("SELECT name FROM organization WHERE id = ?").bind(tenantId).first<{ name: string }>();
-  return org?.name ?? "Mossa";
+    const b = row?.branding_json ? (JSON.parse(row.branding_json) as { name?: string; primary?: string; primaryForeground?: string; logoUrl?: string }) : null;
+    if (b?.name) name = b.name;
+    if (b?.primary) accent = safeColor(b.primary, MOSSA_BRAND.accent);
+    if (b?.primaryForeground) accentFg = safeColor(b.primaryForeground, MOSSA_BRAND.accentFg);
+    // Only a public absolute URL renders in an email client (no session/cookies).
+    if (b?.logoUrl && /^https?:\/\//i.test(b.logoUrl) && !b.logoUrl.includes("/api/media")) logoUrl = b.logoUrl;
+  } catch { /* fall through to org name + defaults */ }
+  if (!name) name = (await db.prepare("SELECT name FROM organization WHERE id = ?").bind(tenantId).first<{ name: string }>())?.name ?? "Mossa";
+  return { name, accent, accentFg, logoUrl };
 }
 
-function notifEmailHtml(env: Env, brand: string, input: NotifyInput): string {
+function notifEmailHtml(env: Env, brand: BrandKit, input: NotifyInput): string {
   const base = env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
   const href = input.link && base ? `${base}${input.link.startsWith("/") ? "" : "/"}${input.link}` : null;
-  const button = href
-    ? `<div style="margin-top:20px"><a href="${encodeURI(href)}" style="display:inline-block;background:#22c55e;color:#0b0c0e;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:9999px;font-size:14px">Open ${escapeHtml(brand)}</a></div>`
-    : "";
-  return emailShell(escapeHtml(input.title), `${input.message ? `<p style="margin:0">${escapeHtml(input.message)}</p>` : ""}${button}`);
+  const body = `${input.message ? `<p style="margin:0">${escapeHtml(input.message)}</p>` : ""}${href ? emailButton(`Open ${brand.name}`, href, brand) : ""}`;
+  return emailShell(escapeHtml(input.title), body, { brand, preheader: input.message ?? input.title });
 }
 
 /** Deliver a notification to one user, honoring their preferences. */
@@ -85,13 +94,13 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
   if (channels.email) {
     const user = await env.DB.prepare("SELECT email FROM \"user\" WHERE id = ?").bind(userId).first<{ email: string | null }>();
     if (user?.email) {
-      const brand = await tenantBrand(env.DB, input.tenantId);
+      const brand = await tenantBrandKit(env.DB, input.tenantId);
       await sendTenantEmail(env, input.tenantId, {
         to: user.email,
         subject: input.title,
         html: input.emailHtml ?? notifEmailHtml(env, brand, input),
         text: input.message ?? input.title,
-        brandName: brand,
+        brandName: brand.name,
       }).catch(() => undefined);
     }
   }

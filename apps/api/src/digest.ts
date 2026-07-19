@@ -8,15 +8,23 @@
 import { resolveChannels, parseNotifPrefs, type NotifRole } from "@mossa/domain";
 import type { Env } from "./env.js";
 import { sendTenantEmail } from "./email-provider.js";
-import { emailShell, escapeHtml } from "./mailer.js";
+import { emailShell, emailButton, escapeHtml, type BrandKit } from "./mailer.js";
+import { tenantBrandKit } from "./notify.js";
 
 interface Stat { label: string; value: string | number }
 
-function digestHtml(heading: string, intro: string, stats: Stat[], footer?: string): string {
+/** A premium branded digest: intro, a stat ledger (label left, big value right,
+ *  hairline dividers), an optional nudge, and a CTA into the app. */
+function digestHtml(brand: BrandKit, heading: string, intro: string, stats: Stat[], ctaHref: string | null, footer?: string): string {
   const rows = stats
-    .map((s) => `<tr><td style="padding:8px 0;color:#c8cbd0">${s.label}</td><td style="padding:8px 0;text-align:right;font-weight:700;color:#e8eaed">${s.value}</td></tr>`)
+    .map((s, i) => `<tr><td style="padding:14px 0;${i ? "border-top:1px solid #23262c;" : ""}font-size:15px;color:#c8cbd0">${escapeHtml(s.label)}</td><td style="padding:14px 0;${i ? "border-top:1px solid #23262c;" : ""}text-align:right;font-size:20px;font-weight:800;color:#e8eaed;font-variant-numeric:tabular-nums">${escapeHtml(String(s.value))}</td></tr>`)
     .join("");
-  return emailShell(heading, `<p style="margin:0 0 14px">${intro}</p><table style="width:100%;border-collapse:collapse">${rows}</table>${footer ? `<p style="margin:16px 0 0;color:#9aa0a6;font-size:13px">${footer}</p>` : ""}`);
+  const body =
+    `<p style="margin:0 0 20px">${escapeHtml(intro)}</p>` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#1e2126;border-radius:18px;padding:4px 18px;margin:0">${rows}</table>` +
+    (footer ? `<p style="margin:20px 0 0;color:#8b9099;font-size:13px;line-height:1.6">${escapeHtml(footer)}</p>` : "") +
+    (ctaHref ? emailButton(`Open ${brand.name}`, ctaHref, brand) : "");
+  return emailShell(escapeHtml(heading), body, { brand, preheader: intro });
 }
 
 /** Whether this user still wants the weekly digest by email. */
@@ -54,9 +62,11 @@ export async function runWeeklyDigest(env: Env): Promise<void> {
   }
 }
 
-async function digestForTenant(env: Env, tenantId: string, brand: string, weekAgoDate: string, weekAgoIso: string, period: string): Promise<void> {
+async function digestForTenant(env: Env, tenantId: string, _brand: string, weekAgoDate: string, weekAgoIso: string, period: string): Promise<void> {
   const db = env.DB;
   const sentAt = new Date().toISOString();
+  const brand = await tenantBrandKit(db, tenantId);
+  const appHref = env.BETTER_AUTH_URL?.replace(/\/$/, "") || null;
 
   // ── Owners: studio health ─────────────────────────────────────────────────
   const [activeClients, activeThisWeek, checkIns, newSales, sub] = await Promise.all([
@@ -75,15 +85,15 @@ async function digestForTenant(env: Env, tenantId: string, brand: string, weekAg
     if (!(await claimSend(db, o.userId, period, "owner", sentAt))) continue;
     const email = (await db.prepare('SELECT email FROM "user" WHERE id = ?').bind(o.userId).first<{ email: string | null }>())?.email;
     if (!email) continue;
-    const html = digestHtml("Your studio this week", `Here's how ${escapeHtml(brand)} did over the last 7 days.`, [
+    const html = digestHtml(brand, "Your studio this week", `Here's how ${brand.name} did over the last 7 days.`, [
       { label: "Active clients", value: active },
       { label: "Engaged this week", value: engaged },
       { label: "Quiet (no logs 7d)", value: atRisk },
       { label: "Check-ins received", value: num(checkIns) },
       { label: "New sales", value: num(newSales) },
       { label: "Subscription", value: sub?.status ?? "active" },
-    ], atRisk > 0 ? `${atRisk} client${atRisk === 1 ? "" : "s"} went quiet — a nudge goes a long way.` : "Nice week — the roster's engaged.");
-    await sendTenantEmail(env, tenantId, { to: email, subject: `${brand} — your week`, html, brandName: brand }).catch(() => undefined);
+    ], appHref, atRisk > 0 ? `${atRisk} client${atRisk === 1 ? "" : "s"} went quiet — a nudge goes a long way.` : "Nice week — the roster's engaged.");
+    await sendTenantEmail(env, tenantId, { to: email, subject: `${brand.name} — your week`, html, brandName: brand.name }).catch(() => undefined);
   }
 
   // ── Trainers: their assigned clients this week ─────────────────────────────
@@ -98,12 +108,12 @@ async function digestForTenant(env: Env, tenantId: string, brand: string, weekAg
       db.prepare("SELECT COUNT(*) AS n FROM check_ins ci JOIN client_trainers ct ON ct.client_id = ci.client_id WHERE ct.trainer_user_id = ? AND ci.date_local >= ? AND ci.trainer_feedback IS NULL").bind(tr.trainer_user_id, weekAgoDate).first(),
       db.prepare("SELECT COUNT(*) AS n FROM client_trainers ct JOIN clients c ON c.id = ct.client_id WHERE ct.trainer_user_id = ? AND c.status = 'active' AND ct.client_id NOT IN (SELECT client_id FROM exercise_logs WHERE date_local >= ? UNION SELECT client_id FROM check_ins WHERE date_local >= ?)").bind(tr.trainer_user_id, weekAgoDate, weekAgoDate).first(),
     ]);
-    const html = digestHtml("Your clients this week", "A quick pulse on the clients assigned to you.", [
+    const html = digestHtml(brand, "Your clients this week", "A quick pulse on the clients assigned to you.", [
       { label: "Assigned clients", value: num(assigned) },
       { label: "Check-ins awaiting your feedback", value: num(awaiting) },
       { label: "Clients gone quiet", value: num(quiet) },
-    ], num(awaiting) > 0 ? `${num(awaiting)} check-in${num(awaiting) === 1 ? "" : "s"} still need${num(awaiting) === 1 ? "s" : ""} your reply.` : undefined);
-    await sendTenantEmail(env, tenantId, { to: email, subject: `${brand} — your clients this week`, html, brandName: brand }).catch(() => undefined);
+    ], appHref, num(awaiting) > 0 ? `${num(awaiting)} check-in${num(awaiting) === 1 ? "" : "s"} still need${num(awaiting) === 1 ? "s" : ""} your reply.` : undefined);
+    await sendTenantEmail(env, tenantId, { to: email, subject: `${brand.name} — your clients this week`, html, brandName: brand.name }).catch(() => undefined);
   }
 
   // ── Clients: their own week ────────────────────────────────────────────────
@@ -126,8 +136,8 @@ async function digestForTenant(env: Env, tenantId: string, brand: string, weekAg
         { label: "Check-ins", value: num(checkInCount) },
       ];
       if (num(labs) > 0) stats.push({ label: "Labs to complete", value: num(labs) });
-      const html = digestHtml("Your week", "Here's your last 7 days at a glance — keep it going.", stats);
-      await sendTenantEmail(env, tenantId, { to: email, subject: `${brand} — your week`, html, brandName: brand }).catch(() => undefined);
+      const html = digestHtml(brand, "Your week", "Here's your last 7 days at a glance — keep it going.", stats, appHref);
+      await sendTenantEmail(env, tenantId, { to: email, subject: `${brand.name} — your week`, html, brandName: brand.name }).catch(() => undefined);
     } catch { /* skip this client */ }
   }
 }
