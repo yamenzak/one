@@ -37,7 +37,7 @@ export interface ScanResult {
   weightKg: number;
 }
 
-type Step = "intro" | "front" | "relax" | "side" | "measuring" | "result" | "manual";
+type Step = "intro" | "front" | "frontShape" | "side" | "measuring" | "result" | "manual";
 
 const CATEGORY_LABEL: Record<BodyFatCategory, string> = {
   essential: "Essential",
@@ -66,7 +66,7 @@ export default function BodyScanFlow({
   const [fatalError, setFatalError] = useState<string | null>(null);
 
   const cueRef = useRef<CuePlayer | null>(null);
-  const capturesRef = useRef<{ front?: Capture; relax?: Capture; side?: Capture }>({});
+  const capturesRef = useRef<{ front?: Capture; frontShape?: Capture; side?: Capture }>({});
 
   // Spin up the cue player once (preload is fire-and-forget, degrades to TTS).
   useEffect(() => {
@@ -81,7 +81,7 @@ export default function BodyScanFlow({
     setStep("measuring");
     // Defer so the "measuring" frame paints before the synchronous pixel crunch.
     setTimeout(() => {
-      const { front, relax, side } = capturesRef.current;
+      const { front, frontShape, side } = capturesRef.current;
       // Diagnostic: what fraction of the frame the person mask covers, and its
       // dims. 0% ⇒ segmentation produced no body (model/delegate); a healthy
       // % that still fails ⇒ a site/scale problem, not the mask. Surfaced on the
@@ -112,11 +112,11 @@ export default function BodyScanFlow({
           neckCm: circ.neckCm, waistCm: circ.waistCm, hipsCm: circ.hipsCm ?? null,
         });
         if (!estimate) throw new Error(`estimate failed · outline ${coverage(front)}`);
-        // Visualization outlines are the FULL body (arms) from the arms-down relax
-        // + side captures — a natural human shape — while the numbers above came
-        // from the torso-only measurement. Fall back to the torso outline if the
-        // relax capture is missing.
-        const contourFront = relax ? fullBodyContour(relax) : f.contour;
+        // Visualization outlines are the FULL body (arms) from the arms-down
+        // frontShape + side captures — a natural human shape — while the numbers
+        // above came from the torso-only measurement. Fall back to the torso
+        // outline if the shape capture is missing.
+        const contourFront = frontShape ? fullBodyContour(frontShape) : f.contour;
         const contourSide = side ? fullBodyContour(side) : null;
         // Discard the masks now — we keep only numbers + the outline.
         capturesRef.current = {};
@@ -147,7 +147,7 @@ export default function BodyScanFlow({
           <span className="font-semibold">Body scan</span>
         </div>
         <div className="flex items-center gap-1.5">
-          {(step === "front" || step === "relax" || step === "side") && (
+          {(step === "front" || step === "frontShape" || step === "side") && (
             <Button size="icon-sm" variant="ghost" aria-pressed={muted} aria-label={muted ? "Unmute voice guidance" : "Mute voice guidance"} onClick={() => setMuted((m) => !m)}>
               <Sparkles className={cn(muted && "opacity-40")} />
             </Button>
@@ -163,16 +163,16 @@ export default function BodyScanFlow({
             onManual={() => { setFatalError(null); setStep("manual"); }}
           />
         )}
-        {(step === "front" || step === "relax" || step === "side") && (
+        {(step === "front" || step === "frontShape" || step === "side") && (
           <CaptureStep
             key={step}
             phase={step}
             cue={cueRef.current}
             onCaptured={(cap) => {
               capturesRef.current[step] = cap;
-              if (step === "front") { cueRef.current?.play("captured_front"); setStep("relax"); }
-              else if (step === "relax") setStep("side");
-              else { cueRef.current?.play("captured_side"); beginMeasure(); }
+              if (step === "front") { cueRef.current?.play("captured"); setStep("frontShape"); }
+              else if (step === "frontShape") { cueRef.current?.play("captured"); setStep("side"); }
+              else { cueRef.current?.play("done"); beginMeasure(); }
             }}
             onFallback={() => { setFatalError(null); setStep("manual"); }}
           />
@@ -200,7 +200,7 @@ function Intro({ onStartCamera, onManual }: { onStartCamera: () => void; onManua
         <div className="mx-auto grid size-16 place-items-center rounded-3xl bg-cardio/15"><Camera className="size-8" style={{ color: toneVar.cardio }} /></div>
         <h1 className="text-2xl font-bold tracking-tight">Scan your body composition</h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Stand in front of your camera for three quick poses — front, relaxed, and side. We estimate your body-fat percentage from your body's proportions and build a silhouette you can rotate in 3-D.
+          Stand in front of your camera for three quick poses: facing forward with your arms out, facing forward with your arms down, then side-on. We estimate your body-fat percentage from your proportions and build a silhouette you can rotate in 3-D. We'll guide you by voice.
         </p>
       </div>
 
@@ -222,8 +222,8 @@ function Intro({ onStartCamera, onManual }: { onStartCamera: () => void; onManua
 
       <div className="space-y-2 rounded-2xl bg-card p-4 text-sm text-muted-foreground">
         <Bullet icon={User}>Wear form-fitting clothing (or none) so your outline is clear.</Bullet>
-        <Bullet icon={ScanLine}>Prop your phone up about 2–3 m away at hip height.</Bullet>
-        <Bullet icon={Ruler}>Stand tall, arms slightly out. We'll guide you by voice.</Bullet>
+        <Bullet icon={ScanLine}>Prop your phone up about 2–3 m away at hip height, so your whole body — head to feet — fits in the frame.</Bullet>
+        <Bullet icon={Ruler}>Stand tall with your feet shoulder-width apart. We'll tell you when to hold your arms out and when to relax them down.</Bullet>
       </div>
 
       <div className="space-y-2.5">
@@ -302,7 +302,8 @@ function CaptureStep({ phase, cue, onCaptured, onFallback }: {
       } catch { if (!stopped) setState("modelfail"); return; }
       if (stopped) return;
       setState("scanning");
-      if (phase === "side") cue?.play("turn_side");
+      // Announce the pose on entry; the alignment loop takes over with corrections.
+      cue?.play(phase === "front" ? "arms_out" : phase === "frontShape" ? "arms_down" : "pose_side");
 
       // 3. Per-frame loop: pose → alignment → auto-capture on ~1s hold.
       const loop = () => {
@@ -372,8 +373,8 @@ function CaptureStep({ phase, cue, onCaptured, onFallback }: {
   return (
     <div className="mx-auto flex max-w-md flex-col px-4 py-2">
       <div className="mb-3 text-center">
-        <h2 className="text-lg font-semibold">{phase === "front" ? "Front pose" : phase === "relax" ? "Relax" : "Side pose"}</h2>
-        <p className="text-xs text-muted-foreground">{phase === "front" ? "Face the camera, arms slightly out" : phase === "relax" ? "Face the camera, arms relaxed at your sides" : "Turn so your side faces the camera"}</p>
+        <h2 className="text-lg font-semibold">{phase === "front" ? "Front · arms out" : phase === "frontShape" ? "Front · arms down" : "Side · arms down"}</h2>
+        <p className="text-xs text-muted-foreground">{phase === "front" ? "Face the camera, feet apart, arms out to your sides" : phase === "frontShape" ? "Stay facing the camera, arms relaxed straight down" : "Turn side-on, feet in frame, arms relaxed down"}</p>
       </div>
       <div className={cn("relative aspect-[3/4] w-full overflow-hidden rounded-3xl bg-black ring-2 transition-colors", ready ? "ring-success" : "ring-white/10")}>
         {/* Mirror the preview so left/right feel natural; measurements are mirror-invariant. */}

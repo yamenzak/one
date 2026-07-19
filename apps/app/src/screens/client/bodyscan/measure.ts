@@ -208,7 +208,7 @@ function rowExtentFull(mask: Float32Array, w: number, h: number, y: number): { m
 
 /**
  * Trace the FULL de-identified body outline — arms included — for the silhouette
- * and 3-D visualization. Meant for the arms-down "relax"/side capture (a natural
+ * and 3-D visualization. Meant for the arms-down shape + side captures (a natural
  * human shape), NOT for measurement (which stays torso-only). Same smoothing +
  * bbox-normalization as the torso outline so the two overlay for the morph.
  */

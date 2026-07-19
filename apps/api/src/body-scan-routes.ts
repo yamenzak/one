@@ -22,18 +22,23 @@ import { parseJson, j } from "./db.js";
 
 /** The fixed cue set. Voiced once per tenant/voice/lang and cached. */
 const CUE_PHRASES: { id: string; text: string }[] = [
-  { id: "intro", text: "Let's set up your body scan. Step back so your whole body fits in the frame." },
+  { id: "intro", text: "Let's scan your body composition. Stand back so your whole body, from your head to your feet, fits inside the frame." },
+  { id: "pose_front", text: "Face the camera. Stand with your feet about shoulder-width apart, and make sure both feet are inside the frame." },
+  { id: "pose_side", text: "Now turn to your side. Keep both feet in the frame and let your arms rest down." },
   { id: "step_back", text: "Step back a little." },
   { id: "step_forward", text: "Step a little closer." },
-  { id: "center", text: "Move to the center of the frame." },
-  { id: "arms", text: "Raise your arms slightly away from your sides." },
-  { id: "straighten", text: "Stand up straight and face the camera." },
-  { id: "hold", text: "Perfect. Hold still." },
-  { id: "captured_front", text: "Front captured. Now turn to your side." },
-  { id: "turn_side", text: "Turn so your side faces the camera." },
-  { id: "captured_side", text: "All done. Calculating your results now." },
+  { id: "center", text: "Move into the middle of the frame." },
+  { id: "feet", text: "Step back until both of your feet are inside the frame." },
+  { id: "arms_out", text: "Hold your arms out to the sides, away from your body, so we can measure your torso." },
+  { id: "arms_down", text: "Now relax — let your arms hang straight down against your sides." },
+  { id: "straighten", text: "Stand up tall, and hold still." },
+  { id: "hold", text: "Hold it right there." },
+  { id: "captured", text: "Got it." },
+  { id: "done", text: "All done. Calculating your results now." },
 ];
-const TTS_VERSION = 1;
+// Bump when the phrase set changes — invalidates cached WAVs so the owner
+// regenerates the voice pack against the new script.
+const TTS_VERSION = 2;
 
 /** The tenant's configured coach voice (ai_config.ttsVoice), validated against
  *  the allowed set; falls back to the default. An explicit query overrides it. */

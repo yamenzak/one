@@ -13,16 +13,19 @@ interface Cue { id: string; url: string; text: string }
 
 /** Local fallback text so guidance still speaks if the cues endpoint 403s. */
 const FALLBACK: Record<CueId, string> = {
-  intro: "Let's set up your body scan. Step back so your whole body fits in the frame.",
+  intro: "Let's scan your body composition. Stand back so your whole body, head to feet, fits inside the frame.",
+  pose_front: "Face the camera. Stand with your feet about shoulder-width apart, both feet inside the frame.",
+  pose_side: "Now turn to your side. Keep both feet in the frame and let your arms rest down.",
   step_back: "Step back a little.",
   step_forward: "Step a little closer.",
-  center: "Move to the center of the frame.",
-  arms: "Raise your arms slightly away from your sides.",
-  straighten: "Stand up straight and face the camera.",
-  hold: "Perfect. Hold still.",
-  captured_front: "Front captured. Now turn to your side.",
-  turn_side: "Turn so your side faces the camera.",
-  captured_side: "All done. Calculating your results now.",
+  center: "Move into the middle of the frame.",
+  feet: "Step back until both of your feet are inside the frame.",
+  arms_out: "Hold your arms out to the sides, away from your body.",
+  arms_down: "Now relax — let your arms hang straight down against your sides.",
+  straighten: "Stand up tall, and hold still.",
+  hold: "Hold it right there.",
+  captured: "Got it.",
+  done: "All done. Calculating your results now.",
 };
 
 export class CuePlayer {
@@ -30,6 +33,8 @@ export class CuePlayer {
   private audio = new Map<string, HTMLAudioElement>();
   private lastId: string | null = null;
   private lastAt = 0;
+  private busyUntil = 0; // never start a cue while one is still speaking
+  private current: HTMLAudioElement | null = null;
   private muted = false;
 
   /** Preload the tenant cue set. Never throws — degrades to speechSynthesis. */
@@ -54,18 +59,32 @@ export class CuePlayer {
     if (m) this.stop();
   }
 
-  /** Speak a cue. Debounced so the same cue doesn't stutter frame-to-frame. */
+  /**
+   * Speak a cue. Two guards stop the "two voices racing" overlap:
+   *  - a GLOBAL cooldown (`busyUntil`) — while any cue is still speaking, new
+   *    cues are dropped, so rapidly-changing alignment can't stack utterances or
+   *    let a late audio.play() promise resume over the next one;
+   *  - a per-id debounce — the same cue won't repeat for a few seconds.
+   */
   play(id: CueId): void {
     if (this.muted) return;
     const now = Date.now();
-    if (id === this.lastId && now - this.lastAt < 2600) return;
+    if (now < this.busyUntil) return; // a cue is still playing — don't talk over it
+    if (id === this.lastId && now - this.lastAt < 3500) return;
     this.lastId = id;
     this.lastAt = now;
-    this.stop();
     const audio = this.audio.get(id);
     if (audio) {
+      // Reserve a conservative window up front; tighten once the duration is known.
+      const dur = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+      this.busyUntil = now + (dur ? dur * 1000 + 350 : 2400);
+      this.current = audio;
       audio.currentTime = 0;
-      void audio.play().catch(() => this.speak(id));
+      audio.onended = () => { this.busyUntil = Date.now() + 300; this.current = null; };
+      void audio
+        .play()
+        .then(() => { if (audio.duration && Number.isFinite(audio.duration)) this.busyUntil = now + audio.duration * 1000 + 350; })
+        .catch(() => { this.current = null; this.busyUntil = 0; this.speak(id); });
     } else {
       this.speak(id);
     }
@@ -79,6 +98,9 @@ export class CuePlayer {
       synth.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.rate = 1;
+      // Hold the floor for an estimated speaking time; release on end.
+      this.busyUntil = Date.now() + Math.max(1600, text.length * 65);
+      u.onend = () => { this.busyUntil = Date.now() + 300; };
       synth.speak(u);
     } catch {
       /* no TTS available — the on-screen message still guides */
@@ -86,8 +108,11 @@ export class CuePlayer {
   }
 
   private stop(): void {
+    this.busyUntil = 0;
     try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
-    for (const a of this.audio.values()) { try { a.pause(); } catch { /* ignore */ } }
+    const a = this.current;
+    this.current = null;
+    if (a) { try { a.pause(); a.onended = null; } catch { /* ignore */ } }
   }
 
   dispose(): void {
