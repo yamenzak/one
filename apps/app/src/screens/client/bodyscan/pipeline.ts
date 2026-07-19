@@ -17,7 +17,7 @@
  */
 
 import type { NormLandmark } from "./measure.js";
-import { LM } from "./measure.js";
+import { LM, cleanMask } from "./measure.js";
 
 /**
  * Each orientation is captured twice: once with arms OUT (a clean torso for the
@@ -112,6 +112,8 @@ export async function loadScanner(): Promise<Scanner> {
             }
             cat?.close?.();
             result.confidenceMasks?.forEach((cm) => cm.close?.());
+            // Drop stray specks + fill interior holes before any measurement runs.
+            cleanMask(mask, w, h);
             resolve({ mask, width: w, height: h });
           });
         } catch {

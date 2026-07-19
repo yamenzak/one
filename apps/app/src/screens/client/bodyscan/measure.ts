@@ -70,6 +70,57 @@ export const LM = {
 
 const THRESH = 0.5; // person cutoff — the DeepLab mask is a clean 0/1 body mask,
 // so any 0<t<1 selects the body; the landmark fallback covers a missed segment
+
+/**
+ * Clean a raw person mask (in place): keep only the LARGEST connected blob (drops
+ * stray background specks the segmenter mislabels as person) and FILL interior
+ * holes (segmentation gaps inside the torso). This is the biggest quality lever
+ * for a coarse mask — noise no longer widens a girth or spikes the outline, and
+ * holes no longer eat into it. The connected body (arms included, they join at
+ * the shoulder) is preserved; gaps open to the frame edge (between the legs, an
+ * arm-to-torso bay) stay background. Values become a hard 0/1.
+ */
+export function cleanMask(mask: Float32Array, w: number, h: number): void {
+  const n = w * h;
+  const label = new Int32Array(n);
+  const stack = new Int32Array(n);
+  let best = 0, bestSize = 0, cur = 0;
+  for (let i = 0; i < n; i++) {
+    if (mask[i]! > THRESH && label[i] === 0) {
+      cur++;
+      let size = 0, sp = 0;
+      stack[sp++] = i; label[i] = cur;
+      while (sp > 0) {
+        const p = stack[--sp]!; size++;
+        const x = p % w, y = (p / w) | 0;
+        if (x > 0 && mask[p - 1]! > THRESH && label[p - 1] === 0) { label[p - 1] = cur; stack[sp++] = p - 1; }
+        if (x < w - 1 && mask[p + 1]! > THRESH && label[p + 1] === 0) { label[p + 1] = cur; stack[sp++] = p + 1; }
+        if (y > 0 && mask[p - w]! > THRESH && label[p - w] === 0) { label[p - w] = cur; stack[sp++] = p - w; }
+        if (y < h - 1 && mask[p + w]! > THRESH && label[p + w] === 0) { label[p + w] = cur; stack[sp++] = p + w; }
+      }
+      if (size > bestSize) { bestSize = size; best = cur; }
+    }
+  }
+  if (best === 0) return; // empty mask — nothing to clean
+  for (let i = 0; i < n; i++) mask[i] = label[i] === best ? 1 : 0;
+
+  // Flood the background inward from the frame border; any background pixel NOT
+  // reached is enclosed by the body → a hole → fill it.
+  const reached = new Uint8Array(n);
+  let sp = 0;
+  const seed = (p: number) => { if (mask[p]! < THRESH && !reached[p]) { reached[p] = 1; stack[sp++] = p; } };
+  for (let x = 0; x < w; x++) { seed(x); seed((h - 1) * w + x); }
+  for (let y = 0; y < h; y++) { seed(y * w); seed(y * w + w - 1); }
+  while (sp > 0) {
+    const p = stack[--sp]!;
+    const x = p % w, y = (p / w) | 0;
+    if (x > 0) seed(p - 1);
+    if (x < w - 1) seed(p + 1);
+    if (y > 0) seed(p - w);
+    if (y < h - 1) seed(p + w);
+  }
+  for (let i = 0; i < n; i++) if (mask[i]! < THRESH && !reached[i]) mask[i] = 1;
+}
 /** nose→hip is ~0.40 of standing height — the fallback scale when feet are out
  *  of frame (nose ≈0.93·H, hip/greater-trochanter ≈0.53·H). */
 const NOSE_TO_HIP_FRACTION = 0.4;
