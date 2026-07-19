@@ -63,7 +63,8 @@ export const LM = {
   rAnkle: 28,
 } as const;
 
-const THRESH = 0.5; // person-confidence cutoff
+const THRESH = 0.4; // person-confidence cutoff (lenient — full-body-at-distance
+// masks are weaker than the selfie framing the model was tuned for)
 /** nose→hip is ~0.40 of standing height — the fallback scale when feet are out
  *  of frame (nose ≈0.93·H, hip/greater-trochanter ≈0.53·H). */
 const NOSE_TO_HIP_FRACTION = 0.4;
@@ -203,12 +204,25 @@ export function measureCapture(cap: Capture, heightCm: number): SiteWidths {
   // Hips: widest row around the hip landmark level.
   const hips = extremeWidthRow(mask, w, h, hipY - torso * 0.05, hipY + torso * 0.15, "max");
 
+  // Landmark-breadth fallback for a FRONTAL capture: a low-contrast or cluttered
+  // background can defeat the person mask (empty rows → zero widths → the scan
+  // dead-ends). The pose landmarks still give a reliable shoulder/hip breadth
+  // even at distance, so we derive the sites from anthropometric ratios when the
+  // mask found nothing. Approximate — a clean mask always overrides — but it
+  // keeps the estimate alive instead of failing outright. Side captures (no
+  // frontal breadth) stay mask-only so we never fabricate a bogus depth.
+  const shoulderPx = Math.abs(lSh.x - rSh.x) * w;
+  const hipPx = Math.abs(lHip.x - rHip.x) * w;
+  const frontal = shoulderPx > w * 0.12;
+  const fb = (maskPx: number, basePx: number, ratio: number): number =>
+    maskPx > 0 ? maskPx : frontal && basePx > 0 ? basePx * ratio : 0;
+
   return {
     pxPerCm,
-    neckCm: toCm(neck.width),
-    chestCm: toCm(chestPx),
-    waistCm: toCm(waist.width),
-    hipsCm: toCm(hips.width),
+    neckCm: toCm(fb(neck.width, shoulderPx, 0.32)),
+    chestCm: toCm(fb(chestPx, shoulderPx, 0.88)),
+    waistCm: toCm(fb(waist.width, hipPx, 0.95)),
+    hipsCm: toCm(fb(hips.width, hipPx, 1.15)),
     contour,
   };
 }
