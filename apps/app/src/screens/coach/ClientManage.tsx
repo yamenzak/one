@@ -465,7 +465,7 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
             <Metric label="Weight Δ" value={wDelta != null ? `${wDelta > 0 ? "+" : ""}${wDelta} ${weightLabel(units)}` : "—"} />
             <Metric label="Avg mood" value={report.averages.mood ?? "—"} />
             <Metric label="Avg sleep" value={report.averages.sleepHours != null ? `${report.averages.sleepHours}h` : "—"} />
-            <Metric label="Tonnage" value={`${Math.round(report.totalTonnage / 1000)}t`} />
+            <Metric label="Tonnage" value={`${Math.round(kgToDisplay(report.totalTonnage, units) / 1000).toLocaleString()}k ${weightLabel(units)}`} />
           </div>
           {report.prs.length > 0 && (
             <Card className="space-y-1.5">

@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, type RangePreset, type SeriesDelta } from "@mossa/domain";
+import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, fmtEnergy, kcalToDisplay, type RangePreset, type SeriesDelta } from "@mossa/domain";
 import {
   Card, Badge, Button, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger, EmptyState,
   Reveal, SkeletonHero, SkeletonChart,
@@ -90,7 +90,7 @@ export function Progress({ clientId }: { clientId: string }) {
              wait-handshake (which could strand the incoming tab unmounted).
              Dim while a new range loads (prior data stays put — no skeleton flash). */
           <motion.div key={tab} variants={stagger} initial="hidden" animate="show" className={cn("space-y-4 transition-opacity", loading && "pointer-events-none opacity-50")}>
-            {tab === "overview" && <Overview data={data} dateLabel={dateLabel} />}
+            {tab === "overview" && <Overview data={data} units={units} dateLabel={dateLabel} />}
             {tab === "body" && <Body data={data} units={units} dateLabel={dateLabel} clientId={clientId} />}
             {tab === "training" && <Training data={data} units={units} />}
             {tab === "wellness" && <Wellness data={data} dateLabel={dateLabel} />}
@@ -105,7 +105,7 @@ export function Progress({ clientId }: { clientId: string }) {
 }
 
 // ── Overview ──
-function Overview({ data, dateLabel }: { data: ProgressData; dateLabel: (i: number) => string }) {
+function Overview({ data, units, dateLabel }: { data: ProgressData; units: ReturnType<typeof useUnits>; dateLabel: (i: number) => string }) {
   const { consistency, wellness, nutrition, body } = data;
   const days = data.range.days;
   const cals = nutrition.perDay.map((p) => (p.logged ? p.calories : null));
@@ -119,7 +119,7 @@ function Overview({ data, dateLabel }: { data: ProgressData; dateLabel: (i: numb
           <div className="relative min-w-0 flex-1 space-y-2.5">
             <MiniStat icon={Flame} tone="calories" label="Check-in streak" value={`${consistency.streak}`} sub={consistency.streak === 1 ? "day" : "days"} />
             <MiniStat icon={Gauge} tone="activity" label="Consistency" value={`${consistency.consistencyPct}`} sub="%" />
-            <MiniStat icon={Scale} tone="cardio" label="Weight trend" value={body.deltas.weight ? `${body.deltas.weight.delta > 0 ? "+" : ""}${body.deltas.weight.delta.toFixed(1)}` : "—"} sub={body.deltas.weight ? "kg" : ""} />
+            <MiniStat icon={Scale} tone="cardio" label="Weight trend" value={body.deltas.weight ? `${body.deltas.weight.delta > 0 ? "+" : ""}${kgToDisplay(body.deltas.weight.delta, units).toFixed(1)}` : "—"} sub={body.deltas.weight ? weightLabel(units) : ""} />
           </div>
         </Card>
       </Stagger>
@@ -131,8 +131,8 @@ function Overview({ data, dateLabel }: { data: ProgressData; dateLabel: (i: numb
       </Stagger>
 
       <Stagger>
-        <ChartCard title="Calorie adherence" icon={METRICS.calories.icon} tone="calories" value={nutrition.adherencePct != null ? nutrition.adherencePct : "—"} unit={nutrition.adherencePct != null ? "%" : undefined} delta={nutrition.targets.targetCalories ? <Badge tone="neutral">target {nutrition.targets.targetCalories} kcal</Badge> : undefined}>
-          <AreaChart values={cals} tone="calories" target={nutrition.targets.targetCalories} trend label={dateLabel} format={(v) => `${Math.round(v)}`} />
+        <ChartCard title="Calorie adherence" icon={METRICS.calories.icon} tone="calories" value={nutrition.adherencePct != null ? nutrition.adherencePct : "—"} unit={nutrition.adherencePct != null ? "%" : undefined} delta={nutrition.targets.targetCalories ? <Badge tone="neutral">target {fmtEnergy(nutrition.targets.targetCalories, units)}</Badge> : undefined}>
+          <AreaChart values={cals} tone="calories" target={nutrition.targets.targetCalories} trend label={dateLabel} format={(v) => `${kcalToDisplay(v, units)}`} />
         </ChartCard>
       </Stagger>
     </>
