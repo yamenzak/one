@@ -49,6 +49,11 @@ const navSpring = { type: "spring" as const, stiffness: 420, damping: 34 };
 
 export function BottomTabs({ tabs, active, onSelect, tinted }: { tabs: TabDef[]; active: string; onSelect: (k: string) => void; tinted?: boolean }) {
   const color = activeColor(tabs, active, tinted);
+  // When the pill is tinted to a domain tone, its text needs the on-tone
+  // foreground (tones invert per mode); otherwise the pill is the brand primary
+  // and takes the brand foreground.
+  const activeTone = tabs.find((t) => t.key === active)?.tone;
+  const onFg = tinted && activeTone && activeTone !== "primary" ? "var(--tone-foreground)" : "var(--primary-foreground)";
   return (
     <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.7rem)] md:hidden">
       <div data-tour="navbar" className="pointer-events-auto flex max-w-full items-center gap-0.5 rounded-full border border-border/60 bg-card/75 p-1.5 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] backdrop-blur-2xl">
@@ -60,9 +65,10 @@ export function BottomTabs({ tabs, active, onSelect, tinted }: { tabs: TabDef[];
               data-tour={`tab-${t.key}`}
               onClick={() => onSelect(t.key)}
               aria-current={on ? "page" : undefined}
+              style={on ? { color: onFg } : undefined}
               className={cn(
                 "relative flex items-center gap-1.5 rounded-full px-3 py-2.5 transition-colors duration-200",
-                on ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                on ? "" : "text-muted-foreground hover:text-foreground",
               )}
             >
               {on && <motion.span layoutId="tab-pill" initial={false} animate={{ backgroundColor: color }} transition={{ ...navSpring, ...pillTween }} className="absolute inset-0 rounded-full" />}
