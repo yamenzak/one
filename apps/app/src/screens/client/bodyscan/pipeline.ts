@@ -64,11 +64,17 @@ export async function loadScanner(): Promise<Scanner> {
     minTrackingConfidence: 0.5,
   });
 
+  // CPU delegate for the segmenter: the WebGL/GPU path for DeepLab has been
+  // unreliable in-browser (empty masks on some devices), and segmentation runs
+  // only ONCE per capture (not per frame) so CPU latency is a non-issue. We ask
+  // for BOTH outputs and union them — argmax `categoryMask` gives crisp edges,
+  // and `confidenceMasks[person] > 0.3` recovers the body where the model was
+  // confident-but-not-argmax (occlusion, busy background). Maximally forgiving.
   const segmenter = await ImageSegmenter.createFromOptions(fileset, {
-    baseOptions: { modelAssetPath: SEG_MODEL, delegate: "GPU" },
+    baseOptions: { modelAssetPath: SEG_MODEL, delegate: "CPU" },
     runningMode: "VIDEO",
     outputCategoryMask: true,
-    outputConfidenceMasks: false,
+    outputConfidenceMasks: true,
   });
 
   return {
@@ -81,17 +87,21 @@ export async function loadScanner(): Promise<Scanner> {
       return new Promise((resolve) => {
         try {
           segmenter.segmentForVideo(video, tsMs, (result) => {
-            const m = result.categoryMask;
-            if (!m) return resolve(null);
-            // DeepLab returns a per-pixel class index; project it to a 0/1 person
-            // mask (1 = body) so the pure measurement code stays mask-agnostic.
-            // Copy off before MediaPipe recycles the buffer on the next call.
-            const src = m.getAsUint8Array();
-            const mask = new Float32Array(src.length);
-            for (let i = 0; i < src.length; i++) if (src[i] === PERSON_CLASS) mask[i] = 1;
-            const out = { mask, width: m.width, height: m.height };
-            m.close?.();
-            resolve(out);
+            const cat = result.categoryMask;
+            const conf = result.confidenceMasks?.[PERSON_CLASS];
+            const base = cat ?? conf;
+            if (!base) return resolve(null);
+            const w = base.width, h = base.height, n = w * h;
+            // Copy off before MediaPipe recycles the buffers on the next call.
+            const catArr = cat?.getAsUint8Array();
+            const confArr = conf?.getAsFloat32Array();
+            const mask = new Float32Array(n);
+            for (let i = 0; i < n; i++) {
+              if ((catArr && catArr[i] === PERSON_CLASS) || (confArr && confArr[i]! > 0.3)) mask[i] = 1;
+            }
+            cat?.close?.();
+            result.confidenceMasks?.forEach((cm) => cm.close?.());
+            resolve({ mask, width: w, height: h });
           });
         } catch {
           resolve(null);
