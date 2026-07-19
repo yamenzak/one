@@ -14,6 +14,7 @@
  */
 
 import { Suspense, lazy, useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Spinner } from "@mossa/ui";
 import { api } from "../../../api.js";
 import { useSession } from "../../../session.js";
@@ -76,8 +77,13 @@ export function BodyScanLauncher({
   return (
     <>
       {children({ open: () => { if (profileReady) setOpen(true); }, loading: profile == null, profileReady })}
-      {open && profile?.p && (
-        <Suspense fallback={<div className="fixed inset-0 z-[60] grid place-items-center bg-background"><Spinner className="size-8" /></div>}>
+      {open && profile?.p && createPortal(
+        // Portal to <body>: the full-screen overlay uses position:fixed, but an
+        // ancestor's motion transform would otherwise become its containing block
+        // (fixed resolves to the transformed parent, not the viewport), so it
+        // rendered trapped inside the page — clipped, with the bottom nav bleeding
+        // over it. At the body root it truly covers the viewport, above the nav.
+        <Suspense fallback={<div className="fixed inset-0 z-[70] grid place-items-center bg-background"><Spinner className="size-8" /></div>}>
           <BodyScanFlow
             clientId={clientId}
             profile={profile.p}
@@ -86,7 +92,8 @@ export function BodyScanLauncher({
             onClose={() => setOpen(false)}
             onSaved={(r: ScanResult & { id: string }) => { setOpen(false); onSaved?.(r); }}
           />
-        </Suspense>
+        </Suspense>,
+        document.body,
       )}
     </>
   );
