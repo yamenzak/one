@@ -168,35 +168,38 @@
   --input: oklch(0.9 0.005 285);
   --ring: oklch(0.62 0.14 164);
 
-  --calories: oklch(0.6 0.15 45);
+  /* Foreground tones are darkened for light mode so tone-colored text/icons on
+     their own pale `-soft` tint clear WCAG AA (>=4.5:1) — the bright dark-mode
+     values washed out on white. `-soft` backgrounds stay pale (unchanged). */
+  --calories: oklch(0.53 0.16 45);
   --calories-soft: oklch(0.94 0.06 45);
-  --protein: oklch(0.58 0.16 350);
+  --protein: oklch(0.535 0.17 350);
   --protein-soft: oklch(0.94 0.05 350);
-  --carbs: oklch(0.66 0.14 90);
+  --carbs: oklch(0.53 0.15 90);
   --carbs-soft: oklch(0.95 0.07 90);
-  --fat: oklch(0.55 0.16 275);
+  --fat: oklch(0.53 0.17 275);
   --fat-soft: oklch(0.94 0.05 275);
 
-  --activity: oklch(0.58 0.13 164);
+  --activity: oklch(0.5 0.14 164);
   --activity-soft: oklch(0.93 0.05 164);
-  --nutrition: oklch(0.62 0.14 62);
+  --nutrition: oklch(0.53 0.15 62);
   --nutrition-soft: oklch(0.94 0.06 68);
-  --sleep: oklch(0.55 0.15 300);
+  --sleep: oklch(0.535 0.16 300);
   --sleep-soft: oklch(0.94 0.05 300);
-  --cardio: oklch(0.55 0.16 250);
+  --cardio: oklch(0.52 0.17 250);
   --cardio-soft: oklch(0.94 0.05 250);
-  --hydration: oklch(0.58 0.12 214);
+  --hydration: oklch(0.51 0.13 214);
   --hydration-soft: oklch(0.94 0.05 214);
-  --supplement: oklch(0.56 0.1 190);
+  --supplement: oklch(0.5 0.11 190);
   --supplement-soft: oklch(0.93 0.05 190);
-  --lab: oklch(0.56 0.15 322);
+  --lab: oklch(0.535 0.16 322);
   --lab-soft: oklch(0.94 0.05 322);
 
-  --success: oklch(0.58 0.15 158);
+  --success: oklch(0.5 0.16 158);
   --success-soft: oklch(0.93 0.06 158);
-  --warning: oklch(0.7 0.14 78);
+  --warning: oklch(0.53 0.15 78);
   --warning-soft: oklch(0.95 0.08 88);
-  --danger: oklch(0.58 0.2 24);
+  --danger: oklch(0.545 0.21 24);
   --danger-soft: oklch(0.95 0.06 24);
 }
 
