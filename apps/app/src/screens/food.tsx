@@ -56,7 +56,7 @@ export function normFood(f: FoodInput): FoodDisplay {
 export function FoodThumb({ src, size = 44, className = "" }: { src?: string | null; size?: number; className?: string }) {
   return (
     <div className={cn("grid shrink-0 place-items-center overflow-hidden rounded-lg bg-nutrition-soft text-nutrition", className)} style={{ width: size, height: size }}>
-      {src ? <img src={src} alt="" className="size-full object-cover" /> : <Utensils className="size-1/2" />}
+      {src ? <img src={src} alt="" className="size-full object-contain" /> : <Utensils className="size-1/2" />}
     </div>
   );
 }
