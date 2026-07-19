@@ -1677,14 +1677,24 @@ describe("body scan (camera body-fat)", () => {
     expect(meas?.body_fat_percent).toBeCloseTo(body.bodyFatPercent, 1);
   });
 
-  it("caches TTS cues (mock lane) and returns playable urls + fallback text", async () => {
-    const cues = (await (await SELF.fetch("http://x/api/body-scan/cues", { headers: auth(ownerCookie) })).json()) as { cues: { id: string; url: string; text: string }[] };
-    expect(cues.cues.length).toBeGreaterThan(5);
-    expect(cues.cues[0]!.url).toContain("/api/media/");
-    expect(cues.cues[0]!.text.length).toBeGreaterThan(0);
-    // Second call is served from cache (no error, same keys).
-    const again = (await (await SELF.fetch("http://x/api/body-scan/cues", { headers: auth(ownerCookie) })).json()) as { cues: { url: string }[] };
-    expect(again.cues[0]!.url).toBe(cues.cues[0]!.url);
+  it("owner generates the voice pack (billed); cues serve-only so a client scan never auto-bills", async () => {
+    // Before generation cues are unvoiced (empty urls) — a client scan can't bill
+    // the owner; the client speaks them with the browser's free speechSynthesis.
+    const before = (await (await SELF.fetch("http://x/api/body-scan/cues", { headers: auth(ownerCookie) })).json()) as { cues: { url: string; text: string }[] };
+    expect(before.cues.length).toBeGreaterThan(5);
+    expect(before.cues.every((q) => q.url === "")).toBe(true);
+    expect(before.cues[0]!.text.length).toBeGreaterThan(0);
+    // The owner explicitly generates the pack — the clear, billed moment.
+    const pack = (await (await SELF.fetch("http://x/api/body-scan/voice-pack", { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: "{}" })).json()) as { ok: boolean; generated: number; credits: number; ready: boolean };
+    expect(pack.generated).toBeGreaterThan(5);
+    expect(pack.credits).toBeGreaterThan(0);
+    expect(pack.ready).toBe(true);
+    // Now cues serve the cached urls, and the status endpoint agrees.
+    const after = (await (await SELF.fetch("http://x/api/body-scan/cues", { headers: auth(ownerCookie) })).json()) as { cues: { url: string }[] };
+    expect(after.cues[0]!.url).toContain("/api/media/");
+    const status = (await (await SELF.fetch("http://x/api/body-scan/voice-pack", { headers: auth(ownerCookie) })).json()) as { ready: boolean; count: number; total: number };
+    expect(status.ready).toBe(true);
+    expect(status.count).toBe(status.total);
   });
 
   it("requires the bfCamera entitlement (free tenant → 403)", async () => {
