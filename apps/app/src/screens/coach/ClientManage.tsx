@@ -432,6 +432,7 @@ interface Report {
   compliance: { checkInDays: number; foodDays: number; workoutDays: number; checkInConsistencyPct: number; currentStreak: number; calorieAdherencePct: number | null };
   averages: { mood: number | null; sleepHours: number | null };
   weightSeries: { date: string; kg: number }[];
+  bodyFatSeries: { date: string; pct: number }[];
   totalTonnage: number;
   prs: { exerciseId: string; e1rm: number; weight: number; reps: number }[];
 }
@@ -450,6 +451,8 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
   useEffect(() => { void api.get<{ exercises: { id: string; name: string }[] }>("/api/exercises?scope=all").then((r) => setExNames(new Map(r.exercises.map((e) => [e.id, e.name])))).catch(() => undefined); }, []);
   const weight = report?.weightSeries ?? [];
   const wDelta = weight.length >= 2 ? Math.round((kgToDisplay(weight.at(-1)!.kg, units) - kgToDisplay(weight[0]!.kg, units)) * 10) / 10 : null;
+  const bfSeries = report?.bodyFatSeries ?? [];
+  const bfDelta = bfSeries.length >= 2 ? Math.round((bfSeries.at(-1)!.pct - bfSeries[0]!.pct) * 10) / 10 : null;
   return (
     <Sheet open onClose={onClose} title="Client report">
       <div className="mb-3 flex gap-2">{(["7d", "30d", "90d"] as const).map((r) => <Chip key={r} selected={range === r} onClick={() => setRange(r)}>{r}</Chip>)}</div>
@@ -463,6 +466,7 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
             <Metric label="Consistency" value={`${report.compliance.checkInConsistencyPct}%`} />
             <Metric label="Cal adherence" value={report.compliance.calorieAdherencePct != null ? `${report.compliance.calorieAdherencePct}%` : "—"} />
             <Metric label="Weight Δ" value={wDelta != null ? `${wDelta > 0 ? "+" : ""}${wDelta} ${weightLabel(units)}` : "—"} />
+            <Metric label="Body-fat Δ" value={bfDelta != null ? `${bfDelta > 0 ? "+" : ""}${bfDelta}%` : "—"} />
             <Metric label="Avg mood" value={report.averages.mood ?? "—"} />
             <Metric label="Avg sleep" value={report.averages.sleepHours != null ? `${report.averages.sleepHours}h` : "—"} />
             <Metric label="Tonnage" value={`${Math.round(kgToDisplay(report.totalTonnage, units) / 1000).toLocaleString()}k ${weightLabel(units)}`} />

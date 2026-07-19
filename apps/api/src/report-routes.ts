@@ -90,6 +90,7 @@ export const reportRoutes = new Hono<AppEnv>()
         sleepHours: sleeps.length ? Math.round((sleeps.reduce((a, b) => a + b, 0) / sleeps.length) * 10) / 10 : null,
       },
       weightSeries: (measurements.results ?? []).filter((m) => m.weight_kg != null).map((m) => ({ date: m.date_local, kg: m.weight_kg })),
+      bodyFatSeries: (measurements.results ?? []).filter((m) => m.body_fat_percent != null).map((m) => ({ date: m.date_local, pct: m.body_fat_percent })),
       totalTonnage,
       prs,
     });
@@ -214,7 +215,7 @@ export const reportRoutes = new Hono<AppEnv>()
       const rows = await db.prepare("SELECT id FROM clients WHERE tenant_id = ? AND status = 'active'").bind(who.tenantId).all<{ id: string }>();
       ids = (rows.results ?? []).map((r) => r.id);
     } else ids = scope;
-    const empty = { range: { start, end: today, days: window }, roster: { total: ids.length, active7: 0, atRisk: ids.length }, daily: window.map((d) => ({ date: d, active: 0, logs: 0 })), engagement: { checkInRate: 0, workoutRate: 0, avgActivePerDay: 0 }, topClients: [] as unknown[] };
+    const empty = { range: { start, end: today, days: window }, roster: { total: ids.length, active7: 0, atRisk: ids.length }, daily: window.map((d) => ({ date: d, active: 0, logs: 0 })), engagement: { checkInRate: 0, workoutRate: 0, avgActivePerDay: 0 }, topClients: [] as unknown[], composition: { tracked: 0, withTrend: 0, improving: 0, avgDeltaPct: null as number | null, mostImproved: null as null } };
     if (ids.length === 0) return c.json(empty);
     ids = ids.slice(0, 500);
     const ph = ids.map(() => "?").join(",");
@@ -250,7 +251,34 @@ export const reportRoutes = new Hono<AppEnv>()
     const daily = window.map((d) => ({ date: d, active: activeByDay.get(d)?.size ?? 0, logs: logsByDay.get(d) ?? 0 }));
     const total = ids.length;
     const topClients = [...perClient.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([id, logs]) => ({ clientId: id, name: names.get(id) ?? "Client", logs }));
+
+    // Body-composition pulse — a wider (~90d) window since fat-loss trends over
+    // weeks, not days. First vs last body-fat reading per client → roster deltas.
+    const bfRows = await db.prepare(`SELECT client_id, date_local, body_fat_percent FROM measurements WHERE client_id IN (${ph}) AND body_fat_percent IS NOT NULL AND date_local >= ? AND date_local <= ? ORDER BY date_local`).bind(...ids, addDays(today, -89), today).all<{ client_id: string; body_fat_percent: number }>();
+    const bf = new Map<string, { first: number; last: number; n: number }>();
+    for (const r of bfRows.results ?? []) {
+      const e = bf.get(r.client_id);
+      if (!e) bf.set(r.client_id, { first: r.body_fat_percent, last: r.body_fat_percent, n: 1 });
+      else { e.last = r.body_fat_percent; e.n++; }
+    }
+    let deltaSum = 0, deltaN = 0, improving = 0;
+    let mostImproved: { clientId: string; name: string; delta: number } | null = null;
+    for (const [cid, e] of bf) {
+      if (e.n < 2) continue;
+      const delta = Math.round((e.last - e.first) * 10) / 10;
+      deltaSum += delta; deltaN++;
+      if (delta <= -0.5) improving++;
+      if (!mostImproved || delta < mostImproved.delta) mostImproved = { clientId: cid, name: names.get(cid) ?? "Client", delta };
+    }
+    const composition = {
+      tracked: bf.size,
+      withTrend: deltaN,
+      improving,
+      avgDeltaPct: deltaN ? Math.round((deltaSum / deltaN) * 10) / 10 : null,
+      mostImproved: mostImproved && mostImproved.delta < 0 ? mostImproved : null,
+    };
     return c.json({
+      composition,
       range: { start, end: today, days: window },
       roster: { total, active7: active7.size, atRisk: Math.max(0, total - active5.size) },
       daily,

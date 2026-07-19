@@ -11,7 +11,7 @@ import { kgToDisplay, weightLabel, type RangePreset } from "@mossa/domain";
 import {
   Button, Card, Badge, SegmentedControl, Page, Stagger, StatCard, ChartCard, AreaChart, SectionHeader, toneVar,
   Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList,
-  Flame, Gauge, Dumbbell, Utensils, Scale, Moon, Smile, Trophy, Sparkles, TrendingUp, cn,
+  Flame, Gauge, Dumbbell, Utensils, Scale, Moon, Smile, Trophy, Sparkles, TrendingUp, Percent, cn,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -22,6 +22,7 @@ interface Report {
   compliance: { checkInDays: number; foodDays: number; workoutDays: number; checkInConsistencyPct: number; currentStreak: number; calorieAdherencePct: number | null };
   averages: { mood: number | null; sleepHours: number | null };
   weightSeries: { date: string; kg: number }[];
+  bodyFatSeries: { date: string; pct: number }[];
   totalTonnage: number;
   prs: { exerciseId: string; e1rm: number; weight: number; reps: number }[];
 }
@@ -50,6 +51,9 @@ export function ClientReport({ clientId }: { clientId: string }) {
   const weight = report?.weightSeries ?? [];
   const weightVals = weight.map((w) => kgToDisplay(w.kg, units));
   const wDelta = weight.length >= 2 ? Math.round((weightVals.at(-1)! - weightVals[0]!) * 10) / 10 : null;
+  const bf = report?.bodyFatSeries ?? [];
+  const bfVals = bf.map((b) => b.pct);
+  const bfDelta = bf.length >= 2 ? Math.round((bfVals.at(-1)! - bfVals[0]!) * 10) / 10 : null;
   const maxE1 = report?.prs[0]?.e1rm ?? 1;
 
   return (
@@ -95,6 +99,15 @@ export function ClientReport({ clientId }: { clientId: string }) {
               <ChartCard title="Weight trajectory" icon={Scale} tone="cardio" value={weightVals.at(-1)!.toFixed(1)} unit={weightLabel(units)}
                 delta={wDelta != null && wDelta !== 0 ? <Badge tone="neutral"><TrendingUp className={cn("size-3", wDelta < 0 && "rotate-180")} />{wDelta > 0 ? "+" : ""}{wDelta} {weightLabel(units)}</Badge> : undefined}>
                 <AreaChart values={weightVals} tone="cardio" trend label={(i) => shortDate(weight[i]!.date)} format={(v) => v.toFixed(1)} />
+              </ChartCard>
+            </Stagger>
+          )}
+
+          {bfVals.length >= 2 && (
+            <Stagger>
+              <ChartCard title="Body-fat trajectory" icon={Percent} tone="sleep" value={bfVals.at(-1)!.toFixed(1)} unit="%"
+                delta={bfDelta != null && bfDelta !== 0 ? <Badge tone={bfDelta < 0 ? "success" : "neutral"}><TrendingUp className={cn("size-3", bfDelta < 0 && "rotate-180")} />{bfDelta > 0 ? "+" : ""}{bfDelta}%</Badge> : undefined}>
+                <AreaChart values={bfVals} tone="sleep" trend label={(i) => shortDate(bf[i]!.date)} format={(v) => v.toFixed(1)} />
               </ChartCard>
             </Stagger>
           )}
