@@ -14,7 +14,7 @@
 
 import { motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { toneVar, type Tone } from "./primitives.js";
+import { toneVar, toneSoft, type Tone } from "./primitives.js";
 import { cn } from "./lib/utils.js";
 
 /** Measure a container's width so an SVG viewBox can fill it responsively. */
@@ -288,7 +288,10 @@ export function ChartCard({ title, icon: Icon, tone = "primary", value, unit, de
     <div className={cn("space-y-3 rounded-2xl bg-card p-4", className)}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          {Icon && <span className="grid size-8 shrink-0 place-items-center rounded-xl" style={{ background: mix(toneVar[tone], 16, "var(--surface-2)") }}><Icon className="size-4" style={{ color: toneVar[tone] }} /></span>}
+          {/* Match IconBadge/Badge everywhere else: a pale wash of the tone's OWN
+              hue (its `-soft` token), not a mix dominated by the neutral surface —
+              that mix let surface-2's hue win, so the wash clashed with the icon. */}
+          {Icon && <span className={cn("grid size-8 shrink-0 place-items-center rounded-xl", toneSoft[tone])}><Icon className="size-4" /></span>}
           <div>
             <div className="text-sm font-semibold">{title}</div>
             {value != null && <div className="numeral text-xl font-bold leading-tight">{value}{unit && <span className="ml-1 text-xs font-medium text-muted-foreground">{unit}</span>}{delta && <span className="ml-2 align-middle text-xs">{delta}</span>}</div>}
