@@ -20,7 +20,7 @@ import {
   type LoggedSet,
 } from "@mossa/protocol";
 import { activityByKey, estimateBurnedCalories, calculateBMI, calculateBMR, ageFromDob, profileGaps, overallDaysRemaining, isFullyExpired, hasActiveBudget, SUSPENDED_STATUSES, type ClientPreferences, type Budget } from "@mossa/domain";
-import { type AppEnv } from "./auth-context.js";
+import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess, type ClientRow } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
 import { notify } from "./notify.js";
@@ -573,6 +573,29 @@ export const logRoutes = new Hono<AppEnv>()
       )
       .run();
     await recomputeBodyMetrics(c.env.DB, access.client, d.date);
+
+    // A new body-fat reading (body scan or manual entry) is coaching signal —
+    // notify the client's primary trainer, unless they logged it themselves.
+    // Deduped per client per day so a re-log doesn't re-notify.
+    if (d.bodyFatPercent != null) {
+      const actorId = requireTenant(c)?.userId;
+      const primary = await c.env.DB
+        .prepare("SELECT trainer_user_id FROM client_trainers WHERE client_id = ? ORDER BY is_primary DESC LIMIT 1")
+        .bind(access.client.id)
+        .first<{ trainer_user_id: string }>();
+      if (primary?.trainer_user_id && primary.trainer_user_id !== actorId) {
+        await notify(c.env, {
+          tenantId: access.client.tenant_id,
+          userId: primary.trainer_user_id,
+          category: "body-composition",
+          type: "body_fat_logged",
+          title: `${access.client.display_name} logged a body-fat reading`,
+          message: `${d.bodyFatPercent}% body fat${d.weightKg != null ? ` · ${d.weightKg} kg` : ""}`,
+          link: `/clients/${access.client.id}/manage`,
+          dedupeKey: `bf_${access.client.id}_${d.date}`,
+        });
+      }
+    }
     return c.json({ ok: true });
   })
 

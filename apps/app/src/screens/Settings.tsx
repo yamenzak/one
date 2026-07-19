@@ -92,6 +92,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
             {canBrand && <BrandingEditor initial={(ctx?.branding ?? null) as Branding | null} onPreview={preview} onSaved={() => void refresh()} />}
             {aiSuite && <AiConfigSection />}
             <EmailSection />
+            <NotificationPolicySection />
             <MarketplaceSection />
             <IntegrationsSection />
             {canBrand && <DomainSection />}
@@ -185,6 +186,40 @@ function NotificationsSection() {
                 </div>
               </div>
             ))}
+      </Card>
+    </section>
+  );
+}
+
+/** Owner: which notification categories members are allowed to receive by EMAIL.
+ *  A studio-wide allow-list layered on top of each member's own preference — the
+ *  inbox is never gated, only the email channel. */
+function NotificationPolicySection() {
+  const [data, setData] = useState<{ notifCategories: { key: string; label: string; blurb: string }[]; notifPolicy: Record<string, boolean> } | null>(null);
+  const load = useCallback(async () => {
+    const r = await api.get<{ notifCategories: { key: string; label: string; blurb: string }[]; notifPolicy: Record<string, boolean> }>("/api/settings");
+    setData({ notifCategories: r.notifCategories, notifPolicy: r.notifPolicy });
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  const toggle = async (cat: string, v: boolean) => {
+    setData((d) => (d ? { ...d, notifPolicy: { ...d.notifPolicy, [cat]: v } } : d));
+    await api.patch("/api/settings", { notifPolicy: { [cat]: v } }).catch(() => void load());
+  };
+  return (
+    <section>
+      <SectionHead title="Member email notifications" scope="tenant" />
+      <Card className="p-0">
+        <p className="px-4 pt-4 text-sm text-muted-foreground">Choose which notifications your members may receive by email. Turning one off keeps it in their in-app inbox but never emails it — members still tune their own preferences within what you allow here.</p>
+        <div className="mt-2 divide-y divide-border/50">
+          {!data
+            ? [0, 1, 2].map((i) => <div key={i} className="p-4"><SkeletonLine w="8rem" h="text" /></div>)
+            : data.notifCategories.map((cat) => (
+                <div key={cat.key} className="flex items-center justify-between gap-3 p-4">
+                  <div className="min-w-0"><div className="text-sm font-medium">{cat.label}</div><div className="text-xs text-muted-foreground">{cat.blurb}</div></div>
+                  <Switch checked={data.notifPolicy[cat.key] ?? true} onCheckedChange={(v) => void toggle(cat.key, v)} />
+                </div>
+              ))}
+        </div>
       </Card>
     </section>
   );

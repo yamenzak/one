@@ -8,7 +8,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { AI_TONES, TTS_VOICES, TTS_VOICE_IDS } from "@mossa/protocol";
-import { categoriesForRole, resolveAllChannels, parseNotifPrefs, type NotifRole, type StoredNotifPrefs } from "@mossa/domain";
+import { categoriesForRole, resolveAllChannels, parseNotifPrefs, NOTIF_CATEGORIES, parseNotifPolicy, resolveEmailPolicy, sanitizeEmailPolicy, type NotifRole, type StoredNotifPrefs } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { tenantEntitlements, getConfig } from "./billing-store.js";
 import { nowIso, periodKey } from "./ids.js";
@@ -26,7 +26,7 @@ export const settingsRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const row = await c.env.DB.prepare("SELECT * FROM tenant_settings WHERE tenant_id = ?")
       .bind(who.tenantId)
-      .first<{ branding_json: string | null; ai_toggles_json: string | null; marketplace_json: string | null; integrations_json: string | null; email_config_json: string | null; stripe_account_id: string | null }>();
+      .first<{ branding_json: string | null; ai_toggles_json: string | null; marketplace_json: string | null; integrations_json: string | null; email_config_json: string | null; notif_policy_json: string | null; stripe_account_id: string | null }>();
     const ent = await tenantEntitlements(c.env.DB, who.tenantId);
     const platformFrom = (await getConfig(c.env.DB))["email.platform_from"] || "Mossa <noreply@fourdegreelabs.com>";
     return c.json({
@@ -37,6 +37,9 @@ export const settingsRoutes = new Hono<AppEnv>()
       integrationProviders: PROVIDERS,
       email: maskEmailConfig(resolveEmailConfig(parseJson(row?.email_config_json ?? null, {}))),
       emailPlatformFrom: platformFrom,
+      // Owner-governed studio-wide email allow-list, by category.
+      notifCategories: NOTIF_CATEGORIES,
+      notifPolicy: resolveEmailPolicy(parseNotifPolicy(row?.notif_policy_json ?? null)),
       stripeConnected: Boolean(row?.stripe_account_id),
       entitlements: ent,
     });
@@ -77,6 +80,8 @@ export const settingsRoutes = new Hono<AppEnv>()
           senderEmail: z.string().max(200).optional(),
           senderName: z.string().max(120).optional(),
         }).optional(),
+        // Studio-wide email allow-list: category → whether members may be emailed.
+        notifPolicy: z.record(z.string(), z.boolean()).optional(),
       })
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
@@ -127,6 +132,13 @@ export const settingsRoutes = new Hono<AppEnv>()
         senderName: d.email.senderName !== undefined ? d.email.senderName : cur.senderName,
       };
       await c.env.DB.prepare("UPDATE tenant_settings SET email_config_json = ?, updated_at = ? WHERE tenant_id = ?").bind(j(next), nowIso(), who.tenantId).run();
+    }
+
+    // Studio-wide email allow-list, merged category-by-category (unknown keys dropped).
+    if (d.notifPolicy) {
+      const cur = parseNotifPolicy((await c.env.DB.prepare("SELECT notif_policy_json FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ notif_policy_json: string | null }>())?.notif_policy_json ?? null).emailCategories ?? {};
+      const next = { emailCategories: { ...cur, ...sanitizeEmailPolicy(d.notifPolicy) } };
+      await c.env.DB.prepare("UPDATE tenant_settings SET notif_policy_json = ?, updated_at = ? WHERE tenant_id = ?").bind(j(next), nowIso(), who.tenantId).run();
     }
     return c.json({ ok: true });
   })

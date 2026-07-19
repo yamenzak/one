@@ -224,6 +224,8 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "ALTER TABLE user_prefs ADD COLUMN notif_json TEXT",
           // Notification category (check-ins | plans-goals | billing | …).
           "ALTER TABLE notifications ADD COLUMN category TEXT",
+          // Owner-set tenant policy: which categories members may be EMAILED.
+          "ALTER TABLE tenant_settings ADD COLUMN notif_policy_json TEXT",
         ];
         for (const sql of alters) await db.exec(sql).catch(() => undefined);
       })

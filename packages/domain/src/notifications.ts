@@ -13,6 +13,7 @@ export type NotifRole = "owner" | "trainer" | "assistant" | "client" | "member";
 export type NotifCategory =
   | "check-ins"
   | "activity"
+  | "body-composition"
   | "plans-goals"
   | "labs"
   | "swaps"
@@ -45,6 +46,7 @@ const ALL: NotifRole[] = ["owner", "trainer", "assistant", "client"];
 export const NOTIF_CATEGORIES: NotifCategoryMeta[] = [
   { key: "check-ins", label: "Check-ins & feedback", blurb: "Client check-ins and your coach's feedback", roles: ALL },
   { key: "activity", label: "Client activity", blurb: "Workouts, weigh-ins, PRs and at-risk clients", roles: STAFF },
+  { key: "body-composition", label: "Body composition", blurb: "New body scans and body-fat readings from clients", roles: STAFF },
   { key: "plans-goals", label: "Plans & goals", blurb: "New workout/meal plans and goals", roles: ALL },
   { key: "labs", label: "Labs & supplements", blurb: "Lab requests, results and supplements", roles: ALL },
   { key: "swaps", label: "Exercise swaps", blurb: "Swap requests and decisions", roles: ALL },
@@ -59,6 +61,11 @@ export const NOTIF_CATEGORIES: NotifCategoryMeta[] = [
 ];
 
 const CATEGORY_KEYS = new Set(NOTIF_CATEGORIES.map((c) => c.key));
+
+/** True when `k` is a known notification category (guards owner-policy writes). */
+export function isNotifCategory(k: string): k is NotifCategory {
+  return CATEGORY_KEYS.has(k as NotifCategory);
+}
 
 /** Categories a role can see/tune. */
 export function categoriesForRole(role: NotifRole): NotifCategoryMeta[] {
@@ -119,5 +126,54 @@ export function resolveChannels(role: NotifRole, stored: StoredNotifPrefs, categ
 export function resolveAllChannels(role: NotifRole, stored: StoredNotifPrefs): Record<string, ChannelPref> {
   const out: Record<string, ChannelPref> = {};
   for (const c of categoriesForRole(role)) out[c.key] = resolveChannels(role, stored, c.key);
+  return out;
+}
+
+// ── Tenant-level EMAIL policy (owner control) ────────────────────────────────
+// A member decides, per category, whether it reaches their inbox and/or email.
+// On top of that, the tenant OWNER governs which categories are allowed to be
+// EMAILED to their studio's members at all — an opt-out allow-list. The inbox is
+// never gated (members always keep in-app delivery); the owner only governs the
+// email channel. Effective email = member's email choice AND owner allows it.
+
+/** Owner-set policy: category → whether email is permitted (absent = permitted). */
+export interface TenantNotifPolicy {
+  emailCategories?: Partial<Record<NotifCategory, boolean>>;
+}
+
+export function parseNotifPolicy(json: string | null | undefined): TenantNotifPolicy {
+  if (!json) return {};
+  try {
+    const raw = JSON.parse(json);
+    const src = raw && typeof raw === "object" ? (raw as { emailCategories?: unknown }).emailCategories : null;
+    if (!src || typeof src !== "object") return {};
+    const out: Partial<Record<NotifCategory, boolean>> = {};
+    for (const [k, v] of Object.entries(src as Record<string, unknown>)) {
+      if (CATEGORY_KEYS.has(k as NotifCategory) && typeof v === "boolean") out[k as NotifCategory] = v;
+    }
+    return { emailCategories: out };
+  } catch {
+    return {};
+  }
+}
+
+/** Keep only known category → boolean pairs (sanitizes an owner-supplied patch). */
+export function sanitizeEmailPolicy(patch: Record<string, unknown>): Partial<Record<NotifCategory, boolean>> {
+  const out: Partial<Record<NotifCategory, boolean>> = {};
+  for (const [k, v] of Object.entries(patch)) {
+    if (CATEGORY_KEYS.has(k as NotifCategory) && typeof v === "boolean") out[k as NotifCategory] = v;
+  }
+  return out;
+}
+
+/** Whether the tenant permits EMAIL for a category (default: yes). */
+export function emailAllowedByPolicy(policy: TenantNotifPolicy, category: NotifCategory): boolean {
+  return policy.emailCategories?.[category] ?? true;
+}
+
+/** The effective email allow-map across every category, for the owner's UI. */
+export function resolveEmailPolicy(policy: TenantNotifPolicy): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  for (const c of NOTIF_CATEGORIES) out[c.key] = emailAllowedByPolicy(policy, c.key);
   return out;
 }
