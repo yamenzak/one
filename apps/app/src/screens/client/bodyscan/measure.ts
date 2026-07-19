@@ -190,15 +190,24 @@ function extremeWidthRow(mask: Float32Array, w: number, h: number, yA: number, y
 
 const vis = (lm: NormLandmark | undefined): number => lm?.visibility ?? 1;
 
-/** 1-D moving-average smooth of a per-row edge series (odd window) — softens the
- *  row-to-row jaggedness of a low-res mask so the outline reads clean. */
-function smooth(vals: number[], win = 5): number[] {
+/** Smooth a per-row edge series: a median-3 pass to kill single-row spikes from a
+ *  coarse mask, then TWO moving-average passes (wide window) to round the outline
+ *  so it reads like a clean body, not a lumpy one. Visualization only. */
+function smooth(vals: number[], win = 9): number[] {
+  const n0 = vals.length;
+  if (n0 < 3) return vals.slice();
+  // Median of each triple removes lone spikes/notches.
+  const med = vals.map((_, i) => {
+    const a = vals[Math.max(0, i - 1)]!, b = vals[i]!, c = vals[Math.min(n0 - 1, i + 1)]!;
+    return Math.max(Math.min(a, b), Math.min(Math.max(a, b), c));
+  });
   const r = (win - 1) / 2;
-  return vals.map((_, i) => {
+  const pass = (src: number[]): number[] => src.map((_, i) => {
     let s = 0, n = 0;
-    for (let k = -r; k <= r; k++) { const j = i + k; if (j >= 0 && j < vals.length) { s += vals[j]!; n++; } }
+    for (let k = -r; k <= r; k++) { const j = i + k; if (j >= 0 && j < src.length) { s += src[j]!; n++; } }
     return s / n;
   });
+  return pass(pass(med));
 }
 
 /**

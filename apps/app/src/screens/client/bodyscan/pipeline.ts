@@ -211,11 +211,13 @@ export function analyzeAlignment(lm: NormLandmark[], phase: ScanPhase): Alignmen
       return { ok: false, cue: "arms_out", message: "Hold your arms out, away from your sides" };
     }
   } else {
-    // Arms down: both wrists should sit well below the shoulders (hanging, not
-    // raised or held out at shoulder height).
+    // Arms down: wrists hang WELL BELOW the shoulders and — facing the camera —
+    // stay CLOSE to the body. An arm held out to a side (wrist below the shoulder
+    // but far from centre) would spike the silhouette, so reject it here.
     const down = (wr: NormLandmark | undefined) => wr != null && wr.y > shoulderY + torso * 0.45;
-    if (!down(lWr) || !down(rWr)) {
-      return { ok: false, cue: "arms_down", message: "Relax your arms straight down at your sides" };
+    const tucked = (wr: NormLandmark | undefined) => wr == null || phase === "side" || Math.abs(wr.x - midShX) < Math.max(0.14, shoulderSpan * 1.5);
+    if (!down(lWr) || !down(rWr) || !tucked(lWr) || !tucked(rWr)) {
+      return { ok: false, cue: "arms_down", message: "Relax your arms straight down, close to your body" };
     }
   }
 
