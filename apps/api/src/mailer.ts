@@ -114,11 +114,80 @@ export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
 }
 
-export function emailShell(heading: string, bodyHtml: string): string {
-  return `<!doctype html><html><body style="margin:0;background:#0b0c0e;padding:32px 16px;font-family:ui-sans-serif,system-ui,sans-serif">
-  <div style="max-width:480px;margin:0 auto;background:#16181b;border-radius:24px;padding:32px;color:#e8eaed">
-    <div style="font-size:20px;font-weight:700;margin-bottom:12px">${heading}</div>
-    <div style="font-size:15px;line-height:1.6;color:#c8cbd0">${bodyHtml}</div>
-    <div style="margin-top:24px;font-size:12px;color:#9aa0a6">Mossa — coaching, organized.</div>
-  </div></body></html>`;
+// ── Branded email system ─────────────────────────────────────────────────────
+// Dark-first to match the app (DESIGN.md: near-black canvas, one-step-lighter
+// cards, very round corners, one tonal primary). Table-based + fully inline so
+// it renders consistently across Gmail / Apple Mail / Outlook. Every surface is
+// the tenant's: accent, logo (or wordmark), and name — a real white-label.
+
+export interface BrandKit {
+  /** Studio name — the wordmark + footer identity. */
+  name: string;
+  /** Primary accent (CTA background, wordmark). A tenant's `branding.primary`. */
+  accent: string;
+  /** Readable text ON the accent (CTA label). A tenant's `branding.primaryForeground`. */
+  accentFg: string;
+  /** A PUBLIC absolute logo URL, or null → fall back to the wordmark. */
+  logoUrl: string | null;
+}
+
+/** Mossa's own identity — platform emails (sign-in codes, receipts). */
+export const MOSSA_BRAND: BrandKit = { name: "Mossa", accent: "#a8c7fa", accentFg: "#0b1220", logoUrl: null };
+
+/** Whitelist a CSS color before it lands in an inline `style` (tenant-supplied —
+ *  must not be able to inject `;`/`}`/quotes/`url(`). Falls back when unsafe. */
+export function safeColor(value: string | null | undefined, fallback: string): string {
+  const v = (value ?? "").trim();
+  const ok =
+    /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v) ||
+    /^(?:rgb|rgba|hsl|hsla|oklch|oklab|color)\([0-9a-z%.,/\s-]+\)$/i.test(v) ||
+    /^[a-z]+$/i.test(v);
+  return ok ? v : fallback;
+}
+
+const T = {
+  bg: "#0b0c0e", card: "#16181b", inset: "#1e2126", border: "#23262c",
+  fg: "#e8eaed", body: "#c8cbd0", muted: "#8b9099",
+} as const;
+
+/** A bulletproof, brand-accented pill CTA. */
+export function emailButton(label: string, href: string, brand: BrandKit = MOSSA_BRAND): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:26px auto 6px"><tr><td align="center" style="border-radius:9999px;background:${brand.accent}">
+    <a href="${encodeURI(href)}" style="display:inline-block;padding:13px 30px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;line-height:1;color:${brand.accentFg};text-decoration:none;border-radius:9999px">${escapeHtml(label)}</a>
+  </td></tr></table>`;
+}
+
+/** The premium, tenant-branded wrapper. `heading`/`bodyHtml` are pre-escaped by
+ *  the caller; `brand` skins it; `preheader` is the inbox preview line. */
+export function emailShell(
+  heading: string,
+  bodyHtml: string,
+  opts: { brand?: BrandKit; preheader?: string } = {},
+): string {
+  const brand = opts.brand ?? MOSSA_BRAND;
+  const font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+  const mark = brand.logoUrl
+    ? `<img src="${encodeURI(brand.logoUrl)}" alt="${escapeHtml(brand.name)}" height="30" style="height:30px;max-height:30px;width:auto;border:0;display:block;margin:0 auto">`
+    : `<span style="font-size:16px;font-weight:800;letter-spacing:0.04em;color:${brand.accent}">${escapeHtml(brand.name)}</span>`;
+  const preheader = opts.preheader ?? heading;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"><meta name="supported-color-schemes" content="dark light"></head>
+<body style="margin:0;padding:0;background:${T.bg};-webkit-font-smoothing:antialiased">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${T.bg};font-size:1px;line-height:1px">${escapeHtml(preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${T.bg};padding:32px 16px">
+  <tr><td align="center">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px">
+      <tr><td align="center" style="padding:8px 0 22px">${mark}</td></tr>
+      <tr><td style="background:${T.card};border:1px solid ${T.border};border-radius:28px;padding:40px 36px">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="font-family:${font}">
+          <div style="font-size:22px;line-height:1.25;font-weight:700;color:${T.fg};margin:0 0 14px">${heading}</div>
+          <div style="font-size:15px;line-height:1.65;color:${T.body}">${bodyHtml}</div>
+        </td></tr></table>
+      </td></tr>
+      <tr><td style="padding:22px 36px 8px;font-family:${font};font-size:12px;line-height:1.6;color:${T.muted};text-align:center">
+        ${escapeHtml(brand.name)}${brand.name === MOSSA_BRAND.name ? " — coaching, organized." : ""}
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
 }
