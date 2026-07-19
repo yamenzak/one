@@ -55,7 +55,7 @@ export function morphPoly(a: Pt[], b: Pt[], t: number, n = 220): Pt[] {
 }
 
 /** A single outline. `trace` draws the stroke in with a dash animation. */
-export function Silhouette({ points, tone = "var(--color-cardio)", width = 150, height = 260, fill = true, trace = false, className }: {
+export function Silhouette({ points, tone = "var(--color-sleep)", width = 150, height = 260, fill = true, trace = false, className }: {
   points: Pt[];
   tone?: string;
   width?: number;

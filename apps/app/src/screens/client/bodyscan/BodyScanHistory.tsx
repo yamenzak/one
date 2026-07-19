@@ -65,7 +65,7 @@ export function BodyScanHistory({ scans, units, onClose }: { scans: HistoryScan[
     >
       <div className="flex items-center justify-between gap-3 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-2">
         <div className="flex items-center gap-2">
-          <IconBadge icon={ScanLine} tone="cardio" size="sm" />
+          <IconBadge icon={ScanLine} tone="sleep" size="sm" />
           <span className="font-semibold">Body composition</span>
         </div>
         <Button size="icon-sm" variant="ghost" aria-label="Close" data-autofocus onClick={onClose}><X /></Button>
@@ -82,9 +82,9 @@ export function BodyScanHistory({ scans, units, onClose }: { scans: HistoryScan[
               {activeView === "3d" && front ? (
                 <Body3D front={front} side={side} width={230} height={300} />
               ) : activeView === "side" && side ? (
-                <Silhouette points={side} tone={toneVar.cardio} width={190} height={300} />
+                <Silhouette points={side} tone={toneVar.sleep} width={190} height={300} />
               ) : front ? (
-                <Silhouette points={front} tone={toneVar.cardio} width={190} height={300} />
+                <Silhouette points={front} tone={toneVar.sleep} width={190} height={300} />
               ) : (
                 <div className="flex flex-col items-center gap-2 text-muted-foreground">
                   <User className="size-16" />
@@ -147,7 +147,7 @@ export function BodyScanHistory({ scans, units, onClose }: { scans: HistoryScan[
           {chrono.length >= 2 && (
             <div className="rounded-2xl bg-card p-3">
               <div className="mb-1 text-xs font-medium text-muted-foreground">Body-fat trend</div>
-              <AreaChart values={chrono.map((s) => s.bodyFatPercent!)} tone="cardio" height={120} trend format={(v) => `${v.toFixed(1)}%`} label={(i) => new Date(`${chrono[i]?.date}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })} />
+              <AreaChart values={chrono.map((s) => s.bodyFatPercent!)} tone="sleep" height={120} trend format={(v) => `${v.toFixed(1)}%`} label={(i) => new Date(`${chrono[i]?.date}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })} />
             </div>
           )}
 
@@ -162,10 +162,10 @@ export function BodyScanHistory({ scans, units, onClose }: { scans: HistoryScan[
                     key={s.id}
                     onClick={() => setSelId(s.id)}
                     aria-current={on ? "true" : undefined}
-                    className={cn("flex w-full items-center gap-3 rounded-2xl p-3 text-left transition-colors", on ? "bg-cardio/15 ring-1 ring-cardio/40" : "bg-card hover:bg-surface-2")}
+                    className={cn("flex w-full items-center gap-3 rounded-2xl p-3 text-left transition-colors", on ? "bg-sleep/15 ring-1 ring-sleep/40" : "bg-card hover:bg-surface-2")}
                   >
                     <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-surface-2">
-                      {hasPts(s.contourFront) ? <Silhouette points={s.contourFront} tone={toneVar.cardio} width={30} height={44} /> : <User className="size-5 text-muted-foreground" />}
+                      {hasPts(s.contourFront) ? <Silhouette points={s.contourFront} tone={toneVar.sleep} width={30} height={44} /> : <User className="size-5 text-muted-foreground" />}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium">{fmtDate(s.date)}</div>

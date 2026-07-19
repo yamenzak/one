@@ -76,7 +76,7 @@ export function BodyScanCard({ clientId }: { clientId: string }) {
         <Card className="space-y-4">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
-              <IconBadge icon={ScanLine} tone="cardio" size="sm" />
+              <IconBadge icon={ScanLine} tone="sleep" size="sm" />
               <div>
                 <div className="font-semibold">Body scan</div>
                 <div className="text-xs text-muted-foreground">Camera body-fat estimate</div>
@@ -149,7 +149,7 @@ function ScanSummary({ scans, latest, onOpenHistory }: { scans: Scan[]; latest: 
       {bfValues.length >= 2 && (
         <div className="rounded-2xl bg-surface-2 p-3">
           <div className="mb-1 text-xs font-medium text-muted-foreground">Body-fat trend</div>
-          <AreaChart values={bfValues} tone="cardio" height={130} trend format={(v) => `${v.toFixed(1)}%`} label={(i) => new Date(`${chrono[i]?.date}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })} />
+          <AreaChart values={bfValues} tone="sleep" height={130} trend format={(v) => `${v.toFixed(1)}%`} label={(i) => new Date(`${chrono[i]?.date}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })} />
         </div>
       )}
 
@@ -178,12 +178,12 @@ function SilhouetteMorph({ scans }: { scans: Scan[] }) {
         <span className="numeral">{fmt(first.date)} → {fmt(last.date)}</span>
       </div>
       <div className="grid place-items-center py-1">
-        <Silhouette points={poly} tone={toneVar.cardio} width={130} height={210} />
+        <Silhouette points={poly} tone={toneVar.sleep} width={130} height={210} />
       </div>
       <input
         type="range" min={0} max={1} step={0.01} value={t} onChange={(e) => setT(Number(e.target.value))}
         aria-label="Scrub silhouette between earliest and latest scan"
-        className="mt-1 w-full accent-[var(--color-cardio)]"
+        className="mt-1 w-full accent-[var(--color-sleep)]"
       />
     </div>
   );
