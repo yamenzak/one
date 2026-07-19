@@ -164,7 +164,12 @@ export function applyBranding(branding: Branding | null | undefined): void {
   if (typeof document === "undefined") return;
   const preset = presetById(branding?.preset);
   const primary = branding?.primary || preset?.primary;
-  const primaryFg = branding?.primaryForeground || preset?.primaryForeground;
+  // Always guarantee a readable on-primary color: if the tenant set a primary but
+  // no explicit foreground, derive the higher-contrast on-color from the primary
+  // itself. Otherwise a light/pastel custom primary in light mode keeps the
+  // default near-white foreground and renders white-on-light (fails contrast).
+  const primaryFg =
+    branding?.primaryForeground || preset?.primaryForeground || (primary ? foregroundFor(primary) : undefined);
 
   const dark: Record<string, string> = {};
   const light: Record<string, string> = {};
@@ -257,13 +262,31 @@ export function oklchStringToHex(str: string): string {
   return `#${hex2(r)}${hex2(g)}${hex2(b)}`;
 }
 
-/** A readable foreground (near-white or near-black) for a given primary. */
+/** WCAG relative luminance for an sRGB triple (0–255). */
+function relLuminance(r: number, g: number, b: number): number {
+  return 0.2126 * srgbToLinear(r) + 0.7152 * srgbToLinear(g) + 0.0722 * srgbToLinear(b);
+}
+const contrastRatio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+
+/**
+ * Pick the on-color (near-white or near-dark, hue-matched) that has the higher
+ * WCAG contrast against a background OKLCH. A luminance threshold mis-calls
+ * mid-lightness saturated colors (where white and black are both borderline);
+ * measuring the actual ratio and taking the winner is robust across the gamut.
+ */
+function bestForeground(l: number, c: number, h: number): string {
+  const bg = oklchToRgb(l, c, h);
+  const bgLum = relLuminance(bg.r, bg.g, bg.b);
+  const w = oklchToRgb(0.99, 0.01, h), d = oklchToRgb(0.2, 0.02, h);
+  const cWhite = contrastRatio(bgLum, relLuminance(w.r, w.g, w.b));
+  const cDark = contrastRatio(bgLum, relLuminance(d.r, d.g, d.b));
+  return cDark >= cWhite ? ok(0.2, 0.02, h) : ok(0.99, 0.01, h);
+}
+
+/** A readable foreground (near-white or near-dark) for a given primary. */
 export function foregroundFor(oklchOrHex: string): string {
-  const hex = oklchOrHex.startsWith("#") ? oklchOrHex : oklchStringToHex(oklchOrHex);
-  const full = hex.replace("#", "");
-  const r = parseInt(full.slice(0, 2), 16), g = parseInt(full.slice(2, 4), 16), b = parseInt(full.slice(4, 6), 16);
-  const { l } = rgbToOklch(r, g, b);
-  return l > 0.65 ? "oklch(0.2 0.02 285)" : "oklch(0.99 0.01 285)";
+  const p = parseColor(oklchOrHex) ?? { l: 0.6, c: 0.15, h: 285 };
+  return bestForeground(p.l, p.c, p.h);
 }
 
 // ── Palette generator (one brand color → a full, coherent light+dark theme) ──
@@ -292,7 +315,6 @@ function rgbToOklchHex(hex: string) {
 }
 
 const ok = (l: number, c: number, h: number) => `oklch(${r2(clamp(l, 0, 1))} ${r2(Math.max(0, c))} ${r2(((h % 360) + 360) % 360)})`;
-const contrastFg = (l: number, h: number) => (l > 0.62 ? ok(0.2, 0.02, h) : ok(0.99, 0.01, h));
 
 // Canonical macro hues (see tokens.css) — nudged toward the brand so they feel
 // part of one palette while staying distinct from each other.
@@ -351,7 +373,7 @@ export function deriveTokens(input: { primary: string; neutral?: NeutralTint }):
     "--card": ok(1, 0, nH), "--card-foreground": ok(0.2, 0.01 * nc, nH),
     "--surface-2": ok(0.965, 0.003 * nc, nH), "--surface-3": ok(0.94, 0.004 * nc, nH),
     "--popover": ok(1, 0, nH), "--popover-foreground": ok(0.2, 0.01 * nc, nH),
-    "--primary": pLight, "--primary-foreground": contrastFg(lightL, p.h),
+    "--primary": pLight, "--primary-foreground": bestForeground(lightL, pC, p.h),
     "--secondary": ok(0.955, 0.004 * nc, nH), "--secondary-foreground": ok(0.24, 0.01 * nc, nH),
     "--muted": ok(0.955, 0.004 * nc, nH), "--muted-foreground": ok(0.5, 0.012 * nc, nH),
     "--accent": ok(0.94, 0.005 * nc, nH), "--accent-foreground": ok(0.24, 0.01 * nc, nH),
@@ -362,7 +384,7 @@ export function deriveTokens(input: { primary: string; neutral?: NeutralTint }):
     "--card": ok(0.202, 0.006 * nc, nH), "--card-foreground": ok(0.975, 0.003 * nc, nH),
     "--surface-2": ok(0.235, 0.007 * nc, nH), "--surface-3": ok(0.275, 0.008 * nc, nH),
     "--popover": ok(0.21, 0.006 * nc, nH), "--popover-foreground": ok(0.975, 0.003 * nc, nH),
-    "--primary": pDark, "--primary-foreground": contrastFg(darkL, p.h),
+    "--primary": pDark, "--primary-foreground": bestForeground(darkL, pC, p.h),
     "--secondary": ok(0.245, 0.007 * nc, nH), "--secondary-foreground": ok(0.975, 0.003 * nc, nH),
     "--muted": ok(0.245, 0.007 * nc, nH), "--muted-foreground": ok(0.7, 0.012 * nc, nH),
     "--accent": ok(0.275, 0.008 * nc, nH), "--accent-foreground": ok(0.975, 0.003 * nc, nH),

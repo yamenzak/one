@@ -186,7 +186,7 @@ export function Body3D({ front, side, width = 220, height = 320, className }: {
   return (
     <div className={className} style={{ width, height, position: "relative" }}>
       {/* Resolves the accent CSS var to rgb for canvas shading. */}
-      <div ref={colorRef} style={{ color: "var(--color-cardio)", width: 0, height: 0, position: "absolute" }} />
+      <div ref={colorRef} style={{ color: "var(--color-sleep)", width: 0, height: 0, position: "absolute" }} />
       <canvas ref={canvasRef} style={{ width, height, touchAction: "none", cursor: "grab" }} aria-label="Rotatable 3-D body from your silhouettes" />
     </div>
   );

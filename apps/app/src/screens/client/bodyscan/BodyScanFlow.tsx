@@ -144,7 +144,7 @@ export default function BodyScanFlow({
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-2">
         <div className="flex items-center gap-2">
-          <IconBadge icon={ScanLine} tone="cardio" size="sm" />
+          <IconBadge icon={ScanLine} tone="sleep" size="sm" />
           <span className="font-semibold">Body scan</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -198,7 +198,7 @@ function Intro({ onStartCamera, onManual }: { onStartCamera: () => void; onManua
   return (
     <div className="mx-auto max-w-md space-y-5 px-5 py-4">
       <div className="space-y-2 text-center">
-        <div className="mx-auto grid size-16 place-items-center rounded-3xl bg-cardio/15"><Camera className="size-8" style={{ color: toneVar.cardio }} /></div>
+        <div className="mx-auto grid size-16 place-items-center rounded-3xl bg-sleep/15"><Camera className="size-8" style={{ color: toneVar.sleep }} /></div>
         <h1 className="text-2xl font-bold tracking-tight">Scan your body composition</h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
           Stand in front of your camera for three quick poses: facing forward with your arms out, facing forward with your arms down, then side-on. We estimate your body-fat percentage from your proportions and build a silhouette you can rotate in 3-D. We'll guide you by voice.
@@ -579,9 +579,9 @@ function ResultStep({ clientId, result, profile, units, onSaved, onRetry }: {
       {/* Silhouette + big number */}
       <div className="flex flex-col items-center">
         {hasContour ? (
-          <Silhouette points={contourFront!} trace tone={toneVar.cardio} width={140} height={230} />
+          <Silhouette points={contourFront!} trace tone={toneVar.sleep} width={140} height={230} />
         ) : (
-          <div className="grid h-[180px] w-[120px] place-items-center rounded-3xl bg-cardio/10"><User className="size-16" style={{ color: toneVar.cardio }} /></div>
+          <div className="grid h-[180px] w-[120px] place-items-center rounded-3xl bg-sleep/10"><User className="size-16" style={{ color: toneVar.sleep }} /></div>
         )}
         <div className="mt-1 flex items-end gap-1">
           <span className="numeral text-6xl font-bold tabular-nums tracking-tight">{count.toFixed(1)}</span>
@@ -589,7 +589,7 @@ function ResultStep({ clientId, result, profile, units, onSaved, onRetry }: {
         </div>
         <div className="text-sm text-muted-foreground">estimated body fat</div>
         <div className="mt-2 flex items-center gap-2">
-          {category && <Badge tone="cardio">{CATEGORY_LABEL[category]}</Badge>}
+          {category && <Badge tone="sleep">{CATEGORY_LABEL[category]}</Badge>}
           <Badge tone={CONFIDENCE_TONE[estimate.confidence]}>
             <span className={cn("mr-0.5 inline-block size-2 rounded-full", estimate.confidence === "high" ? "bg-success" : estimate.confidence === "medium" ? "bg-warning" : "bg-danger")} />
             {CONFIDENCE_LABEL[estimate.confidence]}
@@ -616,7 +616,7 @@ function ResultStep({ clientId, result, profile, units, onSaved, onRetry }: {
           {estimate.methods.map((m) => (
             <div key={m.method} className="flex items-center gap-3 text-sm">
               <span className="w-24 shrink-0 capitalize text-muted-foreground">{METHOD_LABEL[m.method]}</span>
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full" style={{ width: `${Math.round(m.weight * 100)}%`, backgroundColor: toneVar.cardio }} /></div>
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full" style={{ width: `${Math.round(m.weight * 100)}%`, backgroundColor: toneVar.sleep }} /></div>
               <span className="numeral w-12 text-right font-medium">{m.value.toFixed(1)}%</span>
             </div>
           ))}
@@ -676,8 +676,8 @@ function BandBar({ low, value, high }: { low: number; value: number; high: numbe
   const pct = (n: number) => `${Math.min(100, Math.max(0, (n / AX) * 100))}%`;
   return (
     <div className="relative mt-3 h-2.5 rounded-full bg-surface-2">
-      <div className="absolute top-0 h-full rounded-full bg-cardio/40" style={{ left: pct(low), right: `calc(100% - ${pct(high)})` }} />
-      <div className="absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-cardio" style={{ left: pct(value) }} />
+      <div className="absolute top-0 h-full rounded-full bg-sleep/40" style={{ left: pct(low), right: `calc(100% - ${pct(high)})` }} />
+      <div className="absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-sleep" style={{ left: pct(value) }} />
     </div>
   );
 }
