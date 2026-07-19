@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bodyComposition,
   calculateBodyFatNavy,
   classifyBodyFat,
   ellipseCircumference,
@@ -82,5 +83,29 @@ describe("body fat", () => {
     const extreme = estimateBodyFat({ gender: "male", ageYears: 30, heightCm: 180, weightKg: 40, neckCm: 30, waistCm: 60, hipsCm: null });
     expect(extreme!.bodyFatPercent).toBeGreaterThanOrEqual(2);
     expect(extreme!.bodyFatPercent).toBeLessThanOrEqual(65);
+  });
+});
+
+describe("bodyComposition (lean/fat mass + FFMI)", () => {
+  it("splits mass and computes FFMI", () => {
+    const c = bodyComposition(90, 22.7, 181)!;
+    expect(c.fatMassKg).toBeCloseTo(20.4, 1);
+    expect(c.leanMassKg).toBeCloseTo(69.6, 1);
+    expect(c.ffmi).toBeCloseTo(21.2, 1);
+    // Normalized to 1.8 m — near-identical at ~1.81 m.
+    expect(c.normalizedFfmi).toBeCloseTo(21.2, 1);
+  });
+
+  it("normalization lifts a short lifter's FFMI and lowers a tall one's", () => {
+    const short = bodyComposition(70, 12, 165)!;
+    const tall = bodyComposition(90, 12, 195)!;
+    expect(short.normalizedFfmi).toBeGreaterThan(short.ffmi);
+    expect(tall.normalizedFfmi).toBeLessThan(tall.ffmi);
+  });
+
+  it("rejects implausible input", () => {
+    expect(bodyComposition(0, 20, 180)).toBeNull();
+    expect(bodyComposition(80, 90, 180)).toBeNull(); // bf ≥ 75
+    expect(bodyComposition(80, 20, 0)).toBeNull();
   });
 });

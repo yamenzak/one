@@ -66,6 +66,32 @@ export function classifyBodyFat(bf: number, gender: Gender): BodyFatCategory | n
   return null;
 }
 
+/** Derived body-composition metrics from weight + body-fat % + height. */
+export interface BodyComposition {
+  leanMassKg: number;
+  fatMassKg: number;
+  /** Fat-Free Mass Index (kg/m²) — muscularity relative to height. */
+  ffmi: number;
+  /** FFMI adjusted to a 1.8 m reference, so heights compare fairly. */
+  normalizedFfmi: number;
+}
+
+/**
+ * Split weight into lean vs fat mass and compute FFMI. FFMI = lean kg / height²
+ * (m) — a size-of-frame-adjusted muscularity index (natural range ~18–22, ~25 is
+ * the drug-free ceiling); the normalized form adds 6.1·(1.8 − h) so a tall and a
+ * short lifter compare fairly. Returns null on missing/implausible inputs.
+ */
+export function bodyComposition(weightKg: number, bodyFatPercent: number, heightCm: number): BodyComposition | null {
+  if (!(weightKg > 0) || !(bodyFatPercent >= 0 && bodyFatPercent < 75) || !(heightCm > 0)) return null;
+  const fatMassKg = weightKg * (bodyFatPercent / 100);
+  const leanMassKg = weightKg - fatMassKg;
+  const hM = heightCm / 100;
+  const ffmi = leanMassKg / (hM * hM);
+  const r = (n: number): number => Math.round(n * 10) / 10;
+  return { leanMassKg: r(leanMassKg), fatMassKg: r(fatMassKg), ffmi: r(ffmi), normalizedFfmi: r(ffmi + 6.1 * (1.8 - hM)) };
+}
+
 /**
  * Ellipse circumference from front and side full widths (cm): semi-axes
  * a = front/2, b = side/2. Ramanujan's second approximation — accurate to

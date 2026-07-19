@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fmtWeight } from "@mossa/domain";
-import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, type Tone, type LucideIcon } from "@mossa/ui";
+import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, type Tone, type LucideIcon } from "@mossa/ui";
 import type { WidgetItem } from "@mossa/protocol";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -22,6 +22,7 @@ interface RosterAnalytics {
   daily: { date: string; active: number; logs: number }[];
   engagement: { checkInRate: number; workoutRate: number; avgActivePerDay: number };
   topClients: { clientId: string; name: string; logs: number }[];
+  composition: { tracked: number; withTrend: number; improving: number; avgDeltaPct: number | null; mostImproved: { clientId: string; name: string; delta: number } | null };
 }
 const dm = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
 
@@ -132,6 +133,28 @@ export function CoachToday() {
                   );
                 })}
               </div>
+            </Card>
+          )}
+          {analytics.composition && analytics.composition.tracked > 0 && (
+            <Card className="space-y-3">
+              <SectionHeader icon={Percent} tone="sleep" title="Body composition" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs text-muted-foreground">Trending down</div>
+                  <div className="numeral text-2xl font-bold">{analytics.composition.improving}<span className="text-sm font-medium text-muted-foreground"> / {analytics.composition.withTrend}</span></div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Avg body-fat Δ · 90d</div>
+                  <div className="numeral text-2xl font-bold">{analytics.composition.avgDeltaPct != null ? `${analytics.composition.avgDeltaPct > 0 ? "+" : ""}${analytics.composition.avgDeltaPct}%` : "—"}</div>
+                </div>
+              </div>
+              {analytics.composition.mostImproved && (
+                <button onClick={() => nav(`/clients/${analytics.composition.mostImproved!.clientId}/progress`)} className="flex w-full items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2 text-left">
+                  <span className="min-w-0 truncate text-sm"><span className="text-muted-foreground">Most improved · </span><span className="font-medium">{analytics.composition.mostImproved.name}</span></span>
+                  <Badge tone="success">{analytics.composition.mostImproved.delta}%</Badge>
+                </button>
+              )}
+              <p className="text-xs text-muted-foreground">{analytics.composition.tracked} client{analytics.composition.tracked === 1 ? "" : "s"} with a body-fat reading in the last 90 days.</p>
             </Card>
           )}
         </Stagger>
