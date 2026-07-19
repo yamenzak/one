@@ -1752,9 +1752,16 @@ describe("body scan (camera body-fat)", () => {
     const list = (await (await SELF.fetch(`http://x/api/body-scans?clientId=${clientId}`, { headers: auth(ownerCookie) })).json()) as { scans: { date: string; bodyFatPercent: number }[] };
     expect(list.scans.length).toBe(1);
     expect(list.scans[0]!.date).toBe("2026-02-01");
-    // Mirrored into the measurements body-fat series.
-    const meas = await db.prepare("SELECT body_fat_percent FROM measurements WHERE client_id=? AND date_local='2026-02-01'").bind(clientId).first<{ body_fat_percent: number }>();
+    // Mirrored into measurements — body-fat AND the circumferences, so the Body
+    // progress "latest measurements" aren't empty after a scan.
+    const meas = await db.prepare("SELECT body_fat_percent, weight_kg, neck_cm, waist_cm FROM measurements WHERE client_id=? AND date_local='2026-02-01'").bind(clientId).first<{ body_fat_percent: number; weight_kg: number; neck_cm: number; waist_cm: number }>();
     expect(meas?.body_fat_percent).toBeCloseTo(body.bodyFatPercent, 1);
+    expect(meas?.neck_cm).toBe(38);
+    expect(meas?.waist_cm).toBe(85);
+    // Surfaced as the Body tab's latest waist reading.
+    const prog = (await (await SELF.fetch(`http://x/api/progress/${clientId}?range=90d&today=2026-02-05`, { headers: auth(ownerCookie) })).json()) as { body: { latest: { waistCm: number | null; neckCm: number | null } } };
+    expect(prog.body.latest.waistCm).toBe(85);
+    expect(prog.body.latest.neckCm).toBe(38);
   });
 
   it("owner generates the voice pack (billed); cues serve-only so a client scan never auto-bills", async () => {
