@@ -91,9 +91,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
-    await api.post("/api/auth/sign-out").catch(() => undefined);
-    clearAppStorage();
-    setCtx(null);
+    // The session cookie is HttpOnly — ONLY the server can clear it — so the
+    // sign-out request must actually reach the server and succeed. Send a
+    // well-formed POST (an explicit {} body so Better Auth accepts it), then
+    // hard-navigate so the app re-bootstraps against the now-cleared cookie.
+    // We deliberately do NOT swallow the result into a fake success: the old
+    // `.catch(()=>undefined)` + in-place reload silently re-authenticated
+    // whenever the request didn't land (e.g. swallowed by the tour interceptor),
+    // which read as "sign out does nothing". `finally` still resets local state
+    // and navigates so the screen always reflects the true (server) session.
+    try {
+      await api.post("/api/auth/sign-out", {});
+    } finally {
+      clearAppStorage();
+      setCtx(null);
+      location.assign("/");
+    }
   }, []);
 
   const value = useMemo(

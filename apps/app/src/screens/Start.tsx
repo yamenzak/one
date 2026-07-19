@@ -71,7 +71,7 @@ export function Start() {
         </Card>
       </motion.div>
 
-      <button className="text-sm text-muted-foreground transition-colors hover:text-foreground" onClick={() => void signOut().then(() => location.reload())}>
+      <button className="text-sm text-muted-foreground transition-colors hover:text-foreground" onClick={() => void signOut()}>
         Sign out
       </button>
     </div>

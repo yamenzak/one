@@ -279,7 +279,7 @@ function SignOutSection() {
   const { signOut } = useSession();
   return (
     <SettingsList
-      sections={[{ header: "Account", rows: [{ icon: LogOut, label: "Sign out", destructive: true, onClick: () => void signOut().then(() => location.reload()) }] }]}
+      sections={[{ header: "Account", rows: [{ icon: LogOut, label: "Sign out", destructive: true, onClick: () => void signOut() }] }]}
     />
   );
 }

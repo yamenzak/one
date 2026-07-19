@@ -268,7 +268,7 @@ function TabLayout() {
                 {ctx!.isPlatformAdmin && <DropdownMenuItem onSelect={() => nav("/admin")}><ShieldCheck /> Platform admin</DropdownMenuItem>}
                 <DropdownMenuItem onSelect={toggleMode}>{themeMode === "dark" ? <Sun /> : <Moon />} {themeMode === "dark" ? "Light mode" : "Dark mode"}</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem destructive onSelect={() => void signOut().then(() => location.reload())}><LogOut /> Sign out</DropdownMenuItem>
+                <DropdownMenuItem destructive onSelect={() => void signOut()}><LogOut /> Sign out</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </>
