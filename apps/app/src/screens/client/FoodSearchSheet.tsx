@@ -46,6 +46,8 @@ const micros = (f: Food) => ({
 
 export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLogged, onPick }: { clientId?: string; mealType?: string; autoCamera?: boolean; onClose: () => void; onLogged?: () => void; onPick?: (foodId: string, name: string) => void }) {
   const snapInputRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const [q, setQ] = useState("");
   const [local, setLocal] = useState<Food[]>([]);
   const [external, setExternal] = useState<Food[]>([]);
@@ -97,6 +99,17 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
     if (webEnabled) void searchExternal(1);
   }, [q, webEnabled, searchExternal]);
   useEffect(() => { const t = setTimeout(() => void search(), 300); return () => clearTimeout(t); }, [search]);
+  // Infinite scroll: when the sentinel at the bottom of the results list scrolls
+  // into view, pull the next page of web results (the button below still works
+  // as a manual/no-IntersectionObserver fallback).
+  useEffect(() => {
+    if (!extMore || searching || extPage < 1) return;
+    const root = resultsRef.current, target = sentinelRef.current;
+    if (!root || !target || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver((entries) => { if (entries[0]?.isIntersecting) void searchExternal(extPage + 1); }, { root, rootMargin: "160px" });
+    io.observe(target);
+    return () => io.disconnect();
+  }, [extMore, searching, extPage, searchExternal]);
   // "Snap a meal" entry point — open the camera picker as soon as the sheet mounts.
   useEffect(() => { if (autoCamera) snapInputRef.current?.click(); }, [autoCamera]);
 
@@ -247,7 +260,7 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
         />
         {aiError && <p className="text-sm text-warning">{aiError}</p>}
         {snapErr != null && <AiErrorBox error={snapErr} />}
-        <div className="max-h-80 space-y-1 overflow-y-auto">
+        <div ref={resultsRef} className="max-h-80 space-y-1 overflow-y-auto">
           {local.filter(matchesFilter).map((f) => <FoodResult key={f.id} food={f} onPick={() => rowClick(f)} />)}
           {external.filter(matchesFilter).map((f, i) => <FoodResult key={`ext-${i}`} food={f} onPick={() => rowClick(f)} />)}
           {searching && external.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Searching…</p>}
@@ -255,7 +268,10 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
             <p className="p-4 text-center text-sm text-muted-foreground">No matches — scan a barcode or add it manually.</p>
           )}
           {extPage > 0 && extMore && (
-            <Button variant="ghost" className="w-full" disabled={searching} onClick={() => void searchExternal(extPage + 1)}>{searching ? "Loading…" : "Load more results"}</Button>
+            <>
+              <div ref={sentinelRef} aria-hidden className="h-px" />
+              <Button variant="ghost" className="w-full" disabled={searching} onClick={() => void searchExternal(extPage + 1)}>{searching ? "Loading…" : "Load more results"}</Button>
+            </>
           )}
         </div>
       </div>

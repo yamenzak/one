@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, cn, Reveal, SkeletonRow, SkeletonLine, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Sparkles, Ellipsis, Send, History } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, cn, Reveal, SkeletonRow, SkeletonLine, MacroInline, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Sparkles, Ellipsis, Send, History } from "@mossa/ui";
 import { api } from "../../api.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { AiErrorBox } from "../../AiError.js";
 import { FoodEditor } from "../client/FoodEditor.js";
 import { ExerciseEditor } from "./ExerciseEditor.js";
-import { FoodRow as FoodRowUI, normFood } from "../food.js";
+import { FoodThumb } from "../food.js";
+import { fmtEnergy } from "@mossa/domain";
+import { useUnits } from "../../units.js";
 import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
 
 type Tab = "exercises" | "foods" | "templates" | "content";
@@ -163,6 +165,7 @@ function ArchiveConfirm({ kind, id, name, onClose, onDone }: { kind: "exercise" 
 
 interface FoodRow { id: string; name: string; calories: number; brand: string | null; tenant_id: string | null; visibility?: string | null; protein_g?: number; carbs_g?: number; fat_g?: number; image_url?: string | null }
 function Foods() {
+  const units = useUnits();
   const [q, setQ] = useState("");
   const [items, setItems] = useState<FoodRow[] | null>(null);
   // `null` = closed; `{}` = new; `{ id }` = edit that food.
@@ -181,21 +184,26 @@ function Foods() {
         <div className="space-y-1">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="rounded-2xl bg-card p-4"><SkeletonRow thumb={40} /></div>)}</div>
       }>
         {items && (items.length === 0 ? <EmptyState icon={Utensils} title="No foods yet" description="Add one, or build your library from the Eat tab." action={<Button onClick={() => setEditor({})}><Plus /> New food</Button>} /> : (
+        // Two-line row so the food NAME gets the full width — it only shares its
+        // line with the actions; kcal, macros and the visibility tag sit beneath.
         <Stagger className="space-y-1">{items.map((f) => (
-          <Card key={f.id} className="py-3">
-            <FoodRowUI
-              {...normFood(f)}
-              thumbSize={40}
-              macros={f.protein_g != null}
-              trailing={
-                <>
+          <Card key={f.id} className="p-3">
+            <div className="flex items-center gap-3">
+              <FoodThumb src={f.image_url} size={40} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{f.name}</div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                  <span className="numeral font-semibold text-calories">{fmtEnergy(f.calories, units)}</span>
+                  {f.protein_g != null && <MacroInline proteinG={f.protein_g} carbsG={f.carbs_g ?? 0} fatG={f.fat_g ?? 0} className="text-[0.7rem]" />}
                   <Badge tone={tag(f) === "seed" ? "cardio" : tag(f) === "private" ? "neutral" : "activity"}>{tag(f)}</Badge>
-                  <button onClick={() => setEditor({ id: f.id })} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground [&_svg]:size-4" aria-label="Edit food"><PencilLine /></button>
-                  {/* Seeds (tenant_id null) can't be archived — only a tenant's own rows. */}
-                  {f.tenant_id !== null ? <button onClick={() => setArchiveFor(f)} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4" aria-label="Archive food"><Archive /></button> : null}
-                </>
-              }
-            />
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <button onClick={() => setEditor({ id: f.id })} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground [&_svg]:size-4" aria-label="Edit food"><PencilLine /></button>
+                {/* Seeds (tenant_id null) can't be archived — only a tenant's own rows. */}
+                {f.tenant_id !== null ? <button onClick={() => setArchiveFor(f)} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4" aria-label="Archive food"><Archive /></button> : null}
+              </div>
+            </div>
           </Card>
         ))}</Stagger>
         ))}
