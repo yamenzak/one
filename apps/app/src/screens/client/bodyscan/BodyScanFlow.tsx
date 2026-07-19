@@ -23,7 +23,7 @@ import {
 } from "@mossa/ui";
 import { api, todayLocal } from "../../../api.js";
 import { loadScanner, analyzeAlignment, type Scanner, type ScanPhase, type Alignment } from "./pipeline.js";
-import { measureCapture, computeCircumferences, LM, type Capture, type NormLandmark, type Circumferences } from "./measure.js";
+import { measureCapture, computeCircumferences, fullBodyContour, LM, type Capture, type NormLandmark, type Circumferences } from "./measure.js";
 import { CuePlayer } from "./cues.js";
 import { Silhouette } from "./Silhouette.js";
 
@@ -37,7 +37,7 @@ export interface ScanResult {
   weightKg: number;
 }
 
-type Step = "intro" | "front" | "side" | "measuring" | "result" | "manual";
+type Step = "intro" | "front" | "relax" | "side" | "measuring" | "result" | "manual";
 
 const CATEGORY_LABEL: Record<BodyFatCategory, string> = {
   essential: "Essential",
@@ -66,7 +66,7 @@ export default function BodyScanFlow({
   const [fatalError, setFatalError] = useState<string | null>(null);
 
   const cueRef = useRef<CuePlayer | null>(null);
-  const capturesRef = useRef<{ front?: Capture; side?: Capture }>({});
+  const capturesRef = useRef<{ front?: Capture; relax?: Capture; side?: Capture }>({});
 
   // Spin up the cue player once (preload is fire-and-forget, degrades to TTS).
   useEffect(() => {
@@ -81,7 +81,7 @@ export default function BodyScanFlow({
     setStep("measuring");
     // Defer so the "measuring" frame paints before the synchronous pixel crunch.
     setTimeout(() => {
-      const { front, side } = capturesRef.current;
+      const { front, relax, side } = capturesRef.current;
       // Diagnostic: what fraction of the frame the person mask covers, and its
       // dims. 0% ⇒ segmentation produced no body (model/delegate); a healthy
       // % that still fails ⇒ a site/scale problem, not the mask. Surfaced on the
@@ -112,9 +112,15 @@ export default function BodyScanFlow({
           neckCm: circ.neckCm, waistCm: circ.waistCm, hipsCm: circ.hipsCm ?? null,
         });
         if (!estimate) throw new Error(`estimate failed · outline ${coverage(front)}`);
+        // Visualization outlines are the FULL body (arms) from the arms-down relax
+        // + side captures — a natural human shape — while the numbers above came
+        // from the torso-only measurement. Fall back to the torso outline if the
+        // relax capture is missing.
+        const contourFront = relax ? fullBodyContour(relax) : f.contour;
+        const contourSide = side ? fullBodyContour(side) : null;
         // Discard the masks now — we keep only numbers + the outline.
         capturesRef.current = {};
-        setResult({ estimate, circumferences: circ, contourFront: f.contour, contourSide: s.contour, weightKg: latestWeightKg ?? 75 });
+        setResult({ estimate, circumferences: circ, contourFront, contourSide, weightKg: latestWeightKg ?? 75 });
         setStep("result");
       } catch (err) {
         const why = err instanceof Error ? err.message : coverage(front);
@@ -141,7 +147,7 @@ export default function BodyScanFlow({
           <span className="font-semibold">Body scan</span>
         </div>
         <div className="flex items-center gap-1.5">
-          {(step === "front" || step === "side") && (
+          {(step === "front" || step === "relax" || step === "side") && (
             <Button size="icon-sm" variant="ghost" aria-pressed={muted} aria-label={muted ? "Unmute voice guidance" : "Mute voice guidance"} onClick={() => setMuted((m) => !m)}>
               <Sparkles className={cn(muted && "opacity-40")} />
             </Button>
@@ -157,14 +163,15 @@ export default function BodyScanFlow({
             onManual={() => { setFatalError(null); setStep("manual"); }}
           />
         )}
-        {(step === "front" || step === "side") && (
+        {(step === "front" || step === "relax" || step === "side") && (
           <CaptureStep
             key={step}
             phase={step}
             cue={cueRef.current}
             onCaptured={(cap) => {
               capturesRef.current[step] = cap;
-              if (step === "front") { cueRef.current?.play("captured_front"); setStep("side"); }
+              if (step === "front") { cueRef.current?.play("captured_front"); setStep("relax"); }
+              else if (step === "relax") setStep("side");
               else { cueRef.current?.play("captured_side"); beginMeasure(); }
             }}
             onFallback={() => { setFatalError(null); setStep("manual"); }}
@@ -193,7 +200,7 @@ function Intro({ onStartCamera, onManual }: { onStartCamera: () => void; onManua
         <div className="mx-auto grid size-16 place-items-center rounded-3xl bg-cardio/15"><Camera className="size-8" style={{ color: toneVar.cardio }} /></div>
         <h1 className="text-2xl font-bold tracking-tight">Scan your body composition</h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Stand in front of your camera for a front and side pose. We estimate your body-fat percentage from your body's proportions.
+          Stand in front of your camera for three quick poses — front, relaxed, and side. We estimate your body-fat percentage from your body's proportions and build a silhouette you can rotate in 3-D.
         </p>
       </div>
 
@@ -365,8 +372,8 @@ function CaptureStep({ phase, cue, onCaptured, onFallback }: {
   return (
     <div className="mx-auto flex max-w-md flex-col px-4 py-2">
       <div className="mb-3 text-center">
-        <h2 className="text-lg font-semibold">{phase === "front" ? "Front pose" : "Side pose"}</h2>
-        <p className="text-xs text-muted-foreground">{phase === "front" ? "Face the camera, arms slightly out" : "Turn so your side faces the camera"}</p>
+        <h2 className="text-lg font-semibold">{phase === "front" ? "Front pose" : phase === "relax" ? "Relax" : "Side pose"}</h2>
+        <p className="text-xs text-muted-foreground">{phase === "front" ? "Face the camera, arms slightly out" : phase === "relax" ? "Face the camera, arms relaxed at your sides" : "Turn so your side faces the camera"}</p>
       </div>
       <div className={cn("relative aspect-[3/4] w-full overflow-hidden rounded-3xl bg-black ring-2 transition-colors", ready ? "ring-success" : "ring-white/10")}>
         {/* Mirror the preview so left/right feel natural; measurements are mirror-invariant. */}
