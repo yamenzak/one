@@ -4,9 +4,32 @@
  */
 
 import { motion, type Variants, type HTMLMotionProps } from "motion/react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
+
+/** Count a number up from 0 on mount (eased), the way the app animates hero
+ *  values. Respects reduced-motion. Re-animates when `value` changes. */
+export function CountUp({ value, decimals = 0, prefix = "", suffix = "", durationMs = 850, className }: {
+  value: number; decimals?: number; prefix?: string; suffix?: string; durationMs?: number; className?: string;
+}) {
+  const [n, setN] = useState(value);
+  const raf = useRef(0);
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { setN(value); return; }
+    const start = performance.now();
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / durationMs);
+      setN(value * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) raf.current = requestAnimationFrame(tick);
+    };
+    setN(0);
+    raf.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf.current);
+  }, [value, durationMs]);
+  const sign = prefix === "+" && n < 0 ? "" : prefix; // don't render "+-3"
+  return <span className={className}>{sign}{n.toFixed(decimals)}{suffix}</span>;
+}
 
 /** Fade + rise, used for page/section entrances. */
 export const fadeUp: Variants = {

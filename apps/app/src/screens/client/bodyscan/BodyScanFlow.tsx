@@ -20,6 +20,7 @@ import {
 import {
   Button, Field, Switch, Badge, IconBadge, Spinner, cn, toneVar, useModalOverlay,
   Camera, ScanLine, ShieldCheck, Sparkles, Ruler, User, Check, RotateCcw, X, AlertTriangle, ArrowRight, Percent,
+  motion, stagger, popIn, CountUp,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../../api.js";
 import { loadScanner, analyzeAlignment, type Scanner, type ScanPhase, type Alignment } from "./pipeline.js";
@@ -629,11 +630,11 @@ function ResultStep({ clientId, result, profile, units, onSaved, onRetry }: {
         if (!comp) return null;
         const wl = weightLabel(units);
         return (
-          <div className="grid grid-cols-3 gap-2">
-            <CompBox label="Lean mass" value={kgToDisplay(comp.leanMassKg, units).toFixed(1)} unit={wl} />
-            <CompBox label="Fat mass" value={kgToDisplay(comp.fatMassKg, units).toFixed(1)} unit={wl} />
-            <CompBox label="FFMI" value={comp.ffmi.toFixed(1)} unit="kg/m²" />
-          </div>
+          <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-3 gap-2">
+            <CompBox label="Lean mass" value={kgToDisplay(comp.leanMassKg, units)} unit={wl} />
+            <CompBox label="Fat mass" value={kgToDisplay(comp.fatMassKg, units)} unit={wl} />
+            <CompBox label="FFMI" value={comp.ffmi} unit="kg/m²" />
+          </motion.div>
         );
       })()}
 
@@ -690,12 +691,12 @@ function MeasBox({ label, cm, units }: { label: string; cm: number | null | unde
   );
 }
 
-function CompBox({ label, value, unit }: { label: string; value: string; unit: string }) {
+function CompBox({ label, value, unit }: { label: string; value: number; unit: string }) {
   return (
-    <div className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
+    <motion.div variants={popIn} className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
       <div className="text-[0.65rem] font-medium text-muted-foreground">{label}</div>
-      <div className="numeral mt-0.5 text-sm font-bold">{value}<span className="ml-0.5 text-[0.55rem] text-muted-foreground">{unit}</span></div>
-    </div>
+      <div className="numeral mt-0.5 text-sm font-bold"><CountUp value={value} decimals={1} /><span className="ml-0.5 text-[0.55rem] text-muted-foreground">{unit}</span></div>
+    </motion.div>
   );
 }
 // Local re-export to avoid another import line churn.
