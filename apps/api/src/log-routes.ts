@@ -673,7 +673,16 @@ export const logRoutes = new Hono<AppEnv>()
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
     const rows = await c.env.DB.prepare(
-      "SELECT * FROM check_ins WHERE client_id = ? ORDER BY date_local DESC LIMIT 90",
+      // Attach the body-fat reading as of each check-in's date (latest measured
+      // body-fat on or before that day) so the detail view can show it alongside
+      // weight without the client re-entering it. measurements is canonical —
+      // both manual logs and body-scans mirror into it.
+      `SELECT ci.*, (
+         SELECT m.body_fat_percent FROM measurements m
+         WHERE m.client_id = ci.client_id AND m.body_fat_percent IS NOT NULL AND m.date_local <= ci.date_local
+         ORDER BY m.date_local DESC LIMIT 1
+       ) AS body_fat_percent
+       FROM check_ins ci WHERE ci.client_id = ? ORDER BY ci.date_local DESC LIMIT 90`,
     )
       .bind(clientId)
       .all();

@@ -9,7 +9,7 @@
 import { fmtWeight, fmtVolume } from "@mossa/domain";
 import {
   Sheet, SubCard, Badge, IconBadge, PhotoGrid, cn, toneVar, type Photo, type Tone,
-  Smile, Zap, Gauge, Bed, Scale, Footprints, Droplet, ImageIcon, FlaskConical, ClipboardList, Calendar, Sparkles, HeartPulse,
+  Smile, Zap, Gauge, Bed, Scale, Footprints, Droplet, Percent, ImageIcon, FlaskConical, ClipboardList, Calendar, Sparkles, HeartPulse,
 } from "@mossa/ui";
 import { useUnits } from "../../units.js";
 import type { UnitPrefs } from "@mossa/domain";
@@ -18,6 +18,7 @@ export interface CheckInFull {
   id: string; date_local: string;
   weight_kg: number | null; mood: number | null; energy: number | null; stress: number | null;
   sleep_quality: number | null; sleep_hours: number | null; water_ml: number | null; steps_count: number | null;
+  body_fat_percent: number | null; // as-of body-fat from measurements (server-attached)
   notes: string | null; photos_json: string | null;
   trainer_feedback: string | null; feedback_at: string | null;
 }
@@ -92,6 +93,7 @@ function Stat({ icon: Icon, label, value, tone }: { icon: typeof Scale; label: s
 function checkInStats(ci: CheckInFull, units: UnitPrefs): { icon: typeof Scale; label: string; value: string; tone: Tone }[] {
   const out: { icon: typeof Scale; label: string; value: string; tone: Tone }[] = [];
   if (ci.weight_kg != null) out.push({ icon: Scale, label: "Weight", value: fmtWeight(ci.weight_kg, units), tone: "activity" });
+  if (ci.body_fat_percent != null) out.push({ icon: Percent, label: "Body fat", value: `${ci.body_fat_percent.toFixed(1)}%`, tone: "sleep" });
   if (ci.sleep_hours != null) out.push({ icon: Bed, label: "Sleep", value: `${ci.sleep_hours}h${ci.sleep_quality != null ? ` · ${ci.sleep_quality}/5` : ""}`, tone: "sleep" });
   if (ci.steps_count != null) out.push({ icon: Footprints, label: "Steps", value: ci.steps_count.toLocaleString(), tone: "cardio" });
   if (ci.water_ml != null && ci.water_ml > 0) out.push({ icon: Droplet, label: "Water", value: fmtVolume(ci.water_ml, units), tone: "hydration" });

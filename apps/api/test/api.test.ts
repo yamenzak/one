@@ -407,6 +407,22 @@ describe("notifications — email provider + per-user preferences", () => {
     expect(dup.n).toBe(1);
   });
 
+  it("check-ins carry the body-fat reading as of each check-in's date", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "AsOfAva", heightCm: 165 }) })).json()) as { client: { id: string } };
+
+    // A check-in BEFORE any body-fat reading has no body-fat context.
+    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-01", mood: 4 } }) });
+    // A body-fat reading lands mid-window, then a later check-in.
+    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-05", bodyFatPercent: 21 } }) });
+    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-10", mood: 5 } }) });
+
+    const { checkIns } = (await (await SELF.fetch(`http://x/api/check-ins?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { checkIns: { date_local: string; body_fat_percent: number | null }[] };
+    const byDate = Object.fromEntries(checkIns.map((ci) => [ci.date_local, ci.body_fat_percent]));
+    expect(byDate["2026-04-10"]).toBe(21); // as-of the 04-05 reading
+    expect(byDate["2026-04-01"]).toBe(null); // predates any reading → no context
+  });
+
   it("owner governs the studio-wide email allow-list, per category", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const s0 = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as { notifCategories: { key: string }[]; notifPolicy: Record<string, boolean> };

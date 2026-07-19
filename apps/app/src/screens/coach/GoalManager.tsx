@@ -34,7 +34,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
   const [goals, setGoals] = useState<Goal[] | null>(null);
   const [client, setClient] = useState<ClientData | null>(null);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [form, setForm] = useState({ label: "", gender: "male" as "male" | "female", ageYears: "", heightCm: "", heightFt: "", heightIn: "", weightKg: "", bodyFatPercent: "", activityLevel: "moderate", primaryGoal: "maintain", dietaryApproach: "balanced", weightMin: "", weightMax: "", notes: "" });
+  const [form, setForm] = useState({ label: "", gender: "male" as "male" | "female", ageYears: "", heightCm: "", heightFt: "", heightIn: "", weightKg: "", bodyFatPercent: "", activityLevel: "moderate", primaryGoal: "maintain", dietaryApproach: "balanced", weightMin: "", weightMax: "", bodyFatMin: "", bodyFatMax: "", notes: "" });
   const [busy, setBusy] = useState(false);
   const [derivation, setDerivation] = useState<Record<string, unknown> | null>(null);
   const units = useUnits();
@@ -73,7 +73,10 @@ export function GoalManager({ clientId }: { clientId: string }) {
     try {
       const heightCm = units.height === "ft_in" ? feetInchesToCm(Number(form.heightFt || 0), Number(form.heightIn || 0)) : Number(form.heightCm);
       const weightKg = displayToKg(Number(form.weightKg), units);
-      const ranges = (form.weightMin || form.weightMax) ? { weightKg: { min: form.weightMin ? displayToKg(Number(form.weightMin), units) : null, max: form.weightMax ? displayToKg(Number(form.weightMax), units) : null } } : undefined;
+      const rangesObj: Record<string, { min: number | null; max: number | null }> = {};
+      if (form.weightMin || form.weightMax) rangesObj.weightKg = { min: form.weightMin ? displayToKg(Number(form.weightMin), units) : null, max: form.weightMax ? displayToKg(Number(form.weightMax), units) : null };
+      if (form.bodyFatMin || form.bodyFatMax) rangesObj.bodyFatPercent = { min: form.bodyFatMin ? Number(form.bodyFatMin) : null, max: form.bodyFatMax ? Number(form.bodyFatMax) : null };
+      const ranges = Object.keys(rangesObj).length ? rangesObj : undefined;
       const res = await api.post<{ derivation: Record<string, unknown> }>("/api/goals", { clientId, label: form.label || "New phase", notes: form.notes || undefined, ranges, calculator: { gender: form.gender, ageYears: Number(form.ageYears), heightCm, weightKg, bodyFatPercent: form.bodyFatPercent ? Number(form.bodyFatPercent) : undefined, activityLevel: form.activityLevel, primaryGoal: form.primaryGoal, dietaryApproach: form.dietaryApproach } });
       setDerivation(res.derivation); setForm((f) => ({ ...f, label: "", notes: "" })); await load();
       // Refresh metrics/staleness against the new goal snapshot.
@@ -191,6 +194,8 @@ export function GoalManager({ clientId }: { clientId: string }) {
           <div className="grid grid-cols-2 gap-3">
             <Field label={`Weight range min (${weightLabel(units)})`} inputMode="decimal" value={form.weightMin} onChange={(e) => setForm({ ...form, weightMin: e.target.value })} />
             <Field label={`Weight range max (${weightLabel(units)})`} inputMode="decimal" value={form.weightMax} onChange={(e) => setForm({ ...form, weightMax: e.target.value })} />
+            <Field label="Body-fat range min (%)" inputMode="decimal" value={form.bodyFatMin} onChange={(e) => setForm({ ...form, bodyFatMin: e.target.value })} />
+            <Field label="Body-fat range max (%)" inputMode="decimal" value={form.bodyFatMax} onChange={(e) => setForm({ ...form, bodyFatMax: e.target.value })} />
           </div>
           <Field label="Notes (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Context for this phase" />
           <Button size="lg" className="w-full" disabled={!valid || busy} onClick={() => void create()}>{busy ? "Calculating…" : "Set goal + calculate targets"}</Button>
