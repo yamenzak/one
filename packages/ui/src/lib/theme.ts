@@ -319,10 +319,12 @@ const ok = (l: number, c: number, h: number) => `oklch(${r2(clamp(l, 0, 1))} ${r
 // Canonical macro hues (see tokens.css) — nudged toward the brand so they feel
 // part of one palette while staying distinct from each other.
 const MACRO_SPEC: { name: string; hue: number; c: number; dL: number; lL: number }[] = [
-  { name: "calories", hue: 45, c: 0.16, dL: 0.78, lL: 0.6 },
-  { name: "protein", hue: 350, c: 0.16, dL: 0.72, lL: 0.58 },
-  { name: "carbs", hue: 90, c: 0.15, dL: 0.82, lL: 0.66 },
-  { name: "fat", hue: 275, c: 0.14, dL: 0.7, lL: 0.55 },
+  // lL (light-mode lightness) is kept dark enough that macro-colored text/icons
+  // clear WCAG AA on their pale `-soft` tint; dL (dark mode) stays bright.
+  { name: "calories", hue: 45, c: 0.16, dL: 0.78, lL: 0.53 },
+  { name: "protein", hue: 350, c: 0.16, dL: 0.72, lL: 0.535 },
+  { name: "carbs", hue: 90, c: 0.15, dL: 0.82, lL: 0.53 },
+  { name: "fat", hue: 275, c: 0.14, dL: 0.7, lL: 0.53 },
 ];
 const hueDelta = (a: number, b: number) => (((b - a + 540) % 360) - 180);
 
