@@ -63,8 +63,8 @@ export const LM = {
   rAnkle: 28,
 } as const;
 
-const THRESH = 0.4; // person-confidence cutoff (lenient — full-body-at-distance
-// masks are weaker than the selfie framing the model was tuned for)
+const THRESH = 0.5; // person cutoff — the DeepLab mask is a clean 0/1 body mask,
+// so any 0<t<1 selects the body; the landmark fallback covers a missed segment
 /** nose→hip is ~0.40 of standing height — the fallback scale when feet are out
  *  of frame (nose ≈0.93·H, hip/greater-trochanter ≈0.53·H). */
 const NOSE_TO_HIP_FRACTION = 0.4;
