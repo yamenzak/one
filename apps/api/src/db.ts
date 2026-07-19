@@ -228,6 +228,24 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "ALTER TABLE tenant_settings ADD COLUMN notif_policy_json TEXT",
         ];
         for (const sql of alters) await db.exec(sql).catch(() => undefined);
+        // Backfill: older body scans mirrored only weight + body-fat into
+        // measurements, so the Body progress "latest" showed empty waist/neck/
+        // hips/chest. Carry the circumferences across for any day that has a
+        // scan but a measurement row still missing them. The WHERE guard makes
+        // this a no-op once every scan-day is filled.
+        await db
+          .prepare(
+            `UPDATE measurements SET
+               neck_cm  = COALESCE(neck_cm,  (SELECT bs.neck_cm  FROM body_scans bs WHERE bs.client_id=measurements.client_id AND bs.date_local=measurements.date_local)),
+               waist_cm = COALESCE(waist_cm, (SELECT bs.waist_cm FROM body_scans bs WHERE bs.client_id=measurements.client_id AND bs.date_local=measurements.date_local)),
+               hips_cm  = COALESCE(hips_cm,  (SELECT bs.hips_cm  FROM body_scans bs WHERE bs.client_id=measurements.client_id AND bs.date_local=measurements.date_local)),
+               chest_cm = COALESCE(chest_cm, (SELECT bs.chest_cm FROM body_scans bs WHERE bs.client_id=measurements.client_id AND bs.date_local=measurements.date_local))
+             WHERE (measurements.neck_cm IS NULL OR measurements.waist_cm IS NULL OR measurements.hips_cm IS NULL OR measurements.chest_cm IS NULL)
+               AND EXISTS (SELECT 1 FROM body_scans bs WHERE bs.client_id=measurements.client_id AND bs.date_local=measurements.date_local
+                            AND (bs.neck_cm IS NOT NULL OR bs.waist_cm IS NOT NULL OR bs.hips_cm IS NOT NULL OR bs.chest_cm IS NOT NULL))`,
+          )
+          .run()
+          .catch(() => undefined);
       })
       .catch((err) => {
         schemaReady = null; // allow retry on next request

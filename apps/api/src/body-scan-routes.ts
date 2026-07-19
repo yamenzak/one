@@ -102,13 +102,23 @@ export const bodyScanRoutes = new Hono<AppEnv>()
         d.weightKg, height, j(est.methods), cf, cs, now)
       .run();
 
-    // Mirror into measurements so the body-fat trend + reports pick it up.
+    // Mirror into measurements so the body-fat trend + reports + the Body
+    // progress "latest measurements" pick it up. Circumferences are carried
+    // across too (the scan is authoritative for them); weight keeps an existing
+    // manual entry for the day if one was already logged.
     await c.env.DB.prepare(
-      `INSERT INTO measurements (id, tenant_id, client_id, date_local, body_fat_percent, weight_kg, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(client_id, date_local) DO UPDATE SET body_fat_percent=excluded.body_fat_percent, weight_kg=COALESCE(measurements.weight_kg, excluded.weight_kg)`,
+      `INSERT INTO measurements (id, tenant_id, client_id, date_local, body_fat_percent, weight_kg, neck_cm, waist_cm, hips_cm, chest_cm, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(client_id, date_local) DO UPDATE SET
+         body_fat_percent=excluded.body_fat_percent,
+         weight_kg=COALESCE(measurements.weight_kg, excluded.weight_kg),
+         neck_cm=COALESCE(excluded.neck_cm, measurements.neck_cm),
+         waist_cm=COALESCE(excluded.waist_cm, measurements.waist_cm),
+         hips_cm=COALESCE(excluded.hips_cm, measurements.hips_cm),
+         chest_cm=COALESCE(excluded.chest_cm, measurements.chest_cm)`,
     )
-      .bind(newId("meas"), who.tenantId, cl.id, d.date, est.bodyFatPercent, d.weightKg, now)
+      .bind(newId("meas"), who.tenantId, cl.id, d.date, est.bodyFatPercent, d.weightKg,
+        d.circumferences.neckCm, d.circumferences.waistCm, d.circumferences.hipsCm ?? null, d.circumferences.chestCm ?? null, now)
       .run();
 
     return c.json({ ok: true, id, ...est });
