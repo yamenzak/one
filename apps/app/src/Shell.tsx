@@ -160,13 +160,16 @@ function TabLayout() {
   const ambientColor = activeTone ? `var(--${activeTone})` : "var(--primary)";
   // Ambient "token ambience": rebind --primary/--ring to the active section's
   // domain token so every accent on the page (buttons, selected chips, links,
-  // rings) speaks that section's colour instead of the brand primary. The
-  // foreground token is mode-adaptive and contrasts across every domain token,
-  // so it's left as-is. Scoped to the content — the nav keeps its own tinting.
+  // rings) speaks that section's colour instead of the brand primary. We must
+  // ALSO rebind --primary-foreground to the on-tone foreground: the brand
+  // foreground is fixed to the brand primary's polarity, but domain tones invert
+  // per mode, so leaving it produces low-contrast text on a solid tone button
+  // (e.g. a purple "Check in" with dark-on-dark text). --tone-foreground clears
+  // AA on every tone in both modes. Scoped to the content — the nav tints itself.
   // Only rebind for the non-primary section tokens — `--primary: var(--primary)`
   // would be a circular self-reference and blank out every primary-tinted element.
   const pageVars = ambient && activeTone && activeTone !== "primary"
-    ? ({ "--primary": `var(--${activeTone})`, "--ring": `var(--${activeTone})` } as CSSProperties)
+    ? ({ "--primary": `var(--${activeTone})`, "--ring": `var(--${activeTone})`, "--primary-foreground": "var(--tone-foreground)" } as CSSProperties)
     : undefined;
 
   return (
