@@ -149,7 +149,11 @@ export function createAuth(env: Env, origin?: string) {
         rpName: "Mossa",
         // rpID must match the serving origin's registrable domain.
         rpID: baseURL.startsWith("https") ? new URL(baseURL).hostname : "localhost",
-        origin: baseURL,
+        // WebAuthn verifies the ceremony's origin against this. In local dev the
+        // page runs on Vite (:5173) while this worker is :8787, so pin BOTH (same
+        // set as trustedOrigins) or registration fails with an origin mismatch.
+        // In prod the request origin is the one true serving origin.
+        origin: trustedOrigins ?? baseURL,
       }),
     ],
 
