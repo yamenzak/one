@@ -18,6 +18,7 @@ import {
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { notify } from "./notify.js";
+import { recordAudit } from "./audit.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
 
@@ -135,5 +136,6 @@ export const goalRoutes = new Hono<AppEnv>()
     if (access.client.user_id) {
       await notify(c.env, { tenantId: access.client.tenant_id, userId: access.client.user_id, type: "goal_set", title: "Your coach set a new goal", message: d.label, link: "/progress" });
     }
+    await recordAudit(c.env, { tenantId: access.client.tenant_id, clientId: access.client.id, actorUserId: who.userId, action: "goal.set", summary: d.label, ref: id });
     return c.json({ ok: true, id, targets, derivation }, 201);
   });
