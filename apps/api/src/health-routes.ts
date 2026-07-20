@@ -30,8 +30,11 @@ export const healthRoutes = new Hono<AppEnv>()
     if (!clientId) return c.json({ error: "clientId required" }, 400);
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
+    // The client only sees ACTIVE supplements (a paused one drops off their
+    // loggable list + counts); staff see paused too so they can resume it.
+    const statusFilter = c.get("role") === "client" ? "status = 'active'" : "status != 'discontinued'";
     const rows = await c.env.DB.prepare(
-      "SELECT * FROM supplements WHERE client_id = ? AND status != 'discontinued' ORDER BY created_at DESC",
+      `SELECT * FROM supplements WHERE client_id = ? AND ${statusFilter} ORDER BY created_at DESC`,
     )
       .bind(clientId)
       .all();
@@ -108,6 +111,11 @@ export const healthRoutes = new Hono<AppEnv>()
     if ("response" in access) return access.response;
     const { clientId, date, slot } = parsed.data;
     const supId = c.req.param("id");
+    // A paused/discontinued supplement isn't loggable — reject even if a stale
+    // client (or a direct call) tries to toggle it.
+    const sup = await c.env.DB.prepare("SELECT status FROM supplements WHERE id = ? AND client_id = ?").bind(supId, clientId).first<{ status: string }>();
+    if (!sup) return c.json({ error: "supplement not found" }, 404);
+    if (sup.status !== "active") return c.json({ error: "supplement is not active" }, 409);
     // Atomic toggle: DELETE first (idempotent) — if it removed a row the slot was
     // taken, so it's now cleared. Otherwise INSERT OR IGNORE marks it taken. This
     // avoids the SELECT-then-INSERT TOCTOU that 500s on a double-tap (both taps

@@ -1594,6 +1594,49 @@ describe("access gate — clientAccess in context", () => {
   });
 });
 
+describe("supplements — pausing hides from the client + blocks logging", () => {
+  const B = "http://localhost:8787";
+  const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
+  const clientSignIn = async (email: string): Promise<string> => {
+    const db = env.DB as D1Database;
+    await SELF.fetch(`${B}/api/auth/email-otp/send-verification-otp`, { method: "POST", headers: { "content-type": "application/json", origin: B }, body: JSON.stringify({ email, type: "sign-in" }) });
+    const row = await db.prepare("SELECT value FROM verification ORDER BY createdAt DESC LIMIT 1").first<{ value: string }>();
+    const otp = ((row?.value ?? "").match(/\d{6}/) ?? [])[0];
+    return grabCookies(await SELF.fetch(`${B}/api/auth/sign-in/email-otp`, { method: "POST", headers: { "content-type": "application/json", origin: B }, body: JSON.stringify({ email, otp }) }));
+  };
+
+  it("a paused supplement drops off the client's list + can't be logged; staff still see it", async () => {
+    const tenantId = ((await (await SELF.fetch(`${B}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } }).active.tenantId;
+    const client = (await (await SELF.fetch(`${B}/api/clients`, { method: "POST", headers: H(), body: JSON.stringify({ email: "suppclient@test.dev", displayName: "Supp Client" }) })).json() as { client: { id: string } }).client;
+    const sup = (await (await SELF.fetch(`${B}/api/supplements`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: client.id, name: "Creatine", schedule: [{ slot: "daily" }] }) })).json()) as { id: string };
+
+    // Client signs in and selects the tenant.
+    const cookie = await clientSignIn("suppclient@test.dev");
+    const CH = { origin: B, Cookie: cookie };
+    await SELF.fetch(`${B}/api/context`, { headers: CH });
+    await SELF.fetch(`${B}/api/context/switch`, { method: "POST", headers: { "content-type": "application/json", ...CH }, body: JSON.stringify({ tenantId }) });
+
+    // Active: the client sees it and can log it.
+    const list1 = (await (await SELF.fetch(`${B}/api/supplements?clientId=${client.id}`, { headers: CH })).json()) as { supplements: { id: string }[] };
+    expect(list1.supplements.some((s) => s.id === sup.id)).toBe(true);
+    const log1 = await SELF.fetch(`${B}/api/supplements/${sup.id}/log`, { method: "POST", headers: { "content-type": "application/json", ...CH }, body: JSON.stringify({ clientId: client.id, date: "2026-07-20", slot: "daily" }) });
+    expect(log1.status).toBe(200);
+
+    // Coach pauses it.
+    await SELF.fetch(`${B}/api/supplements/${sup.id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ status: "paused" }) });
+
+    // Client no longer sees it and can't log it.
+    const list2 = (await (await SELF.fetch(`${B}/api/supplements?clientId=${client.id}`, { headers: CH })).json()) as { supplements: { id: string }[] };
+    expect(list2.supplements.some((s) => s.id === sup.id)).toBe(false);
+    const log2 = await SELF.fetch(`${B}/api/supplements/${sup.id}/log`, { method: "POST", headers: { "content-type": "application/json", ...CH }, body: JSON.stringify({ clientId: client.id, date: "2026-07-20", slot: "daily" }) });
+    expect(log2.status).toBe(409);
+
+    // Staff still see the paused row (to resume it).
+    const staffList = (await (await SELF.fetch(`${B}/api/supplements?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { supplements: { id: string; status: string }[] };
+    expect(staffList.supplements.find((s) => s.id === sup.id)?.status).toBe("paused");
+  });
+});
+
 describe("foods — tenant isolation + copy-on-write", () => {
   const mkFood = (over: Record<string, unknown>) => ({
     name: "Test Bar", calories: 200, proteinG: 10, source: "usda", sourceId: "SHARED-123", ...over,
