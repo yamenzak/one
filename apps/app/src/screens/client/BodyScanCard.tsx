@@ -12,14 +12,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  Card, Button, Badge, Spinner, IconBadge, EmptyState, cn, toneVar,
-  AreaChart, ScanLine, Camera, Sparkles, Percent, History,
+  Card, Button, Badge, Spinner, IconBadge, EmptyState, SegmentedControl, cn, toneVar,
+  AreaChart, ScanLine, Camera, Sparkles, Percent, History, RotateCcw, ChevronRight,
 } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { morphPoly, Silhouette } from "./bodyscan/Silhouette.js";
 import { scanProfile, modelSilhouette } from "./bodyscan/model.js";
+import { Body3D } from "./bodyscan/Body3D.js";
 import { BodyScanLauncher } from "./bodyscan/BodyScanLauncher.js";
 import { BodyScanHistory } from "./bodyscan/BodyScanHistory.js";
 
@@ -49,7 +50,8 @@ export function BodyScanCard({ clientId }: { clientId: string }) {
   const units = useUnits();
   const [scans, setScans] = useState<Scan[] | null>(null);
   const [blocked, setBlocked] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  // null = closed; object opens the history sheet (optionally at a scan).
+  const [history, setHistory] = useState<{ initialId?: string } | null>(null);
 
   // Known-off flag → render nothing (Progress just skips the section). The
   // launcher enforces the same gate; we mirror it here to skip the scans fetch.
@@ -88,7 +90,7 @@ export function BodyScanCard({ clientId }: { clientId: string }) {
               </div>
             </div>
             {profileReady && !blocked && (
-              <Button size="sm" onClick={open}><Camera /> {latest ? "New scan" : "Scan"}</Button>
+              <Button size="sm" style={{ backgroundColor: toneVar.sleep, color: "var(--tone-foreground)" }} onClick={open}><Camera /> {latest ? "New scan" : "Scan"}</Button>
             )}
           </div>
 
@@ -101,7 +103,7 @@ export function BodyScanCard({ clientId }: { clientId: string }) {
               Add your sex, birth date and height in your profile to use the body scan.
             </div>
           ) : latest ? (
-            <ScanSummary scans={scans} latest={latest} onOpenHistory={() => setHistoryOpen(true)} />
+            <ScanSummary scans={scans} latest={latest} onOpenHistory={(initialId) => setHistory({ initialId })} />
           ) : (
             <EmptyState
               icon={Sparkles}
@@ -111,18 +113,18 @@ export function BodyScanCard({ clientId }: { clientId: string }) {
             />
           )}
         </Card>
-        {historyOpen && scans && <BodyScanHistory scans={scans} units={units} onClose={() => setHistoryOpen(false)} />}
+        {history && scans && <BodyScanHistory scans={scans} units={units} initialId={history.initialId} onClose={() => setHistory(null)} />}
         </>
       )}
     </BodyScanLauncher>
   );
 }
 
-function ScanSummary({ scans, latest, onOpenHistory }: { scans: Scan[]; latest: Scan; onOpenHistory: () => void }) {
+function ScanSummary({ scans, latest, onOpenHistory }: { scans: Scan[]; latest: Scan; onOpenHistory: (initialId?: string) => void }) {
   const chrono = useMemo(() => [...scans].filter((s) => s.bodyFatPercent != null).reverse(), [scans]);
   const bfValues = chrono.map((s) => s.bodyFatPercent!);
   // Renderable = has a measurement-driven model, or a stored capture outline.
-  const withContour = useMemo(() => chrono.filter((s) => scanProfile(s) || (s.contourFront && s.contourFront.length > 3)), [chrono]);
+  const renderable = useMemo(() => chrono.filter((s) => scanProfile(s) || (s.contourFront && s.contourFront.length > 3)), [chrono]);
 
   return (
     <div className="space-y-4">
@@ -172,41 +174,77 @@ function ScanSummary({ scans, latest, onOpenHistory }: { scans: Scan[]; latest: 
         </div>
       )}
 
-      {/* Silhouette morph */}
-      {withContour.length >= 2 && <SilhouetteMorph scans={withContour} />}
+      {/* Shape over time — front + side (or 3D), one slider drives both */}
+      {renderable.length >= 1 && <ShapeOverTime scans={renderable} onOpenDetails={(id) => onOpenHistory(id)} />}
 
-      <Button variant="secondary" className="w-full" onClick={onOpenHistory}>
-        <History /> Body composition history{withContour.length > 0 ? " · front, side & 3D" : ""}
+      <Button variant="secondary" className="w-full" onClick={() => onOpenHistory()}>
+        <History /> View history
       </Button>
     </div>
   );
 }
 
-/** Crossfade + interpolate the outline between the earliest and latest stored
- *  silhouette; the scrubber sweeps the shape from then → now. */
-function SilhouetteMorph({ scans }: { scans: Scan[] }) {
-  const first = scans[0]!;
-  const last = scans[scans.length - 1]!;
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const fmtShort = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+/**
+ * Shape over time — front AND side silhouettes swept by ONE slider (or a
+ * rotatable 3-D at the same point), with the body-fat % and date at that moment.
+ * Silhouettes morph between adjacent scans; the number/date read the nearer scan
+ * so they stay real measured values.
+ */
+function ShapeOverTime({ scans, onOpenDetails }: { scans: Scan[]; onOpenDetails: (scanId: string) => void }) {
   const [t, setT] = useState(1);
-  const ptsOf = (s: Scan) => { const p = scanProfile(s); return p ? modelSilhouette(p, "front") : s.contourFront!; };
-  const fPts = useMemo(() => ptsOf(first), [first]);
-  const lPts = useMemo(() => ptsOf(last), [last]);
-  const poly = useMemo(() => morphPoly(fPts, lPts, t), [fPts, lPts, t]);
-  const fmt = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const [mode, setMode] = useState<"shape" | "3d">("shape");
+  const sil = (view: "front" | "side") => (s: Scan) => { const p = scanProfile(s); return p ? modelSilhouette(p, view) : (view === "front" ? s.contourFront : s.contourSide); };
+  const fronts = useMemo(() => scans.map(sil("front")), [scans]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sides = useMemo(() => scans.map(sil("side")), [scans]); // eslint-disable-line react-hooks/exhaustive-deps
+  const hasSide = sides.every((p) => p && p.length > 3);
+
+  const n = scans.length;
+  const f = t * (n - 1);
+  const i = Math.min(n - 2, Math.max(0, Math.floor(f)));
+  const frac = n > 1 ? f - i : 0;
+  const near = scans[Math.round(f)]!;
+  const frontPoly = n > 1 && fronts[i] && fronts[i + 1] ? morphPoly(fronts[i]!, fronts[i + 1]!, frac) : fronts[Math.round(f)];
+  const sidePoly = hasSide && n > 1 ? morphPoly(sides[i]!, sides[i + 1]!, frac) : sides[Math.round(f)];
+  const bf = n > 1 ? lerp(scans[i]!.bodyFatPercent ?? 0, scans[i + 1]!.bodyFatPercent ?? 0, frac) : (near.bodyFatPercent ?? 0);
+  const nearProfile = scanProfile(near);
+
   return (
-    <div className="rounded-2xl bg-surface-2 p-3">
-      <div className="mb-1 flex items-center justify-between text-xs font-medium text-muted-foreground">
-        <span>Shape over time</span>
-        <span className="numeral">{fmt(first.date)} → {fmt(last.date)}</span>
+    <div className="space-y-3 rounded-2xl bg-surface-2 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <SegmentedControl
+          options={[{ value: "shape", label: "Shape" }, { value: "3d", label: (<span className="inline-flex items-center gap-1"><RotateCcw className="size-3.5" /> 3D</span>) }]}
+          value={mode} onChange={setMode}
+        />
+        <button onClick={() => onOpenDetails(near.id)} className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-sleep transition-opacity active:opacity-70">
+          Open details <ChevronRight className="size-3.5" />
+        </button>
       </div>
-      <div className="grid place-items-center py-1">
-        <Silhouette points={poly} tone={toneVar.sleep} width={130} height={210} />
+
+      <div className="grid min-h-[220px] place-items-center">
+        {mode === "3d" ? (
+          nearProfile ? <Body3D profile={nearProfile} width={200} height={220} /> : <span className="text-xs text-muted-foreground">No model for this scan</span>
+        ) : (
+          <div className="flex items-end justify-center gap-6">
+            {frontPoly && <figure className="m-0"><Silhouette points={frontPoly} tone={toneVar.sleep} width={104} height={200} /><figcaption className="mt-1 text-center text-[0.65rem] text-muted-foreground">Front</figcaption></figure>}
+            {hasSide && sidePoly && <figure className="m-0"><Silhouette points={sidePoly} tone={toneVar.sleep} width={88} height={200} /><figcaption className="mt-1 text-center text-[0.65rem] text-muted-foreground">Side</figcaption></figure>}
+          </div>
+        )}
       </div>
-      <input
-        type="range" min={0} max={1} step={0.01} value={t} onChange={(e) => setT(Number(e.target.value))}
-        aria-label="Scrub silhouette between earliest and latest scan"
-        className="mt-1 w-full accent-[var(--color-sleep)]"
-      />
+
+      <div className="text-center">
+        <span className="numeral text-2xl font-bold tabular-nums">{bf.toFixed(1)}</span>
+        <span className="text-sm text-muted-foreground">% · {fmtShort(near.date)}</span>
+      </div>
+      {n > 1 && (
+        <input
+          type="range" min={0} max={1} step={0.005} value={t} onChange={(e) => setT(Number(e.target.value))}
+          aria-label="Scrub the body shape across your scans"
+          className="w-full accent-[var(--color-sleep)]"
+        />
+      )}
     </div>
   );
 }
