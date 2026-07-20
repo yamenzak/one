@@ -76,14 +76,21 @@ export const distanceLabel = (p: UnitPrefs): string => (p.distance === "mi" ? "m
 export const energyLabel = (p: UnitPrefs): string => (p.energy === "kJ" ? "kJ" : "kcal");
 
 // ── Metric value → display number (for prefilling number inputs) ────────────
+// Storage is metric per dimension: weight kg, length cm, volume ml, distance m,
+// energy kcal. Every dimension the metric registry declares (units UnitDimension
+// ↔ ui metric-coding) has a symmetric display↔metric number pair here.
 export const kgToDisplay = (kg: number, p: UnitPrefs): number => r1(p.weight === "lb" ? kg / KG_PER_LB : kg);
 export const cmToLengthDisplay = (cm: number, p: UnitPrefs): number => r1(p.length === "in" ? cm / CM_PER_IN : cm);
 export const mlToVolumeDisplay = (ml: number, p: UnitPrefs): number => Math.round(p.volume === "oz" ? ml / ML_PER_OZ : ml);
+/** Metres (stored) → display distance number in the user's unit (km or mi). */
+export const metersToDistanceDisplay = (m: number, p: UnitPrefs): number => r1((p.distance === "mi" ? m / KM_PER_MI : m) / 1000);
 
 // ── Display number (in the user's unit) → metric (for storing inputs) ───────
 export const displayToKg = (value: number, p: UnitPrefs): number => (p.weight === "lb" ? value * KG_PER_LB : value);
 export const lengthDisplayToCm = (value: number, p: UnitPrefs): number => (p.length === "in" ? value * CM_PER_IN : value);
 export const volumeDisplayToMl = (value: number, p: UnitPrefs): number => (p.volume === "oz" ? value * ML_PER_OZ : value);
+/** Display distance number (km or mi) → metres (stored). */
+export const distanceDisplayToMeters = (value: number, p: UnitPrefs): number => (p.distance === "mi" ? value * KM_PER_MI : value) * 1000;
 
 // ── Formatters (metric value → "72.5 kg" / "5'11\"" / "16.9 oz") ────────────
 export function fmtWeight(kg: number | null | undefined, p: UnitPrefs, withUnit = true): string {

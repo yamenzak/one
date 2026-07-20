@@ -81,8 +81,11 @@ export const FREE_ENTITLEMENTS: Entitlements = {
 export const QUOTA_KEYS = Object.keys(FREE_ENTITLEMENTS.quotas) as (keyof Quotas)[];
 export const FEATURE_KEYS = Object.keys(FREE_ENTITLEMENTS.features) as (keyof Features)[];
 
-/** Human labels for the admin UI; unknown/new keys fall back to the raw key. */
-export const FEATURE_META: Record<string, { label: string; hint: string }> = {
+/** Human labels for the admin UI; unknown/new keys fall back to the raw key.
+ *  `reserved` marks a feature that is DECLARED but not yet enforced by any route
+ *  (roadmap) — the admin builder hides it and a conformance test permits it to
+ *  have no gate. Every non-reserved feature must be gated somewhere. */
+export const FEATURE_META: Record<string, { label: string; hint: string; reserved?: boolean }> = {
   commerce: { label: "Commerce", hint: "Sell packages via Stripe Connect" },
   aiSuite: { label: "AI suite", hint: "AI drafting, coach notes, vision & image" },
   bfCamera: { label: "Body-fat camera", hint: "Camera body-fat estimator" },
@@ -90,9 +93,13 @@ export const FEATURE_META: Record<string, { label: string; hint: string }> = {
   supplementsLabs: { label: "Supplements & labs", hint: "Supplement tracking + lab tests" },
   frontDesk: { label: "Front desk", hint: "Assistant role + sessions / booking" },
   branding: { label: "White-label branding", hint: "Login skin, accent, public blog" },
-  integrations: { label: "Integrations", hint: "API / webhooks + data exports" },
-  chat: { label: "Chat", hint: "Trainer ↔ client messaging" },
+  integrations: { label: "Integrations", hint: "API / webhooks + data exports", reserved: true },
+  chat: { label: "Chat", hint: "Trainer ↔ client messaging", reserved: true },
 };
+
+/** Features declared but not yet enforced (roadmap). Kept explicit so a gate
+ *  conformance test can distinguish "intentionally unwired" from "forgotten". */
+export const RESERVED_FEATURES = FEATURE_KEYS.filter((k) => FEATURE_META[k]?.reserved);
 export const QUOTA_META: Record<string, { label: string; hint: string; unit?: string }> = {
   staffSeats: { label: "Staff seats", hint: "Owner + trainers + assistants", unit: "seats" },
   activeClients: { label: "Active clients", hint: "Non-archived client records" },

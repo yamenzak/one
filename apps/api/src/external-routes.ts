@@ -11,7 +11,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { type AppEnv, requireTenant } from "./auth-context.js";
-import { tenantEntitlements } from "./billing-store.js";
+import { requireFeature } from "./client-flags.js";
 import { tenantIntegrations, providerReady, type Integrations } from "./integrations.js";
 import { newId, nowIso } from "./ids.js";
 
@@ -297,8 +297,7 @@ export async function searchExerciseProviders(kv: KVNamespace, cfg: Integrations
 export const externalRoutes = new Hono<AppEnv>()
   .get("/foods/search-external", async (c) => {
     const who = requireTenant(c)!;
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.externalSearch) return c.json({ error: "externalSearch not in your plan" }, 403);
+    { const gate = await requireFeature(c, "externalSearch"); if (gate) return gate; }
     const q = (c.req.query("q") ?? "").trim();
     if (q.length < 2) return c.json({ foods: [] });
     const page = Math.max(1, Math.min(20, Number(c.req.query("page") ?? "1") || 1));
@@ -360,8 +359,7 @@ export const externalRoutes = new Hono<AppEnv>()
 
   .get("/exercises/search-external", async (c) => {
     const who = requireTenant(c)!;
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.externalSearch) return c.json({ error: "externalSearch not in your plan" }, 403);
+    { const gate = await requireFeature(c, "externalSearch"); if (gate) return gate; }
     const q = (c.req.query("q") ?? "").trim();
     if (q.length < 2) return c.json({ exercises: [] });
     const cfg = await tenantIntegrations(c.env.DB, who.tenantId);

@@ -3,6 +3,7 @@ import {
   DEFAULT_UNITS, resolveUnits, cmToFeetInches, feetInchesToCm,
   fmtWeight, fmtHeight, fmtLength, fmtVolume, fmtDistance, fmtEnergy,
   displayToKg, lengthDisplayToCm, volumeDisplayToMl, kgToDisplay, kcalToDisplay, displayToKcal,
+  metersToDistanceDisplay, distanceDisplayToMeters,
 } from "../src/units.js";
 
 const M = DEFAULT_UNITS;
@@ -48,5 +49,14 @@ describe("units", () => {
     expect(displayToKcal(8368, IMP)).toBeCloseTo(2000, 1);
     expect(displayToKcal(2000, M)).toBe(2000);
     expect(kcalToDisplay(displayToKcal(8368, IMP), IMP)).toBe(8368);
+  });
+
+  it("distance has a symmetric display↔metric pair (stored in metres)", () => {
+    expect(metersToDistanceDisplay(5000, M)).toBe(5); // 5 km
+    expect(metersToDistanceDisplay(5000, IMP)).toBe(3.1); // mi, rounded to 1dp like fmtDistance
+    expect(distanceDisplayToMeters(5, M)).toBe(5000);
+    expect(distanceDisplayToMeters(3.107, IMP)).toBeCloseTo(5000, 0);
+    // Round-trip in the user's unit.
+    expect(metersToDistanceDisplay(distanceDisplayToMeters(10, IMP), IMP)).toBeCloseTo(10, 1);
   });
 });
