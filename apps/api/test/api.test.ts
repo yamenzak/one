@@ -1631,9 +1631,12 @@ describe("supplements — pausing hides from the client + blocks logging", () =>
     const log2 = await SELF.fetch(`${B}/api/supplements/${sup.id}/log`, { method: "POST", headers: { "content-type": "application/json", ...CH }, body: JSON.stringify({ clientId: client.id, date: "2026-07-20", slot: "daily" }) });
     expect(log2.status).toBe(409);
 
-    // Staff still see the paused row (to resume it).
-    const staffList = (await (await SELF.fetch(`${B}/api/supplements?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { supplements: { id: string; status: string }[] };
-    expect(staffList.supplements.find((s) => s.id === sup.id)?.status).toBe("paused");
+    // Loggable surfaces are active-only for staff too (coach viewing the client's
+    // Today/Wellness); only the Manage view opts into paused via includePaused.
+    const staffDefault = (await (await SELF.fetch(`${B}/api/supplements?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { supplements: { id: string }[] };
+    expect(staffDefault.supplements.some((s) => s.id === sup.id)).toBe(false);
+    const staffManage = (await (await SELF.fetch(`${B}/api/supplements?clientId=${client.id}&includePaused=1`, { headers: auth(ownerCookie) })).json()) as { supplements: { id: string; status: string }[] };
+    expect(staffManage.supplements.find((s) => s.id === sup.id)?.status).toBe("paused");
   });
 });
 

@@ -30,9 +30,13 @@ export const healthRoutes = new Hono<AppEnv>()
     if (!clientId) return c.json({ error: "clientId required" }, 400);
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
-    // The client only sees ACTIVE supplements (a paused one drops off their
-    // loggable list + counts); staff see paused too so they can resume it.
-    const statusFilter = c.get("role") === "client" ? "status = 'active'" : "status != 'discontinued'";
+    // Default is ACTIVE-only — the loggable surfaces (Today, Wellness, widgets)
+    // must never show a paused supplement, whoever is viewing them (a client, or
+    // a coach looking at the client's Today tab, or an owner in train mode). Only
+    // the coach's management view opts in with ?includePaused=1 (staff only) so
+    // it can list paused rows to resume them.
+    const includePaused = c.req.query("includePaused") === "1" && c.get("role") !== "client";
+    const statusFilter = includePaused ? "status != 'discontinued'" : "status = 'active'";
     const rows = await c.env.DB.prepare(
       `SELECT * FROM supplements WHERE client_id = ? AND ${statusFilter} ORDER BY created_at DESC`,
     )
