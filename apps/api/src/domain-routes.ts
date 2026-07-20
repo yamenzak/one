@@ -13,7 +13,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { type AppEnv, requireTenant, requirePermission, isPlatformAdmin } from "./auth-context.js";
-import { setConfig, hasFeature } from "./billing-store.js";
+import { setConfig, getConfig, hasFeature } from "./billing-store.js";
+import { turnstileConfig } from "./turnstile.js";
 import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostname, type CustomHostname } from "./cloudflare.js";
 import { hostnameOf, isPlatformHost, invalidateHostCache, resolveSlugTenant } from "./host-context.js";
 import { nowIso } from "./ids.js";
@@ -65,14 +66,15 @@ export const domainRoutes = new Hono<AppEnv>()
       return c.json({
         platform: false,
         tenant: { tenantId: ht.tenantId, name: ht.name, slug: ht.slug, branding: ht.branding, allowSignup: ht.allowSignup },
+        turnstile: await turnstileConfig(c.env.DB),
       });
     }
     const slug = c.req.query("slug");
     if (platform && slug) {
       const st = await resolveSlugTenant(c.env.DB, slug);
-      if (st) return c.json({ platform: true, tenant: { tenantId: st.tenantId, name: st.name, slug: st.slug, branding: st.branding, allowSignup: st.allowSignup } });
+      if (st) return c.json({ platform: true, tenant: { tenantId: st.tenantId, name: st.name, slug: st.slug, branding: st.branding, allowSignup: st.allowSignup }, turnstile: await turnstileConfig(c.env.DB) });
     }
-    return c.json({ platform, tenant: null });
+    return c.json({ platform, tenant: null, turnstile: await turnstileConfig(c.env.DB) });
   })
 
   // List this tenant's domains, refreshing live status from Cloudflare.
@@ -174,5 +176,24 @@ export const domainAdminRoutes = new Hono<AppEnv>()
     if (d.data.apiToken) await setConfig(c.env.DB, "cf.saas.api_token", d.data.apiToken);
     if (d.data.zoneId) await setConfig(c.env.DB, "cf.saas.zone_id", d.data.zoneId);
     if (d.data.cnameTarget) await setConfig(c.env.DB, "cf.saas.cname_target", d.data.cnameTarget.trim().toLowerCase());
+    return c.json({ ok: true });
+  })
+
+  // ── Cloudflare Turnstile (bot check on the OTP-send path) ──────────────────
+  .get("/admin/turnstile/config", async (c) => {
+    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    const cfg = await getConfig(c.env.DB);
+    // Site key is public; the secret is never echoed — only whether it's set.
+    return c.json({ siteKey: cfg["turnstile.site_key"] ?? null, secretSet: Boolean(cfg["turnstile.secret"]) });
+  })
+  .post("/admin/turnstile/config", async (c) => {
+    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    const d = z
+      // Empty string clears a value (turn Turnstile off); undefined keeps it.
+      .object({ siteKey: z.string().max(120).optional(), secret: z.string().max(200).optional() })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!d.success) return c.json({ error: "invalid body" }, 400);
+    if (d.data.siteKey !== undefined) await setConfig(c.env.DB, "turnstile.site_key", d.data.siteKey.trim());
+    if (d.data.secret !== undefined) await setConfig(c.env.DB, "turnstile.secret", d.data.secret.trim());
     return c.json({ ok: true });
   });

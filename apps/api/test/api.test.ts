@@ -1468,6 +1468,20 @@ describe("OTP-send gate — sign-up eligibility + cooldown", () => {
     expect(second.status).toBe(429);
     expect(((await second.json()) as { retryAfterSec: number }).retryAfterSec).toBeGreaterThan(0);
   });
+
+  it("Turnstile: once a secret is configured, a code needs a valid token", async () => {
+    const db = env.DB as D1Database;
+    await db.prepare("INSERT INTO app_config (key, value) VALUES ('turnstile.secret', 'test-secret') ON CONFLICT(key) DO UPDATE SET value = 'test-secret'").run();
+    try {
+      // No token → rejected before any network call (verify returns not-ok on a
+      // missing token), so this stays hermetic.
+      const res = await send({ email: "ts-guard@test.dev", type: "sign-in" });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { error: string }).error).toBe("human_check_failed");
+    } finally {
+      await db.prepare("DELETE FROM app_config WHERE key = 'turnstile.secret'").run();
+    }
+  });
 });
 
 describe("foods — tenant isolation + copy-on-write", () => {

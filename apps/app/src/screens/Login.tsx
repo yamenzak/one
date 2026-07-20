@@ -10,6 +10,7 @@ import { Button, Card, Field, SegmentedControl, Mail, KeyRound, ArrowRight } fro
 import { api, ApiError } from "../api.js";
 import { useSession } from "../session.js";
 import { passkeySupported, signInWithPasskey, conditionalPasskeyAvailable } from "../passkey.js";
+import { Turnstile } from "../Turnstile.js";
 
 /** The `/t/<slug>` this login was opened on, if any — carried to the OTP-send
  *  gate so it can brand + scope eligibility to that tenant. */
@@ -35,7 +36,11 @@ export function Login() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  const [tsToken, setTsToken] = useState<string | null>(null);
   const otpRef = useRef<HTMLInputElement>(null);
+
+  const turnstile = host?.turnstile ?? null;
+  const needsTurnstile = Boolean(turnstile?.enabled && turnstile.siteKey);
 
   const signup = canSignup && mode === "signup";
   const tagline = login?.tagline?.trim() || "No passwords, ever";
@@ -67,7 +72,7 @@ export function Login() {
     setBusy(true);
     setError(null);
     try {
-      await api.post("/api/auth/email-otp/send-verification-otp", { email, type: "sign-in", slug: pathSlug(), intent: mode });
+      await api.post("/api/auth/email-otp/send-verification-otp", { email, type: "sign-in", slug: pathSlug(), intent: mode, turnstileToken: tsToken });
       setStep("otp");
       setTimeout(() => otpRef.current?.focus(), 100);
     } catch (e) {
@@ -142,8 +147,9 @@ export function Login() {
                 <h2 className="text-xl font-semibold tracking-tight">{signup ? "Create your account" : "Sign in"}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">We'll email you a 6-digit code.</p>
               </div>
-              <Field label="Email" icon={Mail} type="email" autoComplete="email webauthn" value={email} placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && email.includes("@") && cooldown === 0 && void sendCode()} />
-              <Button size="lg" className="w-full" disabled={!email.includes("@") || busy || cooldown > 0} onClick={() => void sendCode()}>
+              <Field label="Email" icon={Mail} type="email" autoComplete="email webauthn" value={email} placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && email.includes("@") && cooldown === 0 && (!needsTurnstile || tsToken) && void sendCode()} />
+              {needsTurnstile && turnstile!.siteKey && <Turnstile siteKey={turnstile!.siteKey} onToken={setTsToken} />}
+              <Button size="lg" className="w-full" disabled={!email.includes("@") || busy || cooldown > 0 || (needsTurnstile && !tsToken)} onClick={() => void sendCode()}>
                 {busy ? "Sending…" : cooldown > 0 ? `Resend in ${cooldown}s` : signup ? "Create my account" : "Email me a code"} {!busy && cooldown === 0 && <ArrowRight />}
               </Button>
               {!signup && showPasskey && passkeySupported() && (

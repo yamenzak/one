@@ -7,19 +7,20 @@ import { api } from "../../api.js";
 interface Tenant { id: string; name: string; slug: string; plan_id: string | null; status: string | null; comp: number | null }
 const PLANS = ["free", "solo", "studio", "team"];
 
-type AdminTab = "tenants" | "plans" | "stripe" | "domains" | "ai";
+type AdminTab = "tenants" | "plans" | "stripe" | "domains" | "ai" | "security";
 
 export function AdminConsole({ onBack }: { onBack: () => void }) {
   const [tab, setTab] = useState<AdminTab>("tenants");
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <div className="flex items-center gap-3"><Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button><div className="flex items-center gap-2"><ShieldCheck className="size-5 text-primary" /><h1 className="text-xl font-bold tracking-tight">Platform admin</h1></div></div>
-      <div className="overflow-x-auto no-scrollbar"><SegmentedControl options={[{ value: "tenants", label: "Tenants" }, { value: "plans", label: "Plans" }, { value: "ai", label: "AI" }, { value: "stripe", label: "Stripe" }, { value: "domains", label: "Domains" }]} value={tab} onChange={setTab} /></div>
+      <div className="overflow-x-auto no-scrollbar"><SegmentedControl options={[{ value: "tenants", label: "Tenants" }, { value: "plans", label: "Plans" }, { value: "ai", label: "AI" }, { value: "stripe", label: "Stripe" }, { value: "domains", label: "Domains" }, { value: "security", label: "Security" }]} value={tab} onChange={setTab} /></div>
       {tab === "tenants" && <Tenants />}
       {tab === "plans" && <PlansConfig />}
       {tab === "stripe" && <StripeConfig />}
       {tab === "ai" && <AiConfig />}
       {tab === "domains" && <DomainsConfig />}
+      {tab === "security" && <SecurityConfig />}
     </Page>
   );
 }
@@ -308,6 +309,42 @@ function DomainsConfig() {
         <Field label="Zone id" value={zoneId} onChange={(e) => setZoneId(e.target.value)} />
         <Field label="CNAME target (e.g. ssl.mossa.4dl.app)" icon={Globe} value={cnameTarget} onChange={(e) => setCnameTarget(e.target.value)} />
         <Button className="w-full" disabled={!apiToken && !zoneId && !cnameTarget} onClick={() => void save()}>Save</Button>
+        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+      </Card>
+    </Stagger>
+  );
+}
+
+/** Cloudflare Turnstile — the bot check on the OTP-send path. Off until a
+ *  secret is saved; the site key is handed to the login screen via /api/host. */
+function SecurityConfig() {
+  const [status, setStatus] = useState<{ siteKey: string | null; secretSet: boolean } | null>(null);
+  const [siteKey, setSiteKey] = useState("");
+  const [secret, setSecret] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const load = () => void api.get<{ siteKey: string | null; secretSet: boolean }>("/api/admin/turnstile/config").then((s) => { setStatus(s); setSiteKey(s.siteKey ?? ""); }).catch(() => undefined);
+  useEffect(load, []);
+  const save = async () => {
+    // Send both so an emptied field clears it (turns Turnstile off).
+    await api.post("/api/admin/turnstile/config", { siteKey, ...(secret ? { secret } : {}) });
+    setSecret(""); setMsg("Saved. New sign-ins run the check once a secret is set."); load();
+  };
+  const disable = async () => { await api.post("/api/admin/turnstile/config", { siteKey: "", secret: "" }); setSiteKey(""); setSecret(""); setMsg("Turnstile turned off."); load(); };
+  return (
+    <Stagger>
+      <Card className="space-y-4">
+        <div className="flex items-center justify-between"><div className="flex items-center gap-2"><ShieldCheck className="size-5 text-primary" /><h2 className="font-semibold">Turnstile bot check</h2></div><Badge tone={status?.secretSet ? "success" : "neutral"}>{status?.secretSet ? "enabled" : "off"}</Badge></div>
+        <p className="text-sm text-muted-foreground">A Cloudflare Turnstile widget guards the email-code request on every login (platform + branded). Codes send freely until a secret is saved.</p>
+        <ol className="space-y-1.5 rounded-xl bg-surface-2 p-3 text-xs text-muted-foreground">
+          <li><span className="font-medium text-foreground">1.</span> In Cloudflare → Turnstile, add a widget. Under Hostnames, list <code className="rounded bg-surface-3 px-1">mossa.4dl.app</code> and any tenant custom domains (or use a domain-flexible widget) so the check works on white-label domains.</li>
+          <li><span className="font-medium text-foreground">2.</span> Copy the <span className="font-medium">Site key</span> (public) and <span className="font-medium">Secret key</span> (server) below.</li>
+        </ol>
+        <Field label="Site key" icon={ShieldCheck} value={siteKey} onChange={(e) => setSiteKey(e.target.value)} placeholder="0x4AAAAAAA…" />
+        <Field label={status?.secretSet ? "Secret key — saved (blank keeps it)" : "Secret key"} icon={KeyRound} type="password" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="0x4AAAAAAA…" />
+        <div className="flex gap-2">
+          <Button className="flex-1" disabled={!siteKey && !secret} onClick={() => void save()}>Save</Button>
+          {status?.secretSet && <Button variant="secondary" onClick={() => void disable()}>Turn off</Button>}
+        </div>
         {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
       </Card>
     </Stagger>

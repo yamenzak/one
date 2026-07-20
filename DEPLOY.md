@@ -95,6 +95,25 @@ the platform origin (it identifies the neutral host); the request origin drives
 auth on custom domains. Because passkeys are origin-bound, a user in more than
 one tenancy enrolls a passkey per domain (OTP always works as the bootstrap).
 
+## Turnstile (bot check on the login) — optional
+
+Cloudflare Turnstile guards the "email me a code" request on every login
+(platform host + tenant branded domains). It's off until you configure it, so
+codes send freely before setup.
+
+1. Cloudflare Dashboard → **Turnstile** → **Add widget**. Under **Hostnames**,
+   add `mossa.4dl.app` and every tenant custom domain you white-label (Turnstile
+   validates the hostname the widget runs on). A widget that allows subdomains /
+   is domain-flexible keeps you from editing this per new domain.
+2. Copy the **Site key** (public) and **Secret key** (server).
+3. Platform-admin console → **Security** → paste both → **Save**.
+
+The site key rides along in `/api/host` so the login renders the widget; the
+secret stays server-side and the OTP-send gate (`turnstile.ts`) verifies each
+token, accepting it only when the solved hostname matches the serving host —
+which is what makes it work on a tenant's own domain. Clear the secret (or hit
+**Turn off**) to disable.
+
 ## Notes
 - The Workers AI binding is commented out in `wrangler.jsonc` for
   credential-free local dev; the Deploy workflow uncomments it automatically.
