@@ -114,7 +114,7 @@ export function ensureSchema(db: D1Database): Promise<void> {
           // Camera body-scan history (SPEC §8.5). Circumferences + the ensemble
           // result + confidence; contour_*_json are de-identified outlines kept
           // only on consent (for the progress morph). One scan per client-day.
-          "CREATE TABLE IF NOT EXISTS body_scans (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, body_fat_percent REAL, low REAL, high REAL, confidence TEXT, neck_cm REAL, waist_cm REAL, hips_cm REAL, chest_cm REAL, weight_kg REAL, height_cm REAL, methods_json TEXT, contour_front_json TEXT, contour_side_json TEXT, created_at TEXT);",
+          "CREATE TABLE IF NOT EXISTS body_scans (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, body_fat_percent REAL, low REAL, high REAL, confidence TEXT, neck_cm REAL, waist_cm REAL, hips_cm REAL, chest_cm REAL, weight_kg REAL, height_cm REAL, methods_json TEXT, contour_front_json TEXT, contour_side_json TEXT, posture_cva_deg REAL, posture_tilt_deg REAL, posture_severity TEXT, somatotype TEXT, created_at TEXT);",
           "CREATE UNIQUE INDEX IF NOT EXISTS idx_body_scans_day ON body_scans(client_id, date_local);",
           // Tenant-cached TTS cue audio (generate once via Gemini, reuse forever).
           // Key = (tenant, voice, lang, phrase id, version) → an R2 media key.
@@ -226,6 +226,11 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "ALTER TABLE notifications ADD COLUMN category TEXT",
           // Owner-set tenant policy: which categories members may be EMAILED.
           "ALTER TABLE tenant_settings ADD COLUMN notif_policy_json TEXT",
+          // Body scan: sagittal posture screen (from the side view) + somatotype.
+          "ALTER TABLE body_scans ADD COLUMN posture_cva_deg REAL",
+          "ALTER TABLE body_scans ADD COLUMN posture_tilt_deg REAL",
+          "ALTER TABLE body_scans ADD COLUMN posture_severity TEXT",
+          "ALTER TABLE body_scans ADD COLUMN somatotype TEXT",
         ];
         for (const sql of alters) await db.exec(sql).catch(() => undefined);
         // Backfill: older body scans mirrored only weight + body-fat into

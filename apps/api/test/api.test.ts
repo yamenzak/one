@@ -1755,7 +1755,7 @@ describe("body scan (camera body-fat)", () => {
     const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ displayName: "ScanTest" }) })).json()) as { client: { id: string } }).client.id;
     // Body scan needs sex + birth date + height to run the formulas.
     await db.prepare("UPDATE clients SET gender='male', date_of_birth='1990-01-01', height_cm=180 WHERE id=?").bind(clientId).run();
-    const res = await SELF.fetch("http://x/api/body-scans", { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ clientId, date: "2026-02-01", weightKg: 80, circumferences: { neckCm: 38, waistCm: 85 }, storeSilhouette: false }) });
+    const res = await SELF.fetch("http://x/api/body-scans", { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ clientId, date: "2026-02-01", weightKg: 80, circumferences: { neckCm: 38, waistCm: 85 }, storeSilhouette: false, posture: { cvaDeg: 46, trunkTiltDeg: 4, severity: "moderate" } }) });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { bodyFatPercent: number; low: number; high: number; confidence: string; methods: unknown[] };
     expect(body.bodyFatPercent).toBeGreaterThan(5);
@@ -1764,9 +1764,12 @@ describe("body scan (camera body-fat)", () => {
     expect(body.high).toBeGreaterThan(body.bodyFatPercent);
     expect(body.methods.length).toBeGreaterThanOrEqual(2); // navy + rfm + deurenberg
     // Listed for the progress morph.
-    const list = (await (await SELF.fetch(`http://x/api/body-scans?clientId=${clientId}`, { headers: auth(ownerCookie) })).json()) as { scans: { date: string; bodyFatPercent: number }[] };
+    const list = (await (await SELF.fetch(`http://x/api/body-scans?clientId=${clientId}`, { headers: auth(ownerCookie) })).json()) as { scans: { date: string; bodyFatPercent: number; somatotype: string | null; posture: { cvaDeg: number; severity: string } | null }[] };
     expect(list.scans.length).toBe(1);
     expect(list.scans[0]!.date).toBe("2026-02-01");
+    // Posture is stored as sent; somatotype is recomputed server-side.
+    expect(list.scans[0]!.posture).toEqual({ cvaDeg: 46, trunkTiltDeg: 4, severity: "moderate" });
+    expect(list.scans[0]!.somatotype).toMatch(/morph/);
     // Mirrored into measurements — body-fat AND the circumferences, so the Body
     // progress "latest measurements" aren't empty after a scan.
     const meas = await db.prepare("SELECT body_fat_percent, weight_kg, neck_cm, waist_cm FROM measurements WHERE client_id=? AND date_local='2026-02-01'").bind(clientId).first<{ body_fat_percent: number; weight_kg: number; neck_cm: number; waist_cm: number }>();
