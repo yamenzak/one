@@ -1,12 +1,14 @@
 /**
- * Sign in / sign up — 100% passwordless (email → OTP). Premium, animated.
- * A tenant that allows self sign-up shows a Log in / Sign up switch; otherwise
- * it's sign-in only and a brand-new email is turned away (invite/existing only).
+ * Sign in — 100% passwordless (email → OTP). Premium, animated. With OTP,
+ * signing in and signing up are the same act (prove you own the email), so
+ * there's one "Continue with email" — no login/signup mode. The real gate lives
+ * server-side: a studio that doesn't allow self sign-up turns a brand-new email
+ * away (invite/existing only); here we just note that.
  */
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { Button, Card, Field, SegmentedControl, Mail, KeyRound, ArrowRight } from "@mossa/ui";
+import { Button, Card, Field, Mail, KeyRound, ArrowRight } from "@mossa/ui";
 import { api, ApiError } from "../api.js";
 import { useSession } from "../session.js";
 import { passkeySupported, signInWithPasskey, conditionalPasskeyAvailable } from "../passkey.js";
@@ -27,9 +29,11 @@ export function Login() {
   const login = tenant?.branding?.login ?? null;
   const bgImageUrl = login?.bgImageUrl || null;
   const showPasskey = login?.showPasskey !== false;
+  // Whether this studio takes new members. Not a mode switch — with passwordless,
+  // signing in and signing up are the same action (prove you own the email); it
+  // only decides whether an unknown email is welcomed or turned away.
   const canSignup = tenant?.allowSignup ?? false;
 
-  const [mode, setMode] = useState<"login" | "signup">("login");
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -42,9 +46,8 @@ export function Login() {
   const turnstile = host?.turnstile ?? null;
   const needsTurnstile = Boolean(turnstile?.enabled && turnstile.siteKey);
 
-  const signup = canSignup && mode === "signup";
   const tagline = login?.tagline?.trim() || "No passwords, ever";
-  const headline = login?.headline?.trim() || (tenant ? (signup ? "Create your account to get started." : "Welcome back — sign in to continue.") : "Coaching, organized.");
+  const headline = login?.headline?.trim() || (tenant ? "Welcome back — sign in to continue." : "Coaching, organized.");
   const subtext = login?.subtext?.trim() || null;
 
   // Passkey autofill (WebAuthn conditional UI): arm the browser to offer saved
@@ -72,7 +75,7 @@ export function Login() {
     setBusy(true);
     setError(null);
     try {
-      await api.post("/api/auth/email-otp/send-verification-otp", { email, type: "sign-in", slug: pathSlug(), intent: mode, turnstileToken: tsToken });
+      await api.post("/api/auth/email-otp/send-verification-otp", { email, type: "sign-in", slug: pathSlug(), turnstileToken: tsToken });
       setStep("otp");
       setTimeout(() => otpRef.current?.focus(), 100);
     } catch (e) {
@@ -133,26 +136,17 @@ export function Login() {
         <Card className="space-y-5 p-6">
           {step === "email" ? (
             <>
-              {/* Log in / Sign up switch — only when this studio allows self sign-up. */}
-              {canSignup && (
-                <SegmentedControl
-                  fill
-                  options={[{ value: "login", label: "Log in" }, { value: "signup", label: "Sign up" }]}
-                  value={mode}
-                  onChange={(v) => { setMode(v); setError(null); }}
-                />
-              )}
               <div className="text-sm font-medium text-primary">{tagline}</div>
               <div>
-                <h2 className="text-xl font-semibold tracking-tight">{signup ? "Create your account" : "Sign in"}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">We'll email you a 6-digit code.</p>
+                <h2 className="text-xl font-semibold tracking-tight">Continue with email</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{canSignup ? "New or returning — we'll email you a 6-digit code." : "We'll email you a 6-digit code."}</p>
               </div>
               <Field label="Email" icon={Mail} type="email" autoComplete="email webauthn" value={email} placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && email.includes("@") && cooldown === 0 && (!needsTurnstile || tsToken) && void sendCode()} />
               {needsTurnstile && turnstile!.siteKey && <Turnstile siteKey={turnstile!.siteKey} onToken={setTsToken} />}
               <Button size="lg" className="w-full" disabled={!email.includes("@") || busy || cooldown > 0 || (needsTurnstile && !tsToken)} onClick={() => void sendCode()}>
-                {busy ? "Sending…" : cooldown > 0 ? `Resend in ${cooldown}s` : signup ? "Create my account" : "Email me a code"} {!busy && cooldown === 0 && <ArrowRight />}
+                {busy ? "Sending…" : cooldown > 0 ? `Resend in ${cooldown}s` : "Continue with email"} {!busy && cooldown === 0 && <ArrowRight />}
               </Button>
-              {!signup && showPasskey && passkeySupported() && (
+              {showPasskey && passkeySupported() && (
                 <button
                   className="flex w-full items-center justify-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
                   onClick={async () => { setError(null); try { await signInWithPasskey(); await refresh(); } catch { setError("No passkey found on this device."); } }}
@@ -172,7 +166,7 @@ export function Login() {
               </p>
               <Field ref={otpRef} label="6-digit code" icon={KeyRound} inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} className="[&_input]:text-center [&_input]:text-lg [&_input]:tracking-[0.5em]" onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} onKeyDown={(e) => e.key === "Enter" && otp.length === 6 && void verify()} />
               <Button size="lg" className="w-full" disabled={otp.length !== 6 || busy} onClick={() => void verify()}>
-                {busy ? "Checking…" : signup ? "Create account" : "Sign in"}
+                {busy ? "Checking…" : "Continue"}
               </Button>
               <button className="w-full text-sm text-muted-foreground transition-colors hover:text-foreground" onClick={() => (setStep("email"), setOtp(""))}>
                 Use a different email
