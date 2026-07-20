@@ -15,7 +15,7 @@ import { z } from "zod";
 import { type AppEnv, requireTenant, requirePermission, isPlatformAdmin } from "./auth-context.js";
 import { setConfig, hasFeature } from "./billing-store.js";
 import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostname, type CustomHostname } from "./cloudflare.js";
-import { hostnameOf, isPlatformHost, invalidateHostCache } from "./host-context.js";
+import { hostnameOf, isPlatformHost, invalidateHostCache, resolveSlugTenant } from "./host-context.js";
 import { nowIso } from "./ids.js";
 
 const HOSTNAME = z
@@ -55,14 +55,24 @@ async function syncStatus(env: { DB: D1Database; CACHE?: KVNamespace }, row: Dom
 
 export const domainRoutes = new Hono<AppEnv>()
   // Public: the pre-auth app asks "whose domain am I on?" to brand the login.
-  .get("/host", (c) => {
+  // A custom domain pins the tenant (platform:false). On the neutral platform
+  // host, a `?slug=` (from the `/t/<slug>` entry) brands the login WITHOUT
+  // pinning — the app still allows cross-tenant switching after sign-in.
+  .get("/host", async (c) => {
     const ht = c.get("hostTenant");
     const platform = isPlatformHost(hostnameOf(c.req.url), c.env);
-    if (!ht) return c.json({ platform, tenant: null });
-    return c.json({
-      platform: false,
-      tenant: { tenantId: ht.tenantId, name: ht.name, slug: ht.slug, branding: ht.branding },
-    });
+    if (ht) {
+      return c.json({
+        platform: false,
+        tenant: { tenantId: ht.tenantId, name: ht.name, slug: ht.slug, branding: ht.branding },
+      });
+    }
+    const slug = c.req.query("slug");
+    if (platform && slug) {
+      const st = await resolveSlugTenant(c.env.DB, slug);
+      if (st) return c.json({ platform: true, tenant: { tenantId: st.tenantId, name: st.name, slug: st.slug, branding: st.branding } });
+    }
+    return c.json({ platform, tenant: null });
   })
 
   // List this tenant's domains, refreshing live status from Cloudflare.

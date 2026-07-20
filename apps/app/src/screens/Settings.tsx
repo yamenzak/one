@@ -3,14 +3,15 @@
  * branding editor: pick a brand preset + radius that themes the app for clients.
  */
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger, ConfirmDialog,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
-  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, Mail,
+  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, Mail, LogIn, ExternalLink, ArrowRight,
   type Branding, type BrandTokens, type NeutralTint, type LucideIcon,
 } from "@mossa/ui";
+import type { LoginBranding, TenantBranding } from "@mossa/protocol";
 import { resolveUnits, cmToFeetInches, feetInchesToCm } from "@mossa/domain";
 import { useUnits } from "../units.js";
 import { useSession } from "../session.js";
@@ -86,20 +87,190 @@ export function Settings({ onBack }: { onBack: () => void }) {
           </>
         )}
 
-        {tab === "studio" && isOwner && (
-          <>
-            <p className="px-1 text-sm text-muted-foreground">Studio-wide settings you control as the owner — your brand, your AI and your business. The <span className="font-medium text-primary">Studio</span> badge marks them apart from your personal settings.</p>
-            {canBrand && <BrandingEditor initial={(ctx?.branding ?? null) as Branding | null} onPreview={preview} onSaved={() => void refresh()} />}
-            {aiSuite && <AiConfigSection />}
-            <EmailSection />
-            <NotificationPolicySection />
-            <MarketplaceSection />
-            <IntegrationsSection />
-            {canBrand && <DomainSection />}
-          </>
-        )}
+        {tab === "studio" && isOwner && <StudioSettings canBrand={!!canBrand} aiSuite={!!aiSuite} />}
       </motion.div>
     </Page>
+  );
+}
+
+/**
+ * The owner's studio settings — split into focused sub-tabs so the (many)
+ * sections don't pile into one endless page. Each sub-tab groups a cohesive
+ * concern; a tab only appears when it has content the tenant is entitled to.
+ */
+function StudioSettings({ canBrand, aiSuite }: { canBrand: boolean; aiSuite: boolean }) {
+  const { ctx, refresh } = useSession();
+  const { preview } = useTheme();
+  const groups: { value: string; label: string; show: boolean; render: () => ReactNode }[] = [
+    { value: "brand", label: "Brand", show: canBrand, render: () => <BrandingEditor initial={(ctx?.branding ?? null) as Branding | null} onPreview={preview} onSaved={() => void refresh()} /> },
+    { value: "signin", label: "Sign-in", show: true, render: () => <SignInSettings canBrand={canBrand} branding={ctx?.branding ?? null} slug={ctx?.active?.tenantSlug ?? null} onSaved={() => void refresh()} /> },
+    { value: "ai", label: "AI", show: aiSuite, render: () => <AiConfigSection /> },
+    { value: "messaging", label: "Messaging", show: true, render: () => <><EmailSection /><NotificationPolicySection /></> },
+    { value: "marketplace", label: "Marketplace", show: true, render: () => <MarketplaceSection /> },
+    { value: "integrations", label: "Integrations", show: true, render: () => <IntegrationsSection /> },
+  ].filter((g) => g.show);
+  const [sub, setSub] = useState<string>(groups[0]?.value ?? "signin");
+  const active = groups.find((g) => g.value === sub) ?? groups[0];
+
+  return (
+    <div className="space-y-5">
+      <p className="px-1 text-sm text-muted-foreground">Studio-wide settings you control as the owner — your brand, your front door, your AI and your business. The <span className="font-medium text-primary">Studio</span> badge marks them apart from your personal settings.</p>
+      <div className="-mx-4 overflow-x-auto px-4 no-scrollbar">
+        <SegmentedControl options={groups.map((g) => ({ value: g.value, label: g.label }))} value={active?.value ?? ""} onChange={setSub} />
+      </div>
+      <motion.div key={active?.value} variants={stagger} initial="hidden" animate="show" className="space-y-6">
+        {active?.render()}
+      </motion.div>
+    </div>
+  );
+}
+
+/**
+ * Sign-in — the tenant's front door. Shows the shareable login link (their
+ * custom domain if live, else the branded `/t/<slug>` path), the login-screen
+ * customization (copy, hero image, passkey), and the custom-domain setup.
+ */
+function SignInSettings({ canBrand, branding, slug, onSaved }: { canBrand: boolean; branding: TenantBranding | null; slug: string | null; onSaved: () => void }) {
+  return (
+    <>
+      <LoginLinkCard slug={slug} />
+      {canBrand
+        ? <LoginCustomizeSection initial={branding?.login ?? null} logoUrl={branding?.logoUrl ?? null} onSaved={onSaved} />
+        : <p className="px-1 text-sm text-muted-foreground">Customizing the sign-in screen (your own copy, a hero image, a branded domain) is part of the branding add-on.</p>}
+      {canBrand && <DomainSection />}
+    </>
+  );
+}
+
+/** The shareable login link — a custom domain when one is live, otherwise the
+ *  branded `/t/<slug>` entry on the platform host. Copy + open. */
+function LoginLinkCard({ slug }: { slug: string | null }) {
+  const [domains, setDomains] = useState<DomainInfo[] | null>(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { void api.get<{ domains: DomainInfo[] }>("/api/domains").then((r) => setDomains(r.domains)).catch(() => setDomains([])); }, []);
+  const liveDomain = domains?.find((d) => d.status === "active") ?? null;
+  const link = liveDomain ? `https://${liveDomain.hostname}` : slug ? `${location.origin}/t/${slug}` : location.origin;
+  const pretty = link.replace(/^https?:\/\//, "");
+  const copy = () => void navigator.clipboard?.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); });
+  return (
+    <section>
+      <SectionHead title="Login link" scope="tenant" />
+      <Card className="space-y-3">
+        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><LogIn /></div><div><div className="font-medium">Your sign-in link</div><div className="text-sm text-muted-foreground">Share this with clients — it opens a sign-in screen wearing your brand.</div></div></div>
+        <div className="flex items-center gap-2 rounded-xl bg-surface-2 p-2 pl-3.5">
+          <Globe className="size-4 shrink-0 text-muted-foreground" />
+          <code className="min-w-0 flex-1 truncate font-mono text-sm">{pretty}</code>
+          <Button size="sm" variant={copied ? "tonal" : "secondary"} onClick={copy}>{copied ? <><Check /> Copied</> : <><Copy /> Copy</>}</Button>
+          <Button size="icon" variant="secondary" aria-label="Open login link" onClick={() => window.open(link, "_blank")}><ExternalLink /></Button>
+        </div>
+        {liveDomain
+          ? <p className="text-xs text-muted-foreground">Served on your live domain <span className="font-medium text-foreground">{liveDomain.hostname}</span>.</p>
+          : <p className="text-xs text-muted-foreground">This branded path works today. Connect a custom domain below for a link on your own address.</p>}
+      </Card>
+    </section>
+  );
+}
+
+/**
+ * Login-screen customization — the copy + affordances shown on the tenant's
+ * branded sign-in (custom domain or `/t/<slug>`). A live mini-preview mirrors
+ * the current theme (so it wears the tenant's brand) as the owner edits.
+ */
+function LoginCustomizeSection({ initial, logoUrl, onSaved }: { initial: LoginBranding | null; logoUrl: string | null; onSaved: () => void }) {
+  const { ctx } = useSession();
+  const brandName = ctx?.active?.tenantName ?? "Your studio";
+  const [tagline, setTagline] = useState(initial?.tagline ?? "");
+  const [headline, setHeadline] = useState(initial?.headline ?? "");
+  const [subtext, setSubtext] = useState(initial?.subtext ?? "");
+  const [bgImageUrl, setBgImageUrl] = useState<string | null>(initial?.bgImageUrl ?? null);
+  const [showPasskey, setShowPasskey] = useState(initial?.showPasskey !== false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const upload = async (file: File) => {
+    setMsg(null);
+    try { const key = await uploadMedia(file, "brand", file.name); setBgImageUrl(`/api/media/${key}`); }
+    catch { setMsg("Couldn't upload that image — try again."); }
+  };
+  const save = async () => {
+    setSaving(true); setMsg(null);
+    const login: LoginBranding = {
+      tagline: tagline.trim() || null,
+      headline: headline.trim() || null,
+      subtext: subtext.trim() || null,
+      bgImageUrl: bgImageUrl || null,
+      showPasskey,
+    };
+    try { await api.patch("/api/settings", { branding: { login } }); onSaved(); setMsg("Sign-in screen saved."); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <section>
+      <SectionHead title="Sign-in screen" scope="tenant" />
+      <Card className="space-y-5">
+        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Palette /></div><div><div className="font-medium">Make it yours</div><div className="text-sm text-muted-foreground">Your words and your image on the screen clients land on.</div></div></div>
+
+        {/* Live preview — mirrors the app's current theme (the tenant's brand). */}
+        <LoginPreview brandName={brandName} logoUrl={logoUrl} tagline={tagline} headline={headline} subtext={subtext} bgImageUrl={bgImageUrl} showPasskey={showPasskey} />
+
+        <Field label="Tagline" value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="No passwords, ever" maxLength={60} hint="The small accent line above the form." />
+        <Field label="Welcome headline" value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Welcome back — sign in to continue." maxLength={120} />
+        <Field label="Subtext" value={subtext} onChange={(e) => setSubtext(e.target.value)} placeholder="Optional — a quieter second line." maxLength={200} />
+
+        {/* Hero background image */}
+        <div className="space-y-2">
+          <div className="text-sm font-medium">Background image <span className="font-normal text-muted-foreground">— optional</span></div>
+          <div className="flex items-center gap-3">
+            <div className="grid h-16 w-24 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/60 bg-surface-2">
+              {bgImageUrl ? <img src={bgImageUrl} alt="Background" className="size-full object-cover" /> : <ImageIcon className="size-5 text-muted-foreground" />}
+            </div>
+            <div className="flex flex-1 flex-wrap gap-2">
+              <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
+              </label>
+              {bgImageUrl && <Button size="icon" variant="secondary" aria-label="Remove background" onClick={() => setBgImageUrl(null)}><Trash2 /></Button>}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">Sits behind a soft scrim so your copy stays readable in light and dark.</p>
+        </div>
+
+        <ToggleRow icon={KeyRound} title="Passkey shortcut" desc="Show the one-tap “Sign in with a passkey” option." checked={showPasskey} onChange={setShowPasskey} />
+
+        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+        <Button className="w-full" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save sign-in screen"}</Button>
+      </Card>
+    </section>
+  );
+}
+
+/** A compact, faithful mock of the login screen using live theme tokens — so
+ *  the owner sees their brand + copy exactly as clients will. */
+function LoginPreview({ brandName, logoUrl, tagline, headline, subtext, bgImageUrl, showPasskey }: {
+  brandName: string; logoUrl: string | null; tagline: string; headline: string; subtext: string; bgImageUrl: string | null; showPasskey: boolean;
+}) {
+  const tag = tagline.trim() || "No passwords, ever";
+  const head = headline.trim() || "Welcome back — sign in to continue.";
+  const sub = subtext.trim();
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-background p-6">
+      {bgImageUrl && <><div className="pointer-events-none absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${bgImageUrl})` }} /><div className="pointer-events-none absolute inset-0 bg-background/80 backdrop-blur-sm" /></>}
+      <div className="pointer-events-none absolute -top-16 left-1/2 size-40 -translate-x-1/2 rounded-full bg-primary/25 blur-[60px]" />
+      <div className="relative mx-auto max-w-[15rem] space-y-4 text-center">
+        {logoUrl ? <img src={logoUrl} alt={brandName} className="mx-auto h-9 w-auto max-w-[60%] object-contain" /> : <div className="mx-auto grid size-10 place-items-center rounded-2xl bg-primary text-lg font-black text-primary-foreground">{brandName.charAt(0).toUpperCase()}</div>}
+        <div>
+          <div className="text-lg font-bold tracking-tight">{brandName}</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">{head}</div>
+          {sub && <div className="text-[0.7rem] text-muted-foreground/80">{sub}</div>}
+        </div>
+        <div className="space-y-2.5 rounded-2xl border border-border/60 bg-card p-3.5 text-left shadow-sm">
+          <div className="flex items-center gap-1.5 text-[0.7rem] font-medium text-primary"><Sparkles className="size-3" /> {tag}</div>
+          <div className="flex items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-2 text-[0.7rem] text-muted-foreground"><Mail className="size-3.5" /> you@example.com</div>
+          <div className="flex items-center justify-center gap-1.5 rounded-full bg-primary py-2 text-[0.7rem] font-semibold text-primary-foreground">Email me a code <ArrowRight className="size-3" /></div>
+          {showPasskey && <div className="flex items-center justify-center gap-1.5 text-[0.7rem] font-medium text-muted-foreground"><KeyRound className="size-3" /> Sign in with a passkey</div>}
+        </div>
+      </div>
+    </div>
   );
 }
 

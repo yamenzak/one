@@ -1398,6 +1398,31 @@ describe("custom domains (SPEC §14.1) — Host pins the tenant", () => {
     expect(host.platform).toBe(true);
     expect(host.tenant).toBe(null);
   });
+
+  it("branded login: /t/<slug> resolves a tenant on the platform host without pinning it", async () => {
+    // Owner customizes their sign-in screen; saved under branding.login.
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const saved = await SELF.fetch("http://localhost:8787/api/settings", {
+      method: "PATCH", headers: H,
+      body: JSON.stringify({ branding: { login: { tagline: "Train with us", headline: "Your journey starts here", showPasskey: false } } }),
+    });
+    expect(saved.status).toBe(200);
+
+    // The platform host + ?slug brands the login (Studio One → slug "studio-one")
+    // but stays platform:true so cross-tenant switching still works after sign-in.
+    const branded = (await (await SELF.fetch("http://localhost:8787/api/host?slug=studio-one")).json()) as {
+      platform: boolean; tenant: { name: string; slug: string; branding: { login?: { tagline?: string; showPasskey?: boolean } } } | null;
+    };
+    expect(branded.platform).toBe(true);
+    expect(branded.tenant?.slug).toBe("studio-one");
+    expect(branded.tenant?.branding?.login?.tagline).toBe("Train with us");
+    expect(branded.tenant?.branding?.login?.showPasskey).toBe(false);
+
+    // An unknown slug just falls back to the neutral platform entry.
+    const unknown = (await (await SELF.fetch("http://localhost:8787/api/host?slug=nope-not-real")).json()) as { platform: boolean; tenant: unknown };
+    expect(unknown.platform).toBe(true);
+    expect(unknown.tenant).toBe(null);
+  });
 });
 
 describe("foods — tenant isolation + copy-on-write", () => {

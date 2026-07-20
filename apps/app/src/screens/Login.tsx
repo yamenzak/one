@@ -14,6 +14,12 @@ export function Login() {
   const tenant = host?.tenant ?? null;
   const brandName = tenant?.name ?? "Mossa";
   const logoUrl = tenant?.branding?.logoUrl ?? null;
+  const login = tenant?.branding?.login ?? null;
+  const tagline = login?.tagline?.trim() || "No passwords, ever";
+  const headline = login?.headline?.trim() || (tenant ? "Welcome back — sign in to continue." : "Coaching, organized.");
+  const subtext = login?.subtext?.trim() || null;
+  const bgImageUrl = login?.bgImageUrl || null;
+  const showPasskey = login?.showPasskey !== false;
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -64,8 +70,15 @@ export function Login() {
 
   return (
     <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-8 overflow-hidden px-6">
+      {/* Optional full-bleed hero image with a legibility scrim, behind the glow. */}
+      {bgImageUrl && (
+        <>
+          <div className="pointer-events-none fixed inset-0 -z-10 bg-cover bg-center" style={{ backgroundImage: `url(${bgImageUrl})` }} />
+          <div className="pointer-events-none fixed inset-0 -z-10 bg-background/80 backdrop-blur-sm" />
+        </>
+      )}
       {/* ambient brand glow */}
-      <div className="pointer-events-none absolute -top-32 left-1/2 size-72 -translate-x-1/2 rounded-full bg-primary/25 blur-[100px]" />
+      <div className={`pointer-events-none absolute -top-32 left-1/2 size-72 -translate-x-1/2 rounded-full bg-primary/25 blur-[100px] ${bgImageUrl ? "opacity-60" : ""}`} />
 
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="relative text-center">
         {logoUrl ? (
@@ -74,7 +87,8 @@ export function Login() {
           <div className="mx-auto mb-5 grid size-16 place-items-center rounded-3xl bg-primary text-2xl font-black text-primary-foreground shadow-glow">{brandName.charAt(0).toUpperCase()}</div>
         )}
         <h1 className="text-3xl font-bold tracking-tight">{brandName}</h1>
-        <p className="mt-2 text-muted-foreground">{tenant ? "Welcome back — sign in to continue." : "Coaching, organized."}</p>
+        <p className="mt-2 text-muted-foreground">{headline}</p>
+        {subtext && <p className="mt-1 text-sm text-muted-foreground/80">{subtext}</p>}
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="relative">
@@ -82,7 +96,7 @@ export function Login() {
           {step === "email" ? (
             <>
               <div className="flex items-center gap-2 text-sm font-medium text-primary">
-                <Sparkles className="size-4" /> No passwords, ever
+                <Sparkles className="size-4" /> {tagline}
               </div>
               <div>
                 <h2 className="text-xl font-semibold tracking-tight">Sign in</h2>
@@ -92,7 +106,7 @@ export function Login() {
               <Button size="lg" className="w-full" disabled={!email.includes("@") || busy} onClick={() => void sendCode()}>
                 {busy ? "Sending…" : "Email me a code"} {!busy && <ArrowRight />}
               </Button>
-              {passkeySupported() && (
+              {showPasskey && passkeySupported() && (
                 <button
                   className="flex w-full items-center justify-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
                   onClick={async () => { setError(null); try { await signInWithPasskey(); await refresh(); } catch { setError("No passkey found on this device."); } }}

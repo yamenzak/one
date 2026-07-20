@@ -27,6 +27,26 @@ export interface TenantBranding {
   aiAvatarUrl?: string | null;
   /** Granular per-mode CSS-variable overrides (e.g. a pasted shadcn theme). */
   tokens?: { light?: Record<string, string> | null; dark?: Record<string, string> | null } | null;
+  /** Sign-in screen copy + affordances, shown on the tenant's branded login
+   *  (custom domain or `/t/<slug>`). All optional — blanks fall back to the
+   *  shipped premium defaults. */
+  login?: LoginBranding | null;
+}
+
+/** The tenant's sign-in screen — copy, an optional hero image, and which
+ *  affordances show. Applied only on the branded entry (custom domain or the
+ *  `/t/<slug>` path); the neutral platform host stays generic Mossa. */
+export interface LoginBranding {
+  /** Small accent line above the form (default "No passwords, ever"). */
+  tagline?: string | null;
+  /** Welcome line under the wordmark (default "Welcome back — sign in to continue."). */
+  headline?: string | null;
+  /** Optional second, quieter line under the headline. */
+  subtext?: string | null;
+  /** Optional full-bleed background image behind the sign-in card. */
+  bgImageUrl?: string | null;
+  /** Show the "Sign in with a passkey" shortcut (default true). */
+  showPasskey?: boolean | null;
 }
 
 /** A placed home widget: which widget, and whether it renders as a big ring
