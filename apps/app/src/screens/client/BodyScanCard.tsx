@@ -35,10 +35,14 @@ interface Scan {
   heightCm: number | null;
   contourFront: [number, number][] | null;
   contourSide: [number, number][] | null;
+  posture: { cvaDeg: number | null; trunkTiltDeg: number | null; severity: "good" | "mild" | "moderate" | "severe" } | null;
+  somatotype: string | null;
   createdAt: string;
 }
 const CONF_TONE = { high: "success", medium: "warning", low: "danger" } as const;
 const CONF_LABEL = { high: "High confidence", medium: "Medium confidence", low: "Lower confidence" } as const;
+const POSTURE_TONE = { good: "success", mild: "warning", moderate: "warning", severe: "danger" } as const;
+const capw = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function BodyScanCard({ clientId }: { clientId: string }) {
   const { ctx } = useSession();
@@ -146,6 +150,19 @@ function ScanSummary({ scans, latest, onOpenHistory }: { scans: Scan[]; latest: 
           <div className="numeral">{scans.length} scan{scans.length === 1 ? "" : "s"}</div>
         </div>
       </div>
+
+      {/* Body type + posture */}
+      {(latest.somatotype || latest.posture) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {latest.somatotype && <span className="rounded-full bg-surface-2 px-2.5 py-1"><span className="text-muted-foreground">Body type · </span><span className="font-semibold">{latest.somatotype}</span></span>}
+          {latest.posture && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1">
+              <span className="text-muted-foreground">Posture</span>
+              <Badge tone={POSTURE_TONE[latest.posture.severity]}>{capw(latest.posture.severity)}</Badge>
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Trend */}
       {bfValues.length >= 2 && (
