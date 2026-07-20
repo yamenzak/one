@@ -15,11 +15,21 @@ import {
   ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Bed, Flame, Plus, ChevronRight, Smile, Upload, HeartPulse, AlertTriangle, type Tone,
 } from "@mossa/ui";
 
-interface PostureScan { date: string; posture: { cvaDeg: number | null; severity: "good" | "mild" | "moderate" | "severe" } | null; somatotype: string | null }
+interface PostureScan {
+  date: string;
+  bodyFatPercent: number | null;
+  heightCm: number | null;
+  circumferences: { neckCm: number | null; waistCm: number | null; hipsCm: number | null; chestCm: number | null };
+  contourSide: [number, number][] | null;
+  posture: { cvaDeg: number | null; trunkTiltDeg: number | null; severity: "good" | "mild" | "moderate" | "severe" } | null;
+  somatotype: string | null;
+}
 const POSTURE_TONE = { good: "success", mild: "warning", moderate: "warning", severe: "danger" } as const;
 const capp = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 import { api, todayLocal, uploadMedia } from "../../api.js";
 import { useUnits } from "../../units.js";
+import { scanProfile, modelSilhouette } from "./bodyscan/model.js";
+import { PostureFigure } from "./bodyscan/PostureFigure.js";
 import { LogSheet } from "./LogSheet.js";
 import { CheckInDetailSheet, LabDetailSheet, labStatus, isLabImage, type CheckInFull, type LabFull } from "./WellnessDetails.js";
 import { WellnessScoreCard, WellnessScoreCardSkeleton, type WellnessScoreResult } from "./WellnessScore.js";
@@ -189,12 +199,15 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
       {/* Wellness Score hero */}
       <Stagger data-tour="wellness-hero">{score ? <WellnessScoreCard result={score} /> : <WellnessScoreCardSkeleton />}</Stagger>
 
-      {/* Posture screen from the latest body scan (side view) */}
+      {/* Posture screen from the latest body scan — side figure + alignment */}
       {(() => {
         const withPosture = scans.filter((s) => s.posture); // newest-first
-        const latest = withPosture[0]?.posture ?? null;
-        if (!latest) return null;
+        const scan = withPosture[0];
+        const latest = scan?.posture ?? null;
+        if (!scan || !latest) return null;
         const trend = [...withPosture].reverse().map((s) => s.posture!.cvaDeg ?? 0).filter((v) => v > 0);
+        const prof = scanProfile(scan);
+        const side = prof ? modelSilhouette(prof, "side") : scan.contourSide;
         return (
           <Stagger>
             <Card className="space-y-3">
@@ -202,17 +215,19 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
                 <div className="flex items-center gap-2.5"><IconBadge icon={HeartPulse} tone="activity" size="sm" /><h2 className="font-semibold">Posture</h2></div>
                 <Badge tone={POSTURE_TONE[latest.severity]}>{capp(latest.severity)}</Badge>
               </div>
-              {latest.severity !== "good" ? (
-                <div className="flex items-start gap-2 rounded-xl bg-warning-soft/40 p-3">
-                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
-                  <p className="text-xs text-muted-foreground">{POSTURE_GUIDANCE[latest.severity]}</p>
+              <div className="flex items-center gap-4">
+                <PostureFigure side={side} cvaDeg={latest.cvaDeg} trunkTiltDeg={latest.trunkTiltDeg} severity={latest.severity} width={92} height={190} />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    {latest.severity !== "good" && <AlertTriangle className="mr-1 inline size-3.5 -translate-y-px text-warning" />}
+                    {POSTURE_GUIDANCE[latest.severity]}
+                  </p>
+                  <p className="text-[0.7rem] text-muted-foreground">The line traces hip → shoulder → head; the dashed plumb is upright. A more forward head is a lower neck angle.</p>
+                  {trend.length >= 2 && (
+                    <div><div className="mb-1 text-[0.7rem] font-medium text-muted-foreground">Neck angle trend</div><Sparkline values={trend} tone="activity" /></div>
+                  )}
                 </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">{POSTURE_GUIDANCE.good}</p>
-              )}
-              {trend.length >= 2 && (
-                <div><div className="mb-1 text-xs font-medium text-muted-foreground">Neck angle (higher = more upright)</div><Sparkline values={trend} tone="activity" /></div>
-              )}
+              </div>
             </Card>
           </Stagger>
         );
