@@ -8,12 +8,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { fmtVolume, volumeLabel, volumeDisplayToMl } from "@mossa/domain";
+import { fmtVolume, volumeLabel, volumeDisplayToMl, POSTURE_GUIDANCE } from "@mossa/domain";
 import {
   Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, StatCard, WeekDots, Sparkline, MiniBars, EmptyState, cn, toneVar,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList,
-  ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Bed, Flame, Plus, ChevronRight, Smile, Upload, type Tone,
+  ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Bed, Flame, Plus, ChevronRight, Smile, Upload, HeartPulse, AlertTriangle, type Tone,
 } from "@mossa/ui";
+
+interface PostureScan { date: string; posture: { cvaDeg: number | null; severity: "good" | "mild" | "moderate" | "severe" } | null; somatotype: string | null }
+const POSTURE_TONE = { good: "success", mild: "warning", moderate: "warning", severe: "danger" } as const;
+const capp = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 import { api, todayLocal, uploadMedia } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { LogSheet } from "./LogSheet.js";
@@ -74,6 +78,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
   const [checkIns, setCheckIns] = useState<CheckInFull[]>([]);
   const [today, setToday] = useState<Today | null>(null);
   const [score, setScore] = useState<WellnessScoreResult | null>(null);
+  const [scans, setScans] = useState<PostureScan[]>([]);
   const [loading, setLoading] = useState(true);
   const [logKind, setLogKind] = useState<"checkin" | "water" | "sleep" | "mood" | null>(null);
   const [detailCheckIn, setDetailCheckIn] = useState<CheckInFull | null>(null);
@@ -85,7 +90,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
   const waterPresets = units.volume === "oz" ? [8, 12, 16] : [250, 500, 750];
 
   const load = useCallback(async () => {
-    const [s, sl, l, f, sess, ci, td, sc] = await Promise.all([
+    const [s, sl, l, f, sess, ci, td, sc, bs] = await Promise.all([
       api.get<{ supplements: Supplement[] }>(`/api/supplements?clientId=${clientId}`),
       api.get<{ taken: { supplement_id: string; slot: string }[] }>(`/api/supplements/logs?clientId=${clientId}&date=${date}`),
       api.get<{ labs: LabFull[] }>(`/api/labs?clientId=${clientId}`),
@@ -94,9 +99,10 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
       api.get<{ checkIns: CheckInFull[] }>(`/api/check-ins?clientId=${clientId}`),
       api.get<Today>(`/api/today?clientId=${clientId}&date=${date}`),
       api.get<WellnessScoreResult>(`/api/wellness/score?clientId=${clientId}&today=${date}`).catch(() => null),
+      api.get<{ scans: PostureScan[] }>(`/api/body-scans?clientId=${clientId}`).catch(() => ({ scans: [] })),
     ]);
     setSupps(s.supplements); setTaken(new Set(sl.taken.map((t) => `${t.supplement_id}:${t.slot}`)));
-    setLabs(l.labs); setFast(f); setSessions(sess.sessions); setCheckIns(ci.checkIns); setToday(td); setScore(sc); setLoading(false);
+    setLabs(l.labs); setFast(f); setSessions(sess.sessions); setCheckIns(ci.checkIns); setToday(td); setScore(sc); setScans(bs.scans); setLoading(false);
   }, [clientId, date]);
   useEffect(() => void load(), [load]);
 
@@ -182,6 +188,35 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         <>
       {/* Wellness Score hero */}
       <Stagger data-tour="wellness-hero">{score ? <WellnessScoreCard result={score} /> : <WellnessScoreCardSkeleton />}</Stagger>
+
+      {/* Posture screen from the latest body scan (side view) */}
+      {(() => {
+        const withPosture = scans.filter((s) => s.posture); // newest-first
+        const latest = withPosture[0]?.posture ?? null;
+        if (!latest) return null;
+        const trend = [...withPosture].reverse().map((s) => s.posture!.cvaDeg ?? 0).filter((v) => v > 0);
+        return (
+          <Stagger>
+            <Card className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5"><IconBadge icon={HeartPulse} tone="activity" size="sm" /><h2 className="font-semibold">Posture</h2></div>
+                <Badge tone={POSTURE_TONE[latest.severity]}>{capp(latest.severity)}</Badge>
+              </div>
+              {latest.severity !== "good" ? (
+                <div className="flex items-start gap-2 rounded-xl bg-warning-soft/40 p-3">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+                  <p className="text-xs text-muted-foreground">{POSTURE_GUIDANCE[latest.severity]}</p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">{POSTURE_GUIDANCE.good}</p>
+              )}
+              {trend.length >= 2 && (
+                <div><div className="mb-1 text-xs font-medium text-muted-foreground">Neck angle (higher = more upright)</div><Sparkline values={trend} tone="activity" /></div>
+              )}
+            </Card>
+          </Stagger>
+        );
+      })()}
 
       {/* Quick-log chips */}
       <Stagger className="flex flex-wrap gap-2">
