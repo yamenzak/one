@@ -41,11 +41,11 @@ const CONF_LABEL = { high: "High confidence", medium: "Medium confidence", low: 
 const fmtDate = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 const hasPts = (p: Pt[] | null): p is Pt[] => !!p && p.length > 3;
 
-export function BodyScanHistory({ scans, units, onClose }: { scans: HistoryScan[]; units: UnitPrefs; onClose: () => void }) {
+export function BodyScanHistory({ scans, units, initialId, onClose }: { scans: HistoryScan[]; units: UnitPrefs; initialId?: string; onClose: () => void }) {
   const ref = useModalOverlay(onClose);
   const list = useMemo(() => scans.filter((s) => s.bodyFatPercent != null), [scans]); // newest-first
   const chrono = useMemo(() => [...list].reverse(), [list]);
-  const [selId, setSelId] = useState(list[0]?.id);
+  const [selId, setSelId] = useState(initialId ?? list[0]?.id);
   const [view, setView] = useState<"front" | "side" | "3d">("front");
   const scan = list.find((s) => s.id === selId) ?? list[0];
 
