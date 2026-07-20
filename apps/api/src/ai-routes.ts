@@ -545,15 +545,20 @@ export const aiRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
-    const [labs, goal, supps] = await Promise.all([
-      c.env.DB.prepare("SELECT display_name, values_json FROM lab_tests WHERE client_id = ? AND status = 'reviewed' ORDER BY created_at DESC LIMIT 5").bind(access.client.id).all<{ display_name: string; values_json: string | null }>(),
-      c.env.DB.prepare("SELECT targets_json, derivation_json FROM client_goals WHERE client_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(access.client.id).first<{ targets_json: string | null; derivation_json: string | null }>(),
-      c.env.DB.prepare("SELECT name, dose FROM supplements WHERE client_id = ? AND status IN ('active','paused')").bind(access.client.id).all<{ name: string; dose: string | null }>(),
+    // Full picture: the client's whole context (goals, targets, nutrition &
+    // training adherence, measurements, check-ins, plans, active stack) PLUS the
+    // complete reviewed lab panel and any paused supplements — so the reco reads
+    // every data source, not just a handful of labs.
+    const prefRow = await c.env.DB.prepare("SELECT units_json FROM user_prefs WHERE user_id = ?").bind(who.userId).first<{ units_json: string | null }>();
+    const units = resolveUnits(parseJson(prefRow?.units_json ?? null, null));
+    const [ctx, labs, supps] = await Promise.all([
+      buildClientContext(c.env, access.client, { today: new Date().toISOString().slice(0, 10), hour: 12, units }),
+      c.env.DB.prepare("SELECT display_name, values_json FROM lab_tests WHERE client_id = ? AND status = 'reviewed' ORDER BY created_at DESC LIMIT 30").bind(access.client.id).all<{ display_name: string; values_json: string | null }>(),
+      c.env.DB.prepare("SELECT name, dose, status FROM supplements WHERE client_id = ? AND status IN ('active','paused')").bind(access.client.id).all<{ name: string; dose: string | null; status: string }>(),
     ]);
     const labText = (labs.results ?? []).map((l) => `${l.display_name}: ${(parseJson<{ marker: string; value: string; unit?: string; flag?: string }[]>(l.values_json, [])).map((v) => `${v.marker} ${v.value}${v.unit ?? ""}${v.flag && v.flag !== "normal" ? ` (${v.flag})` : ""}`).join(", ")}`).join("\n");
-    const primaryGoal = parseJson<{ primaryGoal?: string }>(goal?.derivation_json, {}).primaryGoal ?? "general fitness";
-    const compLine = await bodyCompLine(c.env.DB, access.client);
-    const prompt = [`GOAL: ${primaryGoal}`, compLine, `CURRENT SUPPLEMENTS: ${(supps.results ?? []).map((s) => s.name + (s.dose ? ` ${s.dose}` : "")).join(", ") || "none"}`, `REVIEWED LABS:\n${labText || "none on file"}`].filter(Boolean).join("\n");
+    const stackText = (supps.results ?? []).map((s) => `${s.name}${s.dose ? ` ${s.dose}` : ""}${s.status === "paused" ? " (paused)" : ""}`).join(", ") || "none";
+    const prompt = [ctx.text, `CURRENT SUPPLEMENTS (incl paused): ${stackText}`, `FULL REVIEWED LAB PANEL:\n${labText || "none on file"}`, "Recommend supplements now — address any flagged lab markers and the client's goal, and don't re-suggest anything already in their stack."].join("\n\n");
 
     const result = await generate(c.env, {
       tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
@@ -567,6 +572,41 @@ export const aiRoutes = new Hono<AppEnv>()
     const out = extractJson<{ recommendations: unknown[]; note?: string }>(result.output);
     if (!out?.recommendations || !Array.isArray(out.recommendations)) return c.json({ error: "The AI didn't return valid recommendations.", raw: result.output.slice(0, 1800), mocked: result.mocked }, 422);
     return c.json({ recommendations: out.recommendations, note: out.note ?? "", credits: result.credits, mocked: result.mocked });
+  })
+
+  /** Supplement Guide (client-facing): the client's OWN active stack → a warm,
+   *  plain-language explainer of what each supports + timing tips. Educational,
+   *  never prescriptive (starting/stopping/dosing is the coach's call). Gated by
+   *  the client's aiCoachInsights package flag; staff bypass. */
+  .post("/ai/supplement-guide", async (c) => {
+    const who = requireTenant(c)!;
+    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
+    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    const parsed = z.object({ clientId: z.string() }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, parsed.data.clientId);
+    if ("response" in access) return access.response;
+    if (c.get("role") === "client") {
+      const flags = await resolveClientFlagsFor(c.env.DB, who.tenantId, access.client.id);
+      if (!flags.aiCoachInsights) return c.json({ error: "not included in your current plan" }, 403);
+    }
+    const supps = await c.env.DB.prepare("SELECT name, dose, schedule_json FROM supplements WHERE client_id = ? AND status = 'active'").bind(access.client.id).all<{ name: string; dose: string | null; schedule_json: string | null }>();
+    if (!(supps.results ?? []).length) return c.json({ guide: "" });
+    const goalRow = await c.env.DB.prepare("SELECT derivation_json FROM client_goals WHERE client_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(access.client.id).first<{ derivation_json: string | null }>();
+    const primaryGoal = parseJson<{ primaryGoal?: string }>(goalRow?.derivation_json, {}).primaryGoal ?? "general fitness";
+    const compLine = await bodyCompLine(c.env.DB, access.client);
+    const stack = (supps.results ?? []).map((s) => {
+      const sched = parseJson<{ slot: string }[]>(s.schedule_json, []).map((x) => x.slot.replace(/_/g, " ")).join(", ");
+      return `- ${s.name}${s.dose ? ` (${s.dose})` : ""}${sched ? ` — ${sched}` : ""}`;
+    }).join("\n");
+    const prompt = [`GOAL: ${primaryGoal}`, compLine, `YOUR SUPPLEMENTS:\n${stack}`].filter(Boolean).join("\n");
+    const result = await generate(c.env, {
+      tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
+      feature: "supplement-guide", task: "text-small", system: sys("supplement-guide"), prompt, maxOutputTokens: 500,
+      mock: () => (supps.results ?? []).map((s) => `${s.name}: supports your ${primaryGoal} goal — take it consistently, ideally with a meal.`).join("\n") + "\n\nOverall: keep timing consistent and pair with food where it helps absorption. Ask your coach before changing anything.",
+    });
+    if (!result.ok) return aiFail(c, result);
+    return c.json({ guide: result.output.trim(), credits: result.credits, mocked: result.mocked });
   })
 
   /** Article Writer: a topic → a drafted knowledge-base article (trainer). */
