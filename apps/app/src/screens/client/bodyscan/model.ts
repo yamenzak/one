@@ -7,7 +7,7 @@
  * callers then use the stored capture contour.
  */
 
-import { bodyProfile, profileToSilhouette, type BodyProfile, type Pt } from "@mossa/domain";
+import { bodyProfile, humanoidSilhouette, type BodyProfile, type Pt } from "@mossa/domain";
 
 type Num = number | null | undefined;
 export interface ScanShape {
@@ -30,7 +30,8 @@ export function scanProfile(s: ScanShape): BodyProfile | null {
   });
 }
 
-/** Normalized (0..1) silhouette points for a profile — drop-in for <Silhouette>. */
+/** Normalized (0..1) HUMAN FIGURE points (head, arms, separated legs) for a
+ *  profile — a drop-in for <Silhouette> that reads as a body, not a column. */
 export function modelSilhouette(profile: BodyProfile, view: "front" | "side", box = { width: 190, height: 300 }): Pt[] {
-  return profileToSilhouette(profile, box, view);
+  return humanoidSilhouette(profile, view, box);
 }
