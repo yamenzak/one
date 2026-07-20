@@ -75,6 +75,9 @@ importers:
       '@mossa/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@simplewebauthn/browser':
+        specifier: ^13.3.0
+        version: 13.3.0
       '@zxing/browser':
         specifier: ^0.2.1
         version: 0.2.1(@zxing/library@0.23.0)

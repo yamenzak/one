@@ -18,6 +18,7 @@
     "@mossa/domain": "workspace:*",
     "@mossa/protocol": "workspace:*",
     "@mossa/ui": "workspace:*",
+    "@simplewebauthn/browser": "^13.3.0",
     "@zxing/browser": "^0.2.1",
     "@zxing/library": "^0.23.0",
     "clsx": "^2.1.1",
