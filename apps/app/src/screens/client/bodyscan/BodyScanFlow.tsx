@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  estimateBodyFat, classifyBodyFat, bodyComposition, type BodyFatEstimate, type BodyFatCategory,
+  estimateBodyFat, classifyBodyFat, bodyComposition, posturalMetrics, classifySomatotype, POSTURE_GUIDANCE, type BodyFatEstimate, type BodyFatCategory, type PostureResult,
   displayToKg, kgToDisplay, lengthDisplayToCm, weightLabel, lengthLabel, type UnitPrefs,
 } from "@mossa/domain";
 import {
@@ -24,7 +24,7 @@ import {
 } from "@mossa/ui";
 import { api, todayLocal } from "../../../api.js";
 import { loadScanner, analyzeAlignment, type Scanner, type ScanPhase, type Alignment } from "./pipeline.js";
-import { measureCapture, computeCircumferences, fullBodyContour, LM, type Capture, type NormLandmark, type Circumferences } from "./measure.js";
+import { measureCapture, computeCircumferences, fullBodyContour, posturePoints, LM, type Capture, type NormLandmark, type Circumferences } from "./measure.js";
 import { CuePlayer } from "./cues.js";
 import { Silhouette } from "./Silhouette.js";
 import { scanProfile, modelSilhouette } from "./model.js";
@@ -37,6 +37,8 @@ export interface ScanResult {
   contourFront: [number, number][] | null;
   contourSide: [number, number][] | null;
   weightKg: number;
+  /** Sagittal posture screen from the side view (null if landmarks weren't clear). */
+  posture: PostureResult | null;
 }
 
 type Step = "intro" | "front" | "frontShape" | "side" | "measuring" | "result" | "manual";
@@ -120,9 +122,13 @@ export default function BodyScanFlow({
         // outline if the shape capture is missing.
         const contourFront = frontShape ? fullBodyContour(frontShape) : f.contour;
         const contourSide = side ? fullBodyContour(side) : null;
+        // Posture screen from the side view's ear/shoulder/hip (before we drop the
+        // landmarks below). Null when the profile landmarks weren't clear enough.
+        const pp = side ? posturePoints(side) : null;
+        const posture = pp ? posturalMetrics(pp) : null;
         // Discard the masks now — we keep only numbers + the outline.
         capturesRef.current = {};
-        setResult({ estimate, circumferences: circ, contourFront, contourSide, weightKg: latestWeightKg ?? 75 });
+        setResult({ estimate, circumferences: circ, contourFront, contourSide, weightKg: latestWeightKg ?? 75, posture });
         setStep("result");
       } catch (err) {
         const why = err instanceof Error ? err.message : coverage(front);
@@ -514,7 +520,7 @@ function ManualStep({ profile, latestWeightKg, units, notice, onResult }: {
     const weightKg = displayToKg(weightDisplay, units);
     const estimate = estimateBodyFat({ gender: profile.gender, ageYears: profile.ageYears, heightCm: profile.heightCm, weightKg, neckCm: circ.neckCm, waistCm: circ.waistCm, hipsCm: circ.hipsCm ?? null });
     if (!estimate) { setErr("Those measurements don't produce a valid estimate — check your waist is larger than your neck."); return; }
-    onResult({ estimate, circumferences: circ, contourFront: null, contourSide: null, weightKg });
+    onResult({ estimate, circumferences: circ, contourFront: null, contourSide: null, weightKg, posture: null });
   };
 
   return (
@@ -568,6 +574,7 @@ function ResultStep({ clientId, result, profile, units, onSaved, onRetry }: {
         contourFront: storeSilhouette ? result.contourFront ?? undefined : undefined,
         contourSide: storeSilhouette ? result.contourSide ?? undefined : undefined,
         storeSilhouette,
+        posture: result.posture ? { cvaDeg: result.posture.craniovertebralAngleDeg, trunkTiltDeg: result.posture.trunkTiltDeg, severity: result.posture.severity } : undefined,
       };
       const r = await api.post<{ ok: boolean; id: string }>("/api/body-scans", body);
       onSaved({ ...result, id: r.id });
@@ -641,6 +648,39 @@ function ResultStep({ clientId, result, profile, units, onSaved, onRetry }: {
             <CompBox label="Fat mass" value={kgToDisplay(comp.fatMassKg, units)} unit={wl} />
             <CompBox label="FFMI" value={comp.ffmi} unit="kg/m²" />
           </motion.div>
+        );
+      })()}
+
+      {/* Body type + posture screen */}
+      {(() => {
+        const comp = bodyComposition(result.weightKg, estimate.bodyFatPercent, profile.heightCm);
+        const soma = classifySomatotype({ heightCm: profile.heightCm, weightKg: result.weightKg, bodyFatPercent: estimate.bodyFatPercent, ffmi: comp?.ffmi ?? null });
+        const post = result.posture;
+        if (!soma && !post) return null;
+        const postTone = post ? (post.severity === "good" ? "success" : post.severity === "severe" ? "danger" : "warning") : "neutral";
+        return (
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              {soma && (
+                <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-center">
+                  <div className="text-[0.65rem] font-medium text-muted-foreground">Body type</div>
+                  <div className="mt-0.5 text-sm font-bold">{soma.label}</div>
+                </div>
+              )}
+              {post && (
+                <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-center">
+                  <div className="text-[0.65rem] font-medium text-muted-foreground">Posture</div>
+                  <div className="mt-0.5 flex items-center justify-center gap-1.5">
+                    <Badge tone={postTone}>{post.severity[0]!.toUpperCase() + post.severity.slice(1)}</Badge>
+                    <span className="numeral text-xs text-muted-foreground">{post.craniovertebralAngleDeg.toFixed(0)}°</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            {post && post.severity !== "good" && (
+              <p className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-muted-foreground">{POSTURE_GUIDANCE[post.severity]}</p>
+            )}
+          </div>
         );
       })()}
 

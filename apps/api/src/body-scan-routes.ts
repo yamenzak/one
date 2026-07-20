@@ -11,7 +11,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { estimateBodyFat, ageFromDob, type Gender } from "@mossa/domain";
+import { estimateBodyFat, ageFromDob, bodyComposition, classifySomatotype, type Gender } from "@mossa/domain";
 import { SubmitBodyScan, TTS_VOICE_IDS } from "@mossa/protocol";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
@@ -54,7 +54,9 @@ interface ScanRow {
   id: string; date_local: string; body_fat_percent: number | null; low: number | null; high: number | null;
   confidence: string | null; neck_cm: number | null; waist_cm: number | null; hips_cm: number | null;
   chest_cm: number | null; weight_kg: number | null; height_cm: number | null; methods_json: string | null;
-  contour_front_json: string | null; contour_side_json: string | null; created_at: string;
+  contour_front_json: string | null; contour_side_json: string | null;
+  posture_cva_deg: number | null; posture_tilt_deg: number | null; posture_severity: string | null; somatotype: string | null;
+  created_at: string;
 }
 const scanView = (r: ScanRow) => ({
   id: r.id, date: r.date_local, bodyFatPercent: r.body_fat_percent, low: r.low, high: r.high, confidence: r.confidence,
@@ -62,6 +64,8 @@ const scanView = (r: ScanRow) => ({
   weightKg: r.weight_kg, heightCm: r.height_cm,
   methods: parseJson(r.methods_json, [] as unknown[]),
   contourFront: parseJson(r.contour_front_json, null), contourSide: parseJson(r.contour_side_json, null),
+  posture: r.posture_severity ? { cvaDeg: r.posture_cva_deg, trunkTiltDeg: r.posture_tilt_deg, severity: r.posture_severity } : null,
+  somatotype: r.somatotype,
   createdAt: r.created_at,
 });
 
@@ -92,14 +96,21 @@ export const bodyScanRoutes = new Hono<AppEnv>()
     const now = nowIso();
     const cf = d.storeSilhouette && d.contourFront ? j(d.contourFront) : null;
     const cs = d.storeSilhouette && d.contourSide ? j(d.contourSide) : null;
+    // Somatotype is recomputed server-side (like body-fat) from the estimate +
+    // weight + height. Posture is trusted from the device (needs landmarks only
+    // the on-device pose has).
+    const comp = bodyComposition(d.weightKg, est.bodyFatPercent, height);
+    const soma = classifySomatotype({ heightCm: height, weightKg: d.weightKg, bodyFatPercent: est.bodyFatPercent, ffmi: comp?.ffmi ?? null });
+    const posture = d.posture ?? null;
     await c.env.DB.prepare(
-      `INSERT INTO body_scans (id, tenant_id, client_id, date_local, body_fat_percent, low, high, confidence, neck_cm, waist_cm, hips_cm, chest_cm, weight_kg, height_cm, methods_json, contour_front_json, contour_side_json, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(client_id, date_local) DO UPDATE SET body_fat_percent=excluded.body_fat_percent, low=excluded.low, high=excluded.high, confidence=excluded.confidence, neck_cm=excluded.neck_cm, waist_cm=excluded.waist_cm, hips_cm=excluded.hips_cm, chest_cm=excluded.chest_cm, weight_kg=excluded.weight_kg, height_cm=excluded.height_cm, methods_json=excluded.methods_json, contour_front_json=excluded.contour_front_json, contour_side_json=excluded.contour_side_json`,
+      `INSERT INTO body_scans (id, tenant_id, client_id, date_local, body_fat_percent, low, high, confidence, neck_cm, waist_cm, hips_cm, chest_cm, weight_kg, height_cm, methods_json, contour_front_json, contour_side_json, posture_cva_deg, posture_tilt_deg, posture_severity, somatotype, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(client_id, date_local) DO UPDATE SET body_fat_percent=excluded.body_fat_percent, low=excluded.low, high=excluded.high, confidence=excluded.confidence, neck_cm=excluded.neck_cm, waist_cm=excluded.waist_cm, hips_cm=excluded.hips_cm, chest_cm=excluded.chest_cm, weight_kg=excluded.weight_kg, height_cm=excluded.height_cm, methods_json=excluded.methods_json, contour_front_json=excluded.contour_front_json, contour_side_json=excluded.contour_side_json, posture_cva_deg=excluded.posture_cva_deg, posture_tilt_deg=excluded.posture_tilt_deg, posture_severity=excluded.posture_severity, somatotype=excluded.somatotype`,
     )
       .bind(id, who.tenantId, cl.id, d.date, est.bodyFatPercent, est.low, est.high, est.confidence,
         d.circumferences.neckCm, d.circumferences.waistCm, d.circumferences.hipsCm ?? null, d.circumferences.chestCm ?? null,
-        d.weightKg, height, j(est.methods), cf, cs, now)
+        d.weightKg, height, j(est.methods), cf, cs,
+        posture?.cvaDeg ?? null, posture?.trunkTiltDeg ?? null, posture?.severity ?? null, soma?.label ?? null, now)
       .run();
 
     // Mirror into measurements so the body-fat trend + reports + the Body

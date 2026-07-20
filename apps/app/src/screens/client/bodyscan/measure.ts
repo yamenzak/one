@@ -56,6 +56,8 @@ export interface Circumferences {
 // ── MediaPipe Pose (33-landmark) indices we use ──────────────────────────────
 export const LM = {
   nose: 0,
+  lEar: 7,
+  rEar: 8,
   lShoulder: 11,
   rShoulder: 12,
   lElbow: 13,
@@ -67,6 +69,24 @@ export const LM = {
   lAnkle: 27,
   rAnkle: 28,
 } as const;
+
+/**
+ * Ear / shoulder / hip in FRAME PIXELS for the more-visible side (a side view
+ * shows one profile). Returns null unless all three read clearly — posture is a
+ * screen, so we'd rather show nothing than a guess from occluded points.
+ */
+export function posturePoints(cap: Capture): { ear: { x: number; y: number }; shoulder: { x: number; y: number }; hip: { x: number; y: number } } | null {
+  const L = cap.landmarks;
+  if (!L || L.length < 33) return null;
+  const px = (i: number) => ({ x: (L[i]?.x ?? 0) * cap.frameW, y: (L[i]?.y ?? 0) * cap.frameH, v: L[i]?.visibility ?? 0 });
+  const left = [px(LM.lEar), px(LM.lShoulder), px(LM.lHip)];
+  const right = [px(LM.rEar), px(LM.rShoulder), px(LM.rHip)];
+  const sum = (a: typeof left) => a.reduce((s, p) => s + p.v, 0);
+  const side = sum(left) >= sum(right) ? left : right;
+  if (side.some((p) => p.v < 0.3)) return null;
+  const [ear, shoulder, hip] = side as [typeof left[0], typeof left[0], typeof left[0]];
+  return { ear: { x: ear.x, y: ear.y }, shoulder: { x: shoulder.x, y: shoulder.y }, hip: { x: hip.x, y: hip.y } };
+}
 
 const THRESH = 0.5; // person cutoff — the DeepLab mask is a clean 0/1 body mask,
 // so any 0<t<1 selects the body; the landmark fallback covers a missed segment
