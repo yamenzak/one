@@ -8,6 +8,7 @@ import { ThemeProvider } from "./theme.js";
 import { Login } from "./screens/Login.js";
 import { Start } from "./screens/Start.js";
 import { Shell } from "./Shell.js";
+import { PasskeyProvider } from "./PasskeyPrompt.js";
 import { Spinner } from "@mossa/ui";
 
 function BootSplash() {
@@ -30,7 +31,7 @@ function App() {
         {screen === "boot" && <BootSplash />}
         {screen === "login" && <Login />}
         {screen === "start" && <Start />}
-        {screen === "shell" && <Shell />}
+        {screen === "shell" && <PasskeyProvider><Shell /></PasskeyProvider>}
       </motion.div>
     </AnimatePresence>
   );

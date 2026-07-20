@@ -9,13 +9,14 @@ import {
   Reveal, SkeletonHero, SkeletonList, SkeletonHeader,
   Page, Stagger, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
   Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Sparkles, Utensils, Croissant, Soup, Apple,
-  Store, Ticket, AlertTriangle, toneVar, ChevronLeft, ChevronRight, type Tone, type LucideIcon,
+  Store, Ticket, AlertTriangle, ShieldCheck, toneVar, ChevronLeft, ChevronRight, type Tone, type LucideIcon,
 } from "@mossa/ui";
 import type { WidgetItem } from "@mossa/protocol";
 import { useNavigate } from "react-router-dom";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
+import { usePasskey } from "../../PasskeyPrompt.js";
 import { LogSheet } from "./LogSheet.js";
 import { WidgetCarousel, WidgetCustomizeSheet } from "../widget-kit.js";
 import { CLIENT_WIDGETS, DEFAULT_CLIENT_WIDGETS, type ClientWidgetData } from "./HomeWidgets.js";
@@ -114,6 +115,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   const units = useUnits();
   const nav = useNavigate();
   const { ctx } = useSession();
+  const pk = usePasskey();
   const ownView = ctx?.active?.clientId === clientId;
   const date = todayLocal();
 
@@ -197,11 +199,12 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
             const total = Object.keys(GAP_LABELS).length;
             const done = total - data.profile.gaps.length;
             const pct = total ? done / total : 0;
+            const needsPasskey = ownView && pk?.supported && pk.hasPasskey === false;
             return (
               <Stagger>
-                <button onClick={ownView ? () => nav("/settings") : undefined} disabled={!ownView} className="block w-full text-left">
-                  <Card interactive={ownView} className="relative overflow-hidden">
-                    <div className="pointer-events-none absolute -right-12 -top-14 size-44 rounded-full bg-primary/15 blur-3xl" />
+                <Card className="relative overflow-hidden">
+                  <div className="pointer-events-none absolute -right-12 -top-14 size-44 rounded-full bg-primary/15 blur-3xl" />
+                  <button onClick={ownView ? () => nav("/settings") : undefined} disabled={!ownView} className="block w-full text-left">
                     <div className="relative flex items-center gap-4">
                       <ProgressRing size={66} strokeWidth={7} tone="primary" progress={pct || 0.001} value={<span className="text-sm font-bold">{done}/{total}</span>} softTrack tintValue />
                       <div className="min-w-0 flex-1">
@@ -215,8 +218,15 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
                       {data.profile.gaps.slice(0, 6).map((g) => <span key={g} className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium">{GAP_LABELS[g] ?? g}</span>)}
                       {data.profile.gaps.length > 6 && <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">+{data.profile.gaps.length - 6} more</span>}
                     </div>
-                  </Card>
-                </button>
+                  </button>
+                  {needsPasskey && (
+                    <div className="relative mt-3.5 flex items-center gap-3 border-t border-border/50 pt-3.5">
+                      <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><ShieldCheck /></div>
+                      <div className="min-w-0 flex-1"><div className="text-sm font-medium">Add a passkey</div><div className="text-xs text-muted-foreground">One-tap sign-in with Face ID or fingerprint.</div></div>
+                      <Button size="sm" variant="tonal" onClick={() => pk!.promptEnroll()}>Set up</Button>
+                    </div>
+                  )}
+                </Card>
               </Stagger>
             );
           })()}
