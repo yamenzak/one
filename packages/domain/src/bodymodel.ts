@@ -309,3 +309,91 @@ export function profileToSilhouette(
   }
   return [...right, ...left.reverse()];
 }
+
+// ── Humanoid figure (head + arms + separated legs) ───────────────────────────
+
+/** Half-extent (cm) at height fraction t, front width or side depth, interpolated. */
+function halfAt(profile: BodyProfile, t: number, view: "front" | "side"): number {
+  const s = profile.slices;
+  const pick = view === "front" ? (x: BodySlice) => x.halfWidthCm : (x: BodySlice) => x.halfDepthCm;
+  if (t <= s[0]!.t) return pick(s[0]!);
+  for (let k = 0; k < s.length - 1; k++) {
+    if (t <= s[k + 1]!.t) { const a = s[k]!, b = s[k + 1]!; const f = (t - a.t) / ((b.t - a.t) || 1); return pick(a) + (pick(b) - pick(a)) * f; }
+  }
+  return pick(s[s.length - 1]!);
+}
+
+/** Catmull–Rom through a CLOSED loop of control points → a smooth polygon. */
+function smoothClosed(cps: Pt[], per = 6): Pt[] {
+  const n = cps.length, out: Pt[] = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = cps[(i - 1 + n) % n]!, p1 = cps[i]!, p2 = cps[(i + 1) % n]!, p3 = cps[(i + 2) % n]!;
+    for (let j = 0; j < per; j++) {
+      const t = j / per, t2 = t * t, t3 = t2 * t;
+      const x = 0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3);
+      const y = 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
+      out.push([x, y]);
+    }
+  }
+  return out;
+}
+
+/**
+ * A full human FIGURE outline (head, arms at the sides, separated legs) fitted to
+ * the measured profile — the recognizable body-shape the scan should read as,
+ * not an armless column. Control points are laid out in body proportions and
+ * scaled by the profile's per-height widths (front) or depths (side), then
+ * smoothed and normalized to 0..1 (aspect-preserving) for <Silhouette>.
+ */
+export function humanoidSilhouette(profile: BodyProfile, view: "front" | "side", box = { width: 190, height: 300 }): Pt[] {
+  const H = profile.heightCm;
+  const f = (t: number) => halfAt(profile, t, view) / H; // half-extent as a fraction of height
+  let right: Pt[];
+  if (view === "front") {
+    const S = Math.max(profile.shoulderWidthCm / 2 / H, f(0.29) * 1.15); // shoulder half
+    const headW = Math.max(f(0.05), 0.05), neckW = Math.max(f(0.16), 0.03);
+    const chestW = f(0.30), waistW = f(0.37), hipW = f(0.47);
+    const thigh = f(0.60), knee = f(0.72), calf = f(0.81), ankle = Math.max(f(0.955), 0.028);
+    const gap = 0.02; // half-gap between the legs
+    right = [
+      [0, 0.02], [headW * 0.62, 0.028], [headW, 0.06], [headW * 0.82, 0.105], // rounded head
+      [neckW, 0.135], [neckW, 0.162], // neck
+      [S * 0.7, 0.176], [S, 0.198], // trapezius → deltoid
+      [S * 1.0, 0.245], [S * 0.95, 0.335], [S * 0.9, 0.425], [S * 0.87, 0.495], [S * 0.86, 0.535], // outer arm → wrist
+      [S * 0.85, 0.565], [S * 0.75, 0.578], // hand
+      [S * 0.64, 0.552], [S * 0.66, 0.46], [S * 0.7, 0.37], [chestW * 1.04, 0.278], // inner arm → armpit
+      [chestW, 0.30], [waistW, 0.375], [hipW, 0.46], // torso
+      [hipW * 0.99, 0.505], [thigh, 0.57], [knee, 0.715], [calf, 0.805], [ankle, 0.945], [ankle * 1.45, 0.99], [ankle * 1.1, 1.0], // right leg outer + foot
+      [gap * 2.9, 0.997], [calf * 0.5, 0.83], [knee * 0.55, 0.715], [thigh * 0.45, 0.585], [gap, 0.52], // inner leg → crotch
+    ];
+  } else {
+    // Side profile: front edge (belly/chest) down, then back edge (spine/seat) up.
+    const bf = 20; // belly bulge is baked into the depth via profile; a touch extra low-torso
+    void bf;
+    const headD = Math.max(f(0.05), 0.055), neckD = Math.max(f(0.16), 0.04);
+    const chestD = f(0.30), waistD = f(0.37), hipD = f(0.47);
+    const thigh = f(0.60), knee = f(0.72), calf = f(0.81), ankle = Math.max(f(0.955), 0.03);
+    right = [
+      [0, 0.006], [headD * 0.95, 0.03], [headD, 0.06], [headD * 0.7, 0.10], // front of head/face
+      [neckD * 0.8, 0.135], [neckD * 1.1, 0.165], // throat
+      [chestD, 0.29], [waistD * 1.08, 0.37], [hipD * 0.9, 0.46], // chest → belly → front hip
+      [thigh, 0.585], [knee, 0.715], [calf * 0.9, 0.805], [ankle, 0.95], [ankle * 2.6, 0.995], [ankle * 2.4, 1.0], // front thigh → shin → toe
+      [-ankle * 1.0, 0.995], [-calf, 0.83], [-knee, 0.715], [-thigh * 1.05, 0.6], // heel → calf back → thigh back
+      [-hipD * 1.15, 0.475], [-waistD, 0.37], [-chestD * 1.02, 0.29], // seat/buttock → lower back → upper back
+      [-neckD, 0.17], [-neckD * 0.9, 0.14], [-headD * 1.05, 0.075], [-headD * 0.7, 0.028], // back of neck/head
+    ];
+  }
+  const left = view === "front" ? right.map(([x, y]) => [-x, y] as Pt).reverse() : [];
+  const loop = smoothClosed([...right, ...left]);
+
+  // Aspect-preserving fit into the box, normalized to 0..1.
+  const ys = loop.map((p) => p[1]);
+  const maxX = Math.max(...loop.map((p) => Math.abs(p[0]))) || 1;
+  const minY = Math.min(...ys), maxY = Math.max(...ys), spanY = maxY - minY || 1;
+  const aspect = box.height / box.width;
+  let sc = 0.96; // normalized-y units for the full figure height
+  if (maxX * sc * aspect > 0.46) sc = 0.46 / (maxX * aspect);
+  const yScale = sc / spanY;
+  const yOff = (1 - sc) / 2;
+  return loop.map(([x, y]) => [0.5 + x * sc * aspect, yOff + (y - minY) * yScale] as Pt);
+}

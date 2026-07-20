@@ -5,6 +5,7 @@ import {
   posturalMetrics,
   bodyProfile,
   profileToSilhouette,
+  humanoidSilhouette,
 } from "../src/bodymodel.js";
 
 describe("somatotype", () => {
@@ -92,6 +93,21 @@ describe("body profile", () => {
     const ws = soft.slices.find((s) => Math.abs(s.t - 0.37) < 0.001)!;
     // Same waist girth: the leaner body is more elliptical (wider width:depth).
     expect(wl.halfWidthCm / wl.halfDepthCm).toBeGreaterThan(ws.halfWidthCm / ws.halfDepthCm);
+  });
+
+  it("renders a human FIGURE (arms + separated legs), in-bounds & 0..1", () => {
+    const pts = humanoidSilhouette(prof, "front", { width: 190, height: 300 });
+    expect(pts.length).toBeGreaterThan(100);
+    expect(pts.every(([x, y]) => x >= 0 && x <= 1 && y >= 0 && y <= 1)).toBe(true);
+    // Arms: the widest point (shoulders/arms) is well outside the waist band.
+    const bandX = (lo: number, hi: number) => pts.filter(([, y]) => y >= lo && y <= hi).map(([x]) => Math.abs(x - 0.5));
+    const shoulderReach = Math.max(...bandX(0.18, 0.26));
+    const waistReach = Math.max(...bandX(0.42, 0.48));
+    expect(shoulderReach).toBeGreaterThan(waistReach);
+    // Separated legs: the crotch notch pulls the outline back near the centerline
+    // low on the body (a column silhouette never returns to center below the hip).
+    const crotch = pts.filter(([, y]) => y >= 0.5 && y <= 0.6).map(([x]) => Math.abs(x - 0.5));
+    expect(Math.min(...crotch)).toBeLessThan(0.06);
   });
 
   it("renders a closed, in-bounds silhouette polygon normalized to 0..1", () => {
