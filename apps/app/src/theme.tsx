@@ -5,7 +5,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { applyBranding, applyMode, resolveMode, type Branding, type ThemeMode } from "@mossa/ui";
+import { applyBranding, applyMode, resolveMode, oklchStringToHex, type Branding, type ThemeMode } from "@mossa/ui";
 import { useSession } from "./session.js";
 
 interface ThemeCtx {
@@ -55,15 +55,33 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setMode(resolveMode(branding.defaultMode));
   }, [branding?.defaultMode]);
 
-  // Point the browser-tab favicon at the tenant's app icon.
+  // White-label the browser chrome from branding: favicon + apple-touch-icon
+  // (the square app icon, falling back to the wordmark) and the theme-color meta
+  // (the brand primary) that tints the mobile toolbar / installed title bar. The
+  // PWA manifest is themed server-side per host; this covers the live tab + any
+  // origin (incl. the platform host and /t/<slug>).
   useEffect(() => {
-    if (typeof document === "undefined" || !branding?.iconUrl) return;
-    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-    if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
-    const prev = link.href;
-    link.href = branding.iconUrl;
-    return () => { if (link) link.href = prev; };
-  }, [branding?.iconUrl]);
+    if (typeof document === "undefined") return;
+    const undo: (() => void)[] = [];
+    const icon = branding?.iconUrl || branding?.logoUrl;
+    if (icon) {
+      for (const rel of ["icon", "apple-touch-icon"]) {
+        let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
+        if (!link) { link = document.createElement("link"); link.rel = rel; document.head.appendChild(link); }
+        const prev = link.getAttribute("href");
+        const el = link;
+        el.href = icon;
+        undo.push(() => (prev ? el.setAttribute("href", prev) : el.remove()));
+      }
+    }
+    const rawPrimary = branding?.primary || branding?.tokens?.dark?.["--primary"];
+    const hex = rawPrimary ? (rawPrimary.startsWith("#") ? rawPrimary : oklchStringToHex(rawPrimary)) : null;
+    if (hex) {
+      const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+      if (meta) { const prev = meta.getAttribute("content"); meta.setAttribute("content", hex); undo.push(() => prev && meta.setAttribute("content", prev)); }
+    }
+    return () => undo.forEach((f) => f());
+  }, [branding]);
 
   // Apply mode.
   useEffect(() => {

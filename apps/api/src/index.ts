@@ -37,6 +37,7 @@ import { demoRoutes } from "./demo-routes.js";
 import { sessionRoutes, promoRoutes } from "./session-routes.js";
 import { domainRoutes, domainAdminRoutes } from "./domain-routes.js";
 import { otpSendGuard } from "./otp-guard.js";
+import { buildManifest } from "./manifest.js";
 import type { Env } from "./env.js";
 
 import { notify, notifyOwners } from "./notify.js";
@@ -88,6 +89,14 @@ app.route("/api", sessionRoutes);
 app.route("/api", promoRoutes);
 app.route("/api", domainRoutes);
 app.route("/api", domainAdminRoutes);
+
+// Per-tenant PWA manifest (white-label). Served by the worker (run_worker_first
+// lists this path) so the installed app wears the host tenant's name/icon/colors.
+app.get("/manifest.webmanifest", (c) =>
+  new Response(buildManifest(c.get("hostTenant")), {
+    headers: { "content-type": "application/manifest+json", "cache-control": "public, max-age=300" },
+  }),
+);
 
 app.notFound((c) =>
   c.req.path.startsWith("/api/") ? c.json({ error: "not found" }, 404) : c.text("not found", 404),
