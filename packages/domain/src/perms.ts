@@ -83,17 +83,37 @@ export function sanitizePermissions(input: unknown): Grant {
   return out;
 }
 
-/** Effective grant: stored custom grant if any, else the role preset. */
+/** Intersect a grant with a ceiling — keeps only (resource, action) pairs the
+ *  ceiling also allows. The mechanism behind bounded custom grants. */
+export function intersectGrant(grant: Grant, ceiling: Grant): Grant {
+  const out: Grant = {};
+  for (const [res, acts] of Object.entries(grant)) {
+    const cap = ceiling[res];
+    if (!cap) continue;
+    const keep = acts.filter((a) => cap.includes(a));
+    if (keep.length) out[res] = keep;
+  }
+  return out;
+}
+
+/**
+ * Effective grant. A custom per-member grant is **bounded by the role** — it may
+ * narrow within the role's preset but never exceed it (so a custom grant can't
+ * hand a trainer billing/settings powers their role doesn't carry). The owner is
+ * the one unbounded role: they always hold the full grant, custom or not.
+ */
 export function resolvePermissions(role: string | null, permsJson: string | null | undefined): Grant {
+  const preset = ROLE_PRESETS[role ?? "client"] ?? ROLE_PRESETS.client!;
+  if (role === "owner") return preset; // unbounded — full grant, nothing to exceed
   if (permsJson) {
     try {
-      const g = sanitizePermissions(JSON.parse(permsJson));
-      if (Object.keys(g).length) return g;
+      const custom = sanitizePermissions(JSON.parse(permsJson));
+      if (Object.keys(custom).length) return intersectGrant(custom, preset);
     } catch {
       /* fall through to role preset */
     }
   }
-  return ROLE_PRESETS[role ?? "client"] ?? ROLE_PRESETS.client!;
+  return preset;
 }
 
 /** Does a grant satisfy a required `{ resource: action[] }` permission set? */
