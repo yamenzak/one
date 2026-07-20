@@ -47,7 +47,7 @@ export function ClientManage({ clientId }: { clientId: string }) {
       api.get<{ packages: Pkg[] }>("/api/packages"),
       api.get<{ swaps: Swap[] }>(`/api/swaps?clientId=${clientId}`),
       api.get<{ labs: Lab[] }>(`/api/labs?clientId=${clientId}`),
-      api.get<{ supplements: Supp[] }>(`/api/supplements?clientId=${clientId}`),
+      api.get<{ supplements: Supp[] }>(`/api/supplements?clientId=${clientId}&includePaused=1`),
       api.get<{ checkIns: CheckIn[] }>(`/api/check-ins?clientId=${clientId}`),
       api.get<{ exercises: ExerciseInfo[] }>("/api/exercises"),
     ]);
