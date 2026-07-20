@@ -1,13 +1,17 @@
 /** Client Shop — marketplace packages, Stripe Connect buy, redeem codes. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Page, Stagger, IconBadge, ConfirmDialog, ArrowLeft, Ticket, Store, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
+import { Button, Card, Badge, Field, Page, Stagger, IconBadge, ConfirmDialog, ArrowLeft, LogOut, Ticket, Store, Sparkles, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
 import { api } from "../../api.js";
+import { useSession } from "../../session.js";
 
 interface Pkg { id: string; name: string; description: string | null; one_time_price_cents: number | null; monthly_price_cents?: number | null; budgets: { feature: string; days: number }[]; visibility: string }
 interface Sub { status: string; daysRemaining: number; autoRenew?: boolean }
 
-export function Shop({ clientId, onBack }: { clientId: string; onBack: () => void }) {
+/** The client Shop. In `locked` mode it IS the access gate: no way back into the
+ *  app until a plan/package covers them, plus a sign-out escape. */
+export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: () => void; locked?: boolean }) {
+  const { refresh, signOut } = useSession();
   const [packages, setPackages] = useState<Pkg[] | null>(null);
   const [sub, setSub] = useState<Sub | null>(null);
   const [code, setCode] = useState("");
@@ -24,7 +28,7 @@ export function Shop({ clientId, onBack }: { clientId: string; onBack: () => voi
 
   const redeem = async () => {
     setBusy(true); setMsg(null);
-    try { const r = await api.post<{ daysAdded: number; feature: string }>("/api/redeem", { clientId, code }); setMsg(`${r.daysAdded} days of ${r.feature} access added.`); setCode(""); await load(); }
+    try { const r = await api.post<{ daysAdded: number; feature: string }>("/api/redeem", { clientId, code }); setMsg(`${r.daysAdded} days of ${r.feature} access added.`); setCode(""); await load(); await refresh(); }
     catch (e) { setMsg(e instanceof Error && e.message.includes("not found") ? "That code isn't valid." : "Couldn't redeem that code."); }
     finally { setBusy(false); }
   };
@@ -41,10 +45,23 @@ export function Shop({ clientId, onBack }: { clientId: string; onBack: () => voi
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
-      <div className="flex items-center gap-3">
-        <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
-        <h1 className="text-xl font-bold tracking-tight">Plans &amp; access</h1>
-      </div>
+      {locked ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-xl font-bold tracking-tight">Plans &amp; access</h1>
+            <Button size="sm" variant="ghost" onClick={() => void signOut()}><LogOut /> Sign out</Button>
+          </div>
+          <Card className="flex items-start gap-3">
+            <IconBadge icon={Sparkles} tone="primary" size="sm" />
+            <div className="min-w-0 text-sm"><div className="font-medium">Choose a plan to get started</div><div className="text-muted-foreground">Your access is inactive. Pick a package or enter a code below — or ask your coach to set you up.</div></div>
+          </Card>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3">
+          <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
+          <h1 className="text-xl font-bold tracking-tight">Plans &amp; access</h1>
+        </div>
+      )}
 
       <Reveal loading={!packages} className="space-y-4" skeleton={
         <>

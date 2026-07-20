@@ -10,7 +10,7 @@ import {
   type PersonaRefRole,
 } from "./context-helpers.js";
 import type { PersonaRef, SessionContext } from "@mossa/protocol";
-import { resolveUnits, type UnitPrefs } from "@mossa/domain";
+import { resolveUnits, overallDaysRemaining, type UnitPrefs, type Budget } from "@mossa/domain";
 import { type AppEnv, isPlatformAdmin, requireTenant } from "./auth-context.js";
 import { clientForUser } from "./clients.js";
 import { resolveClientFlagsFor } from "./client-flags.js";
@@ -90,11 +90,29 @@ export const contextRoutes = new Hono<AppEnv>()
     }
 
     let branding = null;
+    let marketplaceJson: string | null = null;
     if (active) {
-      const row = await c.env.DB.prepare("SELECT branding_json FROM tenant_settings WHERE tenant_id = ?")
+      const row = await c.env.DB.prepare("SELECT branding_json, marketplace_json FROM tenant_settings WHERE tenant_id = ?")
         .bind(active.tenantId)
-        .first<{ branding_json: string | null }>();
+        .first<{ branding_json: string | null; marketplace_json: string | null }>();
       branding = parseJson<SessionContext["branding"]>(row?.branding_json ?? null, null);
+      marketplaceJson = row?.marketplace_json ?? null;
+    }
+
+    // Access-economy status for the client persona: does a live plan/package
+    // cover them, and does this tenant require one to use the app?
+    let clientAccess: SessionContext["clientAccess"] = null;
+    if (active?.clientId) {
+      const now = new Date().toISOString();
+      const required = Boolean(parseJson<{ requireActiveAccess?: boolean }>(marketplaceJson, {}).requireActiveAccess);
+      const subs = await c.env.DB
+        .prepare("SELECT budgets_json FROM client_subscriptions WHERE client_id = ? AND status IN ('active','paused')")
+        .bind(active.clientId)
+        .all<{ budgets_json: string | null }>();
+      const rows = subs.results ?? [];
+      let days = 0;
+      for (const s of rows) days = Math.max(days, overallDaysRemaining(parseJson<Budget[]>(s.budgets_json, []), now));
+      clientAccess = { active: days > 0, required, daysRemaining: rows.length ? days : null };
     }
 
     const prefRow = await c.env.DB.prepare("SELECT units_json, widgets_json FROM user_prefs WHERE user_id = ?")
@@ -112,6 +130,7 @@ export const contextRoutes = new Hono<AppEnv>()
       entitlements: entitlements ?? (await tenantEntitlements(c.env.DB, "___none___")),
       clientFlags,
       branding,
+      clientAccess,
       isPlatformAdmin: isPlatformAdmin(c),
       hostTenantId: c.get("hostTenant")?.tenantId ?? null,
     };

@@ -32,7 +32,7 @@ export const settingsRoutes = new Hono<AppEnv>()
     return c.json({
       branding: parseJson(row?.branding_json, { accent: null, logoUrl: null, welcome: null }),
       aiToggles: parseJson(row?.ai_toggles_json, {}),
-      marketplace: parseJson(row?.marketplace_json, { enabled: false, selfRegister: false }),
+      marketplace: parseJson(row?.marketplace_json, { enabled: false, selfRegister: false, requireActiveAccess: false }),
       integrations: maskIntegrations(resolveIntegrations(parseJson(row?.integrations_json ?? null, {}))),
       integrationProviders: PROVIDERS,
       email: maskEmailConfig(resolveEmailConfig(parseJson(row?.email_config_json ?? null, {}))),
@@ -78,7 +78,7 @@ export const settingsRoutes = new Hono<AppEnv>()
           })
           .optional(),
         aiToggles: z.record(z.string(), z.boolean()).optional(),
-        marketplace: z.object({ enabled: z.boolean().optional(), selfRegister: z.boolean().optional() }).optional(),
+        marketplace: z.object({ enabled: z.boolean().optional(), selfRegister: z.boolean().optional(), requireActiveAccess: z.boolean().optional() }).optional(),
         // Per-provider: { enabled?, <keyField>?: string }. Empty string clears a key.
         integrations: z.record(z.string(), z.record(z.string(), z.union([z.boolean(), z.string().max(200)]))).optional(),
         // Email provider: platform (metered) | brevo (own key) | off.

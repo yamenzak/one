@@ -612,15 +612,16 @@ function UnitsSection() {
   );
 }
 
+interface MarketplaceCfg { enabled?: boolean; selfRegister?: boolean; requireActiveAccess?: boolean }
 function MarketplaceSection() {
-  const [marketplace, setMarketplace] = useState<{ enabled?: boolean; selfRegister?: boolean }>({});
+  const [marketplace, setMarketplace] = useState<MarketplaceCfg>({});
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    void api.get<{ marketplace: { enabled?: boolean; selfRegister?: boolean } }>("/api/settings").then((r) => { setMarketplace(r.marketplace ?? {}); setLoaded(true); });
+    void api.get<{ marketplace: MarketplaceCfg }>("/api/settings").then((r) => { setMarketplace(r.marketplace ?? {}); setLoaded(true); });
   }, []);
 
-  const setMarket = async (patch: { enabled?: boolean; selfRegister?: boolean }) => { setMarketplace((m) => ({ ...m, ...patch })); await api.patch("/api/settings", { marketplace: patch }); };
+  const setMarket = async (patch: MarketplaceCfg) => { setMarketplace((m) => ({ ...m, ...patch })); await api.patch("/api/settings", { marketplace: patch }); };
 
   return (
     <section>
@@ -638,6 +639,10 @@ function MarketplaceSection() {
           <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Store /></div><div><div className="font-medium">Public storefront</div><div className="text-sm text-muted-foreground">A shareable page with your packages and blog.</div></div></div>
           <div className="flex items-center justify-between"><span className="text-sm">Enable storefront</span><Switch checked={!!marketplace.enabled} onCheckedChange={(v) => void setMarket({ enabled: v })} /></div>
           <div className="flex items-center justify-between"><span className="text-sm">Allow self sign-up</span><Switch checked={!!marketplace.selfRegister} onCheckedChange={(v) => void setMarket({ selfRegister: v })} /></div>
+          <div className="flex items-start justify-between gap-3 border-t border-border/50 pt-3">
+            <div className="min-w-0"><div className="text-sm">Require an active plan</div><div className="text-xs text-muted-foreground">Clients with no live package are locked to the Plans screen until they have one.</div></div>
+            <Switch checked={!!marketplace.requireActiveAccess} onCheckedChange={(v) => void setMarket({ requireActiveAccess: v })} />
+          </div>
         </Card>
         )}
       </Reveal>
