@@ -9,6 +9,27 @@ import { api } from "./api.js";
 export const passkeySupported = (): boolean =>
   typeof window !== "undefined" && !!window.PublicKeyCredential;
 
+/** Turn a passkey enroll/sign-in failure into a message that says WHY, so the
+ *  user knows whether they cancelled, need HTTPS, or already have one. */
+export function passkeyErrorMessage(e: unknown, action: "enroll" | "signin" = "enroll"): string {
+  const name = e instanceof DOMException ? e.name : "";
+  switch (name) {
+    case "NotAllowedError":
+      return "Cancelled, or the prompt timed out — try again when you're ready.";
+    case "InvalidStateError":
+      return "This device already has a passkey for your account — you're all set.";
+    case "SecurityError":
+      return "Passkeys need a secure (https) connection on a matching domain.";
+    case "NotSupportedError":
+      return "This device can't create a passkey — you'll keep using email codes.";
+    case "AbortError":
+      return "The request was interrupted — try again.";
+  }
+  return action === "enroll"
+    ? "Couldn't finish setting up the passkey — please try again."
+    : "Couldn't sign in with a passkey — try an email code.";
+}
+
 /**
  * Conditional-UI (autofill) support — lets the browser surface passkeys in the
  * email field's autofill dropdown (SPEC §4 "passkey autofill on the login

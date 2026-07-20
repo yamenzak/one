@@ -18,7 +18,7 @@ import { useSession } from "../session.js";
 import { PreferencesEditorCard } from "./PreferencesEditor.js";
 import { useTheme } from "../theme.js";
 import { api, uploadMedia } from "../api.js";
-import { enrollPasskey, listPasskeys, passkeySupported } from "../passkey.js";
+import { enrollPasskey, listPasskeys, passkeySupported, passkeyErrorMessage } from "../passkey.js";
 import { usePasskey } from "../PasskeyPrompt.js";
 import { AiConfigSection } from "./AiSettings.js";
 
@@ -285,7 +285,7 @@ function SecuritySection() {
   const addPasskey = async () => {
     setEnrolling(true); setMsg(null);
     try { await enrollPasskey(`${navigator.platform || "device"} passkey`); setPasskeys(await listPasskeys()); pk?.refresh(); setMsg("Passkey added — next time, sign in with a tap."); }
-    catch { setMsg("Passkey setup was cancelled or failed."); }
+    catch (e) { setMsg(passkeyErrorMessage(e)); }
     finally { setEnrolling(false); }
   };
   return (

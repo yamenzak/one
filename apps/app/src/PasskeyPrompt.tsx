@@ -12,7 +12,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { Button, Dialog, DialogContent, ShieldCheck, KeyRound, Sparkles, ArrowRight } from "@mossa/ui";
-import { passkeySupported, listPasskeys, enrollPasskey } from "./passkey.js";
+import { passkeySupported, listPasskeys, enrollPasskey, passkeyErrorMessage } from "./passkey.js";
 
 interface PasskeyState {
   /** This device/browser can do WebAuthn. */
@@ -55,8 +55,8 @@ export function PasskeyProvider({ children }: { children: ReactNode }) {
       await enrollPasskey(`${navigator.platform || "device"} passkey`);
       setHasPasskey(true);
       setOpen(false);
-    } catch {
-      setMsg("That didn't finish — you can set it up here anytime.");
+    } catch (e) {
+      setMsg(passkeyErrorMessage(e));
     } finally {
       setEnrolling(false);
     }
