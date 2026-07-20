@@ -10,7 +10,7 @@
  * by what a client bought (AI still meters against the tenant's own credits).
  */
 
-import { resolveClientFlags, parseFlagsJson, type Budget, type ClientFlags, type Entitlements } from "@mossa/domain";
+import { resolveClientFlags, parseFlagsJson, gateSpecOf, type Budget, type ClientFlags, type Entitlements, type FeatureKey } from "@mossa/domain";
 import type { Context } from "hono";
 import type { AppEnv } from "./auth-context.js";
 import { tenantEntitlements, hasFeature } from "./billing-store.js";
@@ -70,6 +70,32 @@ export async function requireFeature(
   if (!tenantId) return c.json({ error: "no tenant" }, 403);
   if (!(await hasFeature(c.env.DB, tenantId, feature))) {
     return c.json({ error: `${feature} not in your plan`, feature }, 403);
+  }
+  return null;
+}
+
+/**
+ * Gate a route on a whole FEATURE, deriving its enforcement from the spec — the
+ * tenant's platform entitlement AND (for a client caller) the client capability
+ * flag, in one call. This is the composed gate the registry exists to enable:
+ * instead of hand-pairing `requireFeature("aiSuite")` + `requireClientFlag(
+ * "aiMealTools")` at each site, the pairing lives in FEATURES and can't drift.
+ * Pass the clientId when the feature is a per-client capability. Returns null to
+ * proceed. (Staff callers skip the client-flag half — see requireClientFlag.)
+ */
+export async function gateFeature(
+  c: Context<AppEnv>,
+  feature: FeatureKey,
+  clientId?: string,
+): Promise<Response | null> {
+  const gate = gateSpecOf(feature);
+  if (gate.entitlement) {
+    const r = await requireFeature(c, gate.entitlement);
+    if (r) return r;
+  }
+  if (gate.clientFlag && clientId) {
+    const r = await requireClientFlag(c, clientId, gate.clientFlag);
+    if (r) return r;
   }
   return null;
 }
