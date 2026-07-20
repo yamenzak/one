@@ -20,6 +20,7 @@ import {
   epley1Rm,
   sessionTonnage,
   sessionLoad,
+  bodyComposition,
   type LoggedSetLike,
 } from "@mossa/domain";
 import { type AppEnv } from "./auth-context.js";
@@ -68,8 +69,22 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
   const pickSeries = <K extends keyof (typeof mRows)[number]>(key: K) =>
     mRows.filter((m) => m[key] != null).map((m) => ({ date: m.date_local, v: m[key] as number }));
   const weight = pickSeries("weight_kg"), bodyFat = pickSeries("body_fat_percent"), waist = pickSeries("waist_cm");
+  const chest = pickSeries("chest_cm"), hips = pickSeries("hips_cm");
   const latestOf = <K extends keyof (typeof mRows)[number]>(key: K): number | null => { for (let i = mRows.length - 1; i >= 0; i--) if (mRows[i]![key] != null) return mRows[i]![key] as number; return null; };
   const deltaOf = (s: { v: number }[]) => (s.length >= 2 ? seriesDelta(s.map((p) => p.v)) : null);
+
+  // Derived composition per day (weight + body-fat + height → lean/fat/FFMI).
+  const height = access.client.height_cm ?? null;
+  const comp = height
+    ? mRows.flatMap((m) => {
+        if (m.weight_kg == null || m.body_fat_percent == null) return [];
+        const bc = bodyComposition(m.weight_kg, m.body_fat_percent, height);
+        return bc ? [{ date: m.date_local, lean: bc.leanMassKg, fat: bc.fatMassKg, ffmi: bc.ffmi }] : [];
+      })
+    : [];
+  const leanMass = comp.map((r) => ({ date: r.date, v: r.lean }));
+  const fatMass = comp.map((r) => ({ date: r.date, v: r.fat }));
+  const ffmi = comp.map((r) => ({ date: r.date, v: r.ffmi }));
 
   // ── Nutrition per day (over every range day, with a logged flag) ──
   const fByDay = new Map(fRows.map((r) => [r.date_local, r]));
@@ -148,13 +163,14 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
     range: { start, end, days },
     today,
     body: {
-      weight, bodyFat, waist, posture,
+      weight, bodyFat, waist, chest, hips, posture, leanMass, fatMass, ffmi,
       latest: {
         weightKg: latestOf("weight_kg"), bodyFatPct: latestOf("body_fat_percent"), waistCm: latestOf("waist_cm"),
         neckCm: latestOf("neck_cm"), hipsCm: latestOf("hips_cm"), chestCm: latestOf("chest_cm"),
+        leanMassKg: leanMass.at(-1)?.v ?? null, fatMassKg: fatMass.at(-1)?.v ?? null, ffmi: ffmi.at(-1)?.v ?? null,
         somatotype: latestScan?.somatotype ?? null, postureSeverity: latestScan?.posture_severity ?? null, postureCva: latestScan?.posture_cva_deg ?? null,
       },
-      deltas: { weight: deltaOf(weight), bodyFat: deltaOf(bodyFat), waist: deltaOf(waist) },
+      deltas: { weight: deltaOf(weight), bodyFat: deltaOf(bodyFat), waist: deltaOf(waist), chest: deltaOf(chest), hips: deltaOf(hips) },
     },
     nutrition: { perDay: nutritionPerDay, targets, adherencePct: calorieAdherencePct(calByDay, targets.targetCalories), loggedDays: foodDays.size },
     training: { perDay: trainingPerDay, weekly, totalTonnage: Math.round(totalTonnage), totalSets, workoutDays: workoutDaySet.size, prs },

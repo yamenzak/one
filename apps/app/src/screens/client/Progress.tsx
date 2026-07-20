@@ -30,9 +30,9 @@ interface ProgressData {
   range: { start: string; end: string; days: string[] };
   today: string;
   body: {
-    weight: Pt[]; bodyFat: Pt[]; waist: Pt[]; posture: Pt[];
-    latest: { weightKg: number | null; bodyFatPct: number | null; waistCm: number | null; neckCm: number | null; hipsCm: number | null; chestCm: number | null; somatotype: string | null; postureSeverity: "good" | "mild" | "moderate" | "severe" | null; postureCva: number | null };
-    deltas: { weight: SeriesDelta | null; bodyFat: SeriesDelta | null; waist: SeriesDelta | null };
+    weight: Pt[]; bodyFat: Pt[]; waist: Pt[]; chest: Pt[]; hips: Pt[]; posture: Pt[]; leanMass: Pt[]; fatMass: Pt[]; ffmi: Pt[];
+    latest: { weightKg: number | null; bodyFatPct: number | null; waistCm: number | null; neckCm: number | null; hipsCm: number | null; chestCm: number | null; leanMassKg: number | null; fatMassKg: number | null; ffmi: number | null; somatotype: string | null; postureSeverity: "good" | "mild" | "moderate" | "severe" | null; postureCva: number | null };
+    deltas: { weight: SeriesDelta | null; bodyFat: SeriesDelta | null; waist: SeriesDelta | null; chest: SeriesDelta | null; hips: SeriesDelta | null };
   };
   nutrition: { perDay: { date: string; calories: number; protein: number; carbs: number; fat: number; logged: boolean }[]; targets: { targetCalories?: number; targetProteinG?: number }; adherencePct: number | null; loggedDays: number };
   training: { perDay: { date: string; tonnage: number; load: number; sets: number }[]; weekly: { week: string; tonnage: number; load: number; sets: number }[]; totalTonnage: number; totalSets: number; workoutDays: number; prs: { exerciseId: string; name: string; thumb: string | null; e1rm: number; weight: number; reps: number }[] };
@@ -168,6 +168,41 @@ function Body({ data, units, dateLabel, clientId }: { data: ProgressData; units:
           <AreaChart values={waistVals} tone="nutrition" trend label={dateLabel} format={(v) => v.toFixed(1)} />
         </ChartCard>
       </Stagger>
+      {body.chest.length >= 2 && (
+        <Stagger>
+          <ChartCard title="Chest" icon={METRICS.waist.icon} tone="cardio" value={body.latest.chestCm != null ? cmToLengthDisplay(body.latest.chestCm, units).toFixed(1) : "—"} unit={ll} delta={<DeltaBadge d={body.deltas.chest} convert={(v) => cmToLengthDisplay(v, units)} unit={ll} />}>
+            <AreaChart values={dense(body.chest, days).map((v) => (v == null ? null : cmToLengthDisplay(v, units)))} tone="cardio" trend label={dateLabel} format={(v) => v.toFixed(1)} />
+          </ChartCard>
+        </Stagger>
+      )}
+      {body.hips.length >= 2 && (
+        <Stagger>
+          <ChartCard title="Hips" icon={METRICS.waist.icon} tone="activity" value={body.latest.hipsCm != null ? cmToLengthDisplay(body.latest.hipsCm, units).toFixed(1) : "—"} unit={ll} delta={<DeltaBadge d={body.deltas.hips} convert={(v) => cmToLengthDisplay(v, units)} unit={ll} />}>
+            <AreaChart values={dense(body.hips, days).map((v) => (v == null ? null : cmToLengthDisplay(v, units)))} tone="activity" trend label={dateLabel} format={(v) => v.toFixed(1)} />
+          </ChartCard>
+        </Stagger>
+      )}
+      {body.leanMass.length >= 2 && (
+        <Stagger>
+          <ChartCard title="Lean mass" icon={METRICS.weight.icon} tone="activity" value={body.latest.leanMassKg != null ? kgToDisplay(body.latest.leanMassKg, units).toFixed(1) : "—"} unit={wl}>
+            <AreaChart values={dense(body.leanMass, days).map((v) => (v == null ? null : kgToDisplay(v, units)))} tone="activity" trend label={dateLabel} format={(v) => v.toFixed(1)} />
+          </ChartCard>
+        </Stagger>
+      )}
+      {body.fatMass.length >= 2 && (
+        <Stagger>
+          <ChartCard title="Fat mass" icon={METRICS.bodyFat.icon} tone="sleep" value={body.latest.fatMassKg != null ? kgToDisplay(body.latest.fatMassKg, units).toFixed(1) : "—"} unit={wl}>
+            <AreaChart values={dense(body.fatMass, days).map((v) => (v == null ? null : kgToDisplay(v, units)))} tone="sleep" trend label={dateLabel} format={(v) => v.toFixed(1)} />
+          </ChartCard>
+        </Stagger>
+      )}
+      {body.ffmi.length >= 2 && (
+        <Stagger>
+          <ChartCard title="FFMI" icon={METRICS.weight.icon} tone="cardio" value={body.latest.ffmi != null ? body.latest.ffmi.toFixed(1) : "—"} unit="kg/m²">
+            <AreaChart values={dense(body.ffmi, days)} tone="cardio" trend label={dateLabel} format={(v) => v.toFixed(1)} />
+          </ChartCard>
+        </Stagger>
+      )}
       {body.posture.length > 0 && (
         <Stagger>
           <ChartCard title="Posture" icon={HeartPulse} tone="activity"
