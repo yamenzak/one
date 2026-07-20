@@ -62,6 +62,11 @@ export async function enrollPasskey(name: string): Promise<void> {
   await api.post("/api/auth/passkey/verify-registration", { response, name });
 }
 
+/** Unregister a passkey (removes this device/credential from the account). */
+export async function removePasskey(id: string): Promise<void> {
+  await api.post("/api/auth/passkey/delete-passkey", { id });
+}
+
 export async function listPasskeys(): Promise<{ id: string; name: string | null; createdAt: string }[]> {
   const r = await api.get<{ passkeys?: { id: string; name: string | null; createdAt: string }[] } | { id: string; name: string | null; createdAt: string }[]>("/api/auth/passkey/list-user-passkeys").catch(() => []);
   return Array.isArray(r) ? r : r.passkeys ?? [];

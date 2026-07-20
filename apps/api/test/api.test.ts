@@ -1501,6 +1501,11 @@ describe("passkey — Better Auth endpoint methods (regression)", () => {
     const anon = await SELF.fetch(`${B}/api/auth/passkey/generate-authenticate-options`, { headers: { origin: B } });
     expect(anon.status).toBe(200);
     expect(((await anon.json()) as { challenge?: string }).challenge).toBeTruthy();
+
+    // Removing a device: delete-passkey is a mounted POST that needs a session
+    // (a missing route would 404; unauthenticated is rejected before the body).
+    const delNoAuth = await SELF.fetch(`${B}/api/auth/passkey/delete-passkey`, { method: "POST", headers: { "content-type": "application/json", origin: B }, body: JSON.stringify({ id: "nope" }) });
+    expect(delNoAuth.status).toBe(401);
   });
 });
 
