@@ -10,7 +10,7 @@ import { WorkoutBody, MUSCLE_GROUPS, EQUIPMENT_TYPES, normalizeMuscle, normalize
 import { resolveUnits } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
-import { requireClientFlag, requireFeature, resolveClientFlagsFor } from "./client-flags.js";
+import { requireFeature, gateFeature, resolveClientFlagsFor } from "./client-flags.js";
 import { tenantEntitlements, hasFeature, getConfig, setConfig } from "./billing-store.js";
 import { generate, generateImage, extractJson, listModels } from "./ai.js";
 import { buildClientContext, bodyCompLine } from "./ai-context.js";
@@ -124,14 +124,13 @@ export const aiRoutes = new Hono<AppEnv>()
   /** "2 eggs, toast and an apple" → structured entries (client confirms). */
   .post("/ai/parse-food", async (c) => {
     const who = requireTenant(c)!;
-    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z
       .object({ clientId: z.string(), text: z.string().min(2).max(500) })
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
-    { const fg = await requireClientFlag(c, access.client.id, "aiMealTools"); if (fg) return fg; }
+    { const g = await gateFeature(c, "aiMealTools", access.client.id); if (g) return g; }
 
     const result = await generate(c.env, {
       tenantId: who.tenantId,
@@ -285,12 +284,11 @@ export const aiRoutes = new Hono<AppEnv>()
    */
   .post("/ai/snap-meal", async (c) => {
     const who = requireTenant(c)!;
-    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({ clientId: z.string(), imageKey: z.string().max(300), hint: z.string().max(200).default("") }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
-    { const fg = await requireClientFlag(c, access.client.id, "aiMealTools"); if (fg) return fg; }
+    { const g = await gateFeature(c, "aiMealTools", access.client.id); if (g) return g; }
     // The image must be a same-tenant R2 object.
     if (!parsed.data.imageKey.startsWith(`t/${who.tenantId}/`)) return c.json({ error: "invalid image" }, 400);
     // Load the photo for the vision model (mock lane ignores it).
@@ -468,12 +466,11 @@ export const aiRoutes = new Hono<AppEnv>()
   /** Progress Narrative: aggregates → readable recap (client or trainer). */
   .post("/ai/narrative", async (c) => {
     const who = requireTenant(c)!;
-    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({ clientId: z.string(), stats: z.record(z.string(), z.unknown()) }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
-    { const fg = await requireClientFlag(c, access.client.id, "aiCoachInsights"); if (fg) return fg; }
+    { const g = await gateFeature(c, "aiCoachInsights", access.client.id); if (g) return g; }
     const compLine = await bodyCompLine(c.env.DB, access.client);
     const result = await generate(c.env, {
       tenantId: who.tenantId,
@@ -734,7 +731,6 @@ export const aiRoutes = new Hono<AppEnv>()
   /** Recommend a recipe from a meal option's foods (client-facing). */
   .post("/ai/recipe", async (c) => {
     const who = requireTenant(c)!;
-    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({
       clientId: z.string(),
       mealName: z.string().max(120).default(""),
@@ -743,7 +739,7 @@ export const aiRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
-    { const fg = await requireClientFlag(c, access.client.id, "aiMealTools"); if (fg) return fg; }
+    { const g = await gateFeature(c, "aiMealTools", access.client.id); if (g) return g; }
     const foodList = parsed.data.foods.map((f) => `- ${f.name}${f.quantity ? ` (${Math.round(f.quantity)}${f.unit ?? "g"})` : ""}`).join("\n");
     const result = await generate(c.env, {
       tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,

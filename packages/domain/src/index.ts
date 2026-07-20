@@ -13,3 +13,4 @@ export * from "./workout.js";
 export * from "./progress.js";
 export * from "./wellness.js";
 export * from "./notifications.js";
+export * from "./features.js";
