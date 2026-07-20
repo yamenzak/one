@@ -1,19 +1,42 @@
 /**
  * Passkey (WebAuthn) client (SPEC §4) — enroll + sign-in against Better Auth's
- * passkey plugin endpoints. Better Auth returns the PublicKeyCredential options;
- * we run the browser ceremony and post the result back.
+ * passkey plugin. The browser ceremony runs through @simplewebauthn/browser
+ * (the same lib Better Auth's own client uses), so the request/response JSON is
+ * exactly what the server's verifier expects — no hand-rolled base64url or
+ * partial response shapes (which silently failed verify-registration before).
+ *
+ * The option endpoints are GETs; the challenge is minted per request and bound
+ * to a signed cookie the verify POST sends back. verify-{registration,
+ * authentication} take `{ response }` (the credential minus its extension
+ * results), matching Better Auth's schema.
  */
 
+import { startRegistration, startAuthentication, browserSupportsWebAuthnAutofill, WebAuthnError } from "@simplewebauthn/browser";
 import { api } from "./api.js";
+
+type RegisterOptions = Parameters<typeof startRegistration>[0]["optionsJSON"];
+type AuthenticateOptions = Parameters<typeof startAuthentication>[0]["optionsJSON"];
 
 export const passkeySupported = (): boolean =>
   typeof window !== "undefined" && !!window.PublicKeyCredential;
 
-/** Turn a passkey enroll/sign-in failure into a message that says WHY, so the
- *  user knows whether they cancelled, need HTTPS, or already have one. */
+/** Conditional-UI (autofill) support — lets the browser surface passkeys in the
+ *  email field's autofill dropdown. */
+export async function conditionalPasskeyAvailable(): Promise<boolean> {
+  try {
+    return passkeySupported() && (await browserSupportsWebAuthnAutofill());
+  } catch {
+    return false;
+  }
+}
+
+/** Turn a passkey enroll/sign-in failure into a message that says WHY. */
 export function passkeyErrorMessage(e: unknown, action: "enroll" | "signin" = "enroll"): string {
-  const name = e instanceof DOMException ? e.name : "";
-  switch (name) {
+  if (e instanceof WebAuthnError && e.code === "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED") {
+    return "This device already has a passkey for your account — you're all set.";
+  }
+  const dom = e instanceof DOMException ? e : e instanceof WebAuthnError && e.cause instanceof DOMException ? e.cause : null;
+  switch (dom?.name) {
     case "NotAllowedError":
       return "Cancelled, or the prompt timed out — try again when you're ready.";
     case "InvalidStateError":
@@ -30,122 +53,30 @@ export function passkeyErrorMessage(e: unknown, action: "enroll" | "signin" = "e
     : "Couldn't sign in with a passkey — try an email code.";
 }
 
-/**
- * Conditional-UI (autofill) support — lets the browser surface passkeys in the
- * email field's autofill dropdown (SPEC §4 "passkey autofill on the login
- * screen"). Guarded because not every browser implements it.
- */
-export async function conditionalPasskeyAvailable(): Promise<boolean> {
-  try {
-    const PK = window.PublicKeyCredential as unknown as { isConditionalMediationAvailable?: () => Promise<boolean> };
-    return passkeySupported() && typeof PK.isConditionalMediationAvailable === "function" && (await PK.isConditionalMediationAvailable());
-  } catch {
-    return false;
-  }
-}
-
-function bufToB64url(buf: ArrayBuffer): string {
-  const bytes = new Uint8Array(buf);
-  let str = "";
-  for (const b of bytes) str += String.fromCharCode(b);
-  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-function b64urlToBuf(s: string): ArrayBuffer {
-  const pad = s.length % 4 ? "=".repeat(4 - (s.length % 4)) : "";
-  const base = (s + pad).replace(/-/g, "+").replace(/_/g, "/");
-  const bin = atob(base);
-  const buf = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-  return buf.buffer;
-}
-
 /** Enroll a new passkey for the signed-in user. */
 export async function enrollPasskey(name: string): Promise<void> {
-  // Better Auth serves the options as a GET (POST 404s) — the challenge is
-  // minted per request and bound to the session cookie.
-  const options = await api.get<PublicKeyCredentialCreationOptionsJSON>(
-    "/api/auth/passkey/generate-register-options",
-  );
-  const publicKey: PublicKeyCredentialCreationOptions = {
-    ...(options as unknown as PublicKeyCredentialCreationOptions),
-    challenge: b64urlToBuf(options.challenge),
-    user: {
-      ...options.user,
-      id: b64urlToBuf(options.user.id),
-    },
-    excludeCredentials: options.excludeCredentials?.map((c) => ({ ...c, id: b64urlToBuf(c.id) })) as PublicKeyCredentialDescriptor[] | undefined,
-  };
-  const cred = (await navigator.credentials.create({ publicKey })) as PublicKeyCredential | null;
-  if (!cred) throw new Error("passkey creation cancelled");
-  const resp = cred.response as AuthenticatorAttestationResponse;
-  await api.post("/api/auth/passkey/verify-registration", {
-    name,
-    response: {
-      id: cred.id,
-      rawId: bufToB64url(cred.rawId),
-      type: cred.type,
-      response: {
-        clientDataJSON: bufToB64url(resp.clientDataJSON),
-        attestationObject: bufToB64url(resp.attestationObject),
-      },
-    },
-  });
-}
-
-interface PublicKeyCredentialCreationOptionsJSON {
-  challenge: string;
-  user: { id: string; name: string; displayName: string };
-  excludeCredentials?: { id: string; type: string }[];
-  [k: string]: unknown;
+  const optionsJSON = await api.get<RegisterOptions>("/api/auth/passkey/generate-register-options");
+  const res = await startRegistration({ optionsJSON });
+  const { clientExtensionResults, ...response } = res;
+  void clientExtensionResults;
+  await api.post("/api/auth/passkey/verify-registration", { response, name });
 }
 
 export async function listPasskeys(): Promise<{ id: string; name: string | null; createdAt: string }[]> {
-  const r = await api.get<{ passkeys?: { id: string; name: string | null; createdAt: string }[] }>("/api/auth/passkey/list-user-passkeys").catch(() => ({ passkeys: [] }));
-  return r.passkeys ?? [];
-}
-
-interface RequestOptionsJSON {
-  challenge: string;
-  allowCredentials?: { id: string; type: string; transports?: string[] }[];
-  rpId?: string;
-  userVerification?: string;
-  timeout?: number;
+  const r = await api.get<{ passkeys?: { id: string; name: string | null; createdAt: string }[] } | { id: string; name: string | null; createdAt: string }[]>("/api/auth/passkey/list-user-passkeys").catch(() => []);
+  return Array.isArray(r) ? r : r.passkeys ?? [];
 }
 
 /**
- * Sign in with an existing passkey (WebAuthn get ceremony). With
- * `conditional`, runs as autofill UI — non-modal, resolves only when the user
- * picks a passkey from the field dropdown; pass an AbortSignal to cancel it.
+ * Sign in with an existing passkey (WebAuthn get ceremony). With `conditional`,
+ * runs as autofill UI — non-modal, resolving only when the user picks a passkey
+ * from the field dropdown. (@simplewebauthn self-manages aborting a pending
+ * conditional request when the next ceremony starts.)
  */
 export async function signInWithPasskey(opts?: { conditional?: boolean; signal?: AbortSignal }): Promise<void> {
-  // GET, like register-options (a POST 404s); this one also works pre-auth so
-  // the login screen's passkey button + autofill can call it.
-  const options = await api.get<RequestOptionsJSON>("/api/auth/passkey/generate-authenticate-options");
-  const publicKey: PublicKeyCredentialRequestOptions = {
-    challenge: b64urlToBuf(options.challenge),
-    rpId: options.rpId,
-    userVerification: (options.userVerification as UserVerificationRequirement) ?? "preferred",
-    timeout: options.timeout,
-    allowCredentials: options.allowCredentials?.map((c) => ({ id: b64urlToBuf(c.id), type: "public-key" as const, transports: c.transports as AuthenticatorTransport[] | undefined })),
-  };
-  const cred = (await navigator.credentials.get({
-    publicKey,
-    ...(opts?.conditional ? { mediation: "conditional" as CredentialMediationRequirement } : {}),
-    signal: opts?.signal,
-  })) as PublicKeyCredential | null;
-  if (!cred) throw new Error("passkey sign-in cancelled");
-  const resp = cred.response as AuthenticatorAssertionResponse;
-  await api.post("/api/auth/passkey/verify-authentication", {
-    response: {
-      id: cred.id,
-      rawId: bufToB64url(cred.rawId),
-      type: cred.type,
-      response: {
-        clientDataJSON: bufToB64url(resp.clientDataJSON),
-        authenticatorData: bufToB64url(resp.authenticatorData),
-        signature: bufToB64url(resp.signature),
-        userHandle: resp.userHandle ? bufToB64url(resp.userHandle) : undefined,
-      },
-    },
-  });
+  const optionsJSON = await api.get<AuthenticateOptions>("/api/auth/passkey/generate-authenticate-options");
+  const res = await startAuthentication({ optionsJSON, useBrowserAutofill: opts?.conditional });
+  const { clientExtensionResults, ...response } = res;
+  void clientExtensionResults;
+  await api.post("/api/auth/passkey/verify-authentication", { response });
 }
