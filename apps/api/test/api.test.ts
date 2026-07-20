@@ -1504,6 +1504,48 @@ describe("passkey — Better Auth endpoint methods (regression)", () => {
   });
 });
 
+describe("white-label — public brand assets + per-tenant PWA manifest", () => {
+  const B = "http://localhost:8787";
+  it("brand assets read without auth; other media stays private", async () => {
+    // Upload a brand asset through the API (as the owner), then read it back
+    // with NO session — the login/favicon/PWA path.
+    const form = new FormData();
+    form.set("file", new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }), "logo.png");
+    form.set("purpose", "brand");
+    const up = await SELF.fetch(`${B}/api/media/upload`, { method: "POST", headers: auth(ownerCookie), body: form });
+    expect(up.status).toBe(201);
+    const { key } = (await up.json()) as { key: string };
+    expect(key).toMatch(/\/brand\//);
+
+    const brand = await SELF.fetch(`${B}/api/media/${key}`); // NO cookie
+    expect(brand.status).toBe(200);
+    expect(brand.headers.get("cache-control")).toContain("public");
+    await brand.arrayBuffer(); // drain the R2 stream (isolated-storage hygiene)
+
+    // A non-brand media path with no session is still rejected at the guard.
+    const priv = await SELF.fetch(`${B}/api/media/${key.replace("/brand/", "/misc/")}`);
+    expect(priv.status).toBe(401);
+    await priv.text();
+  });
+
+  it("manifest is Mossa on the platform host and the tenant's on a custom domain", async () => {
+    const platform = (await (await SELF.fetch(`${B}/manifest.webmanifest`)).json()) as { name: string; icons: { src: string }[] };
+    expect(platform.name).toBe("Mossa");
+
+    // Point a custom domain at Studio One with a branded icon + primary.
+    const db = env.DB as D1Database;
+    const tenantId = ((await (await SELF.fetch(`${B}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } }).active.tenantId;
+    await SELF.fetch(`${B}/api/settings`, { method: "PATCH", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ branding: { iconUrl: `/api/media/t/${tenantId}/brand/icon.png`, tokens: { dark: { "--primary": "oklch(0.62 0.19 12)", "--background": "oklch(0.165 0.006 285)" } } } }) });
+    await db.prepare("INSERT INTO tenant_domains (hostname, tenant_id, status, created_at, updated_at) VALUES ('app.studio1.test', ?, 'active', ?, ?) ON CONFLICT(hostname) DO UPDATE SET status='active', tenant_id=excluded.tenant_id").bind(tenantId, new Date().toISOString(), new Date().toISOString()).run();
+
+    const m = (await (await SELF.fetch("http://app.studio1.test/manifest.webmanifest")).json()) as { name: string; theme_color: string; icons: { src: string; sizes: string }[] };
+    expect(m.name).toBe("Studio One");
+    expect(m.theme_color).toBe("#e04667"); // oklch(0.62 0.19 12) → hex
+    expect(m.icons[0]!.src).toContain("/brand/icon.png");
+    expect(m.icons.some((i) => i.sizes === "512x512")).toBe(true);
+  });
+});
+
 describe("foods — tenant isolation + copy-on-write", () => {
   const mkFood = (over: Record<string, unknown>) => ({
     name: "Test Bar", calories: 200, proteinG: 10, source: "usda", sourceId: "SHARED-123", ...over,

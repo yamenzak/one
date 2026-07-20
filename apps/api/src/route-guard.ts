@@ -23,6 +23,10 @@ function isPublic(method: string, path: string): boolean {
   if (path === "/api/me") return true;
   // Which tenant owns this domain — pre-auth, brands the login screen.
   if (isGet && path === "/api/host") return true;
+  // Brand assets (logo, app icon) are public by nature — they appear on the
+  // pre-auth login, the storefront, the favicon, and PWA-install icons (fetched
+  // without our session). Only the `brand/` prefix; all other media stays authed.
+  if (isGet && /^\/api\/media\/t\/[^/]+\/brand\//.test(path)) return true;
   // Health + Stripe webhooks (signature-verified in their handlers).
   if (path === "/health") return true;
   if (path === "/api/stripe/webhook" || path === "/api/connect/webhook") return true;

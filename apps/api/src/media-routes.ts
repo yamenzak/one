@@ -56,22 +56,27 @@ export const mediaRoutes = new Hono<AppEnv>()
   // additionally gated per client assignment (a client / non-assigned trainer
   // must not read another client's photos or lab files just by holding the key).
   .get("/media/:key{.+}", async (c) => {
-    const who = requireTenant(c);
-    if (!who) return c.json({ error: "unauthenticated" }, 401);
     const key = c.req.param("key");
-    // Tenant isolation: the key must belong to the caller's tenant.
-    if (!key.startsWith(`t/${who.tenantId}/`)) return c.json({ error: "forbidden" }, 403);
-    const scoped = key.match(/^t\/[^/]+\/c\/([^/]+)\//);
-    if (scoped) {
-      const access = await requireClientAccess(c, scoped[1]!);
-      if ("response" in access) return access.response;
+    // Brand assets (logo, app icon) are public — served without a session so the
+    // login screen, storefront, favicon, and PWA-install icons can load them.
+    const isBrand = /^t\/[^/]+\/brand\//.test(key);
+    if (!isBrand) {
+      const who = requireTenant(c);
+      if (!who) return c.json({ error: "unauthenticated" }, 401);
+      // Tenant isolation: the key must belong to the caller's tenant.
+      if (!key.startsWith(`t/${who.tenantId}/`)) return c.json({ error: "forbidden" }, 403);
+      const scoped = key.match(/^t\/[^/]+\/c\/([^/]+)\//);
+      if (scoped) {
+        const access = await requireClientAccess(c, scoped[1]!);
+        if ("response" in access) return access.response;
+      }
     }
     const obj = await c.env.MEDIA.get(key);
     if (!obj) return c.json({ error: "not found" }, 404);
     const ct = obj.httpMetadata?.contentType || "application/octet-stream";
     const headers = new Headers();
     headers.set("content-type", ct);
-    headers.set("cache-control", "private, max-age=3600");
+    headers.set("cache-control", isBrand ? "public, max-age=86400" : "private, max-age=3600");
     // Defence-in-depth: never sniff, sandbox on direct navigation, and force a
     // download for anything that isn't an inline-safe raster image so a crafted
     // file can't execute as a document in our origin.
