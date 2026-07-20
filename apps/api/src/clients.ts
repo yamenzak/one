@@ -407,7 +407,7 @@ export const clientRoutes = new Hono<AppEnv>()
       .run();
     // Tell the newly-assigned trainer they've got a new client.
     if (body.data.trainerUserId !== c.get("user")?.id) {
-      await notify(c.env, { tenantId: access.client.tenant_id, userId: body.data.trainerUserId, category: "roster", type: "client_assigned", title: "You've been assigned a client", message: access.client.display_name, link: `/clients/${access.client.id}` });
+      await notify(c.env, { tenantId: access.client.tenant_id, userId: body.data.trainerUserId, type: "client_assigned", title: "You've been assigned a client", message: access.client.display_name, link: `/clients/${access.client.id}` });
     }
     return c.json({ ok: true });
   })

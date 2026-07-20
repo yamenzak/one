@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   defaultChannels, resolveChannels, parseNotifPrefs, categoriesForRole, categoryAppliesTo, resolveAllChannels,
   parseNotifPolicy, emailAllowedByPolicy, resolveEmailPolicy, sanitizeEmailPolicy, isNotifCategory,
+  NOTIF_TYPES, notifCategoryOf,
 } from "../src/notifications.js";
 
 describe("notification preferences", () => {
@@ -56,6 +57,29 @@ describe("notification preferences", () => {
     expect(categoriesForRole("trainer").map((c) => c.key)).toContain("body-composition");
     expect(categoriesForRole("client").map((c) => c.key)).not.toContain("body-composition");
     expect(defaultChannels("trainer", "body-composition")).toEqual({ inbox: true, email: true });
+  });
+});
+
+describe("notification types (the atom)", () => {
+  it("every type binds to a real category", () => {
+    for (const [type, meta] of Object.entries(NOTIF_TYPES)) {
+      expect(isNotifCategory(meta.category), `${type} → ${meta.category}`).toBe(true);
+    }
+  });
+
+  it("notifCategoryOf derives the governing category from the type", () => {
+    expect(notifCategoryOf("check_in")).toBe("check-ins");
+    expect(notifCategoryOf("body_fat_logged")).toBe("body-composition");
+    expect(notifCategoryOf("billing_past_due")).toBe("billing");
+    expect(notifCategoryOf("payment_disputed")).toBe("sales");
+    expect(notifCategoryOf("sub_expiring")).toBe("commerce");
+  });
+
+  it("every type's category is reachable by its declared audience role", () => {
+    const roleFor = { client: "client", staff: "trainer", owner: "owner" } as const;
+    for (const [type, meta] of Object.entries(NOTIF_TYPES)) {
+      expect(categoryAppliesTo(meta.category, roleFor[meta.to]), `${type} (${meta.to}) can't receive ${meta.category}`).toBe(true);
+    }
   });
 });
 

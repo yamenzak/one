@@ -12,7 +12,7 @@ import { sessionMiddleware, type AppEnv } from "./auth-context.js";
 import { routeGuard } from "./route-guard.js";
 import { ensureSchema, parseJson } from "./db.js";
 import { seedBilling, listPlans, getSubscription } from "./billing-store.js";
-import { resolveEntitlements } from "@mossa/domain";
+import { resolveEntitlements, type NotifType } from "@mossa/domain";
 import { periodKey } from "./ids.js";
 import { contextRoutes } from "./context-routes.js";
 import { billingRoutes, adminRoutes } from "./billing-routes.js";
@@ -143,7 +143,6 @@ async function dailySweep(env: Env): Promise<void> {
     .catch(() => undefined);
   for (const s of toSuspend.results ?? []) {
     await notifyOwners(env, s.tenant_id, {
-      category: "billing",
       type: "billing_suspended",
       title: "Your studio is suspended",
       message: "Your Mossa subscription lapsed, so paid features are paused for you and your clients. Update your payment to restore everything.",
@@ -165,7 +164,6 @@ async function dailySweep(env: Env): Promise<void> {
     .catch(() => undefined);
   for (const s of toCancel.results ?? []) {
     await notifyOwners(env, s.tenant_id, {
-      category: "billing",
       type: "billing_canceled",
       title: "Subscription canceled",
       message: "Your studio dropped to the free plan after non-payment. Resubscribe any time to bring back paid features.",
@@ -194,10 +192,10 @@ async function reminderSweep(env: Env): Promise<void> {
     const budgets = parseJson<{ expiresAt: string }[]>(sub.budgets_json, []);
     if (!budgets.length) continue;
     const latest = Math.max(0, ...budgets.map((b) => Date.parse(b.expiresAt)));
-    const nudge = async (type: string, title: string, message: string, marker: string) => {
+    const nudge = async (type: NotifType, title: string, message: string, marker: string) => {
       const client = await env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(sub.client_id).first<{ user_id: string | null }>();
       if (client?.user_id) {
-        await notify(env, { tenantId: sub.tenant_id, userId: client.user_id, category: "commerce", type, title, message, link: "/shop", dedupeKey: `${marker}_${sub.id}` });
+        await notify(env, { tenantId: sub.tenant_id, userId: client.user_id, type, title, message, link: "/shop", dedupeKey: `${marker}_${sub.id}` });
       }
       await env.DB.prepare("UPDATE client_subscriptions SET notes = ? WHERE id = ?").bind(`${notes} ${marker}`.trim(), sub.id).run().catch(() => undefined);
     };

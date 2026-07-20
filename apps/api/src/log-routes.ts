@@ -587,7 +587,6 @@ export const logRoutes = new Hono<AppEnv>()
         await notify(c.env, {
           tenantId: access.client.tenant_id,
           userId: primary.trainer_user_id,
-          category: "body-composition",
           type: "body_fat_logged",
           title: `${access.client.display_name} logged a body-fat reading`,
           message: `${d.bodyFatPercent}% body fat${d.weightKg != null ? ` · ${d.weightKg} kg` : ""}`,
@@ -662,7 +661,7 @@ export const logRoutes = new Hono<AppEnv>()
       .bind(access.client.id)
       .first<{ trainer_user_id: string }>();
     if (primary && primary.trainer_user_id !== c.get("user")?.id) {
-      await notify(c.env, { tenantId: access.client.tenant_id, userId: primary.trainer_user_id, category: "check-ins", type: "check_in", title: `${access.client.display_name} checked in`, message: d.notes ?? "", link: `/clients/${access.client.id}/manage` });
+      await notify(c.env, { tenantId: access.client.tenant_id, userId: primary.trainer_user_id, type: "check_in", title: `${access.client.display_name} checked in`, message: d.notes ?? "", link: `/clients/${access.client.id}/manage` });
     }
     return c.json({ ok: true, id }, 201);
   })
@@ -706,7 +705,7 @@ export const logRoutes = new Hono<AppEnv>()
       .bind(parsed.data.feedback, user.id, nowIso(), c.req.param("id"), access.client.id)
       .run();
     if (access.client.user_id) {
-      await notify(c.env, { tenantId: access.client.tenant_id, userId: access.client.user_id, category: "check-ins", type: "feedback", title: "Coach feedback on your check-in", message: parsed.data.feedback.slice(0, 200), link: "/progress" });
+      await notify(c.env, { tenantId: access.client.tenant_id, userId: access.client.user_id, type: "feedback", title: "Coach feedback on your check-in", message: parsed.data.feedback.slice(0, 200), link: "/progress" });
     }
     return c.json({ ok: true });
   })

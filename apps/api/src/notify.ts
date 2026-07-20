@@ -7,7 +7,7 @@
  * transactional (invites, receipts).
  */
 
-import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, type NotifCategory, type NotifRole } from "@mossa/domain";
+import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, notifCategoryOf, type NotifType, type NotifRole } from "@mossa/domain";
 import type { Env } from "./env.js";
 import { notifyUser } from "./inbox-do.js";
 import { sendTenantEmail } from "./email-provider.js";
@@ -17,8 +17,9 @@ import { nowIso } from "./ids.js";
 export interface NotifyInput {
   tenantId: string;
   userId: string | null | undefined;
-  category: NotifCategory;
-  type: string;
+  /** The type is the SSOT key; its category (which governs preferences + the
+   *  owner email policy) derives from the `NOTIF_TYPES` atom — never passed. */
+  type: NotifType;
   title: string;
   message?: string | null;
   link?: string | null;
@@ -68,6 +69,7 @@ function notifEmailHtml(env: Env, brand: BrandKit, input: NotifyInput): string {
 export async function notify(env: Env, input: NotifyInput): Promise<void> {
   if (!input.userId) return;
   const userId = input.userId;
+  const category = notifCategoryOf(input.type);
   // Best-effort in full: notification delivery must NEVER reject its caller — a
   // transient error in the preference lookup would otherwise 500 an operation
   // (plan publish, goal set, …) that already committed. Swallow everything.
@@ -81,10 +83,10 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
       env.DB.prepare("SELECT notif_json FROM user_prefs WHERE user_id = ?").bind(userId).first<{ notif_json: string | null }>(),
       env.DB.prepare("SELECT notif_policy_json FROM tenant_settings WHERE tenant_id = ?").bind(input.tenantId).first<{ notif_policy_json: string | null }>(),
     ]);
-    channels = resolveChannels(role, parseNotifPrefs(prefRow?.notif_json ?? null), input.category);
+    channels = resolveChannels(role, parseNotifPrefs(prefRow?.notif_json ?? null), category);
     // The owner can globally disable email for a category studio-wide; the
     // member's inbox choice is never overridden, only their email channel.
-    if (channels.email && !emailAllowedByPolicy(parseNotifPolicy(polRow?.notif_policy_json ?? null), input.category)) {
+    if (channels.email && !emailAllowedByPolicy(parseNotifPolicy(polRow?.notif_policy_json ?? null), category)) {
       channels.email = false;
     }
   }
@@ -93,7 +95,7 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
     const id = input.dedupeKey ? `ntf_${input.dedupeKey}_${userId}` : `ntf_${crypto.randomUUID()}`;
     await env.DB.prepare(
       "INSERT OR IGNORE INTO notifications (id, tenant_id, recipient_user_id, category, type, title, message, link, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    ).bind(id, input.tenantId, userId, input.category, input.type, input.title, input.message ?? null, input.link ?? null, nowIso()).run().catch(() => undefined);
+    ).bind(id, input.tenantId, userId, category, input.type, input.title, input.message ?? null, input.link ?? null, nowIso()).run().catch(() => undefined);
     await notifyUser(env, userId);
   }
 
