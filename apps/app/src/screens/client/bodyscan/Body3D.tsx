@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useMemo, useRef } from "react";
-import type { BodySlice } from "@mossa/domain";
+import type { BodySlice, BodyProfile } from "@mossa/domain";
 
 type Pt = [number, number];
 interface Vert { x: number; y: number; z: number }
@@ -21,6 +21,53 @@ interface Face { i: number[]; }
 const LEVELS = 34; // vertical slices
 const ANG = 24; // points around each slice
 const DEPTH_RATIO = 0.6; // deepest slice depth as a fraction of widest width
+const RING = 20; // points around each limb/torso ring in the humanoid mesh
+
+/** A cross-section along a body part: centerline (cx,cz) + ellipse radii at height t. */
+interface Section { t: number; cx: number; cz: number; rx: number; rz: number }
+
+/**
+ * A HUMAN mesh — head, neck, torso, two arms, two legs — built as separate
+ * tubes of stacked ellipse rings from the measurement profile, so the 3-D reads
+ * as a body (not an armless column). Widths mirror the 2-D figure. All parts
+ * merge into one verts/faces set for the painter renderer below.
+ */
+function humanMesh(profile: BodyProfile): { verts: Vert[]; faces: Face[] } {
+  const H = profile.heightCm, S0 = profile.slices;
+  const interp = (t: number, pick: (s: BodySlice) => number): number => {
+    if (t <= S0[0]!.t) return pick(S0[0]!);
+    for (let k = 0; k < S0.length - 1; k++) if (t <= S0[k + 1]!.t) { const a = S0[k]!, b = S0[k + 1]!; return pick(a) + (pick(b) - pick(a)) * ((t - a.t) / ((b.t - a.t) || 1)); }
+    return pick(S0[S0.length - 1]!);
+  };
+  const hw = (t: number) => interp(t, (s) => s.halfWidthCm), hd = (t: number) => interp(t, (s) => s.halfDepthCm);
+  const yOf = (t: number) => (0.5 - t) * H;
+  const S = Math.max(profile.shoulderWidthCm / 2, hw(0.29) * 1.12);
+  const chestW = hw(0.30), hipW = hw(0.47);
+  const neckR = Math.max(hw(0.16), 0.03 * H);
+  const headRx = Math.max(hw(0.05), 0.05 * H), headRz = Math.max(hd(0.05), 0.05 * H) * 0.98;
+  const armCx = S * 0.82, upR = Math.max(S * 0.17, chestW * 0.17), foR = upR * 0.82, handR = foR * 0.72;
+  const legCx = hipW * 0.52, thR = Math.max(hw(0.60) * 0.46, hipW * 0.42), knR = thR * 0.66, caR = thR * 0.82, anR = thR * 0.5;
+
+  const verts: Vert[] = [], faces: Face[] = [];
+  const addPart = (secs: Section[]) => {
+    const base = verts.length;
+    for (const s of secs) for (let j = 0; j < RING; j++) { const a = (j / RING) * Math.PI * 2; verts.push({ x: s.cx + s.rx * Math.cos(a), y: yOf(s.t), z: s.cz + s.rz * Math.sin(a) }); }
+    for (let i = 0; i < secs.length - 1; i++) for (let j = 0; j < RING; j++) { const j2 = (j + 1) % RING; faces.push({ i: [base + i * RING + j, base + i * RING + j2, base + (i + 1) * RING + j2, base + (i + 1) * RING + j] }); }
+  };
+
+  const head: Section[] = [];
+  for (let i = 0; i <= 8; i++) { const u = i / 8, t = 0.02 + (0.135 - 0.02) * u, rf = Math.sqrt(Math.max(0.16, 1 - (2 * u - 1) ** 2)); head.push({ t, cx: 0, cz: 0, rx: headRx * rf, rz: headRz * rf }); }
+  addPart(head);
+  addPart([{ t: 0.11, cx: 0, cz: 0, rx: neckR * 0.95, rz: neckR * 0.9 }, { t: 0.16, cx: 0, cz: 0, rx: neckR, rz: neckR * 0.95 }, { t: 0.215, cx: 0, cz: 0, rx: neckR * 1.4, rz: neckR * 1.2 }]);
+  const torso: Section[] = [];
+  for (let i = 0; i <= 14; i++) { const u = i / 14, t = 0.17 + (0.505 - 0.17) * u; torso.push({ t, cx: 0, cz: 0, rx: hw(t) * 0.98, rz: hd(t) }); }
+  addPart(torso);
+  const armRad = (u: number) => (u < 0.5 ? upR + (foR - upR) * (u / 0.5) : foR + (handR - foR) * ((u - 0.5) / 0.5));
+  for (const sgn of [1, -1]) { const arm: Section[] = []; for (let i = 0; i <= 9; i++) { const u = i / 9, t = 0.205 + (0.57 - 0.205) * u, r = armRad(u); arm.push({ t, cx: sgn * armCx, cz: 0, rx: r, rz: r }); } addPart(arm); }
+  const legRad = (u: number) => (u < 0.45 ? thR + (knR - thR) * (u / 0.45) : u < 0.72 ? knR + (caR - knR) * ((u - 0.45) / 0.27) : caR + (anR - caR) * ((u - 0.72) / 0.28));
+  for (const sgn of [1, -1]) { const leg: Section[] = []; for (let i = 0; i <= 11; i++) { const u = i / 11, t = 0.50 + (0.99 - 0.50) * u, r = legRad(u), foot = u > 0.92; leg.push({ t, cx: sgn * legCx, cz: foot ? (u - 0.92) * 0.06 * H : 0, rx: r, rz: foot ? r * 1.7 : r }); } addPart(leg); }
+  return { verts, faces };
+}
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 
 /**
@@ -112,11 +159,13 @@ function buildMesh(front: Pt[], side: Pt[] | null): { verts: Vert[]; faces: Face
   return { verts, faces };
 }
 
-export function Body3D({ front, side, slices, heightCm, width = 220, height = 320, className }: {
+export function Body3D({ profile, front, side, slices, heightCm, width = 220, height = 320, className }: {
+  /** Preferred path — a full HUMAN figure (head, arms, legs) from the profile. */
+  profile?: BodyProfile | null;
   /** Legacy path — reconstruct from the two stored outlines. */
   front?: Pt[] | null;
   side?: Pt[] | null;
-  /** Preferred path — the measurement-driven profile (true cm proportions). */
+  /** Fallback — a volumetric body column from the profile slices. */
   slices?: BodySlice[] | null;
   heightCm?: number | null;
   width?: number;
@@ -126,8 +175,13 @@ export function Body3D({ front, side, slices, heightCm, width = 220, height = 32
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const colorRef = useRef<HTMLDivElement>(null);
   const mesh = useMemo(
-    () => (slices && slices.length > 1 && heightCm ? meshFromSlices(slices, heightCm) : buildMesh(front ?? [], side ?? null)),
-    [slices, heightCm, front, side],
+    () =>
+      profile
+        ? humanMesh(profile)
+        : slices && slices.length > 1 && heightCm
+          ? meshFromSlices(slices, heightCm)
+          : buildMesh(front ?? [], side ?? null),
+    [profile, slices, heightCm, front, side],
   );
 
   useEffect(() => {
