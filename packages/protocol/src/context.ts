@@ -76,6 +76,13 @@ export interface SessionContext {
   clientFlags: ClientFlags | null;
   /** Active tenant's branding for theming (null before a tenant is chosen). */
   branding: TenantBranding | null;
+  /**
+   * Access-economy status for the active CLIENT persona (null for staff). When
+   * the tenant runs gated access (`required`) and the client has no live
+   * plan/package (`!active`), the app locks to the plans screen. `daysRemaining`
+   * is the covering budget's remaining days (null when none).
+   */
+  clientAccess: { active: boolean; required: boolean; daysRemaining: number | null } | null;
   isPlatformAdmin: boolean;
   /**
    * Set when the app is served on a tenant's custom domain (SPEC §14.1): the

@@ -1551,6 +1551,49 @@ describe("white-label — public brand assets + per-tenant PWA manifest", () => 
   });
 });
 
+describe("access gate — clientAccess in context", () => {
+  const B = "http://localhost:8787";
+  const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
+  // OTP sign-in only (no org creation) — the invited-client path.
+  const clientSignIn = async (email: string): Promise<string> => {
+    const db = env.DB as D1Database;
+    await SELF.fetch(`${B}/api/auth/email-otp/send-verification-otp`, { method: "POST", headers: { "content-type": "application/json", origin: B }, body: JSON.stringify({ email, type: "sign-in" }) });
+    const row = await db.prepare("SELECT value FROM verification ORDER BY createdAt DESC LIMIT 1").first<{ value: string }>();
+    const otp = ((row?.value ?? "").match(/\d{6}/) ?? [])[0];
+    const v = await SELF.fetch(`${B}/api/auth/sign-in/email-otp`, { method: "POST", headers: { "content-type": "application/json", origin: B }, body: JSON.stringify({ email, otp }) });
+    return grabCookies(v);
+  };
+
+  it("required + no package → blocked; granting a package unblocks", async () => {
+    const tenantId = ((await (await SELF.fetch(`${B}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } }).active.tenantId;
+    // An invited client + a package with a 30-day workout budget.
+    const client = (await (await SELF.fetch(`${B}/api/clients`, { method: "POST", headers: H(), body: JSON.stringify({ email: "gateclient@test.dev", displayName: "Gate Client" }) })).json() as { client: { id: string } }).client;
+    const pkg = (await (await SELF.fetch(`${B}/api/packages`, { method: "POST", headers: H(), body: JSON.stringify({ name: "Starter", budgets: [{ feature: "workout", days: 30 }] }) })).json()) as { id: string };
+    // Turn on gated access for the studio.
+    await SELF.fetch(`${B}/api/settings`, { method: "PATCH", headers: H(), body: JSON.stringify({ marketplace: { requireActiveAccess: true } }) });
+
+    // Client signs in, links to the tenant, and selects that persona.
+    const cookie = await clientSignIn("gateclient@test.dev");
+    await SELF.fetch(`${B}/api/context`, { headers: { origin: B, Cookie: cookie } }); // mints membership
+    await SELF.fetch(`${B}/api/context/switch`, { method: "POST", headers: { "content-type": "application/json", origin: B, Cookie: cookie }, body: JSON.stringify({ tenantId }) });
+
+    const before = (await (await SELF.fetch(`${B}/api/context`, { headers: { origin: B, Cookie: cookie } })).json()) as { active: { role: string; clientId: string | null }; clientAccess: { active: boolean; required: boolean; daysRemaining: number | null } | null };
+    expect(before.active.role).toBe("client");
+    expect(before.clientAccess).toEqual({ active: false, required: true, daysRemaining: null });
+
+    // Owner grants the package → the client is now covered.
+    const grant = await SELF.fetch(`${B}/api/subscriptions/grant`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: client.id, packageId: pkg.id }) });
+    expect(grant.status).toBeLessThan(300);
+
+    const after = (await (await SELF.fetch(`${B}/api/context`, { headers: { origin: B, Cookie: cookie } })).json()) as { clientAccess: { active: boolean; required: boolean; daysRemaining: number | null } };
+    expect(after.clientAccess.active).toBe(true);
+    expect(after.clientAccess.required).toBe(true);
+    expect(after.clientAccess.daysRemaining ?? 0).toBeGreaterThan(0);
+
+    await SELF.fetch(`${B}/api/settings`, { method: "PATCH", headers: H(), body: JSON.stringify({ marketplace: { requireActiveAccess: false } }) });
+  });
+});
+
 describe("foods — tenant isolation + copy-on-write", () => {
   const mkFood = (over: Record<string, unknown>) => ({
     name: "Test Bar", calories: 200, proteinG: 10, source: "usda", sourceId: "SHARED-123", ...over,

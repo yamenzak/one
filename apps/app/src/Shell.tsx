@@ -71,6 +71,12 @@ export function Shell() {
   if (gateClientId && needsOnboarding === null) return <div className="grid min-h-dvh place-items-center"><Spinner /></div>;
   if (gateClientId && needsOnboarding) return <Onboarding clientId={gateClientId} displayName={ctx!.user.name || "there"} onDone={() => setNeedsOnboarding(false)} />;
 
+  // Access gate: on a tenant that requires a live plan/package, a client with no
+  // active access is locked to the Plans screen (only clients — never staff).
+  if (active.role === "client" && active.clientId && ctx!.clientAccess?.required && !ctx!.clientAccess.active) {
+    return <Shop clientId={active.clientId} locked />;
+  }
+
   return (
     <TourProvider>
     <Routes>
