@@ -19,6 +19,7 @@ import { PreferencesEditorCard } from "./PreferencesEditor.js";
 import { useTheme } from "../theme.js";
 import { api, uploadMedia } from "../api.js";
 import { enrollPasskey, listPasskeys, passkeySupported } from "../passkey.js";
+import { usePasskey } from "../PasskeyPrompt.js";
 import { AiConfigSection } from "./AiSettings.js";
 
 /** Studio-level settings the owner controls carry this badge, so the owner can
@@ -279,10 +280,11 @@ function SecuritySection() {
   const [passkeys, setPasskeys] = useState<{ id: string; name: string | null }[]>([]);
   const [enrolling, setEnrolling] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const pk = usePasskey();
   useEffect(() => { if (passkeySupported()) void listPasskeys().then(setPasskeys); }, []);
   const addPasskey = async () => {
     setEnrolling(true); setMsg(null);
-    try { await enrollPasskey(`${navigator.platform || "device"} passkey`); setPasskeys(await listPasskeys()); setMsg("Passkey added — next time, sign in with a tap."); }
+    try { await enrollPasskey(`${navigator.platform || "device"} passkey`); setPasskeys(await listPasskeys()); pk?.refresh(); setMsg("Passkey added — next time, sign in with a tap."); }
     catch { setMsg("Passkey setup was cancelled or failed."); }
     finally { setEnrolling(false); }
   };
