@@ -353,18 +353,27 @@ export function humanoidSilhouette(profile: BodyProfile, view: "front" | "side",
     const S = Math.max(profile.shoulderWidthCm / 2 / H, f(0.29) * 1.15); // shoulder half
     const headW = Math.max(f(0.05), 0.05), neckW = Math.max(f(0.16), 0.03);
     const chestW = f(0.30), waistW = f(0.37), hipW = f(0.47);
-    const thigh = f(0.60), knee = f(0.72), calf = f(0.81), ankle = Math.max(f(0.955), 0.028);
-    const gap = 0.02; // half-gap between the legs
+    // Limbs get anatomical widths on their OWN centerlines — deriving leg width
+    // straight from the body half-profile (which spans BOTH legs) made each leg
+    // half as thick as it should be ("chicken legs").
+    const armCx = S * 0.86; // arm centerline
+    const upH = Math.max(S * 0.17, chestW * 0.17); // upper-arm half-width
+    const foH = upH * 0.8; // forearm half-width
+    const legCx = hipW * 0.5; // each leg's centerline (kept vertical)
+    const thH = Math.max(f(0.60) * 0.46, hipW * 0.42); // thigh half-width
+    const knH = thH * 0.66, caH = thH * 0.82, anH = thH * 0.46, ftH = thH * 0.66; // knee/calf(bulge)/ankle/foot
+    const gap = 0.018; // half-gap at the crotch
     right = [
-      [0, 0.02], [headW * 0.62, 0.028], [headW, 0.06], [headW * 0.82, 0.105], // rounded head
-      [neckW, 0.135], [neckW, 0.162], // neck
-      [S * 0.7, 0.176], [S, 0.198], // trapezius → deltoid
-      [S * 1.0, 0.245], [S * 0.95, 0.335], [S * 0.9, 0.425], [S * 0.87, 0.495], [S * 0.86, 0.535], // outer arm → wrist
-      [S * 0.85, 0.565], [S * 0.75, 0.578], // hand
-      [S * 0.64, 0.552], [S * 0.66, 0.46], [S * 0.7, 0.37], [chestW * 1.04, 0.278], // inner arm → armpit
+      [0, 0.02], [headW * 0.62, 0.03], [headW, 0.062], [headW * 0.82, 0.108], // rounded head
+      [neckW, 0.135], [neckW, 0.163], // neck
+      [S * 0.72, 0.176], [S, 0.20], // trapezius → deltoid
+      [armCx + upH, 0.245], [armCx + upH, 0.34], [armCx + foH, 0.44], [armCx + foH, 0.512], // outer arm
+      [armCx + foH * 0.85, 0.552], [armCx, 0.575], // hand
+      [armCx - foH, 0.55], [armCx - foH, 0.44], [armCx - upH, 0.34], [armCx - upH, 0.268], // inner arm → armpit
       [chestW, 0.30], [waistW, 0.375], [hipW, 0.46], // torso
-      [hipW * 0.99, 0.505], [thigh, 0.57], [knee, 0.715], [calf, 0.805], [ankle, 0.945], [ankle * 1.45, 0.99], [ankle * 1.1, 1.0], // right leg outer + foot
-      [gap * 2.9, 0.997], [calf * 0.5, 0.83], [knee * 0.55, 0.715], [thigh * 0.45, 0.585], [gap, 0.52], // inner leg → crotch
+      [legCx + thH, 0.55], [legCx + knH, 0.715], [legCx + caH, 0.80], [legCx + anH, 0.945], // right leg outer (thigh→calf→ankle)
+      [legCx + ftH, 0.986], [legCx + ftH * 0.2, 1.0], // foot
+      [legCx - anH, 0.99], [legCx - caH, 0.82], [legCx - knH, 0.715], [legCx - thH, 0.55], [gap, 0.52], // inner leg → crotch
     ];
   } else {
     // Side profile: front edge (belly/chest) down, then back edge (spine/seat) up.
@@ -376,9 +385,10 @@ export function humanoidSilhouette(profile: BodyProfile, view: "front" | "side",
     right = [
       [0, 0.006], [headD * 0.95, 0.03], [headD, 0.06], [headD * 0.7, 0.10], // front of head/face
       [neckD * 0.8, 0.135], [neckD * 1.1, 0.165], // throat
-      [chestD, 0.29], [waistD * 1.08, 0.37], [hipD * 0.9, 0.46], // chest → belly → front hip
-      [thigh, 0.585], [knee, 0.715], [calf * 0.9, 0.805], [ankle, 0.95], [ankle * 2.6, 0.995], [ankle * 2.4, 1.0], // front thigh → shin → toe
-      [-ankle * 1.0, 0.995], [-calf, 0.83], [-knee, 0.715], [-thigh * 1.05, 0.6], // heel → calf back → thigh back
+      [chestD, 0.29], [waistD * 1.08, 0.37], [hipD * 0.92, 0.46], // chest → belly → front hip
+      [thigh, 0.585], [knee, 0.715], [calf * 0.95, 0.805], [ankle * 1.05, 0.95], // front thigh → shin
+      [ankle * 1.9, 0.985], [ankle * 1.7, 1.0], [-ankle * 1.3, 1.0], [-ankle * 1.15, 0.985], // foot: toe → sole → heel
+      [-calf, 0.83], [-knee, 0.715], [-thigh * 1.05, 0.6], // calf back → thigh back
       [-hipD * 1.15, 0.475], [-waistD, 0.37], [-chestD * 1.02, 0.29], // seat/buttock → lower back → upper back
       [-neckD, 0.17], [-neckD * 0.9, 0.14], [-headD * 1.05, 0.075], [-headD * 0.7, 0.028], // back of neck/head
     ];
