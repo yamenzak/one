@@ -16,6 +16,7 @@ import { SubmitBodyScan, TTS_VOICE_IDS } from "@mossa/protocol";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { hasFeature } from "./billing-store.js";
+import { gateFeature } from "./client-flags.js";
 import { generateSpeech, DEFAULT_TTS_VOICE } from "./ai.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
@@ -77,7 +78,11 @@ export const bodyScanRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body", issues: parsed.error.issues }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
-    if (!(await hasFeature(c.env.DB, who.tenantId, "bfCamera"))) return c.json({ error: "body scan not in your plan" }, 403);
+    // Gate the whole feature from its record: the tenant's bfCamera entitlement
+    // AND (for a client submitting their own scan) the canUseBodyScan package
+    // flag. The flag was previously unenforced here — a client whose package
+    // excluded body scan could still submit; gateFeature closes that.
+    { const g = await gateFeature(c, "bodyScan", access.client.id); if (g) return g; }
 
     const cl = access.client;
     const gender: Gender | null = cl.gender === "male" || cl.gender === "female" ? cl.gender : null;
