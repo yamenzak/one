@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { currentStreak, fmtVolume, fmtEnergy, kcalToDisplay, kgToDisplay, weightLabel, energyLabel, type UnitPrefs } from "@mossa/domain";
-import { Chip, Button, IconBadge, ProgressRing, METRICS, Timer, FlaskConical, Pill, HeartPulse } from "@mossa/ui";
+import { Chip, Button, IconBadge, ProgressRing, METRICS, FASTING_ZONES, Timer, FlaskConical, Pill, HeartPulse } from "@mossa/ui";
 import { api } from "../../api.js";
 import { RingCard, MiniCard, type WidgetDef, type WidgetSize } from "../widget-kit.js";
 import type { TodayBundle } from "./Today.js";
@@ -137,12 +137,7 @@ function WellnessWidget({ clientId, date, size }: { clientId: string; date: stri
 }
 
 // ── Live fasting tracker ─────────────────────────────────────────────────────
-const ZONES = [
-  { label: "Fed", max: 4, tone: "nutrition" as const },
-  { label: "Catabolic", max: 16, tone: "cardio" as const },
-  { label: "Fat burning", max: 24, tone: "activity" as const },
-  { label: "Ketosis", max: 72, tone: "sleep" as const },
-];
+const ZONES = FASTING_ZONES; // SSOT — @mossa/ui
 interface Fast { activeFast: { started_at: string; target_hours: number } | null }
 
 function FastingWidget({ clientId, size }: { clientId: string; size: WidgetSize }) {

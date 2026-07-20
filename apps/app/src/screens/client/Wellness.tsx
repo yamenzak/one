@@ -12,7 +12,7 @@ import { fmtVolume, volumeLabel, volumeDisplayToMl, POSTURE_GUIDANCE } from "@mo
 import {
   Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, StatCard, WeekDots, Sparkline, MiniBars, EmptyState, cn, toneVar,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList,
-  ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Bed, Flame, Plus, ChevronRight, Smile, Upload, HeartPulse, AlertTriangle, type Tone,
+  ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Bed, Flame, Plus, ChevronRight, Smile, Upload, HeartPulse, AlertTriangle, POSTURE_SEVERITY_TONE, FASTING_ZONES, type FastingZone, type Tone,
 } from "@mossa/ui";
 
 interface PostureScan {
@@ -24,7 +24,7 @@ interface PostureScan {
   posture: { cvaDeg: number | null; trunkTiltDeg: number | null; severity: "good" | "mild" | "moderate" | "severe" } | null;
   somatotype: string | null;
 }
-const POSTURE_TONE = { good: "success", mild: "warning", moderate: "warning", severe: "danger" } as const;
+const POSTURE_TONE = POSTURE_SEVERITY_TONE;
 const capp = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 import { api, todayLocal, uploadMedia } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -45,14 +45,8 @@ interface Today { waterMl: number; goal: { targets: { targetWaterMl?: number } |
 /** N days back from a YYYY-MM-DD string, as YYYY-MM-DD. */
 const shift = (date: string, delta: number): string => { const d = new Date(`${date}T00:00:00`); d.setDate(d.getDate() + delta); return d.toISOString().slice(0, 10); };
 
-interface Zone { label: string; start: number; max: number; tone: Tone; vis: number }
-// Metabolic fasting zones — thresholds in elapsed hours (universal, target-free).
-const ZONES: Zone[] = [
-  { label: "Fed", start: 0, max: 4, tone: "nutrition", vis: 4 },
-  { label: "Catabolic", start: 4, max: 16, tone: "cardio", vis: 12 },
-  { label: "Fat burning", start: 16, max: 24, tone: "activity", vis: 8 },
-  { label: "Ketosis", start: 24, max: 72, tone: "sleep", vis: 7 },
-];
+type Zone = FastingZone;
+const ZONES = FASTING_ZONES; // SSOT — @mossa/ui
 const zoneAt = (h: number): Zone => ZONES.find((z) => h < z.max) ?? ZONES[ZONES.length - 1]!;
 const nextZone = (h: number): Zone | null => { const i = ZONES.indexOf(zoneAt(h)); return i < ZONES.length - 1 ? ZONES[i + 1]! : null; };
 const hoursToNext = (h: number): string => { const rem = Math.max(0, zoneAt(h).max - h); const hh = Math.floor(rem); const mm = Math.round((rem - hh) * 60); return hh > 0 ? `${hh}h ${mm}m` : `${mm}m`; };
