@@ -24,6 +24,7 @@ import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess, type ClientRow } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
 import { notify } from "./notify.js";
+import { recordAudit } from "./audit.js";
 import { parseJson, j } from "./db.js";
 
 /** Every log payload arrives wrapped with the target clientId. */
@@ -707,6 +708,7 @@ export const logRoutes = new Hono<AppEnv>()
     if (access.client.user_id) {
       await notify(c.env, { tenantId: access.client.tenant_id, userId: access.client.user_id, type: "feedback", title: "Coach feedback on your check-in", message: parsed.data.feedback.slice(0, 200), link: "/progress" });
     }
+    await recordAudit(c.env, { tenantId: access.client.tenant_id, clientId: access.client.id, actorUserId: user.id, action: "checkin.feedback", summary: parsed.data.feedback.slice(0, 80), ref: c.req.param("id") });
     return c.json({ ok: true });
   })
 

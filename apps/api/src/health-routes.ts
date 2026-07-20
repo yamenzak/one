@@ -17,6 +17,7 @@ import { requireClientAccess } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
 import { notify } from "./notify.js";
+import { recordAudit } from "./audit.js";
 
 interface SessionEntry { exerciseId: string; sets: LoggedSetLike[] }
 
@@ -82,6 +83,7 @@ export const healthRoutes = new Hono<AppEnv>()
     if (access.client.user_id) {
       await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "supplement_added", title: "New supplement added", message: `${d.name}${d.dose ? ` — ${d.dose}` : ""}`, link: "/wellness" });
     }
+    await recordAudit(c.env, { tenantId: who.tenantId, clientId: access.client.id, actorUserId: who.userId, action: "supplement.add", summary: d.name, ref: id });
     return c.json({ ok: true, id }, 201);
   })
 
@@ -197,6 +199,7 @@ export const healthRoutes = new Hono<AppEnv>()
     if (access.client.user_id) {
       await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "lab_requested", title: "New lab test requested", message: d.displayName ?? d.type, link: "/progress" });
     }
+    await recordAudit(c.env, { tenantId: who.tenantId, clientId: access.client.id, actorUserId: who.userId, action: "lab.request", summary: d.displayName ?? d.type, ref: id });
     return c.json({ ok: true, id }, 201);
   })
 
@@ -252,8 +255,9 @@ export const healthRoutes = new Hono<AppEnv>()
       .bind(...binds, c.req.param("id"), who.tenantId)
       .run();
     if (d.status === "reviewed") {
-      const lab = await c.env.DB.prepare("SELECT c.user_id AS user_id, l.display_name AS name FROM lab_tests l JOIN clients c ON c.id = l.client_id WHERE l.id = ? AND l.tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ user_id: string | null; name: string | null }>();
+      const lab = await c.env.DB.prepare("SELECT c.user_id AS user_id, c.id AS client_id, l.display_name AS name FROM lab_tests l JOIN clients c ON c.id = l.client_id WHERE l.id = ? AND l.tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ user_id: string | null; client_id: string; name: string | null }>();
       if (lab?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: lab.user_id, type: "lab_reviewed", title: "Your coach reviewed your lab results", message: lab.name ?? "", link: "/progress" });
+      if (lab?.client_id) await recordAudit(c.env, { tenantId: who.tenantId, clientId: lab.client_id, actorUserId: who.userId, action: "lab.review", summary: lab.name ?? "", ref: c.req.param("id") });
     }
     return c.json({ ok: true });
   })
@@ -500,6 +504,7 @@ export const healthRoutes = new Hono<AppEnv>()
       const client = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null }>();
       if (client?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: client.user_id, type: "swap_rejected", title: "Your coach kept the original exercise", message: parsed.data.trainerNote ?? "", link: "/train" });
     }
+    await recordAudit(c.env, { tenantId: who.tenantId, clientId: row.client_id, actorUserId: who.userId, action: "swap.decide", summary: parsed.data.status, ref: c.req.param("id") });
     return c.json({ ok: true });
   });
 

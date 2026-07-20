@@ -15,7 +15,7 @@ import { withinQuota } from "./billing-store.js";
 import { notify } from "./notify.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
-import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps } from "@mossa/domain";
+import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps, auditLabel } from "@mossa/domain";
 
 export interface ClientRow {
   id: string;
@@ -307,6 +307,22 @@ export const clientRoutes = new Hono<AppEnv>()
     if ("response" in access) return access.response;
     const metrics = await clientMetrics(c.env.DB, access.client);
     return c.json({ client: clientView(access.client), metrics });
+  })
+
+  // Coach-action audit history for a client — STAFF only (a coach or the owner
+  // reviewing what was done to this record). The label renders from the same
+  // AUDIT_ACTIONS registry the write path validates against.
+  .get("/clients/:id/audit", async (c) => {
+    if (c.get("role") === "client") return c.json({ error: "forbidden" }, 403);
+    const access = await requireClientAccess(c, c.req.param("id"));
+    if ("response" in access) return access.response;
+    const rows = await c.env.DB.prepare(
+      "SELECT a.id, a.action, a.summary, a.ref, a.at, u.name AS actor_name FROM audit_log a LEFT JOIN \"user\" u ON u.id = a.actor_user_id WHERE a.client_id = ? ORDER BY a.at DESC LIMIT 200",
+    ).bind(access.client.id).all<{ id: string; action: string; summary: string | null; ref: string | null; at: number; actor_name: string | null }>();
+    const items = (rows.results ?? []).map((r) => ({
+      id: r.id, action: r.action, label: auditLabel(r.action), summary: r.summary, ref: r.ref, at: r.at, actor: r.actor_name,
+    }));
+    return c.json({ items });
   })
 
   .patch("/clients/:id", async (c) => {

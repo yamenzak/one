@@ -173,6 +173,14 @@ export function ensureSchema(db: D1Database): Promise<void> {
           // row per tenant hostname; status/ssl mirror the CF custom hostname.
           "CREATE TABLE IF NOT EXISTS tenant_domains (hostname TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, cf_hostname_id TEXT, status TEXT DEFAULT 'pending', ssl_status TEXT, verify_name TEXT, verify_value TEXT, cname_target TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
           "CREATE INDEX IF NOT EXISTS idx_tenant_domains_tenant ON tenant_domains(tenant_id);",
+
+          // ── Coach-action audit log (SPEC §9; REGISTRY-PLAN Phase 3) ────────
+          // Durable, queryable record of STAFF actions on a client's record. The
+          // action id keys into @mossa/domain AUDIT_ACTIONS; summary is a short
+          // human line; ref points at the affected row. Listed newest-first per
+          // client, so the index is (client_id, at DESC).
+          "CREATE TABLE IF NOT EXISTS audit_log (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, actor_user_id TEXT, action TEXT, summary TEXT, ref TEXT, at INTEGER);",
+          "CREATE INDEX IF NOT EXISTS idx_audit_client ON audit_log(client_id, at);",
         ].join(" "),
       )
       .then(async () => {

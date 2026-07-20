@@ -1909,6 +1909,19 @@ describe("client preferences + body metrics + goal staleness", () => {
     expect(m.metrics.staleness?.weightDeltaKg).toBe(-8);
   });
 
+  it("records a coach action in the audit log and lists it newest-first", async () => {
+    const id = await mkClient();
+    // A coach action (setting a goal) writes an audit row.
+    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, label: "Recomp", calculator: { gender: "male", ageYears: 30, heightCm: 178, weightKg: 82, activityLevel: "moderate", primaryGoal: "maintain", dietaryApproach: "balanced" } }) });
+    const res = await SELF.fetch(`http://x/api/clients/${id}/audit`, { headers: H() });
+    expect(res.status).toBe(200);
+    const { items } = (await res.json()) as { items: { action: string; label: string; summary: string | null; actor: string | null }[] };
+    const goalEntry = items.find((i) => i.action === "goal.set");
+    expect(goalEntry).toBeDefined();
+    expect(goalEntry!.label).toBe("set a goal"); // rendered from the AUDIT_ACTIONS registry
+    expect(goalEntry!.summary).toBe("Recomp");
+  });
+
   it("Today bundle reports profile completeness", async () => {
     const id = await mkClient();
     const before = (await (await SELF.fetch(`http://x/api/today?clientId=${id}&date=2026-01-10`, { headers: H() })).json()) as { profile: { complete: boolean; gaps: string[] } };

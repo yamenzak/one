@@ -13,6 +13,7 @@ import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { requireClientFlag } from "./client-flags.js";
 import { notify } from "./notify.js";
+import { recordAudit } from "./audit.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
 
@@ -210,6 +211,7 @@ function makePlanRoutes(kind: Kind): Hono<AppEnv> {
       if (access.client.user_id) {
         await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "plan_published", title: `Your new ${kind} plan is ready`, message: row.name, link: kind === "workout" ? "/train" : "/eat" });
       }
+      await recordAudit(c.env, { tenantId: who.tenantId, clientId: row.client_id, actorUserId: who.userId, action: "plan.publish", summary: `${kind} · ${row.name}`, ref: row.id });
       return c.json({ plan: planView(updated!) });
     })
 
