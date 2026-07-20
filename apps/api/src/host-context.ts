@@ -26,6 +26,33 @@ export function hostnameOf(url: string): string {
   }
 }
 
+/**
+ * Resolve a tenant by its slug — the `/t/<slug>` branded-login path on the
+ * platform host. Unlike {@link resolveHostTenant} this does NOT pin the tenant
+ * (the platform host still allows cross-tenant switching post-auth); it only
+ * hands the pre-auth Login screen enough to brand itself. Returns null for an
+ * unknown slug.
+ */
+export async function resolveSlugTenant(db: D1Database, slug: string): Promise<HostTenant | null> {
+  const s = slug.trim().toLowerCase();
+  if (!s) return null;
+  const row = await db
+    .prepare(
+      'SELECT o.id AS tenant_id, o.name AS name, o.slug AS slug, ts.branding_json AS branding_json ' +
+        'FROM "organization" o LEFT JOIN tenant_settings ts ON ts.tenant_id = o.id WHERE o.slug = ?',
+    )
+    .bind(s)
+    .first<{ tenant_id: string; name: string; slug: string; branding_json: string | null }>()
+    .catch(() => null);
+  if (!row) return null;
+  return {
+    tenantId: row.tenant_id,
+    name: row.name,
+    slug: row.slug,
+    branding: parseJson<SessionContext["branding"]>(row.branding_json ?? null, null),
+  };
+}
+
 /** True for the neutral platform hosts (never a custom tenant domain). */
 export function isPlatformHost(hostname: string, env: { BETTER_AUTH_URL?: string }): boolean {
   if (hostname === "localhost" || hostname === "127.0.0.1") return true;

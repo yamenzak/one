@@ -59,10 +59,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Resolve the custom-domain tenant once, in parallel — it brands the login
-  // screen before any sign-in and never changes for the life of the page.
+  // Resolve which tenant brands this login, once, in parallel. A custom domain
+  // pins it via the Host header; on the platform host a `/t/<slug>` entry passes
+  // the slug so the same branded login works before a domain is bought.
   useEffect(() => {
-    void api.get<HostInfo>("/api/host").then(setHost).catch(() => setHost({ platform: true, tenant: null }));
+    const m = /^\/t\/([^/?#]+)/.exec(location.pathname);
+    const q = m ? `?slug=${encodeURIComponent(decodeURIComponent(m[1]!))}` : "";
+    void api.get<HostInfo>(`/api/host${q}`).then(setHost).catch(() => setHost({ platform: true, tenant: null }));
   }, []);
 
   useEffect(() => {
