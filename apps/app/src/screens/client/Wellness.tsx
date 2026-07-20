@@ -199,40 +199,6 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
       {/* Wellness Score hero */}
       <Stagger data-tour="wellness-hero">{score ? <WellnessScoreCard result={score} /> : <WellnessScoreCardSkeleton />}</Stagger>
 
-      {/* Posture screen from the latest body scan — side figure + alignment */}
-      {(() => {
-        const withPosture = scans.filter((s) => s.posture); // newest-first
-        const scan = withPosture[0];
-        const latest = scan?.posture ?? null;
-        if (!scan || !latest) return null;
-        const trend = [...withPosture].reverse().map((s) => s.posture!.cvaDeg ?? 0).filter((v) => v > 0);
-        const prof = scanProfile(scan);
-        const side = prof ? modelSilhouette(prof, "side") : scan.contourSide;
-        return (
-          <Stagger>
-            <Card className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5"><IconBadge icon={HeartPulse} tone="activity" size="sm" /><h2 className="font-semibold">Posture</h2></div>
-                <Badge tone={POSTURE_TONE[latest.severity]}>{capp(latest.severity)}</Badge>
-              </div>
-              <div className="flex items-center gap-4">
-                <PostureFigure side={side} cvaDeg={latest.cvaDeg} trunkTiltDeg={latest.trunkTiltDeg} severity={latest.severity} width={92} height={190} />
-                <div className="min-w-0 flex-1 space-y-2">
-                  <p className="text-xs text-muted-foreground">
-                    {latest.severity !== "good" && <AlertTriangle className="mr-1 inline size-3.5 -translate-y-px text-warning" />}
-                    {POSTURE_GUIDANCE[latest.severity]}
-                  </p>
-                  <p className="text-[0.7rem] text-muted-foreground">The line traces hip → shoulder → head; the dashed plumb is upright. A more forward head is a lower neck angle.</p>
-                  {trend.length >= 2 && (
-                    <div><div className="mb-1 text-[0.7rem] font-medium text-muted-foreground">Neck angle trend</div><Sparkline values={trend} tone="activity" /></div>
-                  )}
-                </div>
-              </div>
-            </Card>
-          </Stagger>
-        );
-      })()}
-
       {/* Quick-log chips */}
       <Stagger className="flex flex-wrap gap-2">
         <Chip icon={ClipboardList} selected onClick={() => setLogKind("checkin")}>Check in</Chip>
@@ -293,6 +259,40 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
           )}
         </Card>
       </Stagger>
+
+      {/* Posture screen from the latest body scan — side figure + alignment */}
+      {(() => {
+        const withPosture = scans.filter((s) => s.posture); // newest-first
+        const scan = withPosture[0];
+        const latest = scan?.posture ?? null;
+        if (!scan || !latest) return null;
+        const trend = [...withPosture].reverse().map((s) => s.posture!.cvaDeg ?? 0).filter((v) => v > 0);
+        const prof = scanProfile(scan);
+        const side = prof ? modelSilhouette(prof, "side") : scan.contourSide;
+        return (
+          <Stagger>
+            <Card className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5"><IconBadge icon={HeartPulse} tone="activity" size="sm" /><h2 className="font-semibold">Posture</h2></div>
+                <Badge tone={POSTURE_TONE[latest.severity]}>{capp(latest.severity)}</Badge>
+              </div>
+              <div className="flex items-center gap-4">
+                <PostureFigure side={side} cvaDeg={latest.cvaDeg} trunkTiltDeg={latest.trunkTiltDeg} severity={latest.severity} width={92} height={190} />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    {latest.severity !== "good" && <AlertTriangle className="mr-1 inline size-3.5 -translate-y-px text-warning" />}
+                    {POSTURE_GUIDANCE[latest.severity]}
+                  </p>
+                  <p className="text-[0.7rem] text-muted-foreground">The line traces hip → shoulder → head; the dashed plumb is upright. A more forward head is a lower neck angle.</p>
+                  {trend.length >= 2 && (
+                    <div><div className="mb-1 text-[0.7rem] font-medium text-muted-foreground">Neck angle trend</div><Sparkline values={trend} tone="activity" /></div>
+                  )}
+                </div>
+              </div>
+            </Card>
+          </Stagger>
+        );
+      })()}
 
       {/* This week */}
       <section className="space-y-2">
