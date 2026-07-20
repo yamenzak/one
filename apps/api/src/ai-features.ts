@@ -196,6 +196,16 @@ Be specific and practical, but concise — finish every section. No title, no pr
     defaultSystem: `Turn these fitness stats into a warm, motivating 3-4 sentence recap for the client. Concrete, honest, encouraging. Plain text only.`,
   },
   {
+    key: "supplement-guide",
+    label: "Supplement guide (client)",
+    description: "Explains the client's own supplement stack — what each supports, timing, and simple tips.",
+    audience: "client",
+    task: "text-small",
+    tonable: true,
+    defaultSystem: `You are the client's friendly AI coach, speaking directly TO them ("you"). Given the supplements THEY currently take, plus their goal and body stats, explain in warm, plain language what each one generally supports, the best time to take it, and one simple practical tip (e.g. take with a meal). Keep it tight — a line or two per supplement, then one overall tip.
+This is general educational info, NOT medical advice: never tell them to start, stop, add, or change the dose of anything — that's their coach's call, and say so if they ask. No alarming claims, no diagnoses. Plain text, one short line per supplement.`,
+  },
+  {
     key: "parse-food",
     label: "Natural-language food log",
     description: "Turn a typed food description into structured diary entries.",

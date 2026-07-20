@@ -1638,6 +1638,20 @@ describe("supplements — pausing hides from the client + blocks logging", () =>
     const staffManage = (await (await SELF.fetch(`${B}/api/supplements?clientId=${client.id}&includePaused=1`, { headers: auth(ownerCookie) })).json()) as { supplements: { id: string; status: string }[] };
     expect(staffManage.supplements.find((s) => s.id === sup.id)?.status).toBe("paused");
   });
+
+  it("client supplement-guide returns tips for the active stack; empty with none", async () => {
+    const client = (await (await SELF.fetch(`${B}/api/clients`, { method: "POST", headers: H(), body: JSON.stringify({ email: "supp2@test.dev", displayName: "Supp Two" }) })).json() as { client: { id: string } }).client;
+    // No supplements yet → empty guide.
+    const empty = (await (await SELF.fetch(`${B}/api/ai/supplement-guide`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: client.id }) })).json()) as { guide: string };
+    expect(empty.guide).toBe("");
+    // Add one, then the guide has content (mock lane).
+    await SELF.fetch(`${B}/api/supplements`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: client.id, name: "Omega-3", dose: "2g", schedule: [{ slot: "daily" }] }) });
+    const g = await SELF.fetch(`${B}/api/ai/supplement-guide`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: client.id }) });
+    expect(g.status).toBe(200);
+    const guide = ((await g.json()) as { guide: string }).guide;
+    expect(guide.length).toBeGreaterThan(0);
+    expect(guide).toContain("Omega-3");
+  });
 });
 
 describe("foods — tenant isolation + copy-on-write", () => {
