@@ -88,7 +88,7 @@ export function BodyScanHistory({ scans, units, onClose }: { scans: HistoryScan[
             )}
             <div className="grid min-h-[300px] place-items-center py-1">
               {activeView === "3d" && front ? (
-                <Body3D slices={profile?.slices} heightCm={scan.heightCm} front={front} side={side} width={230} height={300} />
+                <Body3D profile={profile} slices={profile?.slices} heightCm={scan.heightCm} front={front} side={side} width={230} height={300} />
               ) : activeView === "side" && side ? (
                 <Silhouette points={side} tone={toneVar.sleep} width={190} height={300} />
               ) : front ? (
