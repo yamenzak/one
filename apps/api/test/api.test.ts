@@ -1425,6 +1425,51 @@ describe("custom domains (SPEC §14.1) — Host pins the tenant", () => {
   });
 });
 
+describe("OTP-send gate — sign-up eligibility + cooldown", () => {
+  const SEND = "http://localhost:8787/api/auth/email-otp/send-verification-otp";
+  const send = (body: Record<string, unknown>) =>
+    SELF.fetch(SEND, { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:8787" }, body: JSON.stringify(body) });
+  const setSelfRegister = (on: boolean) =>
+    SELF.fetch("http://localhost:8787/api/settings", { method: "PATCH", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ marketplace: { selfRegister: on } }) });
+
+  it("invite-only studio turns a brand-new email away", async () => {
+    await setSelfRegister(false);
+    const res = await send({ email: "stranger-1@test.dev", type: "sign-in", slug: "studio-one" });
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { error: string }).error).toBe("invite_only");
+  });
+
+  it("an invited (existing client-row) email is let through even when invite-only", async () => {
+    await setSelfRegister(false);
+    const tenantId = ((await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } }).active.tenantId;
+    await SELF.fetch("http://x/api/clients", { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ email: "invited-1@test.dev", displayName: "Invited One" }) });
+    const res = await send({ email: "invited-1@test.dev", type: "sign-in", slug: "studio-one" });
+    expect(res.status).toBe(200);
+    expect(tenantId).toBeTruthy();
+  });
+
+  it("self sign-up on: a new email is accepted and a pending client is reserved", async () => {
+    await setSelfRegister(true);
+    const tenantId = ((await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } }).active.tenantId;
+    const res = await send({ email: "joiner-1@test.dev", type: "sign-in", slug: "studio-one", intent: "signup" });
+    expect(res.status).toBe(200);
+    const row = await (env.DB as D1Database)
+      .prepare("SELECT display_name FROM clients WHERE tenant_id = ? AND LOWER(email) = 'joiner-1@test.dev'")
+      .bind(tenantId)
+      .first<{ display_name: string }>();
+    expect(row?.display_name).toBe("joiner-1"); // seeded from the address, not asked
+    await setSelfRegister(false);
+  });
+
+  it("enforces a per-email cooldown between codes", async () => {
+    const first = await send({ email: "cooldown-1@test.dev", type: "sign-in" });
+    expect(first.status).toBe(200); // platform host, no tenant → always allowed
+    const second = await send({ email: "cooldown-1@test.dev", type: "sign-in" });
+    expect(second.status).toBe(429);
+    expect(((await second.json()) as { retryAfterSec: number }).retryAfterSec).toBeGreaterThan(0);
+  });
+});
+
 describe("foods — tenant isolation + copy-on-write", () => {
   const mkFood = (over: Record<string, unknown>) => ({
     name: "Test Bar", calories: 200, proteinG: 10, source: "usda", sourceId: "SHARED-123", ...over,
