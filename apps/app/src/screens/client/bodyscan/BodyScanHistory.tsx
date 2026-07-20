@@ -30,8 +30,12 @@ export interface HistoryScan {
   heightCm: number | null;
   contourFront: Pt[] | null;
   contourSide: Pt[] | null;
+  posture: { cvaDeg: number | null; trunkTiltDeg: number | null; severity: "good" | "mild" | "moderate" | "severe" } | null;
+  somatotype: string | null;
 }
 
+const POSTURE_TONE = { good: "success", mild: "warning", moderate: "warning", severe: "danger" } as const;
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const CONF_TONE = { high: "success", medium: "warning", low: "danger" } as const;
 const CONF_LABEL = { high: "High confidence", medium: "Medium confidence", low: "Lower confidence" } as const;
 const fmtDate = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -138,6 +142,27 @@ export function BodyScanHistory({ scans, units, onClose }: { scans: HistoryScan[
               </motion.div>
             );
           })()}
+
+          {/* Body type + posture */}
+          {(scan.somatotype || scan.posture) && (
+            <div className="grid grid-cols-2 gap-2">
+              {scan.somatotype && (
+                <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-center">
+                  <div className="text-[0.65rem] font-medium text-muted-foreground">Body type</div>
+                  <div className="mt-0.5 text-sm font-bold">{scan.somatotype}</div>
+                </div>
+              )}
+              {scan.posture && (
+                <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-center">
+                  <div className="text-[0.65rem] font-medium text-muted-foreground">Posture</div>
+                  <div className="mt-0.5 flex items-center justify-center gap-1.5">
+                    <Badge tone={POSTURE_TONE[scan.posture.severity]}>{cap(scan.posture.severity)}</Badge>
+                    {scan.posture.cvaDeg != null && <span className="numeral text-xs text-muted-foreground">{scan.posture.cvaDeg.toFixed(0)}°</span>}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Measurements */}
           <div className="grid grid-cols-4 gap-2">
