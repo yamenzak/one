@@ -9,7 +9,10 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, fmtEnergy, kcalToDisplay, type RangePreset, type SeriesDelta } from "@mossa/domain";
+import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, fmtEnergy, kcalToDisplay, POSTURE_GUIDANCE, type RangePreset, type SeriesDelta } from "@mossa/domain";
+
+const POSTURE_TONE = { good: "success", mild: "warning", moderate: "warning", severe: "danger" } as const;
+const capp = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 import {
   Card, Badge, Button, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger, EmptyState,
   Reveal, SkeletonHero, SkeletonChart,
@@ -27,8 +30,8 @@ interface ProgressData {
   range: { start: string; end: string; days: string[] };
   today: string;
   body: {
-    weight: Pt[]; bodyFat: Pt[]; waist: Pt[];
-    latest: { weightKg: number | null; bodyFatPct: number | null; waistCm: number | null; neckCm: number | null; hipsCm: number | null; chestCm: number | null };
+    weight: Pt[]; bodyFat: Pt[]; waist: Pt[]; posture: Pt[];
+    latest: { weightKg: number | null; bodyFatPct: number | null; waistCm: number | null; neckCm: number | null; hipsCm: number | null; chestCm: number | null; somatotype: string | null; postureSeverity: "good" | "mild" | "moderate" | "severe" | null; postureCva: number | null };
     deltas: { weight: SeriesDelta | null; bodyFat: SeriesDelta | null; waist: SeriesDelta | null };
   };
   nutrition: { perDay: { date: string; calories: number; protein: number; carbs: number; fat: number; logged: boolean }[]; targets: { targetCalories?: number; targetProteinG?: number }; adherencePct: number | null; loggedDays: number };
@@ -165,9 +168,27 @@ function Body({ data, units, dateLabel, clientId }: { data: ProgressData; units:
           <AreaChart values={waistVals} tone="nutrition" trend label={dateLabel} format={(v) => v.toFixed(1)} />
         </ChartCard>
       </Stagger>
+      {body.posture.length > 0 && (
+        <Stagger>
+          <ChartCard title="Posture" icon={HeartPulse} tone="activity"
+            value={body.latest.postureCva != null ? body.latest.postureCva.toFixed(0) : "—"} unit="° neck angle"
+            delta={body.latest.postureSeverity ? <Badge tone={POSTURE_TONE[body.latest.postureSeverity]}>{capp(body.latest.postureSeverity)}</Badge> : undefined}>
+            <AreaChart values={dense(body.posture, days)} tone="activity" trend label={dateLabel} format={(v) => `${v.toFixed(0)}°`} />
+          </ChartCard>
+        </Stagger>
+      )}
+      {body.latest.postureSeverity && body.latest.postureSeverity !== "good" && (
+        <Stagger>
+          <Card className="flex items-start gap-3 border border-warning/25 bg-warning-soft/40">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
+            <div className="min-w-0"><div className="text-sm font-semibold">Posture screen</div><p className="text-sm text-muted-foreground">{POSTURE_GUIDANCE[body.latest.postureSeverity]} A higher neck angle is more upright.</p></div>
+          </Card>
+        </Stagger>
+      )}
       <Stagger>
         <Card className="space-y-3">
           <div className="text-sm font-semibold">Latest measurements</div>
+          {body.latest.somatotype && <div className="text-xs text-muted-foreground">Body type · <span className="font-semibold text-foreground">{body.latest.somatotype}</span></div>}
           <div className="grid grid-cols-3 gap-2">
             <MeasChip label="Chest" value={body.latest.chestCm} units={units} />
             <MeasChip label="Waist" value={body.latest.waistCm} units={units} />

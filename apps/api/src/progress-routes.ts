@@ -46,16 +46,20 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
   const db = c.env.DB;
   const days = daysInRange(start, end);
 
-  const [measurements, checkIns, foods, sessions, activities, goal] = await Promise.all([
+  const [measurements, checkIns, foods, sessions, activities, goal, scans] = await Promise.all([
     db.prepare("SELECT date_local, weight_kg, body_fat_percent, waist_cm, neck_cm, hips_cm, chest_cm FROM measurements WHERE client_id=? AND date_local>=? AND date_local<=? ORDER BY date_local").bind(clientId, start, end).all<{ date_local: string; weight_kg: number | null; body_fat_percent: number | null; waist_cm: number | null; neck_cm: number | null; hips_cm: number | null; chest_cm: number | null }>(),
     db.prepare("SELECT date_local, mood, energy, stress, sleep_quality, sleep_hours FROM check_ins WHERE client_id=? AND date_local>=? AND date_local<=? ORDER BY date_local").bind(clientId, start, end).all<{ date_local: string; mood: number | null; energy: number | null; stress: number | null; sleep_quality: number | null; sleep_hours: number | null }>(),
     db.prepare("SELECT date_local, SUM(calories) AS calories, SUM(protein_g) AS protein, SUM(carbs_g) AS carbs, SUM(fat_g) AS fat FROM food_entries WHERE client_id=? AND date_local>=? AND date_local<=? GROUP BY date_local").bind(clientId, start, end).all<{ date_local: string; calories: number; protein: number; carbs: number; fat: number }>(),
     db.prepare("SELECT date_local, entries_json FROM exercise_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(clientId, start, end).all<{ date_local: string; entries_json: string | null }>(),
     db.prepare("SELECT date_local, duration_min, calories FROM activity_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(clientId, start, end).all<{ date_local: string; duration_min: number | null; calories: number | null }>(),
     db.prepare("SELECT targets_json FROM client_goals WHERE client_id=? AND status='active' ORDER BY created_at DESC LIMIT 1").bind(clientId).first<{ targets_json: string | null }>(),
+    db.prepare("SELECT date_local, posture_cva_deg, posture_severity, somatotype FROM body_scans WHERE client_id=? AND date_local>=? AND date_local<=? ORDER BY date_local").bind(clientId, start, end).all<{ date_local: string; posture_cva_deg: number | null; posture_severity: string | null; somatotype: string | null }>(),
   ]);
 
   const mRows = measurements.results ?? [];
+  const sRows = scans.results ?? [];
+  const posture = sRows.filter((s) => s.posture_cva_deg != null).map((s) => ({ date: s.date_local, v: s.posture_cva_deg as number }));
+  const latestScan = sRows.length ? sRows[sRows.length - 1]! : null;
   const ciRows = checkIns.results ?? [];
   const fRows = foods.results ?? [];
   const targets = parseJson<{ targetCalories?: number; targetProteinG?: number; targetCarbsG?: number; targetFatG?: number }>(goal?.targets_json, {});
@@ -144,8 +148,12 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
     range: { start, end, days },
     today,
     body: {
-      weight, bodyFat, waist,
-      latest: { weightKg: latestOf("weight_kg"), bodyFatPct: latestOf("body_fat_percent"), waistCm: latestOf("waist_cm"), neckCm: latestOf("neck_cm"), hipsCm: latestOf("hips_cm"), chestCm: latestOf("chest_cm") },
+      weight, bodyFat, waist, posture,
+      latest: {
+        weightKg: latestOf("weight_kg"), bodyFatPct: latestOf("body_fat_percent"), waistCm: latestOf("waist_cm"),
+        neckCm: latestOf("neck_cm"), hipsCm: latestOf("hips_cm"), chestCm: latestOf("chest_cm"),
+        somatotype: latestScan?.somatotype ?? null, postureSeverity: latestScan?.posture_severity ?? null, postureCva: latestScan?.posture_cva_deg ?? null,
+      },
       deltas: { weight: deltaOf(weight), bodyFat: deltaOf(bodyFat), waist: deltaOf(waist) },
     },
     nutrition: { perDay: nutritionPerDay, targets, adherencePct: calorieAdherencePct(calByDay, targets.targetCalories), loggedDays: foodDays.size },
