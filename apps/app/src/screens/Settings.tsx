@@ -264,7 +264,7 @@ function LoginPreview({ brandName, logoUrl, tagline, headline, subtext, bgImageU
           {sub && <div className="text-[0.7rem] text-muted-foreground/80">{sub}</div>}
         </div>
         <div className="space-y-2.5 rounded-2xl border border-border/60 bg-card p-3.5 text-left shadow-sm">
-          <div className="flex items-center gap-1.5 text-[0.7rem] font-medium text-primary"><Sparkles className="size-3" /> {tag}</div>
+          <div className="text-[0.7rem] font-medium text-primary">{tag}</div>
           <div className="flex items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-2 text-[0.7rem] text-muted-foreground"><Mail className="size-3.5" /> you@example.com</div>
           <div className="flex items-center justify-center gap-1.5 rounded-full bg-primary py-2 text-[0.7rem] font-semibold text-primary-foreground">Email me a code <ArrowRight className="size-3" /></div>
           {showPasskey && <div className="flex items-center justify-center gap-1.5 text-[0.7rem] font-medium text-muted-foreground"><KeyRound className="size-3" /> Sign in with a passkey</div>}

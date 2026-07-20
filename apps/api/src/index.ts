@@ -36,6 +36,7 @@ import { mediaRoutes } from "./media-routes.js";
 import { demoRoutes } from "./demo-routes.js";
 import { sessionRoutes, promoRoutes } from "./session-routes.js";
 import { domainRoutes, domainAdminRoutes } from "./domain-routes.js";
+import { otpSendGuard } from "./otp-guard.js";
 import type { Env } from "./env.js";
 
 import { notify, notifyOwners } from "./notify.js";
@@ -50,6 +51,11 @@ app.get("/health", (c) => c.json({ ok: true, service: "mossa-api" }));
 
 app.use("*", sessionMiddleware);
 app.use("*", routeGuard);
+
+// OTP send runs our policy gate first (cooldown, Turnstile, tenant sign-up
+// eligibility), then forwards to Better Auth. Registered before the catch-all
+// so this exact path lands here, not on the generic handler.
+app.post("/api/auth/email-otp/send-verification-otp", otpSendGuard);
 
 // Better Auth: sign-in (OTP), passkey ceremonies, org management, sessions.
 app.on(["GET", "POST"], "/api/auth/*", (c) => c.get("auth").handler(c.req.raw));

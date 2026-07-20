@@ -23,7 +23,7 @@ type Mode = "coach" | "train";
 /** Which tenant (if any) owns the domain the app is served on (SPEC §14.1). */
 export interface HostInfo {
   platform: boolean;
-  tenant: { tenantId: string; name: string; slug: string; branding: TenantBranding | null } | null;
+  tenant: { tenantId: string; name: string; slug: string; branding: TenantBranding | null; allowSignup: boolean } | null;
 }
 
 interface Session {

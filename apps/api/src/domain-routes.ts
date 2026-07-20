@@ -64,13 +64,13 @@ export const domainRoutes = new Hono<AppEnv>()
     if (ht) {
       return c.json({
         platform: false,
-        tenant: { tenantId: ht.tenantId, name: ht.name, slug: ht.slug, branding: ht.branding },
+        tenant: { tenantId: ht.tenantId, name: ht.name, slug: ht.slug, branding: ht.branding, allowSignup: ht.allowSignup },
       });
     }
     const slug = c.req.query("slug");
     if (platform && slug) {
       const st = await resolveSlugTenant(c.env.DB, slug);
-      if (st) return c.json({ platform: true, tenant: { tenantId: st.tenantId, name: st.name, slug: st.slug, branding: st.branding } });
+      if (st) return c.json({ platform: true, tenant: { tenantId: st.tenantId, name: st.name, slug: st.slug, branding: st.branding, allowSignup: st.allowSignup } });
     }
     return c.json({ platform, tenant: null });
   })

@@ -121,8 +121,13 @@ export async function visibleClientIds(c: AppContext): Promise<string[] | "all">
 }
 
 const CreateClient = z.object({
-  displayName: z.string().min(1).max(80),
+  // Email is the invite — it's what links them the moment they sign in — so the
+  // coach's Add-client form requires it. The API stays permissive (email OR name
+  // is enough) so other paths keep working: a walk-in with no email, the
+  // trainer's own record, demo seeds. Name is optional now (they fill it on the
+  // complete-your-profile screen); when omitted we seed it from the address.
   email: z.string().email().nullish(),
+  displayName: z.string().max(80).nullish(),
   gender: z.enum(["male", "female"]).nullish(),
   dateOfBirth: z.string().nullish(),
   heightCm: z.number().positive().nullish(),
@@ -254,7 +259,7 @@ export const clientRoutes = new Hono<AppEnv>()
       .bind(
         id,
         who.tenantId,
-        body.data.displayName,
+        body.data.displayName?.trim() || body.data.email?.split("@")[0] || "New client",
         body.data.email ?? null,
         body.data.gender ?? null,
         body.data.dateOfBirth ?? null,

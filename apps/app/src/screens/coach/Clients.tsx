@@ -33,9 +33,10 @@ export function Clients() {
 
   const create = async () => {
     setBusy(true);
-    try { const r = await api.post<{ client: { id: string } }>("/api/clients", { displayName: name, email: email || undefined }); setCreateOpen(false); setName(""); setEmail(""); await load(); nav(`/clients/${r.client.id}/today`); }
+    try { const r = await api.post<{ client: { id: string } }>("/api/clients", { email: email.trim(), displayName: name.trim() || undefined }); setCreateOpen(false); setName(""); setEmail(""); await load(); nav(`/clients/${r.client.id}/today`); }
     finally { setBusy(false); }
   };
+  const emailValid = /.+@.+\..+/.test(email.trim());
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
@@ -65,9 +66,9 @@ export function Clients() {
 
       <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title="New client">
         <div className="space-y-4">
-          <Field label="Name" icon={User} value={name} onChange={(e) => setName(e.target.value)} />
-          <Field label="Email (optional)" icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} hint="With an email, they sign in with a code — their space links automatically." />
-          <Button size="lg" className="w-full" disabled={name.trim().length < 2 || busy} onClick={() => void create()}>{busy ? "Creating…" : "Add client"}</Button>
+          <Field label="Email" icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} hint="This is the invite — they sign in with a code and their space links automatically." />
+          <Field label="Name (optional)" icon={User} value={name} onChange={(e) => setName(e.target.value)} hint="Leave blank and they'll add it on their profile." />
+          <Button size="lg" className="w-full" disabled={!emailValid || busy} onClick={() => void create()}>{busy ? "Creating…" : "Add client"}</Button>
         </div>
       </Sheet>
     </Page>

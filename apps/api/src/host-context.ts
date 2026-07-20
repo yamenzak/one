@@ -15,6 +15,10 @@ export interface HostTenant {
   name: string;
   slug: string;
   branding: SessionContext["branding"];
+  /** marketplace.selfRegister — whether a brand-new email may self-sign-up as a
+   *  client here (else it's invite/existing-only). Drives the login screen's
+   *  Log-in vs Sign-up affordance and the OTP-send eligibility gate. */
+  allowSignup: boolean;
 }
 
 /** Lowercased hostname of the request (no port). */
@@ -38,11 +42,11 @@ export async function resolveSlugTenant(db: D1Database, slug: string): Promise<H
   if (!s) return null;
   const row = await db
     .prepare(
-      'SELECT o.id AS tenant_id, o.name AS name, o.slug AS slug, ts.branding_json AS branding_json ' +
+      'SELECT o.id AS tenant_id, o.name AS name, o.slug AS slug, ts.branding_json AS branding_json, ts.marketplace_json AS marketplace_json ' +
         'FROM "organization" o LEFT JOIN tenant_settings ts ON ts.tenant_id = o.id WHERE o.slug = ?',
     )
     .bind(s)
-    .first<{ tenant_id: string; name: string; slug: string; branding_json: string | null }>()
+    .first<{ tenant_id: string; name: string; slug: string; branding_json: string | null; marketplace_json: string | null }>()
     .catch(() => null);
   if (!row) return null;
   return {
@@ -50,6 +54,7 @@ export async function resolveSlugTenant(db: D1Database, slug: string): Promise<H
     name: row.name,
     slug: row.slug,
     branding: parseJson<SessionContext["branding"]>(row.branding_json ?? null, null),
+    allowSignup: Boolean(parseJson<{ selfRegister?: boolean }>(row.marketplace_json ?? null, {}).selfRegister),
   };
 }
 
@@ -96,13 +101,13 @@ export async function resolveHostTenant(
 
   const row = await db
     .prepare(
-      'SELECT td.tenant_id AS tenant_id, o.name AS name, o.slug AS slug, ts.branding_json AS branding_json ' +
+      'SELECT td.tenant_id AS tenant_id, o.name AS name, o.slug AS slug, ts.branding_json AS branding_json, ts.marketplace_json AS marketplace_json ' +
         'FROM tenant_domains td JOIN "organization" o ON o.id = td.tenant_id ' +
         'LEFT JOIN tenant_settings ts ON ts.tenant_id = td.tenant_id ' +
         "WHERE td.hostname = ? AND td.status = 'active'",
     )
     .bind(hostname)
-    .first<{ tenant_id: string; name: string; slug: string; branding_json: string | null }>()
+    .first<{ tenant_id: string; name: string; slug: string; branding_json: string | null; marketplace_json: string | null }>()
     .catch(() => null);
 
   const result: HostTenant | null = row
@@ -111,6 +116,7 @@ export async function resolveHostTenant(
         name: row.name,
         slug: row.slug,
         branding: parseJson<SessionContext["branding"]>(row.branding_json ?? null, null),
+        allowSignup: Boolean(parseJson<{ selfRegister?: boolean }>(row.marketplace_json ?? null, {}).selfRegister),
       }
     : null;
 
