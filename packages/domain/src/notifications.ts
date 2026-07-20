@@ -67,6 +67,75 @@ export function isNotifCategory(k: string): k is NotifCategory {
   return CATEGORY_KEYS.has(k as NotifCategory);
 }
 
+// ── Notification TYPES (the atom) ─────────────────────────────────────────────
+// Every notification `notify()` emits has a stable TYPE. The type is the SSOT
+// key; its CATEGORY (which governs preferences + the owner email policy) derives
+// from here, so a call site can never pair a type with the wrong category. Titles
+// and links stay at the call site (they interpolate names/ids); the registry owns
+// the type→category binding and the audience the type is meant for.
+
+export type NotifType =
+  // check-ins & feedback
+  | "check_in" | "feedback"
+  // body composition
+  | "body_fat_logged"
+  // plans & goals
+  | "plan_published" | "goal_set"
+  // labs & supplements
+  | "lab_requested" | "lab_uploaded" | "lab_reviewed" | "supplement_added"
+  // exercise swaps
+  | "swap_request" | "swap_approved" | "swap_rejected"
+  // content
+  | "content_assigned"
+  // sessions
+  | "session_booked" | "session_cancelled"
+  // roster & staff
+  | "client_assigned"
+  // client commerce (their plan & billing)
+  | "sub_expired" | "sub_expiring" | "sub_payment_failed"
+  // studio billing (owner)
+  | "billing_suspended" | "billing_canceled" | "billing_past_due"
+  // sales (owner)
+  | "payment_disputed" | "payment_refunded";
+
+export interface NotifTypeMeta {
+  category: NotifCategory;
+  /** Who the type is emitted to (documentation + future audience checks). */
+  to: "client" | "staff" | "owner";
+}
+
+export const NOTIF_TYPES: Record<NotifType, NotifTypeMeta> = {
+  check_in: { category: "check-ins", to: "staff" },
+  feedback: { category: "check-ins", to: "client" },
+  body_fat_logged: { category: "body-composition", to: "staff" },
+  plan_published: { category: "plans-goals", to: "client" },
+  goal_set: { category: "plans-goals", to: "client" },
+  lab_requested: { category: "labs", to: "client" },
+  lab_uploaded: { category: "labs", to: "staff" },
+  lab_reviewed: { category: "labs", to: "client" },
+  supplement_added: { category: "labs", to: "client" },
+  swap_request: { category: "swaps", to: "staff" },
+  swap_approved: { category: "swaps", to: "client" },
+  swap_rejected: { category: "swaps", to: "client" },
+  content_assigned: { category: "content", to: "client" },
+  session_booked: { category: "sessions", to: "client" },
+  session_cancelled: { category: "sessions", to: "client" },
+  client_assigned: { category: "roster", to: "staff" },
+  sub_expired: { category: "commerce", to: "client" },
+  sub_expiring: { category: "commerce", to: "client" },
+  sub_payment_failed: { category: "commerce", to: "client" },
+  billing_suspended: { category: "billing", to: "owner" },
+  billing_canceled: { category: "billing", to: "owner" },
+  billing_past_due: { category: "billing", to: "owner" },
+  payment_disputed: { category: "sales", to: "owner" },
+  payment_refunded: { category: "sales", to: "owner" },
+};
+
+/** The category that governs a notification type's delivery preferences. */
+export function notifCategoryOf(type: NotifType): NotifCategory {
+  return NOTIF_TYPES[type].category;
+}
+
 /** Categories a role can see/tune. */
 export function categoriesForRole(role: NotifRole): NotifCategoryMeta[] {
   return NOTIF_CATEGORIES.filter((c) => c.roles.includes(role));

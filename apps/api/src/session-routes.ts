@@ -68,7 +68,7 @@ export const sessionRoutes = new Hono<AppEnv>()
       .bind(id, who.tenantId, access.client.id, who.userId, sub?.id ?? null, b.data.addOnTypeId, b.data.scheduledAt, b.data.durationMinutes, b.data.notes ?? null, nowIso())
       .run();
     if (access.client.user_id) {
-      await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, category: "sessions", type: "session_booked", title: "Session booked", message: new Date(b.data.scheduledAt).toLocaleString(), link: "/wellness" });
+      await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "session_booked", title: "Session booked", message: new Date(b.data.scheduledAt).toLocaleString(), link: "/wellness" });
     }
     return c.json({ ok: true, id }, 201);
   })
@@ -117,7 +117,7 @@ export const sessionRoutes = new Hono<AppEnv>()
     }
     if (changed && (target === "cancelled" || target === "no_show")) {
       const cl = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null }>();
-      if (cl?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: cl.user_id, category: "sessions", type: "session_cancelled", title: "Your session was cancelled", message: new Date(row.scheduled_at).toLocaleString(), link: "/wellness" });
+      if (cl?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: cl.user_id, type: "session_cancelled", title: "Your session was cancelled", message: new Date(row.scheduled_at).toLocaleString(), link: "/wellness" });
     }
     return c.json({ ok: true });
   });

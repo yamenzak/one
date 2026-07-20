@@ -5,7 +5,7 @@
  * doesn't sink the sweep.
  */
 
-import { resolveChannels, parseNotifPrefs, type NotifRole } from "@mossa/domain";
+import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, type NotifRole } from "@mossa/domain";
 import type { Env } from "./env.js";
 import { sendTenantEmail } from "./email-provider.js";
 import { emailShell, emailButton, escapeHtml, type BrandKit } from "./mailer.js";
@@ -65,6 +65,12 @@ export async function runWeeklyDigest(env: Env): Promise<void> {
 async function digestForTenant(env: Env, tenantId: string, _brand: string, weekAgoDate: string, weekAgoIso: string, period: string): Promise<void> {
   const db = env.DB;
   const sentAt = new Date().toISOString();
+  // The digest goes out over email, so it honors the same owner email policy as
+  // every other notification: if the owner disabled the `digest` category
+  // studio-wide, no digests are emailed for this tenant (members still keep it
+  // in their own prefs, but the studio-level email switch wins).
+  const policyRow = await db.prepare("SELECT notif_policy_json FROM tenant_settings WHERE tenant_id = ?").bind(tenantId).first<{ notif_policy_json: string | null }>();
+  if (!emailAllowedByPolicy(parseNotifPolicy(policyRow?.notif_policy_json ?? null), "digest")) return;
   const brand = await tenantBrandKit(db, tenantId);
   const appHref = env.BETTER_AUTH_URL?.replace(/\/$/, "") || null;
 

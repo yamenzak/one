@@ -133,7 +133,7 @@ export const goalRoutes = new Hono<AppEnv>()
       ),
     ]);
     if (access.client.user_id) {
-      await notify(c.env, { tenantId: access.client.tenant_id, userId: access.client.user_id, category: "plans-goals", type: "goal_set", title: "Your coach set a new goal", message: d.label, link: "/progress" });
+      await notify(c.env, { tenantId: access.client.tenant_id, userId: access.client.user_id, type: "goal_set", title: "Your coach set a new goal", message: d.label, link: "/progress" });
     }
     return c.json({ ok: true, id, targets, derivation }, 201);
   });
