@@ -10,8 +10,8 @@ import { WorkoutBody, MUSCLE_GROUPS, EQUIPMENT_TYPES, normalizeMuscle, normalize
 import { resolveUnits } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
-import { requireClientFlag, resolveClientFlagsFor } from "./client-flags.js";
-import { tenantEntitlements, getConfig, setConfig } from "./billing-store.js";
+import { requireClientFlag, requireFeature, resolveClientFlagsFor } from "./client-flags.js";
+import { tenantEntitlements, hasFeature, getConfig, setConfig } from "./billing-store.js";
 import { generate, generateImage, extractJson, listModels } from "./ai.js";
 import { buildClientContext, bodyCompLine } from "./ai-context.js";
 import { featureDef } from "./ai-features.js";
@@ -124,8 +124,7 @@ export const aiRoutes = new Hono<AppEnv>()
   /** "2 eggs, toast and an apple" → structured entries (client confirms). */
   .post("/ai/parse-food", async (c) => {
     const who = requireTenant(c)!;
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z
       .object({ clientId: z.string(), text: z.string().min(2).max(500) })
       .safeParse(await c.req.json().catch(() => null));
@@ -160,8 +159,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const role = c.get("role");
     if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z
       .object({ clientId: z.string(), instructions: z.string().max(2000).default("") })
       .safeParse(await c.req.json().catch(() => null));
@@ -244,7 +242,7 @@ export const aiRoutes = new Hono<AppEnv>()
     // providers (imported WITH its photo/gif) → a custom row. Only truly empty
     // slots drop; nothing is silently discarded for lacking a library match.
     const appCfg = await getConfig(c.env.DB);
-    const allowExternal = ent.features.externalSearch && appCfg["ai.mock"] !== "on";
+    const allowExternal = (await hasFeature(c.env.DB, who.tenantId, "externalSearch")) && appCfg["ai.mock"] !== "on";
     const cfg = await tenantIntegrations(c.env.DB, who.tenantId);
     const cache = new Map<string, string | null>();
     const days: unknown[] = [];
@@ -287,8 +285,7 @@ export const aiRoutes = new Hono<AppEnv>()
    */
   .post("/ai/snap-meal", async (c) => {
     const who = requireTenant(c)!;
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({ clientId: z.string(), imageKey: z.string().max(300), hint: z.string().max(200).default("") }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
@@ -358,8 +355,7 @@ export const aiRoutes = new Hono<AppEnv>()
    */
   .post("/ai/label-reader", async (c) => {
     const who = requireTenant(c)!;
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({ imageKey: z.string().max(300) }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     if (!parsed.data.imageKey.startsWith(`t/${who.tenantId}/`)) return c.json({ error: "invalid image" }, 400);
@@ -396,8 +392,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const role = c.get("role");
     if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({ clientId: z.string(), instructions: z.string().max(2000).default("") }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
@@ -432,7 +427,7 @@ export const aiRoutes = new Hono<AppEnv>()
     // integrated web providers (imported with photo) → a custom row from the
     // model's estimate — so every option carries real, editable macros.
     const appCfg = await getConfig(c.env.DB);
-    const allowExternal = ent.features.externalSearch && appCfg["ai.mock"] !== "on";
+    const allowExternal = (await hasFeature(c.env.DB, who.tenantId, "externalSearch")) && appCfg["ai.mock"] !== "on";
     const cfg = await tenantIntegrations(c.env.DB, who.tenantId);
     const resolved = await resolveMealFoods(c.env as ResolveEnv, who.tenantId, who.userId, cfg, allowExternal, draft.mealOptions);
     return c.json({ draft: { customMealTypes: [], mealOptions: resolved }, credits: result.credits, mocked: result.mocked });
@@ -443,8 +438,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const role = c.get("role");
     if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({ clientId: z.string() }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
@@ -474,8 +468,7 @@ export const aiRoutes = new Hono<AppEnv>()
   /** Progress Narrative: aggregates → readable recap (client or trainer). */
   .post("/ai/narrative", async (c) => {
     const who = requireTenant(c)!;
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({ clientId: z.string(), stats: z.record(z.string(), z.unknown()) }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
@@ -503,8 +496,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const role = c.get("role");
     if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({ clientId: z.string(), labId: z.string() }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
@@ -539,8 +531,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const role = c.get("role");
     if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({ clientId: z.string() }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
@@ -580,8 +571,7 @@ export const aiRoutes = new Hono<AppEnv>()
    *  the client's aiCoachInsights package flag; staff bypass. */
   .post("/ai/supplement-guide", async (c) => {
     const who = requireTenant(c)!;
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({ clientId: z.string() }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
@@ -614,8 +604,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const role = c.get("role");
     if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({ topic: z.string().min(3).max(200), notes: z.string().max(1000).default("") }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
 
@@ -637,8 +626,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const role = c.get("role");
     if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({ prompt: z.string().min(2).max(500) }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const result = await generateImage(c.env, {
@@ -659,8 +647,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const role = c.get("role");
     if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({
       feature: z.enum(["food-image", "exercise-image", "cover-image", "workout-day-image", "meal-image"]),
       subject: z.string().min(1).max(200),
@@ -720,8 +707,7 @@ export const aiRoutes = new Hono<AppEnv>()
   /** Estimate a food's nutrition from its name (fills the food editor). */
   .post("/ai/food-meta", async (c) => {
     const who = requireTenant(c)!;
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({ name: z.string().min(1).max(160) }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const result = await generate(c.env, {
@@ -748,8 +734,7 @@ export const aiRoutes = new Hono<AppEnv>()
   /** Recommend a recipe from a meal option's foods (client-facing). */
   .post("/ai/recipe", async (c) => {
     const who = requireTenant(c)!;
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({
       clientId: z.string(),
       mealName: z.string().max(120).default(""),
@@ -776,8 +761,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const role = c.get("role");
     if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({
       name: z.string().min(1).max(120),
       muscleGroups: z.array(z.string()).default([]),
@@ -801,8 +785,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const role = c.get("role");
     if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({ name: z.string().min(1).max(120) }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     // Enum-constrained schema → the model can only return our slugs (Gemini
@@ -853,8 +836,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const role = c.get("role");
     if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
-    const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    if (!ent.features.aiSuite) return c.json({ error: "aiSuite not in your plan" }, 403);
+    { const gate = await requireFeature(c, "aiSuite"); if (gate) return gate; }
     const parsed = z.object({ clientId: z.string(), today: z.string().optional(), hour: z.coerce.number().int().min(0).max(23).optional() }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);

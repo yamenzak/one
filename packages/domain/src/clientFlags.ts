@@ -10,7 +10,7 @@
  *      Mossa didn't sell them)
  */
 
-import type { Budget } from "./budgets.js";
+import type { Budget, BudgetFeature } from "./budgets.js";
 import { hasActiveBudget } from "./budgets.js";
 import type { Entitlements } from "./entitlements.js";
 
@@ -102,23 +102,27 @@ export interface ClientFlagMeta {
   category: ClientFlagCategory;
   /** Platform entitlement the tenant must hold to offer this to clients. */
   requiresFeature?: keyof Entitlements["features"];
+  /** Access budget that must be currently active for this flag to hold — when
+   *  the covering budget lapses, the flag is forced off (SSOT for budget gating;
+   *  the resolver derives its gate lists from this, mirroring requiresFeature). */
+  budgetGate?: BudgetFeature;
 }
 
 /** Metadata that drives the tenant's package builder: every flag auto-appears
  *  as a labelled, categorised toggle, hidden when the tenant lacks the feature
  *  that would back it. New flags added above surface with no extra wiring. */
 export const CLIENT_FLAG_META: Record<keyof ClientFlags, ClientFlagMeta> = {
-  canAccessWorkoutPlan: { label: "Workout plan", hint: "See & follow their training plan", category: "plan" },
-  canAccessMealPlan: { label: "Meal plan", hint: "See & follow their meal plan", category: "plan" },
+  canAccessWorkoutPlan: { label: "Workout plan", hint: "See & follow their training plan", category: "plan", budgetGate: "workout" },
+  canAccessMealPlan: { label: "Meal plan", hint: "See & follow their meal plan", category: "plan", budgetGate: "meal" },
   canLogOwnFood: { label: "Log own food", hint: "Self-log meals & foods", category: "nutrition" },
-  canEditMealPlan: { label: "Swap meal options", hint: "Pick/customise meal-plan options", category: "nutrition" },
+  canEditMealPlan: { label: "Swap meal options", hint: "Pick/customise meal-plan options", category: "nutrition", budgetGate: "meal" },
   showMacroBreakdown: { label: "Macro breakdown", hint: "See per-meal macro detail", category: "nutrition" },
   showNutritionReports: { label: "Nutrition reports", hint: "Nutrition trends & adherence", category: "nutrition" },
-  canRequestExerciseSwap: { label: "Request swaps", hint: "Ask the coach to swap an exercise", category: "exercise" },
-  canReorderExercises: { label: "Reorder exercises", hint: "Reorder within a session", category: "exercise" },
+  canRequestExerciseSwap: { label: "Request swaps", hint: "Ask the coach to swap an exercise", category: "exercise", budgetGate: "workout" },
+  canReorderExercises: { label: "Reorder exercises", hint: "Reorder within a session", category: "exercise", budgetGate: "workout" },
   canLogExtraWorkouts: { label: "Log extra workouts", hint: "Log sessions beyond the plan", category: "exercise" },
   canViewBodyMetricsReport: { label: "Body-metrics report", hint: "Weight/body-fat trends", category: "reporting" },
-  canViewExerciseReport: { label: "Strength report", hint: "Lift progression & PRs", category: "reporting" },
+  canViewExerciseReport: { label: "Strength report", hint: "Lift progression & PRs", category: "reporting", budgetGate: "workout" },
   canLogSleep: { label: "Log sleep", hint: "Sleep duration & quality", category: "wellness" },
   canLogMood: { label: "Log mood", hint: "Mood, energy & stress", category: "wellness" },
   canLogWater: { label: "Log water", hint: "Hydration tracking", category: "wellness" },
@@ -138,17 +142,6 @@ export const CLIENT_FLAG_META: Record<keyof ClientFlags, ClientFlagMeta> = {
 
 /** All flag keys, derived from the defaults (new keys auto-appear). */
 export const CLIENT_FLAG_KEYS = Object.keys(DEFAULT_CLIENT_FLAGS) as (keyof ClientFlags)[];
-
-/** Flags forced off when the WORKOUT budget has lapsed. */
-const WORKOUT_GATED: (keyof ClientFlags)[] = [
-  "canAccessWorkoutPlan",
-  "canRequestExerciseSwap",
-  "canReorderExercises",
-  "canViewExerciseReport",
-];
-
-/** Flags forced off when the MEAL budget has lapsed. */
-const MEAL_GATED: (keyof ClientFlags)[] = ["canAccessMealPlan", "canEditMealPlan"];
 
 function applyPartial(base: ClientFlags, partial: Partial<ClientFlags> | null | undefined): ClientFlags {
   // Always return a fresh object — the resolver mutates the result in place
@@ -196,11 +189,9 @@ export function resolveClientFlags(input: ResolveFlagsInput): ClientFlags {
   // (e.g. a preview) and skips gating. `[]` and `null` are deliberately NOT the
   // same: one is a lapsed subscriber, the other is no subscriber.
   if (input.budgets) {
-    if (!hasActiveBudget(input.budgets, "workout", input.nowIso)) {
-      for (const k of WORKOUT_GATED) flags[k] = false;
-    }
-    if (!hasActiveBudget(input.budgets, "meal", input.nowIso)) {
-      for (const k of MEAL_GATED) flags[k] = false;
+    for (const key of CLIENT_FLAG_KEYS) {
+      const gate = CLIENT_FLAG_META[key].budgetGate;
+      if (gate && !hasActiveBudget(input.budgets, gate, input.nowIso)) flags[key] = false;
     }
   }
 

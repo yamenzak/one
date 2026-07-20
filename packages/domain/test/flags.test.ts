@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { FREE_ENTITLEMENTS, mergeOverrides, resolveEntitlements, checkDowngrade } from "../src/entitlements.js";
-import { DEFAULT_CLIENT_FLAGS, resolveClientFlags } from "../src/clientFlags.js";
+import { FREE_ENTITLEMENTS, mergeOverrides, resolveEntitlements, checkDowngrade, RESERVED_FEATURES, FEATURE_KEYS } from "../src/entitlements.js";
+import { DEFAULT_CLIENT_FLAGS, resolveClientFlags, CLIENT_FLAG_META, CLIENT_FLAG_KEYS } from "../src/clientFlags.js";
 import { grantSatisfies, resolvePermissions, sanitizePermissions, ROLE_PRESETS } from "../src/perms.js";
 import type { Budget } from "../src/budgets.js";
 
@@ -58,6 +58,24 @@ describe("client flags resolver", () => {
     expect(f.canRequestExerciseSwap).toBe(false);
     expect(f.canViewExerciseReport).toBe(false);
     expect(f.canEditMealPlan).toBe(true); // meal budget alive
+  });
+
+  it("budget gating is derived from CLIENT_FLAG_META.budgetGate (no hardcoded lists)", () => {
+    // Every flag META-tagged budgetGate is forced off when that budget lapses;
+    // untagged flags are never budget-gated.
+    const noBudgets: Budget[] = []; // has a subscription context, all lapsed
+    const f = resolveClientFlags({ entitlements: paidEnt, budgets: noBudgets, nowIso: NOW });
+    for (const key of CLIENT_FLAG_KEYS) {
+      if (CLIENT_FLAG_META[key].budgetGate) expect(f[key], `${key} should gate off`).toBe(false);
+    }
+    // A flag with no budgetGate (e.g. canLogOwnFood) survives an empty budget set.
+    expect(CLIENT_FLAG_META.canLogOwnFood.budgetGate).toBeUndefined();
+    expect(f.canLogOwnFood).toBe(true);
+  });
+
+  it("reserved features are exactly the unenforced roadmap flags", () => {
+    expect([...RESERVED_FEATURES].sort()).toEqual(["chat", "integrations"]);
+    for (const k of RESERVED_FEATURES) expect(FEATURE_KEYS).toContain(k);
   });
 
   it("tenant entitlements are the outer bound (no aiSuite -> no client AI)", () => {

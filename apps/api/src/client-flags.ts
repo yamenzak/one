@@ -10,10 +10,10 @@
  * by what a client bought (AI still meters against the tenant's own credits).
  */
 
-import { resolveClientFlags, parseFlagsJson, type Budget, type ClientFlags } from "@mossa/domain";
+import { resolveClientFlags, parseFlagsJson, type Budget, type ClientFlags, type Entitlements } from "@mossa/domain";
 import type { Context } from "hono";
 import type { AppEnv } from "./auth-context.js";
-import { tenantEntitlements } from "./billing-store.js";
+import { tenantEntitlements, hasFeature } from "./billing-store.js";
 import { parseJson } from "./db.js";
 
 /** Resolve a client's effective flags from their current subscription (if any). */
@@ -52,5 +52,24 @@ export async function requireClientFlag(
   if (!tenantId) return null;
   const flags = await resolveClientFlagsFor(c.env.DB, tenantId, clientId);
   if (!flags[flag]) return c.json({ error: "not included in your current plan", flag }, 403);
+  return null;
+}
+
+/**
+ * Gate a route on a PLATFORM entitlement (what the tenant bought from Mossa).
+ * The single fetch-and-gate helper — resolves the tenant's entitlements (status-
+ * clamped) and 403s with a uniform shape when the feature isn't in the plan.
+ * Companion to `requireClientFlag`; replaces the hand-rolled
+ * `tenantEntitlements()` + `if (!ent.features.x)` copies. Returns null to proceed.
+ */
+export async function requireFeature(
+  c: Context<AppEnv>,
+  feature: keyof Entitlements["features"],
+): Promise<Response | null> {
+  const tenantId = c.get("tenantId");
+  if (!tenantId) return c.json({ error: "no tenant" }, 403);
+  if (!(await hasFeature(c.env.DB, tenantId, feature))) {
+    return c.json({ error: `${feature} not in your plan`, feature }, 403);
+  }
   return null;
 }
