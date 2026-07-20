@@ -61,9 +61,10 @@ function b64urlToBuf(s: string): ArrayBuffer {
 
 /** Enroll a new passkey for the signed-in user. */
 export async function enrollPasskey(name: string): Promise<void> {
-  const options = await api.post<PublicKeyCredentialCreationOptionsJSON>(
+  // Better Auth serves the options as a GET (POST 404s) — the challenge is
+  // minted per request and bound to the session cookie.
+  const options = await api.get<PublicKeyCredentialCreationOptionsJSON>(
     "/api/auth/passkey/generate-register-options",
-    {},
   );
   const publicKey: PublicKeyCredentialCreationOptions = {
     ...(options as unknown as PublicKeyCredentialCreationOptions),
@@ -117,7 +118,9 @@ interface RequestOptionsJSON {
  * picks a passkey from the field dropdown; pass an AbortSignal to cancel it.
  */
 export async function signInWithPasskey(opts?: { conditional?: boolean; signal?: AbortSignal }): Promise<void> {
-  const options = await api.post<RequestOptionsJSON>("/api/auth/passkey/generate-authenticate-options", {});
+  // GET, like register-options (a POST 404s); this one also works pre-auth so
+  // the login screen's passkey button + autofill can call it.
+  const options = await api.get<RequestOptionsJSON>("/api/auth/passkey/generate-authenticate-options");
   const publicKey: PublicKeyCredentialRequestOptions = {
     challenge: b64urlToBuf(options.challenge),
     rpId: options.rpId,

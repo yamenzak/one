@@ -1484,6 +1484,26 @@ describe("OTP-send gate — sign-up eligibility + cooldown", () => {
   });
 });
 
+describe("passkey — Better Auth endpoint methods (regression)", () => {
+  // The option endpoints are GETs; the client used to POST them and silently
+  // 404'd, so passkey enroll + sign-in never worked. Lock the methods in.
+  const B = "http://localhost:8787";
+  it("register-options is GET (POST 404s); authenticate-options is GET and pre-auth", async () => {
+    const getReg = await SELF.fetch(`${B}/api/auth/passkey/generate-register-options`, { headers: auth(ownerCookie) });
+    expect(getReg.status).toBe(200);
+    expect(((await getReg.json()) as { challenge?: string }).challenge).toBeTruthy();
+
+    const postReg = await SELF.fetch(`${B}/api/auth/passkey/generate-register-options`, { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: "{}" });
+    expect(postReg.status).toBe(404);
+
+    // Sign-in options are a GET too, and must work with no session (the login
+    // screen's passkey button + autofill call it before authenticating).
+    const anon = await SELF.fetch(`${B}/api/auth/passkey/generate-authenticate-options`, { headers: { origin: B } });
+    expect(anon.status).toBe(200);
+    expect(((await anon.json()) as { challenge?: string }).challenge).toBeTruthy();
+  });
+});
+
 describe("foods — tenant isolation + copy-on-write", () => {
   const mkFood = (over: Record<string, unknown>) => ({
     name: "Test Bar", calories: 200, proteinG: 10, source: "usda", sourceId: "SHARED-123", ...over,
