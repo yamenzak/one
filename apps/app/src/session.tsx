@@ -24,6 +24,9 @@ type Mode = "coach" | "train";
 export interface HostInfo {
   platform: boolean;
   tenant: { tenantId: string; name: string; slug: string; branding: TenantBranding | null; allowSignup: boolean } | null;
+  /** Cloudflare Turnstile — the login renders the widget when a site key is set
+   *  and `enabled` (a server secret is configured, so codes are gated on it). */
+  turnstile?: { siteKey: string | null; enabled: boolean } | null;
 }
 
 interface Session {
