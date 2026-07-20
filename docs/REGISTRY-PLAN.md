@@ -69,6 +69,33 @@ gate + task + cost + prompt; colour/icon/unit resolve through `metrics`/`tones`.
 - **P3 — new facets**: coach-action audit log; two-level legal/privacy consent;
   fully-populated done-message / activity-feed string registry.
 
+## Status (shipped)
+
+The refactor landed as seven squash-merged PRs, each green:
+
+- **P0a** (#65) — `perms.ts` is the RBAC source of truth; `access.ts` guarded by a
+  conformance test; bounded custom grants (`intersectGrant`).
+- **P0b** (#66) — `METRICS` absorbs the 8 inline body metrics + `unitDimension`/
+  `noConvert`; `FASTING_ZONES` + `POSTURE_SEVERITY_TONE` de-duped.
+- **P0c** (#67) — `NOTIF_TYPES` atom; `notify()` derives category from type; the
+  weekly digest honours the owner email policy.
+- **P0d** (#68) — `requireFeature` gate helper; budget gating derives from
+  `CLIENT_FLAG_META.budgetGate`; distance unit symmetry; `RESERVED_FEATURES`.
+- **P1** (#69) — `FEATURES` spine + `gateSpecOf`/`gateFeature`; conformance test;
+  the four AI flag-paired gates collapsed onto the record.
+- **P2** (#70) — body-scan gates from its record via `gateFeature` (closing an
+  unenforced `canUseBodyScan` gap); cross-package metric conformance in the app.
+- **P3** (#71) — `AUDIT_ACTIONS` + `recordAudit()` wired into the key coach
+  mutations; `GET /clients/:id/audit`.
+
+**Deferred (scoped follow-up):** the two-level legal/privacy **consent flows**
+(decision 3) are a product feature — versioned TOS, per-tenant + per-client
+consent capture and UI — needing product/design input beyond a registry, so the
+facet is scaffolded conceptually but the flows are not built. The
+done-message/activity-feed string registry was folded into P0c where it mattered
+(the notif-type vocabulary); the remaining feed titles are single-use and left
+in place.
+
 ## Guardrails
 
 Every phase merges only with the workspace suite green. A registry-conformance
