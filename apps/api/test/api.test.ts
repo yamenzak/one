@@ -1763,6 +1763,19 @@ describe("passkey — Better Auth endpoint methods (regression)", () => {
     const delNoAuth = await SELF.fetch(`${B}/api/auth/passkey/delete-passkey`, { method: "POST", headers: { "content-type": "application/json", origin: B }, body: JSON.stringify({ id: "nope" }) });
     expect(delNoAuth.status).toBe(401);
   });
+
+  it("enroll works for a day-old session (freshAge:0 — no SESSION_NOT_FRESH lockout)", async () => {
+    const db = env.DB as D1Database;
+    // Age every session well past Better Auth's 1-day `freshAge` default. The
+    // passkey enroll's FIRST call (generate-register-options) runs behind
+    // freshSessionMiddleware; without `session: { freshAge: 0 }` an old session
+    // would 403 SESSION_NOT_FRESH here — so a user signed in >1 day couldn't add
+    // a passkey at all. With the fix it still mints options.
+    await db.prepare("UPDATE session SET createdAt = ?").bind(new Date(Date.now() - 3 * 86_400_000).toISOString()).run();
+    const res = await SELF.fetch(`${B}/api/auth/passkey/generate-register-options`, { headers: auth(ownerCookie) });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { challenge?: string }).challenge).toBeTruthy();
+  });
 });
 
 describe("white-label — public brand assets + per-tenant PWA manifest", () => {
