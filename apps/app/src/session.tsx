@@ -4,7 +4,8 @@
  * powers + nav, never screens).
  */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { SessionContext, TenantBranding } from "@mossa/protocol";
 import { api, setUnauthorizedHandler } from "./api.js";
 
@@ -95,6 +96,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     },
     [refresh],
   );
+
+  // Tenant hint from an email deep-link (`?t=<tenantId>`): a link opened in a
+  // fresh browser has no session context, so it can't know which studio to land
+  // in for a user who belongs to several. Once the session resolves, if the hint
+  // names a DIFFERENT tenant, switch to it (the server validates membership) —
+  // then strip the param so it doesn't re-fire or linger. Runs once; the deep-
+  // link path + its item param (e.g. ?lab=) are preserved for the target screen.
+  const [params, setParams] = useSearchParams();
+  const tenantHintDone = useRef(false);
+  useEffect(() => {
+    if (loading || !ctx?.active || tenantHintDone.current) return;
+    const t = params.get("t");
+    tenantHintDone.current = true;
+    if (!t) return;
+    setParams((prev) => { prev.delete("t"); return prev; }, { replace: true });
+    if (t !== ctx.active.tenantId) void switchTenant(t).catch(() => undefined);
+  }, [loading, ctx, params, setParams, switchTenant]);
 
   const signOut = useCallback(async () => {
     // The session cookie is HttpOnly — ONLY the server can clear it — so the

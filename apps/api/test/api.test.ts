@@ -577,6 +577,31 @@ describe("notification coverage — new signals", () => {
     expect(all.results.length).toBe(2);
     expect(all.results.some((r) => r.title.includes("extended"))).toBe(true);
   });
+
+  it("notification links carry the specific item (deep-link params)", async () => {
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+    const coach = await ghostTrainer(tenantId);
+    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "DeepLinkDan" }) })).json()) as { client: { id: string } }).client.id;
+    await clientWithUser("DeepLinkDan", tenantId, "usr_dlclient", clientId);
+    await db.prepare("UPDATE client_trainers SET trainer_user_id = ? WHERE client_id = ?").bind(coach, clientId).run();
+
+    // A client check-in → the trainer's notification deep-links to that check-in.
+    const chk = (await (await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H(), body: JSON.stringify({ clientId, data: { date: "2026-06-01", mood: 4, notes: "good week" } }) })).json()) as { id: string };
+    const ciLink = (await db.prepare("SELECT link FROM notifications WHERE recipient_user_id = ? AND type = 'check_in'").bind(coach).first<{ link: string }>())!.link;
+    expect(ciLink).toBe(`/clients/${clientId}/manage?checkin=${chk.id}`);
+
+    // Coach feedback → the client's notification deep-links to the check-in by date.
+    await SELF.fetch(`http://x/api/check-ins/${chk.id}/feedback`, { method: "POST", headers: H(), body: JSON.stringify({ clientId, feedback: "great job" }) });
+    const fbLink = (await db.prepare("SELECT link FROM notifications WHERE recipient_user_id = 'usr_dlclient' AND type = 'feedback'").first<{ link: string }>())!.link;
+    expect(fbLink).toBe("/wellness?checkin=2026-06-01");
+
+    // A lab request → the client's notification deep-links to that lab on Wellness.
+    const lab = (await (await SELF.fetch("http://x/api/labs", { method: "POST", headers: H(), body: JSON.stringify({ clientId, type: "bloodwork", displayName: "Full panel" }) })).json()) as { id: string };
+    const labLink = (await db.prepare("SELECT link FROM notifications WHERE recipient_user_id = 'usr_dlclient' AND type = 'lab_requested'").first<{ link: string }>())!.link;
+    expect(labLink).toBe(`/wellness?lab=${lab.id}`);
+  });
 });
 
 describe("platform rail — dunning notifies the owner", () => {

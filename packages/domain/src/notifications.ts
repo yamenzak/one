@@ -132,17 +132,17 @@ export interface NotifTypeMeta {
 
 export const NOTIF_TYPES: Record<NotifType, NotifTypeMeta> = {
   check_in: { category: "check-ins", to: "staff" }, // title interpolates client name
-  feedback: { category: "check-ins", to: "client", title: "Coach feedback on your check-in", link: "/progress",
+  feedback: { category: "check-ins", to: "client", title: "Coach feedback on your check-in", link: "/wellness",
     template: { subject: "{{coachName}} left you feedback", body: "<p>{{coachName}} reviewed your latest check-in and left feedback. Open {{studioName}} to read it and keep your momentum going.</p>" }, vars: ["coachName", "studioName"] },
   body_fat_logged: { category: "body-composition", to: "staff" }, // title interpolates client name
   pr_achieved: { category: "activity", to: "staff" }, // title interpolates client + lift name
   plan_published: { category: "plans-goals", to: "client",
     template: { subject: "Your new {{planName}} is ready", body: "<p>{{coachName}} just published <strong>{{planName}}</strong> for you. Take a look and get started.</p>" }, vars: ["coachName", "planName"] }, // title + link vary by plan kind
-  goal_set: { category: "plans-goals", to: "client", title: "Your coach set a new goal", link: "/progress",
+  goal_set: { category: "plans-goals", to: "client", title: "Your coach set a new goal", link: "/progress?tab=body",
     template: { subject: "A new goal from {{coachName}}", body: "<p>{{coachName}} set a new goal for you: <strong>{{goalLabel}}</strong>. Open {{studioName}} to see the details.</p>" }, vars: ["coachName", "goalLabel", "studioName"] },
-  lab_requested: { category: "labs", to: "client", title: "New lab test requested", link: "/progress" },
+  lab_requested: { category: "labs", to: "client", title: "New lab test requested", link: "/wellness" },
   lab_uploaded: { category: "labs", to: "staff" }, // title interpolates client name
-  lab_reviewed: { category: "labs", to: "client", title: "Your coach reviewed your lab results", link: "/progress" },
+  lab_reviewed: { category: "labs", to: "client", title: "Your coach reviewed your lab results", link: "/wellness" },
   supplement_added: { category: "labs", to: "client", title: "New supplement added", link: "/wellness" },
   supplement_updated: { category: "labs", to: "client", title: "A supplement was updated", link: "/wellness",
     template: { subject: "{{coachName}} updated a supplement", body: "<p>{{coachName}} updated <strong>{{supplementName}}</strong> in your plan. Open {{studioName}} to see what changed.</p>" }, vars: ["coachName", "supplementName", "studioName"] },

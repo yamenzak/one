@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "motion/react";
 import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, fmtEnergy, kcalToDisplay, POSTURE_GUIDANCE, type RangePreset, type SeriesDelta } from "@mossa/domain";
 
@@ -47,9 +48,18 @@ type Tab = "overview" | "body" | "training" | "wellness";
 const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 const dense = (series: Pt[], days: string[]): (number | null)[] => { const m = new Map(series.map((p) => [p.date, p.v])); return days.map((d) => m.get(d) ?? null); };
 
+const isTab = (t: string | null): t is Tab => t === "overview" || t === "body" || t === "training" || t === "wellness";
+
 export function Progress({ clientId }: { clientId: string }) {
   const [data, setData] = useState<ProgressData | null>(null);
-  const [tab, setTab] = useState<Tab>("overview");
+  // Deep-link: a notification (or another screen) can open a specific lens via
+  // `?tab=body|training|wellness`. Seed from it once, then strip the param.
+  const [params, setParams] = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => (isTab(params.get("tab")) ? (params.get("tab") as Tab) : "overview"));
+  useEffect(() => {
+    if (params.get("tab")) setParams((p) => { p.delete("tab"); return p; }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [range, setRange] = useState<RangePreset>("30d");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);

@@ -73,9 +73,17 @@ function categoryEyebrow(category: NotifCategory): string | undefined {
   return NOTIF_CATEGORIES.find((c) => c.key === category)?.label;
 }
 
-function notifEmailHtml(env: Env, brand: BrandKit, r: { title: string; message?: string | null; link: string | null; footnote?: string | null; eyebrow?: string }): string {
+/** Append the recipient's tenant to an email deep-link. An email opens in a
+ *  fresh browser with no session context, so the app can't know which studio to
+ *  land in for a user who belongs to several — the `?t=` hint tells it to switch
+ *  to this tenant before routing (the app reads + strips it at boot). */
+function withTenantHint(url: string, tenantId: string): string {
+  return `${url}${url.includes("?") ? "&" : "?"}t=${encodeURIComponent(tenantId)}`;
+}
+
+function notifEmailHtml(env: Env, brand: BrandKit, tenantId: string, r: { title: string; message?: string | null; link: string | null; footnote?: string | null; eyebrow?: string }): string {
   const base = env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
-  const href = r.link && base ? `${base}${r.link.startsWith("/") ? "" : "/"}${r.link}` : null;
+  const href = r.link && base ? withTenantHint(`${base}${r.link.startsWith("/") ? "" : "/"}${r.link}`, tenantId) : null;
   const body = `${r.message ? `<p style="margin:0">${escapeHtml(r.message)}</p>` : ""}${href ? emailButton(`Open ${brand.name}`, href, brand) : ""}`;
   return emailShell(escapeHtml(r.title), body, { brand, preheader: r.message ?? r.title, footnote: r.footnote ?? undefined, eyebrow: r.eyebrow });
 }
@@ -156,14 +164,14 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
           html = input.emailHtml;
         } else if (tpl) {
           const base = env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
-          const href = link && base ? `${base}${link.startsWith("/") ? "" : "/"}${link}` : null;
+          const href = link && base ? withTenantHint(`${base}${link.startsWith("/") ? "" : "/"}${link}`, input.tenantId) : null;
           const raw: Record<string, string | number | null | undefined> = { studioName: brand.name, ...(input.vars ?? {}) };
           const esc = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, escapeHtml(v === undefined || v === null ? "" : String(v))]));
           subject = renderTemplate(tpl.subject, raw);
           const inner = renderTemplate(tpl.body, esc) + (href ? emailButton(`Open ${brand.name}`, href, brand) : "");
           html = emailShell(escapeHtml(subject), inner, { brand, preheader: subject, footnote, eyebrow });
         } else {
-          html = notifEmailHtml(env, brand, { title, message: input.message, link, footnote: signature, eyebrow });
+          html = notifEmailHtml(env, brand, input.tenantId, { title, message: input.message, link, footnote: signature, eyebrow });
         }
         if (isPlatformBilling) {
           await sendEmail(env.DB, { to: user.email, subject, html, text: input.message ?? subject }, env.EMAIL, undefined, env.ENVIRONMENT === "development").catch(() => undefined);

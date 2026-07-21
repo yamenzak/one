@@ -213,7 +213,12 @@ async function digestForTenant(env: Env, tenantId: string, _brand: string, weekA
   const policyRow = await db.prepare("SELECT notif_policy_json FROM tenant_settings WHERE tenant_id = ?").bind(tenantId).first<{ notif_policy_json: string | null }>();
   if (!emailAllowedByPolicy(parseNotifPolicy(policyRow?.notif_policy_json ?? null), "digest")) return;
   const brand = await tenantBrandKit(db, tenantId);
-  const appHref = env.BETTER_AUTH_URL?.replace(/\/$/, "") || null;
+  // Every CTA carries the tenant hint (?t=) so a multi-studio recipient lands in
+  // THIS studio; the coach CTA deep-links to /today, where the attention queue
+  // lives. The app reads + strips ?t= at boot before routing.
+  const base = env.BETTER_AUTH_URL?.replace(/\/$/, "") || null;
+  const hint = (path: string): string | null => (base ? `${base}${path}${path.includes("?") ? "&" : "?"}t=${encodeURIComponent(tenantId)}` : null);
+  const appHref = hint("/today");
 
   // Attention rollup over the whole active roster — the SAME computation the
   // in-app "Needs attention" queue uses, so email and app never disagree. Owners

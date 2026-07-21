@@ -4,7 +4,8 @@
  * per-client report.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
 import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, PhotoGrid, ConfirmDialog, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon, User } from "@mossa/ui";
 import { api } from "../../api.js";
@@ -22,6 +23,18 @@ interface Swap { id: string; reason: string | null; status: string; day_index: n
 interface Lab { id: string; display_name: string; status: string; client_notes?: string | null; file_key?: string | null; values?: { marker: string; value: string; unit?: string; flag?: string }[] | null; trainer_feedback?: string | null }
 interface Supp { id: string; name: string; dose: string | null; kind: string; status: string; schedule?: { slot: string }[] }
 interface CheckIn { id: string; date_local: string; mood: number | null; energy: number | null; stress: number | null; sleep_hours: number | null; weight_kg: number | null; steps_count: number | null; notes: string | null; photos_json: string | null; trainer_feedback: string | null }
+
+/** Scroll a deep-linked row into view and pulse a highlight ring so the coach's
+ *  eye lands on the exact item a notification pointed them at. */
+function focusRow(id: string): boolean {
+  const el = document.getElementById(id);
+  if (!el) return false;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  const ring = ["ring-2", "ring-primary", "ring-offset-2", "ring-offset-background"];
+  el.classList.add(...ring, "rounded-2xl");
+  setTimeout(() => el.classList.remove(...ring), 2400);
+  return true;
+}
 
 export function ClientManage({ clientId }: { clientId: string }) {
   const { ctx } = useSession();
@@ -54,6 +67,28 @@ export function ClientManage({ clientId }: { clientId: string }) {
     setSubs(s.subscriptions); setPackages(p.packages); setSwaps(sw.swaps); setLabs(l.labs); setSupps(su.supplements); setCheckIns(ci.checkIns); setExercises(ex.exercises);
   }, [clientId]);
   useEffect(() => void load(), [load]);
+
+  // Deep-link: a notification points here at a specific item — open the lab
+  // review sheet, or scroll+highlight the check-in / swap row. Runs once the
+  // data is loaded, then strips the param so it doesn't re-fire.
+  const [params, setParams] = useSearchParams();
+  const deepLinkDone = useRef(false);
+  useEffect(() => {
+    if (!subs || deepLinkDone.current) return;
+    const labId = params.get("lab");
+    const checkinId = params.get("checkin");
+    const swapId = params.get("swap");
+    if (!labId && !checkinId && !swapId) return;
+    deepLinkDone.current = true;
+    if (labId) { const l = labs.find((x) => x.id === labId); if (l) setReviewLab(l); }
+    // Let the rows paint before scrolling to one.
+    const t = setTimeout(() => {
+      if (checkinId) focusRow(`mng-ci-${checkinId}`);
+      else if (swapId) focusRow(`mng-swap-${swapId}`);
+    }, 120);
+    setParams((prev) => { prev.delete("lab"); prev.delete("checkin"); prev.delete("swap"); return prev; }, { replace: true });
+    return () => clearTimeout(t);
+  }, [subs, labs, params, setParams]);
 
   const grant = async (packageId: string) => { await api.post("/api/subscriptions/grant", { clientId, packageId }); setGrantOpen(false); await load(); };
   const resolveSwap = async (id: string, status: "approved" | "rejected", replacementExerciseId?: string) => { await api.patch(`/api/swaps/${id}`, { status, replacementExerciseId }); await load(); };
@@ -95,7 +130,7 @@ export function ClientManage({ clientId }: { clientId: string }) {
         <Stagger>
           <Card className="space-y-3">
             <div className="flex items-center gap-2.5"><IconBadge icon={ArrowLeftRight} tone="cardio" size="sm" /><h2 className="font-semibold">Swap requests</h2><Badge tone="cardio">{pending.length}</Badge></div>
-            {pending.map((s) => <SwapResolver key={s.id} swap={s} exercises={exercises} onResolve={resolveSwap} />)}
+            {pending.map((s) => <div key={s.id} id={`mng-swap-${s.id}`}><SwapResolver swap={s} exercises={exercises} onResolve={resolveSwap} /></div>)}
           </Card>
         </Stagger>
       )}
@@ -307,7 +342,7 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
         const photos = checkInPhotos(c.photos_json);
         const meta = [c.mood != null ? `mood ${c.mood}/5` : null, c.energy != null ? `energy ${c.energy}/5` : null, c.sleep_hours ? `${c.sleep_hours}h sleep` : null, c.steps_count ? `${c.steps_count.toLocaleString()} steps` : null].filter(Boolean).join(" · ");
         return (
-          <SubCard key={c.id} className="space-y-2">
+          <SubCard key={c.id} id={`mng-ci-${c.id}`} className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium">{new Date(c.date_local).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}</span>
               {c.weight_kg && <span className="numeral text-xs font-medium text-muted-foreground">{fmtWeight(c.weight_kg, units)}</span>}

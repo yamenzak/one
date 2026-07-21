@@ -724,7 +724,7 @@ export const logRoutes = new Hono<AppEnv>()
       .bind(access.client.id)
       .first<{ trainer_user_id: string }>();
     if (primary && primary.trainer_user_id !== c.get("user")?.id) {
-      await notify(c.env, { tenantId: access.client.tenant_id, userId: primary.trainer_user_id, type: "check_in", title: `${access.client.display_name} checked in`, message: d.notes ?? "", link: `/clients/${access.client.id}/manage` });
+      await notify(c.env, { tenantId: access.client.tenant_id, userId: primary.trainer_user_id, type: "check_in", title: `${access.client.display_name} checked in`, message: d.notes ?? "", link: `/clients/${access.client.id}/manage?checkin=${id}` });
     }
     return c.json({ ok: true, id }, 201);
   })
@@ -768,7 +768,10 @@ export const logRoutes = new Hono<AppEnv>()
       .bind(parsed.data.feedback, user.id, nowIso(), c.req.param("id"), access.client.id)
       .run();
     if (access.client.user_id) {
-      await notify(c.env, { tenantId: access.client.tenant_id, userId: access.client.user_id, type: "feedback", message: parsed.data.feedback.slice(0, 200), vars: { coachName: user.name || "Your coach" } });
+      // Deep-link to the exact check-in on the client's Wellness screen, which
+      // keys check-ins by their local date (?checkin=<date_local>).
+      const ci = await c.env.DB.prepare("SELECT date_local FROM check_ins WHERE id = ? AND client_id = ?").bind(c.req.param("id"), access.client.id).first<{ date_local: string }>();
+      await notify(c.env, { tenantId: access.client.tenant_id, userId: access.client.user_id, type: "feedback", message: parsed.data.feedback.slice(0, 200), link: ci?.date_local ? `/wellness?checkin=${ci.date_local}` : undefined, vars: { coachName: user.name || "Your coach" } });
     }
     await recordAudit(c.env, { tenantId: access.client.tenant_id, clientId: access.client.id, actorUserId: user.id, action: "checkin.feedback", summary: parsed.data.feedback.slice(0, 80), ref: c.req.param("id") });
     return c.json({ ok: true });
