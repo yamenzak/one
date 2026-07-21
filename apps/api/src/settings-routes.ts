@@ -11,7 +11,7 @@ import { AI_TONES, TTS_VOICES, TTS_VOICE_IDS } from "@mossa/protocol";
 import { categoriesForRole, resolveAllChannels, parseNotifPrefs, NOTIF_CATEGORIES, parseNotifPolicy, resolveEmailPolicy, sanitizeEmailPolicy, type NotifRole, type StoredNotifPrefs } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { tenantEntitlements, getConfig } from "./billing-store.js";
-import { requireFeature } from "./client-flags.js";
+import { gateFeature } from "./client-flags.js";
 import { nowIso, periodKey } from "./ids.js";
 import { parseJson, j } from "./db.js";
 import { invalidateHostCache } from "./host-context.js";
@@ -98,7 +98,7 @@ export const settingsRoutes = new Hono<AppEnv>()
 
     // Branding edits require the entitlement.
     if (d.branding) {
-      const gate = await requireFeature(c, "branding"); if (gate) return gate;
+      const gate = await gateFeature(c, "branding"); if (gate) return gate;
     }
 
     const existing = await c.env.DB.prepare("SELECT branding_json, ai_toggles_json, marketplace_json, integrations_json FROM tenant_settings WHERE tenant_id = ?")

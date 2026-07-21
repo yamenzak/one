@@ -17,7 +17,7 @@ import {
   type Budget,
 } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
-import { hasFeature } from "./billing-store.js";
+import { gateFeature } from "./client-flags.js";
 import { requireClientAccess } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
@@ -105,7 +105,7 @@ export const commerceRoutes = new Hono<AppEnv>()
 
   .post("/packages", async (c) => {
     const who = requireTenant(c)!;
-    if (!(await hasFeature(c.env.DB, who.tenantId, "commerce"))) return c.json({ error: "commerce not in your plan" }, 403);
+    { const g = await gateFeature(c, "commerce"); if (g) return g; }
     const parsed = PackageBody.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body", issues: parsed.error.issues }, 400);
     const d = parsed.data;
@@ -187,7 +187,7 @@ export const commerceRoutes = new Hono<AppEnv>()
     if (c.get("role") !== "owner" && c.get("role") !== "trainer") {
       return c.json({ error: "forbidden" }, 403);
     }
-    if (!(await hasFeature(c.env.DB, who.tenantId, "commerce"))) return c.json({ error: "commerce not in your plan" }, 403);
+    { const g = await gateFeature(c, "commerce"); if (g) return g; }
     const parsed = z
       .object({ clientId: z.string(), packageId: z.string() })
       .safeParse(await c.req.json().catch(() => null));
@@ -261,7 +261,7 @@ export const commerceRoutes = new Hono<AppEnv>()
 
   .post("/redemption-codes", async (c) => {
     const who = requireTenant(c)!;
-    if (!(await hasFeature(c.env.DB, who.tenantId, "commerce"))) return c.json({ error: "commerce not in your plan" }, 403);
+    { const g = await gateFeature(c, "commerce"); if (g) return g; }
     const parsed = z
       .object({
         code: z.string().min(4).max(40),

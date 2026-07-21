@@ -8,7 +8,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { remainingAddOnQuantity, type AddOnBalance } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
-import { hasFeature } from "./billing-store.js";
+import { gateFeature } from "./client-flags.js";
 import { requireClientAccess } from "./clients.js";
 import { notify } from "./notify.js";
 import { newId, nowIso } from "./ids.js";
@@ -26,7 +26,7 @@ export const sessionRoutes = new Hono<AppEnv>()
   .post("/addon-types", async (c) => {
     const who = requireTenant(c)!;
     if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
-    if (!(await hasFeature(c.env.DB, who.tenantId, "frontDesk"))) return c.json({ error: "frontDesk not in your plan" }, 403);
+    { const g = await gateFeature(c, "sessions"); if (g) return g; }
     const b = z.object({ label: z.string().min(1).max(80), slug: z.string().max(40).optional(), durationMinutes: z.number().int().positive().default(30), standalonePriceCents: z.number().int().min(0).nullish() }).safeParse(await c.req.json().catch(() => null));
     if (!b.success) return c.json({ error: "invalid body" }, 400);
     const id = newId("aot");
@@ -53,7 +53,7 @@ export const sessionRoutes = new Hono<AppEnv>()
   .post("/sessions", async (c) => {
     const who = requireTenant(c)!;
     if (!staff(c)) return c.json({ error: "forbidden" }, 403);
-    if (!(await hasFeature(c.env.DB, who.tenantId, "frontDesk"))) return c.json({ error: "frontDesk not in your plan" }, 403);
+    { const g = await gateFeature(c, "sessions"); if (g) return g; }
     const b = z.object({ clientId: z.string(), addOnTypeId: z.string(), scheduledAt: z.string(), durationMinutes: z.number().int().positive().default(30), notes: z.string().max(500).nullish() }).safeParse(await c.req.json().catch(() => null));
     if (!b.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, b.data.clientId);

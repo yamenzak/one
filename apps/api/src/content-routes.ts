@@ -10,7 +10,7 @@ import { z } from "zod";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { notify } from "./notify.js";
-import { hasFeature } from "./billing-store.js";
+import { gateFeature } from "./client-flags.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
 
@@ -133,8 +133,7 @@ export const contentHubRoutes = new Hono<AppEnv>()
     const d = parsed.data;
     // Public (marketplace-SEO) content is a white-label capability; other
     // audiences (clients / assigned) are available on every plan.
-    if (d.audience === "public" && !(await hasFeature(c.env.DB, who.tenantId, "branding")))
-      return c.json({ error: "public content requires the branding plan feature" }, 403);
+    if (d.audience === "public") { const g = await gateFeature(c, "branding"); if (g) return g; }
     const id = newId("res");
     // A stable, URL-safe slug (title + short id suffix) for headless fetch.
     const slug = `${slugify(d.title) || "post"}-${id.slice(-6)}`;
@@ -165,8 +164,7 @@ export const contentHubRoutes = new Hono<AppEnv>()
     if (d.topics) put("topics", d.topics.join(","));
     if (d.muscleGroups) put("muscle_groups", d.muscleGroups.join(","));
     if (d.durationMinutes !== undefined) put("duration_minutes", d.durationMinutes);
-    if (d.audience === "public" && !(await hasFeature(c.env.DB, who.tenantId, "branding")))
-      return c.json({ error: "public content requires the branding plan feature" }, 403);
+    if (d.audience === "public") { const g = await gateFeature(c, "branding"); if (g) return g; }
     if (d.audience) put("audience", d.audience);
     if (d.assignedClientIds) put("assigned_json", j(d.assignedClientIds));
     put("updated_at", nowIso());
