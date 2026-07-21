@@ -197,7 +197,7 @@ export const healthRoutes = new Hono<AppEnv>()
       .run();
     // Notify the client to complete the request.
     if (access.client.user_id) {
-      await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "lab_requested", title: "New lab test requested", message: d.displayName ?? d.type, link: "/progress" });
+      await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "lab_requested", message: d.displayName ?? d.type });
     }
     await recordAudit(c.env, { tenantId: who.tenantId, clientId: access.client.id, actorUserId: who.userId, action: "lab.request", summary: d.displayName ?? d.type, ref: id });
     return c.json({ ok: true, id }, 201);
@@ -256,7 +256,7 @@ export const healthRoutes = new Hono<AppEnv>()
       .run();
     if (d.status === "reviewed") {
       const lab = await c.env.DB.prepare("SELECT c.user_id AS user_id, c.id AS client_id, l.display_name AS name FROM lab_tests l JOIN clients c ON c.id = l.client_id WHERE l.id = ? AND l.tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ user_id: string | null; client_id: string; name: string | null }>();
-      if (lab?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: lab.user_id, type: "lab_reviewed", title: "Your coach reviewed your lab results", message: lab.name ?? "", link: "/progress" });
+      if (lab?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: lab.user_id, type: "lab_reviewed", message: lab.name ?? "" });
       if (lab?.client_id) await recordAudit(c.env, { tenantId: who.tenantId, clientId: lab.client_id, actorUserId: who.userId, action: "lab.review", summary: lab.name ?? "", ref: c.req.param("id") });
     }
     return c.json({ ok: true });
@@ -498,11 +498,11 @@ export const healthRoutes = new Hono<AppEnv>()
       });
       // Notify the client their swap was applied.
       const client = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null }>();
-      if (client?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: client.user_id, type: "swap_approved", title: "Your exercise swap was applied", link: "/train" });
+      if (client?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: client.user_id, type: "swap_approved" });
     } else if (parsed.data.status === "rejected") {
       // Previously silent — the client was left waiting. Tell them the coach kept the original.
       const client = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null }>();
-      if (client?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: client.user_id, type: "swap_rejected", title: "Your coach kept the original exercise", message: parsed.data.trainerNote ?? "", link: "/train" });
+      if (client?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: client.user_id, type: "swap_rejected", message: parsed.data.trainerNote ?? "" });
     }
     await recordAudit(c.env, { tenantId: who.tenantId, clientId: row.client_id, actorUserId: who.userId, action: "swap.decide", summary: parsed.data.status, ref: c.req.param("id") });
     return c.json({ ok: true });

@@ -144,9 +144,7 @@ async function dailySweep(env: Env): Promise<void> {
   for (const s of toSuspend.results ?? []) {
     await notifyOwners(env, s.tenant_id, {
       type: "billing_suspended",
-      title: "Your studio is suspended",
       message: "Your Mossa subscription lapsed, so paid features are paused for you and your clients. Update your payment to restore everything.",
-      link: "/business",
       dedupeKey: `susp_${s.tenant_id}`,
     });
   }
@@ -165,9 +163,7 @@ async function dailySweep(env: Env): Promise<void> {
   for (const s of toCancel.results ?? []) {
     await notifyOwners(env, s.tenant_id, {
       type: "billing_canceled",
-      title: "Subscription canceled",
       message: "Your studio dropped to the free plan after non-payment. Resubscribe any time to bring back paid features.",
-      link: "/business",
       dedupeKey: `cancel_${s.tenant_id}`,
     });
   }
@@ -192,24 +188,25 @@ async function reminderSweep(env: Env): Promise<void> {
     const budgets = parseJson<{ expiresAt: string }[]>(sub.budgets_json, []);
     if (!budgets.length) continue;
     const latest = Math.max(0, ...budgets.map((b) => Date.parse(b.expiresAt)));
-    const nudge = async (type: NotifType, title: string, message: string, marker: string) => {
+    const nudge = async (type: NotifType, message: string, marker: string) => {
       const client = await env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(sub.client_id).first<{ user_id: string | null }>();
       if (client?.user_id) {
-        await notify(env, { tenantId: sub.tenant_id, userId: client.user_id, type, title, message, link: "/shop", dedupeKey: `${marker}_${sub.id}` });
+        // Title + link (/shop) come from the type's record.
+        await notify(env, { tenantId: sub.tenant_id, userId: client.user_id, type, message, dedupeKey: `${marker}_${sub.id}` });
       }
       await env.DB.prepare("UPDATE client_subscriptions SET notes = ? WHERE id = ?").bind(`${notes} ${marker}`.trim(), sub.id).run().catch(() => undefined);
     };
     // Fully lapsed → one "expired" nudge, and reconcile the status.
     if (latest > 0 && latest <= now) {
       if (!notes.includes("expired-notified")) {
-        await nudge("sub_expired", "Your access has expired", "Renew to pick your plan back up where you left off.", "expired-notified");
+        await nudge("sub_expired", "Renew to pick your plan back up where you left off.", "expired-notified");
         await env.DB.prepare("UPDATE client_subscriptions SET status = 'expired' WHERE id = ?").bind(sub.id).run().catch(() => undefined);
       }
       continue;
     }
     // Within 3 days of lapsing → one "expiring soon" nudge.
     if (latest > now && latest < soon && !notes.includes("expiry-notified")) {
-      await nudge("sub_expiring", "Your plan is expiring soon", "Renew to keep your coaching access.", "expiry-notified");
+      await nudge("sub_expiring", "Renew to keep your coaching access.", "expiry-notified");
     }
    } catch { /* skip this row; a bad record can't stall the whole sweep */ }
   }

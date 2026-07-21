@@ -70,9 +70,12 @@ export function isNotifCategory(k: string): k is NotifCategory {
 // ── Notification TYPES (the atom) ─────────────────────────────────────────────
 // Every notification `notify()` emits has a stable TYPE. The type is the SSOT
 // key; its CATEGORY (which governs preferences + the owner email policy) derives
-// from here, so a call site can never pair a type with the wrong category. Titles
-// and links stay at the call site (they interpolate names/ids); the registry owns
-// the type→category binding and the audience the type is meant for.
+// from here, so a call site can never pair a type with the wrong category. The
+// record also owns the DEFAULT title + link for types whose copy is fixed, so
+// notify() renders them from here and the call site passes only what varies
+// (the message, and for staff notifications the client-scoped link). Types whose
+// title genuinely interpolates a name (`Alex checked in`) carry no default title
+// and provide it at the call site.
 
 export type NotifType =
   // check-ins & feedback
@@ -102,38 +105,57 @@ export interface NotifTypeMeta {
   category: NotifCategory;
   /** Who the type is emitted to (documentation + future audience checks). */
   to: "client" | "staff" | "owner";
+  /** Default title, when the type's copy is fixed (no name interpolation).
+   *  Omitted for types whose title interpolates a name — those pass it in. */
+  title?: string;
+  /** Default in-app / email deep link, when it's fixed for this type.
+   *  Staff notifications that link to a specific client (`/clients/:id/…`)
+   *  omit it and pass the client-scoped link in. */
+  link?: string;
 }
 
 export const NOTIF_TYPES: Record<NotifType, NotifTypeMeta> = {
-  check_in: { category: "check-ins", to: "staff" },
-  feedback: { category: "check-ins", to: "client" },
-  body_fat_logged: { category: "body-composition", to: "staff" },
-  plan_published: { category: "plans-goals", to: "client" },
-  goal_set: { category: "plans-goals", to: "client" },
-  lab_requested: { category: "labs", to: "client" },
-  lab_uploaded: { category: "labs", to: "staff" },
-  lab_reviewed: { category: "labs", to: "client" },
-  supplement_added: { category: "labs", to: "client" },
-  swap_request: { category: "swaps", to: "staff" },
-  swap_approved: { category: "swaps", to: "client" },
-  swap_rejected: { category: "swaps", to: "client" },
-  content_assigned: { category: "content", to: "client" },
-  session_booked: { category: "sessions", to: "client" },
-  session_cancelled: { category: "sessions", to: "client" },
-  client_assigned: { category: "roster", to: "staff" },
-  sub_expired: { category: "commerce", to: "client" },
-  sub_expiring: { category: "commerce", to: "client" },
-  sub_payment_failed: { category: "commerce", to: "client" },
-  billing_suspended: { category: "billing", to: "owner" },
-  billing_canceled: { category: "billing", to: "owner" },
-  billing_past_due: { category: "billing", to: "owner" },
-  payment_disputed: { category: "sales", to: "owner" },
-  payment_refunded: { category: "sales", to: "owner" },
+  check_in: { category: "check-ins", to: "staff" }, // title interpolates client name
+  feedback: { category: "check-ins", to: "client", title: "Coach feedback on your check-in", link: "/progress" },
+  body_fat_logged: { category: "body-composition", to: "staff" }, // title interpolates client name
+  plan_published: { category: "plans-goals", to: "client" }, // title + link vary by plan kind
+  goal_set: { category: "plans-goals", to: "client", title: "Your coach set a new goal", link: "/progress" },
+  lab_requested: { category: "labs", to: "client", title: "New lab test requested", link: "/progress" },
+  lab_uploaded: { category: "labs", to: "staff" }, // title interpolates client name
+  lab_reviewed: { category: "labs", to: "client", title: "Your coach reviewed your lab results", link: "/progress" },
+  supplement_added: { category: "labs", to: "client", title: "New supplement added", link: "/wellness" },
+  swap_request: { category: "swaps", to: "staff" }, // title interpolates client name
+  swap_approved: { category: "swaps", to: "client", title: "Your exercise swap was applied", link: "/train" },
+  swap_rejected: { category: "swaps", to: "client", title: "Your coach kept the original exercise", link: "/train" },
+  content_assigned: { category: "content", to: "client", title: "Your coach shared something with you", link: "/explore" },
+  session_booked: { category: "sessions", to: "client", title: "Session booked", link: "/wellness" },
+  session_cancelled: { category: "sessions", to: "client", title: "Your session was cancelled", link: "/wellness" },
+  client_assigned: { category: "roster", to: "staff", title: "You've been assigned a client" }, // link is client-scoped
+  sub_expired: { category: "commerce", to: "client", title: "Your access has expired", link: "/shop" },
+  sub_expiring: { category: "commerce", to: "client", title: "Your plan is expiring soon", link: "/shop" },
+  sub_payment_failed: { category: "commerce", to: "client", title: "Renewal payment failed", link: "/shop" },
+  billing_suspended: { category: "billing", to: "owner", title: "Your studio is suspended", link: "/business" },
+  billing_canceled: { category: "billing", to: "owner", title: "Subscription canceled", link: "/business" },
+  billing_past_due: { category: "billing", to: "owner", title: "Payment failed", link: "/business" },
+  payment_disputed: { category: "sales", to: "owner", title: "A client payment was disputed", link: "/clients" },
+  payment_refunded: { category: "sales", to: "owner", title: "A client payment was refunded", link: "/clients" },
 };
 
 /** The category that governs a notification type's delivery preferences. */
 export function notifCategoryOf(type: NotifType): NotifCategory {
   return NOTIF_TYPES[type].category;
+}
+
+/** The default title for a type (from the registry), or null if it must be
+ *  supplied at the call site (name-interpolating titles). */
+export function notifTitleOf(type: NotifType): string | null {
+  return NOTIF_TYPES[type].title ?? null;
+}
+
+/** The default link for a type (from the registry), or null when the link is
+ *  contextual (client-scoped) and supplied at the call site. */
+export function notifLinkOf(type: NotifType): string | null {
+  return NOTIF_TYPES[type].link ?? null;
 }
 
 /** Categories a role can see/tune. */

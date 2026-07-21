@@ -7,7 +7,7 @@
  * transactional (invites, receipts).
  */
 
-import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, notifCategoryOf, type NotifType, type NotifRole } from "@mossa/domain";
+import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, notifCategoryOf, notifTitleOf, notifLinkOf, type NotifType, type NotifRole } from "@mossa/domain";
 import type { Env } from "./env.js";
 import { notifyUser } from "./inbox-do.js";
 import { sendTenantEmail } from "./email-provider.js";
@@ -20,8 +20,12 @@ export interface NotifyInput {
   /** The type is the SSOT key; its category (which governs preferences + the
    *  owner email policy) derives from the `NOTIF_TYPES` atom — never passed. */
   type: NotifType;
-  title: string;
+  /** Overrides the type's default title; required only for types whose title
+   *  interpolates a name (the registry has no default for those). */
+  title?: string;
   message?: string | null;
+  /** Overrides the type's default link; required only for client-scoped links
+   *  (`/clients/:id/…`) the registry can't know. */
   link?: string | null;
   /** Stable id part → INSERT OR IGNORE dedupe across retries/sweeps. */
   dedupeKey?: string;
@@ -58,11 +62,11 @@ export async function tenantBrandKit(db: D1Database, tenantId: string): Promise<
   return { name, accent, accentFg, logoUrl };
 }
 
-function notifEmailHtml(env: Env, brand: BrandKit, input: NotifyInput): string {
+function notifEmailHtml(env: Env, brand: BrandKit, r: { title: string; message?: string | null; link: string | null }): string {
   const base = env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
-  const href = input.link && base ? `${base}${input.link.startsWith("/") ? "" : "/"}${input.link}` : null;
-  const body = `${input.message ? `<p style="margin:0">${escapeHtml(input.message)}</p>` : ""}${href ? emailButton(`Open ${brand.name}`, href, brand) : ""}`;
-  return emailShell(escapeHtml(input.title), body, { brand, preheader: input.message ?? input.title });
+  const href = r.link && base ? `${base}${r.link.startsWith("/") ? "" : "/"}${r.link}` : null;
+  const body = `${r.message ? `<p style="margin:0">${escapeHtml(r.message)}</p>` : ""}${href ? emailButton(`Open ${brand.name}`, href, brand) : ""}`;
+  return emailShell(escapeHtml(r.title), body, { brand, preheader: r.message ?? r.title });
 }
 
 /** Deliver a notification to one user, honoring their preferences. */
@@ -70,6 +74,11 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
   if (!input.userId) return;
   const userId = input.userId;
   const category = notifCategoryOf(input.type);
+  // Title + link derive from the type's record unless the call site overrides
+  // (name-interpolating titles / client-scoped links). Title always resolves to
+  // something (registry default → type id) so a row is never blank.
+  const title = input.title ?? notifTitleOf(input.type) ?? input.type;
+  const link = input.link ?? notifLinkOf(input.type);
   // Best-effort in full: notification delivery must NEVER reject its caller — a
   // transient error in the preference lookup would otherwise 500 an operation
   // (plan publish, goal set, …) that already committed. Swallow everything.
@@ -95,7 +104,7 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
     const id = input.dedupeKey ? `ntf_${input.dedupeKey}_${userId}` : `ntf_${crypto.randomUUID()}`;
     await env.DB.prepare(
       "INSERT OR IGNORE INTO notifications (id, tenant_id, recipient_user_id, category, type, title, message, link, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    ).bind(id, input.tenantId, userId, category, input.type, input.title, input.message ?? null, input.link ?? null, nowIso()).run().catch(() => undefined);
+    ).bind(id, input.tenantId, userId, category, input.type, title, input.message ?? null, link ?? null, nowIso()).run().catch(() => undefined);
     await notifyUser(env, userId);
   }
 
@@ -105,9 +114,9 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
       const brand = await tenantBrandKit(env.DB, input.tenantId);
       await sendTenantEmail(env, input.tenantId, {
         to: user.email,
-        subject: input.title,
-        html: input.emailHtml ?? notifEmailHtml(env, brand, input),
-        text: input.message ?? input.title,
+        subject: title,
+        html: input.emailHtml ?? notifEmailHtml(env, brand, { title, message: input.message, link }),
+        text: input.message ?? title,
         brandName: brand.name,
       }).catch(() => undefined);
     }
