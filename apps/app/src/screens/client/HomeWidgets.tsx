@@ -80,7 +80,7 @@ export const CLIENT_WIDGETS: WidgetDef<ClientWidgetData>[] = [
     renderSmall: (d) => <MiniCard icon={METRICS.weight.icon} tone={METRICS.weight.tone} label={`Weight 7d ${weightLabel(d.units)}`} value={weightDelta(d.bundle.weightSeries, d.units)} />,
   },
   {
-    id: "bodyfat", title: "Body fat", icon: METRICS.bodyFat.icon,
+    id: "bodyfat", title: "Body fat", icon: METRICS.bodyFat.icon, feature: "bodyScan",
     renderBig: (d) => <BodyFatWidget clientId={d.clientId} size="big" />,
     renderSmall: (d) => <BodyFatWidget clientId={d.clientId} size="small" />,
   },
@@ -90,12 +90,12 @@ export const CLIENT_WIDGETS: WidgetDef<ClientWidgetData>[] = [
     renderSmall: (d) => <MiniCard icon={METRICS.sets.icon} tone={METRICS.sets.tone} label="Sets today" value={d.bundle.workout.loggedSets} />,
   },
   {
-    id: "labs", title: "Labs due", icon: FlaskConical,
+    id: "labs", title: "Labs due", icon: FlaskConical, feature: "supplementsLabs",
     renderBig: (d) => <RingCard tone="lab" progress={0.001} value={d.bundle.pendingLabs ?? 0} label="Labs" sublabel="due" />,
     renderSmall: (d) => <MiniCard icon={FlaskConical} tone="lab" label="Labs due" value={d.bundle.pendingLabs ?? 0} />,
   },
   {
-    id: "supplements", title: "Supplements today", icon: Pill,
+    id: "supplements", title: "Supplements today", icon: Pill, feature: "supplementsLabs",
     renderBig: (d) => <SupplementsWidget clientId={d.clientId} size="big" />,
     renderSmall: (d) => <SupplementsWidget clientId={d.clientId} size="small" />,
   },

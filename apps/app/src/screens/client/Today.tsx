@@ -2,8 +2,8 @@
  * Client Today — hero ring + metric pills, action row, timeline feed.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { fmtVolume, fmtEnergy, fmtWeight, type UnitPrefs } from "@mossa/domain";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { fmtVolume, fmtEnergy, fmtWeight, featureEnabled, type UnitPrefs } from "@mossa/domain";
 import {
   Button, Card, Skeleton, MacroBar, IconBadge, Sheet, EmptyState, ProgressRing,
   Reveal, SkeletonHero, SkeletonList, SkeletonHeader,
@@ -119,6 +119,15 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   const ownView = ctx?.active?.clientId === clientId;
   const date = todayLocal();
 
+  // Offer only the widgets this plan unlocks — a widget tagged with a FEATURES
+  // key is filtered out when the tenant/client lacks it, so the hero and its
+  // customize picker self-discover from the same records the routes enforce.
+  const widgetCatalog = useMemo(() => {
+    const features = ctx?.entitlements?.features;
+    if (!features) return CLIENT_WIDGETS;
+    return CLIENT_WIDGETS.filter((w) => !w.feature || featureEnabled(w.feature, { features, clientFlags: ctx?.clientFlags }));
+  }, [ctx?.entitlements?.features, ctx?.clientFlags]);
+
   const saveWidgets = async (items: WidgetItem[]) => {
     setWidgetItems(items);
     await api.patch(`/api/clients/${clientId}`, { dashboardPrefs: { widgets: items } }).catch(() => undefined);
@@ -232,7 +241,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
           })()}
 
           <Stagger data-tour="today-hero">
-            <WidgetCarousel catalog={CLIENT_WIDGETS} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
+            <WidgetCarousel catalog={widgetCatalog} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
           </Stagger>
 
           <Stagger>
@@ -285,7 +294,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} clientId={clientId} onLogged={() => void load()} />
       {checkInOpen && <LogSheet open initialKind="checkin" onClose={() => setCheckInOpen(false)} clientId={clientId} onLogged={() => { setCheckInOpen(false); void load(); }} />}
       {historyOpen && <HistorySheet clientId={clientId} onClose={() => setHistoryOpen(false)} onOpen={onOpen} />}
-      {widgetsOpen && <WidgetCustomizeSheet catalog={CLIENT_WIDGETS} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
+      {widgetsOpen && <WidgetCustomizeSheet catalog={widgetCatalog} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
     </Page>
   );
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { FEATURES, gateSpecOf, type FeatureSpec } from "../src/features.js";
+import { FEATURES, gateSpecOf, featureEnabled, type FeatureSpec } from "../src/features.js";
+import { DEFAULT_CLIENT_FLAGS } from "../src/clientFlags.js";
 import { FEATURE_KEYS } from "../src/entitlements.js";
 import { CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "../src/clientFlags.js";
 import { PERMISSION_CATALOG } from "../src/perms.js";
@@ -43,6 +44,19 @@ describe("feature registry conformance", () => {
     expect(gateSpecOf("bodyScan")).toEqual({ entitlement: "bfCamera", clientFlag: "canUseBodyScan" });
     expect(gateSpecOf("commerce")).toEqual({ entitlement: "commerce", clientFlag: undefined });
     expect(gateSpecOf("foodLogging")).toEqual({ entitlement: undefined, clientFlag: "canLogOwnFood" });
+  });
+
+  it("featureEnabled composes entitlement ∩ client flag (the read-model gate)", () => {
+    const on = { commerce: true, aiSuite: true, bfCamera: true, externalSearch: true, supplementsLabs: true, frontDesk: true, branding: true, integrations: false, chat: false };
+    const off = { ...on, bfCamera: false };
+    // bodyScan needs bfCamera (entitlement) AND canUseBodyScan (flag).
+    expect(featureEnabled("bodyScan", { features: on, clientFlags: { ...DEFAULT_CLIENT_FLAGS, canUseBodyScan: true } })).toBe(true);
+    expect(featureEnabled("bodyScan", { features: off, clientFlags: { ...DEFAULT_CLIENT_FLAGS, canUseBodyScan: true } })).toBe(false); // entitlement missing
+    expect(featureEnabled("bodyScan", { features: on, clientFlags: { ...DEFAULT_CLIENT_FLAGS, canUseBodyScan: false } })).toBe(false); // flag off
+    // Staff (no clientFlags) aren't limited by the client-flag half.
+    expect(featureEnabled("bodyScan", { features: on, clientFlags: null })).toBe(true);
+    // A feature with no gate is always enabled.
+    expect(featureEnabled("checkIns", { features: off, clientFlags: null })).toBe(true);
   });
 
   it("every entitlement-gated platform feature is represented in the registry", () => {
