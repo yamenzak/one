@@ -5,7 +5,7 @@
  * key — is validated here, where the app already depends on both.
  */
 import { describe, expect, it } from "vitest";
-import { FEATURES, TENANT_ROLES, type FeatureSpec } from "@mossa/domain";
+import { FEATURES, TENANT_ROLES, FEATURE_KEYS, STUDIO_SETTINGS_SECTIONS, settingsSectionVisible, FREE_ENTITLEMENTS, type FeatureSpec } from "@mossa/domain";
 import { METRICS, personaLabel, PERSONA_LABELS } from "@mossa/ui";
 
 describe("feature ↔ metric registry join", () => {
@@ -33,5 +33,21 @@ describe("persona labels", () => {
 
   it("every tenant role has a persona label", () => {
     for (const role of TENANT_ROLES) expect(PERSONA_LABELS, role).toHaveProperty(role);
+  });
+});
+
+describe("studio settings registry", () => {
+  it("every section's requiresFeature is a real platform feature", () => {
+    for (const s of STUDIO_SETTINGS_SECTIONS) {
+      if (s.requiresFeature) expect(FEATURE_KEYS, s.key).toContain(s.requiresFeature);
+    }
+  });
+
+  it("entitlement-gated sections hide on the free plan; ungated ones stay", () => {
+    const free = FREE_ENTITLEMENTS.features;
+    const brand = STUDIO_SETTINGS_SECTIONS.find((s) => s.key === "brand")!;
+    const signin = STUDIO_SETTINGS_SECTIONS.find((s) => s.key === "signin")!;
+    expect(settingsSectionVisible(brand, free)).toBe(false); // branding not on free
+    expect(settingsSectionVisible(signin, free)).toBe(true); // always available
   });
 });
