@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { kcalToDisplay, displayToKcal, energyLabel, type UnitPrefs } from "@mossa/domain";
+import { kcalToDisplay, displayToKcal, energyLabel, featureEnabled, type UnitPrefs } from "@mossa/domain";
 import { FixedDrawer, Button, Field, Chip, SegmentedControl, cn, toneSoft, METRICS, Utensils, Barcode, ChevronDown, Sparkles, Globe, PencilLine, Search, Plus, X, ArrowLeft } from "@mossa/ui";
 import { api, uploadMedia } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -71,7 +71,12 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
 }) {
   const { ctx } = useSession();
   const units = useUnits();
-  const aiSuite = !!ctx?.entitlements?.features?.aiSuite;
+  const features = ctx?.entitlements?.features;
+  const aiSuite = !!features?.aiSuite; // the food-IMAGE tool is staff-only, entitlement-gated
+  // The food TOOLS (macro estimate, label scan) are the aiMealTools feature —
+  // for a client, the same aiSuite ⊕ package-flag gate /ai/parse-food & /ai/
+  // snap-meal enforce; staff aren't limited by a client's package.
+  const aiMealTools = !!features && featureEnabled("aiMealTools", { features, clientFlags: isStaff ? null : ctx?.clientFlags });
   const startReview = !!foodId || !!autoScanLabel;
 
   const [step, setStep] = useState<"choose" | "review">(startReview ? "review" : "choose");
@@ -176,7 +181,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
     else { setF((p) => ({ ...p, barcode: code })); setStep("review"); }
   };
 
-  useEffect(() => { if (autoScanLabel && aiSuite && !foodId) labelInputRef.current?.click(); }, [autoScanLabel, aiSuite, foodId]);
+  useEffect(() => { if (autoScanLabel && aiMealTools && !foodId) labelInputRef.current?.click(); }, [autoScanLabel, aiMealTools, foodId]);
   useEffect(() => {
     if (!foodId) return;
     let alive = true;
@@ -219,9 +224,9 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
               <div className="space-y-4">
                 <Field label="Food name" icon={Utensils} value={f.name} onChange={(e) => set("name", e.target.value)} autoFocus placeholder="e.g. Greek yogurt" />
                 <div className="grid grid-cols-2 gap-2">
-                  {aiSuite && <ModeCard icon={Sparkles} tone="primary" label="With AI" hint="Estimate macros" busy={aiBusy} disabled={f.name.trim().length < 2} onClick={() => void estimateFromName()} />}
+                  {aiMealTools && <ModeCard icon={Sparkles} tone="primary" label="With AI" hint="Estimate macros" busy={aiBusy} disabled={f.name.trim().length < 2} onClick={() => void estimateFromName()} />}
                   <ModeCard icon={Globe} tone="cardio" label="Web / barcode" hint="From databases" active={webMode} onClick={() => setWebMode((v) => !v)} />
-                  {aiSuite && <ModeCard icon={Barcode} tone="nutrition" label="Scan label" hint="Read the panel" onClick={() => labelInputRef.current?.click()} />}
+                  {aiMealTools && <ModeCard icon={Barcode} tone="nutrition" label="Scan label" hint="Read the panel" onClick={() => labelInputRef.current?.click()} />}
                   <ModeCard icon={PencilLine} tone="neutral" label="Manual" hint="Enter it yourself" disabled={f.name.trim().length < 2} onClick={() => setStep("review")} />
                 </div>
                 <input ref={labelInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void scanLabel(e.target.files[0])} />
@@ -266,7 +271,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                 <Field label="Name" icon={Utensils} value={f.name} onChange={(e) => set("name", e.target.value)} />
                 <AiImageField value={f.image} onChange={(url) => set("image", url)} feature="food-image" subject={f.name} canAi={!!isStaff && aiSuite} label="Photo" />
 
-                {aiSuite && (
+                {aiMealTools && (
                   <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary/15 px-3.5 text-sm font-medium text-primary transition-colors hover:bg-primary/25 [&_svg]:size-4">
                     <Sparkles /> Scan nutrition label
                     <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void scanLabel(e.target.files[0])} />
