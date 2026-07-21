@@ -2029,6 +2029,52 @@ describe("billing DO — two-bucket credits (purchased forever, granted no-rollo
   });
 });
 
+describe("platform rail — inline Stripe webhooks", () => {
+  async function sig(payload: string, secret: string): Promise<string> {
+    const t = Math.floor(Date.now() / 1000);
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${payload}`));
+    const hex = [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    return `t=${t},v1=${hex}`;
+  }
+  const secret = "whsec_platform_inline";
+  const post = async (payload: string) =>
+    SELF.fetch("http://x/api/stripe/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await sig(payload, secret) }, body: payload });
+
+  it("payment_intent.succeeded tops up the durable purchased bucket (inline pack)", async () => {
+    const db = env.DB as D1Database;
+    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const before = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
+    const payload = JSON.stringify({ id: "evt_pi_pack_1", type: "payment_intent.succeeded", data: { object: { id: "pi_pack_1", metadata: { mossa_tenant: ctx.active.tenantId, mossa_pack: "pack_1k", mossa_credits: "1000" } } } });
+    expect((await post(payload)).status).toBe(200);
+    const after = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
+    expect(after.balance.purchased - before.balance.purchased).toBe(1000);
+    // A redelivery of the same event id is a no-op (no double top-up).
+    await post(payload);
+    const again = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
+    expect(again.balance.purchased).toBe(after.balance.purchased);
+  });
+
+  it("an inline subscription going active (metadata-carried plan) activates the plan + grants credits", async () => {
+    // Isolated synthetic tenant so we don't perturb any cookie-backed tenant's plan.
+    const db = env.DB as D1Database;
+    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
+    const tenantId = "tenant_inline_sub_1";
+    await db.prepare("INSERT INTO subscriptions (tenant_id, plan_id, status, comp, stripe_customer_id, updated_at) VALUES (?, 'free', 'active', 0, 'cus_inline_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_customer_id = 'cus_inline_1'").bind(tenantId, new Date().toISOString()).run();
+    const cpe = Math.floor(Date.now() / 1000) + 30 * 86400;
+    const payload = JSON.stringify({ id: "evt_sub_inline_active", type: "customer.subscription.updated", data: { object: { id: "sub_inline_1", status: "active", customer: "cus_inline_1", current_period_end: cpe, metadata: { mossa_tenant: tenantId, mossa_plan: "solo" } } } });
+    expect((await post(payload)).status).toBe(200);
+    const row = (await db.prepare("SELECT plan_id, status FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<{ plan_id: string; status: string }>())!;
+    expect(row.plan_id).toBe("solo");
+    expect(row.status).toBe("active");
+    // The solo monthly grant (500) landed in the DO's `granted` bucket.
+    const BILLING = (env as unknown as { BILLING: DurableObjectNamespace }).BILLING;
+    const stub = BILLING.get(BILLING.idFromName(tenantId)) as unknown as { view: () => Promise<{ granted: number }> };
+    expect((await stub.view()).granted).toBeGreaterThanOrEqual(500);
+  });
+});
+
 describe("redemption codes — atomic over-redemption guard", () => {
   it("a max_uses=1 code is spent once: a second client and a re-redeem both 409", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

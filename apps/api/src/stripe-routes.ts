@@ -74,6 +74,60 @@ export const stripeRoutes = new Hono<AppEnv>()
     return c.json({ url: session.url });
   })
 
+  // ── Inline (Payment Element) — platform rail ───────────────────────────────
+  // Preferred over the hosted redirect: the app confirms these client secrets
+  // with Stripe.js inline. The hosted checkout-plan/checkout-pack routes above
+  // remain as a fallback.
+  .post("/billing/pack-intent", async (c) => {
+    const who = requireTenant(c)!;
+    const cfg = await stripeConfig(c.env.DB);
+    if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
+    const body = z.object({ packId: z.string() }).safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body" }, 400);
+    const pack = (await listPacks(c.env.DB)).find((p) => p.id === body.data.packId);
+    if (!pack) return c.json({ error: "unknown pack" }, 404);
+    const customer = await ensureCustomer(c.env.DB, cfg.secretKey, who.tenantId, c.get("user")?.email);
+    // A PaymentIntent whose success webhook tops up the durable `purchased`
+    // bucket. Credits ride on the PI metadata; the hosted-checkout path keeps
+    // them on the session, so payment_intent.succeeded can't double-grant.
+    const pi = await stripeCall<{ client_secret: string; id: string }>(cfg.secretKey, "payment_intents", {
+      amount: Math.round(pack.price_usd * 100),
+      currency: "usd",
+      customer,
+      "automatic_payment_methods[enabled]": "true",
+      "metadata[mossa_tenant]": who.tenantId,
+      "metadata[mossa_pack]": pack.id,
+      "metadata[mossa_credits]": pack.credits,
+    });
+    return c.json({ clientSecret: pi.client_secret, publishableKey: cfg.publishableKey, amountCents: Math.round(pack.price_usd * 100), credits: pack.credits });
+  })
+
+  .post("/billing/plan-intent", async (c) => {
+    const who = requireTenant(c)!;
+    const cfg = await stripeConfig(c.env.DB);
+    if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
+    const body = z.object({ planId: z.string() }).safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body" }, 400);
+    const plan = (await listPlans(c.env.DB)).find((p) => p.id === body.data.planId);
+    if (!plan?.stripe_price_id) return c.json({ error: "plan not synced to stripe" }, 409);
+    const customer = await ensureCustomer(c.env.DB, cfg.secretKey, who.tenantId, c.get("user")?.email);
+    // default_incomplete: the subscription is created unpaid; confirming the
+    // first invoice's PaymentIntent inline activates it. The webhook
+    // (customer.subscription.updated → active) stamps the plan + grants credits.
+    const sub = await stripeCall<{ id: string; latest_invoice?: { payment_intent?: { client_secret?: string } } }>(cfg.secretKey, "subscriptions", {
+      customer,
+      "items[0][price]": plan.stripe_price_id,
+      payment_behavior: "default_incomplete",
+      "payment_settings[save_default_payment_method]": "on_subscription",
+      "expand[0]": "latest_invoice.payment_intent",
+      "metadata[mossa_tenant]": who.tenantId,
+      "metadata[mossa_plan]": plan.id,
+    });
+    const clientSecret = sub.latest_invoice?.payment_intent?.client_secret;
+    if (!clientSecret) return c.json({ error: "could not start subscription" }, 502);
+    return c.json({ clientSecret, subscriptionId: sub.id, publishableKey: cfg.publishableKey });
+  })
+
   // Platform webhook (public lane; signature-verified).
   .post("/stripe/webhook", async (c) => {
     const cfg = await stripeConfig(c.env.DB);
@@ -394,6 +448,17 @@ async function handlePlatformEvent(
       }
       break;
     }
+    case "payment_intent.succeeded": {
+      // Inline credit-pack purchase (Payment Element). Credits ride on the PI
+      // metadata; the hosted checkout path keeps them on the session, so this
+      // and checkout.session.completed never both fire for the same purchase.
+      if (meta.mossa_pack && meta.mossa_credits && meta.mossa_tenant) {
+        const dobj = billing.get(billing.idFromName(meta.mossa_tenant));
+        await dobj.bind(meta.mossa_tenant);
+        await dobj.topUp(Number(meta.mossa_credits), "pack.purchase", meta.mossa_pack);
+      }
+      break;
+    }
     case "invoice.paid": {
       const tenantId = meta.mossa_tenant ?? (await tenantByCustomer(db, obj.customer as string));
       const planId = await planForTenant(db, tenantId);
@@ -421,6 +486,18 @@ async function handlePlatformEvent(
     }
     case "customer.subscription.created":
     case "customer.subscription.updated": {
+      // Inline (default_incomplete) subscriptions carry the plan on their
+      // metadata. Stamp the plan id as soon as we see it (even while
+      // `incomplete`) so a first invoice.paid resolves the right plan; only
+      // GRANT once the subscription is actually active/trialing.
+      const status = obj.status as string;
+      if (meta.mossa_plan && meta.mossa_tenant) {
+        await getSubscription(db, meta.mossa_tenant);
+        await db.prepare("UPDATE subscriptions SET plan_id = ? WHERE tenant_id = ?").bind(meta.mossa_plan, meta.mossa_tenant).run();
+        if (status === "active" || status === "trialing") {
+          await activatePlan(db, billing, meta.mossa_tenant, meta.mossa_plan);
+        }
+      }
       await syncStripeSubscription(db, obj);
       break;
     }

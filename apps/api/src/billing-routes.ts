@@ -82,6 +82,8 @@ export const billingRoutes = new Hono<AppEnv>()
       packs,
       entitlements,
       stripeEnabled: stripeEnabled(cfg),
+      // Publishable key drives the inline Payment Element (safe to expose).
+      publishableKey: cfg.publishableKey || null,
       connect: {
         connected: Boolean(connectRow?.stripe_account_id),
         chargesEnabled: Boolean(connectRow?.charges_enabled),
