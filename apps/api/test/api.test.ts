@@ -2939,3 +2939,21 @@ describe("studio close + tenant purge", () => {
     expect(await db.prepare('SELECT id FROM "user" WHERE email = ?').bind("teardown@test.dev").first()).toBeNull();
   });
 });
+
+describe("platform nuclear reset — guards", () => {
+  const B = "http://localhost:8787";
+  it("refuses without the exact confirm phrase, and without a valid OTP", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    // Wrong phrase → 400 BEFORE anything is touched (the confirm gate is first).
+    const badPhrase = await SELF.fetch(`${B}/api/admin/nuclear-reset`, { method: "POST", headers: H, body: JSON.stringify({ code: "000000", confirm: "nope" }) });
+    expect(badPhrase.status).toBe(400);
+    expect(((await badPhrase.json()) as { error: string }).error).toBe("confirm_phrase");
+    // Right phrase but no valid OTP → 403 (still no wipe).
+    const noOtp = await SELF.fetch(`${B}/api/admin/nuclear-reset`, { method: "POST", headers: H, body: JSON.stringify({ code: "000000", confirm: "RESET EVERYTHING" }) });
+    expect(noOtp.status).toBe(403);
+    expect(((await noOtp.json()) as { error: string }).error).toBe("invalid_code");
+    // The shared tenant is still intact (nothing was wiped).
+    const ctx = await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) });
+    expect(ctx.status).toBe(200);
+  });
+});

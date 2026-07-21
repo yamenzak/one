@@ -1,7 +1,7 @@
 /** Platform admin console — tenants (comp/topup/seed), Stripe config. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Sheet, Skeleton, Reveal, SkeletonLine, SegmentedControl, Switch, Chip, Page, Stagger, ConfirmDialog, ShieldCheck, Sparkles, ArrowLeft, KeyRound, Globe, Gift, Tag, Trash2, Plus, cn, LayoutGrid } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, Reveal, SkeletonLine, SegmentedControl, Switch, Chip, Page, Stagger, ConfirmDialog, ShieldCheck, Sparkles, ArrowLeft, KeyRound, Globe, Gift, Tag, Trash2, Plus, cn, LayoutGrid, AlertTriangle, Spinner } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Tenant { id: string; name: string; slug: string; plan_id: string | null; status: string | null; comp: number | null }
@@ -348,6 +348,70 @@ function SecurityConfig() {
         </div>
         {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
       </Card>
+      <NuclearResetCard />
+    </Stagger>
+  );
+}
+
+/** Platform nuclear reset — wipe every tenant + all data back to an empty
+ *  install (platform config kept). OTP to the admin's email + a typed phrase. */
+function NuclearResetCard() {
+  const [open, setOpen] = useState(false);
+  const [stage, setStage] = useState<"intro" | "code">("intro");
+  const [code, setCode] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [done, setDone] = useState<number | null>(null);
+  const PHRASE = "RESET EVERYTHING";
+
+  const sendCode = async () => {
+    setBusy(true); setErr(null);
+    try { await api.post("/api/admin/nuclear-reset/request-otp"); setStage("code"); }
+    catch { setErr("Couldn't send the code."); }
+    finally { setBusy(false); }
+  };
+  const run = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const r = await api.post<{ ok: boolean; tenants: number }>("/api/admin/nuclear-reset", { code: code.trim(), confirm });
+      setDone(r.tenants);
+    } catch (e) {
+      const s = (e as { status?: number })?.status;
+      setErr(s === 403 ? "That code is wrong or has expired." : s === 400 ? `Type ${PHRASE} exactly to confirm.` : "Reset failed.");
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <Stagger>
+      <Card className="space-y-2.5">
+        <div className="flex items-center gap-2 font-medium text-danger"><AlertTriangle className="size-5" /> Nuclear reset</div>
+        <p className="text-sm text-muted-foreground">Permanently erases <span className="font-medium text-foreground">every studio</span>, all users, and all media — the whole platform back to empty. Plans, keys and AI config are kept. There is no undo.</p>
+        <Button variant="outline" className="w-full border-danger/40 text-danger" onClick={() => { setStage("intro"); setCode(""); setConfirm(""); setErr(null); setDone(null); setOpen(true); }}><Trash2 /> Reset the platform…</Button>
+      </Card>
+
+      <Sheet open={open} onClose={() => setOpen(false)} title="Nuclear reset">
+        {done != null ? (
+          <div className="space-y-3 text-center">
+            <div className="mx-auto grid size-12 place-items-center rounded-full bg-success-soft/60 text-success"><AlertTriangle className="size-6" /></div>
+            <p className="text-sm">Wiped <span className="font-semibold">{done}</span> studio{done === 1 ? "" : "s"} and everything in them. You'll be signed out — sign back in to start fresh.</p>
+            <Button className="w-full" onClick={() => location.assign("/")}>Reload</Button>
+          </div>
+        ) : stage === "intro" ? (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">This erases the entire platform. We'll email a confirmation code to your admin address first.</p>
+            {err && <p className="text-sm text-danger">{err}</p>}
+            <Button className="w-full" disabled={busy} onClick={() => void sendCode()}>{busy ? <><Spinner /> Sending…</> : "Email me a confirmation code"}</Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <Field label="Confirmation code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} placeholder="000000" autoFocus />
+            <Field label={`Type ${PHRASE} to confirm`} value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder={PHRASE} />
+            {err && <p className="text-sm text-danger">{err}</p>}
+            <Button className="w-full border-danger/40 text-danger" variant="outline" disabled={busy || code.length < 6 || confirm !== PHRASE} onClick={() => void run()}>{busy ? <><Spinner /> Wiping…</> : <><Trash2 /> Erase everything, permanently</>}</Button>
+          </div>
+        )}
+      </Sheet>
     </Stagger>
   );
 }

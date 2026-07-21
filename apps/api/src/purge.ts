@@ -151,6 +151,33 @@ export async function isOwnerAnywhere(db: D1Database, userId: string): Promise<b
   return !!row;
 }
 
+/**
+ * PLATFORM NUCLEAR RESET — erase EVERY tenant + all identity + the whole media
+ * bucket, back to an empty install. Platform-config tables (plans, credit packs,
+ * app_config incl. Stripe/AI keys, ai_models) are PRESERVED so the operator can
+ * sign back in and start fresh. Irreversible; guarded by OTP + a typed phrase.
+ */
+export async function purgeEverything(env: Env): Promise<{ tenants: number }> {
+  const orgs = (await env.DB.prepare('SELECT id FROM "organization"').all<{ id: string }>().catch(() => ({ results: [] as { id: string }[] }))).results ?? [];
+  for (const o of orgs) await purgeTenant(env, o.id).catch(() => undefined);
+
+  // Sweep the ENTIRE media bucket (empty prefix) so any orphan escapes nothing.
+  await purgePrefix(env, "");
+
+  // Wipe every remaining tenant-data + identity row (a user with no org, a
+  // dangling child row). Platform config tables are intentionally NOT listed.
+  const wipe = [
+    ...TENANT_TABLES.map((t) => `DELETE FROM ${t}`),
+    "DELETE FROM redemption_uses",
+    'DELETE FROM "member"', 'DELETE FROM "invitation"', 'DELETE FROM "organization"',
+    'DELETE FROM "user"', 'DELETE FROM "session"', 'DELETE FROM "account"', 'DELETE FROM "passkey"',
+    "DELETE FROM user_prefs", "DELETE FROM digest_sent", "DELETE FROM action_otps",
+    "DELETE FROM auth_logs", "DELETE FROM verification", "DELETE FROM stripe_events", "DELETE FROM ai_cache",
+  ];
+  for (const sql of wipe) await run(env.DB, sql);
+  return { tenants: orgs.length };
+}
+
 export async function purgeUser(env: Env, userId: string): Promise<void> {
   const memberships = (await env.DB.prepare('SELECT organizationId FROM "member" WHERE userId = ?').bind(userId).all<{ organizationId: string }>().catch(() => ({ results: [] as { organizationId: string }[] }))).results ?? [];
   for (const m of memberships) {
