@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PERMISSION_CATALOG } from "@mossa/domain";
-import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, Plus } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, Plus, personaLabel, personaTone } from "@mossa/ui";
 import { api } from "../../api.js";
+import { useSession } from "../../session.js";
 
 interface Member { userId: string; role: string; name: string | null; email: string | null; customGrant?: Record<string, string[]> | null }
-const ROLES = [
-  { value: "owner", label: "Owner" }, { value: "trainer", label: "Trainer" }, { value: "assistant", label: "Assistant" }, { value: "client", label: "Client" },
-];
+// Labels + tones read from the persona registry — `trainer` shows as "Coach".
+const ROLES = ["owner", "trainer", "assistant", "client"].map((value) => ({ value, label: personaLabel(value) }));
 
 export function Staff() {
   const [members, setMembers] = useState<Member[] | null>(null);
@@ -26,7 +26,8 @@ export function Staff() {
     try { await api.patch(`/api/members/${userId}/role`, { role: newRole }); await load(); }
     catch (e) { setMsg(e instanceof Error && e.message.includes("last owner") ? "Can't demote the last owner." : "Couldn't change role."); }
   };
-  const ROLE_LABEL = (r: string) => ROLES.find((x) => x.value === r)?.label ?? r;
+  const ROLE_LABEL = (r: string) => personaLabel(r);
+  const myUserId = useSession().ctx?.user.id ?? null;
   const invite = async () => {
     try { await api.post("/api/auth/organization/invite-member", { email, role }); setMsg(`Invite sent to ${email}.`); setInviteOpen(false); setEmail(""); }
     catch { setMsg("Invite failed — check the email and try again."); }
@@ -50,7 +51,11 @@ export function Staff() {
               <Card key={m.userId} className="flex items-center gap-3">
                 <Avatar name={m.name || m.email || "?"} seed={m.email ?? m.userId} className="size-10" />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2"><span className="truncate font-medium">{m.name || m.email}</span>{m.customGrant && <Badge tone="warning">Custom</Badge>}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="truncate font-medium">{m.name || m.email}</span>
+                    <Badge tone={personaTone(m.role, { self: m.userId === myUserId })}>{personaLabel(m.role, { self: m.userId === myUserId })}</Badge>
+                    {m.customGrant && <Badge tone="warning">Custom</Badge>}
+                  </div>
                   <div className="truncate text-xs text-muted-foreground">{m.email}</div>
                 </div>
                 {m.role !== "owner" && <Button size="icon" variant="secondary" aria-label="Permissions" onClick={() => setPermMember(m)}><ShieldCheck /></Button>}
@@ -66,7 +71,7 @@ export function Staff() {
       <Sheet open={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite staff">
         <div className="space-y-4">
           <Field label="Email" icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <div className="flex gap-2"><Chip selected={role === "trainer"} onClick={() => setRole("trainer")}>Trainer</Chip><Chip selected={role === "assistant"} onClick={() => setRole("assistant")}>Assistant</Chip></div>
+          <div className="flex gap-2"><Chip selected={role === "trainer"} onClick={() => setRole("trainer")}>{personaLabel("trainer")}</Chip><Chip selected={role === "assistant"} onClick={() => setRole("assistant")}>{personaLabel("assistant")}</Chip></div>
           <Button size="lg" className="w-full" disabled={!email.includes("@")} onClick={() => void invite()}>Send invite</Button>
           <p className="text-xs text-muted-foreground">They sign in with a code — no password to set.</p>
         </div>

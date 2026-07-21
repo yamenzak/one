@@ -47,7 +47,7 @@ export function Start() {
             </div>
             <h2 className="text-lg font-semibold">Start your business</h2>
           </div>
-          <p className="text-sm text-muted-foreground">Create your studio's workspace — you'll be its owner and can invite trainers and clients.</p>
+          <p className="text-sm text-muted-foreground">Create your studio's workspace — you'll be its owner and can invite coaches and clients.</p>
           <Field label="Business name" icon={Store} value={name} placeholder="FitLab Studio" onChange={(e) => setName(e.target.value)} />
           <Button size="lg" className="w-full" disabled={name.trim().length < 2 || busy} onClick={() => void create()}>
             {busy ? "Creating…" : "Create workspace"} {!busy && <ArrowRight />}
