@@ -706,7 +706,7 @@ export const logRoutes = new Hono<AppEnv>()
       .bind(parsed.data.feedback, user.id, nowIso(), c.req.param("id"), access.client.id)
       .run();
     if (access.client.user_id) {
-      await notify(c.env, { tenantId: access.client.tenant_id, userId: access.client.user_id, type: "feedback", message: parsed.data.feedback.slice(0, 200) });
+      await notify(c.env, { tenantId: access.client.tenant_id, userId: access.client.user_id, type: "feedback", message: parsed.data.feedback.slice(0, 200), vars: { coachName: user.name || "Your coach" } });
     }
     await recordAudit(c.env, { tenantId: access.client.tenant_id, clientId: access.client.id, actorUserId: user.id, action: "checkin.feedback", summary: parsed.data.feedback.slice(0, 80), ref: c.req.param("id") });
     return c.json({ ok: true });

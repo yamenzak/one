@@ -4,6 +4,7 @@ import {
   parseNotifPolicy, emailAllowedByPolicy, resolveEmailPolicy, sanitizeEmailPolicy, isNotifCategory,
   NOTIF_TYPES, notifCategoryOf, notifTitleOf, notifLinkOf,
   notifAudienceOf, notifVisibleInSurface, unreadInSurface, type NotifType,
+  renderTemplate, notifTemplateOf, notifVarsOf,
 } from "../src/notifications.js";
 
 describe("notification preferences", () => {
@@ -134,6 +135,39 @@ describe("audience + surface (mode-aware in-app filtering)", () => {
     ];
     expect(unreadInSurface(items, "client")).toBe(2); // feedback + plan_published
     expect(unreadInSurface(items, "staff")).toBe(1); // check_in
+  });
+});
+
+describe("email templates + variable rendering", () => {
+  it("substitutes known variables and blanks unknown/missing ones", () => {
+    expect(renderTemplate("Hi {{coachName}}, your {{planName}} is ready", { coachName: "Sam", planName: "Push/Pull" }))
+      .toBe("Hi Sam, your Push/Pull is ready");
+    expect(renderTemplate("Expires in {{daysLeft}} days", { daysLeft: 3 })).toBe("Expires in 3 days");
+    // Unknown / missing → empty, never a stray {{x}}.
+    expect(renderTemplate("Hi {{missing}}!", {})).toBe("Hi !");
+    expect(renderTemplate("{{ spaced }}", { spaced: "ok" })).toBe("ok");
+  });
+
+  it("templated types expose a subject/body and their declared vars are used in it", () => {
+    const tpl = notifTemplateOf("plan_published")!;
+    expect(tpl.subject).toContain("{{planName}}");
+    // Every declared var actually appears somewhere in the template.
+    for (const type of Object.keys(NOTIF_TYPES) as NotifType[]) {
+      const t = notifTemplateOf(type);
+      if (!t) continue;
+      const blob = t.subject + t.body;
+      for (const v of notifVarsOf(type)) {
+        expect(blob.includes(`{{${v}}}`) || blob.includes(`{{ ${v} }}`), `${type}: ${v} declared but unused`).toBe(true);
+      }
+    }
+  });
+
+  it("only client-facing + studio-billing types carry a template (phased scope)", () => {
+    expect(notifTemplateOf("feedback")).not.toBeNull();
+    expect(notifTemplateOf("billing_past_due")).not.toBeNull();
+    // Staff activity signals fall back to the generic card.
+    expect(notifTemplateOf("check_in")).toBeNull();
+    expect(notifTemplateOf("body_fat_logged")).toBeNull();
   });
 });
 

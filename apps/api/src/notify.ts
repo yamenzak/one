@@ -7,11 +7,11 @@
  * transactional (invites, receipts).
  */
 
-import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, notifCategoryOf, notifTitleOf, notifLinkOf, type NotifType, type NotifRole } from "@mossa/domain";
+import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, notifCategoryOf, notifTitleOf, notifLinkOf, notifTemplateOf, renderTemplate, type NotifType, type NotifRole } from "@mossa/domain";
 import type { Env } from "./env.js";
 import { notifyUser } from "./inbox-do.js";
 import { sendTenantEmail } from "./email-provider.js";
-import { emailShell, emailButton, escapeHtml, safeColor, MOSSA_BRAND, type BrandKit } from "./mailer.js";
+import { sendEmail, emailShell, emailButton, escapeHtml, safeColor, MOSSA_BRAND, type BrandKit } from "./mailer.js";
 import { nowIso } from "./ids.js";
 
 export interface NotifyInput {
@@ -33,6 +33,10 @@ export interface NotifyInput {
   force?: boolean;
   /** Full email HTML override; otherwise a standard card is built from title/message. */
   emailHtml?: string;
+  /** Values for the type's email template `{{variables}}` (e.g. coachName,
+   *  planName, daysLeft). `studioName` is injected automatically. Ignored for
+   *  types without a template. */
+  vars?: Record<string, string | number | null | undefined>;
 }
 
 async function userRole(db: D1Database, tenantId: string, userId: string): Promise<NotifRole> {
@@ -111,14 +115,36 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
   if (channels.email) {
     const user = await env.DB.prepare("SELECT email FROM \"user\" WHERE id = ?").bind(userId).first<{ email: string | null }>();
     if (user?.email) {
-      const brand = await tenantBrandKit(env.DB, input.tenantId);
-      await sendTenantEmail(env, input.tenantId, {
-        to: user.email,
-        subject: title,
-        html: input.emailHtml ?? notifEmailHtml(env, brand, { title, message: input.message, link }),
-        text: input.message ?? title,
-        brandName: brand.name,
-      }).catch(() => undefined);
+      // Studio-billing (Mossa → tenant) emails send on the PLATFORM rail with
+      // Mossa's own identity, unmetered — a studio's suspension notice is from
+      // Mossa, not the studio, and shouldn't cost the studio a credit. Everything
+      // else is the tenant's own message: tenant rail + tenant brand.
+      const isPlatformBilling = category === "billing";
+      const brand = isPlatformBilling ? MOSSA_BRAND : await tenantBrandKit(env.DB, input.tenantId);
+      // Prefer the type's branded template (variable-rendered) over the generic
+      // card. Values are HTML-escaped before substituting into the body; the
+      // subject is plain text. `studioName` is always available.
+      const tpl = notifTemplateOf(input.type);
+      let subject = title;
+      let html: string;
+      if (input.emailHtml) {
+        html = input.emailHtml;
+      } else if (tpl) {
+        const base = env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
+        const href = link && base ? `${base}${link.startsWith("/") ? "" : "/"}${link}` : null;
+        const raw: Record<string, string | number | null | undefined> = { studioName: brand.name, ...(input.vars ?? {}) };
+        const esc = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, escapeHtml(v === undefined || v === null ? "" : String(v))]));
+        subject = renderTemplate(tpl.subject, raw);
+        const inner = renderTemplate(tpl.body, esc) + (href ? emailButton(`Open ${brand.name}`, href, brand) : "");
+        html = emailShell(escapeHtml(subject), inner, { brand, preheader: subject });
+      } else {
+        html = notifEmailHtml(env, brand, { title, message: input.message, link });
+      }
+      if (isPlatformBilling) {
+        await sendEmail(env.DB, { to: user.email, subject, html, text: input.message ?? subject }, env.EMAIL, undefined, env.ENVIRONMENT === "development").catch(() => undefined);
+      } else {
+        await sendTenantEmail(env, input.tenantId, { to: user.email, subject, html, text: input.message ?? subject, brandName: brand.name }).catch(() => undefined);
+      }
     }
   }
   } catch { /* notification is best-effort; never surface to the caller */ }

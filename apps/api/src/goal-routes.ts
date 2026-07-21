@@ -134,7 +134,7 @@ export const goalRoutes = new Hono<AppEnv>()
       ),
     ]);
     if (access.client.user_id) {
-      await notify(c.env, { tenantId: access.client.tenant_id, userId: access.client.user_id, type: "goal_set", message: d.label });
+      await notify(c.env, { tenantId: access.client.tenant_id, userId: access.client.user_id, type: "goal_set", message: d.label, vars: { coachName: c.get("user")?.name || "Your coach", goalLabel: d.label } });
     }
     await recordAudit(c.env, { tenantId: access.client.tenant_id, clientId: access.client.id, actorUserId: who.userId, action: "goal.set", summary: d.label, ref: id });
     return c.json({ ok: true, id, targets, derivation }, 201);
