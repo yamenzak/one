@@ -108,7 +108,7 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
     brand: () => <BrandingEditor initial={(ctx?.branding ?? null) as Branding | null} onPreview={preview} onSaved={() => void refresh()} />,
     signin: () => <SignInSettings canBrand={canBrand} branding={ctx?.branding ?? null} slug={ctx?.active?.tenantSlug ?? null} onSaved={() => void refresh()} />,
     ai: () => <AiConfigSection />,
-    messaging: () => <><EmailSection /><NotificationPolicySection /></>,
+    messaging: () => <><EmailSection /><NotificationPolicySection /><EmailTemplatesSection /></>,
     marketplace: () => <MarketplaceSection />,
     integrations: () => <IntegrationsSection />,
   };
@@ -403,6 +403,83 @@ function NotificationsSection() {
 /** Owner: which notification categories members are allowed to receive by EMAIL.
  *  A studio-wide allow-list layered on top of each member's own preference — the
  *  inbox is never gated, only the email channel. */
+interface EmailTemplate { type: string; label: string; category: string; vars: string[]; defaultSubject: string; defaultBody: string; subject: string; body: string; enabled: boolean; customized: boolean }
+
+/** Owner email white-label — rewrite each notification email's subject/body with
+ *  {{variables}}, mute a type's email, and set a global signature. */
+function EmailTemplatesSection() {
+  const [templates, setTemplates] = useState<EmailTemplate[] | null>(null);
+  const [signature, setSignature] = useState("");
+  const [sigSaved, setSigSaved] = useState(false);
+  const [openType, setOpenType] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    const r = await api.get<{ templates: EmailTemplate[]; signature: string }>("/api/email-templates");
+    setTemplates(r.templates); setSignature(r.signature);
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  const saveSig = async () => { await api.put("/api/email-signature", { signature }).catch(() => undefined); setSigSaved(true); setTimeout(() => setSigSaved(false), 1500); };
+
+  return (
+    <section className="space-y-3">
+      <SectionHead title="Email templates" scope="tenant" />
+      <Card className="space-y-2">
+        <div className="text-sm font-medium">Signature</div>
+        <p className="text-xs text-muted-foreground">Appended to the footer of every email your studio sends.</p>
+        <Textarea rows={2} value={signature} onChange={(e) => setSignature(e.target.value)} placeholder="Team YourStudio · reply to this email anytime" />
+        <div className="flex justify-end"><Button size="sm" onClick={() => void saveSig()}>{sigSaved ? "Saved" : "Save signature"}</Button></div>
+      </Card>
+
+      {!templates ? (
+        <SkeletonLine w="10rem" h="text" />
+      ) : (
+        <div className="space-y-2">
+          {templates.map((t) => (
+            <EmailTemplateRow key={t.type} tpl={t} open={openType === t.type} onToggle={() => setOpenType((o) => (o === t.type ? null : t.type))} onSaved={() => void load()} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function EmailTemplateRow({ tpl, open, onToggle, onSaved }: { tpl: EmailTemplate; open: boolean; onToggle: () => void; onSaved: () => void }) {
+  const [subject, setSubject] = useState(tpl.subject);
+  const [body, setBody] = useState(tpl.body);
+  const [enabled, setEnabled] = useState(tpl.enabled);
+  const [busy, setBusy] = useState(false);
+  const dirty = subject !== tpl.subject || body !== tpl.body || enabled !== tpl.enabled;
+  const save = async () => { setBusy(true); try { await api.put(`/api/email-templates/${tpl.type}`, { subject, body, enabled }); onSaved(); } finally { setBusy(false); } };
+  const reset = async () => { setBusy(true); try { await api.del(`/api/email-templates/${tpl.type}`); setSubject(tpl.defaultSubject); setBody(tpl.defaultBody); setEnabled(true); onSaved(); } finally { setBusy(false); } };
+  return (
+    <Card className="p-0">
+      <button onClick={onToggle} className="flex w-full items-center justify-between gap-3 p-4 text-left">
+        <div className="min-w-0"><div className="truncate text-sm font-medium capitalize">{tpl.label}</div><div className="truncate text-xs text-muted-foreground">{tpl.subject}</div></div>
+        <div className="flex shrink-0 items-center gap-2">{tpl.customized && <Badge tone="primary">Custom</Badge>}{!tpl.enabled && <Badge tone="neutral">Email off</Badge>}</div>
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-border/50 p-4">
+          <Field label="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
+          <div className="space-y-1">
+            <span className="text-xs font-medium text-muted-foreground">Body (HTML)</span>
+            <Textarea rows={4} value={body} onChange={(e) => setBody(e.target.value)} className="font-mono text-xs" />
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Variables:</span>
+            {tpl.vars.map((v) => <Chip key={v} onClick={() => setBody((b) => `${b}{{${v}}}`)}>{`{{${v}}}`}</Chip>)}
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <label className="flex items-center gap-2 text-sm"><Switch checked={enabled} onCheckedChange={setEnabled} /> Send this email</label>
+            <div className="flex gap-2">
+              {tpl.customized && <Button size="sm" variant="ghost" disabled={busy} onClick={() => void reset()}>Reset</Button>}
+              <Button size="sm" disabled={busy || !dirty} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function NotificationPolicySection() {
   const [data, setData] = useState<{ notifCategories: { key: string; label: string; blurb: string }[]; notifPolicy: Record<string, boolean> } | null>(null);
   const load = useCallback(async () => {

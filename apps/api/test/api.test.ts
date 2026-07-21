@@ -2198,6 +2198,29 @@ describe("notifications — surface-scoped mark-all-read", () => {
   });
 });
 
+describe("email templates — tenant white-label store", () => {
+  it("owner overrides a type's subject/body, GET merges it, reset restores the default", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    // A templatable type can be overridden.
+    const put = await SELF.fetch("http://x/api/email-templates/feedback", { method: "PUT", headers: H, body: JSON.stringify({ subject: "{{coachName}} says hi", body: "<p>Custom body for {{studioName}}.</p>", enabled: true }) });
+    expect(put.status).toBe(200);
+    const list1 = (await (await SELF.fetch("http://x/api/email-templates", { headers: auth(ownerCookie) })).json()) as { templates: { type: string; subject: string; customized: boolean; defaultSubject: string }[] };
+    const fb1 = list1.templates.find((t) => t.type === "feedback")!;
+    expect(fb1.customized).toBe(true);
+    expect(fb1.subject).toBe("{{coachName}} says hi");
+
+    // A non-templatable type is rejected.
+    expect((await SELF.fetch("http://x/api/email-templates/check_in", { method: "PUT", headers: H, body: JSON.stringify({ subject: "x", body: "y" }) })).status).toBe(400);
+
+    // Reset drops the override → back to the registry default.
+    expect((await SELF.fetch("http://x/api/email-templates/feedback", { method: "DELETE", headers: auth(ownerCookie) })).status).toBe(200);
+    const list2 = (await (await SELF.fetch("http://x/api/email-templates", { headers: auth(ownerCookie) })).json()) as { templates: { type: string; subject: string; customized: boolean; defaultSubject: string }[] };
+    const fb2 = list2.templates.find((t) => t.type === "feedback")!;
+    expect(fb2.customized).toBe(false);
+    expect(fb2.subject).toBe(fb2.defaultSubject);
+  });
+});
+
 describe("platform promo codes (Mossa → tenant)", () => {
   it("admin creates a 100%-off pack promo; it grants free once, then is exhausted", async () => {
     const db = env.DB as D1Database;

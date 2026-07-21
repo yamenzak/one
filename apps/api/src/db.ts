@@ -147,6 +147,10 @@ export function ensureSchema(db: D1Database): Promise<void> {
           // Promo codes = Stripe checkout discounts (distinct from redemption day top-ups).
           "CREATE TABLE IF NOT EXISTS promo_codes (id TEXT PRIMARY KEY, tenant_id TEXT, code TEXT, discount_type TEXT DEFAULT 'percent', percent_off INTEGER, amount_off_cents INTEGER, restricted_package_id TEXT, restricted_client_id TEXT, scope TEXT DEFAULT 'tenant', max_redemptions INTEGER, redemption_count INTEGER DEFAULT 0, expires_at TEXT, active INTEGER DEFAULT 1, stripe_coupon_id TEXT, stripe_promo_id TEXT, created_by TEXT, created_at TEXT);",
           "CREATE UNIQUE INDEX IF NOT EXISTS idx_promo_code ON promo_codes(tenant_id, code);",
+          // Per-tenant email template overrides (white-label): a tenant rewrites a
+          // notification type's subject/body ({{variables}}); enabled=0 mutes the
+          // email for that type. Absent row = the registry default template.
+          "CREATE TABLE IF NOT EXISTS email_templates (tenant_id TEXT, type TEXT, subject TEXT, body TEXT, enabled INTEGER DEFAULT 1, updated_at TEXT, PRIMARY KEY (tenant_id, type));",
           // Personal unit preferences, per user (cross-tenant).
           "CREATE TABLE IF NOT EXISTS user_prefs (user_id TEXT PRIMARY KEY, units_json TEXT, updated_at TEXT);",
           "CREATE TABLE IF NOT EXISTS addon_types (id TEXT PRIMARY KEY, tenant_id TEXT, slug TEXT, label TEXT, kind TEXT DEFAULT 'consultation', duration_minutes INTEGER, standalone_price_cents INTEGER, active INTEGER DEFAULT 1);",
@@ -246,6 +250,8 @@ export function ensureSchema(db: D1Database): Promise<void> {
           // Redemption codes: optional per-package + per-client scoping.
           "ALTER TABLE redemption_codes ADD COLUMN restricted_package_id TEXT",
           "ALTER TABLE redemption_codes ADD COLUMN restricted_client_id TEXT",
+          // Tenant email white-label: a global signature appended to every email.
+          "ALTER TABLE tenant_settings ADD COLUMN email_signature TEXT",
         ];
         for (const sql of alters) await db.exec(sql).catch(() => undefined);
         // Backfill: older body scans mirrored only weight + body-fat into
