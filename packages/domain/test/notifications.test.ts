@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   defaultChannels, resolveChannels, parseNotifPrefs, categoriesForRole, categoryAppliesTo, resolveAllChannels,
   parseNotifPolicy, emailAllowedByPolicy, resolveEmailPolicy, sanitizeEmailPolicy, isNotifCategory,
-  NOTIF_TYPES, notifCategoryOf,
+  NOTIF_TYPES, notifCategoryOf, notifTitleOf, notifLinkOf,
 } from "../src/notifications.js";
 
 describe("notification preferences", () => {
@@ -73,6 +73,19 @@ describe("notification types (the atom)", () => {
     expect(notifCategoryOf("billing_past_due")).toBe("billing");
     expect(notifCategoryOf("payment_disputed")).toBe("sales");
     expect(notifCategoryOf("sub_expiring")).toBe("commerce");
+  });
+
+  it("static-copy types carry a default title+link; name-interpolating types don't", () => {
+    // Fixed-copy notifications own their title + link on the record.
+    expect(notifTitleOf("goal_set")).toBe("Your coach set a new goal");
+    expect(notifLinkOf("goal_set")).toBe("/progress");
+    expect(notifTitleOf("supplement_added")).toBe("New supplement added");
+    // Titles that interpolate a client name have no default — supplied at the call site.
+    expect(notifTitleOf("check_in")).toBeNull();
+    expect(notifTitleOf("body_fat_logged")).toBeNull();
+    // client_assigned has a fixed title but a client-scoped link (no default link).
+    expect(notifTitleOf("client_assigned")).toBe("You've been assigned a client");
+    expect(notifLinkOf("client_assigned")).toBeNull();
   });
 
   it("every type's category is reachable by its declared audience role", () => {

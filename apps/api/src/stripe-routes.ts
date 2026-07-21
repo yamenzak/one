@@ -266,7 +266,7 @@ export const stripeRoutes = new Hono<AppEnv>()
         if (row) {
           await c.env.DB.prepare("UPDATE client_subscriptions SET payment_status = 'past_due', updated_at = ? WHERE id = ?").bind(nowIso(), row.id).run();
           const cl = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null }>();
-          if (cl?.user_id) await notify(c.env, { tenantId: row.tenant_id, userId: cl.user_id, type: "sub_payment_failed", title: "Renewal payment failed", message: "Update your card to keep your plan from pausing.", link: "/shop", dedupeKey: `pf_${row.id}` });
+          if (cl?.user_id) await notify(c.env, { tenantId: row.tenant_id, userId: cl.user_id, type: "sub_payment_failed", message: "Update your card to keep your plan from pausing.", dedupeKey: `pf_${row.id}` });
         }
       }
     } else if (event.type === "customer.subscription.deleted") {
@@ -287,12 +287,11 @@ export const stripeRoutes = new Hono<AppEnv>()
       if (tenantId) {
         const disputed = event.type === "charge.dispute.created";
         await notifyOwners(c.env, tenantId, {
+          // Title (per type) + link (/clients) come from the type's record.
           type: disputed ? "payment_disputed" : "payment_refunded",
-          title: disputed ? "A client payment was disputed" : "A client payment was refunded",
           message: disputed
             ? "A client opened a dispute on a package payment. Review it in Stripe and adjust their access if needed."
             : "A client package payment was refunded. Review whether their access should be adjusted.",
-          link: "/clients",
           dedupeKey: `${event.type}_${(event.data.object as { id?: string }).id ?? event.id}`,
         });
       }
@@ -414,9 +413,7 @@ async function handlePlatformEvent(
         await db.prepare("UPDATE subscriptions SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?) WHERE tenant_id = ? AND status NOT IN ('suspended','canceled')").bind(nowIso(), tenantId).run();
         await notifyOwners(env, tenantId, {
           type: "billing_past_due",
-          title: "Payment failed",
           message: "We couldn't charge your card. Update your payment method to keep your studio running — you have a short grace period before features pause.",
-          link: "/business",
           dedupeKey: typeof obj.id === "string" ? `pf_${obj.id}` : undefined,
         });
       }

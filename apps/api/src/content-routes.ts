@@ -192,7 +192,7 @@ export const contentHubRoutes = new Hono<AppEnv>()
       if (ids.length) {
         const rows = await c.env.DB.prepare(`SELECT user_id FROM clients WHERE id IN (${ids.map(() => "?").join(",")}) AND tenant_id = ?`).bind(...ids, who.tenantId).all<{ user_id: string | null }>();
         for (const r of rows.results ?? []) {
-          if (r.user_id) await notify(c.env, { tenantId: who.tenantId, userId: r.user_id, type: "content_assigned", title: "Your coach shared something with you", message: res!.title, link: "/explore" });
+          if (r.user_id) await notify(c.env, { tenantId: who.tenantId, userId: r.user_id, type: "content_assigned", message: res!.title });
         }
       }
     }
