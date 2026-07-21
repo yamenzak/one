@@ -441,21 +441,24 @@ describe("notifications — email provider + per-user preferences", () => {
     expect(byDate["2026-04-01"]).toBe(null); // predates any reading → no context
   });
 
-  it("owner governs the studio-wide email allow-list, per category", async () => {
+  it("owner governs the studio-wide email allow-list, per audience (clients vs staff)", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const s0 = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as { notifCategories: { key: string }[]; notifPolicy: Record<string, boolean> };
+    type Pol = { notifCategories: { key: string }[]; notifPolicy: { client: Record<string, boolean>; staff: Record<string, boolean> } };
+    const s0 = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as Pol;
     expect(s0.notifCategories.some((c) => c.key === "body-composition")).toBe(true);
-    expect(s0.notifPolicy["body-composition"]).toBe(true); // default: allowed
+    expect(s0.notifPolicy.staff["body-composition"]).toBe(true); // default: allowed
 
-    // Disable one category's email studio-wide; junk keys are dropped.
-    await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ notifPolicy: { "body-composition": false, "nonsense-cat": true } }) });
-    const s1 = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as { notifPolicy: Record<string, boolean> };
-    expect(s1.notifPolicy["body-composition"]).toBe(false);
-    expect(s1.notifPolicy["labs"]).toBe(true); // untouched stays allowed
-    expect("nonsense-cat" in s1.notifPolicy).toBe(false);
+    // Disable STAFF email for a couple of categories; junk keys are dropped.
+    await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ notifPolicy: { staff: { "body-composition": false, labs: false, "nonsense-cat": true } } }) });
+    const s1 = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as Pol;
+    expect(s1.notifPolicy.staff["body-composition"]).toBe(false);
+    expect(s1.notifPolicy.staff["labs"]).toBe(false);
+    expect("nonsense-cat" in s1.notifPolicy.staff).toBe(false);
+    // The CLIENT audience is independent — labs email to clients stays allowed.
+    expect(s1.notifPolicy.client["labs"]).toBe(true);
 
-    // Re-enable so the flag doesn't leak into other suites.
-    await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ notifPolicy: { "body-composition": true } }) });
+    // Re-enable so the flags don't leak into other suites.
+    await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ notifPolicy: { staff: { "body-composition": true, labs: true } } }) });
   });
 });
 

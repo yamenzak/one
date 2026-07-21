@@ -305,22 +305,46 @@ export function resolveAllChannels(role: NotifRole, stored: StoredNotifPrefs): R
 // never gated (members always keep in-app delivery); the owner only governs the
 // email channel. Effective email = member's email choice AND owner allows it.
 
-/** Owner-set policy: category → whether email is permitted (absent = permitted). */
+/** The two audiences an owner's email policy can target separately: clients vs
+ *  the studio's own staff (owner/trainer/assistant). */
+export type NotifAudience = "client" | "staff";
+
+/** Owner-set policy: whether email is permitted, per category, and now per
+ *  AUDIENCE (email clients about X separately from emailing staff). Backward
+ *  compatible: `emailCategories` is the legacy all-audiences map; `emailAudience`
+ *  overrides it for a specific audience when present. Absent everywhere = allowed. */
 export interface TenantNotifPolicy {
   emailCategories?: Partial<Record<NotifCategory, boolean>>;
+  emailAudience?: Partial<Record<NotifAudience, Partial<Record<NotifCategory, boolean>>>>;
+}
+
+function parseCatBoolMap(src: unknown): Partial<Record<NotifCategory, boolean>> {
+  const out: Partial<Record<NotifCategory, boolean>> = {};
+  if (src && typeof src === "object") {
+    for (const [k, v] of Object.entries(src as Record<string, unknown>)) {
+      if (CATEGORY_KEYS.has(k as NotifCategory) && typeof v === "boolean") out[k as NotifCategory] = v;
+    }
+  }
+  return out;
 }
 
 export function parseNotifPolicy(json: string | null | undefined): TenantNotifPolicy {
   if (!json) return {};
   try {
-    const raw = JSON.parse(json);
-    const src = raw && typeof raw === "object" ? (raw as { emailCategories?: unknown }).emailCategories : null;
-    if (!src || typeof src !== "object") return {};
-    const out: Partial<Record<NotifCategory, boolean>> = {};
-    for (const [k, v] of Object.entries(src as Record<string, unknown>)) {
-      if (CATEGORY_KEYS.has(k as NotifCategory) && typeof v === "boolean") out[k as NotifCategory] = v;
+    const raw = JSON.parse(json) as { emailCategories?: unknown; emailAudience?: unknown };
+    const out: TenantNotifPolicy = {};
+    const legacy = parseCatBoolMap(raw?.emailCategories);
+    if (Object.keys(legacy).length) out.emailCategories = legacy;
+    const aud = raw?.emailAudience;
+    if (aud && typeof aud === "object") {
+      const parsed: TenantNotifPolicy["emailAudience"] = {};
+      for (const a of ["client", "staff"] as NotifAudience[]) {
+        const m = parseCatBoolMap((aud as Record<string, unknown>)[a]);
+        if (Object.keys(m).length) parsed[a] = m;
+      }
+      if (Object.keys(parsed).length) out.emailAudience = parsed;
     }
-    return { emailCategories: out };
+    return out;
   } catch {
     return {};
   }
@@ -328,21 +352,30 @@ export function parseNotifPolicy(json: string | null | undefined): TenantNotifPo
 
 /** Keep only known category → boolean pairs (sanitizes an owner-supplied patch). */
 export function sanitizeEmailPolicy(patch: Record<string, unknown>): Partial<Record<NotifCategory, boolean>> {
-  const out: Partial<Record<NotifCategory, boolean>> = {};
-  for (const [k, v] of Object.entries(patch)) {
-    if (CATEGORY_KEYS.has(k as NotifCategory) && typeof v === "boolean") out[k as NotifCategory] = v;
-  }
-  return out;
+  return parseCatBoolMap(patch);
 }
 
-/** Whether the tenant permits EMAIL for a category (default: yes). */
-export function emailAllowedByPolicy(policy: TenantNotifPolicy, category: NotifCategory): boolean {
+/** Which audience a role belongs to for policy purposes (owner/assistant = staff). */
+export function audienceForRole(role: NotifRole): NotifAudience {
+  return role === "client" ? "client" : "staff";
+}
+
+/** Whether the tenant permits EMAIL for a category (default: yes). When an
+ *  `audience` is given, an audience-specific setting wins over the legacy
+ *  all-audiences map. */
+export function emailAllowedByPolicy(policy: TenantNotifPolicy, category: NotifCategory, audience?: NotifAudience): boolean {
+  if (audience) {
+    const a = policy.emailAudience?.[audience];
+    if (a && category in a) return a[category]!;
+  }
   return policy.emailCategories?.[category] ?? true;
 }
 
-/** The effective email allow-map across every category, for the owner's UI. */
-export function resolveEmailPolicy(policy: TenantNotifPolicy): Record<string, boolean> {
+/** The effective email allow-map across every category, for the owner's UI.
+ *  With no audience it returns the legacy single map; with one it returns that
+ *  audience's effective map. */
+export function resolveEmailPolicy(policy: TenantNotifPolicy, audience?: NotifAudience): Record<string, boolean> {
   const out: Record<string, boolean> = {};
-  for (const c of NOTIF_CATEGORIES) out[c.key] = emailAllowedByPolicy(policy, c.key);
+  for (const c of NOTIF_CATEGORIES) out[c.key] = emailAllowedByPolicy(policy, c.key, audience);
   return out;
 }

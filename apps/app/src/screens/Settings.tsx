@@ -480,29 +480,39 @@ function EmailTemplateRow({ tpl, open, onToggle, onSaved }: { tpl: EmailTemplate
   );
 }
 
+interface NotifCat { key: string; label: string; blurb: string; roles: string[] }
+type AudiencePolicy = { client: Record<string, boolean>; staff: Record<string, boolean> };
+
 function NotificationPolicySection() {
-  const [data, setData] = useState<{ notifCategories: { key: string; label: string; blurb: string }[]; notifPolicy: Record<string, boolean> } | null>(null);
+  const [data, setData] = useState<{ notifCategories: NotifCat[]; notifPolicy: AudiencePolicy } | null>(null);
   const load = useCallback(async () => {
-    const r = await api.get<{ notifCategories: { key: string; label: string; blurb: string }[]; notifPolicy: Record<string, boolean> }>("/api/settings");
+    const r = await api.get<{ notifCategories: NotifCat[]; notifPolicy: AudiencePolicy }>("/api/settings");
     setData({ notifCategories: r.notifCategories, notifPolicy: r.notifPolicy });
   }, []);
   useEffect(() => { void load(); }, [load]);
-  const toggle = async (cat: string, v: boolean) => {
-    setData((d) => (d ? { ...d, notifPolicy: { ...d.notifPolicy, [cat]: v } } : d));
-    await api.patch("/api/settings", { notifPolicy: { [cat]: v } }).catch(() => void load());
+  const toggle = async (audience: "client" | "staff", cat: string, v: boolean) => {
+    setData((d) => (d ? { ...d, notifPolicy: { ...d.notifPolicy, [audience]: { ...d.notifPolicy[audience], [cat]: v } } } : d));
+    await api.patch("/api/settings", { notifPolicy: { [audience]: { [cat]: v } } }).catch(() => void load());
   };
+  const isStaff = (roles: string[]) => roles.some((r) => r !== "client");
   return (
     <section>
-      <SectionHead title="Member email notifications" scope="tenant" />
+      <SectionHead title="Email notifications policy" scope="tenant" />
       <Card className="p-0">
-        <p className="px-4 pt-4 text-sm text-muted-foreground">Choose which notifications your members may receive by email. Turning one off keeps it in their in-app inbox but never emails it — members still tune their own preferences within what you allow here.</p>
-        <div className="mt-2 divide-y divide-border/50">
+        <p className="px-4 pt-4 text-sm text-muted-foreground">Choose which notifications may be emailed — separately for your clients and your staff. Turning one off keeps it in the in-app inbox but never emails it; people still tune their own preferences within what you allow here.</p>
+        <div className="mt-2 flex items-center justify-end gap-6 px-4 pb-1 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+          <span className="w-10 text-center">Clients</span><span className="w-10 text-center">Staff</span>
+        </div>
+        <div className="divide-y divide-border/50">
           {!data
             ? [0, 1, 2].map((i) => <div key={i} className="p-4"><SkeletonLine w="8rem" h="text" /></div>)
             : data.notifCategories.map((cat) => (
                 <div key={cat.key} className="flex items-center justify-between gap-3 p-4">
                   <div className="min-w-0"><div className="text-sm font-medium">{cat.label}</div><div className="text-xs text-muted-foreground">{cat.blurb}</div></div>
-                  <Switch checked={data.notifPolicy[cat.key] ?? true} onCheckedChange={(v) => void toggle(cat.key, v)} />
+                  <div className="flex shrink-0 items-center gap-6">
+                    <div className="grid w-10 place-items-center">{cat.roles.includes("client") ? <Switch checked={data.notifPolicy.client[cat.key] ?? true} onCheckedChange={(v) => void toggle("client", cat.key, v)} /> : <span className="text-muted-foreground/40">—</span>}</div>
+                    <div className="grid w-10 place-items-center">{isStaff(cat.roles) ? <Switch checked={data.notifPolicy.staff[cat.key] ?? true} onCheckedChange={(v) => void toggle("staff", cat.key, v)} /> : <span className="text-muted-foreground/40">—</span>}</div>
+                  </div>
                 </div>
               ))}
         </div>

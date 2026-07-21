@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultChannels, resolveChannels, parseNotifPrefs, categoriesForRole, categoryAppliesTo, resolveAllChannels,
-  parseNotifPolicy, emailAllowedByPolicy, resolveEmailPolicy, sanitizeEmailPolicy, isNotifCategory,
+  parseNotifPolicy, emailAllowedByPolicy, resolveEmailPolicy, sanitizeEmailPolicy, isNotifCategory, audienceForRole,
   NOTIF_TYPES, notifCategoryOf, notifTitleOf, notifLinkOf,
   notifAudienceOf, notifVisibleInSurface, unreadInSurface, type NotifType,
   renderTemplate, notifTemplateOf, notifVarsOf,
@@ -197,5 +197,26 @@ describe("tenant email policy (owner allow-list)", () => {
     expect(map["activity"]).toBe(false);
     expect(map["plans-goals"]).toBe(true);
     expect(Object.keys(map)).toContain("body-composition");
+  });
+
+  it("audience-split: an owner can email clients but not staff about a category", () => {
+    const pol = parseNotifPolicy(JSON.stringify({ emailAudience: { staff: { "plans-goals": false } } }));
+    expect(emailAllowedByPolicy(pol, "plans-goals", "client")).toBe(true);
+    expect(emailAllowedByPolicy(pol, "plans-goals", "staff")).toBe(false);
+    expect(emailAllowedByPolicy(pol, "plans-goals")).toBe(true); // no audience → legacy default
+    expect(resolveEmailPolicy(pol, "staff")["plans-goals"]).toBe(false);
+    expect(resolveEmailPolicy(pol, "client")["plans-goals"]).toBe(true);
+  });
+
+  it("an audience-specific setting overrides the legacy all-audiences map", () => {
+    const pol = parseNotifPolicy(JSON.stringify({ emailCategories: { labs: false }, emailAudience: { client: { labs: true } } }));
+    expect(emailAllowedByPolicy(pol, "labs", "client")).toBe(true); // audience override wins
+    expect(emailAllowedByPolicy(pol, "labs", "staff")).toBe(false); // falls back to legacy
+  });
+
+  it("audienceForRole maps owner/trainer/assistant → staff, client → client", () => {
+    expect(audienceForRole("owner")).toBe("staff");
+    expect(audienceForRole("assistant")).toBe("staff");
+    expect(audienceForRole("client")).toBe("client");
   });
 });

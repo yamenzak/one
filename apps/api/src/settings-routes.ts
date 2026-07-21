@@ -38,9 +38,13 @@ export const settingsRoutes = new Hono<AppEnv>()
       integrationProviders: PROVIDERS,
       email: maskEmailConfig(resolveEmailConfig(parseJson(row?.email_config_json ?? null, {}))),
       emailPlatformFrom: platformFrom,
-      // Owner-governed studio-wide email allow-list, by category.
+      // Owner-governed studio-wide email allow-list, by category AND audience
+      // (email clients vs staff about a category, separately).
       notifCategories: NOTIF_CATEGORIES,
-      notifPolicy: resolveEmailPolicy(parseNotifPolicy(row?.notif_policy_json ?? null)),
+      notifPolicy: {
+        client: resolveEmailPolicy(parseNotifPolicy(row?.notif_policy_json ?? null), "client"),
+        staff: resolveEmailPolicy(parseNotifPolicy(row?.notif_policy_json ?? null), "staff"),
+      },
       stripeConnected: Boolean(row?.stripe_account_id),
       entitlements: ent,
     });
@@ -89,8 +93,11 @@ export const settingsRoutes = new Hono<AppEnv>()
           senderEmail: z.string().max(200).optional(),
           senderName: z.string().max(120).optional(),
         }).optional(),
-        // Studio-wide email allow-list: category → whether members may be emailed.
-        notifPolicy: z.record(z.string(), z.boolean()).optional(),
+        // Studio-wide email allow-list, per audience: category → may email.
+        notifPolicy: z.object({
+          client: z.record(z.string(), z.boolean()).optional(),
+          staff: z.record(z.string(), z.boolean()).optional(),
+        }).optional(),
       })
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
@@ -144,8 +151,12 @@ export const settingsRoutes = new Hono<AppEnv>()
 
     // Studio-wide email allow-list, merged category-by-category (unknown keys dropped).
     if (d.notifPolicy) {
-      const cur = parseNotifPolicy((await c.env.DB.prepare("SELECT notif_policy_json FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ notif_policy_json: string | null }>())?.notif_policy_json ?? null).emailCategories ?? {};
-      const next = { emailCategories: { ...cur, ...sanitizeEmailPolicy(d.notifPolicy) } };
+      const cur = parseNotifPolicy((await c.env.DB.prepare("SELECT notif_policy_json FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ notif_policy_json: string | null }>())?.notif_policy_json ?? null);
+      const emailAudience: Record<string, Record<string, boolean>> = { ...(cur.emailAudience as Record<string, Record<string, boolean>> ?? {}) };
+      for (const a of ["client", "staff"] as const) {
+        if (d.notifPolicy[a]) emailAudience[a] = { ...(emailAudience[a] ?? {}), ...sanitizeEmailPolicy(d.notifPolicy[a]!) };
+      }
+      const next = { ...(cur.emailCategories ? { emailCategories: cur.emailCategories } : {}), emailAudience };
       await c.env.DB.prepare("UPDATE tenant_settings SET notif_policy_json = ?, updated_at = ? WHERE tenant_id = ?").bind(j(next), nowIso(), who.tenantId).run();
     }
     return c.json({ ok: true });
