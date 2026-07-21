@@ -67,6 +67,30 @@ async function cancelTenantStripe(env: Env, tenantId: string): Promise<void> {
   } catch { /* teardown proceeds even if Stripe is unreachable */ }
 }
 
+export const TENANT_CLOSE_GRACE_DAYS = 7;
+
+/** Owner-initiated studio close: cancel billing NOW (charging stops immediately),
+ *  then mark the subscription `closing` with a delete_at 7 days out — the daily
+ *  cron hard-purges it once the hold lapses. Returns the scheduled purge date. */
+export async function scheduleTenantClose(env: Env, tenantId: string): Promise<{ deleteAt: string }> {
+  await cancelTenantStripe(env, tenantId);
+  const deleteAt = new Date(Date.now() + TENANT_CLOSE_GRACE_DAYS * 86_400_000).toISOString();
+  await env.DB
+    .prepare("UPDATE subscriptions SET status = 'closing', suspend_at = ?, delete_at = ? WHERE tenant_id = ?")
+    .bind(new Date().toISOString(), deleteAt, tenantId)
+    .run();
+  return { deleteAt };
+}
+
+/** Undo a pending close within the grace window (the studio stays; billing must
+ *  be re-established separately since the Stripe sub was already canceled). */
+export async function cancelTenantClose(env: Env, tenantId: string): Promise<void> {
+  await env.DB
+    .prepare("UPDATE subscriptions SET status = 'active', suspend_at = NULL, delete_at = NULL WHERE tenant_id = ? AND status = 'closing'")
+    .bind(tenantId)
+    .run();
+}
+
 /** Erase the identity + personal rows of a user who no longer belongs to ANY
  *  tenant. (Guarded by the caller — never called while a membership remains.) */
 async function purgeUserIdentity(env: Env, userId: string): Promise<void> {

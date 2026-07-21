@@ -15,7 +15,7 @@ import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@mossa/protocol";
 import { ensureSchema } from "../src/db.js";
 import { clientDigestHtml, coachDigestHtml } from "../src/digest.js";
 import { emailBar, emailBars, emailSparkline, emailRing, emailStatRow, emailListRow, MOSSA_BRAND } from "../src/mailer.js";
-import { purgeClient } from "../src/purge.js";
+import { purgeClient, purgeTenant } from "../src/purge.js";
 import { verifyActionOtp } from "../src/action-otp.js";
 
 const ORIGIN = "http://localhost:8787"; // treated as local by createAuth (non-secure cookies)
@@ -2894,5 +2894,48 @@ describe("GDPR — action OTP + cascade purge", () => {
     // R2 object gone + ledger tombstoned.
     expect(await env.MEDIA.get(key)).toBeNull();
     expect((await db.prepare("SELECT COUNT(*) AS n FROM media_assets WHERE client_id = ? AND deleted_at IS NULL").bind(client.id).first<{ n: number }>())!.n).toBe(0);
+  });
+});
+
+describe("studio close + tenant purge", () => {
+  const B = "http://localhost:8787";
+  const sha = async (s: string): Promise<string> => {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  };
+
+  it("owner schedules a close (OTP), can undo it, and purgeTenant tears the studio down", async () => {
+    const db = env.DB as D1Database;
+    // A throwaway studio so the shared test tenants are never touched.
+    const cookie = await signInFlow("teardown@test.dev", "TeardownGym");
+    const H = { "content-type": "application/json", ...auth(cookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(cookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+    const { client } = (await (await SELF.fetch(`${B}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "DoomedDan" }) })).json()) as { client: { id: string } };
+
+    // Schedule the close with a known OTP → status 'closing' + delete_at ~7d out.
+    await db.prepare("INSERT OR REPLACE INTO action_otps (subject, purpose, code_hash, expires_at, attempts, created_at) VALUES (?, 'tenant_close', ?, ?, 0, ?)")
+      .bind(`tenant_close:${tenantId}`, await sha("tenant_close:654321"), Date.now() + 600_000, Date.now()).run();
+    const close = await SELF.fetch(`${B}/api/tenant/close`, { method: "POST", headers: H, body: JSON.stringify({ code: "654321" }) });
+    expect(close.status).toBe(200);
+    const st1 = (await (await SELF.fetch(`${B}/api/tenant/close/status`, { headers: auth(cookie) })).json()) as { closing: boolean; deleteAt: string | null };
+    expect(st1.closing).toBe(true);
+    expect(st1.deleteAt).toBeTruthy();
+
+    // Undo within the grace window → back to active.
+    await SELF.fetch(`${B}/api/tenant/close/cancel`, { method: "POST", headers: H, body: "{}" });
+    const st2 = (await (await SELF.fetch(`${B}/api/tenant/close/status`, { headers: auth(cookie) })).json()) as { closing: boolean };
+    expect(st2.closing).toBe(false);
+
+    // The actual teardown (what the cron runs at delete_at).
+    expect(await db.prepare("SELECT id FROM organization WHERE id = ?").bind(tenantId).first()).not.toBeNull();
+    await purgeTenant(env as unknown as import("../src/env.js").Env, tenantId);
+    expect(await db.prepare("SELECT id FROM organization WHERE id = ?").bind(tenantId).first()).toBeNull();
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM member WHERE organizationId = ?").bind(tenantId).first<{ n: number }>())!.n).toBe(0);
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ?").bind(tenantId).first<{ n: number }>())!.n).toBe(0);
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<{ n: number }>())!.n).toBe(0);
+    void client;
+    // The owner belonged only to this studio → their identity is erased too.
+    expect(await db.prepare('SELECT id FROM "user" WHERE email = ?').bind("teardown@test.dev").first()).toBeNull();
   });
 });
