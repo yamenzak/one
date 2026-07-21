@@ -17,7 +17,8 @@ export function CoachPlans({ clientId }: { clientId: string }) {
   const [kind, setKind] = useState<Kind>("workout");
   const [plans, setPlans] = useState<Plan[] | null>(null);
   const [variants, setVariants] = useState<Lane[]>([]);
-  const [laneId, setLaneId] = useState<string | null>(null); // null = Main (default lane)
+  const [defaultLabel, setDefaultLabel] = useState("Main");
+  const [laneId, setLaneId] = useState<string | null>(null); // null = default lane
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [lanesOpen, setLanesOpen] = useState(false);
@@ -28,9 +29,10 @@ export function CoachPlans({ clientId }: { clientId: string }) {
   // Lanes are client-level, so the workout + meal lists share the same lane set;
   // we take it from whichever list loads. Both endpoints return it.
   const load = useCallback(async () => {
-    const r = await api.get<{ plans: Plan[]; variants: Lane[] }>(`/api/${endpoint}?clientId=${clientId}`);
+    const r = await api.get<{ plans: Plan[]; variants: Lane[]; defaultLabel?: string }>(`/api/${endpoint}?clientId=${clientId}`);
     setPlans(r.plans);
     setVariants(r.variants ?? []);
+    setDefaultLabel(r.defaultLabel || "Main");
   }, [clientId, endpoint]);
   useEffect(() => { setPlans(null); void load(); }, [load]);
 
@@ -40,7 +42,7 @@ export function CoachPlans({ clientId }: { clientId: string }) {
   // If the selected lane got archived out from under us, fall back to Main.
   useEffect(() => { if (laneId && !variants.some((l) => l.id === laneId && !l.archived)) setLaneId(null); }, [laneId, variants]);
   const shown = (plans ?? []).filter((p) => (p.variantId ?? null) === laneId);
-  const laneName = laneId ? liveLanes.find((l) => l.id === laneId)?.label ?? "" : "Main";
+  const laneName = laneId ? liveLanes.find((l) => l.id === laneId)?.label ?? "" : defaultLabel;
 
   return (
     <Page className="mx-auto max-w-xl space-y-3 p-4 pb-28">
@@ -50,7 +52,7 @@ export function CoachPlans({ clientId }: { clientId: string }) {
           once there's a second lane; a coach can always add one. */}
       {(liveLanes.length > 0) && (
         <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 no-scrollbar">
-          <Chip selected={laneId === null} onClick={() => setLaneId(null)}>Main</Chip>
+          <Chip selected={laneId === null} onClick={() => setLaneId(null)}>{defaultLabel}</Chip>
           {liveLanes.map((l) => (
             <Chip key={l.id} selected={laneId === l.id} onClick={() => setLaneId(l.id)}>{l.label}</Chip>
           ))}
@@ -97,7 +99,7 @@ export function CoachPlans({ clientId }: { clientId: string }) {
         </div>
       </Sheet>
 
-      {lanesOpen && <LaneManager clientId={clientId} variants={variants} onClose={() => setLanesOpen(false)} onChanged={() => void load()} />}
+      {lanesOpen && <LaneManager clientId={clientId} variants={variants} defaultLabel={defaultLabel} onClose={() => setLanesOpen(false)} onChanged={() => void load()} />}
 
       {menuFor && (
         <PlanActions
@@ -113,7 +115,7 @@ export function CoachPlans({ clientId }: { clientId: string }) {
 }
 
 /** Create / rename / archive a client's plan lanes (schedules). */
-function LaneManager({ clientId, variants, onClose, onChanged }: { clientId: string; variants: Lane[]; onClose: () => void; onChanged: () => void }) {
+function LaneManager({ clientId, variants, defaultLabel, onClose, onChanged }: { clientId: string; variants: Lane[]; defaultLabel: string; onClose: () => void; onChanged: () => void }) {
   const [adding, setAdding] = useState("");
   const [busy, setBusy] = useState(false);
   const live = variants.filter((v) => !v.archived);
@@ -125,13 +127,15 @@ function LaneManager({ clientId, variants, onClose, onChanged }: { clientId: str
     finally { setBusy(false); }
   };
   const patch = async (id: string, body: { label?: string; archived?: boolean }) => { await api.patch(`/api/clients/${clientId}/variants/${id}`, body); onChanged(); };
+  const renameDefault = async (label: string) => { await api.patch(`/api/clients/${clientId}/default-lane`, { label }); onChanged(); };
 
   return (
     <Sheet open onClose={onClose} title="Schedules">
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">Lanes let a client run parallel plans — a "Work week" and an "Off week", or "Night shift" and "Morning shift". Each lane keeps its own published plan; the client switches between them.</p>
         <div className="space-y-2">
-          <div className="flex items-center gap-3 rounded-xl bg-secondary/50 px-3 py-2.5 text-sm"><span className="font-medium">Main</span><span className="ml-auto text-xs text-muted-foreground">default</span></div>
+          {/* The default lane — renameable, but can't be archived (it always exists). */}
+          <LaneRow lane={{ id: "__default", label: defaultLabel, archived: false }} isDefault onRename={(label) => void renameDefault(label)} onArchive={() => undefined} />
           {live.map((l) => (
             <LaneRow key={l.id} lane={l} onRename={(label) => void patch(l.id, { label })} onArchive={() => void patch(l.id, { archived: true })} />
           ))}
@@ -145,7 +149,7 @@ function LaneManager({ clientId, variants, onClose, onChanged }: { clientId: str
   );
 }
 
-function LaneRow({ lane, onRename, onArchive }: { lane: Lane; onRename: (label: string) => void; onArchive: () => void }) {
+function LaneRow({ lane, isDefault, onRename, onArchive }: { lane: Lane; isDefault?: boolean; onRename: (label: string) => void; onArchive: () => void }) {
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState(lane.label);
   return (
@@ -158,8 +162,9 @@ function LaneRow({ lane, onRename, onArchive }: { lane: Lane; onRename: (label: 
       ) : (
         <>
           <span className="min-w-0 flex-1 truncate text-sm font-medium">{lane.label}</span>
-          <button onClick={() => setEditing(true)} aria-label="Rename" className="grid size-7 place-items-center rounded-full text-muted-foreground hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><PencilLine /></button>
-          <button onClick={onArchive} aria-label="Archive" className="grid size-7 place-items-center rounded-full text-muted-foreground hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><Archive /></button>
+          {isDefault && <span className="text-xs text-muted-foreground">default</span>}
+          <button onClick={() => { setLabel(lane.label); setEditing(true); }} aria-label="Rename" className="grid size-7 place-items-center rounded-full text-muted-foreground hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><PencilLine /></button>
+          {!isDefault && <button onClick={onArchive} aria-label="Archive" className="grid size-7 place-items-center rounded-full text-muted-foreground hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><Archive /></button>}
         </>
       )}
     </div>

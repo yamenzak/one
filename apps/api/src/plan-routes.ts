@@ -93,8 +93,8 @@ function makePlanRoutes(kind: Kind): Hono<AppEnv> {
         .all<PlanRow>();
       // Lane context travels with the plan list so the client can pick the
       // published plan for the lane they're on and offer a lane switcher.
-      const lanes = await loadVariants(c.env.DB, access.client.id, access.client.current_variant_id ?? null);
-      return c.json({ plans: (rows.results ?? []).map(planView), variants: lanes.variants, currentVariantId: lanes.currentVariantId });
+      const lanes = await loadVariants(c.env.DB, access.client.id, access.client.current_variant_id ?? null, access.client.default_lane_label ?? null);
+      return c.json({ plans: (rows.results ?? []).map(planView), variants: lanes.variants, currentVariantId: lanes.currentVariantId, defaultLabel: lanes.defaultLabel });
     })
 
     .post(prefix, async (c) => {

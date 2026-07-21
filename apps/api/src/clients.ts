@@ -41,6 +41,7 @@ export interface ClientRow {
   phone: string | null;
   preferences_json: string | null;
   current_variant_id: string | null;
+  default_lane_label: string | null;
   created_at: string;
   archived_at: string | null;
 }
