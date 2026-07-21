@@ -6,9 +6,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fmtEnergy, fmtVolume, weightLabel, displayToKg, feetInchesToCm, kgToDisplay, cmToFeetInches,
+  kcalToDisplay, displayToKcal, mlToVolumeDisplay, volumeDisplayToMl, energyLabel, volumeLabel,
   calculateNutritionTargets, validateCalculatorInputs,
   PRIMARY_GOAL_LABELS, ACTIVITY_LEVEL_LABELS, DIETARY_APPROACH_LABELS, WORKOUT_LOCATION_LABELS, BMI_CATEGORY_LABELS,
-  type ClientPreferences, type BmiCategory, type Gender, type ActivityLevel, type PrimaryGoal, type DietaryApproach,
+  type ClientPreferences, type BmiCategory, type Gender, type ActivityLevel, type PrimaryGoal, type DietaryApproach, type UnitPrefs,
 } from "@mossa/domain";
 import { Button, Card, Badge, Field, Select, Reveal, SegmentedControl, SkeletonStatGrid, SkeletonList, Page, Stagger, SectionHeader, METRICS, toneVar, Target, History, Activity, Scale, Flame, AlertTriangle, Calculator, SlidersHorizontal, ArrowRight, Calendar, type MetricKey } from "@mossa/ui";
 import { api } from "../../api.js";
@@ -33,11 +34,18 @@ const TARGET_FIELDS: { key: TargetKey; metric: MetricKey; unit: string }[] = [
 ];
 const emptyTargets = (): Record<TargetKey, string> => ({ targetCalories: "", targetProteinG: "", targetCarbsG: "", targetFatG: "", targetFiberG: "", targetWaterMl: "" });
 
-function fmtTarget(field: TargetKey, v: number, units: ReturnType<typeof useUnits>): string {
+function fmtTarget(field: TargetKey, v: number, units: UnitPrefs): string {
   if (field === "targetCalories") return fmtEnergy(v, units);
   if (field === "targetWaterMl") return fmtVolume(v, units);
   return `${Math.round(v)} g`;
 }
+
+// Manual entry follows the coach's display units: calories in kcal/kJ, water in
+// ml/fl-oz; the macros (protein/carbs/fat/fiber) are always grams. Values are
+// stored metric (kcal, ml) — convert on fill and on save.
+const unitLabelOf = (key: TargetKey, u: UnitPrefs): string => (key === "targetCalories" ? energyLabel(u) : key === "targetWaterMl" ? volumeLabel(u) : "g");
+const toDisplayVal = (key: TargetKey, metric: number, u: UnitPrefs): number => (key === "targetCalories" ? kcalToDisplay(metric, u) : key === "targetWaterMl" ? mlToVolumeDisplay(metric, u) : Math.round(metric));
+const toMetricVal = (key: TargetKey, display: number, u: UnitPrefs): number => Math.round(key === "targetCalories" ? displayToKcal(display, u) : key === "targetWaterMl" ? volumeDisplayToMl(display, u) : display);
 
 export function GoalManager({ clientId }: { clientId: string }) {
   const [goals, setGoals] = useState<Goal[] | null>(null);
@@ -99,7 +107,14 @@ export function GoalManager({ clientId }: { clientId: string }) {
     const inputs = calcInputs();
     if (validateCalculatorInputs(inputs).length) return;
     const r = calculateNutritionTargets(inputs);
-    setTargets({ targetCalories: String(r.targetCalories), targetProteinG: String(r.targetProteinG), targetCarbsG: String(r.targetCarbsG), targetFatG: String(r.targetFatG), targetFiberG: String(r.targetFiberG), targetWaterMl: String(r.targetWaterMl) });
+    setTargets({
+      targetCalories: String(toDisplayVal("targetCalories", r.targetCalories, units)),
+      targetProteinG: String(r.targetProteinG),
+      targetCarbsG: String(r.targetCarbsG),
+      targetFatG: String(r.targetFatG),
+      targetFiberG: String(r.targetFiberG),
+      targetWaterMl: String(toDisplayVal("targetWaterMl", r.targetWaterMl, units)),
+    });
     setDerivation(r.derivation as Record<string, unknown>);
   };
 
@@ -107,7 +122,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
     setBusy(true);
     try {
       const targetsObj: Record<string, number> = {};
-      for (const { key } of TARGET_FIELDS) if (targets[key] !== "" && Number.isFinite(Number(targets[key]))) targetsObj[key] = Number(targets[key]);
+      for (const { key } of TARGET_FIELDS) if (targets[key] !== "" && Number.isFinite(Number(targets[key]))) targetsObj[key] = toMetricVal(key, Number(targets[key]), units);
       const rangesObj: Record<string, { min: number | null; max: number | null }> = {};
       if (form.weightMin || form.weightMax) rangesObj.weightKg = { min: form.weightMin ? displayToKg(Number(form.weightMin), units) : null, max: form.weightMax ? displayToKg(Number(form.weightMax), units) : null };
       if (form.bodyFatMin || form.bodyFatMax) rangesObj.bodyFatPercent = { min: form.bodyFatMin ? Number(form.bodyFatMin) : null, max: form.bodyFatMax ? Number(form.bodyFatMax) : null };
@@ -143,8 +158,9 @@ export function GoalManager({ clientId }: { clientId: string }) {
   const heightOk = units.height === "ft_in" ? form.heightFt : form.heightCm;
   const calcReady = !!(form.ageYears && heightOk && form.weightKg);
   const canSave = Number(targets.targetCalories) > 0;
-  // Diff the pending calories against the active goal (the headline change).
-  const newCals = Number(targets.targetCalories) || null;
+  // Diff the pending calories against the active goal (the headline change) —
+  // both compared in METRIC kcal, then rendered in the coach's energy unit.
+  const newCals = targets.targetCalories !== "" && Number.isFinite(Number(targets.targetCalories)) ? toMetricVal("targetCalories", Number(targets.targetCalories), units) : null;
   const oldCals = active?.targets?.targetCalories ?? null;
   const calDelta = newCals != null && oldCals != null ? newCals - oldCals : null;
 
@@ -279,9 +295,9 @@ export function GoalManager({ clientId }: { clientId: string }) {
               {mode === "calculate" && Object.values(targets).some((v) => v !== "") && <button type="button" className="text-xs text-muted-foreground underline" onClick={() => setTargets(emptyTargets())}>clear</button>}
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {TARGET_FIELDS.map(({ key, metric, unit }) => {
+              {TARGET_FIELDS.map(({ key, metric }) => {
                 const m = METRICS[metric];
-                return <Field key={key} label={`${m.label} (${unit})`} icon={m.icon} inputMode="decimal" value={targets[key]} onChange={(e) => setTargets((t) => ({ ...t, [key]: e.target.value.replace(/[^\d.]/g, "") }))} />;
+                return <Field key={key} label={`${m.label} (${unitLabelOf(key, units)})`} icon={m.icon} inputMode="decimal" value={targets[key]} onChange={(e) => setTargets((t) => ({ ...t, [key]: e.target.value.replace(/[^\d.]/g, "") }))} />;
               })}
             </div>
           </div>
@@ -297,7 +313,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
               <ArrowRight className="size-4 text-muted-foreground" />
               <span className="numeral font-semibold">{fmtEnergy(newCals, units)}</span>
               {calDelta != null && calDelta !== 0 && (
-                <Badge tone={calDelta > 0 ? "cardio" : "sleep"}>{calDelta > 0 ? "+" : ""}{Math.round(calDelta)} kcal</Badge>
+                <Badge tone={calDelta > 0 ? "cardio" : "sleep"}>{calDelta > 0 ? "+" : "−"}{kcalToDisplay(Math.abs(calDelta), units)} {energyLabel(units)}</Badge>
               )}
             </div>
           )}
