@@ -13,6 +13,8 @@ import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@mossa/protocol";
 import { ensureSchema } from "../src/db.js";
+import { clientDigestHtml, coachDigestHtml } from "../src/digest.js";
+import { emailBar, emailBars, emailSparkline, emailRing, emailStatRow, emailListRow, MOSSA_BRAND } from "../src/mailer.js";
 
 const ORIGIN = "http://localhost:8787"; // treated as local by createAuth (non-secure cookies)
 let ownerCookie = "";
@@ -459,6 +461,146 @@ describe("notifications — email provider + per-user preferences", () => {
 
     // Re-enable so the flags don't leak into other suites.
     await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ notifPolicy: { staff: { "body-composition": true, labs: true } } }) });
+  });
+});
+
+describe("notification coverage — new signals", () => {
+  const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
+  // A real, non-logger staff member to receive the staff-facing notifications.
+  async function ghostTrainer(tenantId: string) {
+    const db = env.DB as D1Database;
+    await db.prepare("INSERT OR IGNORE INTO member (id, organizationId, userId, role, createdAt) VALUES ('mem_ntcoach', ?, 'usr_ntcoach', 'trainer', '2026-01-01')").bind(tenantId).run();
+    return "usr_ntcoach";
+  }
+  // A client with a linked user + client member row, so client-facing notifs
+  // resolve a real role (not "member", which zeroes every channel).
+  async function clientWithUser(name: string, tenantId: string, userId: string, clientId: string) {
+    const db = env.DB as D1Database;
+    await db.prepare("INSERT OR IGNORE INTO \"user\" (id, name, email, createdAt, updatedAt) VALUES (?, ?, ?, '2026-01-01', '2026-01-01')").bind(userId, name, `${userId}@ex.com`).run();
+    await db.prepare("INSERT OR IGNORE INTO member (id, organizationId, userId, role, createdAt) VALUES (?, ?, ?, 'client', '2026-01-01')").bind(`mem_${userId}`, tenantId, userId).run();
+    await db.prepare("UPDATE clients SET user_id = ? WHERE id = ?").bind(userId, clientId).run();
+  }
+
+  it("a completed body scan notifies the primary trainer (deduped, distinct from manual)", async () => {
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+    const coach = await ghostTrainer(tenantId);
+    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "ScanBella" }) })).json()) as { client: { id: string } }).client.id;
+    await db.prepare("UPDATE clients SET gender='female', date_of_birth='1992-01-01', height_cm=168 WHERE id=?").bind(clientId).run();
+    await db.prepare("UPDATE client_trainers SET trainer_user_id = ? WHERE client_id = ?").bind(coach, clientId).run();
+
+    const res = await SELF.fetch("http://x/api/body-scans", { method: "POST", headers: H(), body: JSON.stringify({ clientId, date: "2026-05-01", weightKg: 64, circumferences: { neckCm: 33, waistCm: 74 }, storeSilhouette: false }) });
+    expect(res.status).toBe(200);
+    const notif = (await db.prepare("SELECT category, title, message FROM notifications WHERE recipient_user_id = ? AND type = 'body_fat_logged' AND title LIKE '%body scan%'").bind(coach).first<{ category: string; title: string; message: string }>())!;
+    expect(notif.category).toBe("body-composition");
+    expect(notif.title).toContain("ScanBella");
+    expect(notif.message).toContain("% body fat");
+
+    // Re-scanning the same day upserts but doesn't re-notify (bfscan_ dedupe key).
+    await SELF.fetch("http://x/api/body-scans", { method: "POST", headers: H(), body: JSON.stringify({ clientId, date: "2026-05-01", weightKg: 63, circumferences: { neckCm: 33, waistCm: 73 }, storeSilhouette: false }) });
+    const dup = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE recipient_user_id = ? AND type = 'body_fat_logged' AND title LIKE '%body scan%'").bind(coach).first<{ n: number }>())!;
+    expect(dup.n).toBe(1);
+  });
+
+  it("beating an all-time e1RM notifies the trainer once per exercise/day; the first-ever lift is silent", async () => {
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+    const coach = await ghostTrainer(tenantId);
+    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "PRPete" }) })).json()) as { client: { id: string } }).client.id;
+    await db.prepare("UPDATE client_trainers SET trainer_user_id = ? WHERE client_id = ?").bind(coach, clientId).run();
+    await db.prepare("INSERT OR IGNORE INTO exercises (id, tenant_id, name, active) VALUES ('ex_bench', ?, 'Bench Press', 1)").bind(tenantId).run();
+
+    const logSet = (date: string, weightKg: number, reps: number) => SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H(), body: JSON.stringify({ clientId, data: { date, workoutPlanId: "wp-pr", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "ex_bench", sets: [{ setIndex: 0, reps, weightKg, completed: true }] } }) });
+    const prCount = async () => (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE recipient_user_id = ? AND type = 'pr_achieved'").bind(coach).first<{ n: number }>())!.n;
+
+    // First-ever lift establishes the baseline — no PR notification.
+    await logSet("2026-05-02", 60, 5);
+    expect(await prCount()).toBe(0);
+    // A heavier lift beats the baseline → one PR notification.
+    await logSet("2026-05-03", 80, 5);
+    expect(await prCount()).toBe(1);
+    const pr = (await db.prepare("SELECT category, title, message, link FROM notifications WHERE recipient_user_id = ? AND type = 'pr_achieved'").bind(coach).first<{ category: string; title: string; message: string; link: string }>())!;
+    expect(pr.category).toBe("activity");
+    expect(pr.title).toContain("PRPete");
+    expect(pr.title).toContain("Bench Press");
+    expect(pr.link).toContain(clientId);
+    // Another beat the SAME day is deduped to one per exercise/day.
+    await logSet("2026-05-03", 90, 5);
+    expect(await prCount()).toBe(1);
+    // The ledger tracked the best (90×5 e1RM), so a 3rd, higher day beats it again.
+    await logSet("2026-05-04", 100, 5);
+    expect(await prCount()).toBe(2);
+  });
+
+  it("a supplement status/dose change notifies the client; a notes-only edit is silent", async () => {
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "SuppSam" }) })).json()) as { client: { id: string } }).client.id;
+    await clientWithUser("SuppSam", tenantId, "usr_suppclient", clientId);
+    const sup = (await (await SELF.fetch("http://x/api/supplements", { method: "POST", headers: H(), body: JSON.stringify({ clientId, name: "Creatine", schedule: [{ slot: "daily" }] }) })).json()) as { id: string };
+
+    // Pausing it is an actionable change → the client is told.
+    await SELF.fetch(`http://x/api/supplements/${sup.id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ status: "paused" }) });
+    const notif = (await db.prepare("SELECT category, title, message FROM notifications WHERE recipient_user_id = 'usr_suppclient' AND type = 'supplement_updated'").first<{ category: string; title: string; message: string }>())!;
+    expect(notif.category).toBe("labs");
+    expect(notif.message).toContain("Creatine");
+    expect(notif.message).toContain("paused");
+
+    // A notes-only edit doesn't notify (no status/dose change).
+    await SELF.fetch(`http://x/api/supplements/${sup.id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ notes: "take with water" }) });
+    const after = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE recipient_user_id = 'usr_suppclient' AND type = 'supplement_updated'").first<{ n: number }>())!;
+    expect(after.n).toBe(1);
+  });
+
+  it("granting and extending access notifies the client", async () => {
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "AccessAmy" }) })).json()) as { client: { id: string } }).client.id;
+    await clientWithUser("AccessAmy", tenantId, "usr_accessclient", clientId);
+    await SELF.fetch("http://x/api/packages", { method: "POST", headers: H(), body: JSON.stringify({ name: "AccessPack", budgets: [{ feature: "all", days: 30 }] }) });
+    const pkgs = (await (await SELF.fetch("http://x/api/packages", { headers: auth(ownerCookie) })).json()) as { packages: { id: string; name: string }[] };
+    const pkg = pkgs.packages.find((p) => p.name === "AccessPack")!;
+
+    // First grant opens a subscription → "new access".
+    await SELF.fetch("http://x/api/subscriptions/grant", { method: "POST", headers: H(), body: JSON.stringify({ clientId, packageId: pkg.id }) });
+    const granted = (await db.prepare("SELECT category, title, message FROM notifications WHERE recipient_user_id = 'usr_accessclient' AND type = 'access_granted'").first<{ category: string; title: string; message: string }>())!;
+    expect(granted.category).toBe("commerce");
+    expect(granted.message).toContain("AccessPack");
+
+    // Second grant extends the live subscription → an "extended" notification.
+    await SELF.fetch("http://x/api/subscriptions/grant", { method: "POST", headers: H(), body: JSON.stringify({ clientId, packageId: pkg.id }) });
+    const all = await db.prepare("SELECT title FROM notifications WHERE recipient_user_id = 'usr_accessclient' AND type = 'access_granted'").all<{ title: string }>();
+    expect(all.results.length).toBe(2);
+    expect(all.results.some((r) => r.title.includes("extended"))).toBe(true);
+  });
+
+  it("notification links carry the specific item (deep-link params)", async () => {
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+    const coach = await ghostTrainer(tenantId);
+    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "DeepLinkDan" }) })).json()) as { client: { id: string } }).client.id;
+    await clientWithUser("DeepLinkDan", tenantId, "usr_dlclient", clientId);
+    await db.prepare("UPDATE client_trainers SET trainer_user_id = ? WHERE client_id = ?").bind(coach, clientId).run();
+
+    // A client check-in → the trainer's notification deep-links to that check-in.
+    const chk = (await (await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H(), body: JSON.stringify({ clientId, data: { date: "2026-06-01", mood: 4, notes: "good week" } }) })).json()) as { id: string };
+    const ciLink = (await db.prepare("SELECT link FROM notifications WHERE recipient_user_id = ? AND type = 'check_in'").bind(coach).first<{ link: string }>())!.link;
+    expect(ciLink).toBe(`/clients/${clientId}/manage?checkin=${chk.id}`);
+
+    // Coach feedback → the client's notification deep-links to the check-in by date.
+    await SELF.fetch(`http://x/api/check-ins/${chk.id}/feedback`, { method: "POST", headers: H(), body: JSON.stringify({ clientId, feedback: "great job" }) });
+    const fbLink = (await db.prepare("SELECT link FROM notifications WHERE recipient_user_id = 'usr_dlclient' AND type = 'feedback'").first<{ link: string }>())!.link;
+    expect(fbLink).toBe("/wellness?checkin=2026-06-01");
+
+    // A lab request → the client's notification deep-links to that lab on Wellness.
+    const lab = (await (await SELF.fetch("http://x/api/labs", { method: "POST", headers: H(), body: JSON.stringify({ clientId, type: "bloodwork", displayName: "Full panel" }) })).json()) as { id: string };
+    const labLink = (await db.prepare("SELECT link FROM notifications WHERE recipient_user_id = 'usr_dlclient' AND type = 'lab_requested'").first<{ link: string }>())!.link;
+    expect(labLink).toBe(`/wellness?lab=${lab.id}`);
   });
 });
 
@@ -1621,6 +1763,19 @@ describe("passkey — Better Auth endpoint methods (regression)", () => {
     const delNoAuth = await SELF.fetch(`${B}/api/auth/passkey/delete-passkey`, { method: "POST", headers: { "content-type": "application/json", origin: B }, body: JSON.stringify({ id: "nope" }) });
     expect(delNoAuth.status).toBe(401);
   });
+
+  it("enroll works for a day-old session (freshAge:0 — no SESSION_NOT_FRESH lockout)", async () => {
+    const db = env.DB as D1Database;
+    // Age every session well past Better Auth's 1-day `freshAge` default. The
+    // passkey enroll's FIRST call (generate-register-options) runs behind
+    // freshSessionMiddleware; without `session: { freshAge: 0 }` an old session
+    // would 403 SESSION_NOT_FRESH here — so a user signed in >1 day couldn't add
+    // a passkey at all. With the fix it still mints options.
+    await db.prepare("UPDATE session SET createdAt = ?").bind(new Date(Date.now() - 3 * 86_400_000).toISOString()).run();
+    const res = await SELF.fetch(`${B}/api/auth/passkey/generate-register-options`, { headers: auth(ownerCookie) });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { challenge?: string }).challenge).toBeTruthy();
+  });
 });
 
 describe("white-label — public brand assets + per-tenant PWA manifest", () => {
@@ -2548,5 +2703,72 @@ describe("coach voice (TTS) picker", () => {
     expect(cues.voice).toBe("Puck");
     // Unknown voices are rejected by the schema.
     expect((await SELF.fetch("http://x/api/settings/ai", { method: "PATCH", headers: H, body: JSON.stringify({ ttsVoice: "NotARealVoice" }) })).status).toBe(400);
+  });
+});
+
+describe("email digest — data-viz primitives + rich builders (pure render)", () => {
+  const brand = MOSSA_BRAND;
+
+  it("primitives render their chart markup and escape user input", () => {
+    // Bars carry the value in text (Gmail-safe) and clamp the fill width.
+    expect(emailBar("Training", "9/7", 2)).toContain("width:100%"); // pct > 1 clamps to 100%
+    expect(emailBar("Training", "0/7", -1)).toContain("width:0%");
+    // Weekly histogram renders one labelled column per point.
+    const bars = emailBars([{ label: "Mon", value: 3 }, { label: "Tue", value: 0 }]);
+    expect(bars).toContain("Mon");
+    expect(bars).toContain("Tue");
+    // Sparkline is an inline SVG path; needs ≥2 points.
+    expect(emailSparkline([1, 2, 3])).toContain("<svg");
+    expect(emailSparkline([1])).toBe("");
+    // Ring centers its number.
+    expect(emailRing(0.8, "82")).toContain(">82<");
+    // Stat row + list row escape attacker-influenced strings.
+    expect(emailStatRow([{ value: "5", label: "<script>x</script>" }])).toContain("&lt;script&gt;");
+    expect(emailListRow("<b>Ann</b>", "3 logs")).toContain("&lt;b&gt;Ann&lt;/b&gt;");
+    expect(emailListRow("<b>Ann</b>", "3 logs")).not.toContain("<b>Ann</b>");
+  });
+
+  it("client digest composes ring + stats + charts and escapes the name", () => {
+    const html = clientDigestHtml(brand, {
+      name: "Sam",
+      intro: "Nice work this week, Sam.",
+      stats: [{ value: "4", label: "Workout days" }, { value: "5", label: "Day streak" }],
+      dayBars: [{ label: "Mon", value: 3 }, { label: "Tue", value: 1 }, { label: "Wed", value: 0 }],
+      weightSeries: [80, 79.4, 78.8, 78.2],
+      weightCaption: "Down 1.8 kg over 4 readings — now 78.2 kg.",
+      wellness: 4.2,
+      adherence: [{ label: "Training days", value: "4/7", pct: 4 / 7, tone: "good" }],
+      labs: 1,
+    }, "https://app.example.com");
+    expect(html).toContain("<svg"); // ring + sparkline
+    expect(html).toContain(">4.2<"); // wellness ring center
+    expect(html).toContain("Workout days");
+    expect(html).toContain("Weight trend");
+    expect(html).toContain("lab test"); // labs nudge
+    expect(html).toContain("Weekly recap"); // eyebrow
+  });
+
+  it("coach digest composes trend + engagement + attention breakdown", () => {
+    const html = coachDigestHtml(brand, {
+      heading: "Your studio this week",
+      intro: "Here's how you did.",
+      stats: [{ value: "12", label: "Active clients" }],
+      activeTrend: [3, 5, 4, 6, 5, 7, 6, 8, 7, 6, 9, 8, 7, 10],
+      avgActive: 6,
+      engagement: { checkInRate: 60, workoutRate: 40 },
+      topClients: [{ name: "Ann", logs: 12 }, { name: "Ben", logs: 9 }],
+      attention: [{ label: "Stale goals", count: 2 }, { label: "Gone quiet", count: 3 }],
+      attentionTotal: 5,
+      mostImproved: { name: "Cara", delta: -2.1 },
+      ctaHref: "https://app.example.com",
+      ctaLabel: "Open the attention queue",
+      footer: "5 clients need attention.",
+    });
+    expect(html).toContain("<svg"); // active-clients sparkline
+    expect(html).toContain("60%"); // engagement bar value
+    expect(html).toContain("Stale goals");
+    expect(html).toContain("Needs attention · 5");
+    expect(html).toContain("Most improved");
+    expect(html).toContain("Open the attention queue");
   });
 });

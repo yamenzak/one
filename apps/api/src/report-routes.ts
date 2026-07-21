@@ -211,87 +211,104 @@ export const reportRoutes = new Hono<AppEnv>()
     const scope = await visibleClientIds(c);
     const today = c.req.query("today") ?? new Date().toISOString().slice(0, 10);
     const days = Math.min(30, Math.max(7, Number(c.req.query("days")) || 14));
-    const window = daysInRange(addDays(today, -(days - 1)), today);
-    const start = window[0]!;
-    const db = c.env.DB;
-
     let ids: string[];
     if (scope === "all") {
-      const rows = await db.prepare("SELECT id FROM clients WHERE tenant_id = ? AND status = 'active'").bind(who.tenantId).all<{ id: string }>();
+      const rows = await c.env.DB.prepare("SELECT id FROM clients WHERE tenant_id = ? AND status = 'active'").bind(who.tenantId).all<{ id: string }>();
       ids = (rows.results ?? []).map((r) => r.id);
     } else ids = scope;
-    const empty = { range: { start, end: today, days: window }, roster: { total: ids.length, active7: 0, atRisk: ids.length }, daily: window.map((d) => ({ date: d, active: 0, logs: 0 })), engagement: { checkInRate: 0, workoutRate: 0, avgActivePerDay: 0 }, topClients: [] as unknown[], composition: { tracked: 0, withTrend: 0, improving: 0, avgDeltaPct: null as number | null, mostImproved: null as null } };
-    if (ids.length === 0) return c.json(empty);
-    ids = ids.slice(0, 500);
-    const ph = ids.map(() => "?").join(",");
-
-    const names = new Map<string, string>();
-    const nrows = await db.prepare(`SELECT id, display_name FROM clients WHERE id IN (${ph})`).bind(...ids).all<{ id: string; display_name: string }>();
-    for (const r of nrows.results ?? []) names.set(r.id, r.display_name);
-
-    const q = (table: string) => db.prepare(`SELECT DISTINCT client_id, date_local FROM ${table} WHERE client_id IN (${ph}) AND date_local >= ? AND date_local <= ?`).bind(...ids, start, today).all<{ client_id: string; date_local: string }>();
-    const [ci, fe, xl, al] = await Promise.all([q("check_ins"), q("food_entries"), q("exercise_logs"), q("activity_logs")]);
-
-    const activeByDay = new Map<string, Set<string>>();
-    const logsByDay = new Map<string, number>();
-    const perClient = new Map<string, number>();
-    const active5 = new Set<string>();
-    const active7 = new Set<string>();
-    const checkin7 = new Set<string>();
-    const workout7 = new Set<string>();
-    const d7 = addDays(today, -6), d5 = addDays(today, -4);
-    const add = (cid: string, date: string, kind: string) => {
-      let s = activeByDay.get(date); if (!s) { s = new Set(); activeByDay.set(date, s); }
-      s.add(cid);
-      logsByDay.set(date, (logsByDay.get(date) ?? 0) + 1);
-      perClient.set(cid, (perClient.get(cid) ?? 0) + 1);
-      if (date >= d5) active5.add(cid);
-      if (date >= d7) { active7.add(cid); if (kind === "checkin") checkin7.add(cid); if (kind === "workout") workout7.add(cid); }
-    };
-    for (const r of ci.results ?? []) add(r.client_id, r.date_local, "checkin");
-    for (const r of fe.results ?? []) add(r.client_id, r.date_local, "food");
-    for (const r of xl.results ?? []) add(r.client_id, r.date_local, "workout");
-    for (const r of al.results ?? []) add(r.client_id, r.date_local, "activity");
-
-    const daily = window.map((d) => ({ date: d, active: activeByDay.get(d)?.size ?? 0, logs: logsByDay.get(d) ?? 0 }));
-    const total = ids.length;
-    const topClients = [...perClient.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([id, logs]) => ({ clientId: id, name: names.get(id) ?? "Client", logs }));
-
-    // Body-composition pulse — a wider (~90d) window since fat-loss trends over
-    // weeks, not days. First vs last body-fat reading per client → roster deltas.
-    const bfRows = await db.prepare(`SELECT client_id, date_local, body_fat_percent FROM measurements WHERE client_id IN (${ph}) AND body_fat_percent IS NOT NULL AND date_local >= ? AND date_local <= ? ORDER BY date_local`).bind(...ids, addDays(today, -89), today).all<{ client_id: string; body_fat_percent: number }>();
-    const bf = new Map<string, { first: number; last: number; n: number }>();
-    for (const r of bfRows.results ?? []) {
-      const e = bf.get(r.client_id);
-      if (!e) bf.set(r.client_id, { first: r.body_fat_percent, last: r.body_fat_percent, n: 1 });
-      else { e.last = r.body_fat_percent; e.n++; }
-    }
-    let deltaSum = 0, deltaN = 0, improving = 0;
-    let mostImproved: { clientId: string; name: string; delta: number } | null = null;
-    for (const [cid, e] of bf) {
-      if (e.n < 2) continue;
-      const delta = Math.round((e.last - e.first) * 10) / 10;
-      deltaSum += delta; deltaN++;
-      if (delta <= -0.5) improving++;
-      if (!mostImproved || delta < mostImproved.delta) mostImproved = { clientId: cid, name: names.get(cid) ?? "Client", delta };
-    }
-    const composition = {
-      tracked: bf.size,
-      withTrend: deltaN,
-      improving,
-      avgDeltaPct: deltaN ? Math.round((deltaSum / deltaN) * 10) / 10 : null,
-      mostImproved: mostImproved && mostImproved.delta < 0 ? mostImproved : null,
-    };
-    return c.json({
-      composition,
-      range: { start, end: today, days: window },
-      roster: { total, active7: active7.size, atRisk: Math.max(0, total - active5.size) },
-      daily,
-      engagement: {
-        checkInRate: total ? Math.round((checkin7.size / total) * 100) : 0,
-        workoutRate: total ? Math.round((workout7.size / total) * 100) : 0,
-        avgActivePerDay: Math.round(daily.reduce((n, x) => n + x.active, 0) / daily.length),
-      },
-      topClients,
-    });
+    return c.json(await rosterAnalytics(c.env.DB, ids, today, days));
   });
+
+/** The studio-engagement rollup behind /reports/roster-analytics — a daily
+ *  active-clients trend, 7-day check-in/workout rates, at-risk count, the most
+ *  active clients, and a body-composition pulse. Extracted so the weekly coach
+ *  digest reuses the EXACT same computation the in-app analytics screen shows
+ *  (no drift), the way the attention queue shares `rollupAttention`. */
+export interface RosterAnalytics {
+  range: { start: string; end: string; days: string[] };
+  roster: { total: number; active7: number; atRisk: number };
+  daily: { date: string; active: number; logs: number }[];
+  engagement: { checkInRate: number; workoutRate: number; avgActivePerDay: number };
+  topClients: { clientId: string; name: string; logs: number }[];
+  composition: { tracked: number; withTrend: number; improving: number; avgDeltaPct: number | null; mostImproved: { clientId: string; name: string; delta: number } | null };
+}
+
+export async function rosterAnalytics(db: D1Database, idsIn: string[], today: string, days: number): Promise<RosterAnalytics> {
+  const window = daysInRange(addDays(today, -(days - 1)), today);
+  const start = window[0]!;
+  if (idsIn.length === 0) {
+    return { range: { start, end: today, days: window }, roster: { total: 0, active7: 0, atRisk: 0 }, daily: window.map((d) => ({ date: d, active: 0, logs: 0 })), engagement: { checkInRate: 0, workoutRate: 0, avgActivePerDay: 0 }, topClients: [], composition: { tracked: 0, withTrend: 0, improving: 0, avgDeltaPct: null, mostImproved: null } };
+  }
+  const ids = idsIn.slice(0, 500);
+  const ph = ids.map(() => "?").join(",");
+
+  const names = new Map<string, string>();
+  const nrows = await db.prepare(`SELECT id, display_name FROM clients WHERE id IN (${ph})`).bind(...ids).all<{ id: string; display_name: string }>();
+  for (const r of nrows.results ?? []) names.set(r.id, r.display_name);
+
+  const q = (table: string) => db.prepare(`SELECT DISTINCT client_id, date_local FROM ${table} WHERE client_id IN (${ph}) AND date_local >= ? AND date_local <= ?`).bind(...ids, start, today).all<{ client_id: string; date_local: string }>();
+  const [ci, fe, xl, al] = await Promise.all([q("check_ins"), q("food_entries"), q("exercise_logs"), q("activity_logs")]);
+
+  const activeByDay = new Map<string, Set<string>>();
+  const logsByDay = new Map<string, number>();
+  const perClient = new Map<string, number>();
+  const active5 = new Set<string>();
+  const active7 = new Set<string>();
+  const checkin7 = new Set<string>();
+  const workout7 = new Set<string>();
+  const d7 = addDays(today, -6), d5 = addDays(today, -4);
+  const add = (cid: string, date: string, kind: string) => {
+    let s = activeByDay.get(date); if (!s) { s = new Set(); activeByDay.set(date, s); }
+    s.add(cid);
+    logsByDay.set(date, (logsByDay.get(date) ?? 0) + 1);
+    perClient.set(cid, (perClient.get(cid) ?? 0) + 1);
+    if (date >= d5) active5.add(cid);
+    if (date >= d7) { active7.add(cid); if (kind === "checkin") checkin7.add(cid); if (kind === "workout") workout7.add(cid); }
+  };
+  for (const r of ci.results ?? []) add(r.client_id, r.date_local, "checkin");
+  for (const r of fe.results ?? []) add(r.client_id, r.date_local, "food");
+  for (const r of xl.results ?? []) add(r.client_id, r.date_local, "workout");
+  for (const r of al.results ?? []) add(r.client_id, r.date_local, "activity");
+
+  const daily = window.map((d) => ({ date: d, active: activeByDay.get(d)?.size ?? 0, logs: logsByDay.get(d) ?? 0 }));
+  const total = ids.length;
+  const topClients = [...perClient.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([id, logs]) => ({ clientId: id, name: names.get(id) ?? "Client", logs }));
+
+  // Body-composition pulse — a wider (~90d) window since fat-loss trends over
+  // weeks, not days. First vs last body-fat reading per client → roster deltas.
+  const bfRows = await db.prepare(`SELECT client_id, date_local, body_fat_percent FROM measurements WHERE client_id IN (${ph}) AND body_fat_percent IS NOT NULL AND date_local >= ? AND date_local <= ? ORDER BY date_local`).bind(...ids, addDays(today, -89), today).all<{ client_id: string; body_fat_percent: number }>();
+  const bf = new Map<string, { first: number; last: number; n: number }>();
+  for (const r of bfRows.results ?? []) {
+    const e = bf.get(r.client_id);
+    if (!e) bf.set(r.client_id, { first: r.body_fat_percent, last: r.body_fat_percent, n: 1 });
+    else { e.last = r.body_fat_percent; e.n++; }
+  }
+  let deltaSum = 0, deltaN = 0, improving = 0;
+  let mostImproved: { clientId: string; name: string; delta: number } | null = null;
+  for (const [cid, e] of bf) {
+    if (e.n < 2) continue;
+    const delta = Math.round((e.last - e.first) * 10) / 10;
+    deltaSum += delta; deltaN++;
+    if (delta <= -0.5) improving++;
+    if (!mostImproved || delta < mostImproved.delta) mostImproved = { clientId: cid, name: names.get(cid) ?? "Client", delta };
+  }
+  const composition = {
+    tracked: bf.size,
+    withTrend: deltaN,
+    improving,
+    avgDeltaPct: deltaN ? Math.round((deltaSum / deltaN) * 10) / 10 : null,
+    mostImproved: mostImproved && mostImproved.delta < 0 ? mostImproved : null,
+  };
+  return {
+    composition,
+    range: { start, end: today, days: window },
+    roster: { total, active7: active7.size, atRisk: Math.max(0, total - active5.size) },
+    daily,
+    engagement: {
+      checkInRate: total ? Math.round((checkin7.size / total) * 100) : 0,
+      workoutRate: total ? Math.round((workout7.size / total) * 100) : 0,
+      avgActivePerDay: Math.round(daily.reduce((n, x) => n + x.active, 0) / daily.length),
+    },
+    topClients,
+  };
+}

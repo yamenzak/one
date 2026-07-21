@@ -80,7 +80,7 @@ describe("notification types (the atom)", () => {
   it("static-copy types carry a default title+link; name-interpolating types don't", () => {
     // Fixed-copy notifications own their title + link on the record.
     expect(notifTitleOf("goal_set")).toBe("Your coach set a new goal");
-    expect(notifLinkOf("goal_set")).toBe("/progress");
+    expect(notifLinkOf("goal_set")).toBe("/progress?tab=body"); // deep-links to the Body lens
     expect(notifTitleOf("supplement_added")).toBe("New supplement added");
     // Titles that interpolate a client name have no default — supplied at the call site.
     expect(notifTitleOf("check_in")).toBeNull();

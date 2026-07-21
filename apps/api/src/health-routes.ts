@@ -105,8 +105,20 @@ export const healthRoutes = new Hono<AppEnv>()
     await c.env.DB.prepare(`UPDATE supplements SET ${sets.join(", ")} WHERE id = ? AND tenant_id = ?`)
       .bind(...binds, c.req.param("id"), who.tenantId)
       .run();
-    const sup = await c.env.DB.prepare("SELECT client_id, name FROM supplements WHERE id = ? AND tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ client_id: string; name: string }>();
+    const sup = await c.env.DB.prepare("SELECT s.client_id, s.name, cl.user_id FROM supplements s JOIN clients cl ON cl.id = s.client_id WHERE s.id = ? AND s.tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ client_id: string; name: string; user_id: string | null }>();
     if (sup) await recordAudit(c.env, { tenantId: who.tenantId, clientId: sup.client_id, actorUserId: who.userId, action: "supplement.update", summary: `${sup.name}${d.status ? ` · ${d.status}` : ""}`, ref: c.req.param("id") });
+    // Tell the client when the change is one they'd act on — a status flip
+    // (paused/resumed/stopped) or a dose change. A notes-only tweak is silent.
+    if (sup?.user_id && (d.status || d.dose !== undefined)) {
+      const change = d.status ? `marked ${d.status}` : "dose updated";
+      await notify(c.env, {
+        tenantId: who.tenantId,
+        userId: sup.user_id,
+        type: "supplement_updated",
+        message: `${sup.name} — ${change}`,
+        vars: { coachName: c.get("user")?.name || "Your coach", supplementName: sup.name },
+      });
+    }
     return c.json({ ok: true });
   })
 
@@ -200,7 +212,7 @@ export const healthRoutes = new Hono<AppEnv>()
       .run();
     // Notify the client to complete the request.
     if (access.client.user_id) {
-      await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "lab_requested", message: d.displayName ?? d.type });
+      await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "lab_requested", message: d.displayName ?? d.type, link: `/wellness?lab=${id}` });
     }
     await recordAudit(c.env, { tenantId: who.tenantId, clientId: access.client.id, actorUserId: who.userId, action: "lab.request", summary: d.displayName ?? d.type, ref: id });
     return c.json({ ok: true, id }, 201);
@@ -226,7 +238,7 @@ export const healthRoutes = new Hono<AppEnv>()
       .bind(access.client.id)
       .first<{ trainer_user_id: string }>();
     if (primary) {
-      await notify(c.env, { tenantId: access.client.tenant_id, userId: primary.trainer_user_id, type: "lab_uploaded", title: `${access.client.display_name} uploaded a lab result`, link: `/clients/${access.client.id}/manage` });
+      await notify(c.env, { tenantId: access.client.tenant_id, userId: primary.trainer_user_id, type: "lab_uploaded", title: `${access.client.display_name} uploaded a lab result`, link: `/clients/${access.client.id}/manage?lab=${c.req.param("id")}` });
     }
     return c.json({ ok: true });
   })
@@ -259,7 +271,7 @@ export const healthRoutes = new Hono<AppEnv>()
       .run();
     if (d.status === "reviewed") {
       const lab = await c.env.DB.prepare("SELECT c.user_id AS user_id, c.id AS client_id, l.display_name AS name FROM lab_tests l JOIN clients c ON c.id = l.client_id WHERE l.id = ? AND l.tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ user_id: string | null; client_id: string; name: string | null }>();
-      if (lab?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: lab.user_id, type: "lab_reviewed", message: lab.name ?? "" });
+      if (lab?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: lab.user_id, type: "lab_reviewed", message: lab.name ?? "", link: `/wellness?lab=${c.req.param("id")}` });
       if (lab?.client_id) await recordAudit(c.env, { tenantId: who.tenantId, clientId: lab.client_id, actorUserId: who.userId, action: "lab.review", summary: lab.name ?? "", ref: c.req.param("id") });
     }
     return c.json({ ok: true });
@@ -473,7 +485,7 @@ export const healthRoutes = new Hono<AppEnv>()
         .bind(access.client.id)
         .first<{ trainer_user_id: string }>();
       if (primary) {
-        await notify(c.env, { tenantId: access.client.tenant_id, userId: primary.trainer_user_id, type: "swap_request", title: `${access.client.display_name} requested an exercise swap`, link: `/clients/${access.client.id}/manage` });
+        await notify(c.env, { tenantId: access.client.tenant_id, userId: primary.trainer_user_id, type: "swap_request", title: `${access.client.display_name} requested an exercise swap`, link: `/clients/${access.client.id}/manage?swap=${id}` });
       }
     }
     return c.json({ ok: true, id, autoApproved: autoApprove }, 201);

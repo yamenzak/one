@@ -19,7 +19,7 @@ import {
   SubmitCheckIn,
   type LoggedSet,
 } from "@mossa/protocol";
-import { activityByKey, estimateBurnedCalories, calculateBMI, calculateBMR, ageFromDob, profileGaps, overallDaysRemaining, isFullyExpired, hasActiveBudget, SUSPENDED_STATUSES, type ClientPreferences, type Budget } from "@mossa/domain";
+import { activityByKey, estimateBurnedCalories, calculateBMI, calculateBMR, ageFromDob, profileGaps, overallDaysRemaining, isFullyExpired, hasActiveBudget, epley1Rm, SUSPENDED_STATUSES, type ClientPreferences, type Budget } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess, type ClientRow } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
@@ -133,7 +133,47 @@ export const logRoutes = new Hono<AppEnv>()
         .prepare("UPDATE exercise_logs SET entries_json = ?, updated_at = ? WHERE id = ? AND entries_json IS ?")
         .bind(nextJson, nowIso(), log.id, log.entries_json)
         .run();
-      if ((res.meta?.changes ?? 0) > 0) return c.json({ ok: true, logId: log.id, entries });
+      if ((res.meta?.changes ?? 0) > 0) {
+        // A logged set that beats the client's all-time estimated 1RM for this
+        // exercise is a PR: keep the authoritative ledger current (O(1), no
+        // full-history fold) and — on a genuine improvement over an EXISTING
+        // best — tell the primary trainer, once per exercise per day. Only
+        // weighted sets yield an e1RM; bodyweight/timed sets update nothing.
+        const submittedBest = d.sets.reduce<{ e1rm: number; weight: number; reps: number } | null>((best, s) => {
+          if (s.completed === false || !s.weightKg || !s.reps) return best;
+          const e = epley1Rm(s.weightKg, s.reps);
+          if (e == null) return best;
+          return !best || e > best.e1rm ? { e1rm: e, weight: s.weightKg, reps: s.reps } : best;
+        }, null);
+        if (submittedBest) {
+          const prior = await db.prepare("SELECT best_e1rm FROM exercise_prs WHERE client_id = ? AND exercise_id = ?").bind(access.client.id, d.exerciseId).first<{ best_e1rm: number }>();
+          if (!prior || submittedBest.e1rm > prior.best_e1rm) {
+            await db.prepare(
+              "INSERT INTO exercise_prs (client_id, exercise_id, best_e1rm, weight_kg, reps, tenant_id, achieved_on, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(client_id, exercise_id) DO UPDATE SET best_e1rm=excluded.best_e1rm, weight_kg=excluded.weight_kg, reps=excluded.reps, achieved_on=excluded.achieved_on, updated_at=excluded.updated_at WHERE excluded.best_e1rm > exercise_prs.best_e1rm",
+            ).bind(access.client.id, d.exerciseId, submittedBest.e1rm, submittedBest.weight, submittedBest.reps, access.client.tenant_id, d.date, nowIso()).run().catch(() => undefined);
+            // First-ever lift sets the baseline silently; a beat over a prior best
+            // is the moment worth surfacing (never the coach's own logging).
+            if (prior) {
+              const actorId = requireTenant(c)?.userId;
+              const primary = await db.prepare("SELECT trainer_user_id FROM client_trainers WHERE client_id = ? ORDER BY is_primary DESC LIMIT 1").bind(access.client.id).first<{ trainer_user_id: string }>();
+              if (primary?.trainer_user_id && primary.trainer_user_id !== actorId) {
+                const ex = await db.prepare("SELECT name FROM exercises WHERE id = ?").bind(d.exerciseId).first<{ name: string }>();
+                const lift = ex?.name ?? "an exercise";
+                await notify(c.env, {
+                  tenantId: access.client.tenant_id,
+                  userId: primary.trainer_user_id,
+                  type: "pr_achieved",
+                  title: `${access.client.display_name} hit a PR on ${lift}`,
+                  message: `${submittedBest.weight} kg × ${submittedBest.reps} — new est. 1RM ${submittedBest.e1rm} kg`,
+                  link: `/clients/${access.client.id}/progress`,
+                  dedupeKey: `pr_${access.client.id}_${d.exerciseId}_${d.date}`,
+                });
+              }
+            }
+          }
+        }
+        return c.json({ ok: true, logId: log.id, entries });
+      }
       // CAS lost (a concurrent writer changed the row) — retry the merge.
       if (attempt >= MAX_ATTEMPTS) return c.json({ error: "conflict, retry" }, 409);
     }
@@ -684,7 +724,7 @@ export const logRoutes = new Hono<AppEnv>()
       .bind(access.client.id)
       .first<{ trainer_user_id: string }>();
     if (primary && primary.trainer_user_id !== c.get("user")?.id) {
-      await notify(c.env, { tenantId: access.client.tenant_id, userId: primary.trainer_user_id, type: "check_in", title: `${access.client.display_name} checked in`, message: d.notes ?? "", link: `/clients/${access.client.id}/manage` });
+      await notify(c.env, { tenantId: access.client.tenant_id, userId: primary.trainer_user_id, type: "check_in", title: `${access.client.display_name} checked in`, message: d.notes ?? "", link: `/clients/${access.client.id}/manage?checkin=${id}` });
     }
     return c.json({ ok: true, id }, 201);
   })
@@ -728,7 +768,10 @@ export const logRoutes = new Hono<AppEnv>()
       .bind(parsed.data.feedback, user.id, nowIso(), c.req.param("id"), access.client.id)
       .run();
     if (access.client.user_id) {
-      await notify(c.env, { tenantId: access.client.tenant_id, userId: access.client.user_id, type: "feedback", message: parsed.data.feedback.slice(0, 200), vars: { coachName: user.name || "Your coach" } });
+      // Deep-link to the exact check-in on the client's Wellness screen, which
+      // keys check-ins by their local date (?checkin=<date_local>).
+      const ci = await c.env.DB.prepare("SELECT date_local FROM check_ins WHERE id = ? AND client_id = ?").bind(c.req.param("id"), access.client.id).first<{ date_local: string }>();
+      await notify(c.env, { tenantId: access.client.tenant_id, userId: access.client.user_id, type: "feedback", message: parsed.data.feedback.slice(0, 200), link: ci?.date_local ? `/wellness?checkin=${ci.date_local}` : undefined, vars: { coachName: user.name || "Your coach" } });
     }
     await recordAudit(c.env, { tenantId: access.client.tenant_id, clientId: access.client.id, actorUserId: user.id, action: "checkin.feedback", summary: parsed.data.feedback.slice(0, 80), ref: c.req.param("id") });
     return c.json({ ok: true });

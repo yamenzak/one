@@ -9,7 +9,7 @@
 import type { NotifType } from "@mossa/domain";
 import {
   ClipboardList, BadgeCheck, Scale, Target, FlaskConical, Pill, ArrowLeftRight,
-  BookOpen, Calendar, CreditCard, AlertTriangle, Sparkles, type LucideIcon, type Tone,
+  BookOpen, Calendar, CreditCard, AlertTriangle, Sparkles, Trophy, type LucideIcon, type Tone,
 } from "@mossa/ui";
 
 export interface NotifCoding { icon: LucideIcon; tone: Tone }
@@ -18,12 +18,14 @@ const CODING: Record<NotifType, NotifCoding> = {
   check_in: { icon: ClipboardList, tone: "activity" },
   feedback: { icon: BadgeCheck, tone: "nutrition" },
   body_fat_logged: { icon: Scale, tone: "sleep" },
+  pr_achieved: { icon: Trophy, tone: "activity" },
   plan_published: { icon: ClipboardList, tone: "cardio" },
   goal_set: { icon: Target, tone: "activity" },
   lab_requested: { icon: FlaskConical, tone: "nutrition" },
   lab_uploaded: { icon: FlaskConical, tone: "nutrition" },
   lab_reviewed: { icon: FlaskConical, tone: "success" },
   supplement_added: { icon: Pill, tone: "nutrition" },
+  supplement_updated: { icon: Pill, tone: "warning" },
   swap_request: { icon: ArrowLeftRight, tone: "activity" },
   swap_approved: { icon: ArrowLeftRight, tone: "success" },
   swap_rejected: { icon: ArrowLeftRight, tone: "warning" },
@@ -31,6 +33,7 @@ const CODING: Record<NotifType, NotifCoding> = {
   session_booked: { icon: Calendar, tone: "cardio" },
   session_cancelled: { icon: Calendar, tone: "warning" },
   client_assigned: { icon: BadgeCheck, tone: "cardio" },
+  access_granted: { icon: BadgeCheck, tone: "success" },
   sub_expired: { icon: CreditCard, tone: "danger" },
   sub_expiring: { icon: CreditCard, tone: "warning" },
   sub_payment_failed: { icon: CreditCard, tone: "danger" },

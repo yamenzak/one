@@ -20,6 +20,23 @@ type AuthenticateOptions = Parameters<typeof startAuthentication>[0]["optionsJSO
 export const passkeySupported = (): boolean =>
   typeof window !== "undefined" && !!window.PublicKeyCredential;
 
+/** A human device label for a new passkey — "Chrome · macOS", "Safari · iPhone".
+ *  `navigator.platform` (what we used before) is deprecated and returns opaque
+ *  values like "MacIntel" / "Win32" / "" — so the stored names read wrong. This
+ *  prefers the modern userAgentData, then falls back to parsing the UA. */
+export function deviceLabel(): string {
+  if (typeof navigator === "undefined") return "Passkey";
+  const ua = navigator.userAgent || "";
+  const uaData = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData;
+  const os =
+    uaData?.platform ||
+    (/iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android" : /Mac OS X|Macintosh/.test(ua) ? "macOS" : /Windows/.test(ua) ? "Windows" : /CrOS/.test(ua) ? "ChromeOS" : /Linux/.test(ua) ? "Linux" : "");
+  const browser =
+    /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "";
+  const label = [browser, os].filter(Boolean).join(" · ");
+  return label || "Passkey";
+}
+
 /** Conditional-UI (autofill) support — lets the browser surface passkeys in the
  *  email field's autofill dropdown. */
 export async function conditionalPasskeyAvailable(): Promise<boolean> {

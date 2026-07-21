@@ -19,6 +19,7 @@ import { gateFeature } from "./client-flags.js";
 import { generateSpeech, DEFAULT_TTS_VOICE } from "./ai.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
+import { notify } from "./notify.js";
 
 /** The fixed cue set. Voiced once per tenant/voice/lang and cached. */
 const CUE_PHRASES: { id: string; text: string }[] = [
@@ -135,6 +136,26 @@ export const bodyScanRoutes = new Hono<AppEnv>()
       .bind(newId("meas"), who.tenantId, cl.id, d.date, est.bodyFatPercent, d.weightKg,
         d.circumferences.neckCm, d.circumferences.waistCm, d.circumferences.hipsCm ?? null, d.circumferences.chestCm ?? null, now)
       .run();
+
+    // A completed scan is coaching signal — notify the client's primary trainer
+    // (unless they ran it themselves). The /measurements handler fires the same
+    // body_fat_logged type; this path writes measurements directly, so it mirrors
+    // that notify here. Deduped per client per day, distinct from the manual key.
+    const primary = await c.env.DB
+      .prepare("SELECT trainer_user_id FROM client_trainers WHERE client_id = ? ORDER BY is_primary DESC LIMIT 1")
+      .bind(cl.id)
+      .first<{ trainer_user_id: string }>();
+    if (primary?.trainer_user_id && primary.trainer_user_id !== who.userId) {
+      await notify(c.env, {
+        tenantId: who.tenantId,
+        userId: primary.trainer_user_id,
+        type: "body_fat_logged",
+        title: `${cl.display_name} completed a body scan`,
+        message: `${est.bodyFatPercent}% body fat · ${d.weightKg} kg`,
+        link: `/clients/${cl.id}/manage`,
+        dedupeKey: `bfscan_${cl.id}_${d.date}`,
+      });
+    }
 
     return c.json({ ok: true, id, ...est });
   })

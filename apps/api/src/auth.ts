@@ -83,6 +83,16 @@ export function createAuth(env: Env, origin?: string) {
     // Passwordless-only: the email/password provider stays OFF.
     emailAndPassword: { enabled: false },
 
+    // Passkey enrollment (`generate-register-options`) runs behind Better Auth's
+    // freshSessionMiddleware, which 403s SESSION_NOT_FRESH once a session is
+    // older than `freshAge` (DEFAULT 1 DAY). In a 100% passwordless app the only
+    // way to "refresh" a session is another OTP round-trip, which we never force
+    // — so a user signed in for more than a day simply COULD NOT add a passkey
+    // (the very first enroll call 403'd with no actionable reason). `freshAge: 0`
+    // skips the freshness check, so enrollment works for the whole session
+    // lifetime; the operation is still gated by a valid, active session.
+    session: { freshAge: 0 },
+
     // Stamp the active organization onto the session at creation so a
     // single-tenant user lands in their tenant without a switcher round-trip.
     databaseHooks: {
