@@ -3,6 +3,7 @@ import {
   defaultChannels, resolveChannels, parseNotifPrefs, categoriesForRole, categoryAppliesTo, resolveAllChannels,
   parseNotifPolicy, emailAllowedByPolicy, resolveEmailPolicy, sanitizeEmailPolicy, isNotifCategory,
   NOTIF_TYPES, notifCategoryOf, notifTitleOf, notifLinkOf,
+  notifAudienceOf, notifVisibleInSurface, unreadInSurface, type NotifType,
 } from "../src/notifications.js";
 
 describe("notification preferences", () => {
@@ -93,6 +94,46 @@ describe("notification types (the atom)", () => {
     for (const [type, meta] of Object.entries(NOTIF_TYPES)) {
       expect(categoryAppliesTo(meta.category, roleFor[meta.to]), `${type} (${meta.to}) can't receive ${meta.category}`).toBe(true);
     }
+  });
+});
+
+describe("audience + surface (mode-aware in-app filtering)", () => {
+  it("the client surface shows only client-audience types", () => {
+    expect(notifVisibleInSurface("feedback", "client")).toBe(true); // to: client
+    expect(notifVisibleInSurface("plan_published", "client")).toBe(true);
+    expect(notifVisibleInSurface("check_in", "client")).toBe(false); // to: staff
+    expect(notifVisibleInSurface("billing_past_due", "client")).toBe(false); // to: owner
+  });
+
+  it("the staff surface shows staff + owner types, never client ones", () => {
+    expect(notifVisibleInSurface("check_in", "staff")).toBe(true); // to: staff
+    expect(notifVisibleInSurface("billing_past_due", "staff")).toBe(true); // to: owner
+    expect(notifVisibleInSurface("client_assigned", "staff")).toBe(true);
+    expect(notifVisibleInSurface("feedback", "staff")).toBe(false); // to: client
+  });
+
+  it("every type lands in exactly one surface", () => {
+    for (const type of Object.keys(NOTIF_TYPES) as NotifType[]) {
+      const inClient = notifVisibleInSurface(type, "client");
+      const inStaff = notifVisibleInSurface(type, "staff");
+      expect(inClient !== inStaff, `${type} must be in exactly one surface`).toBe(true);
+    }
+  });
+
+  it("an unknown type is shown everywhere rather than dropped", () => {
+    expect(notifVisibleInSurface("nope" as NotifType, "client")).toBe(true);
+    expect(notifAudienceOf("nope" as NotifType)).toBe("staff");
+  });
+
+  it("unreadInSurface counts only unread items visible in the surface", () => {
+    const items = [
+      { type: "feedback" as NotifType, read: false }, // client, unread
+      { type: "check_in" as NotifType, read: false }, // staff, unread
+      { type: "goal_set" as NotifType, read: true }, // client, read
+      { type: "plan_published" as NotifType, read: false }, // client, unread
+    ];
+    expect(unreadInSurface(items, "client")).toBe(2); // feedback + plan_published
+    expect(unreadInSurface(items, "staff")).toBe(1); // check_in
   });
 });
 

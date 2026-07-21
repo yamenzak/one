@@ -146,6 +146,36 @@ export function notifCategoryOf(type: NotifType): NotifCategory {
   return NOTIF_TYPES[type].category;
 }
 
+// ── Audience + surface (persona / mode-aware in-app filtering) ────────────────
+// A user can be BOTH staff and a client (a coach who trains themselves). The app
+// switches between two surfaces — the client surface ("train" mode) and the staff
+// surface ("coach" mode) — and the notification bell should show only what belongs
+// to the surface you're currently in. Audience is the type's `to` field; the
+// surface→audience mapping is: the client surface shows `client` notifications,
+// the staff surface shows `staff` + `owner` notifications. This is the single
+// source the bell/inbox filter on (pure — the app supplies the current surface).
+
+export type NotifSurface = "client" | "staff";
+
+/** Who a type is addressed to. Unknown types fall back to `staff` (never hidden
+ *  by accident from staff, who can act on anything). */
+export function notifAudienceOf(type: NotifType): NotifTypeMeta["to"] {
+  return NOTIF_TYPES[type]?.to ?? "staff";
+}
+
+/** Whether a notification of `type` belongs in the given surface. An unknown
+ *  type is shown everywhere rather than silently dropped. */
+export function notifVisibleInSurface(type: NotifType, surface: NotifSurface): boolean {
+  const meta = NOTIF_TYPES[type];
+  if (!meta) return true;
+  return surface === "client" ? meta.to === "client" : meta.to === "staff" || meta.to === "owner";
+}
+
+/** Count unread notifications visible in a surface — the bell's per-surface badge. */
+export function unreadInSurface(items: { type: NotifType; read: boolean | number }[], surface: NotifSurface): number {
+  return items.filter((n) => !n.read && notifVisibleInSurface(n.type, surface)).length;
+}
+
 /** The default title for a type (from the registry), or null if it must be
  *  supplied at the call site (name-interpolating titles). */
 export function notifTitleOf(type: NotifType): string | null {
