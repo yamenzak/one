@@ -2179,6 +2179,33 @@ describe("installments — limited-term subscription (per-cycle unlock)", () => 
   });
 });
 
+describe("platform promo codes (Mossa → tenant)", () => {
+  it("admin creates a 100%-off pack promo; it grants free once, then is exhausted", async () => {
+    const db = env.DB as D1Database;
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    for (const [k, v] of [["stripe.mode", "test"], ["stripe.secret_key", "sk_test_x"]] as const) {
+      await db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v).run();
+    }
+    // Admin creates a single-use platform promo (ownerCookie is admin in tests).
+    expect((await SELF.fetch("http://x/api/admin/promo-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "PLAT100", discountType: "percent", percentOff: 100, maxRedemptions: 1 }) })).status).toBe(201);
+    const listed = (await (await SELF.fetch("http://x/api/admin/promo-codes", { headers: auth(ownerCookie) })).json()) as { codes: { code: string }[] };
+    expect(listed.codes.some((c) => c.code === "PLAT100")).toBe(true);
+
+    const before = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
+    // 100% off → free grant (no Stripe charge); purchased credits jump by the pack size.
+    const r1 = await SELF.fetch("http://x/api/billing/pack-intent", { method: "POST", headers: H, body: JSON.stringify({ packId: "pack_1k", promoCode: "PLAT100" }) });
+    expect(r1.status).toBe(200);
+    expect((await r1.json() as { granted?: boolean }).granted).toBe(true);
+    const after = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
+    expect(after.balance.purchased - before.balance.purchased).toBe(1000);
+
+    // The single slot is consumed — a repeat is rejected (no second free grant).
+    const r2 = await SELF.fetch("http://x/api/billing/pack-intent", { method: "POST", headers: H, body: JSON.stringify({ packId: "pack_1k", promoCode: "PLAT100" }) });
+    expect(r2.status).toBe(400);
+    expect((await r2.json() as { error: string }).error).toBe("promo_exhausted");
+  });
+});
+
 describe("package lifecycle + redemption scoping", () => {
   it("blocks self-checkout of private / other-client packages and scopes redemption codes", async () => {
     const db = env.DB as D1Database;
