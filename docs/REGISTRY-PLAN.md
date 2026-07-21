@@ -88,13 +88,31 @@ The refactor landed as seven squash-merged PRs, each green:
 - **P3** (#71) — `AUDIT_ACTIONS` + `recordAudit()` wired into the key coach
   mutations; `GET /clients/:id/audit`.
 
-**Deferred (scoped follow-up):** the two-level legal/privacy **consent flows**
-(decision 3) are a product feature — versioned TOS, per-tenant + per-client
-consent capture and UI — needing product/design input beyond a registry, so the
-facet is scaffolded conceptually but the flows are not built. The
-done-message/activity-feed string registry was folded into P0c where it mattered
-(the notif-type vocabulary); the remaining feed titles are single-use and left
-in place.
+Then the completion pass, closing the gaps P1/P2 had only proof-of-concepted:
+
+- **Slice A** (#73) — **every** feature-level gate now derives from its record:
+  ~30 sites across all routes converted to `gateFeature(c, key, clientId?)`; a
+  base `aiSuite` feature added for the coach AI tools. Before: 5 sites on the
+  record; after: all of them.
+- **Slice B** (#74) — each notification's default **title + link live on its
+  `NOTIF_TYPES` record**; `notify()` renders them, call sites pass only what
+  varies (message; name-interpolating titles / client-scoped links stay inline).
+- **Slice C** (#77) — `STUDIO_SETTINGS_SECTIONS`: the studio-settings tabs + their
+  entitlement gating come from a registry (concern #8), not inline `show` flags.
+- **Slice D** (#76) — `coaching.ts` facet: the multi-coach access rule
+  (`canAccessClient`, `primaryCoach`) is one tested pure function; `requireClientAccess`
+  applies it instead of inline role branches (concern #9).
+- **Slice E** (#75) — `persona` atom: the `trainer` role always renders as
+  **"Coach"** (with a "You" self variant + role-aware badge), from one place
+  (concern #12).
+
+**Still deferred (needs product/design input, not a registry):** the two-level
+legal/privacy **consent flows** (decision 3) — versioned TOS + per-tenant +
+per-client consent capture and UI. The platform-level Terms + Privacy Policy
+were drafted (`docs/legal/`); the in-app consent flows are the remaining work.
+The done-message/activity-feed string registry stays folded into the notif-type
+vocabulary (P0c/Slice B) — the app has no toast layer and the remaining feed
+titles are single-use.
 
 ## Guardrails
 
