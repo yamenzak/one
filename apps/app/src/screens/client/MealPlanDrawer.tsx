@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
-import { fmtEnergy, kcalToDisplay } from "@mossa/domain";
+import { fmtEnergy, kcalToDisplay, featureEnabled } from "@mossa/domain";
 import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, ConfirmDialog, useModalOverlay, Utensils, ShoppingCart, Plus, Minus, Sparkles, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -57,7 +57,11 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   const units = useUnits();
   const { ctx } = useSession();
   const { startIfNew, start: startTour, active: tourActive, tour, stepSelector } = useTour();
-  const aiSuite = !!ctx?.entitlements?.features?.aiSuite;
+  // The recipe suggestion is the aiMealTools feature (aiSuite ⊕ the client's
+  // package flag) — the same gate /ai/recipe enforces, so the button never shows
+  // when the server would 403.
+  const features = ctx?.entitlements?.features;
+  const aiMealTools = !!features && featureEnabled("aiMealTools", { features, clientFlags: ctx?.clientFlags });
   const date = todayLocal();
   // `active` is the plan being viewed — the current published one by default, or
   // a past (superseded) plan the client picked from history. The shopping list is
@@ -366,7 +370,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
         <OptionDetailSheet
           opt={detail.opt} index={detail.index} units={units} foods={foods} foodMap={foodMap} image={optionImage(detail.opt)} readOnly={isPast}
           logged={!isPast && loggedIdx.has(detail.index)} logging={logging === detail.index} onLog={() => void logOption(detail.opt, detail.index)}
-          aiSuite={aiSuite} recipeBusy={recipeBusy === detail.index} onRecipe={() => void recommendRecipe(detail.opt, detail.index)}
+          aiMealTools={aiMealTools} recipeBusy={recipeBusy === detail.index} onRecipe={() => void recommendRecipe(detail.opt, detail.index)}
           onClose={() => setDetail(null)}
         />
       )}
@@ -463,9 +467,9 @@ function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, on
 }
 
 /** The full option breakdown — cover, macro tiles, foods, notes, recipe, micros. */
-function OptionDetailSheet({ opt, index, units, foods, foodMap, image, logged, logging, onLog, aiSuite, recipeBusy, onRecipe, onClose, readOnly }: {
+function OptionDetailSheet({ opt, index, units, foods, foodMap, image, logged, logging, onLog, aiMealTools, recipeBusy, onRecipe, onClose, readOnly }: {
   opt: MealOption; index: number; units: ReturnType<typeof useUnits>; foods: Map<string, FoodRow>; foodMap: Map<string, FoodLike>; image: string | null;
-  logged: boolean; logging: boolean; onLog: () => void; aiSuite: boolean; recipeBusy: boolean; onRecipe: () => void; onClose: () => void; readOnly?: boolean;
+  logged: boolean; logging: boolean; onLog: () => void; aiMealTools: boolean; recipeBusy: boolean; onRecipe: () => void; onClose: () => void; readOnly?: boolean;
 }) {
   const t = optionMacroTotals(opt, foodMap);
   const contrib = (mf: MealOption["foods"][number]) => { const f = foods.get(mf.foodId); return { f, factor: f && f.serving_size > 0 ? mf.quantity / f.serving_size : 0 }; };
@@ -515,7 +519,7 @@ function OptionDetailSheet({ opt, index, units, foods, foodMap, image, logged, l
               </div>
             )}
             {opt.notes && <p className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-muted-foreground">{opt.notes}</p>}
-            {aiSuite && opt.foods.length > 0 && (
+            {aiMealTools && opt.foods.length > 0 && (
               <Button size="sm" variant="tonal" className="w-full" disabled={recipeBusy} onClick={onRecipe}>
                 <Sparkles /> {recipeBusy ? "Cooking up a recipe…" : "Recommend a recipe"}
               </Button>

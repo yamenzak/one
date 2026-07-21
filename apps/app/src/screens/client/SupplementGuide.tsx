@@ -9,15 +9,17 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { Button, Sparkles } from "@mossa/ui";
+import { featureEnabled } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { AiAvatar } from "../../AiAvatar.js";
 
 export function SupplementGuide({ clientId }: { clientId: string }) {
   const { ctx } = useSession();
-  // aiSuite is a tenant entitlement; aiCoachInsights is the client's package flag
-  // (null for staff previewing → allowed).
-  const available = !!ctx?.entitlements?.features?.aiSuite && (ctx?.clientFlags?.aiCoachInsights ?? true);
+  // Composed from the aiCoachInsights FEATURES record (aiSuite entitlement ⊕ the
+  // client's package flag) — the same gate the /ai/narrative route enforces.
+  const features = ctx?.entitlements?.features;
+  const available = !!features && featureEnabled("aiCoachInsights", { features, clientFlags: ctx?.clientFlags });
   const [guide, setGuide] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
