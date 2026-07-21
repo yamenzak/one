@@ -44,6 +44,7 @@ export function Eat({ clientId }: { clientId: string }) {
   const [mealPlan, setMealPlan] = useState<{ name: string; meals: number; options: number } | null>(null);
   const [variants, setVariants] = useState<Lane[]>([]);
   const [currentVariantId, setCurrentVariantId] = useState<string | null>(null);
+  const [defaultLabel, setDefaultLabel] = useState("Main");
   const [edit, setEdit] = useState<Entry | null>(null);
   const [error, setError] = useState(false);
   const reqRef = useRef(0);
@@ -60,12 +61,12 @@ export function Eat({ clientId }: { clientId: string }) {
         api.get<{ entries: Entry[] }>(`/api/logs/food?clientId=${clientId}&date=${date}`),
         api.get<{ goal: { targets: Targets | null } | null }>(`/api/today?clientId=${clientId}&date=${date}`),
         api.get<Week>(`/api/logs/nutrition/week?clientId=${clientId}&date=${date}`),
-        api.get<{ plans: { status: string; name: string; variantId: string | null; body?: { mealOptions?: { mealType: string }[] } }[]; variants: Lane[]; currentVariantId: string | null }>(`/api/meal-plans?clientId=${clientId}`).catch(() => ({ plans: [], variants: [], currentVariantId: null })),
+        api.get<{ plans: { status: string; name: string; variantId: string | null; body?: { mealOptions?: { mealType: string }[] } }[]; variants: Lane[]; currentVariantId: string | null; defaultLabel?: string }>(`/api/meal-plans?clientId=${clientId}`).catch(() => ({ plans: [], variants: [], currentVariantId: null, defaultLabel: "Main" })),
       ]);
       if (rid !== reqRef.current) return;
       setEntries(e.entries); setTargets(today.goal?.targets ?? null);
       setWeek(wk); setWaterMl(wk.days[wk.days.length - 1]?.waterMl ?? 0);
-      setVariants(mp.variants ?? []); setCurrentVariantId(mp.currentVariantId ?? null);
+      setVariants(mp.variants ?? []); setCurrentVariantId(mp.currentVariantId ?? null); setDefaultLabel(mp.defaultLabel || "Main");
       const cur = mp.currentVariantId ?? null;
       const published = mp.plans.find((p) => p.status === "published" && (p.variantId ?? null) === cur);
       const opts = published?.body?.mealOptions ?? [];
@@ -128,7 +129,7 @@ export function Eat({ clientId }: { clientId: string }) {
       }>
         {entries && (
         <>
-      <LaneSwitcher clientId={clientId} variants={variants} currentVariantId={currentVariantId} onSwitched={() => void load()} />
+      <LaneSwitcher clientId={clientId} variants={variants} currentVariantId={currentVariantId} defaultLabel={defaultLabel} onSwitched={() => void load()} />
       {/* Your meal plan — the primary entry (parity with Train's active-plan hero) */}
       {mealPlan && (
         <Stagger>

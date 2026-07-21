@@ -268,6 +268,10 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "CREATE TABLE IF NOT EXISTS plan_variants (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, label TEXT, ord INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT)",
           "CREATE INDEX IF NOT EXISTS idx_plan_variants_client ON plan_variants(client_id)",
           "ALTER TABLE clients ADD COLUMN current_variant_id TEXT",
+          // Custom display name for the default (NULL) lane — e.g. rename "Main"
+          // to "Regular week". The lane is still the NULL variant; only its label
+          // is stored. NULL → shown as "Main".
+          "ALTER TABLE clients ADD COLUMN default_lane_label TEXT",
           "ALTER TABLE workout_plans ADD COLUMN variant_id TEXT",
           "ALTER TABLE meal_plans ADD COLUMN variant_id TEXT",
         ];

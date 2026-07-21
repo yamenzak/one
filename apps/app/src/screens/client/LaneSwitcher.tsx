@@ -15,18 +15,20 @@ export function LaneSwitcher({
   clientId,
   variants,
   currentVariantId,
+  defaultLabel = "Main",
   onSwitched,
 }: {
   clientId: string;
   variants: Lane[];
   currentVariantId: string | null;
+  defaultLabel?: string;
   onSwitched: (variantId: string | null) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const lanes = variants.filter((v) => !v.archived);
   if (lanes.length === 0) return null; // no second lane → nothing to switch
 
-  const options: { id: string | null; label: string }[] = [{ id: null, label: "Main" }, ...lanes.map((l) => ({ id: l.id, label: l.label }))];
+  const options: { id: string | null; label: string }[] = [{ id: null, label: defaultLabel }, ...lanes.map((l) => ({ id: l.id, label: l.label }))];
 
   const pick = async (id: string | null) => {
     if (busy || id === (currentVariantId ?? null)) return;

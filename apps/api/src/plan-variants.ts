@@ -25,19 +25,22 @@ export interface VariantRow {
 }
 
 /** Load a client's lanes (non-archived first, by order) + the current lane id,
- *  clamped: if the stored current lane is missing/archived, fall to default. */
+ *  clamped: if the stored current lane is missing/archived, fall to default.
+ *  `defaultLabel` is the display name of the NULL default lane ("Main" unless
+ *  the coach renamed it). */
 export async function loadVariants(
   db: D1Database,
   clientId: string,
   currentVariantId: string | null,
-): Promise<{ variants: { id: string; label: string; ord: number; archived: boolean }[]; currentVariantId: string | null }> {
+  defaultLabel: string | null,
+): Promise<{ variants: { id: string; label: string; ord: number; archived: boolean }[]; currentVariantId: string | null; defaultLabel: string }> {
   const rows = await db
     .prepare("SELECT id, label, ord, archived FROM plan_variants WHERE client_id = ? ORDER BY archived, ord, created_at")
     .bind(clientId)
     .all<VariantRow>();
   const variants = (rows.results ?? []).map((r) => ({ id: r.id, label: r.label, ord: r.ord, archived: !!r.archived }));
   const live = variants.find((v) => v.id === currentVariantId && !v.archived);
-  return { variants, currentVariantId: live ? live.id : null };
+  return { variants, currentVariantId: live ? live.id : null, defaultLabel: defaultLabel || "Main" };
 }
 
 /** The lane a plan read should resolve to for this client right now. */
@@ -53,7 +56,23 @@ export const planVariantRoutes = new Hono<AppEnv>()
   .get("/clients/:clientId/variants", async (c) => {
     const access = await requireClientAccess(c, c.req.param("clientId"));
     if ("response" in access) return access.response;
-    return c.json(await loadVariants(c.env.DB, access.client.id, access.client.current_variant_id ?? null));
+    return c.json(await loadVariants(c.env.DB, access.client.id, access.client.current_variant_id ?? null, access.client.default_lane_label ?? null));
+  })
+
+  // Rename the default (Main) lane — the NULL lane has no plan_variants row, so
+  // its label lives on the client. Blank/"Main" resets to the built-in name.
+  .patch("/clients/:clientId/default-lane", async (c) => {
+    const who = requireTenant(c)!;
+    const access = await requireClientAccess(c, c.req.param("clientId"));
+    if ("response" in access) return access.response;
+    if (c.get("role") === "client") return c.json({ error: "forbidden" }, 403);
+    const parsed = z.object({ label: z.string().max(60).nullable() }).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const label = parsed.data.label?.trim();
+    const stored = label && label.toLowerCase() !== "main" ? label : null;
+    await c.env.DB.prepare("UPDATE clients SET default_lane_label = ? WHERE id = ?").bind(stored, access.client.id).run();
+    await recordAudit(c.env, { tenantId: access.client.tenant_id, clientId: access.client.id, actorUserId: who.userId, action: "variant.update", summary: stored ?? "Main", ref: "default" });
+    return c.json({ ok: true, defaultLabel: stored || "Main" });
   })
 
   // Create a lane (coaching action — staff only).

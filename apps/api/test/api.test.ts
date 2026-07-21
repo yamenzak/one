@@ -1913,10 +1913,19 @@ describe("plan lifecycle — publish supersedes, restore, draft-only delete", ()
     expect(s.get(offA)).toBe("published"); // other lane untouched
 
     // The plan list carries lane context.
-    const list = (await (await SELF.fetch(`http://x/api/workout-plans?clientId=${client}`, { headers: H() })).json()) as { variants: { id: string; label: string }[]; currentVariantId: string | null; plans: { id: string; variantId: string | null }[] };
+    const list = (await (await SELF.fetch(`http://x/api/workout-plans?clientId=${client}`, { headers: H() })).json()) as { variants: { id: string; label: string }[]; currentVariantId: string | null; defaultLabel: string; plans: { id: string; variantId: string | null }[] };
     expect(list.variants.map((v) => v.label)).toContain("Off week");
     expect(list.currentVariantId).toBeNull(); // default lane
+    expect(list.defaultLabel).toBe("Main"); // default lane's default name
     expect(list.plans.find((p) => p.id === offA)!.variantId).toBe(laneId);
+
+    // The default (Main) lane can be renamed; "Main" resets it.
+    await SELF.fetch(`http://x/api/clients/${client}/default-lane`, { method: "PATCH", headers: H(), body: JSON.stringify({ label: "Regular week" }) });
+    const renamed = (await (await SELF.fetch(`http://x/api/workout-plans?clientId=${client}`, { headers: H() })).json()) as { defaultLabel: string };
+    expect(renamed.defaultLabel).toBe("Regular week");
+    await SELF.fetch(`http://x/api/clients/${client}/default-lane`, { method: "PATCH", headers: H(), body: JSON.stringify({ label: "Main" }) });
+    const reset = (await (await SELF.fetch(`http://x/api/clients/${client}/variants`, { headers: H() })).json()) as { defaultLabel: string };
+    expect(reset.defaultLabel).toBe("Main");
 
     // Today resolves the DEFAULT lane's published plan…
     const today = new Date().toISOString().slice(0, 10);

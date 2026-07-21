@@ -38,6 +38,7 @@ export function Train({ clientId }: { clientId: string }) {
   const [plans, setPlans] = useState<Plan[] | null>(null);
   const [variants, setVariants] = useState<Lane[]>([]);
   const [currentVariantId, setCurrentVariantId] = useState<string | null>(null);
+  const [defaultLabel, setDefaultLabel] = useState("Main");
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const nav = useNavigate();
@@ -54,12 +55,12 @@ export function Train({ clientId }: { clientId: string }) {
     setError(false);
     try {
       const [p, s, a] = await Promise.all([
-        api.get<{ plans: Plan[]; variants: Lane[]; currentVariantId: string | null }>(`/api/workout-plans?clientId=${clientId}`),
+        api.get<{ plans: Plan[]; variants: Lane[]; currentVariantId: string | null; defaultLabel?: string }>(`/api/workout-plans?clientId=${clientId}`),
         api.get<{ sessions: Session[] }>(`/api/logs/workout-sessions?clientId=${clientId}&from=${shift(today, -89)}&to=${today}`),
         api.get<{ activities: ActivityLog[] }>(`/api/logs/activities?clientId=${clientId}&from=${shift(today, -29)}&to=${today}`),
       ]);
       if (rid !== reqRef.current) return;
-      setPlans(p.plans); setVariants(p.variants ?? []); setCurrentVariantId(p.currentVariantId ?? null); setSessions(s.sessions); setActivities(a.activities);
+      setPlans(p.plans); setVariants(p.variants ?? []); setCurrentVariantId(p.currentVariantId ?? null); setDefaultLabel(p.defaultLabel || "Main"); setSessions(s.sessions); setActivities(a.activities);
     } catch {
       if (rid !== reqRef.current) return;
       setError(true);
@@ -168,7 +169,7 @@ export function Train({ clientId }: { clientId: string }) {
       }>
         {plans && (
         <>
-      <LaneSwitcher clientId={clientId} variants={variants} currentVariantId={currentVariantId} onSwitched={() => void load()} />
+      <LaneSwitcher clientId={clientId} variants={variants} currentVariantId={currentVariantId} defaultLabel={defaultLabel} onSwitched={() => void load()} />
       {published ? (
         <Stagger data-tour="train-hero">
           <button onClick={() => start()} className="w-full text-left">
