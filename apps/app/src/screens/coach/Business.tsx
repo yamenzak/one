@@ -1,7 +1,8 @@
 /** Owner Business — tabbed: overview (plan + credits + AI usage), packages, staff. */
 
 import { useEffect, useState } from "react";
-import { Button, Card, Badge, StatCard, SegmentedControl, Page, Stagger, ChartCard, SectionHeader, IconBadge, EmptyState, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Sparkles, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, CheckCheck } from "@mossa/ui";
+import { Button, Card, Badge, StatCard, SegmentedControl, Page, Stagger, ChartCard, SectionHeader, IconBadge, EmptyState, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Sparkles, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, CheckCheck, Check, Lock } from "@mossa/ui";
+import { FEATURE_KEYS, FEATURE_META, QUOTA_KEYS, QUOTA_META, type Entitlements } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { Staff } from "./Staff.js";
@@ -174,6 +175,10 @@ function Overview() {
             </Stagger>
           )}
 
+          {ctx?.entitlements && (
+            <Stagger><PlanFeatures ent={ctx.entitlements} /></Stagger>
+          )}
+
           <Stagger>
             <Card className="space-y-3">
               <SectionHeader icon={CreditCard} tone="primary" title="Credit packs" />
@@ -210,5 +215,43 @@ function Overview() {
       </Reveal>
       )}
     </Page>
+  );
+}
+
+/** "What's in your plan" — every platform feature the tenant does / doesn't
+ *  hold, plus the capacity quotas, rendered straight from the entitlement
+ *  registry (FEATURE_META / QUOTA_META) so it can't drift from what's enforced.
+ *  Reserved (unreleased) features are hidden. */
+function PlanFeatures({ ent }: { ent: Entitlements }) {
+  const features = FEATURE_KEYS.filter((k) => !FEATURE_META[k]?.reserved);
+  const fmtQuota = (v: number) => (v < 0 ? "Unlimited" : v.toLocaleString());
+  return (
+    <Card className="space-y-3">
+      <SectionHeader icon={CheckCheck} tone="success" title="What's in your plan" />
+      <div className="space-y-1">
+        {features.map((k) => {
+          const on = ent.features[k];
+          const meta = FEATURE_META[k]!;
+          return (
+            <div key={k} className="flex items-start gap-2.5 rounded-lg px-1 py-1.5">
+              <IconBadge icon={on ? Check : Lock} tone={on ? "success" : "neutral"} size="sm" />
+              <div className="min-w-0 flex-1">
+                <div className={cn("text-sm font-medium", !on && "text-muted-foreground")}>{meta.label}</div>
+                <div className="text-xs text-muted-foreground">{meta.hint}</div>
+              </div>
+              {!on && <Badge tone="neutral">Locked</Badge>}
+            </div>
+          );
+        })}
+      </div>
+      <div className="grid grid-cols-2 gap-2 border-t border-border/40 pt-3">
+        {QUOTA_KEYS.map((k) => (
+          <div key={k} className="rounded-xl bg-surface-2 px-3 py-2.5">
+            <div className="text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground">{QUOTA_META[k]?.label ?? k}</div>
+            <div className="numeral mt-0.5 text-sm font-bold">{fmtQuota(ent.quotas[k])}<span className="ml-1 text-[0.6rem] font-medium text-muted-foreground">{QUOTA_META[k]?.unit ?? ""}</span></div>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
