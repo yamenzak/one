@@ -5,8 +5,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Sheet, Avatar, SegmentedControl, Page, Stagger, EmptyState, Reveal, SkeletonList, Users, Mail, User, ArrowLeft, Plus } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, SegmentedControl, Page, Stagger, EmptyState, Reveal, SkeletonList, toneVar, Users, Mail, User, ArrowLeft, Plus } from "@mossa/ui";
+import type { AttentionSeverity } from "@mossa/domain";
 import { api } from "../../api.js";
+import { SEVERITY_TONE } from "../../attention-ui.js";
 import { Today } from "../client/Today.js";
 import { Progress } from "../client/Progress.js";
 import { CoachPlans } from "./CoachPlans.js";
@@ -24,11 +26,15 @@ export function Clients() {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const [pending, setPending] = useState<Set<string>>(new Set());
+  // Per-client attention rollup — the worst item's label + how many, so a coach
+  // spots a stale goal / quiet client / lab-to-review straight from the roster.
+  const [att, setAtt] = useState<Map<string, { label: string; count: number; severity: AttentionSeverity }>>(new Map());
   const load = useCallback(async () => { setClients((await api.get<{ clients: ClientSummary[] }>("/api/clients")).clients); }, []);
   useEffect(() => void load(), [load]);
   useEffect(() => {
-    void api.get<{ swaps: { client_id: string }[] }>("/api/swaps").then((r) => setPending(new Set(r.swaps.map((s) => s.client_id)))).catch(() => undefined);
+    void api.get<{ clients: { clientId: string; items: { label: string; severity: AttentionSeverity }[] }[] }>("/api/coach/attention")
+      .then((r) => setAtt(new Map(r.clients.filter((c) => c.items.length).map((c) => [c.clientId, { label: c.items[0]!.label, count: c.items.length, severity: c.items[0]!.severity }]))))
+      .catch(() => undefined);
   }, []);
 
   const create = async () => {
@@ -54,10 +60,12 @@ export function Clients() {
               <Card key={c.id} interactive onClick={() => nav(`/clients/${c.id}/today`)} className="flex items-center gap-3.5 py-3.5">
                 <Avatar name={c.displayName} src={c.avatarUrl} seed={c.avatarSeed ?? c.id} className="size-11" />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 truncate font-semibold">{c.displayName}{pending.has(c.id) && <span className="size-2 shrink-0 rounded-full bg-cardio" title="Needs action" />}</div>
+                  <div className="flex items-center gap-2 truncate font-semibold">{c.displayName}{att.has(c.id) && <span className="size-2 shrink-0 rounded-full" style={{ background: toneVar[SEVERITY_TONE[att.get(c.id)!.severity]] }} title="Needs attention" />}</div>
                   <div className="truncate text-sm text-muted-foreground">{c.email ?? "no email"}</div>
                 </div>
-                {pending.has(c.id) ? <Badge tone="cardio">Swap</Badge> : c.hasLogin ? <Badge tone="success">Active</Badge> : <Badge tone="neutral">Invited</Badge>}
+                {att.has(c.id)
+                  ? <Badge tone={SEVERITY_TONE[att.get(c.id)!.severity]}>{att.get(c.id)!.label}{att.get(c.id)!.count > 1 ? ` +${att.get(c.id)!.count - 1}` : ""}</Badge>
+                  : c.hasLogin ? <Badge tone="success">Active</Badge> : <Badge tone="neutral">Invited</Badge>}
               </Card>
             ))}
           </Stagger>

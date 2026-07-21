@@ -998,6 +998,30 @@ describe("reports", () => {
     const body = (await res.json()) as { atRisk: { name: string }[] };
     expect(body.atRisk.some((r) => r.name === "GhostClient")).toBe(true);
   });
+
+  it("coach attention rolls up per-client signals across the roster", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    // A: bare + no logs → gone quiet + profile incomplete.
+    const { client: a } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "QuietQuinn" }) })).json()) as { client: { id: string } };
+    // B: a check-in today with no coach feedback → check-in to answer (and NOT quiet — a check-in is activity).
+    const { client: b } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "NeedsReplyRey" }) })).json()) as { client: { id: string } };
+    const today = new Date().toISOString().slice(0, 10);
+    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: b.id, data: { date: today, mood: 4 } }) });
+
+    const res = await SELF.fetch("http://x/api/coach/attention", { headers: auth(ownerCookie) });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { clients: { clientId: string; items: { type: string; label: string; link: string }[] }[]; totals: Record<string, number>; total: number };
+    const rowA = body.clients.find((r) => r.clientId === a.id)!;
+    const rowB = body.clients.find((r) => r.clientId === b.id)!;
+    expect(rowA.items.map((i) => i.type)).toContain("client_quiet");
+    expect(rowA.items.map((i) => i.type)).toContain("profile_incomplete");
+    expect(rowB.items.map((i) => i.type)).toContain("checkin_unanswered");
+    expect(rowB.items.map((i) => i.type)).not.toContain("client_quiet"); // logged today
+    // Items carry a deep link to the client's relevant tab + the registry label.
+    expect(rowB.items.find((i) => i.type === "checkin_unanswered")!.link).toBe(`/clients/${b.id}/manage`);
+    expect(rowA.items.find((i) => i.type === "client_quiet")!.label).toBe("Gone quiet");
+    expect(body.totals.client_quiet).toBeGreaterThanOrEqual(1);
+  });
 });
 
 describe("client-scoped home widgets (coach configures on the client's behalf)", () => {
