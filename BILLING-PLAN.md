@@ -1,6 +1,10 @@
 # Billing Centralization — Design Plan
 
-Status: **proposed, awaiting approval.** No money code changes until this is signed off.
+Status: **shipped** — all 8 slices implemented, tested, and pushed to
+`claude/full-app-audit-fb3oya` (credits two-bucket, inline Stripe on both rails,
+website-native promo codes, installments, redemption-code scoping, private-to-
+client enforcement, and the billing UI). Full suite green: 151 domain / 118 API /
+6 app / 7 protocol.
 
 This is the same discipline we used for the registry refactor: map the ground
 truth first, agree the target model, then implement in reviewable slices. Two
