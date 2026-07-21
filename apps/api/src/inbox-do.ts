@@ -36,6 +36,13 @@ export class InboxDO extends DurableObject<Env> {
     }
   }
 
+  /** Drop all durable state + close any open sockets — called when the user is
+   *  erased (account delete / tenant purge / nuclear reset). */
+  async wipe(): Promise<void> {
+    for (const ws of this.ctx.getWebSockets()) { try { ws.close(1000, "account closed"); } catch { /* already gone */ } }
+    await this.ctx.storage.deleteAll();
+  }
+
   /** Client keepalive; we only ever push server→client otherwise. */
   override async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     if (message === "ping") {

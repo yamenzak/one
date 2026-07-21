@@ -8,7 +8,7 @@ import { motion } from "motion/react";
 import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger, ConfirmDialog,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
-  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, Mail, LogIn, ExternalLink, ArrowRight,
+  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
   personaLabel, personaTone, type Branding, type BrandTokens, type NeutralTint, type LucideIcon,
 } from "@mossa/ui";
 import type { LoginBranding, TenantBranding } from "@mossa/protocol";
@@ -86,7 +86,7 @@ export function Settings({ onBack, view = "studio" }: { onBack: () => void; view
       case "notifications":
         return <NotificationsSection />;
       case "passkeys":
-        return <><SecuritySection /><SignOutSection /></>;
+        return <><SecuritySection /><SignOutSection /><DeleteAccountSection /></>;
       case "studio":
         return isOwner ? <StudioSettings canBrand={!!canBrand} /> : <Stagger><Card className="text-sm text-muted-foreground">Studio settings are available to studio owners.</Card></Stagger>;
     }
@@ -589,6 +589,68 @@ function SignOutSection() {
     <SettingsList
       sections={[{ header: "Account", rows: [{ icon: LogOut, label: "Sign out", destructive: true, onClick: () => void signOut() }] }]}
     />
+  );
+}
+
+/** GDPR self-delete — an emailed code confirms erasing the account + all data.
+ *  Owners are redirected to close their studio (which cancels billing first). */
+function DeleteAccountSection() {
+  const { ctx, signOut } = useSession();
+  const isOwner = ctx?.active?.role === "owner";
+  const [open, setOpen] = useState(false);
+  const [stage, setStage] = useState<"intro" | "code">("intro");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const status = (e: unknown): number | undefined => (e as { status?: number })?.status;
+
+  const sendCode = async () => {
+    setBusy(true); setErr(null);
+    try { await api.post("/api/me/delete/request-otp"); setStage("code"); }
+    catch (e) { setErr(status(e) === 409 ? "You own a studio — close it first in Studio settings → Danger zone." : "Couldn't send the code. Try again."); }
+    finally { setBusy(false); }
+  };
+  const confirmDelete = async () => {
+    setBusy(true); setErr(null);
+    try { await api.post("/api/me/delete", { code: code.trim() }); await signOut(); }
+    catch (e) {
+      const s = status(e);
+      setErr(s === 403 ? "That code is wrong or has expired." : s === 409 ? "You own a studio — close it first." : "Couldn't delete your account. Try again.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Stagger>
+      <SectionHead title="Danger zone" />
+      <Card className="space-y-2.5">
+        <div className="flex items-center gap-2 font-medium text-danger"><AlertTriangle className="size-4" /> Delete my account</div>
+        <p className="text-sm text-muted-foreground">Permanently erase your account and everything in it — photos, logs, measurements, messages. This can't be undone.</p>
+        {isOwner ? (
+          <p className="text-xs text-muted-foreground">You own a studio. To delete your account, first close your studio in <span className="font-medium text-foreground">Studio settings → Danger zone</span> (that cancels billing and wipes the studio).</p>
+        ) : (
+          <Button variant="outline" className="w-full border-danger/40 text-danger" onClick={() => { setStage("intro"); setCode(""); setErr(null); setOpen(true); }}><Trash2 /> Delete my account…</Button>
+        )}
+      </Card>
+
+      <Sheet open={open} onClose={() => setOpen(false)} title="Delete your account">
+        {stage === "intro" ? (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">We'll email a confirmation code to <span className="font-medium text-foreground">{ctx?.user.email}</span>. Entering it permanently erases your account and all your data. There's no undo.</p>
+            {err && <p className="text-sm text-danger">{err}</p>}
+            <Button className="w-full" disabled={busy} onClick={() => void sendCode()}>{busy ? <><Spinner /> Sending…</> : "Email me a confirmation code"}</Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">Enter the 6-digit code we emailed you, then confirm. This erases everything.</p>
+            <Field label="Confirmation code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} placeholder="000000" autoFocus />
+            {err && <p className="text-sm text-danger">{err}</p>}
+            <Button className="w-full border-danger/40 text-danger" variant="outline" disabled={busy || code.length < 6} onClick={() => void confirmDelete()}>{busy ? <><Spinner /> Deleting…</> : <><Trash2 /> Permanently delete my account</>}</Button>
+            <button className="w-full text-center text-xs text-muted-foreground hover:underline" onClick={() => void sendCode()} disabled={busy}>Resend code</button>
+          </div>
+        )}
+      </Sheet>
+    </Stagger>
   );
 }
 

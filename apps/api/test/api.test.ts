@@ -15,6 +15,8 @@ import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@mossa/protocol";
 import { ensureSchema } from "../src/db.js";
 import { clientDigestHtml, coachDigestHtml } from "../src/digest.js";
 import { emailBar, emailBars, emailSparkline, emailRing, emailStatRow, emailListRow, MOSSA_BRAND } from "../src/mailer.js";
+import { purgeClient } from "../src/purge.js";
+import { verifyActionOtp } from "../src/action-otp.js";
 
 const ORIGIN = "http://localhost:8787"; // treated as local by createAuth (non-secure cookies)
 let ownerCookie = "";
@@ -2843,5 +2845,54 @@ describe("media library — role-scoped list + delete", () => {
     expect(cl.avatar_url).toBeNull();
     const lib2 = (await (await SELF.fetch(`${B}/api/media-library`, { headers: auth(ownerCookie) })).json()) as { items: { id: string }[] };
     expect(lib2.items.find((i) => i.id === found.id)).toBeFalsy();
+  });
+});
+
+describe("GDPR — action OTP + cascade purge", () => {
+  const B = "http://localhost:8787";
+  const sha256Hex = async (s: string): Promise<string> => {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  };
+
+  it("action OTP verifies once, then is consumed; wrong codes are rejected", async () => {
+    const db = env.DB as D1Database;
+    await db.prepare("INSERT OR REPLACE INTO action_otps (subject, purpose, code_hash, expires_at, attempts, created_at) VALUES ('u_otptest', 'account_delete', ?, ?, 0, ?)")
+      .bind(await sha256Hex("account_delete:123456"), Date.now() + 600_000, Date.now()).run();
+    expect(await verifyActionOtp(env as unknown as import("../src/env.js").Env, { subject: "u_otptest", purpose: "account_delete", code: "999999" })).toBe(false);
+    expect(await verifyActionOtp(env as unknown as import("../src/env.js").Env, { subject: "u_otptest", purpose: "account_delete", code: "123456" })).toBe(true);
+    // Consumed — a replay fails.
+    expect(await verifyActionOtp(env as unknown as import("../src/env.js").Env, { subject: "u_otptest", purpose: "account_delete", code: "123456" })).toBe(false);
+  });
+
+  it("purgeClient removes the client's rows, R2 objects, and ledger entries", async () => {
+    const db = env.DB as D1Database;
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+    const { client } = (await (await SELF.fetch(`${B}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "PurgePat" }) })).json()) as { client: { id: string } };
+
+    // A client-scoped upload (R2 object + ledger row) + some tracked data.
+    const form = new FormData();
+    form.set("file", new Blob([new Uint8Array(1000)], { type: "image/png" }), "p.png");
+    form.set("purpose", "progress");
+    form.set("clientId", client.id);
+    const { key } = (await (await SELF.fetch(`${B}/api/media/upload`, { method: "POST", headers: auth(ownerCookie), body: form })).json()) as { key: string };
+    await SELF.fetch(`${B}/api/check-ins`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-06-10", mood: 4 } }) });
+    await SELF.fetch(`${B}/api/measurements`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-06-10", weightKg: 70 } }) });
+    // Sanity — the object + rows exist. Drain the R2 body (isolated-storage hygiene).
+    const before = await env.MEDIA.get(key);
+    expect(before).not.toBeNull();
+    await before!.arrayBuffer();
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM check_ins WHERE client_id = ?").bind(client.id).first<{ n: number }>())!.n).toBe(1);
+
+    await purgeClient(env as unknown as import("../src/env.js").Env, tenantId, client.id);
+
+    expect(await db.prepare("SELECT id FROM clients WHERE id = ?").bind(client.id).first()).toBeNull();
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM check_ins WHERE client_id = ?").bind(client.id).first<{ n: number }>())!.n).toBe(0);
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM measurements WHERE client_id = ?").bind(client.id).first<{ n: number }>())!.n).toBe(0);
+    // R2 object gone + ledger tombstoned.
+    expect(await env.MEDIA.get(key)).toBeNull();
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM media_assets WHERE client_id = ? AND deleted_at IS NULL").bind(client.id).first<{ n: number }>())!.n).toBe(0);
   });
 });
