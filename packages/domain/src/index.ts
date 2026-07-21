@@ -16,3 +16,4 @@ export * from "./notifications.js";
 export * from "./features.js";
 export * from "./audit.js";
 export * from "./coaching.js";
+export * from "./settings.js";

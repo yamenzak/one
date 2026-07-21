@@ -12,7 +12,7 @@ import {
   type Branding, type BrandTokens, type NeutralTint, type LucideIcon,
 } from "@mossa/ui";
 import type { LoginBranding, TenantBranding } from "@mossa/protocol";
-import { resolveUnits, cmToFeetInches, feetInchesToCm } from "@mossa/domain";
+import { resolveUnits, cmToFeetInches, feetInchesToCm, STUDIO_SETTINGS_SECTIONS, settingsSectionVisible } from "@mossa/domain";
 import { useUnits } from "../units.js";
 import { useSession } from "../session.js";
 import { PreferencesEditorCard } from "./PreferencesEditor.js";
@@ -43,7 +43,6 @@ export function Settings({ onBack }: { onBack: () => void }) {
   const { preview } = useTheme();
   const isOwner = ctx?.active?.role === "owner";
   const canBrand = isOwner && ctx?.entitlements.features.branding;
-  const aiSuite = isOwner && ctx?.entitlements.features.aiSuite;
   const role = ctx?.active?.role ?? "member";
 
   const tabs = [
@@ -88,7 +87,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
           </>
         )}
 
-        {tab === "studio" && isOwner && <StudioSettings canBrand={!!canBrand} aiSuite={!!aiSuite} />}
+        {tab === "studio" && isOwner && <StudioSettings canBrand={!!canBrand} />}
       </motion.div>
     </Page>
   );
@@ -99,17 +98,24 @@ export function Settings({ onBack }: { onBack: () => void }) {
  * sections don't pile into one endless page. Each sub-tab groups a cohesive
  * concern; a tab only appears when it has content the tenant is entitled to.
  */
-function StudioSettings({ canBrand, aiSuite }: { canBrand: boolean; aiSuite: boolean }) {
+function StudioSettings({ canBrand }: { canBrand: boolean }) {
   const { ctx, refresh } = useSession();
   const { preview } = useTheme();
-  const groups: { value: string; label: string; show: boolean; render: () => ReactNode }[] = [
-    { value: "brand", label: "Brand", show: canBrand, render: () => <BrandingEditor initial={(ctx?.branding ?? null) as Branding | null} onPreview={preview} onSaved={() => void refresh()} /> },
-    { value: "signin", label: "Sign-in", show: true, render: () => <SignInSettings canBrand={canBrand} branding={ctx?.branding ?? null} slug={ctx?.active?.tenantSlug ?? null} onSaved={() => void refresh()} /> },
-    { value: "ai", label: "AI", show: aiSuite, render: () => <AiConfigSection /> },
-    { value: "messaging", label: "Messaging", show: true, render: () => <><EmailSection /><NotificationPolicySection /></> },
-    { value: "marketplace", label: "Marketplace", show: true, render: () => <MarketplaceSection /> },
-    { value: "integrations", label: "Integrations", show: true, render: () => <IntegrationsSection /> },
-  ].filter((g) => g.show);
+  // Each section's editor, keyed by its registry id. Which tabs SHOW (and their
+  // order + labels) comes from STUDIO_SETTINGS_SECTIONS, so the visible surface
+  // can't drift from the tenant's entitlements.
+  const render: Record<string, () => ReactNode> = {
+    brand: () => <BrandingEditor initial={(ctx?.branding ?? null) as Branding | null} onPreview={preview} onSaved={() => void refresh()} />,
+    signin: () => <SignInSettings canBrand={canBrand} branding={ctx?.branding ?? null} slug={ctx?.active?.tenantSlug ?? null} onSaved={() => void refresh()} />,
+    ai: () => <AiConfigSection />,
+    messaging: () => <><EmailSection /><NotificationPolicySection /></>,
+    marketplace: () => <MarketplaceSection />,
+    integrations: () => <IntegrationsSection />,
+  };
+  const features = ctx?.entitlements.features;
+  const groups = STUDIO_SETTINGS_SECTIONS
+    .filter((s) => (!features || settingsSectionVisible(s, features)) && render[s.key])
+    .map((s) => ({ value: s.key, label: s.label, render: render[s.key]! }));
   const [sub, setSub] = useState<string>(groups[0]?.value ?? "signin");
   const active = groups.find((g) => g.value === sub) ?? groups[0];
 
