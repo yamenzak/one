@@ -169,10 +169,8 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
   // Healthy-range status (SPEC §8.11): the coach-set band the metric should sit
   // in, compared against the latest value shown.
   const latestWeight = latestOf("weight_kg");
-  const latestBodyFat = latestOf("body_fat_percent");
-  const wRange = timeline.ranges.weightKg, bfRange = timeline.ranges.bodyFatPercent;
+  const wRange = timeline.ranges.weightKg;
   const weightStatus = latestWeight != null && wRange ? rangeStatus(latestWeight, wRange.min, wRange.max) : null;
-  const bodyFatStatus = latestBodyFat != null && bfRange ? rangeStatus(latestBodyFat, bfRange.min, bfRange.max) : null;
   return c.json({
     range: { start, end, days },
     today,
@@ -180,11 +178,11 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
       weight, bodyFat, waist, chest, hips, posture, leanMass, fatMass, ffmi,
       ranges: timeline.ranges,
       latest: {
-        weightKg: latestWeight, bodyFatPct: latestBodyFat, waistCm: latestOf("waist_cm"),
+        weightKg: latestWeight, bodyFatPct: latestOf("body_fat_percent"), waistCm: latestOf("waist_cm"),
         neckCm: latestOf("neck_cm"), hipsCm: latestOf("hips_cm"), chestCm: latestOf("chest_cm"),
         leanMassKg: leanMass.at(-1)?.v ?? null, fatMassKg: fatMass.at(-1)?.v ?? null, ffmi: ffmi.at(-1)?.v ?? null,
         somatotype: latestScan?.somatotype ?? null, postureSeverity: latestScan?.posture_severity ?? null, postureCva: latestScan?.posture_cva_deg ?? null,
-        weightStatus, bodyFatStatus,
+        weightStatus,
       },
       deltas: { weight: deltaOf(weight), bodyFat: deltaOf(bodyFat), waist: deltaOf(waist), chest: deltaOf(chest), hips: deltaOf(hips) },
     },

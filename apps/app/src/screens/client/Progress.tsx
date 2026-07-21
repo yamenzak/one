@@ -32,8 +32,8 @@ interface ProgressData {
   today: string;
   body: {
     weight: Pt[]; bodyFat: Pt[]; waist: Pt[]; chest: Pt[]; hips: Pt[]; posture: Pt[]; leanMass: Pt[]; fatMass: Pt[]; ffmi: Pt[];
-    ranges?: { weightKg?: MetricRange; bodyFatPercent?: MetricRange };
-    latest: { weightKg: number | null; bodyFatPct: number | null; waistCm: number | null; neckCm: number | null; hipsCm: number | null; chestCm: number | null; leanMassKg: number | null; fatMassKg: number | null; ffmi: number | null; somatotype: string | null; postureSeverity: "good" | "mild" | "moderate" | "severe" | null; postureCva: number | null; weightStatus: RangeStat | null; bodyFatStatus: RangeStat | null };
+    ranges?: { weightKg?: MetricRange };
+    latest: { weightKg: number | null; bodyFatPct: number | null; waistCm: number | null; neckCm: number | null; hipsCm: number | null; chestCm: number | null; leanMassKg: number | null; fatMassKg: number | null; ffmi: number | null; somatotype: string | null; postureSeverity: "good" | "mild" | "moderate" | "severe" | null; postureCva: number | null; weightStatus: RangeStat | null };
     deltas: { weight: SeriesDelta | null; bodyFat: SeriesDelta | null; waist: SeriesDelta | null; chest: SeriesDelta | null; hips: SeriesDelta | null };
   };
   nutrition: { perDay: { date: string; calories: number; protein: number; carbs: number; fat: number; logged: boolean; target: number | null }[]; targets: { targetCalories?: number; targetProteinG?: number }; adherencePct: number | null; loggedDays: number };
@@ -162,7 +162,7 @@ function Body({ data, units, dateLabel, clientId }: { data: ProgressData; units:
         </ChartCard>
       </Stagger>
       <Stagger>
-        <ChartCard title="Body fat" icon={METRICS.bodyFat.icon} tone="sleep" value={body.latest.bodyFatPct != null ? body.latest.bodyFatPct.toFixed(1) : "—"} unit="%" delta={<span className="flex flex-wrap items-center gap-1.5"><DeltaBadge d={body.deltas.bodyFat} convert={(v) => v} unit="%" /><RangeChip status={body.latest.bodyFatStatus} range={body.ranges?.bodyFatPercent} convert={(v) => v} unit="%" /></span>}>
+        <ChartCard title="Body fat" icon={METRICS.bodyFat.icon} tone="sleep" value={body.latest.bodyFatPct != null ? body.latest.bodyFatPct.toFixed(1) : "—"} unit="%" delta={<DeltaBadge d={body.deltas.bodyFat} convert={(v) => v} unit="%" />}>
           <AreaChart values={bfVals} tone="sleep" trend label={dateLabel} format={(v) => `${v.toFixed(1)}%`} />
         </ChartCard>
       </Stagger>

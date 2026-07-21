@@ -24,7 +24,7 @@ interface Metrics {
   ageYears: number | null; weightKg: number | null; bodyFatPercent: number | null; measuredAt: string | null;
   bmi: number | null; bmiCategory: BmiCategory | null; bmr: number | null; bmrFormula: string | null;
   hasActiveGoal: boolean; staleness: { stale: boolean; weightDeltaKg: number | null; reason: string | null } | null;
-  weightStatus?: RangeStat | null; bodyFatStatus?: RangeStat | null;
+  weightStatus?: RangeStat | null;
 }
 const RANGE_LABEL: Record<RangeStat, string> = { in_range: "In range", below: "Below", above: "Above" };
 function StatusChip({ status }: { status?: RangeStat | null }) {
@@ -60,7 +60,8 @@ export function GoalManager({ clientId }: { clientId: string }) {
   const [client, setClient] = useState<ClientData | null>(null);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [formula, setFormula] = useState<Formula>({ primaryGoal: "maintain", activityLevel: "moderate", dietaryApproach: "balanced" });
-  const [form, setForm] = useState({ label: "", startDate: "", weightMin: "", weightMax: "", bodyFatMin: "", bodyFatMax: "", notes: "" });
+  const [form, setForm] = useState({ label: "", startDate: "", weightMin: "", weightMax: "", notes: "" });
+  const [rangeOpen, setRangeOpen] = useState(false);
   const [targets, setTargets] = useState<Record<TargetKey, string>>(emptyTargets);
   const [edited, setEdited] = useState(false); // coach hand-tweaked → don't auto-overwrite
   const [busy, setBusy] = useState(false);
@@ -127,10 +128,11 @@ export function GoalManager({ clientId }: { clientId: string }) {
       dietaryApproach: (p.dietaryApproach as DietaryApproach) ?? "balanced",
     };
     setFormula(f);
-    setForm((prev) => ({
-      ...prev,
-      weightMax: p.targetWeightKg != null ? String(kgToDisplay(p.targetWeightKg, units)) : prev.weightMax,
-    }));
+    // Suggest a healthy weight band around the client's target weight (±2 kg),
+    // so the coach never types it — just opens the optional section to confirm.
+    if (p.targetWeightKg != null) {
+      setForm((prev) => ({ ...prev, weightMin: String(kgToDisplay(p.targetWeightKg! - 2, units)), weightMax: String(kgToDisplay(p.targetWeightKg! + 2, units)) }));
+    }
     if (client.gender && metrics.ageYears != null && client.heightCm != null && metrics.weightKg != null) runCalc(f);
   }, [client, metrics, units, runCalc]);
 
@@ -147,8 +149,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
       const targetsObj: Record<string, number> = {};
       for (const { key } of TARGET_FIELDS) if (targets[key] !== "" && Number.isFinite(Number(targets[key]))) targetsObj[key] = toMetricVal(key, Number(targets[key]), units);
       const rangesObj: Record<string, { min: number | null; max: number | null }> = {};
-      if (form.weightMin || form.weightMax) rangesObj.weightKg = { min: form.weightMin ? displayToKg(Number(form.weightMin), units) : null, max: form.weightMax ? displayToKg(Number(form.weightMax), units) : null };
-      if (form.bodyFatMin || form.bodyFatMax) rangesObj.bodyFatPercent = { min: form.bodyFatMin ? Number(form.bodyFatMin) : null, max: form.bodyFatMax ? Number(form.bodyFatMax) : null };
+      if (rangeOpen && (form.weightMin || form.weightMax)) rangesObj.weightKg = { min: form.weightMin ? displayToKg(Number(form.weightMin), units) : null, max: form.weightMax ? displayToKg(Number(form.weightMax), units) : null };
       const ranges = Object.keys(rangesObj).length ? rangesObj : undefined;
       // Send the calculator (from the client's body) so the goal keeps its
       // BMR/TDEE derivation snapshot for staleness detection; the explicit
@@ -221,7 +222,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
               <div className="rounded-xl bg-secondary p-3"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Scale className="size-3.5" style={{ color: toneVar.cardio }} /> Weight</div><div className="numeral mt-0.5 text-xl font-semibold">{metrics.weightKg != null ? kgToDisplay(metrics.weightKg, units) : "—"}<span className="ml-1 text-xs font-medium text-muted-foreground">{weightLabel(units)}</span></div><StatusChip status={metrics.weightStatus} /></div>
               <div className="rounded-xl bg-secondary p-3"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Activity className="size-3.5" style={{ color: toneVar.activity }} /> BMI</div><div className="numeral mt-0.5 text-xl font-semibold">{metrics.bmi ?? "—"}</div>{metrics.bmiCategory && <div className="text-[0.7rem] font-medium text-muted-foreground">{BMI_CATEGORY_LABELS[metrics.bmiCategory]}</div>}</div>
               <div className="rounded-xl bg-secondary p-3"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Flame className="size-3.5" style={{ color: toneVar.calories }} /> BMR</div><div className="numeral mt-0.5 text-xl font-semibold">{metrics.bmr ?? "—"}</div>{metrics.bmr != null && <div className="text-[0.7rem] font-medium text-muted-foreground">kcal/day</div>}</div>
-              <div className="rounded-xl bg-secondary p-3"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Target className="size-3.5" style={{ color: toneVar.sleep }} /> Body fat</div><div className="numeral mt-0.5 text-xl font-semibold">{metrics.bodyFatPercent != null ? `${metrics.bodyFatPercent}%` : "—"}</div><StatusChip status={metrics.bodyFatStatus} /></div>
+              <div className="rounded-xl bg-secondary p-3"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Target className="size-3.5" style={{ color: toneVar.sleep }} /> Body fat</div><div className="numeral mt-0.5 text-xl font-semibold">{metrics.bodyFatPercent != null ? `${metrics.bodyFatPercent}%` : "—"}</div></div>
             </div>
           </Card>
         </Stagger>
@@ -312,11 +313,22 @@ export function GoalManager({ clientId }: { clientId: string }) {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label={`Weight range min (${weightLabel(units)})`} inputMode="decimal" value={form.weightMin} onChange={(e) => setForm({ ...form, weightMin: e.target.value })} />
-            <Field label={`Weight range max (${weightLabel(units)})`} inputMode="decimal" value={form.weightMax} onChange={(e) => setForm({ ...form, weightMax: e.target.value })} />
-            <Field label="Body-fat range min (%)" inputMode="decimal" value={form.bodyFatMin} onChange={(e) => setForm({ ...form, bodyFatMin: e.target.value })} />
-            <Field label="Body-fat range max (%)" inputMode="decimal" value={form.bodyFatMax} onChange={(e) => setForm({ ...form, bodyFatMax: e.target.value })} />
+          {/* Optional healthy weight band — suggested from the target weight, so
+              nothing to type. Drives the client's In-range / off-track chip. */}
+          <div className="rounded-xl bg-secondary/40 p-3">
+            <button type="button" className="flex w-full items-center justify-between text-sm font-medium" onClick={() => setRangeOpen((o) => !o)}>
+              <span>Healthy weight range <span className="text-muted-foreground">(optional)</span></span>
+              <span className="text-muted-foreground">{rangeOpen ? "−" : "+"}</span>
+            </button>
+            {rangeOpen && (
+              <div className="mt-3 space-y-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label={`Min (${weightLabel(units)})`} inputMode="decimal" value={form.weightMin} onChange={(e) => setForm({ ...form, weightMin: e.target.value })} />
+                  <Field label={`Max (${weightLabel(units)})`} inputMode="decimal" value={form.weightMax} onChange={(e) => setForm({ ...form, weightMax: e.target.value })} />
+                </div>
+                <p className="text-xs text-muted-foreground">Suggested from the client's target weight. The client sees In range / off track against this band.</p>
+              </div>
+            )}
           </div>
           <Field label="Notes (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Context for this phase" />
           <Button size="lg" className="w-full" disabled={!canSave || busy} onClick={() => void create()}>{busy ? "Saving…" : active ? "Replace goal" : "Set goal"}</Button>
