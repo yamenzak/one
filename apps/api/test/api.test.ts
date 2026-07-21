@@ -2810,3 +2810,38 @@ describe("storage accounting + quota gate", () => {
     expect(ok.status).toBe(201);
   });
 });
+
+describe("media library — role-scoped list + delete", () => {
+  const B = "http://localhost:8787";
+  it("owner lists media, deletes it, and the delete tombstones + scrubs the reference", async () => {
+    const db = env.DB as D1Database;
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+
+    // Upload an avatar image and point a client's avatar_url at it.
+    const form = new FormData();
+    form.set("file", new Blob([new Uint8Array(1500)], { type: "image/png" }), "a.png");
+    form.set("purpose", "avatar");
+    const up = await SELF.fetch(`${B}/api/media/upload`, { method: "POST", headers: auth(ownerCookie), body: form });
+    const { key } = (await up.json()) as { key: string };
+    const { client } = (await (await SELF.fetch(`${B}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "MediaMia" }) })).json()) as { client: { id: string } };
+    await db.prepare("UPDATE clients SET avatar_url = ? WHERE id = ?").bind(`/api/media/${key}`, client.id).run();
+
+    // Owner sees it, can manage + delete.
+    const lib = (await (await SELF.fetch(`${B}/api/media-library`, { headers: auth(ownerCookie) })).json()) as { items: { id: string; url: string; canDelete: boolean }[]; canManage: boolean };
+    expect(lib.canManage).toBe(true);
+    const found = lib.items.find((i) => i.url === `/api/media/${key}`)!;
+    expect(found).toBeTruthy();
+    expect(found.canDelete).toBe(true);
+
+    // Delete → 200, ledger tombstoned, reference scrubbed, gone from the list.
+    const del = await SELF.fetch(`${B}/api/media-library/${found.id}`, { method: "DELETE", headers: auth(ownerCookie) });
+    expect(del.status).toBe(200);
+    const row = (await db.prepare("SELECT deleted_at, deleted_by FROM media_assets WHERE id = ?").bind(found.id).first<{ deleted_at: string | null; deleted_by: string | null }>())!;
+    expect(row.deleted_at).toBeTruthy();
+    expect(row.deleted_by).toBeTruthy();
+    const cl = (await db.prepare("SELECT avatar_url FROM clients WHERE id = ?").bind(client.id).first<{ avatar_url: string | null }>())!;
+    expect(cl.avatar_url).toBeNull();
+    const lib2 = (await (await SELF.fetch(`${B}/api/media-library`, { headers: auth(ownerCookie) })).json()) as { items: { id: string }[] };
+    expect(lib2.items.find((i) => i.id === found.id)).toBeFalsy();
+  });
+});

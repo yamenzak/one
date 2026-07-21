@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNod
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
-  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, Palette, Bell, KeyRound, toneVar, type TabDef, type Tone,
+  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, Palette, Bell, KeyRound, ImageIcon, toneVar, type TabDef, type Tone,
 } from "@mossa/ui";
 import { useSession, useActiveClientId } from "./session.js";
 import { useTheme } from "./theme.js";
@@ -27,6 +27,7 @@ import { Business } from "./screens/coach/Business.js";
 import { Library } from "./screens/coach/Library.js";
 import { Settings } from "./screens/Settings.js";
 import { Inbox } from "./screens/Inbox.js";
+import { MediaLibrary } from "./screens/MediaLibrary.js";
 import { Wellness } from "./screens/client/Wellness.js";
 import { Onboarding } from "./screens/client/Onboarding.js";
 import { Shop } from "./screens/client/Shop.js";
@@ -89,6 +90,7 @@ export function Shell() {
       <Route path="/notification-settings" element={<SettingsRoute view="notifications" />} />
       <Route path="/passkeys" element={<SettingsRoute view="passkeys" />} />
       <Route path="/inbox" element={<InboxRoute />} />
+      <Route path="/media" element={<MediaRoute />} />
       <Route path="/shop" element={<OverlayWithClient render={(cid, back) => <Shop clientId={cid} onBack={back} />} />} />
       <Route path="/explore" element={<OverlayWithClient render={(cid, back) => <Explore clientId={cid} onBack={back} />} />} />
       <Route path="/admin" element={<AdminRoute />} />
@@ -283,6 +285,7 @@ function TabLayout() {
                 {/* Personal settings — each its own destination (no buried tabs). */}
                 {clientSurface && clientId && <DropdownMenuItem onSelect={() => nav("/profile")}><CircleUser /> Profile</DropdownMenuItem>}
                 {clientSurface && clientId && <DropdownMenuItem onSelect={() => nav("/preferences")}><SlidersHorizontal /> Preferences</DropdownMenuItem>}
+                <DropdownMenuItem onSelect={() => nav("/media")}><ImageIcon /> Media library</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => nav("/appearance")}><Palette /> Appearance &amp; units</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => nav("/notification-settings")}><Bell /> Notifications</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => nav("/passkeys")}><KeyRound /> Passkeys &amp; security</DropdownMenuItem>
@@ -360,6 +363,11 @@ function SettingsRoute({ view }: { view: import("./screens/Settings.js").Setting
 function InboxRoute() {
   const nav = useNavigate();
   return <Inbox onBack={() => nav(-1)} />;
+}
+
+function MediaRoute() {
+  const nav = useNavigate();
+  return <MediaLibrary onBack={() => nav(-1)} />;
 }
 
 function AdminRoute() {
