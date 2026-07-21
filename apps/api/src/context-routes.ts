@@ -10,7 +10,7 @@ import {
   type PersonaRefRole,
 } from "./context-helpers.js";
 import type { PersonaRef, SessionContext } from "@mossa/protocol";
-import { resolveUnits, overallDaysRemaining, type UnitPrefs, type Budget } from "@mossa/domain";
+import { resolveUnits, overallDaysRemaining, NOTIF_TYPES, notifVisibleInSurface, type UnitPrefs, type Budget, type NotifType } from "@mossa/domain";
 import { type AppEnv, isPlatformAdmin, requireTenant } from "./auth-context.js";
 import { clientForUser } from "./clients.js";
 import { resolveClientFlagsFor } from "./client-flags.js";
@@ -189,6 +189,25 @@ export const contextRoutes = new Hono<AppEnv>()
     await c.env.DB.prepare("UPDATE notifications SET read = 1 WHERE id = ? AND recipient_user_id = ?")
       .bind(c.req.param("id"), who.userId)
       .run();
+    return c.json({ ok: true });
+  })
+
+  // Mark every unread notification read. Scoped to the current SURFACE when one
+  // is given (train mode clears only client notifications, coach mode only
+  // staff/owner) so "mark all read" respects the mode you're in.
+  .post("/notifications/read-all", async (c) => {
+    const who = requireTenant(c);
+    if (!who) return c.json({ error: "unauthenticated" }, 401);
+    const body = (await c.req.json().catch(() => ({}))) as { surface?: string };
+    const surface = body.surface === "client" || body.surface === "staff" ? body.surface : null;
+    if (surface) {
+      const types = (Object.keys(NOTIF_TYPES) as NotifType[]).filter((t) => notifVisibleInSurface(t, surface));
+      if (types.length === 0) return c.json({ ok: true });
+      const ph = types.map(() => "?").join(",");
+      await c.env.DB.prepare(`UPDATE notifications SET read = 1 WHERE recipient_user_id = ? AND read = 0 AND type IN (${ph})`).bind(who.userId, ...types).run();
+    } else {
+      await c.env.DB.prepare("UPDATE notifications SET read = 1 WHERE recipient_user_id = ? AND read = 0").bind(who.userId).run();
+    }
     return c.json({ ok: true });
   })
 

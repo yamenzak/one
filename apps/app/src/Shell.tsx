@@ -26,6 +26,7 @@ import { WorkoutPlayer } from "./screens/client/WorkoutPlayer.js";
 import { Business } from "./screens/coach/Business.js";
 import { Library } from "./screens/coach/Library.js";
 import { Settings } from "./screens/Settings.js";
+import { Inbox } from "./screens/Inbox.js";
 import { Wellness } from "./screens/client/Wellness.js";
 import { Onboarding } from "./screens/client/Onboarding.js";
 import { Shop } from "./screens/client/Shop.js";
@@ -82,6 +83,7 @@ export function Shell() {
     <Routes>
       {/* Full-screen surfaces (no tab chrome). */}
       <Route path="/settings" element={<SettingsRoute />} />
+      <Route path="/inbox" element={<InboxRoute />} />
       <Route path="/shop" element={<OverlayWithClient render={(cid, back) => <Shop clientId={cid} onBack={back} />} />} />
       <Route path="/explore" element={<OverlayWithClient render={(cid, back) => <Explore clientId={cid} onBack={back} />} />} />
       <Route path="/admin" element={<AdminRoute />} />
@@ -342,6 +344,11 @@ function NoClient() {
 function SettingsRoute() {
   const nav = useNavigate();
   return <Settings onBack={() => nav(-1)} />;
+}
+
+function InboxRoute() {
+  const nav = useNavigate();
+  return <Inbox onBack={() => nav(-1)} />;
 }
 
 function AdminRoute() {

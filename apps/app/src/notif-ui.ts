@@ -1,0 +1,49 @@
+/**
+ * Notification visual coding — maps each notification TYPE to its icon + tone,
+ * so the bell and the Inbox render a distinct, on-brand glyph per type instead of
+ * one grey sparkle. This is the UI-layer twin of the pure `@mossa/domain`
+ * registry (mirrors `metric-coding.ts`): domain owns audience/category/copy, the
+ * app owns the visual identity. Unknown types fall back to a neutral default.
+ */
+
+import type { NotifType } from "@mossa/domain";
+import {
+  ClipboardList, BadgeCheck, Scale, Target, FlaskConical, Pill, ArrowLeftRight,
+  BookOpen, Calendar, CreditCard, AlertTriangle, Sparkles, type LucideIcon, type Tone,
+} from "@mossa/ui";
+
+export interface NotifCoding { icon: LucideIcon; tone: Tone }
+
+const CODING: Record<NotifType, NotifCoding> = {
+  check_in: { icon: ClipboardList, tone: "activity" },
+  feedback: { icon: BadgeCheck, tone: "nutrition" },
+  body_fat_logged: { icon: Scale, tone: "sleep" },
+  plan_published: { icon: ClipboardList, tone: "cardio" },
+  goal_set: { icon: Target, tone: "activity" },
+  lab_requested: { icon: FlaskConical, tone: "nutrition" },
+  lab_uploaded: { icon: FlaskConical, tone: "nutrition" },
+  lab_reviewed: { icon: FlaskConical, tone: "success" },
+  supplement_added: { icon: Pill, tone: "nutrition" },
+  swap_request: { icon: ArrowLeftRight, tone: "activity" },
+  swap_approved: { icon: ArrowLeftRight, tone: "success" },
+  swap_rejected: { icon: ArrowLeftRight, tone: "warning" },
+  content_assigned: { icon: BookOpen, tone: "nutrition" },
+  session_booked: { icon: Calendar, tone: "cardio" },
+  session_cancelled: { icon: Calendar, tone: "warning" },
+  client_assigned: { icon: BadgeCheck, tone: "cardio" },
+  sub_expired: { icon: CreditCard, tone: "danger" },
+  sub_expiring: { icon: CreditCard, tone: "warning" },
+  sub_payment_failed: { icon: CreditCard, tone: "danger" },
+  billing_suspended: { icon: AlertTriangle, tone: "danger" },
+  billing_canceled: { icon: AlertTriangle, tone: "danger" },
+  billing_past_due: { icon: CreditCard, tone: "warning" },
+  payment_disputed: { icon: AlertTriangle, tone: "danger" },
+  payment_refunded: { icon: CreditCard, tone: "warning" },
+};
+
+const DEFAULT: NotifCoding = { icon: Sparkles, tone: "primary" };
+
+/** Icon + tone for a notification type; a neutral default for unknown types. */
+export function notifCoding(type: string): NotifCoding {
+  return CODING[type as NotifType] ?? DEFAULT;
+}

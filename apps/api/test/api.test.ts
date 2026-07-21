@@ -2179,6 +2179,25 @@ describe("installments — limited-term subscription (per-cycle unlock)", () => 
   });
 });
 
+describe("notifications — surface-scoped mark-all-read", () => {
+  it("coach mode clears staff/owner notifications but leaves client ones unread", async () => {
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const owner = (await db.prepare("SELECT userId FROM member WHERE organizationId = ? AND role = 'owner' LIMIT 1").bind(ctx.active.tenantId).first<{ userId: string }>())!;
+    const mk = (id: string, type: string) => db.prepare("INSERT INTO notifications (id, tenant_id, recipient_user_id, type, title, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)").bind(id, ctx.active.tenantId, owner.userId, type, type, new Date().toISOString()).run();
+    await mk("ntf_s1", "check_in"); // staff audience
+    await mk("ntf_o1", "billing_past_due"); // owner audience
+    await mk("ntf_c1", "feedback"); // client audience
+
+    const r = await SELF.fetch("http://x/api/notifications/read-all", { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ surface: "staff" }) });
+    expect(r.status).toBe(200);
+    const read = async (id: string) => (await db.prepare("SELECT read FROM notifications WHERE id = ?").bind(id).first<{ read: number }>())!.read;
+    expect(await read("ntf_s1")).toBe(1); // staff → cleared
+    expect(await read("ntf_o1")).toBe(1); // owner → cleared in coach mode
+    expect(await read("ntf_c1")).toBe(0); // client → left unread (wrong surface)
+  });
+});
+
 describe("platform promo codes (Mossa → tenant)", () => {
   it("admin creates a 100%-off pack promo; it grants free once, then is exhausted", async () => {
     const db = env.DB as D1Database;
