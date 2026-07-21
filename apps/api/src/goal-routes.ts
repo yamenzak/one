@@ -54,7 +54,9 @@ export const goalRoutes = new Hono<AppEnv>()
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
     const rows = await c.env.DB.prepare(
-      "SELECT * FROM client_goals WHERE client_id = ? ORDER BY created_at DESC LIMIT 20",
+      `SELECT g.*, u.name AS created_by_name
+         FROM client_goals g LEFT JOIN "user" u ON u.id = g.created_by
+        WHERE g.client_id = ? ORDER BY g.created_at DESC LIMIT 20`,
     )
       .bind(clientId)
       .all();

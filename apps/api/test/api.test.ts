@@ -1973,6 +1973,29 @@ describe("client preferences + body metrics + goal staleness", () => {
     expect(m.metrics.staleness?.weightDeltaKg).toBe(-8);
   });
 
+  it("keeps a goal history log: manual targets round-trip, supersede is retained, attributed to who set it", async () => {
+    const id = await mkClient();
+    // Name the acting owner so the created_by join can attribute goals.
+    const gctx = (await (await SELF.fetch("http://x/api/context", { headers: H() })).json()) as { active: { tenantId: string } };
+    const gOwner = (await (env.DB as D1Database).prepare("SELECT userId FROM member WHERE organizationId = ? AND role = 'owner' LIMIT 1").bind(gctx.active.tenantId).first<{ userId: string }>())!;
+    await (env.DB as D1Database).prepare("UPDATE \"user\" SET name = 'Coach Nova' WHERE id = ?").bind(gOwner.userId).run();
+    // First goal, MANUAL targets (no calculator) — the coach hand-sets macros.
+    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, label: "Phase 1", startDate: "2026-01-01", targets: { targetCalories: 2100, targetProteinG: 160 } }) });
+    // Second goal supersedes it.
+    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, label: "Phase 2", startDate: "2026-02-01", targets: { targetCalories: 2600, targetProteinG: 190 } }) });
+
+    const { goals } = (await (await SELF.fetch(`http://x/api/goals?clientId=${id}`, { headers: H() })).json()) as { goals: { label: string; status: string; targets: Record<string, number> | null; start_date: string | null; created_by_name: string | null }[] };
+    expect(goals.length).toBe(2);
+    const active = goals.find((g) => g.status === "active")!;
+    const past = goals.find((g) => g.status === "superseded")!;
+    expect(active.label).toBe("Phase 2");
+    expect(active.targets?.targetCalories).toBe(2600); // manual macros persisted verbatim
+    expect(past.label).toBe("Phase 1"); // old goal retained, not deleted
+    expect(past.targets?.targetCalories).toBe(2100);
+    expect(active.start_date).toBe("2026-02-01"); // explicit effective date honored
+    expect(active.created_by_name).toBe("Coach Nova"); // attribution
+  });
+
   it("records a coach action in the audit log and lists it newest-first", async () => {
     const id = await mkClient();
     // A coach action (setting a goal) writes an audit row.
