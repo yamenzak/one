@@ -13,6 +13,8 @@ import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@mossa/protocol";
 import { ensureSchema } from "../src/db.js";
+import { clientDigestHtml, coachDigestHtml } from "../src/digest.js";
+import { emailBar, emailBars, emailSparkline, emailRing, emailStatRow, emailListRow, MOSSA_BRAND } from "../src/mailer.js";
 
 const ORIGIN = "http://localhost:8787"; // treated as local by createAuth (non-secure cookies)
 let ownerCookie = "";
@@ -2663,5 +2665,72 @@ describe("coach voice (TTS) picker", () => {
     expect(cues.voice).toBe("Puck");
     // Unknown voices are rejected by the schema.
     expect((await SELF.fetch("http://x/api/settings/ai", { method: "PATCH", headers: H, body: JSON.stringify({ ttsVoice: "NotARealVoice" }) })).status).toBe(400);
+  });
+});
+
+describe("email digest — data-viz primitives + rich builders (pure render)", () => {
+  const brand = MOSSA_BRAND;
+
+  it("primitives render their chart markup and escape user input", () => {
+    // Bars carry the value in text (Gmail-safe) and clamp the fill width.
+    expect(emailBar("Training", "9/7", 2)).toContain("width:100%"); // pct > 1 clamps to 100%
+    expect(emailBar("Training", "0/7", -1)).toContain("width:0%");
+    // Weekly histogram renders one labelled column per point.
+    const bars = emailBars([{ label: "Mon", value: 3 }, { label: "Tue", value: 0 }]);
+    expect(bars).toContain("Mon");
+    expect(bars).toContain("Tue");
+    // Sparkline is an inline SVG path; needs ≥2 points.
+    expect(emailSparkline([1, 2, 3])).toContain("<svg");
+    expect(emailSparkline([1])).toBe("");
+    // Ring centers its number.
+    expect(emailRing(0.8, "82")).toContain(">82<");
+    // Stat row + list row escape attacker-influenced strings.
+    expect(emailStatRow([{ value: "5", label: "<script>x</script>" }])).toContain("&lt;script&gt;");
+    expect(emailListRow("<b>Ann</b>", "3 logs")).toContain("&lt;b&gt;Ann&lt;/b&gt;");
+    expect(emailListRow("<b>Ann</b>", "3 logs")).not.toContain("<b>Ann</b>");
+  });
+
+  it("client digest composes ring + stats + charts and escapes the name", () => {
+    const html = clientDigestHtml(brand, {
+      name: "Sam",
+      intro: "Nice work this week, Sam.",
+      stats: [{ value: "4", label: "Workout days" }, { value: "5", label: "Day streak" }],
+      dayBars: [{ label: "Mon", value: 3 }, { label: "Tue", value: 1 }, { label: "Wed", value: 0 }],
+      weightSeries: [80, 79.4, 78.8, 78.2],
+      weightCaption: "Down 1.8 kg over 4 readings — now 78.2 kg.",
+      wellness: 4.2,
+      adherence: [{ label: "Training days", value: "4/7", pct: 4 / 7, tone: "good" }],
+      labs: 1,
+    }, "https://app.example.com");
+    expect(html).toContain("<svg"); // ring + sparkline
+    expect(html).toContain(">4.2<"); // wellness ring center
+    expect(html).toContain("Workout days");
+    expect(html).toContain("Weight trend");
+    expect(html).toContain("lab test"); // labs nudge
+    expect(html).toContain("Weekly recap"); // eyebrow
+  });
+
+  it("coach digest composes trend + engagement + attention breakdown", () => {
+    const html = coachDigestHtml(brand, {
+      heading: "Your studio this week",
+      intro: "Here's how you did.",
+      stats: [{ value: "12", label: "Active clients" }],
+      activeTrend: [3, 5, 4, 6, 5, 7, 6, 8, 7, 6, 9, 8, 7, 10],
+      avgActive: 6,
+      engagement: { checkInRate: 60, workoutRate: 40 },
+      topClients: [{ name: "Ann", logs: 12 }, { name: "Ben", logs: 9 }],
+      attention: [{ label: "Stale goals", count: 2 }, { label: "Gone quiet", count: 3 }],
+      attentionTotal: 5,
+      mostImproved: { name: "Cara", delta: -2.1 },
+      ctaHref: "https://app.example.com",
+      ctaLabel: "Open the attention queue",
+      footer: "5 clients need attention.",
+    });
+    expect(html).toContain("<svg"); // active-clients sparkline
+    expect(html).toContain("60%"); // engagement bar value
+    expect(html).toContain("Stale goals");
+    expect(html).toContain("Needs attention · 5");
+    expect(html).toContain("Most improved");
+    expect(html).toContain("Open the attention queue");
   });
 });
