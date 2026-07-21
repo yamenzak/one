@@ -247,8 +247,16 @@ export const logRoutes = new Hono<AppEnv>()
     if ("response" in access) return access.response;
     const d = parsed.data.data;
     const id = newId("fen");
+    // Freeze the calorie/protein target that was in force for THIS day onto the
+    // row, so a later goal change never re-grades this entry's adherence. Resolve
+    // the goal whose window covers d.date (a back-dated log gets the goal that
+    // applied then, which may since have been superseded).
+    const goalAtLog = await c.env.DB.prepare(
+      "SELECT targets_json FROM client_goals WHERE client_id = ? AND COALESCE(start_date, substr(created_at, 1, 10)) <= ? ORDER BY COALESCE(start_date, substr(created_at, 1, 10)) DESC, created_at DESC LIMIT 1",
+    ).bind(access.client.id, d.date).first<{ targets_json: string | null }>();
+    const snap = parseJson<{ targetCalories?: number | null; targetProteinG?: number | null }>(goalAtLog?.targets_json, {});
     await c.env.DB.prepare(
-      "INSERT INTO food_entries (id, tenant_id, client_id, date_local, meal_type, food_id, label, quantity, unit, calories, protein_g, carbs_g, fat_g, source, meal_plan_id, meal_option_index, image_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO food_entries (id, tenant_id, client_id, date_local, meal_type, food_id, label, quantity, unit, calories, protein_g, carbs_g, fat_g, source, meal_plan_id, meal_option_index, image_url, target_calories, target_protein_g, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
       .bind(
         id,
@@ -268,6 +276,8 @@ export const logRoutes = new Hono<AppEnv>()
         d.mealPlanId ?? null,
         d.mealOptionIndex ?? null,
         d.imageUrl ?? null,
+        snap.targetCalories ?? null,
+        snap.targetProteinG ?? null,
         nowIso(),
       )
       .run();

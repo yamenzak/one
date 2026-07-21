@@ -1043,6 +1043,35 @@ describe("progress analytics aggregation", () => {
     expect(p.consistency.streak).toBeGreaterThanOrEqual(1);
     expect(p.consistency.heatmap[today]).toBeGreaterThanOrEqual(2); // check-in + weigh-in
   });
+
+  it("grades calorie adherence against the goal in force on each day, not the current one", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "TimeGoal" }) })).json()) as { client: { id: string } };
+    // Goal A (2000 kcal) effective early, then Goal B (3000 kcal) effective later —
+    // manual targets, no calculator (the API accepts explicit targets).
+    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, label: "Cut", startDate: "2026-05-01", targets: { targetCalories: 2000, targetProteinG: 150 } }) });
+    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, label: "Bulk", startDate: "2026-05-10", targets: { targetCalories: 3000, targetProteinG: 200 } }) });
+
+    // Logged via the API — each row freezes the target in force on ITS date.
+    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-05-05", mealType: "lunch", label: "Meal A", calories: 2000, proteinG: 150, carbsG: 200, fatG: 60 } }) });
+    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-05-15", mealType: "lunch", label: "Meal B", calories: 3000, proteinG: 200, carbsG: 300, fatG: 90 } }) });
+    // A pre-existing (historical) row with NO snapshot — resolved via the goal timeline.
+    await (env.DB as D1Database).prepare("INSERT INTO food_entries (id, tenant_id, client_id, date_local, meal_type, label, calories, protein_g, carbs_g, fat_g, source, created_at) VALUES ('fen_hist_a', 'x', ?, '2026-05-03', 'breakfast', 'Legacy', 2000, 150, 200, 60, 'self_logged', '2026-05-03T08:00:00.000Z')").bind(client.id).run();
+
+    const p = (await (await SELF.fetch(`http://x/api/progress/${client.id}?range=30d&today=2026-05-20`, { headers: auth(ownerCookie) })).json()) as {
+      nutrition: { adherencePct: number | null; targets: { targetCalories?: number }; perDay: { date: string; target: number | null }[] };
+    };
+    // All three days are within ±10% of THEIR day's target → 100% (would be ~33%
+    // if every day were graded against the current 3000-kcal goal).
+    expect(p.nutrition.adherencePct).toBe(100);
+    // Headline target = the goal active today (Goal B).
+    expect(p.nutrition.targets.targetCalories).toBe(3000);
+    // Per-day target line reflects the goal in force each day (snapshot + timeline).
+    const byDate = new Map(p.nutrition.perDay.map((d) => [d.date, d.target]));
+    expect(byDate.get("2026-05-03")).toBe(2000); // timeline fallback (no snapshot)
+    expect(byDate.get("2026-05-05")).toBe(2000); // frozen snapshot under Goal A
+    expect(byDate.get("2026-05-15")).toBe(3000); // frozen snapshot under Goal B
+  });
 });
 
 describe("access economy", () => {

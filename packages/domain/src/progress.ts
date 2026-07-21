@@ -66,19 +66,62 @@ export function consistencyPct(loggedDays: Set<string>, start: string, end: stri
 }
 
 /**
+ * A goal's targets with the day it took effect — the atom of the goal timeline.
+ * `start` is the goal's effective local day (YYYY-MM-DD); `createdAt` (ISO)
+ * tie-breaks two goals that started the same day (the later-created wins).
+ */
+export interface GoalPeriod<T = Record<string, number>> {
+  start: string;
+  createdAt: string;
+  targets: T | null;
+}
+
+/**
+ * Build a per-day target resolver from a client's *whole* goal history so
+ * adherence grades each day against the goal that was actually in force THEN —
+ * not whatever goal happens to be active now. Each goal is effective from its
+ * start day until the next goal begins; the most recent goal starting on or
+ * before `date` wins. Days before the first goal resolve to `null` (ungraded).
+ */
+export function resolveGoalTimeline<T>(goals: GoalPeriod<T>[]): (date: string) => T | null {
+  const sorted = [...goals].sort((a, b) =>
+    a.start !== b.start ? a.start.localeCompare(b.start) : a.createdAt.localeCompare(b.createdAt),
+  );
+  return (date: string) => {
+    let picked: T | null = null;
+    for (const g of sorted) {
+      if (g.start <= date) picked = g.targets;
+      else break;
+    }
+    return picked;
+  };
+}
+
+/** A per-day calorie target: a fixed number, or a resolver keyed by local day. */
+export type CalorieTarget = number | null | undefined | ((date: string) => number | null | undefined);
+
+/**
  * Calorie adherence: % of LOGGED days within ±10% of target. Null when no
- * target or no logged days.
+ * logged day has a target. `target` may be a single number (legacy) or a
+ * per-day resolver — a day with no target for it (before any goal existed) is
+ * simply not graded rather than counted as a miss.
  */
 export function calorieAdherencePct(
   dailyCalories: Map<string, number>,
-  targetCalories: number | null | undefined,
+  target: CalorieTarget,
 ): number | null {
-  if (!targetCalories || targetCalories <= 0) return null;
-  const days = [...dailyCalories.values()].filter((c) => c > 0);
-  if (days.length === 0) return null;
-  const band = targetCalories * 0.1;
-  const within = days.filter((c) => Math.abs(c - targetCalories) <= band).length;
-  return Math.round((within / days.length) * 100);
+  const resolve = typeof target === "function" ? target : () => target;
+  let graded = 0;
+  let within = 0;
+  for (const [date, cal] of dailyCalories) {
+    if (!(cal > 0)) continue;
+    const t = resolve(date);
+    if (!t || t <= 0) continue;
+    graded++;
+    if (Math.abs(cal - t) <= t * 0.1) within++;
+  }
+  if (graded === 0) return null;
+  return Math.round((within / graded) * 100);
 }
 
 /** Mean of 1-5 ratings, 1dp; null when empty. */

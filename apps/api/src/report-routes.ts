@@ -20,6 +20,7 @@ import {
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess, visibleClientIds } from "./clients.js";
 import { parseJson } from "./db.js";
+import { loadGoalTimeline, dayCalorieTarget } from "./goals.js";
 
 interface SessionEntry {
   exerciseId: string;
@@ -37,17 +38,22 @@ export const reportRoutes = new Hono<AppEnv>()
     const clientId = access.client.id;
     const db = c.env.DB;
 
-    const [checkIns, foods, sessions, measurements, goal] = await Promise.all([
+    const [checkIns, foods, sessions, measurements, timeline] = await Promise.all([
       db.prepare("SELECT date_local, mood, sleep_hours, weight_kg FROM check_ins WHERE client_id = ? AND date_local >= ? AND date_local <= ?").bind(clientId, start, end).all<{ date_local: string; mood: number | null; sleep_hours: number | null; weight_kg: number | null }>(),
-      db.prepare("SELECT date_local, calories FROM food_entries WHERE client_id = ? AND date_local >= ? AND date_local <= ?").bind(clientId, start, end).all<{ date_local: string; calories: number }>(),
+      db.prepare("SELECT date_local, SUM(calories) AS calories, MAX(target_calories) AS day_target_cal FROM food_entries WHERE client_id = ? AND date_local >= ? AND date_local <= ? GROUP BY date_local").bind(clientId, start, end).all<{ date_local: string; calories: number; day_target_cal: number | null }>(),
       db.prepare("SELECT date_local, entries_json FROM exercise_logs WHERE client_id = ? AND date_local >= ? AND date_local <= ?").bind(clientId, start, end).all<{ date_local: string; entries_json: string | null }>(),
       db.prepare("SELECT date_local, weight_kg, body_fat_percent FROM measurements WHERE client_id = ? AND date_local >= ? AND date_local <= ? ORDER BY date_local").bind(clientId, start, end).all<{ date_local: string; weight_kg: number | null; body_fat_percent: number | null }>(),
-      db.prepare("SELECT targets_json FROM client_goals WHERE client_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(clientId).first<{ targets_json: string | null }>(),
+      loadGoalTimeline(db, clientId),
     ]);
 
     const checkInDays = new Set((checkIns.results ?? []).map((r) => r.date_local));
     const foodByDay = new Map<string, number>();
-    for (const f of foods.results ?? []) foodByDay.set(f.date_local, (foodByDay.get(f.date_local) ?? 0) + f.calories);
+    const calTargetSnap = new Map<string, number>();
+    for (const f of foods.results ?? []) {
+      foodByDay.set(f.date_local, (foodByDay.get(f.date_local) ?? 0) + f.calories);
+      if (f.day_target_cal != null) calTargetSnap.set(f.date_local, f.day_target_cal);
+    }
+    const calTargetForDay = dayCalorieTarget(timeline, calTargetSnap);
     const workoutDays = new Set((sessions.results ?? []).map((r) => r.date_local));
 
     // PR table (top by Epley e1RM) + weekly tonnage.
@@ -71,7 +77,6 @@ export const reportRoutes = new Hono<AppEnv>()
       .sort((a, b) => b.e1rm - a.e1rm)
       .slice(0, 15);
 
-    const targets = parseJson<{ targetCalories?: number }>(goal?.targets_json, {});
     const moods = (checkIns.results ?? []).map((r) => r.mood).filter((m): m is number => m != null);
     const sleeps = (checkIns.results ?? []).map((r) => r.sleep_hours).filter((s): s is number => s != null);
 
@@ -83,7 +88,7 @@ export const reportRoutes = new Hono<AppEnv>()
         workoutDays: workoutDays.size,
         checkInConsistencyPct: consistencyPct(checkInDays, start, end),
         currentStreak: currentStreak(checkInDays, today),
-        calorieAdherencePct: calorieAdherencePct(foodByDay, targets.targetCalories),
+        calorieAdherencePct: calorieAdherencePct(foodByDay, calTargetForDay),
       },
       averages: {
         mood: moods.length ? Math.round((moods.reduce((a, b) => a + b, 0) / moods.length) * 10) / 10 : null,
