@@ -9,7 +9,7 @@ import {
   Reveal, SkeletonHero, SkeletonList, SkeletonHeader,
   Page, Stagger, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
   Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Sparkles, Utensils, Croissant, Soup, Apple,
-  Store, Ticket, AlertTriangle, ShieldCheck, toneVar, ChevronLeft, ChevronRight, type Tone, type LucideIcon,
+  Store, Ticket, AlertTriangle, ShieldCheck, toneVar, ChevronLeft, ChevronRight, Target, ScanLine, Calendar, type Tone, type LucideIcon,
 } from "@mossa/ui";
 import type { WidgetItem } from "@mossa/protocol";
 import { useNavigate } from "react-router-dom";
@@ -23,7 +23,7 @@ import { CLIENT_WIDGETS, DEFAULT_CLIENT_WIDGETS, type ClientWidgetData } from ".
 import { TodayAgenda, fetchAgenda, type AgendaData } from "./TodayAgenda.js";
 import { CoachNote } from "./CoachNote.js";
 
-export interface FeedEvent { id: string; kind: string; date: string; at: string; title: string; subtitle: string | null; ref?: string; metric?: { unit: "energy" | "volume" | "weight"; value: number } }
+export interface FeedEvent { id: string; kind: string; date: string; at: string; title: string; subtitle: string | null; ref?: string; actor?: string; metric?: { unit: "energy" | "volume" | "weight"; value: number } }
 
 /** N days back from a YYYY-MM-DD string. */
 const shiftDay = (date: string, delta: number): string => {
@@ -95,7 +95,7 @@ const routeForEvent = (ev: FeedEvent): string | null => {
     case "fast": case "sleep": case "supplement": case "session": return "/wellness";
     case "water": case "plan_meal": return "/eat";
     case "workout": case "activity": case "swap": case "plan_workout": return "/train";
-    case "measurement": case "mood": return "/progress";
+    case "measurement": case "mood": case "bodyscan": case "goal": return "/progress";
     default: return null;
   }
 };
@@ -106,7 +106,6 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   const [feed, setFeed] = useState<FeedEvent[] | null>(null);
   const [logOpen, setLogOpen] = useState(false);
   const [checkInOpen, setCheckInOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [widgetsOpen, setWidgetsOpen] = useState(false);
   // The home widget layout is CLIENT-scoped (stored on the client's dashboard
   // prefs, surfaced in the today bundle), so a coach viewing a client edits the
@@ -117,7 +116,11 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   const { ctx } = useSession();
   const pk = usePasskey();
   const ownView = ctx?.active?.clientId === clientId;
-  const date = todayLocal();
+  // Today is date-navigable: the whole day (macros + agenda + feed) rewinds to any
+  // past date. Interactive/current-state blocks show only on the actual today.
+  const today = todayLocal();
+  const [date, setDate] = useState(today);
+  const isToday = date === today;
 
   // Offer only the widgets this plan unlocks — a widget tagged with a FEATURES
   // key is filtered out when the tenant/client lacks it, so the hero and its
@@ -174,7 +177,20 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
       }>
         {data && agenda && widgetData && (
         <>
-          {(() => {
+          {/* Date navigator — the whole day (macros + agenda + feed) rewinds. */}
+          <Stagger className="flex items-center gap-2">
+            <button onClick={() => setDate((d) => shiftDay(d, -1))} aria-label="Previous day" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-4"><ChevronLeft /></button>
+            <label className="relative flex-1">
+              <input type="date" max={today} value={date} onChange={(e) => e.target.value && setDate(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0 [color-scheme:dark]" aria-label="Pick a date" />
+              <div className="pointer-events-none flex items-center justify-center gap-1.5 rounded-xl bg-surface-2 px-3 py-2 text-sm font-semibold [&_svg]:size-4"><Calendar className="text-muted-foreground" />{dayLabel(date, today)}</div>
+            </label>
+            {isToday
+              ? <div className="size-9 shrink-0" />
+              : <button onClick={() => setDate((d) => (d < today ? shiftDay(d, 1) : d))} aria-label="Next day" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-4"><ChevronRight /></button>}
+          </Stagger>
+          {!isToday && <button onClick={() => setDate(today)} className="mx-auto block text-xs font-medium text-primary">Jump to today</button>}
+
+          {isToday && (() => {
             const notice = accessNotice(data.access);
             if (!notice) return null;
             const tappable = !!notice.cta && ownView;
@@ -253,6 +269,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
             />
           </Stagger>
 
+          {isToday && (
           <Stagger className="flex items-center gap-2.5">
             <Button size="lg" className="flex-1" data-tour="today-log" onClick={() => setLogOpen(true)}>
               <Plus /> Log
@@ -264,20 +281,20 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
               <PencilLine />
             </Button>
           </Stagger>
+          )}
 
+          {isToday && (
           <Stagger data-tour="today-agenda">
             <TodayAgenda clientId={clientId} date={date} bundle={data} agenda={agenda} onChanged={() => void load()} onNavigate={onOpen} onCheckIn={() => setCheckInOpen(true)} onStartWorkout={onStart} />
           </Stagger>
+          )}
 
-          {/* Today's activity — everything logged today; older days live in History. */}
+          {/* The day's activity timeline — the client's own logs + coach events. */}
           <Stagger className="space-y-2">
-            <div className="flex items-center justify-between px-1">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today's activity</h3>
-              <button onClick={() => setHistoryOpen(true)} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><History /> History</button>
-            </div>
+            <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{isToday ? "Today's activity" : `${dayLabel(date, today)} · activity`}</h3>
             <Reveal loading={!feed} skeleton={<SkeletonList card rows={3} />}>
               {feed && (feed.length === 0 ? (
-                <Card className="text-center text-sm text-muted-foreground">Your day fills in here as you log — meals, workouts, check-ins and more.</Card>
+                <Card className="text-center text-sm text-muted-foreground">{isToday ? "Your day fills in here as you log — meals, workouts, check-ins and more." : "Nothing was logged on this day."}</Card>
               ) : (
                 <Card className="divide-y divide-border/40 py-0.5">
                   {feed.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} onOpen={onOpen} />)}
@@ -286,14 +303,13 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
             </Reveal>
           </Stagger>
 
-          <Stagger><CoachNote clientId={clientId} surface="home" /></Stagger>
+          {isToday && <Stagger><CoachNote clientId={clientId} surface="home" /></Stagger>}
         </>
         )}
       </Reveal>
 
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} clientId={clientId} onLogged={() => void load()} />
       {checkInOpen && <LogSheet open initialKind="checkin" onClose={() => setCheckInOpen(false)} clientId={clientId} onLogged={() => { setCheckInOpen(false); void load(); }} />}
-      {historyOpen && <HistorySheet clientId={clientId} onClose={() => setHistoryOpen(false)} onOpen={onOpen} />}
       {widgetsOpen && <WidgetCustomizeSheet catalog={widgetCatalog} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
     </Page>
   );
@@ -323,6 +339,8 @@ const FEED_META: Record<string, { icon: LucideIcon; tone: Tone }> = {
   session: { icon: ClipboardList, tone: "activity" },
   plan_workout: { icon: Dumbbell, tone: "activity" },
   plan_meal: { icon: Utensils, tone: "nutrition" },
+  bodyscan: { icon: ScanLine, tone: "sleep" },
+  goal: { icon: Target, tone: "cardio" },
 };
 const metaFor = (kind: string) => FEED_META[kind] ?? { icon: Sparkles, tone: "neutral" as Tone };
 
@@ -339,7 +357,8 @@ function dayLabel(day: string, today: string): string {
 
 function FeedRow({ ev, units, onOpen }: { ev: FeedEvent; units: UnitPrefs; onOpen?: (route: string) => void }) {
   const meta = metaFor(ev.kind);
-  const sub = [ev.subtitle, formatMetric(ev.metric, units)].filter(Boolean).join(" · ");
+  // Coach-authored events carry the acting staff member's name ("by Jane").
+  const sub = [ev.subtitle, ev.actor ? `by ${ev.actor}` : null, formatMetric(ev.metric, units)].filter(Boolean).join(" · ");
   const time = new Date(ev.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const route = onOpen ? routeForEvent(ev) : null;
   const body = (
@@ -360,36 +379,4 @@ function FeedRow({ ev, units, onOpen }: { ev: FeedEvent; units: UnitPrefs; onOpe
   );
 }
 
-/** History browser — pick any past day and see its full timeline. */
-function HistorySheet({ clientId, onClose, onOpen }: { clientId: string; onClose: () => void; onOpen?: (route: string) => void }) {
-  const units = useUnits();
-  const today = todayLocal();
-  const [day, setDay] = useState(shiftDay(today, -1));
-  const [events, setEvents] = useState<FeedEvent[] | null>(null);
-  useEffect(() => {
-    let alive = true;
-    setEvents(null);
-    void api.get<{ events: FeedEvent[] }>(`/api/activity-history?clientId=${clientId}&from=${day}&to=${day}`).then((r) => { if (alive) setEvents(r.events); });
-    return () => { alive = false; };
-  }, [clientId, day]);
-  return (
-    <Sheet open onClose={onClose} title="History">
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <button onClick={() => setDay((d) => shiftDay(d, -1))} className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-4" aria-label="Previous day"><ChevronLeft /></button>
-          <input type="date" max={today} value={day} onChange={(e) => e.target.value && setDay(e.target.value)} className="flex-1 rounded-xl bg-surface-2 px-3 py-2.5 text-center text-sm outline-none [color-scheme:dark]" />
-          <button onClick={() => setDay((d) => (d < today ? shiftDay(d, 1) : d))} disabled={day >= today} className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40 [&_svg]:size-4" aria-label="Next day"><ChevronRight /></button>
-        </div>
-        <div className="text-center text-sm font-semibold text-muted-foreground">{dayLabel(day, today)}</div>
-        <Reveal loading={!events} skeleton={<SkeletonList card rows={5} />}>
-          {events && (events.length === 0 ? (
-            <EmptyState icon={Clock} title="Nothing logged" description="No activity recorded on this day." />
-          ) : (
-            <Card className="divide-y divide-border/40 py-0.5">{events.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} onOpen={onOpen ? (r) => { onClose(); onOpen(r); } : undefined} />)}</Card>
-          ))}
-        </Reveal>
-      </div>
-    </Sheet>
-  );
-}
 

@@ -1199,22 +1199,36 @@ describe("activity history feed", () => {
     await SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, workoutPlanId: "wp-hist", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "ex1", sets: [{ setIndex: 0, reps: 8, weightKg: 50, completed: true }] } }) });
     await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, mood: 4, notes: "felt strong" } }) });
     const { id: labId } = (await (await SELF.fetch("http://x/api/labs", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, type: "blood_panel" }) })).json()) as { id: string };
+    // A body scan on the same day (inserted directly — capture needs image data).
+    await (env.DB as D1Database).prepare("INSERT INTO body_scans (id, tenant_id, client_id, date_local, body_fat_percent, weight_kg, created_at) VALUES ('scan_hist_1', 'x', ?, ?, 18.4, 80, ?)").bind(client.id, d, `${d}T09:00:00.000Z`).run();
+    // A goal set by the owner (records an audit entry → drives actor attribution).
+    // Give the acting user a display name so the audit join can attribute it.
+    const hctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const hOwner = (await (env.DB as D1Database).prepare("SELECT userId FROM member WHERE organizationId = ? AND role = 'owner' LIMIT 1").bind(hctx.active.tenantId).first<{ userId: string }>())!;
+    await (env.DB as D1Database).prepare("UPDATE \"user\" SET name = 'Coach One' WHERE id = ?").bind(hOwner.userId).run();
+    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, label: "Recomp", calculator: { gender: "male", ageYears: 30, heightCm: 178, weightKg: 80, activityLevel: "moderate", primaryGoal: "maintain", dietaryApproach: "balanced" } }) });
 
-    const feed = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2026-07-10`, { headers: auth(ownerCookie) })).json()) as { events: { kind: string; date: string; title: string; ref?: string; metric?: { unit: string; value: number } }[] };
+    const feed = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2026-07-10`, { headers: auth(ownerCookie) })).json()) as { events: { kind: string; date: string; title: string; ref?: string; actor?: string; metric?: { unit: string; value: number } }[] };
     const kinds = feed.events.map((e) => e.kind);
     expect(kinds).toContain("food:lunch");
     expect(kinds).toContain("water");
     expect(kinds).toContain("activity");
     expect(kinds).toContain("workout");
     expect(kinds).toContain("checkin");
+    expect(kinds).toContain("bodyscan"); // enriched: body scans now in the feed
     expect(feed.events.every((e) => e.date >= "2026-07-08" && e.date <= "2026-07-10")).toBe(true);
     const food = feed.events.find((e) => e.kind === "food:lunch")!;
     expect(food.metric).toMatchObject({ unit: "energy", value: 500 });
     // Deep-link ref: a check-in carries its date so the feed can open its detail.
     expect(feed.events.find((e) => e.kind === "checkin")!.ref).toBe(d);
     // A lab is dated by its creation time; a wide window catches it, ref = lab id.
-    const wide = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2030-01-01`, { headers: auth(ownerCookie) })).json()) as { events: { kind: string; ref?: string }[] };
+    const wide = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2030-01-01`, { headers: auth(ownerCookie) })).json()) as { events: { kind: string; ref?: string; actor?: string; subtitle?: string | null }[] };
     expect(wide.events.find((e) => e.kind === "lab")!.ref).toBe(labId);
+    // The goal is in the feed and carries the acting coach's name (actor attribution).
+    const goalEv = wide.events.find((e) => e.kind === "goal")!;
+    expect(goalEv.subtitle).toBe("Recomp");
+    expect(typeof goalEv.actor).toBe("string");
+    expect(goalEv.actor!.length).toBeGreaterThan(0);
     // Out-of-range window returns nothing.
     const empty = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-06-01&to=2026-06-02`, { headers: auth(ownerCookie) })).json()) as { events: unknown[] };
     expect(empty.events.length).toBe(0);
