@@ -1,7 +1,8 @@
 /** Client Shop — marketplace packages, Stripe Connect buy, redeem codes. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Page, Stagger, IconBadge, ConfirmDialog, ArrowLeft, LogOut, Ticket, Store, Sparkles, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
+import { Button, Card, Badge, Field, Page, Stagger, IconBadge, SectionHeader, ConfirmDialog, ArrowLeft, LogOut, Ticket, Store, Sparkles, Check, CheckCheck, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
+import { CLIENT_FLAG_CATEGORIES, CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 
@@ -88,6 +89,8 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
         </Card>
       )}
 
+      <Stagger><PlanIncludes /></Stagger>
+
       <Stagger>
         <Card className="space-y-3">
           <div className="flex items-center gap-2.5"><IconBadge icon={Ticket} tone="primary" size="sm" /><h2 className="font-semibold">Have a code?</h2></div>
@@ -140,5 +143,39 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
         onConfirm={() => void cancelRenew()}
       />
     </Page>
+  );
+}
+
+/** "What your plan includes" — the client's own capabilities, grouped by
+ *  category, rendered from CLIENT_FLAG_META + the resolved clientFlags in
+ *  session context. The flags are already the intersection of what the coach
+ *  enabled for this client AND what the studio bought from Mossa (∩ live
+ *  budget), so this shows exactly what they can actually do. Positive framing:
+ *  only included capabilities are listed. */
+function PlanIncludes() {
+  const { ctx } = useSession();
+  const flags = ctx?.clientFlags;
+  if (!flags) return null;
+  const groups = CLIENT_FLAG_CATEGORIES
+    .map((cat) => ({ cat, keys: CLIENT_FLAG_KEYS.filter((k) => CLIENT_FLAG_META[k].category === cat.key && flags[k]) }))
+    .filter((g) => g.keys.length > 0);
+  if (!groups.length) return null;
+  return (
+    <Card className="space-y-3">
+      <SectionHeader icon={CheckCheck} tone="success" title="What your plan includes" />
+      <div className="space-y-3">
+        {groups.map((g) => (
+          <div key={g.cat.key} className="space-y-1">
+            <div className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">{g.cat.label}</div>
+            {g.keys.map((k) => (
+              <div key={k} className="flex items-center gap-2 text-sm">
+                <Check className="size-4 shrink-0 text-success" />
+                <span>{CLIENT_FLAG_META[k].label}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
