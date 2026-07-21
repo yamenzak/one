@@ -3,9 +3,10 @@
 > **DRAFT for legal review.** This document was prepared as a working draft to be
 > reviewed and finalised by qualified legal counsel admitted in the United Arab
 > Emirates before publication. It is not legal advice. Bracketed items `[ ]` are
-> placeholders you must confirm. Confirm in particular whether Four Degree Labs is
-> incorporated in mainland Abu Dhabi, in ADGM, or in a free zone — that choice
-> changes the governing-law and dispute-resolution clauses (see §19).
+> remaining placeholders you must confirm (commercial licence number, registered
+> address, and — if you prefer arbitration to the Abu Dhabi courts — the dispute
+> clause in §19). Four Degree Labs is confirmed as a mainland Abu Dhabi LLC, so
+> UAE Federal law and the Abu Dhabi courts govern.
 
 **Effective date:** `[DATE]`
 **Last updated:** `[DATE]`
@@ -14,10 +15,9 @@
 
 Mossa (the "**Platform**", "**Service**", "**we**", "**us**", "**our**") is a
 software-as-a-service platform for personal-training and coaching businesses,
-operated by **Four Degree Labs** `[full legal name, e.g. "Four Degree Labs FZ-LLC" / "…LLC"]`,
-a company `[registered / licensed]` in `[Abu Dhabi, United Arab Emirates — specify
-mainland Abu Dhabi / ADGM / free zone]` under commercial licence / registration
-number `[NUMBER]`, with its registered office at `[ADDRESS]`.
+operated by **Four Degree Labs LLC**, a limited liability company licensed in
+mainland Abu Dhabi, United Arab Emirates, under commercial licence number
+`[NUMBER]`, with its registered office at `[ADDRESS]`.
 
 These Terms of Service (the "**Terms**") are a binding agreement between Four
 Degree Labs and the person or entity that registers for, accesses, or uses the
@@ -57,14 +57,14 @@ under your account.
 
 3.2 **Eligibility.** You must be at least 18 years old (or the age of majority in
 your jurisdiction) to register a Studio account or act as Staff. Clients must be at
-least `[16 / 18]` years old, or have verifiable consent from a parent or legal
-guardian where a Studio permits younger Clients; the Studio is responsible for
-obtaining that consent. See the Privacy Policy, "Children".
+least 17 years old, or have verifiable consent from a parent or legal guardian where
+a Studio permits younger Clients; the Studio is responsible for obtaining that
+consent. See the Privacy Policy, "Children".
 
 3.3 **Accurate information.** You agree to provide accurate, current, and complete
 registration information and to keep it up to date.
 
-3.4 **Account security.** Notify us promptly at `[security@4dl.app]` if you suspect
+3.4 **Account security.** Notify us promptly at `info@fourdegreelabs.com` if you suspect
 unauthorised access to your account. You must not share sign-in codes or transfer
 your account without our consent.
 
@@ -113,9 +113,10 @@ added and shown on your invoice.
 may suspend paid features or the account. Suspension for non-payment reduces the
 account (and its Clients) to the free-tier capability set until payment is settled.
 
-5.6 **Refunds.** Except where required by applicable UAE consumer-protection law,
-Subscription fees and AI Credit purchases are non-refundable. `[Confirm your refund
-policy — e.g. no refunds, or a stated cooling-off / pro-rata policy.]`
+5.6 **Refunds.** All fees are non-refundable. Subscription fees and AI Credit
+purchases are not refundable in whole or in part, including for partial billing
+periods or unused AI Credits, except to the limited extent a refund is required by
+applicable UAE consumer-protection law.
 
 5.7 **Cancellation.** You may cancel a Subscription at any time; cancellation takes
 effect at the end of the current billing period, and you retain access until then.
@@ -268,7 +269,7 @@ practicable and lawful, we will give notice.
 
 14.5 **Data export and deletion.** You may export your Customer Data using the
 Service's export features while your account is active. After termination, we will
-delete or de-identify Customer Data within `[e.g. 30–90 days]`, except where we must
+delete or de-identify Customer Data within 90 days, except where we must
 retain it to comply with law, resolve disputes, or enforce our agreements. Retention
 and deletion are further described in the Privacy Policy.
 
@@ -294,7 +295,7 @@ Service, even if advised of the possibility.
 16.2 To the maximum extent permitted by applicable law, Four Degree Labs' total
 aggregate liability arising out of or related to these Terms or the Service will not
 exceed the greater of (a) the total fees you paid to us for the Service in the
-`[twelve (12)]` months before the event giving rise to the claim, or (b) `[USD 100 /
+twelve (12) months before the event giving rise to the claim, or (b) `[USD 100 /
 AED 500]`.
 
 16.3 Nothing in these Terms limits liability that cannot be limited under applicable
@@ -318,17 +319,14 @@ must stop using the Service.
 
 ## 19. Governing law and dispute resolution
 
-19.1 **Governing law.** These Terms are governed by the laws of the United Arab
-Emirates as applied in the Emirate of Abu Dhabi, without regard to conflict-of-laws
-rules. `[If Four Degree Labs is registered in ADGM, substitute: "…governed by the
-laws applicable in the Abu Dhabi Global Market (ADGM), including ADGM's application
-of English common law."]`
+19.1 **Governing law.** These Terms are governed by the federal laws of the United
+Arab Emirates as applied in the Emirate of Abu Dhabi, without regard to
+conflict-of-laws rules.
 
-19.2 **Jurisdiction.** The parties submit to the exclusive jurisdiction of the
-`[courts of Abu Dhabi / the ADGM Courts]`. `[Alternatively, if you prefer
-arbitration, substitute an arbitration clause — e.g. arbitration seated in Abu Dhabi
-under the Abu Dhabi International Arbitration Centre (arbitrateAD) Rules, in
-English.]`
+19.2 **Jurisdiction.** The parties submit to the exclusive jurisdiction of the courts
+of Abu Dhabi. `[Optional — if you prefer arbitration to the courts, replace this
+clause with, e.g., arbitration seated in Abu Dhabi under the Abu Dhabi International
+Arbitration Centre (arbitrateAD) Rules, conducted in English.]`
 
 19.3 Nothing prevents either party from seeking injunctive relief to protect its
 intellectual property or confidential information in any court of competent
@@ -344,7 +342,7 @@ assets.
 beyond its reasonable control.
 
 20.3 **Notices.** We may give notice by email or in-app. Legal notices to us must be
-sent to `[legal@4dl.app]` and to our registered address.
+sent to `info@fourdegreelabs.com` and to our registered address.
 
 20.4 **Entire agreement; severability; waiver.** These Terms and the Privacy Policy
 are the entire agreement between the parties on their subject matter. If any
@@ -355,6 +353,6 @@ provision is not a waiver.
 
 ## 21. Contact
 
-**Four Degree Labs** `[full legal name]`
+**Four Degree Labs LLC**
 `[Registered address, Abu Dhabi, United Arab Emirates]`
-General: `[hello@4dl.app]` · Legal: `[legal@4dl.app]` · Security: `[security@4dl.app]`
+Contact (general, legal, and security notices): `info@fourdegreelabs.com`

@@ -2,22 +2,23 @@
 
 > **DRAFT for legal review.** Prepared as a working draft to be reviewed and
 > finalised by qualified UAE legal counsel before publication. It is not legal
-> advice. Bracketed items `[ ]` are placeholders you must confirm. This policy is
-> drafted against the UAE **Federal Decree-Law No. 45 of 2021 on the Protection of
-> Personal Data (PDPL)**. If Four Degree Labs is registered in **ADGM**, the **ADGM
-> Data Protection Regulations 2021** apply instead/additionally — have counsel
-> confirm which regime governs and adjust the "Your rights" and "International
-> transfers" sections accordingly. If you serve customers in the EU/UK, GDPR/UK GDPR
-> may also apply.
+> advice. Bracketed items `[ ]` are remaining placeholders you must confirm
+> (registered address, email sub-processor, DPO/contact, retention period). Four
+> Degree Labs LLC is a mainland Abu Dhabi company, so this policy is drafted against
+> the UAE **Federal Decree-Law No. 45 of 2021 on the Protection of Personal Data
+> (PDPL)** and its executive regulations, and the **UAE Data Office** is the
+> competent authority. If you later serve customers in the EU/UK, GDPR/UK GDPR may
+> also apply and this policy should be revisited.
 
 **Effective date:** `[DATE]`
 **Last updated:** `[DATE]`
 
 ## 1. Introduction
 
-This Privacy Policy explains how **Four Degree Labs** `[full legal name]` ("**we**",
-"**us**", "**our**"), the operator of the **Mossa** platform ("**Platform**"),
-collects, uses, shares, and protects personal data. It applies to the Platform at
+This Privacy Policy explains how **Four Degree Labs LLC** ("**we**", "**us**",
+"**our**"), a limited liability company licensed in mainland Abu Dhabi, United Arab
+Emirates, and the operator of the **Mossa** platform ("**Platform**"), collects,
+uses, shares, and protects personal data. It applies to the Platform at
 `mossa.4dl.app`, any Studio custom domains, our marketing site, and related
 services.
 
@@ -143,15 +144,16 @@ camera body-composition estimates, check-in summaries, and coaching notes.
 The optional body-scan feature estimates body composition from photos a Client
 captures. Where a Studio and Client use it:
 
-- Photos are processed to compute an estimate and its confidence.
-- De-identified body outlines/contours are **stored only with the Client's consent**,
-  to render progress visualisations; without consent, they are not retained.
-- `[Confirm and state your image-retention practice — e.g. whether the original photo
-  is stored, for how long, or discarded after processing. State it here precisely.]`
+- A captured photo is processed only to compute the estimate and its confidence, and
+  **the original photo is not stored** — it is discarded after processing.
+- The only thing retained is a set of **de-identified body outlines (contours)**, and
+  only **with the Client's consent**, to render progress visualisations. Without
+  consent, nothing from the scan image is retained beyond the numeric estimate the
+  Studio saves as a measurement.
 
 Because body-scan data is sensitive, it is processed only on the Client's explicit
 consent obtained by the Studio, and a Client may withdraw consent and request
-deletion (see §14).
+deletion of the retained contours (see §14).
 
 ## 9. How we share data and our sub-processors
 
@@ -184,9 +186,8 @@ We and our sub-processors operate globally, so personal data may be processed ou
 the United Arab Emirates. Where we transfer personal data across borders, we do so in
 accordance with the PDPL's cross-border transfer requirements — to jurisdictions with
 an adequate level of protection or, where none applies, under appropriate safeguards
-(such as contractual clauses) or another lawful basis, including your consent.
-`[Confirm the specific transfer mechanism with counsel once the UAE Data Office's
-executive regulations on transfers are finalised.]`
+(such as contractual clauses) or another lawful basis, including your consent, in
+line with the UAE Data Office's requirements.
 
 ## 11. Data retention
 
@@ -196,7 +197,7 @@ purposes described here:
 - **Account & Studio data** — for the life of the account.
 - **Customer Data (Client/Staff)** — for as long as the Studio maintains it; after a
   Studio closes its account or a Client is deleted, we delete or de-identify the data
-  within `[e.g. 30–90 days]`.
+  within 90 days.
 - **Billing records** — retained as required by applicable UAE tax and accounting law.
 - **Logs and security data** — retained for a limited period for security and
   diagnostics.
@@ -217,7 +218,7 @@ controllers where required.
 
 ## 13. Children
 
-The Platform is not directed to children under `[16 / 18]`. A Studio must not create a
+The Platform is not directed to children under 17. A Studio must not create a
 Client record for a minor without the verifiable consent of a parent or legal
 guardian, and is responsible for obtaining it. If you believe we hold a child's data
 without appropriate consent, contact us and we will address it.
@@ -235,12 +236,11 @@ appropriate safeguards.
   of your coaching data — direct your request to the Studio in the first instance. We
   will assist the Studio in responding as its processor.
 - **For data where Mossa is the controller** (account, billing, usage), contact us at
-  `[privacy@4dl.app]`. We may need to verify your identity, and we will respond within
+  `info@fourdegreelabs.com`. We may need to verify your identity, and we will respond within
   the timeframe required by law.
 
-You also have the right to lodge a complaint with the **UAE Data Office** (the
-competent supervisory authority under the PDPL) `[or, if ADGM applies, the ADGM Office
-of Data Protection]`.
+You also have the right to lodge a complaint with the **UAE Data Office**, the
+competent supervisory authority under the PDPL.
 
 ## 15. Cookies and similar technologies
 
@@ -257,7 +257,7 @@ the latest version.
 
 ## 17. Contact us
 
-**Four Degree Labs** `[full legal name]`
+**Four Degree Labs LLC**
 `[Registered address, Abu Dhabi, United Arab Emirates]`
-Privacy / data-protection enquiries: `[privacy@4dl.app]`
+Privacy / data-protection enquiries: `info@fourdegreelabs.com`
 `[Data Protection Officer / contact, if appointed: name + email]`
