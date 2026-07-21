@@ -217,8 +217,8 @@ export const stripeRoutes = new Hono<AppEnv>()
     if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
     // The account must actually be able to accept charges (onboarding done).
     if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
-    const pkg = await c.env.DB.prepare("SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; currency: string }>();
-    if (!pkg) return c.json({ error: "package not found" }, 404);
+    const pkg = await c.env.DB.prepare("SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; currency: string; visibility: string; restricted_client_id: string | null }>();
+    if (!pkg || purchaseBlocked(pkg, access.client.id)) return c.json({ error: "package not found" }, 404);
     // A monthly price makes the package auto-renewing (a Stripe subscription on
     // the connected account); otherwise it's a one-time day-pack. Either way the
     // budget model is the source of truth — recurring just re-buys each period.
@@ -284,8 +284,8 @@ export const stripeRoutes = new Hono<AppEnv>()
     const settings = await c.env.DB.prepare("SELECT stripe_account_id, charges_enabled FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null }>();
     if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
     if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
-    const pkg = await c.env.DB.prepare("SELECT id, name, one_time_price_cents, monthly_price_cents, currency FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; currency: string }>();
-    if (!pkg) return c.json({ error: "package not found" }, 404);
+    const pkg = await c.env.DB.prepare("SELECT id, name, one_time_price_cents, monthly_price_cents, currency, visibility, restricted_client_id FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; currency: string; visibility: string; restricted_client_id: string | null }>();
+    if (!pkg || purchaseBlocked(pkg, access.client.id)) return c.json({ error: "package not found" }, 404);
     if ((pkg.monthly_price_cents ?? 0) > 0) return c.json({ error: "use /connect/checkout for subscriptions" }, 400);
     let amount = pkg.one_time_price_cents ?? 0;
     if (amount <= 0) return c.json({ error: "use /subscriptions/grant for $0 packages" }, 400);
@@ -443,6 +443,16 @@ export const stripeRoutes = new Hono<AppEnv>()
     }
     return c.json({ received: true });
   });
+
+/** Can this client purchase this package directly (self-checkout)? Marketplace
+ *  packages are public; a client_specific package only its own client; `private`
+ *  packages are grant-only (staff assigns them, never client-purchasable). A
+ *  blocked package reads as "not found" at checkout — no oracle. */
+function purchaseBlocked(pkg: { visibility: string; restricted_client_id: string | null }, clientId: string): boolean {
+  if (pkg.visibility === "marketplace") return false;
+  if (pkg.visibility === "client_specific") return !(pkg.restricted_client_id && pkg.restricted_client_id === clientId);
+  return true;
+}
 
 /** Webhook idempotency: the first insert of a Stripe event id processes; a
  *  redelivery finds the row already present (changes = 0) and short-circuits. */
