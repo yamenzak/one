@@ -20,6 +20,7 @@ import { type AppEnv, requireTenant } from "./auth-context.js";
 import { gateFeature } from "./client-flags.js";
 import { requireClientAccess } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
+import { recordAudit } from "./audit.js";
 import { parseJson, j } from "./db.js";
 
 const PackageBody = z.object({
@@ -198,7 +199,7 @@ export const commerceRoutes = new Hono<AppEnv>()
       "SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1",
     )
       .bind(parsed.data.packageId, who.tenantId)
-      .first<{ id: string; budgets_json: string | null; addons_json: string | null; flags_json: string | null; once_per_customer: number }>();
+      .first<{ id: string; name: string; budgets_json: string | null; addons_json: string | null; flags_json: string | null; once_per_customer: number }>();
     if (!pkg) return c.json({ error: "package not found" }, 404);
 
     const now = nowIso();
@@ -231,6 +232,7 @@ export const commerceRoutes = new Hono<AppEnv>()
       )
         .bind(j([...existing, ...added]), j(addOns), now, current.id)
         .run();
+      await recordAudit(c.env, { tenantId: who.tenantId, clientId: access.client.id, actorUserId: who.userId, action: "package.assign", summary: `${pkg.name} (extended)`, ref: pkg.id });
       return c.json({ ok: true, id: current.id, extended: true });
     }
 
@@ -245,6 +247,7 @@ export const commerceRoutes = new Hono<AppEnv>()
         j(mergeAddOnBalances([], purchasedAddOns)), pkg.flags_json, now, now,
       )
       .run();
+    await recordAudit(c.env, { tenantId: who.tenantId, clientId: access.client.id, actorUserId: who.userId, action: "package.assign", summary: pkg.name, ref: pkg.id });
     return c.json({ ok: true, id, extended: false }, 201);
   })
 

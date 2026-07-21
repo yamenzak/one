@@ -10,6 +10,7 @@ import { z } from "zod";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { notify } from "./notify.js";
+import { recordAudit } from "./audit.js";
 import { gateFeature } from "./client-flags.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
@@ -190,9 +191,10 @@ export const contentHubRoutes = new Hono<AppEnv>()
       const res = await c.env.DB.prepare("SELECT title, audience, assigned_json FROM resources WHERE id = ? AND tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ title: string; audience: string; assigned_json: string | null }>();
       const ids = res?.audience === "assigned" ? parseJson<string[]>(res.assigned_json, []) : [];
       if (ids.length) {
-        const rows = await c.env.DB.prepare(`SELECT user_id FROM clients WHERE id IN (${ids.map(() => "?").join(",")}) AND tenant_id = ?`).bind(...ids, who.tenantId).all<{ user_id: string | null }>();
+        const rows = await c.env.DB.prepare(`SELECT id, user_id FROM clients WHERE id IN (${ids.map(() => "?").join(",")}) AND tenant_id = ?`).bind(...ids, who.tenantId).all<{ id: string; user_id: string | null }>();
         for (const r of rows.results ?? []) {
           if (r.user_id) await notify(c.env, { tenantId: who.tenantId, userId: r.user_id, type: "content_assigned", message: res!.title });
+          await recordAudit(c.env, { tenantId: who.tenantId, clientId: r.id, actorUserId: who.userId, action: "content.assign", summary: res!.title, ref: c.req.param("id") });
         }
       }
     }

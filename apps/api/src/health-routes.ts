@@ -104,6 +104,8 @@ export const healthRoutes = new Hono<AppEnv>()
     await c.env.DB.prepare(`UPDATE supplements SET ${sets.join(", ")} WHERE id = ? AND tenant_id = ?`)
       .bind(...binds, c.req.param("id"), who.tenantId)
       .run();
+    const sup = await c.env.DB.prepare("SELECT client_id, name FROM supplements WHERE id = ? AND tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ client_id: string; name: string }>();
+    if (sup) await recordAudit(c.env, { tenantId: who.tenantId, clientId: sup.client_id, actorUserId: who.userId, action: "supplement.update", summary: `${sup.name}${d.status ? ` · ${d.status}` : ""}`, ref: c.req.param("id") });
     return c.json({ ok: true });
   })
 
