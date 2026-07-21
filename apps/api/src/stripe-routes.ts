@@ -248,6 +248,45 @@ export const stripeRoutes = new Hono<AppEnv>()
     return c.json({ url: session.url });
   })
 
+  // Inline (Payment Element) one-time purchase on the tenant's connected account.
+  // Direct charge → the tenant stays merchant of record; the app confirms this
+  // client secret with Stripe.js scoped to `stripeAccount`. Recurring packages
+  // keep the hosted checkout above (Checkout auto-provisions the connected-account
+  // customer + price a bare Subscription call would need).
+  .post("/connect/pay-intent", async (c) => {
+    const who = requireTenant(c)!;
+    const cfg = await stripeConfig(c.env.DB);
+    if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
+    const body = z.object({ clientId: z.string(), packageId: z.string() }).safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, body.data.clientId);
+    if ("response" in access) return access.response;
+    const settings = await c.env.DB.prepare("SELECT stripe_account_id, charges_enabled FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null }>();
+    if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
+    if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
+    const pkg = await c.env.DB.prepare("SELECT id, name, one_time_price_cents, monthly_price_cents, currency FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; currency: string }>();
+    if (!pkg) return c.json({ error: "package not found" }, 404);
+    if ((pkg.monthly_price_cents ?? 0) > 0) return c.json({ error: "use /connect/checkout for subscriptions" }, 400);
+    const amount = pkg.one_time_price_cents ?? 0;
+    if (amount <= 0) return c.json({ error: "use /subscriptions/grant for $0 packages" }, 400);
+    const feeBps = Number((await getConfig(c.env.DB))["stripe.platform_fee_bps"] ?? "0");
+    const pi = await stripeCall<{ client_secret: string; id: string }>(
+      cfg.secretKey,
+      "payment_intents",
+      {
+        amount,
+        currency: pkg.currency || "usd",
+        "automatic_payment_methods[enabled]": "true",
+        ...(feeBps > 0 ? { application_fee_amount: Math.round((amount * feeBps) / 10000) } : {}),
+        "metadata[mossa_tenant]": who.tenantId,
+        "metadata[mossa_client]": access.client.id,
+        "metadata[mossa_package]": pkg.id,
+      },
+      { connectedAccount: settings.stripe_account_id },
+    );
+    return c.json({ clientSecret: pi.client_secret, publishableKey: cfg.publishableKey, stripeAccount: settings.stripe_account_id });
+  })
+
   // Cancel a client's auto-renewing package (stops future billing; the current
   // period's budget still runs out naturally). Client, their coach, or owner.
   .post("/connect/cancel-subscription", async (c) => {
@@ -303,6 +342,15 @@ export const stripeRoutes = new Hono<AppEnv>()
         // First period for both one-time and recurring; for recurring we also
         // pin the Stripe subscription id so later invoices renew this same row.
         await grantClientPackage(c.env.DB, m.mossa_tenant!, m.mossa_client, m.mossa_package, s.id ?? null, s.mode === "subscription" ? s.subscription ?? null : null);
+      }
+    } else if (event.type === "payment_intent.succeeded") {
+      // Inline one-time purchase (Payment Element on the connected account).
+      // Metadata rides on the PI; the hosted path keeps it on the session, so
+      // this and checkout.session.completed never both grant the same purchase.
+      const pi = event.data.object as { id?: string; metadata?: Record<string, string> };
+      const m = pi.metadata ?? {};
+      if (m.mossa_client && m.mossa_package && m.mossa_tenant) {
+        await grantClientPackage(c.env.DB, m.mossa_tenant, m.mossa_client, m.mossa_package, pi.id ?? null, null);
       }
     } else if (event.type === "invoice.paid") {
       // Renewal cycles top up the budget; the first invoice (subscription_create)

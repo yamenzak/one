@@ -333,6 +333,24 @@ describe("connect rail — webhook idempotency + grant", () => {
     expect(sub2.budgets.length).toBeGreaterThan(budgetsAfterCreate); // another period queued
     expect(sub2.daysRemaining).toBeGreaterThan(sub1.daysRemaining);
   });
+
+  it("inline one-time: payment_intent.succeeded grants the client package", async () => {
+    const db = env.DB as D1Database;
+    const secret = "whsec_connect_test";
+    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.connect_webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "InlineBuyer" }) })).json()) as { client: { id: string } };
+    const pkgId = "pkg_inline_ot";
+    await db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, active, created_at) VALUES (?, ?, ?, ?, ?, 'usd', 1, ?)")
+      .bind(pkgId, ctx.active.tenantId, "Inline Pack", 3000, JSON.stringify([{ feature: "all", days: 20 }]), new Date().toISOString()).run();
+    const payload = JSON.stringify({ id: "evt_pi_ot_1", type: "payment_intent.succeeded", data: { object: { id: "pi_ot_1", metadata: { mossa_tenant: ctx.active.tenantId, mossa_client: client.id, mossa_package: pkgId } } } });
+    const r = await SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
+    expect(r.status).toBe(200);
+    const subs = (await (await SELF.fetch(`http://x/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number; budgets: unknown[] }[] };
+    const granted = subs.subscriptions.find((s) => (s.budgets?.length ?? 0) > 0)!;
+    expect(granted.daysRemaining).toBeGreaterThan(15);
+  });
 });
 
 describe("auth — sign-out revokes the session", () => {
