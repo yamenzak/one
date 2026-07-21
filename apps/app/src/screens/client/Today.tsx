@@ -229,7 +229,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
               <Stagger>
                 <Card className="relative overflow-hidden">
                   <div className="pointer-events-none absolute -right-12 -top-14 size-44 rounded-full bg-primary/15 blur-3xl" />
-                  <button onClick={ownView ? () => nav("/settings") : undefined} disabled={!ownView} className="block w-full text-left">
+                  <button onClick={ownView ? () => nav("/profile") : undefined} disabled={!ownView} className="block w-full text-left">
                     <div className="relative flex items-center gap-4">
                       <ProgressRing size={66} strokeWidth={7} tone="primary" progress={pct || 0.001} value={<span className="text-sm font-bold">{done}/{total}</span>} softTrack tintValue />
                       <div className="min-w-0 flex-1">

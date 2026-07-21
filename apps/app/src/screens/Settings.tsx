@@ -38,56 +38,68 @@ function SectionHead({ title, scope }: { title: string; scope?: Scope }) {
   );
 }
 
-export function Settings({ onBack }: { onBack: () => void }) {
+/** Personal + studio surfaces are now reached as SEPARATE destinations from the
+ *  avatar dropdown — `view` selects which one this route renders. `studio` is the
+ *  owner-only studio-config surface; the rest are personal-to-the-user. */
+export type SettingsView = "profile" | "preferences" | "appearance" | "notifications" | "passkeys" | "studio";
+
+const VIEW_TITLE: Record<SettingsView, string> = {
+  profile: "Profile",
+  preferences: "Preferences",
+  appearance: "Appearance & units",
+  notifications: "Notifications",
+  passkeys: "Passkeys & security",
+  studio: "Studio settings",
+};
+
+export function Settings({ onBack, view = "studio" }: { onBack: () => void; view?: SettingsView }) {
   const { ctx, refresh } = useSession();
-  const { preview } = useTheme();
   const isOwner = ctx?.active?.role === "owner";
   const canBrand = isOwner && ctx?.entitlements.features.branding;
   const role = ctx?.active?.role ?? "member";
+  const clientId = ctx?.active?.clientId ?? null;
 
-  const tabs = [
-    { value: "account", label: "Account" },
-    { value: "prefs", label: "Preferences" },
-    ...(isOwner ? [{ value: "studio", label: "Studio" }] : []),
-  ];
-  const [tab, setTab] = useState<string>("account");
+  const body = (() => {
+    switch (view) {
+      case "profile":
+        return (
+          <>
+            <Stagger>
+              <Card className="flex items-center justify-between gap-3">
+                <div className="min-w-0"><div className="text-sm text-muted-foreground">Signed in as</div><div className="truncate font-semibold">{ctx?.user.email}</div></div>
+                <Badge tone={personaTone(role)}>{personaLabel(role)}</Badge>
+              </Card>
+            </Stagger>
+            {clientId ? (
+              <ClientProfileSection clientId={clientId} email={ctx!.user.email} onSaved={() => void refresh()} />
+            ) : (
+              <Stagger><Card className="text-sm text-muted-foreground">Your name and photo are managed with your studio account.</Card></Stagger>
+            )}
+          </>
+        );
+      case "preferences":
+        return clientId
+          ? <PreferencesSection clientId={clientId} onSaved={() => void refresh()} />
+          : <Stagger><Card className="text-sm text-muted-foreground">Training &amp; nutrition preferences appear here once you're set up as a client.</Card></Stagger>;
+      case "appearance":
+        return <><UnitsSection /><AppearanceSection /></>;
+      case "notifications":
+        return <NotificationsSection />;
+      case "passkeys":
+        return <><SecuritySection /><SignOutSection /></>;
+      case "studio":
+        return isOwner ? <StudioSettings canBrand={!!canBrand} /> : <Stagger><Card className="text-sm text-muted-foreground">Studio settings are available to studio owners.</Card></Stagger>;
+    }
+  })();
 
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       <div className="flex items-center gap-3">
         <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{VIEW_TITLE[view]}</h1>
       </div>
-
-      <Stagger>
-        <Card className="flex items-center justify-between gap-3">
-          <div className="min-w-0"><div className="text-sm text-muted-foreground">Signed in as</div><div className="truncate font-semibold">{ctx?.user.email}</div></div>
-          <Badge tone={personaTone(role)}>{personaLabel(role)}</Badge>
-        </Card>
-      </Stagger>
-
-      <SegmentedControl options={tabs} value={tab} onChange={setTab} />
-
-      {/* Keyed remount → each tab re-staggers its sections in. */}
-      <motion.div key={tab} variants={stagger} initial="hidden" animate="show" className="space-y-6">
-        {tab === "account" && (
-          <>
-            {ctx?.active?.clientId && <ClientProfileSection clientId={ctx.active.clientId} email={ctx.user.email} onSaved={() => void refresh()} />}
-            {ctx?.active?.clientId && <PreferencesSection clientId={ctx.active.clientId} onSaved={() => void refresh()} />}
-            <SecuritySection />
-            <SignOutSection />
-          </>
-        )}
-
-        {tab === "prefs" && (
-          <>
-            <UnitsSection />
-            <AppearanceSection />
-            <NotificationsSection />
-          </>
-        )}
-
-        {tab === "studio" && isOwner && <StudioSettings canBrand={!!canBrand} />}
+      <motion.div key={view} variants={stagger} initial="hidden" animate="show" className="space-y-6">
+        {body}
       </motion.div>
     </Page>
   );
