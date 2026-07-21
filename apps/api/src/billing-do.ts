@@ -9,8 +9,15 @@
  *   release(hold)                 // generation failed — drop the hold, no charge
  *   topUp / grantMonthly          // credit packs, promos, the recurring grant
  *
- * The balance + a rolling ledger live in DO storage; every mutation is also
- * mirrored to D1 `credit_ledger` for invoices/history (append-only).
+ * TWO-BUCKET BALANCE (billing centralization). The balance is split so the
+ * platform can honour "purchased credits last forever, plan-granted credits do
+ * not roll over":
+ *   - `purchased` — credit packs, promos, admin top-ups. Never expires.
+ *   - `granted`   — the monthly plan grant. RESET (overwritten) each period, not
+ *                   added, so an unused grant lapses instead of rolling over.
+ * Spending drains `granted` first (use-it-or-lose-it), then `purchased`, so a
+ * tenant never loses a credit they paid for. Both counters + a rolling ledger
+ * live in DO storage; every mutation mirrors to D1 `credit_ledger` (append-only).
  */
 
 import { DurableObject } from "cloudflare:workers";
@@ -23,7 +30,12 @@ interface Hold {
 }
 
 export interface BalanceView {
+  /** purchased + granted — the total the tenant can spend (pre-holds). */
   balance: number;
+  /** Credit-pack / promo / admin credits. Persist forever. */
+  purchased: number;
+  /** The current period's plan grant. Lapses (does not roll over) on reset. */
+  granted: number;
   held: number;
   available: number;
 }
@@ -56,11 +68,49 @@ export class TenantBillingDO extends DurableObject<Env> {
     }
   }
 
+  /**
+   * Read the two credit buckets, migrating a legacy single `balance` the first
+   * time we see one: all existing credits become `purchased` (we never revoke
+   * credits a tenant already holds), and `granted` starts empty — it fills on
+   * the next monthly grant. Single-threaded DO ⇒ this lazy migration is safe.
+   */
+  private async buckets(): Promise<{ purchased: number; granted: number }> {
+    let purchased = await this.ctx.storage.get<number>("purchased");
+    let granted = await this.ctx.storage.get<number>("granted");
+    if (purchased === undefined && granted === undefined) {
+      const legacy = await this.ctx.storage.get<number>("balance");
+      purchased = Math.max(0, legacy ?? 0);
+      granted = 0;
+      await this.ctx.storage.put("purchased", purchased);
+      await this.ctx.storage.put("granted", granted);
+      if (legacy !== undefined) await this.ctx.storage.delete("balance");
+    }
+    return { purchased: purchased ?? 0, granted: granted ?? 0 };
+  }
+
+  /** Spend `amount`, draining the (non-rolling) grant before purchased credits.
+   *  Returns the credits actually charged; appends one ledger entry. */
+  private async debit(amount: number, reason: string, ref?: string): Promise<number> {
+    const cost = Math.max(0, Math.ceil(amount));
+    if (cost === 0) return 0;
+    const { purchased, granted } = await this.buckets();
+    const fromGrant = Math.min(granted, cost);
+    const fromPurchased = Math.min(purchased, cost - fromGrant);
+    const charged = fromGrant + fromPurchased;
+    const nextGranted = granted - fromGrant;
+    const nextPurchased = purchased - fromPurchased;
+    await this.ctx.storage.put("granted", nextGranted);
+    await this.ctx.storage.put("purchased", nextPurchased);
+    if (charged > 0) await this.record(-charged, nextGranted + nextPurchased, reason, ref);
+    return charged;
+  }
+
   async view(): Promise<BalanceView> {
-    const balance = (await this.ctx.storage.get<number>("balance")) ?? 0;
+    const { purchased, granted } = await this.buckets();
+    const balance = purchased + granted;
     const holds = await this.reapStaleHolds();
     const held = Object.values(holds).reduce((s, h) => s + h.credits, 0);
-    return { balance, held, available: Math.max(0, balance - held) };
+    return { balance, purchased, granted, held, available: Math.max(0, balance - held) };
   }
 
   /** Drop holds past their TTL (orphaned by a died request) and persist if any
@@ -111,12 +161,9 @@ export class TenantBillingDO extends DurableObject<Env> {
     const held = holds[hold];
     if (!held) return this.view(); // already settled/released/reaped — no double charge
     const charge = Math.min(held.credits, Math.max(0, Math.ceil(actual)));
-    const balance = (await this.ctx.storage.get<number>("balance")) ?? 0;
-    const next = Math.max(0, balance - charge);
     delete holds[hold];
     await this.ctx.storage.put("holds", holds);
-    await this.ctx.storage.put("balance", next);
-    if (charge > 0) await this.record(-charge, next, reason, ref);
+    await this.debit(charge, reason, ref);
     return this.view();
   }
 
@@ -139,41 +186,55 @@ export class TenantBillingDO extends DurableObject<Env> {
     const cost = Math.max(0, Math.ceil(credits));
     const { available } = await this.view();
     if (cost > available) return { ok: false, ...(await this.view()) };
-    const balance = (await this.ctx.storage.get<number>("balance")) ?? 0;
-    const next = Math.max(0, balance - cost);
-    await this.ctx.storage.put("balance", next);
-    if (cost > 0) await this.record(-cost, next, reason, ref);
+    await this.debit(cost, reason, ref);
     return { ok: true, ...(await this.view()) };
   }
 
-  /** Add credits (credit pack, promo top-up, admin adjustment). */
+  /** Add credits to the durable `purchased` bucket (credit pack, promo, admin
+   *  top-up). These persist forever — they are never touched by a grant reset. */
   async topUp(credits: number, reason = "topup", ref?: string): Promise<BalanceView> {
     const add = Math.max(0, Math.floor(credits));
-    const balance = (await this.ctx.storage.get<number>("balance")) ?? 0;
-    const next = balance + add;
-    await this.ctx.storage.put("balance", next);
-    if (add > 0) await this.record(add, next, reason, ref);
+    const { purchased, granted } = await this.buckets();
+    if (add > 0) {
+      const nextPurchased = purchased + add;
+      await this.ctx.storage.put("purchased", nextPurchased);
+      await this.record(add, nextPurchased + granted, reason, ref);
+    }
     return this.view();
   }
 
   /**
    * Apply the recurring monthly grant for a plan, keyed by `periodKey`
    * (e.g. "2026-07") so repeated cron/webhook calls in the same period are a
-   * no-op. The grant is a floor top-up: purchased credits persist alongside it.
+   * no-op. The grant is a RESET, not a top-up: the prior period's unused grant
+   * lapses and the new grant replaces it — this is what makes plan credits
+   * non-rolling. Purchased credits are untouched. Two ledger entries (expire +
+   * grant) keep the non-rollover visible in history.
    */
   async grantMonthly(credits: number, periodKey: string): Promise<BalanceView> {
     const last = await this.ctx.storage.get<string>("lastGrantKey");
     if (last === periodKey) return this.view();
+    const grant = Math.max(0, Math.floor(credits));
+    const { purchased, granted } = await this.buckets();
     await this.ctx.storage.put("lastGrantKey", periodKey);
-    return this.topUp(credits, "grant.monthly", periodKey);
+    await this.ctx.storage.put("granted", grant);
+    if (granted > 0) await this.record(-granted, purchased, "grant.expire", periodKey);
+    if (grant > 0) await this.record(grant, purchased + grant, "grant.monthly", periodKey);
+    return this.view();
   }
 
-  /** Admin: set the balance to an exact value (audited). */
+  /** Admin: set the total balance to an exact value (audited). Fills from the
+   *  grant bucket first (kept), overflow into purchased; a target below the
+   *  current grant clamps the grant down too, so the total is always exact. */
   async setBalance(credits: number, reason = "admin.adjust"): Promise<BalanceView> {
     const target = Math.max(0, Math.floor(credits));
-    const balance = (await this.ctx.storage.get<number>("balance")) ?? 0;
-    await this.ctx.storage.put("balance", target);
-    await this.record(target - balance, target, reason);
+    const { purchased, granted } = await this.buckets();
+    const currentTotal = purchased + granted;
+    const nextGranted = Math.min(granted, target);
+    const nextPurchased = target - nextGranted;
+    await this.ctx.storage.put("granted", nextGranted);
+    await this.ctx.storage.put("purchased", nextPurchased);
+    await this.record(target - currentTotal, target, reason);
     return this.view();
   }
 

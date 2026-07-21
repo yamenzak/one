@@ -1999,6 +1999,36 @@ describe("billing DO — reserve/settle invariants", () => {
   });
 });
 
+describe("billing DO — two-bucket credits (purchased forever, granted no-rollover)", () => {
+  it("grant resets each period, purchased persist, and spending drains the grant first", async () => {
+    const BILLING = (env as unknown as { BILLING: DurableObjectNamespace }).BILLING;
+    type V = { ok?: boolean; balance: number; purchased: number; granted: number };
+    const stub = BILLING.get(BILLING.idFromName("do-buckets-tenant")) as unknown as {
+      bind: (t: string) => Promise<void>;
+      topUp: (c: number) => Promise<V>;
+      grantMonthly: (c: number, k: string) => Promise<V>;
+      charge: (c: number) => Promise<V>;
+    };
+    await stub.bind("do-buckets-tenant");
+    // A credit pack (purchased) plus this period's plan grant.
+    await stub.topUp(1000);
+    let v = await stub.grantMonthly(500, "2026-07");
+    expect([v.purchased, v.granted, v.balance]).toEqual([1000, 500, 1500]);
+    // Spend 300 — the grant drains first, purchased is untouched.
+    v = await stub.charge(300);
+    expect([v.granted, v.purchased]).toEqual([200, 1000]);
+    // A second grant in the SAME period is a no-op (idempotent).
+    v = await stub.grantMonthly(500, "2026-07");
+    expect(v.granted).toBe(200);
+    // A NEW period RESETS the grant: the unused 200 lapses (not 200+500=700).
+    v = await stub.grantMonthly(500, "2026-08");
+    expect([v.granted, v.purchased, v.balance]).toEqual([500, 1000, 1500]);
+    // Spending past the grant dips into the durable purchased bucket.
+    v = await stub.charge(700); // 500 from grant, 200 from purchased
+    expect([v.granted, v.purchased]).toEqual([0, 800]);
+  });
+});
+
 describe("redemption codes — atomic over-redemption guard", () => {
   it("a max_uses=1 code is spent once: a second client and a re-redeem both 409", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
