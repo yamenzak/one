@@ -14,6 +14,7 @@ import {
   longestStreak,
   consistencyPct,
   calorieAdherencePct,
+  rangeStatus,
   averageRating,
   wellnessIndex,
   seriesDelta,
@@ -165,16 +166,25 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
   for (let i = 0; i < 7; i++) { const dd = new Date(mon); dd.setDate(mon.getDate() + i); weekFlags.push(checkInDays.has(dd.toISOString().slice(0, 10))); }
 
   const radarNorm = (v: number | null, max = 5) => (v == null ? 0 : Math.max(0, Math.min(1, v / max)));
+  // Healthy-range status (SPEC §8.11): the coach-set band the metric should sit
+  // in, compared against the latest value shown.
+  const latestWeight = latestOf("weight_kg");
+  const latestBodyFat = latestOf("body_fat_percent");
+  const wRange = timeline.ranges.weightKg, bfRange = timeline.ranges.bodyFatPercent;
+  const weightStatus = latestWeight != null && wRange ? rangeStatus(latestWeight, wRange.min, wRange.max) : null;
+  const bodyFatStatus = latestBodyFat != null && bfRange ? rangeStatus(latestBodyFat, bfRange.min, bfRange.max) : null;
   return c.json({
     range: { start, end, days },
     today,
     body: {
       weight, bodyFat, waist, chest, hips, posture, leanMass, fatMass, ffmi,
+      ranges: timeline.ranges,
       latest: {
-        weightKg: latestOf("weight_kg"), bodyFatPct: latestOf("body_fat_percent"), waistCm: latestOf("waist_cm"),
+        weightKg: latestWeight, bodyFatPct: latestBodyFat, waistCm: latestOf("waist_cm"),
         neckCm: latestOf("neck_cm"), hipsCm: latestOf("hips_cm"), chestCm: latestOf("chest_cm"),
         leanMassKg: leanMass.at(-1)?.v ?? null, fatMassKg: fatMass.at(-1)?.v ?? null, ffmi: ffmi.at(-1)?.v ?? null,
         somatotype: latestScan?.somatotype ?? null, postureSeverity: latestScan?.posture_severity ?? null, postureCva: latestScan?.posture_cva_deg ?? null,
+        weightStatus, bodyFatStatus,
       },
       deltas: { weight: deltaOf(weight), bodyFat: deltaOf(bodyFat), waist: deltaOf(waist), chest: deltaOf(chest), hips: deltaOf(hips) },
     },

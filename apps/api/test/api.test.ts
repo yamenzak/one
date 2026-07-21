@@ -1072,6 +1072,33 @@ describe("progress analytics aggregation", () => {
     expect(byDate.get("2026-05-05")).toBe(2000); // frozen snapshot under Goal A
     expect(byDate.get("2026-05-15")).toBe(3000); // frozen snapshot under Goal B
   });
+
+  it("flags weight + body-fat In range / off track against the goal's healthy band", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "RangePat", gender: "male", dateOfBirth: "1994-01-01", heightCm: 180 }) })).json()) as { client: { id: string } };
+    const today = new Date().toISOString().slice(0, 10);
+    // Goal with a healthy band: weight 75–78 kg, body fat 12–15%.
+    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, label: "Lean", targets: { targetCalories: 2200 }, ranges: { weightKg: { min: 75, max: 78 }, bodyFatPercent: { min: 12, max: 15 } } }) });
+    // A weigh-in above both bands.
+    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: today, weightKg: 82, bodyFatPercent: 19 } }) });
+
+    // Client-facing Progress carries the band + status on the latest values.
+    const prog = (await (await SELF.fetch(`http://x/api/progress/${client.id}?range=30d&today=${today}`, { headers: H })).json()) as { body: { ranges: { weightKg?: { max: number } }; latest: { weightStatus: string | null; bodyFatStatus: string | null } } };
+    expect(prog.body.latest.weightStatus).toBe("above");
+    expect(prog.body.latest.bodyFatStatus).toBe("above");
+    expect(prog.body.ranges.weightKg?.max).toBe(78);
+
+    // Coach-facing metrics carry the same status.
+    const cv = (await (await SELF.fetch(`http://x/api/clients/${client.id}`, { headers: H })).json()) as { metrics: { weightStatus: string | null; bodyFatStatus: string | null } };
+    expect(cv.metrics.weightStatus).toBe("above");
+    expect(cv.metrics.bodyFatStatus).toBe("above");
+
+    // A later, in-band weigh-in flips weight to In range (metrics take the latest).
+    const tomorrow = new Date(Date.parse(today) + 86_400_000).toISOString().slice(0, 10);
+    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: tomorrow, weightKg: 76 } }) });
+    const cv2 = (await (await SELF.fetch(`http://x/api/clients/${client.id}`, { headers: H })).json()) as { metrics: { weightStatus: string | null } };
+    expect(cv2.metrics.weightStatus).toBe("in_range");
+  });
 });
 
 describe("access economy", () => {
