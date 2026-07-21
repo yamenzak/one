@@ -5,12 +5,30 @@
  * doesn't sink the sweep.
  */
 
-import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, ATTENTION_TYPES, type NotifRole, type AttentionType } from "@mossa/domain";
+import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, ATTENTION_TYPES, currentStreak, wellnessIndex, averageRating, seriesDelta, type NotifRole, type AttentionType } from "@mossa/domain";
 import type { Env } from "./env.js";
 import { sendTenantEmail } from "./email-provider.js";
-import { emailShell, emailButton, escapeHtml, type BrandKit } from "./mailer.js";
+import { emailShell, emailButton, escapeHtml, emailStatRow, emailBar, emailBars, emailSparkline, emailRing, emailPanel, emailKicker, emailDivider, type EmailStat, type EmailTone, type BrandKit } from "./mailer.js";
 import { tenantBrandKit } from "./notify.js";
 import { rollupAttention, type AttentionClientRow } from "./attention-routes.js";
+
+/** Add `n` days to a YYYY-MM-DD date string (UTC-safe, no Date.now dependency). */
+function shiftDate(dateStr: string, n: number): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function weekdayLabel(dateStr: string): string {
+  return WEEKDAY[new Date(`${dateStr}T00:00:00Z`).getUTCDay()] ?? "";
+}
+/** The last `n` calendar dates ending at `endDate`, oldest first, with weekday labels. */
+function lastNDates(endDate: string, n: number): { date: string; label: string }[] {
+  return Array.from({ length: n }, (_, i) => {
+    const date = shiftDate(endDate, -(n - 1 - i));
+    return { date, label: weekdayLabel(date) };
+  });
+}
 
 const ATTENTION_COLUMNS = "id, display_name, email, avatar_url, gender, date_of_birth, height_cm, preferences_json";
 /** Turn an attention-rollup's totals into digest ledger rows (non-zero only). */
@@ -34,6 +52,69 @@ function digestHtml(brand: BrandKit, heading: string, intro: string, stats: Stat
     (footer ? `<p style="margin:20px 0 0;color:#8b9099;font-size:13px;line-height:1.6">${escapeHtml(footer)}</p>` : "") +
     (ctaHref ? emailButton(`Open ${brand.name}`, ctaHref, brand) : "");
   return emailShell(escapeHtml(heading), body, { brand, preheader: intro });
+}
+
+/** Everything a client's rich weekly recap needs — gathered per client, then
+ *  rendered into charts. All fields degrade gracefully (nulls hide a block). */
+interface ClientDigestData {
+  name: string;
+  intro: string;
+  stats: EmailStat[];
+  dayBars: { label: string; value: number; tone?: EmailTone }[];
+  weightSeries: number[];
+  weightCaption: string | null;
+  wellness: number | null; // 1..5 index, or null
+  adherence: { label: string; pct: number; value: string; tone?: EmailTone }[];
+  labs: number;
+}
+
+/** A premium, chart-led client digest: a ring for the week's wellness, a stat
+ *  ledger, a day-by-day consistency histogram, a weight sparkline with delta,
+ *  and adherence bars — all email-safe, all skinned to the studio. */
+function clientDigestHtml(brand: BrandKit, d: ClientDigestData, ctaHref: string | null): string {
+  const parts: string[] = [`<p style="margin:0 0 4px">${escapeHtml(d.intro)}</p>`];
+
+  // Wellness ring (centred) — only when the week has complete check-ins.
+  if (d.wellness != null) {
+    const pct = d.wellness / 5;
+    const tone: EmailTone = d.wellness >= 3.75 ? "good" : d.wellness >= 2.75 ? "warn" : "bad";
+    parts.push(
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:22px 0 2px"><tr><td align="center">` +
+        emailRing(pct, d.wellness.toFixed(1), { brand, tone, sub: "of 5" }) +
+        `<div style="font-family:'Inter',sans-serif;font-size:12px;color:#8a9099;margin:8px 0 0">Wellness this week</div>` +
+        `</td></tr></table>`,
+    );
+  }
+
+  if (d.stats.length) parts.push(emailStatRow(d.stats));
+
+  // Day-by-day consistency histogram (pillars logged per day, tone by intensity).
+  if (d.dayBars.some((b) => b.value > 0)) {
+    parts.push(emailPanel(emailBars(d.dayBars, { brand }), { title: "Your week, day by day" }));
+  }
+
+  // Weight trend sparkline + delta caption.
+  if (d.weightSeries.length >= 2) {
+    parts.push(
+      emailPanel(
+        emailSparkline(d.weightSeries, { brand }) +
+          (d.weightCaption ? `<div style="font-family:'Inter',sans-serif;font-size:13px;color:#b6bbc2;margin:12px 0 0">${escapeHtml(d.weightCaption)}</div>` : ""),
+        { title: "Weight trend" },
+      ),
+    );
+  }
+
+  // Adherence bars.
+  if (d.adherence.length) {
+    parts.push(emailPanel(d.adherence.map((a) => emailBar(a.label, a.value, a.pct, { brand, tone: a.tone })).join(""), { title: "How consistent you were" }));
+  }
+
+  if (d.labs > 0) {
+    parts.push(`<p style="margin:20px 0 0;color:#8a9099;font-size:13px;line-height:1.6">You have ${d.labs} lab test${d.labs === 1 ? "" : "s"} to complete — open ${escapeHtml(brand.name)} to get them done.</p>`);
+  }
+
+  if (ctaHref) parts.push(emailButton(`Open ${brand.name}`, ctaHref, brand));
+  return emailShell(escapeHtml("Your week"), parts.join(""), { brand, preheader: d.intro, eyebrow: "Weekly recap" });
 }
 
 /** Whether this user still wants the weekly digest by email. */
@@ -138,27 +219,87 @@ async function digestForTenant(env: Env, tenantId: string, _brand: string, weekA
     await sendTenantEmail(env, tenantId, { to: email, subject: `${brand.name} — your clients this week`, html, brandName: brand.name }).catch(() => undefined);
   }
 
-  // ── Clients: their own week ────────────────────────────────────────────────
-  const clients = await db.prepare("SELECT id, user_id FROM clients WHERE tenant_id = ? AND status = 'active' AND user_id IS NOT NULL").bind(tenantId).all<{ id: string; user_id: string }>();
+  // ── Clients: their own week — a rich, chart-led recap ──────────────────────
+  const clients = await db.prepare("SELECT id, user_id, display_name FROM clients WHERE tenant_id = ? AND status = 'active' AND user_id IS NOT NULL").bind(tenantId).all<{ id: string; user_id: string; display_name: string }>();
+  const monthAgo = shiftDate(period, -30);
+  const eightWeeksAgo = shiftDate(period, -56);
+  const week = lastNDates(period, 7);
   for (const cl of clients.results ?? []) {
     try {
       if (!(await digestOn(db, cl.user_id, "client"))) continue;
       if (!(await claimSend(db, cl.user_id, period, "client", sentAt))) continue;
       const email = (await db.prepare('SELECT email FROM "user" WHERE id = ?').bind(cl.user_id).first<{ email: string | null }>())?.email;
       if (!email) continue;
-      const [workoutDays, foodDays, checkInCount, labs] = await Promise.all([
-        db.prepare("SELECT COUNT(DISTINCT date_local) AS n FROM exercise_logs WHERE client_id = ? AND date_local >= ?").bind(cl.id, weekAgoDate).first(),
-        db.prepare("SELECT COUNT(DISTINCT date_local) AS n FROM food_entries WHERE client_id = ? AND date_local >= ?").bind(cl.id, weekAgoDate).first(),
-        db.prepare("SELECT COUNT(*) AS n FROM check_ins WHERE client_id = ? AND date_local >= ?").bind(cl.id, weekAgoDate).first(),
+
+      // A few cheap gathers (weekly sweep) — dates for consistency + streak, the
+      // week's wellness ratings, a weight series for the trend, and PR count.
+      const [woRows, foodRows, ciRows, measRows, prRow, labsRow] = await Promise.all([
+        db.prepare("SELECT DISTINCT date_local AS d FROM exercise_logs WHERE client_id = ? AND date_local >= ?").bind(cl.id, monthAgo).all<{ d: string }>(),
+        db.prepare("SELECT DISTINCT date_local AS d FROM food_entries WHERE client_id = ? AND date_local >= ?").bind(cl.id, monthAgo).all<{ d: string }>(),
+        db.prepare("SELECT date_local AS d, mood, energy, stress, sleep_quality FROM check_ins WHERE client_id = ? AND date_local >= ?").bind(cl.id, monthAgo).all<{ d: string; mood: number | null; energy: number | null; stress: number | null; sleep_quality: number | null }>(),
+        db.prepare("SELECT date_local AS d, weight_kg FROM measurements WHERE client_id = ? AND weight_kg IS NOT NULL AND date_local >= ? ORDER BY date_local").bind(cl.id, eightWeeksAgo).all<{ d: string; weight_kg: number }>(),
+        db.prepare("SELECT COUNT(*) AS n FROM exercise_prs WHERE client_id = ? AND achieved_on >= ?").bind(cl.id, weekAgoDate).first(),
         db.prepare("SELECT COUNT(*) AS n FROM lab_tests WHERE client_id = ? AND status = 'requested'").bind(cl.id).first(),
       ]);
-      const stats: Stat[] = [
-        { label: "Workout days", value: num(workoutDays) },
-        { label: "Days you logged food", value: num(foodDays) },
-        { label: "Check-ins", value: num(checkInCount) },
+      const woDays = new Set((woRows.results ?? []).map((r) => r.d));
+      const foodDaysSet = new Set((foodRows.results ?? []).map((r) => r.d));
+      const ciDays = new Set((ciRows.results ?? []).map((r) => r.d));
+      const measDays = new Set((measRows.results ?? []).map((r) => r.d));
+      const weekSet = new Set(week.map((w) => w.date));
+      const inWeek = (s: Set<string>) => [...s].filter((d) => weekSet.has(d)).length;
+      const woWeek = inWeek(woDays);
+      const foodWeek = inWeek(foodDaysSet);
+      const ciWeek = inWeek(ciDays);
+
+      // Per-day consistency: how many of the four pillars were logged each day.
+      const dayBars = week.map((w) => {
+        const v = (woDays.has(w.date) ? 1 : 0) + (foodDaysSet.has(w.date) ? 1 : 0) + (ciDays.has(w.date) ? 1 : 0) + (measDays.has(w.date) ? 1 : 0);
+        const tone: EmailTone | undefined = v >= 3 ? "good" : v === 0 ? undefined : "warn";
+        return { label: w.label, value: v, tone };
+      });
+
+      // Streak over any activity (workout ∪ food ∪ check-in ∪ measurement).
+      const allDays = new Set<string>([...woDays, ...foodDaysSet, ...ciDays, ...measDays]);
+      const streak = currentStreak(allDays, period);
+
+      // Week's wellness = index over the 7-day averages (needs all four ratings).
+      const ciWeekRows = (ciRows.results ?? []).filter((r) => weekSet.has(r.d));
+      const wellness = wellnessIndex({
+        mood: averageRating(ciWeekRows.map((r) => r.mood)),
+        energy: averageRating(ciWeekRows.map((r) => r.energy)),
+        sleepQuality: averageRating(ciWeekRows.map((r) => r.sleep_quality)),
+        stress: averageRating(ciWeekRows.map((r) => r.stress)),
+      });
+
+      // Weight trend + delta caption.
+      const weightSeries = (measRows.results ?? []).map((r) => r.weight_kg);
+      const wDelta = seriesDelta(weightSeries);
+      const weightCaption = wDelta
+        ? `${wDelta.delta === 0 ? "Holding steady at" : wDelta.delta < 0 ? "Down" : "Up"} ${wDelta.delta === 0 ? `${wDelta.last} kg` : `${Math.abs(wDelta.delta)} kg`} over ${weightSeries.length} readings — now ${wDelta.last} kg.`
+        : null;
+
+      const prCount = num(prRow);
+      const stats: EmailStat[] = [
+        { value: `${woWeek}`, label: woWeek === 1 ? "Workout day" : "Workout days" },
+        { value: `${streak}`, label: streak === 1 ? "Day streak" : "Day streak", deltaTone: streak >= 3 ? "good" : undefined, delta: streak >= 3 ? "🔥 on a roll" : undefined },
+        { value: `${prCount}`, label: prCount === 1 ? "New PR" : "New PRs", deltaTone: prCount > 0 ? "good" : undefined },
       ];
-      if (num(labs) > 0) stats.push({ label: "Labs to complete", value: num(labs) });
-      const html = digestHtml(brand, "Your week", "Here's your last 7 days at a glance — keep it going.", stats, appHref);
+      if (wDelta) stats.push({ value: `${wDelta.delta > 0 ? "+" : ""}${wDelta.delta}kg`, label: "Weight change", deltaTone: wDelta.delta <= 0 ? "good" : "warn" });
+
+      const adherence = [
+        { label: "Training days", value: `${woWeek}/7`, pct: woWeek / 7, tone: (woWeek >= 3 ? "good" : woWeek >= 1 ? "warn" : "bad") as EmailTone },
+        { label: "Days you logged food", value: `${foodWeek}/7`, pct: foodWeek / 7, tone: (foodWeek >= 5 ? "good" : foodWeek >= 2 ? "warn" : "bad") as EmailTone },
+        { label: "Check-ins", value: `${ciWeek}/7`, pct: ciWeek / 7, tone: (ciWeek >= 3 ? "good" : ciWeek >= 1 ? "warn" : "bad") as EmailTone },
+      ];
+
+      const first = (cl.display_name || "").split(/\s+/)[0] || "there";
+      const intro = streak >= 3
+        ? `${streak} days in a row, ${first} — here's your week at ${brand.name}.`
+        : woWeek > 0
+          ? `Nice work this week, ${first} — here's your recap.`
+          : `Here's your week, ${first}. A small step this week goes a long way.`;
+
+      const html = clientDigestHtml(brand, { name: cl.display_name, intro, stats, dayBars, weightSeries, weightCaption, wellness, adherence, labs: num(labsRow) }, appHref);
       await sendTenantEmail(env, tenantId, { to: email, subject: `${brand.name} — your week`, html, brandName: brand.name }).catch(() => undefined);
     } catch { /* skip this client */ }
   }
