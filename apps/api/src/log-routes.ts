@@ -854,8 +854,9 @@ export const logRoutes = new Hono<AppEnv>()
         .bind(clientId)
         .first<{ targets_json: string | null; weekly_load_target: number | null }>(),
       db
-        .prepare("SELECT id, name, status, published_at, body_json FROM workout_plans WHERE client_id = ? AND status = 'published' LIMIT 1")
-        .bind(clientId)
+        // Resolve the published workout plan for the lane the client is on.
+        .prepare("SELECT id, name, status, published_at, body_json FROM workout_plans WHERE client_id = ? AND status = 'published' AND COALESCE(variant_id, '') = COALESCE(?, '') ORDER BY published_at DESC LIMIT 1")
+        .bind(clientId, access.client.current_variant_id ?? null)
         .all<{ id: string; name: string; status: string; published_at: string; body_json: string | null }>(),
       db
         .prepare("SELECT date_local FROM check_ins WHERE client_id = ? ORDER BY date_local DESC LIMIT 30")

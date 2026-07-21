@@ -40,6 +40,7 @@ export interface ClientRow {
   blood_type: string | null;
   phone: string | null;
   preferences_json: string | null;
+  current_variant_id: string | null;
   created_at: string;
   archived_at: string | null;
 }

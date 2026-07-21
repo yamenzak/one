@@ -258,6 +258,18 @@ export function ensureSchema(db: D1Database): Promise<void> {
           // (resolved from the goal timeline instead).
           "ALTER TABLE food_entries ADD COLUMN target_calories REAL",
           "ALTER TABLE food_entries ADD COLUMN target_protein_g REAL",
+          // Plan lanes (variants): a client can run parallel plan tracks — e.g.
+          // "Work week" vs "Off week", or "Night shift" vs "Morning shift". Each
+          // plan belongs to a lane (NULL = the single default lane, = today's
+          // behavior); publishing supersedes only within its own lane, so there
+          // is one published plan PER lane. `current_variant_id` is the lane the
+          // client is on right now (NULL = default). Lanes are client-level, so
+          // one switch flips both the workout and meal surfaces.
+          "CREATE TABLE IF NOT EXISTS plan_variants (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, label TEXT, ord INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT)",
+          "CREATE INDEX IF NOT EXISTS idx_plan_variants_client ON plan_variants(client_id)",
+          "ALTER TABLE clients ADD COLUMN current_variant_id TEXT",
+          "ALTER TABLE workout_plans ADD COLUMN variant_id TEXT",
+          "ALTER TABLE meal_plans ADD COLUMN variant_id TEXT",
         ];
         for (const sql of alters) await db.exec(sql).catch(() => undefined);
         // Backfill: older body scans mirrored only weight + body-fat into

@@ -16,6 +16,7 @@ import { notify } from "./notify.js";
 import { recordAudit } from "./audit.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
+import { loadVariants, laneMatchSql } from "./plan-variants.js";
 
 type Kind = "workout" | "meal";
 /** The FEATURES key gating a client's own view of this plan kind. */
@@ -34,6 +35,7 @@ interface PlanRow {
   published_at: string | null;
   target_goal_json: string | null;
   body_json: string | null;
+  variant_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -47,6 +49,7 @@ function planView(row: PlanRow) {
     description: row.description,
     status: row.status,
     publishedAt: row.published_at,
+    variantId: row.variant_id ?? null,
     targetGoal: parseJson<Record<string, unknown> | null>(row.target_goal_json, null),
     body: parseJson<Record<string, unknown>>(row.body_json, { days: [], mealOptions: [] }),
     createdAt: row.created_at,
@@ -58,6 +61,8 @@ const CreatePlan = z.object({
   clientId: z.string().min(1),
   name: z.string().min(1).max(120),
   description: z.string().max(2000).nullish(),
+  /** Which plan lane this belongs to (null = the default lane). */
+  variantId: z.string().nullish(),
 });
 
 const UpdatePlan = z.object({
@@ -86,7 +91,10 @@ function makePlanRoutes(kind: Kind): Hono<AppEnv> {
       )
         .bind(clientId, access.client.tenant_id)
         .all<PlanRow>();
-      return c.json({ plans: (rows.results ?? []).map(planView) });
+      // Lane context travels with the plan list so the client can pick the
+      // published plan for the lane they're on and offer a lane switcher.
+      const lanes = await loadVariants(c.env.DB, access.client.id, access.client.current_variant_id ?? null);
+      return c.json({ plans: (rows.results ?? []).map(planView), variants: lanes.variants, currentVariantId: lanes.currentVariantId });
     })
 
     .post(prefix, async (c) => {
@@ -98,10 +106,10 @@ function makePlanRoutes(kind: Kind): Hono<AppEnv> {
       const id = newId(kind === "workout" ? "wpl" : "mpl");
       const emptyBody = kind === "workout" ? { days: [] } : { customMealTypes: [], mealOptions: [] };
       await c.env.DB.prepare(
-        `INSERT INTO ${table} (id, tenant_id, client_id, name, description, status, body_json, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
+        `INSERT INTO ${table} (id, tenant_id, client_id, name, description, status, body_json, variant_id, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)`,
       )
-        .bind(id, who.tenantId, body.data.clientId, body.data.name, body.data.description ?? null, j(emptyBody), who.userId, nowIso(), nowIso())
+        .bind(id, who.tenantId, body.data.clientId, body.data.name, body.data.description ?? null, j(emptyBody), body.data.variantId ?? null, who.userId, nowIso(), nowIso())
         .run();
       const row = await c.env.DB.prepare(`SELECT * FROM ${table} WHERE id = ?`).bind(id).first<PlanRow>();
       return c.json({ plan: planView(row!) }, 201);
@@ -113,7 +121,7 @@ function makePlanRoutes(kind: Kind): Hono<AppEnv> {
     .post(`${prefix}/from-template`, async (c) => {
       const who = requireTenant(c)!;
       const parsed = z
-        .object({ clientId: z.string().min(1), templateId: z.string().min(1), name: z.string().min(1).max(120).optional() })
+        .object({ clientId: z.string().min(1), templateId: z.string().min(1), name: z.string().min(1).max(120).optional(), variantId: z.string().nullish() })
         .safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) return c.json({ error: "invalid body" }, 400);
       const access = await requireClientAccess(c, parsed.data.clientId);
@@ -126,10 +134,10 @@ function makePlanRoutes(kind: Kind): Hono<AppEnv> {
       if (!tpl) return c.json({ error: "template not found" }, 404);
       const id = newId(kind === "workout" ? "wpl" : "mpl");
       await c.env.DB.prepare(
-        `INSERT INTO ${table} (id, tenant_id, client_id, name, description, status, body_json, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
+        `INSERT INTO ${table} (id, tenant_id, client_id, name, description, status, body_json, variant_id, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)`,
       )
-        .bind(id, who.tenantId, parsed.data.clientId, parsed.data.name ?? tpl.name, tpl.description ?? null, tpl.body_json, who.userId, nowIso(), nowIso())
+        .bind(id, who.tenantId, parsed.data.clientId, parsed.data.name ?? tpl.name, tpl.description ?? null, tpl.body_json, parsed.data.variantId ?? null, who.userId, nowIso(), nowIso())
         .run();
       const row = await c.env.DB.prepare(`SELECT * FROM ${table} WHERE id = ?`).bind(id).first<PlanRow>();
       return c.json({ plan: planView(row!) }, 201);
@@ -200,8 +208,10 @@ function makePlanRoutes(kind: Kind): Hono<AppEnv> {
       const now = nowIso();
       await c.env.DB.batch([
         c.env.DB.prepare(
-          `UPDATE ${table} SET status = 'superseded', updated_at = ? WHERE client_id = ? AND status = 'published' AND id != ?`,
-        ).bind(now, row.client_id, row.id),
+          // Supersede only the previously-published plan IN THE SAME LANE, so
+          // other lanes' published plans keep running in parallel.
+          `UPDATE ${table} SET status = 'superseded', updated_at = ? WHERE client_id = ? AND status = 'published' AND ${laneMatchSql} AND id != ?`,
+        ).bind(now, row.client_id, row.variant_id ?? null, row.id),
         c.env.DB.prepare(
           `UPDATE ${table} SET status = 'published', published_at = ?, target_goal_json = ?, updated_at = ? WHERE id = ?`,
         ).bind(now, goal?.targets_json ?? null, now, row.id),
