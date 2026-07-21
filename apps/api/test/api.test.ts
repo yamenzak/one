@@ -2129,6 +2129,12 @@ describe("promo codes — website-native discounts (tenant rail)", () => {
     const r3 = await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: other, packageId: pkgId, promoCode: "ONLYME" }) });
     expect(r3.status).toBe(400);
     expect((await r3.json() as { error: string }).error).toBe("promo_wrong_client");
+
+    // A discount that lands the charge below Stripe's minimum → clean 400, not a 500.
+    await SELF.fetch("http://x/api/promo-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "ALMOSTALL", discountType: "amount", amountOffCents: 4980 }) }); // 5000 → 20¢
+    const r4 = await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: buyer, packageId: pkgId, promoCode: "ALMOSTALL" }) });
+    expect(r4.status).toBe(400);
+    expect((await r4.json() as { error: string }).error).toBe("promo_min_amount");
   });
 });
 

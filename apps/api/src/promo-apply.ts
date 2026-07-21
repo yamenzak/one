@@ -49,13 +49,27 @@ export async function resolveAndApplyPromo(
   return { id: row!.id, ...res };
 }
 
-/** Guarded increment of a promo's redemption counter — the WHERE clause is what
- *  actually enforces max_redemptions under concurrency (no TOCTOU). Best-effort:
- *  called from a webhook after the charge succeeded. */
-export async function bumpPromoRedemption(db: D1Database, promoId: string): Promise<void> {
-  await db
+/** Atomically consume one redemption slot: the guarded UPDATE is the single
+ *  serialization point, so under concurrency only `max_redemptions` callers ever
+ *  see `changes > 0`. Returns whether a slot was consumed. Use this to GATE a
+ *  value-producing action (the free-grant path) BEFORE granting, so two racing
+ *  requests can't both grant against a one-use code. */
+export async function consumePromoRedemption(db: D1Database, promoId: string): Promise<boolean> {
+  const r = await db
     .prepare("UPDATE promo_codes SET redemption_count = redemption_count + 1 WHERE id = ? AND (max_redemptions IS NULL OR redemption_count < max_redemptions)")
     .bind(promoId)
     .run()
-    .catch(() => undefined);
+    .catch(() => ({ meta: { changes: 0 } }) as { meta?: { changes?: number } });
+  return (r.meta?.changes ?? 0) > 0;
+}
+
+/** Fire-and-forget counter bump for the PAID path (called from a webhook AFTER
+ *  the charge succeeded). Note: on the paid path the eligibility check runs at
+ *  intent time and this bump lands at payment time, so under heavy concurrency a
+ *  bounded code can back a few extra DISCOUNTED sales — bounded (each still pays
+ *  the reduced price), by design for website-native promos. The free-grant path
+ *  uses `consumePromoRedemption` instead precisely because it has no such
+ *  payment gate. */
+export async function bumpPromoRedemption(db: D1Database, promoId: string): Promise<void> {
+  await consumePromoRedemption(db, promoId);
 }

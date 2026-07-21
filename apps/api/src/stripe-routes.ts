@@ -24,7 +24,7 @@ import {
 } from "./stripe.js";
 import { newId, nowIso, nowMs, periodKey } from "./ids.js";
 import { parseJson, j } from "./db.js";
-import { resolveAndApplyPromo, bumpPromoRedemption } from "./promo-apply.js";
+import { resolveAndApplyPromo, bumpPromoRedemption, consumePromoRedemption } from "./promo-apply.js";
 
 export const stripeRoutes = new Hono<AppEnv>()
   // ── Platform rail ──────────────────────────────────────────────────────────
@@ -97,29 +97,38 @@ export const stripeRoutes = new Hono<AppEnv>()
       promoId = p.id;
       discountCents = p.discountCents;
     }
-    // A fully-discounted pack grants immediately — no Stripe charge to run.
+    // A fully-discounted pack grants immediately — no Stripe charge to run. The
+    // free grant has NO payment gate, so consume the redemption slot ATOMICALLY
+    // and grant only if we won it (else a racing/repeat request could mint free
+    // credits against a one-use code).
     if (amount <= 0) {
+      if (!promoId || !(await consumePromoRedemption(c.env.DB, promoId))) return c.json({ error: "promo_exhausted" }, 400);
       const dobj = c.env.BILLING.get(c.env.BILLING.idFromName(who.tenantId));
       await dobj.bind(who.tenantId);
       await dobj.topUp(pack.credits, "pack.promo", pack.id);
-      if (promoId) await bumpPromoRedemption(c.env.DB, promoId);
       return c.json({ granted: true, credits: pack.credits, discountCents });
     }
+    // Below Stripe's minimum charge after a discount → clean 400, not a 500.
+    if (promoId && amount < 50) return c.json({ error: "promo_min_amount" }, 400);
     const customer = await ensureCustomer(c.env.DB, cfg.secretKey, who.tenantId, c.get("user")?.email);
     // A PaymentIntent whose success webhook tops up the durable `purchased`
     // bucket. Credits ride on the PI metadata; the hosted-checkout path keeps
     // them on the session, so payment_intent.succeeded can't double-grant.
-    const pi = await stripeCall<{ client_secret: string; id: string }>(cfg.secretKey, "payment_intents", {
-      amount,
-      currency: "usd",
-      customer,
-      "automatic_payment_methods[enabled]": "true",
-      "metadata[mossa_tenant]": who.tenantId,
-      "metadata[mossa_pack]": pack.id,
-      "metadata[mossa_credits]": pack.credits,
-      ...(promoId ? { "metadata[mossa_promo]": promoId } : {}),
-    });
-    return c.json({ clientSecret: pi.client_secret, publishableKey: cfg.publishableKey, amountCents: amount, discountCents, credits: pack.credits });
+    try {
+      const pi = await stripeCall<{ client_secret: string; id: string }>(cfg.secretKey, "payment_intents", {
+        amount,
+        currency: "usd",
+        customer,
+        "automatic_payment_methods[enabled]": "true",
+        "metadata[mossa_tenant]": who.tenantId,
+        "metadata[mossa_pack]": pack.id,
+        "metadata[mossa_credits]": pack.credits,
+        ...(promoId ? { "metadata[mossa_promo]": promoId } : {}),
+      });
+      return c.json({ clientSecret: pi.client_secret, publishableKey: cfg.publishableKey, amountCents: amount, discountCents, credits: pack.credits });
+    } catch {
+      return c.json({ error: "checkout_failed" }, 402);
+    }
   })
 
   .post("/billing/plan-intent", async (c) => {
@@ -307,29 +316,38 @@ export const stripeRoutes = new Hono<AppEnv>()
       promoId = p.id;
       discountCents = p.discountCents;
     }
-    // Fully discounted → grant the package directly (no charge on the connected account).
+    // Fully discounted → grant directly (no charge). No payment gate, so consume
+    // the redemption slot atomically and grant only if we won it.
     if (amount <= 0) {
+      if (!promoId || !(await consumePromoRedemption(c.env.DB, promoId))) return c.json({ error: "promo_exhausted" }, 400);
       await grantClientPackage(c.env.DB, who.tenantId, access.client.id, pkg.id, null, null);
-      if (promoId) await bumpPromoRedemption(c.env.DB, promoId);
       return c.json({ granted: true, discountCents });
     }
+    if (promoId && amount < 50) return c.json({ error: "promo_min_amount" }, 400);
     const feeBps = Number((await getConfig(c.env.DB))["stripe.platform_fee_bps"] ?? "0");
-    const pi = await stripeCall<{ client_secret: string; id: string }>(
-      cfg.secretKey,
-      "payment_intents",
-      {
-        amount,
-        currency: pkg.currency || "usd",
-        "automatic_payment_methods[enabled]": "true",
-        ...(feeBps > 0 ? { application_fee_amount: Math.round((amount * feeBps) / 10000) } : {}),
-        "metadata[mossa_tenant]": who.tenantId,
-        "metadata[mossa_client]": access.client.id,
-        "metadata[mossa_package]": pkg.id,
-        ...(promoId ? { "metadata[mossa_promo]": promoId } : {}),
-      },
-      { connectedAccount: settings.stripe_account_id },
-    );
-    return c.json({ clientSecret: pi.client_secret, publishableKey: cfg.publishableKey, stripeAccount: settings.stripe_account_id, discountCents });
+    // The application fee must stay strictly below the charge (Stripe rejects a
+    // fee >= amount on a direct charge), so clamp it — a 100% feeBps footgun.
+    const fee = feeBps > 0 ? Math.min(Math.round((amount * feeBps) / 10000), Math.max(0, amount - 1)) : 0;
+    try {
+      const pi = await stripeCall<{ client_secret: string; id: string }>(
+        cfg.secretKey,
+        "payment_intents",
+        {
+          amount,
+          currency: pkg.currency || "usd",
+          "automatic_payment_methods[enabled]": "true",
+          ...(fee > 0 ? { application_fee_amount: fee } : {}),
+          "metadata[mossa_tenant]": who.tenantId,
+          "metadata[mossa_client]": access.client.id,
+          "metadata[mossa_package]": pkg.id,
+          ...(promoId ? { "metadata[mossa_promo]": promoId } : {}),
+        },
+        { connectedAccount: settings.stripe_account_id },
+      );
+      return c.json({ clientSecret: pi.client_secret, publishableKey: cfg.publishableKey, stripeAccount: settings.stripe_account_id, discountCents });
+    } catch {
+      return c.json({ error: "checkout_failed" }, 402);
+    }
   })
 
   // Cancel a client's auto-renewing package (stops future billing; the current
@@ -678,6 +696,24 @@ function scaleSpecs(specs: { feature: Budget["feature"]; days: number }[], n: nu
   return n > 1 ? specs.map((s) => ({ ...s, days: Math.max(1, Math.round(s.days / n)) })) : specs;
 }
 
+/** Stop an installment plan after its final payment: cancel the Stripe
+ *  subscription on the connected account, and only clear `stripe_sub_id` once
+ *  the cancel actually succeeded. Cancel-before-unlink means a failed cancel
+ *  leaves the row resolvable so a stray invoice hits the `alreadyDone` guard
+ *  (no extra grant) and the cancel is retried, rather than billing on with a
+ *  dangling, unresolvable subscription. */
+async function cancelInstallmentSub(db: D1Database, tenantId: string, stripeSubId: string, rowId: string): Promise<void> {
+  const settings = await db.prepare("SELECT stripe_account_id FROM tenant_settings WHERE tenant_id = ?").bind(tenantId).first<{ stripe_account_id: string | null }>();
+  const cfg = await stripeConfig(db);
+  let canceled = true;
+  if (settings?.stripe_account_id && stripeEnabled(cfg)) {
+    canceled = await stripeCall(cfg.secretKey, `subscriptions/${stripeSubId}`, undefined, { connectedAccount: settings.stripe_account_id, method: "DELETE" })
+      .then(() => true)
+      .catch(() => false);
+  }
+  if (canceled) await db.prepare("UPDATE client_subscriptions SET stripe_sub_id = NULL WHERE id = ?").bind(rowId).run();
+}
+
 /** Shared with commerce: create/extend a client subscription from a package.
  *  `checkoutId`/`subId` are the Stripe Checkout Session / Subscription ids;
  *  event-level idempotency (firstSeen) already prevents a redelivery twice.
@@ -750,19 +786,26 @@ async function renewClientSubscription(db: D1Database, stripeSubId: string): Pro
     // An installment cycle: unlock this payment's share, advance the counter,
     // and on the final payment stop future billing (per-cycle unlock — no
     // clawback; access rides out whatever's been paid if a cycle later fails).
+    const alreadyDone = (sub.installments_paid ?? 1) >= n;
+    if (alreadyDone) {
+      // A stray cycle after completion (the cancel below previously failed and
+      // Stripe billed again). Do NOT grant another share — just retry the cancel
+      // and clear the link once it sticks. This is what makes a webhook retry or
+      // an extra charge idempotent (no (N+1)th grant).
+      await cancelInstallmentSub(db, sub.tenant_id, stripeSubId, sub.id);
+      return;
+    }
     const paid = (sub.installments_paid ?? 1) + 1;
     const done = paid >= n;
+    // Single statement — the counter and budgets commit together, so a retry of
+    // a failed handler recomputes `paid` from the last committed value (never
+    // double-counts). `stripe_sub_id` is left intact here and only cleared once
+    // the Stripe cancel is confirmed (below), so a post-completion stray invoice
+    // still resolves this row and hits the `alreadyDone` guard.
     await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, status = 'active', payment_status = ?, installments_paid = ?, updated_at = ? WHERE id = ?")
       .bind(j([...existing, ...added]), j(balances), done ? "completed" : "installments", paid, now, sub.id)
       .run();
-    if (done) {
-      const settings = await db.prepare("SELECT stripe_account_id FROM tenant_settings WHERE tenant_id = ?").bind(sub.tenant_id).first<{ stripe_account_id: string | null }>();
-      const cfg = await stripeConfig(db);
-      if (settings?.stripe_account_id && stripeEnabled(cfg)) {
-        await stripeCall(cfg.secretKey, `subscriptions/${stripeSubId}`, undefined, { connectedAccount: settings.stripe_account_id, method: "DELETE" }).catch(() => undefined);
-      }
-      await db.prepare("UPDATE client_subscriptions SET stripe_sub_id = NULL WHERE id = ?").bind(sub.id).run();
-    }
+    if (done) await cancelInstallmentSub(db, sub.tenant_id, stripeSubId, sub.id);
     return;
   }
   await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, status = 'active', payment_status = 'paid', updated_at = ? WHERE id = ?").bind(j([...existing, ...added]), j(balances), now, sub.id).run();
