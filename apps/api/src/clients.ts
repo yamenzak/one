@@ -16,7 +16,7 @@ import { notify } from "./notify.js";
 import { newId, nowIso } from "./ids.js";
 import { recordAudit } from "./audit.js";
 import { parseJson, j } from "./db.js";
-import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps, auditLabel, canAccessClient, seesWholeRoster } from "@mossa/domain";
+import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps, rangeStatus, auditLabel, canAccessClient, seesWholeRoster } from "@mossa/domain";
 
 export interface ClientRow {
   id: string;
@@ -210,6 +210,12 @@ async function clientMetrics(db: D1Database, row: ClientRow) {
   const deriv = parseJson<{ snapshotWeightKg?: number; bmr?: number }>(goal?.derivation_json, {});
   const staleness = goal ? goalStaleness({ goalWeightKg: deriv.snapshotWeightKg ?? null, currentWeightKg: weightKg, goalBmr: deriv.bmr ?? null, currentBmr: bmrCalc?.bmr ?? null }) : null;
 
+  // Healthy-range status (SPEC §8.11): the coach-set band the metric should sit
+  // in → In range / below / above, for weight and body fat.
+  const ranges = parseJson<{ weightKg?: { min: number | null; max: number | null }; bodyFatPercent?: { min: number | null; max: number | null } }>(goal?.ranges_json, {});
+  const weightStatus = weightKg != null && ranges.weightKg ? rangeStatus(weightKg, ranges.weightKg.min, ranges.weightKg.max) : null;
+  const bodyFatStatus = bodyFatPercent != null && ranges.bodyFatPercent ? rangeStatus(bodyFatPercent, ranges.bodyFatPercent.min, ranges.bodyFatPercent.max) : null;
+
   return {
     ageYears,
     weightKg,
@@ -221,6 +227,9 @@ async function clientMetrics(db: D1Database, row: ClientRow) {
     bmrFormula: bmrCalc?.formula ?? null,
     hasActiveGoal: Boolean(goal),
     staleness,
+    ranges,
+    weightStatus,
+    bodyFatStatus,
   };
 }
 

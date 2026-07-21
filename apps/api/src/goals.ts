@@ -19,11 +19,21 @@ export interface GoalTargets {
   targetWaterMl?: number | null;
 }
 
+/** Coach-set healthy bands (SPEC §8.11) — the acceptable window for an outcome
+ *  metric, used for In-range / Off-track status. Bounds may be open on a side. */
+export type MetricRange = { min: number | null; max: number | null };
+export interface GoalRanges {
+  weightKg?: MetricRange;
+  bodyFatPercent?: MetricRange;
+}
+
 export interface GoalTimeline {
   /** Targets in force on `date` (local YYYY-MM-DD); null before the first goal. */
   resolve: (date: string) => GoalTargets | null;
   /** The goal active today — the headline for target lines and display. */
   active: GoalTargets;
+  /** The active goal's healthy ranges (In-range / Off-track bands). */
+  ranges: GoalRanges;
   weeklyLoadTarget: number | null;
   derivation: unknown;
   /** Whether the client has any goal at all. */
@@ -33,10 +43,10 @@ export interface GoalTimeline {
 export async function loadGoalTimeline(db: D1Database, clientId: string): Promise<GoalTimeline> {
   const rows = await db
     .prepare(
-      "SELECT status, start_date, created_at, targets_json, weekly_load_target, derivation_json FROM client_goals WHERE client_id = ? ORDER BY created_at DESC LIMIT 40",
+      "SELECT status, start_date, created_at, targets_json, ranges_json, weekly_load_target, derivation_json FROM client_goals WHERE client_id = ? ORDER BY created_at DESC LIMIT 40",
     )
     .bind(clientId)
-    .all<{ status: string; start_date: string | null; created_at: string; targets_json: string | null; weekly_load_target: number | null; derivation_json: string | null }>();
+    .all<{ status: string; start_date: string | null; created_at: string; targets_json: string | null; ranges_json: string | null; weekly_load_target: number | null; derivation_json: string | null }>();
   const list = rows.results ?? [];
   const periods: GoalPeriod<GoalTargets>[] = list.map((r) => ({
     start: r.start_date || r.created_at.slice(0, 10),
@@ -47,6 +57,7 @@ export async function loadGoalTimeline(db: D1Database, clientId: string): Promis
   return {
     resolve: resolveGoalTimeline(periods),
     active: parseJson<GoalTargets>(activeRow?.targets_json, {}),
+    ranges: parseJson<GoalRanges>(activeRow?.ranges_json, {}),
     weeklyLoadTarget: activeRow?.weekly_load_target ?? null,
     derivation: parseJson(activeRow?.derivation_json, {}),
     hasGoal: list.length > 0,

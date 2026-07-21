@@ -19,10 +19,17 @@ import { useUnits } from "../../units.js";
 type TargetKey = "targetCalories" | "targetProteinG" | "targetCarbsG" | "targetFatG" | "targetFiberG" | "targetWaterMl";
 interface Goal { id: string; label: string; status: string; targets: Record<string, number> | null; notes?: string | null; start_date?: string | null; end_date?: string | null; created_at: string; created_by_name?: string | null }
 interface ClientData { gender: string | null; heightCm: number | null; dateOfBirth: string | null; preferences: ClientPreferences }
+type RangeStat = "in_range" | "below" | "above";
 interface Metrics {
   ageYears: number | null; weightKg: number | null; bodyFatPercent: number | null; measuredAt: string | null;
   bmi: number | null; bmiCategory: BmiCategory | null; bmr: number | null; bmrFormula: string | null;
   hasActiveGoal: boolean; staleness: { stale: boolean; weightDeltaKg: number | null; reason: string | null } | null;
+  weightStatus?: RangeStat | null; bodyFatStatus?: RangeStat | null;
+}
+const RANGE_LABEL: Record<RangeStat, string> = { in_range: "In range", below: "Below", above: "Above" };
+function StatusChip({ status }: { status?: RangeStat | null }) {
+  if (!status) return null;
+  return <div className="mt-1"><Badge tone={status === "in_range" ? "success" : "warning"}>{RANGE_LABEL[status]}</Badge></div>;
 }
 interface Formula { primaryGoal: PrimaryGoal; activityLevel: ActivityLevel; dietaryApproach: DietaryApproach }
 
@@ -211,10 +218,10 @@ export function GoalManager({ clientId }: { clientId: string }) {
           <Card className="space-y-3">
             <SectionHeader icon={Scale} tone="cardio" title="Body snapshot" action={metrics.measuredAt ? <Badge tone="neutral">{new Date(`${metrics.measuredAt}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</Badge> : undefined} />
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-xl bg-secondary p-3"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Scale className="size-3.5" style={{ color: toneVar.cardio }} /> Weight</div><div className="numeral mt-0.5 text-xl font-semibold">{metrics.weightKg != null ? kgToDisplay(metrics.weightKg, units) : "—"}<span className="ml-1 text-xs font-medium text-muted-foreground">{weightLabel(units)}</span></div></div>
+              <div className="rounded-xl bg-secondary p-3"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Scale className="size-3.5" style={{ color: toneVar.cardio }} /> Weight</div><div className="numeral mt-0.5 text-xl font-semibold">{metrics.weightKg != null ? kgToDisplay(metrics.weightKg, units) : "—"}<span className="ml-1 text-xs font-medium text-muted-foreground">{weightLabel(units)}</span></div><StatusChip status={metrics.weightStatus} /></div>
               <div className="rounded-xl bg-secondary p-3"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Activity className="size-3.5" style={{ color: toneVar.activity }} /> BMI</div><div className="numeral mt-0.5 text-xl font-semibold">{metrics.bmi ?? "—"}</div>{metrics.bmiCategory && <div className="text-[0.7rem] font-medium text-muted-foreground">{BMI_CATEGORY_LABELS[metrics.bmiCategory]}</div>}</div>
               <div className="rounded-xl bg-secondary p-3"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Flame className="size-3.5" style={{ color: toneVar.calories }} /> BMR</div><div className="numeral mt-0.5 text-xl font-semibold">{metrics.bmr ?? "—"}</div>{metrics.bmr != null && <div className="text-[0.7rem] font-medium text-muted-foreground">kcal/day</div>}</div>
-              <div className="rounded-xl bg-secondary p-3"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Target className="size-3.5" style={{ color: toneVar.sleep }} /> Body fat</div><div className="numeral mt-0.5 text-xl font-semibold">{metrics.bodyFatPercent != null ? `${metrics.bodyFatPercent}%` : "—"}</div></div>
+              <div className="rounded-xl bg-secondary p-3"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Target className="size-3.5" style={{ color: toneVar.sleep }} /> Body fat</div><div className="numeral mt-0.5 text-xl font-semibold">{metrics.bodyFatPercent != null ? `${metrics.bodyFatPercent}%` : "—"}</div><StatusChip status={metrics.bodyFatStatus} /></div>
             </div>
           </Card>
         </Stagger>
