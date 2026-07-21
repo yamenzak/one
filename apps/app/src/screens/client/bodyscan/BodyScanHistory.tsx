@@ -10,7 +10,7 @@ import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { cmToLengthDisplay, lengthLabel, kgToDisplay, weightLabel, bodyComposition, type UnitPrefs } from "@mossa/domain";
 import {
-  Button, Badge, IconBadge, SegmentedControl, AreaChart, cn, toneVar, useModalOverlay,
+  Button, Badge, IconBadge, SegmentedControl, AreaChart, cn, toneVar, useModalOverlay, POSTURE_SEVERITY_TONE,
   ScanLine, X, Percent, RotateCcw, User, motion, stagger, popIn, CountUp,
 } from "@mossa/ui";
 import { Silhouette } from "./Silhouette.js";
@@ -34,7 +34,7 @@ export interface HistoryScan {
   somatotype: string | null;
 }
 
-const POSTURE_TONE = { good: "success", mild: "warning", moderate: "warning", severe: "danger" } as const;
+const POSTURE_TONE = POSTURE_SEVERITY_TONE; // SSOT — was a divergent local copy
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const CONF_TONE = { high: "success", medium: "warning", low: "danger" } as const;
 const CONF_LABEL = { high: "High confidence", medium: "Medium confidence", low: "Lower confidence" } as const;

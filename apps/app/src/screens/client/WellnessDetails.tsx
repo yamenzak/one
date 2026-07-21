@@ -8,8 +8,8 @@
 
 import { fmtWeight, fmtVolume } from "@mossa/domain";
 import {
-  Sheet, SubCard, Badge, IconBadge, PhotoGrid, cn, toneVar, type Photo, type Tone,
-  Smile, Zap, Gauge, Bed, Scale, Footprints, Droplet, Percent, ImageIcon, FlaskConical, ClipboardList, Calendar, Sparkles, HeartPulse,
+  Sheet, SubCard, Badge, IconBadge, PhotoGrid, cn, toneVar, METRICS, type Photo, type Tone, type LucideIcon,
+  ImageIcon, FlaskConical, ClipboardList, Calendar, Sparkles, HeartPulse,
 } from "@mossa/ui";
 import { useUnits } from "../../units.js";
 import type { UnitPrefs } from "@mossa/domain";
@@ -54,14 +54,8 @@ function CoachFeedback({ title, body, at }: { title: string; body: string; at?: 
 
 // ── Check-in detail ──────────────────────────────────────────────────────────
 
-const RATING_META: Record<"mood" | "energy" | "stress", { label: string; icon: typeof Smile; tone: Tone }> = {
-  mood: { label: "Mood", icon: Smile, tone: "nutrition" },
-  energy: { label: "Energy", icon: Zap, tone: "cardio" },
-  stress: { label: "Stress", icon: Gauge, tone: "sleep" },
-};
-
 function Rating({ kind, value }: { kind: "mood" | "energy" | "stress"; value: number }) {
-  const m = RATING_META[kind];
+  const m = METRICS[kind]; // label/icon/tone from the metric registry (SSOT)
   return (
     <div className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2.5">
       <IconBadge icon={m.icon} tone={m.tone} size="sm" />
@@ -78,7 +72,7 @@ function Rating({ kind, value }: { kind: "mood" | "energy" | "stress"; value: nu
   );
 }
 
-function Stat({ icon: Icon, label, value, tone }: { icon: typeof Scale; label: string; value: string; tone: Tone }) {
+function Stat({ icon: Icon, label, value, tone }: { icon: LucideIcon; label: string; value: string; tone: Tone }) {
   return (
     <div className="flex items-center gap-2.5 rounded-xl bg-surface-2 px-3 py-2.5">
       <IconBadge icon={Icon} tone={tone} size="sm" />
@@ -90,13 +84,17 @@ function Stat({ icon: Icon, label, value, tone }: { icon: typeof Scale; label: s
   );
 }
 
-function checkInStats(ci: CheckInFull, units: UnitPrefs): { icon: typeof Scale; label: string; value: string; tone: Tone }[] {
-  const out: { icon: typeof Scale; label: string; value: string; tone: Tone }[] = [];
-  if (ci.weight_kg != null) out.push({ icon: Scale, label: "Weight", value: fmtWeight(ci.weight_kg, units), tone: "activity" });
-  if (ci.body_fat_percent != null) out.push({ icon: Percent, label: "Body fat", value: `${ci.body_fat_percent.toFixed(1)}%`, tone: "sleep" });
-  if (ci.sleep_hours != null) out.push({ icon: Bed, label: "Sleep", value: `${ci.sleep_hours}h${ci.sleep_quality != null ? ` · ${ci.sleep_quality}/5` : ""}`, tone: "sleep" });
-  if (ci.steps_count != null) out.push({ icon: Footprints, label: "Steps", value: ci.steps_count.toLocaleString(), tone: "cardio" });
-  if (ci.water_ml != null && ci.water_ml > 0) out.push({ icon: Droplet, label: "Water", value: fmtVolume(ci.water_ml, units), tone: "hydration" });
+// Icon / label / tone all come from the METRICS registry — this sheet is just
+// another reader, so a check-in stat looks identical to the same metric on
+// Progress / the home widgets.
+function checkInStats(ci: CheckInFull, units: UnitPrefs): { icon: LucideIcon; label: string; value: string; tone: Tone }[] {
+  const m = METRICS;
+  const out: { icon: LucideIcon; label: string; value: string; tone: Tone }[] = [];
+  if (ci.weight_kg != null) out.push({ icon: m.weight.icon, label: m.weight.label, value: fmtWeight(ci.weight_kg, units), tone: m.weight.tone });
+  if (ci.body_fat_percent != null) out.push({ icon: m.bodyFat.icon, label: m.bodyFat.label, value: `${ci.body_fat_percent.toFixed(1)}%`, tone: m.bodyFat.tone });
+  if (ci.sleep_hours != null) out.push({ icon: m.sleep.icon, label: m.sleep.label, value: `${ci.sleep_hours}h${ci.sleep_quality != null ? ` · ${ci.sleep_quality}/5` : ""}`, tone: m.sleep.tone });
+  if (ci.steps_count != null) out.push({ icon: m.steps.icon, label: m.steps.label, value: ci.steps_count.toLocaleString(), tone: m.steps.tone });
+  if (ci.water_ml != null && ci.water_ml > 0) out.push({ icon: m.water.icon, label: m.water.label, value: fmtVolume(ci.water_ml, units), tone: m.water.tone });
   return out;
 }
 

@@ -12,7 +12,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  Card, Button, Badge, Spinner, IconBadge, EmptyState, SegmentedControl, cn, toneVar,
+  Card, Button, Badge, Spinner, IconBadge, EmptyState, SegmentedControl, cn, toneVar, POSTURE_SEVERITY_TONE,
   AreaChart, ScanLine, Camera, Sparkles, Percent, History, RotateCcw, ChevronRight,
 } from "@mossa/ui";
 import { api } from "../../api.js";
@@ -42,7 +42,7 @@ interface Scan {
 }
 const CONF_TONE = { high: "success", medium: "warning", low: "danger" } as const;
 const CONF_LABEL = { high: "High confidence", medium: "Medium confidence", low: "Lower confidence" } as const;
-const POSTURE_TONE = { good: "success", mild: "warning", moderate: "warning", severe: "danger" } as const;
+const POSTURE_TONE = POSTURE_SEVERITY_TONE; // SSOT — was a divergent local copy
 const capw = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function BodyScanCard({ clientId }: { clientId: string }) {
