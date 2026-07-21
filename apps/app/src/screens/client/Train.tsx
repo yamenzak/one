@@ -20,8 +20,9 @@ import { useUnits } from "../../units.js";
 import { LogSheet } from "./LogSheet.js";
 import { pretty } from "../exercise.js";
 import { CoachNote } from "./CoachNote.js";
+import { LaneSwitcher, type Lane } from "./LaneSwitcher.js";
 
-interface Plan { id: string; name: string; status: string; body: WorkoutBody }
+interface Plan { id: string; name: string; status: string; variantId: string | null; body: WorkoutBody }
 interface LoggedSet { reps?: number | null; weightKg?: number | null; durationSeconds?: number | null; effortLabel?: "easy" | "perfect" | "hard" | null; completed: boolean }
 interface Session { id: string; date_local: string; entries: { exerciseId: string; sets: LoggedSet[] }[] }
 interface ActivityLog { id: string; date_local: string; activity_key: string; label: string | null; duration_min: number | null; calories: number | null }
@@ -35,6 +36,8 @@ const shift = (date: string, delta: number): string => {
 
 export function Train({ clientId }: { clientId: string }) {
   const [plans, setPlans] = useState<Plan[] | null>(null);
+  const [variants, setVariants] = useState<Lane[]>([]);
+  const [currentVariantId, setCurrentVariantId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const nav = useNavigate();
@@ -51,12 +54,12 @@ export function Train({ clientId }: { clientId: string }) {
     setError(false);
     try {
       const [p, s, a] = await Promise.all([
-        api.get<{ plans: Plan[] }>(`/api/workout-plans?clientId=${clientId}`),
+        api.get<{ plans: Plan[]; variants: Lane[]; currentVariantId: string | null }>(`/api/workout-plans?clientId=${clientId}`),
         api.get<{ sessions: Session[] }>(`/api/logs/workout-sessions?clientId=${clientId}&from=${shift(today, -89)}&to=${today}`),
         api.get<{ activities: ActivityLog[] }>(`/api/logs/activities?clientId=${clientId}&from=${shift(today, -29)}&to=${today}`),
       ]);
       if (rid !== reqRef.current) return;
-      setPlans(p.plans); setSessions(s.sessions); setActivities(a.activities);
+      setPlans(p.plans); setVariants(p.variants ?? []); setCurrentVariantId(p.currentVariantId ?? null); setSessions(s.sessions); setActivities(a.activities);
     } catch {
       if (rid !== reqRef.current) return;
       setError(true);
@@ -135,7 +138,8 @@ export function Train({ clientId }: { clientId: string }) {
 
   const start = (day?: number) => nav(day != null ? `/train/session/${day}` : "/train/session");
 
-  const published = plans?.find((p) => p.status === "published");
+  // Pick the published plan for the lane the client is on right now.
+  const published = plans?.find((p) => p.status === "published" && (p.variantId ?? null) === (currentVariantId ?? null));
   const hasData = week.activeCount > 0 || week.weekTonnage > 0 || recent.length > 0;
 
   return (
@@ -164,6 +168,7 @@ export function Train({ clientId }: { clientId: string }) {
       }>
         {plans && (
         <>
+      <LaneSwitcher clientId={clientId} variants={variants} currentVariantId={currentVariantId} onSwitched={() => void load()} />
       {published ? (
         <Stagger data-tour="train-hero">
           <button onClick={() => start()} className="w-full text-left">

@@ -14,6 +14,7 @@ import { FoodRow, normFood } from "../food.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
 import { MealPlanDrawer } from "./MealPlanDrawer.js";
 import { CoachNote } from "./CoachNote.js";
+import { LaneSwitcher, type Lane } from "./LaneSwitcher.js";
 
 interface Entry { id: string; meal_type: string; label: string | null; calories: number; protein_g: number; carbs_g: number; fat_g: number; quantity: number | null; unit: string | null; image_url: string | null }
 interface Targets { targetCalories?: number; targetProteinG?: number; targetCarbsG?: number; targetFatG?: number; targetWaterMl?: number }
@@ -41,6 +42,8 @@ export function Eat({ clientId }: { clientId: string }) {
   const [logOpen, setLogOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tour") === "meal");
   const [mealPlan, setMealPlan] = useState<{ name: string; meals: number; options: number } | null>(null);
+  const [variants, setVariants] = useState<Lane[]>([]);
+  const [currentVariantId, setCurrentVariantId] = useState<string | null>(null);
   const [edit, setEdit] = useState<Entry | null>(null);
   const [error, setError] = useState(false);
   const reqRef = useRef(0);
@@ -57,12 +60,14 @@ export function Eat({ clientId }: { clientId: string }) {
         api.get<{ entries: Entry[] }>(`/api/logs/food?clientId=${clientId}&date=${date}`),
         api.get<{ goal: { targets: Targets | null } | null }>(`/api/today?clientId=${clientId}&date=${date}`),
         api.get<Week>(`/api/logs/nutrition/week?clientId=${clientId}&date=${date}`),
-        api.get<{ plans: { status: string; name: string; body?: { mealOptions?: { mealType: string }[] } }[] }>(`/api/meal-plans?clientId=${clientId}`).catch(() => ({ plans: [] })),
+        api.get<{ plans: { status: string; name: string; variantId: string | null; body?: { mealOptions?: { mealType: string }[] } }[]; variants: Lane[]; currentVariantId: string | null }>(`/api/meal-plans?clientId=${clientId}`).catch(() => ({ plans: [], variants: [], currentVariantId: null })),
       ]);
       if (rid !== reqRef.current) return;
       setEntries(e.entries); setTargets(today.goal?.targets ?? null);
       setWeek(wk); setWaterMl(wk.days[wk.days.length - 1]?.waterMl ?? 0);
-      const published = mp.plans.find((p) => p.status === "published");
+      setVariants(mp.variants ?? []); setCurrentVariantId(mp.currentVariantId ?? null);
+      const cur = mp.currentVariantId ?? null;
+      const published = mp.plans.find((p) => p.status === "published" && (p.variantId ?? null) === cur);
       const opts = published?.body?.mealOptions ?? [];
       setMealPlan(published ? { name: published.name, meals: new Set(opts.map((o) => o.mealType)).size, options: opts.length } : null);
     } catch {
@@ -123,6 +128,7 @@ export function Eat({ clientId }: { clientId: string }) {
       }>
         {entries && (
         <>
+      <LaneSwitcher clientId={clientId} variants={variants} currentVariantId={currentVariantId} onSwitched={() => void load()} />
       {/* Your meal plan — the primary entry (parity with Train's active-plan hero) */}
       {mealPlan && (
         <Stagger>
