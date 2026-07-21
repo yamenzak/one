@@ -5,12 +5,15 @@ import { Button, Card, Badge, Field, Switch, Sheet, Chip, Page, Stagger, EmptySt
 import { CLIENT_FLAG_META, CLIENT_FLAG_CATEGORIES, CLIENT_FLAG_KEYS, DEFAULT_CLIENT_FLAGS, type ClientFlags } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
+import { FeatureLock } from "../../FeatureLock.js";
 
 interface Pkg { id: string; name: string; one_time_price_cents: number | null; monthly_price_cents?: number | null; budgets: { feature: string; days: number }[]; visibility: string }
 interface Code { id: string; code: string; days_to_add: number; target_feature: string; used_count: number; max_uses: number }
 interface Promo { id: string; code: string; discount_type: string; percent_off: number | null; amount_off_cents: number | null; redemption_count: number; max_redemptions: number | null; active: number }
 
 export function Packages() {
+  const { ctx } = useSession();
+  const hasCommerce = ctx?.entitlements?.features?.commerce ?? false;
   const [packages, setPackages] = useState<Pkg[] | null>(null);
   const [codes, setCodes] = useState<Code[]>([]);
   const [promos, setPromos] = useState<Promo[]>([]);
@@ -23,11 +26,12 @@ export function Packages() {
     const [p, c, pr] = await Promise.all([api.get<{ packages: Pkg[] }>("/api/packages"), api.get<{ codes: Code[] }>("/api/redemption-codes"), api.get<{ codes: Promo[] }>("/api/promo-codes").catch(() => ({ codes: [] }))]);
     setPackages(p.packages); setCodes(c.codes); setPromos(pr.codes);
   }, []);
-  useEffect(() => void load(), [load]);
+  useEffect(() => { if (hasCommerce) void load(); }, [load, hasCommerce]);
   const deletePromo = async (id: string) => { await api.del(`/api/promo-codes/${id}`); await load(); };
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+    <FeatureLock feature="commerce">
       <Reveal loading={!packages} className="space-y-4" skeleton={
         <>
           <SkeletonHeader action />
@@ -93,6 +97,7 @@ export function Packages() {
         destructive
         onConfirm={() => { if (promoToDelete) void deletePromo(promoToDelete.id); }}
       />
+    </FeatureLock>
     </Page>
   );
 }
