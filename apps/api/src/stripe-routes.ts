@@ -217,32 +217,37 @@ export const stripeRoutes = new Hono<AppEnv>()
     if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
     // The account must actually be able to accept charges (onboarding done).
     if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
-    const pkg = await c.env.DB.prepare("SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; currency: string; visibility: string; restricted_client_id: string | null }>();
+    const pkg = await c.env.DB.prepare("SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_client_id: string | null }>();
     if (!pkg || purchaseBlocked(pkg, access.client.id)) return c.json({ error: "package not found" }, 404);
-    // A monthly price makes the package auto-renewing (a Stripe subscription on
-    // the connected account); otherwise it's a one-time day-pack. Either way the
-    // budget model is the source of truth — recurring just re-buys each period.
+    // Three pricing modes. A monthly price = an open-ended subscription. An
+    // installment plan (installment_months N on a one-time package) = a
+    // LIMITED-term subscription: monthly = one_time/N, billed N times then
+    // self-cancels; each cycle unlocks 1/N of the term. Otherwise it's a
+    // one-time day-pack. The budget model stays the source of truth.
     const monthly = pkg.monthly_price_cents ?? 0;
     const recurring = monthly > 0;
-    const amount = recurring ? monthly : (pkg.one_time_price_cents ?? 0);
+    const installN = !recurring && (pkg.installment_months ?? 0) > 1 && (pkg.one_time_price_cents ?? 0) > 0 ? (pkg.installment_months as number) : 0;
+    const isSub = recurring || installN > 0;
+    const amount = recurring ? monthly : installN ? Math.ceil((pkg.one_time_price_cents ?? 0) / installN) : (pkg.one_time_price_cents ?? 0);
     if (amount <= 0) return c.json({ error: "use /subscriptions/grant for $0 packages" }, 400);
 
     // Optional platform cut — a basis-points application fee set by the platform
     // admin (default 0 = zero markup, tenant keeps 100%). Direct charge on the
     // connected account, so the fee routes to the platform on this payment.
     const feeBps = Number((await getConfig(c.env.DB))["stripe.platform_fee_bps"] ?? "0");
-    const meta = {
+    const meta: Record<string, string | number> = {
       "metadata[mossa_tenant]": who.tenantId,
       "metadata[mossa_client]": access.client.id,
       "metadata[mossa_package]": pkg.id,
+      ...(installN ? { "metadata[mossa_installments]": installN } : {}),
     };
     const priceData = {
       "line_items[0][price_data][currency]": pkg.currency || "usd",
-      "line_items[0][price_data][product_data][name]": pkg.name,
+      "line_items[0][price_data][product_data][name]": installN ? `${pkg.name} (${installN}-month plan)` : pkg.name,
       "line_items[0][price_data][unit_amount]": amount,
       "line_items[0][quantity]": 1,
     };
-    const params: Record<string, string | number | undefined> = recurring
+    const params: Record<string, string | number | undefined> = isSub
       ? {
           mode: "subscription",
           ...priceData,
@@ -252,6 +257,7 @@ export const stripeRoutes = new Hono<AppEnv>()
           "subscription_data[metadata][mossa_tenant]": who.tenantId,
           "subscription_data[metadata][mossa_client]": access.client.id,
           "subscription_data[metadata][mossa_package]": pkg.id,
+          ...(installN ? { "subscription_data[metadata][mossa_installments]": installN } : {}),
           success_url: `${body.data.returnUrl}?purchase=success`,
           cancel_url: `${body.data.returnUrl}?purchase=cancel`,
           ...meta,
@@ -284,9 +290,12 @@ export const stripeRoutes = new Hono<AppEnv>()
     const settings = await c.env.DB.prepare("SELECT stripe_account_id, charges_enabled FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null }>();
     if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
     if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
-    const pkg = await c.env.DB.prepare("SELECT id, name, one_time_price_cents, monthly_price_cents, currency, visibility, restricted_client_id FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; currency: string; visibility: string; restricted_client_id: string | null }>();
+    const pkg = await c.env.DB.prepare("SELECT id, name, one_time_price_cents, monthly_price_cents, installment_months, currency, visibility, restricted_client_id FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_client_id: string | null }>();
     if (!pkg || purchaseBlocked(pkg, access.client.id)) return c.json({ error: "package not found" }, 404);
-    if ((pkg.monthly_price_cents ?? 0) > 0) return c.json({ error: "use /connect/checkout for subscriptions" }, 400);
+    // Subscriptions and installment plans go through hosted checkout (Stripe
+    // provisions the connected-account customer + recurring price); inline is
+    // one-time only.
+    if ((pkg.monthly_price_cents ?? 0) > 0 || (pkg.installment_months ?? 0) > 1) return c.json({ error: "use /connect/checkout for subscriptions" }, 400);
     let amount = pkg.one_time_price_cents ?? 0;
     if (amount <= 0) return c.json({ error: "use /subscriptions/grant for $0 packages" }, 400);
     let promoId: string | null = null;
@@ -375,9 +384,11 @@ export const stripeRoutes = new Hono<AppEnv>()
       const s = event.data.object as { id?: string; mode?: string; subscription?: string; metadata?: Record<string, string> };
       const m = s.metadata ?? {};
       if (m.mossa_client && m.mossa_package) {
-        // First period for both one-time and recurring; for recurring we also
-        // pin the Stripe subscription id so later invoices renew this same row.
-        await grantClientPackage(c.env.DB, m.mossa_tenant!, m.mossa_client, m.mossa_package, s.id ?? null, s.mode === "subscription" ? s.subscription ?? null : null);
+        // First period for one-time, recurring, and installments; for the last
+        // two we pin the Stripe subscription id so later invoices renew this row.
+        // `mossa_installments` (N) marks a limited-term plan → per-cycle unlock.
+        const installN = m.mossa_installments ? Number(m.mossa_installments) : null;
+        await grantClientPackage(c.env.DB, m.mossa_tenant!, m.mossa_client, m.mossa_package, s.id ?? null, s.mode === "subscription" ? s.subscription ?? null : null, installN);
       }
     } else if (event.type === "payment_intent.succeeded") {
       // Inline one-time purchase (Payment Element on the connected account).
@@ -661,14 +672,23 @@ async function planForTenant(db: D1Database, tenantId: string | null): Promise<s
   return row?.plan_id ?? null;
 }
 
+/** Per-cycle share of a package's runway for an N-installment plan: each
+ *  payment unlocks days/N (min 1). N<=1 leaves the specs untouched. */
+function scaleSpecs(specs: { feature: Budget["feature"]; days: number }[], n: number): { feature: Budget["feature"]; days: number }[] {
+  return n > 1 ? specs.map((s) => ({ ...s, days: Math.max(1, Math.round(s.days / n)) })) : specs;
+}
+
 /** Shared with commerce: create/extend a client subscription from a package.
  *  `checkoutId`/`subId` are the Stripe Checkout Session / Subscription ids;
- *  event-level idempotency (firstSeen) already prevents a redelivery twice. */
-async function grantClientPackage(db: D1Database, tenantId: string, clientId: string, packageId: string, checkoutId: string | null = null, subId: string | null = null): Promise<void> {
+ *  event-level idempotency (firstSeen) already prevents a redelivery twice.
+ *  `installmentsTotal` (>1) marks a limited-term installment plan: period one
+ *  unlocks the first 1/N of the term and pins the count on the row. */
+async function grantClientPackage(db: D1Database, tenantId: string, clientId: string, packageId: string, checkoutId: string | null = null, subId: string | null = null, installmentsTotal: number | null = null): Promise<void> {
   const pkg = await db.prepare("SELECT budgets_json, addons_json, flags_json FROM packages WHERE id = ?").bind(packageId).first<{ budgets_json: string | null; addons_json: string | null; flags_json: string | null }>();
   if (!pkg) return;
   const now = nowIso();
-  const specs = parseJson<{ feature: Budget["feature"]; days: number }[]>(pkg.budgets_json, []);
+  const n = installmentsTotal && installmentsTotal > 1 ? installmentsTotal : 1;
+  const specs = scaleSpecs(parseJson<{ feature: Budget["feature"]; days: number }[]>(pkg.budgets_json, []), n);
   const addOns = parseJson<{ addOnTypeId: string; quantity: number }[]>(pkg.addons_json, []);
 
   // Recurring purchase (a Stripe subscription): each subscription gets its OWN
@@ -686,9 +706,9 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
       await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, payment_status = 'paid', stripe_checkout_id = COALESCE(?, stripe_checkout_id), updated_at = ? WHERE id = ?").bind(j([...existing, ...added]), j(balances), checkoutId, now, bySub.id).run();
     } else {
       await db.prepare(
-        "INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, ?, 'stripe', ?, ?, ?, ?)",
+        "INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, installments_total, installments_paid, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, 'stripe', ?, ?, ?, ?, ?, ?)",
       )
-        .bind(newId("csub"), tenantId, clientId, packageId, j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, subId, now, now)
+        .bind(newId("csub"), tenantId, clientId, packageId, n > 1 ? "installments" : "paid", j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, subId, n > 1 ? n : null, n > 1 ? 1 : null, now, now)
         .run();
     }
     return;
@@ -715,15 +735,35 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
  *  row's budget up by another period. Resolved by the Stripe subscription id so
  *  it always hits the right row. Budgets stay the source of truth. */
 async function renewClientSubscription(db: D1Database, stripeSubId: string): Promise<void> {
-  const sub = await db.prepare("SELECT id, tenant_id, client_id, package_id, budgets_json, addons_json FROM client_subscriptions WHERE stripe_sub_id = ? ORDER BY started_at DESC LIMIT 1").bind(stripeSubId).first<{ id: string; tenant_id: string; client_id: string; package_id: string | null; budgets_json: string | null; addons_json: string | null }>();
+  const sub = await db.prepare("SELECT id, tenant_id, client_id, package_id, budgets_json, addons_json, installments_total, installments_paid FROM client_subscriptions WHERE stripe_sub_id = ? ORDER BY started_at DESC LIMIT 1").bind(stripeSubId).first<{ id: string; tenant_id: string; client_id: string; package_id: string | null; budgets_json: string | null; addons_json: string | null; installments_total: number | null; installments_paid: number | null }>();
   if (!sub?.package_id) return;
   const pkg = await db.prepare("SELECT budgets_json, addons_json FROM packages WHERE id = ?").bind(sub.package_id).first<{ budgets_json: string | null; addons_json: string | null }>();
   if (!pkg) return;
   const now = nowIso();
-  const specs = parseJson<{ feature: Budget["feature"]; days: number }[]>(pkg.budgets_json, []);
+  const n = sub.installments_total && sub.installments_total > 1 ? sub.installments_total : 1;
+  const specs = scaleSpecs(parseJson<{ feature: Budget["feature"]; days: number }[]>(pkg.budgets_json, []), n);
   const addOns = parseJson<{ addOnTypeId: string; quantity: number }[]>(pkg.addons_json, []);
   const existing = parseJson<Budget[]>(sub.budgets_json, []);
   const added = buildBudgetsForPurchase(existing, specs, now);
   const balances = mergeAddOnBalances(parseJson(sub.addons_json, []), addOns);
+  if (n > 1) {
+    // An installment cycle: unlock this payment's share, advance the counter,
+    // and on the final payment stop future billing (per-cycle unlock — no
+    // clawback; access rides out whatever's been paid if a cycle later fails).
+    const paid = (sub.installments_paid ?? 1) + 1;
+    const done = paid >= n;
+    await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, status = 'active', payment_status = ?, installments_paid = ?, updated_at = ? WHERE id = ?")
+      .bind(j([...existing, ...added]), j(balances), done ? "completed" : "installments", paid, now, sub.id)
+      .run();
+    if (done) {
+      const settings = await db.prepare("SELECT stripe_account_id FROM tenant_settings WHERE tenant_id = ?").bind(sub.tenant_id).first<{ stripe_account_id: string | null }>();
+      const cfg = await stripeConfig(db);
+      if (settings?.stripe_account_id && stripeEnabled(cfg)) {
+        await stripeCall(cfg.secretKey, `subscriptions/${stripeSubId}`, undefined, { connectedAccount: settings.stripe_account_id, method: "DELETE" }).catch(() => undefined);
+      }
+      await db.prepare("UPDATE client_subscriptions SET stripe_sub_id = NULL WHERE id = ?").bind(sub.id).run();
+    }
+    return;
+  }
   await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, status = 'active', payment_status = 'paid', updated_at = ? WHERE id = ?").bind(j([...existing, ...added]), j(balances), now, sub.id).run();
 }

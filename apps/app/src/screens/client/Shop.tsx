@@ -7,7 +7,7 @@ import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { PaymentSheet, type CheckoutIntent } from "../../PaymentSheet.js";
 
-interface Pkg { id: string; name: string; description: string | null; one_time_price_cents: number | null; monthly_price_cents?: number | null; budgets: { feature: string; days: number }[]; visibility: string }
+interface Pkg { id: string; name: string; description: string | null; one_time_price_cents: number | null; monthly_price_cents?: number | null; installment_months?: number | null; budgets: { feature: string; days: number }[]; visibility: string }
 interface Sub { status: string; daysRemaining: number; autoRenew?: boolean }
 
 /** The client Shop. In `locked` mode it IS the access gate: no way back into the
@@ -133,10 +133,12 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
                     {p.description && <div className="mt-0.5 text-sm text-muted-foreground">{p.description}</div>}
                     <div className="mt-2 flex flex-wrap gap-1">{p.budgets.map((b, i) => <Badge key={i} tone="activity">{b.days}d {b.feature}</Badge>)}</div>
                   </div>
-                  <div className="numeral shrink-0 text-xl font-bold">{p.monthly_price_cents ? <span>${(p.monthly_price_cents / 100).toFixed(0)}<span className="text-sm font-medium text-muted-foreground">/mo</span></span> : p.one_time_price_cents ? `$${(p.one_time_price_cents / 100).toFixed(0)}` : <Badge tone="success">Free</Badge>}</div>
+                  <div className="numeral shrink-0 text-xl font-bold">{p.monthly_price_cents ? <span>${(p.monthly_price_cents / 100).toFixed(0)}<span className="text-sm font-medium text-muted-foreground">/mo</span></span> : p.one_time_price_cents ? (<span>${(p.one_time_price_cents / 100).toFixed(0)}{p.installment_months && p.installment_months > 1 ? <span className="text-sm font-medium text-muted-foreground"> · {p.installment_months}× ${Math.ceil(p.one_time_price_cents / 100 / p.installment_months)}/mo</span> : null}</span>) : <Badge tone="success">Free</Badge>}</div>
                 </div>
                 {p.monthly_price_cents ? (
                   <Button className="mt-4 w-full" onClick={() => void buy(p.id)}>Subscribe</Button>
+                ) : p.installment_months && p.installment_months > 1 && p.one_time_price_cents ? (
+                  <Button className="mt-4 w-full" onClick={() => void buy(p.id)}>Pay in {p.installment_months} months</Button>
                 ) : p.one_time_price_cents ? (
                   <Button className="mt-4 w-full" onClick={() => void buyInline(p)}>Buy</Button>
                 ) : (

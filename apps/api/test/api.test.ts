@@ -2132,6 +2132,47 @@ describe("promo codes — website-native discounts (tenant rail)", () => {
   });
 });
 
+describe("installments — limited-term subscription (per-cycle unlock)", () => {
+  async function sig(payload: string, secret: string): Promise<string> {
+    const t = Math.floor(Date.now() / 1000);
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${payload}`));
+    return `t=${t},v1=${[...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+  }
+  it("each cycle unlocks 1/N of the term; the final payment completes and stops billing", async () => {
+    const db = env.DB as D1Database;
+    const secret = "whsec_connect_test";
+    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.connect_webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
+    // Isolated synthetic tenant (no connected account) so completion doesn't call Stripe.
+    const tenantId = "tenant_install_1";
+    const pkgId = "pkg_install_1";
+    await db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, installment_months, budgets_json, currency, visibility, active, created_at) VALUES (?, ?, ?, 9000, 3, ?, 'usd', 'marketplace', 1, ?)")
+      .bind(pkgId, tenantId, "3-Month Plan", JSON.stringify([{ feature: "all", days: 90 }]), new Date().toISOString()).run();
+    const post = async (payload: string) => SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await sig(payload, secret) }, body: payload });
+    const subId = "sub_install_1";
+
+    // Period one via installment-mode checkout (N=3).
+    await post(JSON.stringify({ id: "evt_inst_create", type: "checkout.session.completed", data: { object: { id: "cs_inst_1", mode: "subscription", subscription: subId, metadata: { mossa_tenant: tenantId, mossa_client: "cl_install_1", mossa_package: pkgId, mossa_installments: "3" } } } }));
+    let row = (await db.prepare("SELECT installments_total, installments_paid, payment_status, stripe_sub_id, budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ installments_total: number; installments_paid: number; payment_status: string; stripe_sub_id: string | null; budgets_json: string }>())!;
+    expect([row.installments_total, row.installments_paid]).toEqual([3, 1]);
+    const cycleBudgets = JSON.parse(row.budgets_json).length; // 'all' → workout+meal = 2 per cycle
+
+    // Cycle two (still billing, so keyed by the Stripe sub id).
+    await post(JSON.stringify({ id: "evt_inst_c2", type: "invoice.paid", data: { object: { subscription: subId, billing_reason: "subscription_cycle" } } }));
+    row = (await db.prepare("SELECT installments_total, installments_paid, payment_status, stripe_sub_id, budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first())!;
+    expect(row.installments_paid).toBe(2);
+    expect(JSON.parse(row.budgets_json).length).toBe(cycleBudgets * 2); // another period queued
+
+    // Final cycle → completed, billing stopped (stripe_sub_id cleared).
+    await post(JSON.stringify({ id: "evt_inst_c3", type: "invoice.paid", data: { object: { subscription: subId, billing_reason: "subscription_cycle" } } }));
+    row = (await db.prepare("SELECT installments_paid, payment_status, stripe_sub_id, budgets_json FROM client_subscriptions WHERE package_id = ? LIMIT 1").bind(pkgId).first())!;
+    expect(row.installments_paid).toBe(3);
+    expect(row.payment_status).toBe("completed");
+    expect(row.stripe_sub_id).toBeNull();
+    expect(JSON.parse(row.budgets_json).length).toBe(cycleBudgets * 3); // full term unlocked across 3 cycles
+  });
+});
+
 describe("package lifecycle + redemption scoping", () => {
   it("blocks self-checkout of private / other-client packages and scopes redemption codes", async () => {
     const db = env.DB as D1Database;
