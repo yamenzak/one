@@ -35,6 +35,11 @@ import { settingsRoutes } from "./settings-routes.js";
 import { externalRoutes } from "./external-routes.js";
 import { stripeRoutes, stripeAdminRoutes } from "./stripe-routes.js";
 import { mediaRoutes } from "./media-routes.js";
+import { mediaLibraryRoutes } from "./media-library-routes.js";
+import { accountRoutes } from "./account-routes.js";
+import { tenantCloseRoutes } from "./tenant-close-routes.js";
+import { nuclearRoutes } from "./nuclear-routes.js";
+import { purgeTenant } from "./purge.js";
 import { demoRoutes } from "./demo-routes.js";
 import { sessionRoutes, promoRoutes } from "./session-routes.js";
 import { domainRoutes, domainAdminRoutes } from "./domain-routes.js";
@@ -88,6 +93,10 @@ app.route("/api", externalRoutes);
 app.route("/api", stripeRoutes);
 app.route("/api", stripeAdminRoutes);
 app.route("/api", mediaRoutes);
+app.route("/api", mediaLibraryRoutes);
+app.route("/api", accountRoutes);
+app.route("/api", tenantCloseRoutes);
+app.route("/api", nuclearRoutes);
 app.route("/api", demoRoutes);
 app.route("/api", sessionRoutes);
 app.route("/api", promoRoutes);
@@ -170,6 +179,16 @@ async function dailySweep(env: Env): Promise<void> {
       message: "Your studio dropped to the free plan after non-payment. Resubscribe any time to bring back paid features.",
       dedupeKey: `cancel_${s.tenant_id}`,
     });
+  }
+
+  // 4) Owner-initiated studio closures past their 7-day hold → full hard purge
+  //    (R2 + D1 + billing DO + member identities). Distinct from the dunning
+  //    lifecycle above (which merely resets a delinquent tenant to free).
+  const toPurge = await env.DB.prepare(
+    "SELECT tenant_id FROM subscriptions WHERE status = 'closing' AND delete_at IS NOT NULL AND delete_at < ?",
+  ).bind(nowIso).all<{ tenant_id: string }>().catch(() => ({ results: [] as { tenant_id: string }[] }));
+  for (const s of toPurge.results ?? []) {
+    await purgeTenant(env, s.tenant_id).catch(() => undefined);
   }
 }
 

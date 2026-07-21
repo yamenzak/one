@@ -20,6 +20,7 @@ import { generateSpeech, DEFAULT_TTS_VOICE } from "./ai.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
 import { notify } from "./notify.js";
+import { putMedia, StorageQuotaError } from "./storage.js";
 
 /** The fixed cue set. Voiced once per tenant/voice/lang and cached. */
 const CUE_PHRASES: { id: string; text: string }[] = [
@@ -221,7 +222,12 @@ export const bodyScanRoutes = new Hono<AppEnv>()
         continue; // one provider hiccup shouldn't abort the whole pack
       }
       const key = `t/${who.tenantId}/tts/${voice}-${lang}-${phrase.id}-v${TTS_VERSION}.wav`;
-      await c.env.MEDIA.put(key, speech.bytes, { httpMetadata: { contentType: "audio/wav" } });
+      try {
+        await putMedia(c.env, { tenantId: who.tenantId, key, bytes: speech.bytes, contentType: "audio/wav", purpose: "tts", ownerUserId: who.userId });
+      } catch (e) {
+        if (e instanceof StorageQuotaError) return c.json({ error: "storage_full", generated, credits }, 413);
+        throw e;
+      }
       await c.env.DB.prepare("INSERT OR IGNORE INTO tts_cues (tenant_id, voice, lang, phrase_id, version, media_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
         .bind(who.tenantId, voice, lang, phrase.id, TTS_VERSION, key, nowIso())
         .run();
@@ -245,7 +251,12 @@ export const bodyScanRoutes = new Hono<AppEnv>()
       const speech = await generateSpeech(c.env, { tenantId: who.tenantId, feature: "voice_preview", text: "Hi, I'm your coach — let's do a quick body scan.", voice });
       if (!speech.ok) return c.json({ error: speech.error }, speech.error === "insufficient_credits" ? 402 : 502);
       key = `t/${who.tenantId}/tts/${voice}-en-preview-v${TTS_VERSION}.wav`;
-      await c.env.MEDIA.put(key, speech.bytes, { httpMetadata: { contentType: "audio/wav" } });
+      try {
+        await putMedia(c.env, { tenantId: who.tenantId, key, bytes: speech.bytes, contentType: "audio/wav", purpose: "tts", ownerUserId: who.userId });
+      } catch (e) {
+        if (e instanceof StorageQuotaError) return c.json({ error: "storage_full" }, 413);
+        throw e;
+      }
       await c.env.DB.prepare("INSERT OR IGNORE INTO tts_cues (tenant_id, voice, lang, phrase_id, version, media_key, created_at) VALUES (?, ?, 'en', 'preview', ?, ?, ?)")
         .bind(who.tenantId, voice, TTS_VERSION, key, nowIso())
         .run();

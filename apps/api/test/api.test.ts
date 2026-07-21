@@ -15,6 +15,8 @@ import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@mossa/protocol";
 import { ensureSchema } from "../src/db.js";
 import { clientDigestHtml, coachDigestHtml } from "../src/digest.js";
 import { emailBar, emailBars, emailSparkline, emailRing, emailStatRow, emailListRow, MOSSA_BRAND } from "../src/mailer.js";
+import { purgeClient, purgeTenant } from "../src/purge.js";
+import { verifyActionOtp } from "../src/action-otp.js";
 
 const ORIGIN = "http://localhost:8787"; // treated as local by createAuth (non-secure cookies)
 let ownerCookie = "";
@@ -2770,5 +2772,188 @@ describe("email digest — data-viz primitives + rich builders (pure render)", (
     expect(html).toContain("Needs attention · 5");
     expect(html).toContain("Most improved");
     expect(html).toContain("Open the attention queue");
+  });
+});
+
+describe("storage accounting + quota gate", () => {
+  const B = "http://localhost:8787";
+  it("records uploads in the ledger, meters usage, and blocks over quota", async () => {
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+
+    const usage0 = (await (await SELF.fetch(`${B}/api/storage-usage`, { headers: auth(ownerCookie) })).json()) as { usedBytes: number; limitBytes: number };
+    expect(usage0.limitBytes).toBeGreaterThan(0);
+
+    // Upload a 2 KB PNG → 201 + a ledger row with the REAL byte size.
+    const mkForm = () => { const f = new FormData(); f.set("file", new Blob([new Uint8Array(2048)], { type: "image/png" }), "x.png"); f.set("purpose", "avatar"); return f; };
+    const up = await SELF.fetch(`${B}/api/media/upload`, { method: "POST", headers: auth(ownerCookie), body: mkForm() });
+    expect(up.status).toBe(201);
+    const { key } = (await up.json()) as { key: string };
+    const row = (await db.prepare("SELECT size_bytes, purpose, tenant_id, deleted_at FROM media_assets WHERE r2_key = ?").bind(key).first<{ size_bytes: number; purpose: string; tenant_id: string; deleted_at: string | null }>())!;
+    expect(row.size_bytes).toBe(2048);
+    expect(row.purpose).toBe("avatar");
+    expect(row.tenant_id).toBe(tenantId);
+    expect(row.deleted_at).toBeNull();
+
+    const usage1 = (await (await SELF.fetch(`${B}/api/storage-usage`, { headers: auth(ownerCookie) })).json()) as { usedBytes: number };
+    expect(usage1.usedBytes).toBeGreaterThanOrEqual(usage0.usedBytes + 2048);
+
+    // Fill the ledger to the plan ceiling with a synthetic row → next upload 413s.
+    await db.prepare("INSERT INTO media_assets (id, tenant_id, r2_key, purpose, content_type, size_bytes, created_at) VALUES ('mda_test_fill', ?, 't/fill/big.bin', 'misc', 'application/octet-stream', ?, ?)")
+      .bind(tenantId, usage0.limitBytes, new Date().toISOString()).run();
+    const over = await SELF.fetch(`${B}/api/media/upload`, { method: "POST", headers: auth(ownerCookie), body: mkForm() });
+    expect(over.status).toBe(413);
+    expect(((await over.json()) as { error: string }).error).toBe("storage_full");
+
+    // Deleting the fill row (tombstone) frees room again — usage drops, upload works.
+    await db.prepare("UPDATE media_assets SET deleted_at = ? WHERE id = 'mda_test_fill'").bind(new Date().toISOString()).run();
+    const ok = await SELF.fetch(`${B}/api/media/upload`, { method: "POST", headers: auth(ownerCookie), body: mkForm() });
+    expect(ok.status).toBe(201);
+  });
+});
+
+describe("media library — role-scoped list + delete", () => {
+  const B = "http://localhost:8787";
+  it("owner lists media, deletes it, and the delete tombstones + scrubs the reference", async () => {
+    const db = env.DB as D1Database;
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+
+    // Upload an avatar image and point a client's avatar_url at it.
+    const form = new FormData();
+    form.set("file", new Blob([new Uint8Array(1500)], { type: "image/png" }), "a.png");
+    form.set("purpose", "avatar");
+    const up = await SELF.fetch(`${B}/api/media/upload`, { method: "POST", headers: auth(ownerCookie), body: form });
+    const { key } = (await up.json()) as { key: string };
+    const { client } = (await (await SELF.fetch(`${B}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "MediaMia" }) })).json()) as { client: { id: string } };
+    await db.prepare("UPDATE clients SET avatar_url = ? WHERE id = ?").bind(`/api/media/${key}`, client.id).run();
+
+    // Owner sees it, can manage + delete.
+    const lib = (await (await SELF.fetch(`${B}/api/media-library`, { headers: auth(ownerCookie) })).json()) as { items: { id: string; url: string; canDelete: boolean }[]; canManage: boolean };
+    expect(lib.canManage).toBe(true);
+    const found = lib.items.find((i) => i.url === `/api/media/${key}`)!;
+    expect(found).toBeTruthy();
+    expect(found.canDelete).toBe(true);
+
+    // Delete → 200, ledger tombstoned, reference scrubbed, gone from the list.
+    const del = await SELF.fetch(`${B}/api/media-library/${found.id}`, { method: "DELETE", headers: auth(ownerCookie) });
+    expect(del.status).toBe(200);
+    const row = (await db.prepare("SELECT deleted_at, deleted_by FROM media_assets WHERE id = ?").bind(found.id).first<{ deleted_at: string | null; deleted_by: string | null }>())!;
+    expect(row.deleted_at).toBeTruthy();
+    expect(row.deleted_by).toBeTruthy();
+    const cl = (await db.prepare("SELECT avatar_url FROM clients WHERE id = ?").bind(client.id).first<{ avatar_url: string | null }>())!;
+    expect(cl.avatar_url).toBeNull();
+    const lib2 = (await (await SELF.fetch(`${B}/api/media-library`, { headers: auth(ownerCookie) })).json()) as { items: { id: string }[] };
+    expect(lib2.items.find((i) => i.id === found.id)).toBeFalsy();
+  });
+});
+
+describe("GDPR — action OTP + cascade purge", () => {
+  const B = "http://localhost:8787";
+  const sha256Hex = async (s: string): Promise<string> => {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  };
+
+  it("action OTP verifies once, then is consumed; wrong codes are rejected", async () => {
+    const db = env.DB as D1Database;
+    await db.prepare("INSERT OR REPLACE INTO action_otps (subject, purpose, code_hash, expires_at, attempts, created_at) VALUES ('u_otptest', 'account_delete', ?, ?, 0, ?)")
+      .bind(await sha256Hex("account_delete:123456"), Date.now() + 600_000, Date.now()).run();
+    expect(await verifyActionOtp(env as unknown as import("../src/env.js").Env, { subject: "u_otptest", purpose: "account_delete", code: "999999" })).toBe(false);
+    expect(await verifyActionOtp(env as unknown as import("../src/env.js").Env, { subject: "u_otptest", purpose: "account_delete", code: "123456" })).toBe(true);
+    // Consumed — a replay fails.
+    expect(await verifyActionOtp(env as unknown as import("../src/env.js").Env, { subject: "u_otptest", purpose: "account_delete", code: "123456" })).toBe(false);
+  });
+
+  it("purgeClient removes the client's rows, R2 objects, and ledger entries", async () => {
+    const db = env.DB as D1Database;
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+    const { client } = (await (await SELF.fetch(`${B}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "PurgePat" }) })).json()) as { client: { id: string } };
+
+    // A client-scoped upload (R2 object + ledger row) + some tracked data.
+    const form = new FormData();
+    form.set("file", new Blob([new Uint8Array(1000)], { type: "image/png" }), "p.png");
+    form.set("purpose", "progress");
+    form.set("clientId", client.id);
+    const { key } = (await (await SELF.fetch(`${B}/api/media/upload`, { method: "POST", headers: auth(ownerCookie), body: form })).json()) as { key: string };
+    await SELF.fetch(`${B}/api/check-ins`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-06-10", mood: 4 } }) });
+    await SELF.fetch(`${B}/api/measurements`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-06-10", weightKg: 70 } }) });
+    // Sanity — the object + rows exist. Drain the R2 body (isolated-storage hygiene).
+    const before = await env.MEDIA.get(key);
+    expect(before).not.toBeNull();
+    await before!.arrayBuffer();
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM check_ins WHERE client_id = ?").bind(client.id).first<{ n: number }>())!.n).toBe(1);
+
+    await purgeClient(env as unknown as import("../src/env.js").Env, tenantId, client.id);
+
+    expect(await db.prepare("SELECT id FROM clients WHERE id = ?").bind(client.id).first()).toBeNull();
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM check_ins WHERE client_id = ?").bind(client.id).first<{ n: number }>())!.n).toBe(0);
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM measurements WHERE client_id = ?").bind(client.id).first<{ n: number }>())!.n).toBe(0);
+    // R2 object gone + ledger tombstoned.
+    expect(await env.MEDIA.get(key)).toBeNull();
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM media_assets WHERE client_id = ? AND deleted_at IS NULL").bind(client.id).first<{ n: number }>())!.n).toBe(0);
+  });
+});
+
+describe("studio close + tenant purge", () => {
+  const B = "http://localhost:8787";
+  const sha = async (s: string): Promise<string> => {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  };
+
+  it("owner schedules a close (OTP), can undo it, and purgeTenant tears the studio down", async () => {
+    const db = env.DB as D1Database;
+    // A throwaway studio so the shared test tenants are never touched.
+    const cookie = await signInFlow("teardown@test.dev", "TeardownGym");
+    const H = { "content-type": "application/json", ...auth(cookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(cookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+    const { client } = (await (await SELF.fetch(`${B}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "DoomedDan" }) })).json()) as { client: { id: string } };
+
+    // Schedule the close with a known OTP → status 'closing' + delete_at ~7d out.
+    await db.prepare("INSERT OR REPLACE INTO action_otps (subject, purpose, code_hash, expires_at, attempts, created_at) VALUES (?, 'tenant_close', ?, ?, 0, ?)")
+      .bind(`tenant_close:${tenantId}`, await sha("tenant_close:654321"), Date.now() + 600_000, Date.now()).run();
+    const close = await SELF.fetch(`${B}/api/tenant/close`, { method: "POST", headers: H, body: JSON.stringify({ code: "654321" }) });
+    expect(close.status).toBe(200);
+    const st1 = (await (await SELF.fetch(`${B}/api/tenant/close/status`, { headers: auth(cookie) })).json()) as { closing: boolean; deleteAt: string | null };
+    expect(st1.closing).toBe(true);
+    expect(st1.deleteAt).toBeTruthy();
+
+    // Undo within the grace window → back to active.
+    await SELF.fetch(`${B}/api/tenant/close/cancel`, { method: "POST", headers: H, body: "{}" });
+    const st2 = (await (await SELF.fetch(`${B}/api/tenant/close/status`, { headers: auth(cookie) })).json()) as { closing: boolean };
+    expect(st2.closing).toBe(false);
+
+    // The actual teardown (what the cron runs at delete_at).
+    expect(await db.prepare("SELECT id FROM organization WHERE id = ?").bind(tenantId).first()).not.toBeNull();
+    await purgeTenant(env as unknown as import("../src/env.js").Env, tenantId);
+    expect(await db.prepare("SELECT id FROM organization WHERE id = ?").bind(tenantId).first()).toBeNull();
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM member WHERE organizationId = ?").bind(tenantId).first<{ n: number }>())!.n).toBe(0);
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ?").bind(tenantId).first<{ n: number }>())!.n).toBe(0);
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<{ n: number }>())!.n).toBe(0);
+    void client;
+    // The owner belonged only to this studio → their identity is erased too.
+    expect(await db.prepare('SELECT id FROM "user" WHERE email = ?').bind("teardown@test.dev").first()).toBeNull();
+  });
+});
+
+describe("platform nuclear reset — guards", () => {
+  const B = "http://localhost:8787";
+  it("refuses without the exact confirm phrase, and without a valid OTP", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    // Wrong phrase → 400 BEFORE anything is touched (the confirm gate is first).
+    const badPhrase = await SELF.fetch(`${B}/api/admin/nuclear-reset`, { method: "POST", headers: H, body: JSON.stringify({ code: "000000", confirm: "nope" }) });
+    expect(badPhrase.status).toBe(400);
+    expect(((await badPhrase.json()) as { error: string }).error).toBe("confirm_phrase");
+    // Right phrase but no valid OTP → 403 (still no wipe).
+    const noOtp = await SELF.fetch(`${B}/api/admin/nuclear-reset`, { method: "POST", headers: H, body: JSON.stringify({ code: "000000", confirm: "RESET EVERYTHING" }) });
+    expect(noOtp.status).toBe(403);
+    expect(((await noOtp.json()) as { error: string }).error).toBe("invalid_code");
+    // The shared tenant is still intact (nothing was wiped).
+    const ctx = await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) });
+    expect(ctx.status).toBe(200);
   });
 });

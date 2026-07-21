@@ -189,6 +189,25 @@ export function ensureSchema(db: D1Database): Promise<void> {
           // client, so the index is (client_id, at DESC).
           "CREATE TABLE IF NOT EXISTS audit_log (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, actor_user_id TEXT, action TEXT, summary TEXT, ref TEXT, at INTEGER);",
           "CREATE INDEX IF NOT EXISTS idx_audit_client ON audit_log(client_id, at);",
+
+          // ── R2 media ledger (storage accounting + the media library) ────────
+          // The SSOT for every object stored in the MEDIA bucket: who owns it,
+          // which tenant/client it belongs to, its byte size, and — on removal —
+          // when + by whom it was deleted (soft tombstone). Live usage for the
+          // per-tenant storage quota is SUM(size_bytes) WHERE deleted_at IS NULL.
+          // Every MEDIA.put funnels through storage.ts putMedia to write a row.
+          "CREATE TABLE IF NOT EXISTS media_assets (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, owner_user_id TEXT, r2_key TEXT UNIQUE, purpose TEXT, content_type TEXT, size_bytes INTEGER DEFAULT 0, created_at TEXT, deleted_at TEXT, deleted_by TEXT);",
+          "CREATE INDEX IF NOT EXISTS idx_media_tenant ON media_assets(tenant_id, deleted_at);",
+          "CREATE INDEX IF NOT EXISTS idx_media_client ON media_assets(client_id, deleted_at);",
+          "CREATE INDEX IF NOT EXISTS idx_media_owner ON media_assets(owner_user_id, deleted_at);",
+
+          // ── Action OTPs (step-up confirmation for destructive flows) ────────
+          // A one-time 6-digit code emailed to confirm an irreversible action
+          // (wipe my data, close studio, platform nuclear reset) for an already
+          // signed-in user — decoupled from the sign-in OTP so confirming never
+          // mints a session. One live code per (subject, purpose); the hash is
+          // stored, never the code. `attempts` caps brute force.
+          "CREATE TABLE IF NOT EXISTS action_otps (subject TEXT, purpose TEXT, code_hash TEXT, expires_at INTEGER, attempts INTEGER DEFAULT 0, created_at INTEGER, PRIMARY KEY (subject, purpose));",
         ].join(" "),
       )
       .then(async () => {

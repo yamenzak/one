@@ -68,6 +68,12 @@ export class TenantBillingDO extends DurableObject<Env> {
     }
   }
 
+  /** Erase all durable state — the credit buckets, holds and ledger — when a
+   *  tenant is purged (close-studio / nuclear reset). */
+  async wipe(): Promise<void> {
+    await this.ctx.storage.deleteAll();
+  }
+
   /**
    * Read the two credit buckets, migrating a legacy single `balance` the first
    * time we see one: all existing credits become `purchased` (we never revoke

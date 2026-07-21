@@ -12,6 +12,7 @@ import {
   FEATURE_KEYS, QUOTA_KEYS, FEATURE_META, QUOTA_META, type Entitlements, type EntitlementGrants, type Budget,
 } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
+import { tenantStorageBytes } from "./storage.js";
 import {
   getSubscription,
   listPacks,
@@ -131,7 +132,7 @@ export const billingRoutes = new Hono<AppEnv>()
       templates:
         (await count("SELECT COUNT(*) AS n FROM workout_templates WHERE tenant_id = ?")) +
         (await count("SELECT COUNT(*) AS n FROM meal_templates WHERE tenant_id = ?")),
-      storageMb: 0, // media accounting arrives with the media phase
+      storageMb: Math.round((await tenantStorageBytes(db, who.tenantId)) / (1024 * 1024)),
       activeCommerceSubs: await count(
         "SELECT COUNT(*) AS n FROM client_subscriptions WHERE tenant_id = ? AND status = 'active' AND payment_status IN ('paid','installments')",
       ),
