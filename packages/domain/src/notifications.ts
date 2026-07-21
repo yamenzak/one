@@ -82,10 +82,12 @@ export type NotifType =
   | "check_in" | "feedback"
   // body composition
   | "body_fat_logged"
+  // client activity (staff-facing)
+  | "pr_achieved"
   // plans & goals
   | "plan_published" | "goal_set"
   // labs & supplements
-  | "lab_requested" | "lab_uploaded" | "lab_reviewed" | "supplement_added"
+  | "lab_requested" | "lab_uploaded" | "lab_reviewed" | "supplement_added" | "supplement_updated"
   // exercise swaps
   | "swap_request" | "swap_approved" | "swap_rejected"
   // content
@@ -95,7 +97,7 @@ export type NotifType =
   // roster & staff
   | "client_assigned"
   // client commerce (their plan & billing)
-  | "sub_expired" | "sub_expiring" | "sub_payment_failed"
+  | "access_granted" | "sub_expired" | "sub_expiring" | "sub_payment_failed"
   // studio billing (owner)
   | "billing_suspended" | "billing_canceled" | "billing_past_due"
   // sales (owner)
@@ -133,6 +135,7 @@ export const NOTIF_TYPES: Record<NotifType, NotifTypeMeta> = {
   feedback: { category: "check-ins", to: "client", title: "Coach feedback on your check-in", link: "/progress",
     template: { subject: "{{coachName}} left you feedback", body: "<p>{{coachName}} reviewed your latest check-in and left feedback. Open {{studioName}} to read it and keep your momentum going.</p>" }, vars: ["coachName", "studioName"] },
   body_fat_logged: { category: "body-composition", to: "staff" }, // title interpolates client name
+  pr_achieved: { category: "activity", to: "staff" }, // title interpolates client + lift name
   plan_published: { category: "plans-goals", to: "client",
     template: { subject: "Your new {{planName}} is ready", body: "<p>{{coachName}} just published <strong>{{planName}}</strong> for you. Take a look and get started.</p>" }, vars: ["coachName", "planName"] }, // title + link vary by plan kind
   goal_set: { category: "plans-goals", to: "client", title: "Your coach set a new goal", link: "/progress",
@@ -141,6 +144,8 @@ export const NOTIF_TYPES: Record<NotifType, NotifTypeMeta> = {
   lab_uploaded: { category: "labs", to: "staff" }, // title interpolates client name
   lab_reviewed: { category: "labs", to: "client", title: "Your coach reviewed your lab results", link: "/progress" },
   supplement_added: { category: "labs", to: "client", title: "New supplement added", link: "/wellness" },
+  supplement_updated: { category: "labs", to: "client", title: "A supplement was updated", link: "/wellness",
+    template: { subject: "{{coachName}} updated a supplement", body: "<p>{{coachName}} updated <strong>{{supplementName}}</strong> in your plan. Open {{studioName}} to see what changed.</p>" }, vars: ["coachName", "supplementName", "studioName"] },
   swap_request: { category: "swaps", to: "staff" }, // title interpolates client name
   swap_approved: { category: "swaps", to: "client", title: "Your exercise swap was applied", link: "/train" },
   swap_rejected: { category: "swaps", to: "client", title: "Your coach kept the original exercise", link: "/train" },
@@ -150,6 +155,8 @@ export const NOTIF_TYPES: Record<NotifType, NotifTypeMeta> = {
   session_cancelled: { category: "sessions", to: "client", title: "Your session was cancelled", link: "/wellness",
     template: { subject: "Your session was cancelled", body: "<p>Your session on <strong>{{sessionTime}}</strong> was cancelled. Book another time with {{studioName}} whenever you're ready.</p>" }, vars: ["sessionTime", "studioName"] },
   client_assigned: { category: "roster", to: "staff", title: "You've been assigned a client" }, // link is client-scoped
+  access_granted: { category: "commerce", to: "client", title: "You've got new access", link: "/shop",
+    template: { subject: "New access at {{studioName}}", body: "<p>{{coachName}} gave you access to <strong>{{packageName}}</strong>. Open {{studioName}} to jump back in.</p>" }, vars: ["coachName", "packageName", "studioName"] },
   sub_expired: { category: "commerce", to: "client", title: "Your access has expired", link: "/shop",
     template: { subject: "Your access has expired", body: "<p>Your access at {{studioName}} has expired. Renew to pick up right where you left off.</p>" }, vars: ["studioName"] },
   sub_expiring: { category: "commerce", to: "client", title: "Your plan is expiring soon", link: "/shop",

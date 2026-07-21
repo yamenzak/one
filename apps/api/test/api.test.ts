@@ -462,6 +462,121 @@ describe("notifications — email provider + per-user preferences", () => {
   });
 });
 
+describe("notification coverage — new signals", () => {
+  const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
+  // A real, non-logger staff member to receive the staff-facing notifications.
+  async function ghostTrainer(tenantId: string) {
+    const db = env.DB as D1Database;
+    await db.prepare("INSERT OR IGNORE INTO member (id, organizationId, userId, role, createdAt) VALUES ('mem_ntcoach', ?, 'usr_ntcoach', 'trainer', '2026-01-01')").bind(tenantId).run();
+    return "usr_ntcoach";
+  }
+  // A client with a linked user + client member row, so client-facing notifs
+  // resolve a real role (not "member", which zeroes every channel).
+  async function clientWithUser(name: string, tenantId: string, userId: string, clientId: string) {
+    const db = env.DB as D1Database;
+    await db.prepare("INSERT OR IGNORE INTO \"user\" (id, name, email, createdAt, updatedAt) VALUES (?, ?, ?, '2026-01-01', '2026-01-01')").bind(userId, name, `${userId}@ex.com`).run();
+    await db.prepare("INSERT OR IGNORE INTO member (id, organizationId, userId, role, createdAt) VALUES (?, ?, ?, 'client', '2026-01-01')").bind(`mem_${userId}`, tenantId, userId).run();
+    await db.prepare("UPDATE clients SET user_id = ? WHERE id = ?").bind(userId, clientId).run();
+  }
+
+  it("a completed body scan notifies the primary trainer (deduped, distinct from manual)", async () => {
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+    const coach = await ghostTrainer(tenantId);
+    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "ScanBella" }) })).json()) as { client: { id: string } }).client.id;
+    await db.prepare("UPDATE clients SET gender='female', date_of_birth='1992-01-01', height_cm=168 WHERE id=?").bind(clientId).run();
+    await db.prepare("UPDATE client_trainers SET trainer_user_id = ? WHERE client_id = ?").bind(coach, clientId).run();
+
+    const res = await SELF.fetch("http://x/api/body-scans", { method: "POST", headers: H(), body: JSON.stringify({ clientId, date: "2026-05-01", weightKg: 64, circumferences: { neckCm: 33, waistCm: 74 }, storeSilhouette: false }) });
+    expect(res.status).toBe(200);
+    const notif = (await db.prepare("SELECT category, title, message FROM notifications WHERE recipient_user_id = ? AND type = 'body_fat_logged' AND title LIKE '%body scan%'").bind(coach).first<{ category: string; title: string; message: string }>())!;
+    expect(notif.category).toBe("body-composition");
+    expect(notif.title).toContain("ScanBella");
+    expect(notif.message).toContain("% body fat");
+
+    // Re-scanning the same day upserts but doesn't re-notify (bfscan_ dedupe key).
+    await SELF.fetch("http://x/api/body-scans", { method: "POST", headers: H(), body: JSON.stringify({ clientId, date: "2026-05-01", weightKg: 63, circumferences: { neckCm: 33, waistCm: 73 }, storeSilhouette: false }) });
+    const dup = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE recipient_user_id = ? AND type = 'body_fat_logged' AND title LIKE '%body scan%'").bind(coach).first<{ n: number }>())!;
+    expect(dup.n).toBe(1);
+  });
+
+  it("beating an all-time e1RM notifies the trainer once per exercise/day; the first-ever lift is silent", async () => {
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+    const coach = await ghostTrainer(tenantId);
+    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "PRPete" }) })).json()) as { client: { id: string } }).client.id;
+    await db.prepare("UPDATE client_trainers SET trainer_user_id = ? WHERE client_id = ?").bind(coach, clientId).run();
+    await db.prepare("INSERT OR IGNORE INTO exercises (id, tenant_id, name, active) VALUES ('ex_bench', ?, 'Bench Press', 1)").bind(tenantId).run();
+
+    const logSet = (date: string, weightKg: number, reps: number) => SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H(), body: JSON.stringify({ clientId, data: { date, workoutPlanId: "wp-pr", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "ex_bench", sets: [{ setIndex: 0, reps, weightKg, completed: true }] } }) });
+    const prCount = async () => (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE recipient_user_id = ? AND type = 'pr_achieved'").bind(coach).first<{ n: number }>())!.n;
+
+    // First-ever lift establishes the baseline — no PR notification.
+    await logSet("2026-05-02", 60, 5);
+    expect(await prCount()).toBe(0);
+    // A heavier lift beats the baseline → one PR notification.
+    await logSet("2026-05-03", 80, 5);
+    expect(await prCount()).toBe(1);
+    const pr = (await db.prepare("SELECT category, title, message, link FROM notifications WHERE recipient_user_id = ? AND type = 'pr_achieved'").bind(coach).first<{ category: string; title: string; message: string; link: string }>())!;
+    expect(pr.category).toBe("activity");
+    expect(pr.title).toContain("PRPete");
+    expect(pr.title).toContain("Bench Press");
+    expect(pr.link).toContain(clientId);
+    // Another beat the SAME day is deduped to one per exercise/day.
+    await logSet("2026-05-03", 90, 5);
+    expect(await prCount()).toBe(1);
+    // The ledger tracked the best (90×5 e1RM), so a 3rd, higher day beats it again.
+    await logSet("2026-05-04", 100, 5);
+    expect(await prCount()).toBe(2);
+  });
+
+  it("a supplement status/dose change notifies the client; a notes-only edit is silent", async () => {
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "SuppSam" }) })).json()) as { client: { id: string } }).client.id;
+    await clientWithUser("SuppSam", tenantId, "usr_suppclient", clientId);
+    const sup = (await (await SELF.fetch("http://x/api/supplements", { method: "POST", headers: H(), body: JSON.stringify({ clientId, name: "Creatine", schedule: [{ slot: "daily" }] }) })).json()) as { id: string };
+
+    // Pausing it is an actionable change → the client is told.
+    await SELF.fetch(`http://x/api/supplements/${sup.id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ status: "paused" }) });
+    const notif = (await db.prepare("SELECT category, title, message FROM notifications WHERE recipient_user_id = 'usr_suppclient' AND type = 'supplement_updated'").first<{ category: string; title: string; message: string }>())!;
+    expect(notif.category).toBe("labs");
+    expect(notif.message).toContain("Creatine");
+    expect(notif.message).toContain("paused");
+
+    // A notes-only edit doesn't notify (no status/dose change).
+    await SELF.fetch(`http://x/api/supplements/${sup.id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ notes: "take with water" }) });
+    const after = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE recipient_user_id = 'usr_suppclient' AND type = 'supplement_updated'").first<{ n: number }>())!;
+    expect(after.n).toBe(1);
+  });
+
+  it("granting and extending access notifies the client", async () => {
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "AccessAmy" }) })).json()) as { client: { id: string } }).client.id;
+    await clientWithUser("AccessAmy", tenantId, "usr_accessclient", clientId);
+    await SELF.fetch("http://x/api/packages", { method: "POST", headers: H(), body: JSON.stringify({ name: "AccessPack", budgets: [{ feature: "all", days: 30 }] }) });
+    const pkgs = (await (await SELF.fetch("http://x/api/packages", { headers: auth(ownerCookie) })).json()) as { packages: { id: string; name: string }[] };
+    const pkg = pkgs.packages.find((p) => p.name === "AccessPack")!;
+
+    // First grant opens a subscription → "new access".
+    await SELF.fetch("http://x/api/subscriptions/grant", { method: "POST", headers: H(), body: JSON.stringify({ clientId, packageId: pkg.id }) });
+    const granted = (await db.prepare("SELECT category, title, message FROM notifications WHERE recipient_user_id = 'usr_accessclient' AND type = 'access_granted'").first<{ category: string; title: string; message: string }>())!;
+    expect(granted.category).toBe("commerce");
+    expect(granted.message).toContain("AccessPack");
+
+    // Second grant extends the live subscription → an "extended" notification.
+    await SELF.fetch("http://x/api/subscriptions/grant", { method: "POST", headers: H(), body: JSON.stringify({ clientId, packageId: pkg.id }) });
+    const all = await db.prepare("SELECT title FROM notifications WHERE recipient_user_id = 'usr_accessclient' AND type = 'access_granted'").all<{ title: string }>();
+    expect(all.results.length).toBe(2);
+    expect(all.results.some((r) => r.title.includes("extended"))).toBe(true);
+  });
+});
+
 describe("platform rail — dunning notifies the owner", () => {
   async function stripeSig(payload: string, secret: string): Promise<string> {
     const t = Math.floor(Date.now() / 1000);

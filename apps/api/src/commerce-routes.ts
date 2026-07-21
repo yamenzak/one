@@ -21,6 +21,7 @@ import { gateFeature } from "./client-flags.js";
 import { requireClientAccess } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
 import { recordAudit } from "./audit.js";
+import { notify } from "./notify.js";
 import { parseJson, j } from "./db.js";
 
 const PackageBody = z.object({
@@ -239,6 +240,9 @@ export const commerceRoutes = new Hono<AppEnv>()
         .bind(j([...existing, ...added]), j(addOns), now, current.id)
         .run();
       await recordAudit(c.env, { tenantId: who.tenantId, clientId: access.client.id, actorUserId: who.userId, action: "package.assign", summary: `${pkg.name} (extended)`, ref: pkg.id });
+      if (access.client.user_id && access.client.user_id !== who.userId) {
+        await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "access_granted", title: "Your access was extended", message: `${pkg.name} — more time added`, vars: { coachName: c.get("user")?.name || "Your coach", packageName: pkg.name } });
+      }
       return c.json({ ok: true, id: current.id, extended: true });
     }
 
@@ -254,6 +258,9 @@ export const commerceRoutes = new Hono<AppEnv>()
       )
       .run();
     await recordAudit(c.env, { tenantId: who.tenantId, clientId: access.client.id, actorUserId: who.userId, action: "package.assign", summary: pkg.name, ref: pkg.id });
+    if (access.client.user_id && access.client.user_id !== who.userId) {
+      await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "access_granted", message: pkg.name, vars: { coachName: c.get("user")?.name || "Your coach", packageName: pkg.name } });
+    }
     return c.json({ ok: true, id, extended: false }, 201);
   })
 

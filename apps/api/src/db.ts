@@ -102,6 +102,10 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "CREATE TABLE IF NOT EXISTS exercise_logs (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, workout_plan_id TEXT, plan_day_index INTEGER, entries_json TEXT, session_calories INTEGER, created_at TEXT, updated_at TEXT);",
           "CREATE UNIQUE INDEX IF NOT EXISTS idx_elogs_session ON exercise_logs(client_id, workout_plan_id, plan_day_index, date_local);",
           "CREATE INDEX IF NOT EXISTS idx_elogs_client ON exercise_logs(client_id, date_local);",
+          // Per-exercise all-time best (e1RM) per client — the authoritative PR
+          // ledger. Updated transactionally on every logged set so PR detection
+          // is O(1) (no full-history fold) and drives the pr_achieved notify.
+          "CREATE TABLE IF NOT EXISTS exercise_prs (client_id TEXT, exercise_id TEXT, best_e1rm REAL, weight_kg REAL, reps INTEGER, tenant_id TEXT, achieved_on TEXT, updated_at TEXT, PRIMARY KEY (client_id, exercise_id));",
           "CREATE TABLE IF NOT EXISTS activity_logs (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, activity_key TEXT, label TEXT, start_time TEXT, duration_min INTEGER, avg_hr_bpm INTEGER, calories INTEGER, calories_locked INTEGER DEFAULT 0, created_at TEXT);",
           "CREATE INDEX IF NOT EXISTS idx_alogs_client ON activity_logs(client_id, date_local);",
           "CREATE TABLE IF NOT EXISTS food_entries (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, meal_type TEXT, food_id TEXT, label TEXT, quantity REAL, unit TEXT, calories REAL DEFAULT 0, protein_g REAL DEFAULT 0, carbs_g REAL DEFAULT 0, fat_g REAL DEFAULT 0, source TEXT DEFAULT 'self_logged', meal_plan_id TEXT, meal_option_index INTEGER, image_url TEXT, created_at TEXT);",

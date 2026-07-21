@@ -105,8 +105,20 @@ export const healthRoutes = new Hono<AppEnv>()
     await c.env.DB.prepare(`UPDATE supplements SET ${sets.join(", ")} WHERE id = ? AND tenant_id = ?`)
       .bind(...binds, c.req.param("id"), who.tenantId)
       .run();
-    const sup = await c.env.DB.prepare("SELECT client_id, name FROM supplements WHERE id = ? AND tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ client_id: string; name: string }>();
+    const sup = await c.env.DB.prepare("SELECT s.client_id, s.name, cl.user_id FROM supplements s JOIN clients cl ON cl.id = s.client_id WHERE s.id = ? AND s.tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ client_id: string; name: string; user_id: string | null }>();
     if (sup) await recordAudit(c.env, { tenantId: who.tenantId, clientId: sup.client_id, actorUserId: who.userId, action: "supplement.update", summary: `${sup.name}${d.status ? ` · ${d.status}` : ""}`, ref: c.req.param("id") });
+    // Tell the client when the change is one they'd act on — a status flip
+    // (paused/resumed/stopped) or a dose change. A notes-only tweak is silent.
+    if (sup?.user_id && (d.status || d.dose !== undefined)) {
+      const change = d.status ? `marked ${d.status}` : "dose updated";
+      await notify(c.env, {
+        tenantId: who.tenantId,
+        userId: sup.user_id,
+        type: "supplement_updated",
+        message: `${sup.name} — ${change}`,
+        vars: { coachName: c.get("user")?.name || "Your coach", supplementName: sup.name },
+      });
+    }
     return c.json({ ok: true });
   })
 
