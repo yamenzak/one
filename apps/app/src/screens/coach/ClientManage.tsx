@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, PhotoGrid, ConfirmDialog, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, PhotoGrid, ConfirmDialog, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon, User } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
@@ -152,6 +152,8 @@ export function ClientManage({ clientId }: { clientId: string }) {
       </>)}
       </Reveal>
 
+      <ActivityLog clientId={clientId} />
+
       <Sheet open={grantOpen} onClose={() => setGrantOpen(false)} title="Grant a package">
         <div className="space-y-2">
           {packages.length === 0 && <p className="text-sm text-muted-foreground">No packages yet — create one in the Business tab.</p>}
@@ -175,6 +177,55 @@ export function ClientManage({ clientId }: { clientId: string }) {
         onConfirm={() => { if (suppToDiscontinue) void discontinueSupp(suppToDiscontinue.id); }}
       />
     </Page>
+  );
+}
+
+/** Coach-action audit history — the durable record of what staff did to this
+ *  client's record (GET /clients/:id/audit). Each row's label comes from the
+ *  AUDIT_ACTIONS registry (server-rendered); the icon is coded by action family. */
+interface AuditItem { id: string; action: string; label: string; summary: string | null; at: number; actor: string | null }
+const AUDIT_ICON: Record<string, typeof Pill> = {
+  goal: BarChart3, plan: ClipboardList, checkin: Check, supplement: Pill, lab: FlaskConical, swap: ArrowLeftRight, content: Sparkles, package: Ticket, client: User, member: User,
+};
+const timeAgo = (ms: number): string => {
+  const s = Math.max(0, (Date.now() - ms) / 1000);
+  if (s < 60) return "just now";
+  const m = s / 60; if (m < 60) return `${Math.floor(m)}m ago`;
+  const h = m / 60; if (h < 24) return `${Math.floor(h)}h ago`;
+  const d = h / 24; if (d < 7) return `${Math.floor(d)}d ago`;
+  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+};
+
+function ActivityLog({ clientId }: { clientId: string }) {
+  const [items, setItems] = useState<AuditItem[] | null>(null);
+  useEffect(() => {
+    void api.get<{ items: AuditItem[] }>(`/api/clients/${clientId}/audit`).then((r) => setItems(r.items)).catch(() => setItems([]));
+  }, [clientId]);
+  if (items && items.length === 0) return null; // nothing to show yet — stay quiet
+  return (
+    <Stagger>
+      <Card className="space-y-3">
+        <div className="flex items-center gap-2.5"><IconBadge icon={ClipboardList} tone="neutral" size="sm" /><h2 className="font-semibold">Activity log</h2></div>
+        {!items ? (
+          <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-8 animate-pulse rounded-lg bg-surface-2" />)}</div>
+        ) : (
+          <div className="max-h-80 space-y-1 overflow-y-auto">
+            {items.map((it) => {
+              const Icon = AUDIT_ICON[it.action.split(".")[0] ?? ""] ?? ClipboardList;
+              return (
+                <div key={it.id} className="flex items-start gap-2.5 rounded-lg px-1 py-1.5">
+                  <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm"><span className="font-medium">{it.actor ?? "A coach"}</span> {it.label}{it.summary ? <span className="text-muted-foreground"> · {it.summary}</span> : null}</div>
+                  </div>
+                  <span className="shrink-0 text-[0.7rem] text-muted-foreground">{timeAgo(it.at)}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+    </Stagger>
   );
 }
 
