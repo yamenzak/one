@@ -7,11 +7,11 @@
  * transactional (invites, receipts).
  */
 
-import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, notifCategoryOf, notifTitleOf, notifLinkOf, type NotifType, type NotifRole } from "@mossa/domain";
+import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, audienceForRole, notifCategoryOf, notifTitleOf, notifLinkOf, notifTemplateOf, renderTemplate, type NotifType, type NotifRole } from "@mossa/domain";
 import type { Env } from "./env.js";
 import { notifyUser } from "./inbox-do.js";
 import { sendTenantEmail } from "./email-provider.js";
-import { emailShell, emailButton, escapeHtml, safeColor, MOSSA_BRAND, type BrandKit } from "./mailer.js";
+import { sendEmail, emailShell, emailButton, escapeHtml, safeColor, MOSSA_BRAND, type BrandKit } from "./mailer.js";
 import { nowIso } from "./ids.js";
 
 export interface NotifyInput {
@@ -33,6 +33,10 @@ export interface NotifyInput {
   force?: boolean;
   /** Full email HTML override; otherwise a standard card is built from title/message. */
   emailHtml?: string;
+  /** Values for the type's email template `{{variables}}` (e.g. coachName,
+   *  planName, daysLeft). `studioName` is injected automatically. Ignored for
+   *  types without a template. */
+  vars?: Record<string, string | number | null | undefined>;
 }
 
 async function userRole(db: D1Database, tenantId: string, userId: string): Promise<NotifRole> {
@@ -62,11 +66,11 @@ export async function tenantBrandKit(db: D1Database, tenantId: string): Promise<
   return { name, accent, accentFg, logoUrl };
 }
 
-function notifEmailHtml(env: Env, brand: BrandKit, r: { title: string; message?: string | null; link: string | null }): string {
+function notifEmailHtml(env: Env, brand: BrandKit, r: { title: string; message?: string | null; link: string | null; footnote?: string | null }): string {
   const base = env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
   const href = r.link && base ? `${base}${r.link.startsWith("/") ? "" : "/"}${r.link}` : null;
   const body = `${r.message ? `<p style="margin:0">${escapeHtml(r.message)}</p>` : ""}${href ? emailButton(`Open ${brand.name}`, href, brand) : ""}`;
-  return emailShell(escapeHtml(r.title), body, { brand, preheader: r.message ?? r.title });
+  return emailShell(escapeHtml(r.title), body, { brand, preheader: r.message ?? r.title, footnote: r.footnote ?? undefined });
 }
 
 /** Deliver a notification to one user, honoring their preferences. */
@@ -93,9 +97,10 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
       env.DB.prepare("SELECT notif_policy_json FROM tenant_settings WHERE tenant_id = ?").bind(input.tenantId).first<{ notif_policy_json: string | null }>(),
     ]);
     channels = resolveChannels(role, parseNotifPrefs(prefRow?.notif_json ?? null), category);
-    // The owner can globally disable email for a category studio-wide; the
-    // member's inbox choice is never overridden, only their email channel.
-    if (channels.email && !emailAllowedByPolicy(parseNotifPolicy(polRow?.notif_policy_json ?? null), category)) {
+    // The owner can disable email for a category studio-wide, now per AUDIENCE
+    // (clients vs staff); the member's inbox choice is never overridden, only
+    // their email channel.
+    if (channels.email && !emailAllowedByPolicy(parseNotifPolicy(polRow?.notif_policy_json ?? null), category, audienceForRole(role))) {
       channels.email = false;
     }
   }
@@ -111,14 +116,53 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
   if (channels.email) {
     const user = await env.DB.prepare("SELECT email FROM \"user\" WHERE id = ?").bind(userId).first<{ email: string | null }>();
     if (user?.email) {
-      const brand = await tenantBrandKit(env.DB, input.tenantId);
-      await sendTenantEmail(env, input.tenantId, {
-        to: user.email,
-        subject: title,
-        html: input.emailHtml ?? notifEmailHtml(env, brand, { title, message: input.message, link }),
-        text: input.message ?? title,
-        brandName: brand.name,
-      }).catch(() => undefined);
+      // Studio-billing (Mossa → tenant) emails send on the PLATFORM rail with
+      // Mossa's own identity, unmetered — a studio's suspension notice is from
+      // Mossa, not the studio, and shouldn't cost the studio a credit. Everything
+      // else is the tenant's own message: tenant rail + tenant brand.
+      const isPlatformBilling = category === "billing";
+      const brand = isPlatformBilling ? MOSSA_BRAND : await tenantBrandKit(env.DB, input.tenantId);
+      // Tenant white-label (tenant rail only): a per-type subject/body override
+      // and a global signature. An override with enabled=0 mutes this email
+      // entirely (the inbox row above still delivers).
+      let override: { subject: string | null; body: string | null; enabled: number } | null = null;
+      let signature: string | null = null;
+      if (!isPlatformBilling) {
+        const [ov, sig] = await Promise.all([
+          env.DB.prepare("SELECT subject, body, enabled FROM email_templates WHERE tenant_id = ? AND type = ?").bind(input.tenantId, input.type).first<{ subject: string | null; body: string | null; enabled: number }>(),
+          env.DB.prepare("SELECT email_signature FROM tenant_settings WHERE tenant_id = ?").bind(input.tenantId).first<{ email_signature: string | null }>(),
+        ]);
+        override = ov ?? null;
+        signature = sig?.email_signature ?? null;
+      }
+      if (override && override.enabled === 0) {
+        // Tenant muted email for this type — inbox already delivered, nothing to send.
+      } else {
+        // Prefer a tenant override, then the registry template, then the generic
+        // card. Values are HTML-escaped for the body; the subject is plain text.
+        const tpl = override && override.subject ? { subject: override.subject, body: override.body ?? "" } : notifTemplateOf(input.type);
+        const footnote = signature ? escapeHtml(signature) : undefined;
+        let subject = title;
+        let html: string;
+        if (input.emailHtml) {
+          html = input.emailHtml;
+        } else if (tpl) {
+          const base = env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
+          const href = link && base ? `${base}${link.startsWith("/") ? "" : "/"}${link}` : null;
+          const raw: Record<string, string | number | null | undefined> = { studioName: brand.name, ...(input.vars ?? {}) };
+          const esc = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, escapeHtml(v === undefined || v === null ? "" : String(v))]));
+          subject = renderTemplate(tpl.subject, raw);
+          const inner = renderTemplate(tpl.body, esc) + (href ? emailButton(`Open ${brand.name}`, href, brand) : "");
+          html = emailShell(escapeHtml(subject), inner, { brand, preheader: subject, footnote });
+        } else {
+          html = notifEmailHtml(env, brand, { title, message: input.message, link, footnote: signature });
+        }
+        if (isPlatformBilling) {
+          await sendEmail(env.DB, { to: user.email, subject, html, text: input.message ?? subject }, env.EMAIL, undefined, env.ENVIRONMENT === "development").catch(() => undefined);
+        } else {
+          await sendTenantEmail(env, input.tenantId, { to: user.email, subject, html, text: input.message ?? subject, brandName: brand.name }).catch(() => undefined);
+        }
+      }
     }
   }
   } catch { /* notification is best-effort; never surface to the caller */ }

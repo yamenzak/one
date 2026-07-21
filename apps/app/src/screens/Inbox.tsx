@@ -1,0 +1,97 @@
+/** Notifications inbox — the full, grouped-by-day list behind the bell's
+ *  "See all". Surface-aware (client vs coach mode), click-through, mark-all. */
+
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button, Card, Page, Stagger, SectionHeader, IconBadge, EmptyState, Reveal, SkeletonList, Bell, CheckCheck, ArrowLeft } from "@mossa/ui";
+import { notifVisibleInSurface, unreadInSurface, type NotifType, type NotifSurface } from "@mossa/domain";
+import { api } from "../api.js";
+import { useSession } from "../session.js";
+import { notifCoding } from "../notif-ui.js";
+
+interface Notification { id: string; type: NotifType; tenant_id: string | null; title: string; message: string | null; link: string | null; read: number; created_at: string }
+
+/** "Today" / "Yesterday" / a localized date, for day grouping. */
+function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOf(now) - startOf(d)) / 86400000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  return d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+}
+
+export function Inbox({ onBack }: { onBack: () => void }) {
+  const { ctx, mode, setMode, switchTenant } = useSession();
+  const nav = useNavigate();
+  const [items, setItems] = useState<Notification[] | null>(null);
+  const surface: NotifSurface = ctx?.active?.role === "client" || mode === "train" ? "client" : "staff";
+  const activeTenantId = ctx?.active?.tenantId ?? null;
+
+  const load = useCallback(async () => {
+    setItems((await api.get<{ notifications: Notification[] }>("/api/notifications")).notifications);
+  }, []);
+  useEffect(() => void load().catch(() => setItems([])), [load]);
+
+  const shown = (items ?? []).filter((n) => notifVisibleInSurface(n.type, surface));
+  const unread = unreadInSurface(items ?? [], surface);
+  const markAll = async () => {
+    await api.post("/api/notifications/read-all", { surface }).catch(() => undefined);
+    setItems((p) => (p ?? []).map((n) => (notifVisibleInSurface(n.type, surface) ? { ...n, read: 1 } : n)));
+  };
+  const open = async (n: Notification) => {
+    api.post(`/api/notifications/${n.id}/read`).catch(() => undefined);
+    setItems((p) => (p ?? []).map((x) => (x.id === n.id ? { ...x, read: 1 } : x)));
+    if (n.tenant_id && n.tenant_id !== activeTenantId) { try { await switchTenant(n.tenant_id); } catch { /* stay */ } }
+    if (mode !== "train" && surface === "client") setMode("train");
+    if (n.link) nav(n.link);
+  };
+
+  // Group consecutive items by day (already sorted newest-first by the API).
+  const groups: { label: string; items: Notification[] }[] = [];
+  for (const n of shown) {
+    const label = dayLabel(n.created_at);
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) last.items.push(n);
+    else groups.push({ label, items: [n] });
+  }
+
+  return (
+    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+      <div className="flex items-center gap-3">
+        <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
+        <h1 className="flex-1 text-xl font-bold tracking-tight">Notifications</h1>
+        {unread > 0 && <Button size="sm" variant="ghost" onClick={() => void markAll()}><CheckCheck /> Mark all read</Button>}
+      </div>
+
+      <Reveal loading={items === null} className="space-y-5" skeleton={<SkeletonList card rows={6} thumb={36} />}>
+        {items !== null && (shown.length === 0 ? (
+          <EmptyState icon={Bell} title="You're all caught up" description="New notifications for this view will show up here." />
+        ) : (
+          groups.map((g) => (
+            <div key={g.label} className="space-y-2">
+              <div className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{g.label}</div>
+              <Stagger className="space-y-2">
+                {g.items.map((n) => {
+                  const { icon, tone } = notifCoding(n.type);
+                  return (
+                    <Card key={n.id} onClick={() => void open(n)} className={`flex cursor-pointer items-start gap-3 transition-colors hover:bg-secondary ${n.read ? "opacity-60" : ""}`}>
+                      <IconBadge icon={icon} tone={tone} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium">{n.title}</div>
+                        {n.message && <div className="mt-0.5 text-sm text-muted-foreground">{n.message}</div>}
+                        <div className="mt-1 text-xs text-muted-foreground">{new Date(n.created_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</div>
+                      </div>
+                      {!n.read && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />}
+                    </Card>
+                  );
+                })}
+              </Stagger>
+            </div>
+          ))
+        ))}
+      </Reveal>
+    </Page>
+  );
+}

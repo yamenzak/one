@@ -5,8 +5,9 @@ import { Button, Card, Badge, Field, Page, Stagger, IconBadge, SectionHeader, Co
 import { CLIENT_FLAG_CATEGORIES, CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
+import { PaymentSheet, type CheckoutIntent } from "../../PaymentSheet.js";
 
-interface Pkg { id: string; name: string; description: string | null; one_time_price_cents: number | null; monthly_price_cents?: number | null; budgets: { feature: string; days: number }[]; visibility: string }
+interface Pkg { id: string; name: string; description: string | null; one_time_price_cents: number | null; monthly_price_cents?: number | null; installment_months?: number | null; budgets: { feature: string; days: number }[]; visibility: string }
 interface Sub { status: string; daysRemaining: number; autoRenew?: boolean }
 
 /** The client Shop. In `locked` mode it IS the access gate: no way back into the
@@ -33,9 +34,30 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
     catch (e) { setMsg(e instanceof Error && e.message.includes("not found") ? "That code isn't valid." : "Couldn't redeem that code."); }
     finally { setBusy(false); }
   };
+  // Recurring subscriptions use hosted Checkout (Stripe provisions the
+  // connected-account customer + price for us).
   const buy = async (packageId: string) => {
     try { const r = await api.post<{ url: string }>("/api/connect/checkout", { clientId, packageId, returnUrl: location.href }); location.href = r.url; }
     catch { setMsg("Checkout isn't available yet — ask your coach to finish Stripe setup."); }
+  };
+  // One-time packages check out inline (Payment Element) on the tenant's account.
+  const [checkout, setCheckout] = useState<{ intent: CheckoutIntent; name: string; price: string } | null>(null);
+  const [buyPromo, setBuyPromo] = useState("");
+  const promoMsg = (m: string): string => ({ not_found: "That promo code isn't valid.", inactive: "That code is no longer active.", expired: "That code has expired.", exhausted: "That code has been fully used.", wrong_package: "That code doesn't apply to this package.", wrong_client: "That code isn't available on your account." }[m.replace("promo_", "")] ?? "That promo code can't be applied.");
+  const buyInline = async (p: Pkg) => {
+    setMsg(null);
+    try {
+      const r = await api.post<{ clientSecret?: string; publishableKey?: string; stripeAccount?: string; granted?: boolean }>("/api/connect/pay-intent", { clientId, packageId: p.id, promoCode: buyPromo || undefined });
+      if (r.granted) { setMsg("Access unlocked!"); await load(); await refresh(); return; } // promo covered it fully
+      if (r.clientSecret && r.publishableKey) setCheckout({ intent: { clientSecret: r.clientSecret, publishableKey: r.publishableKey, stripeAccount: r.stripeAccount }, name: p.name, price: `$${((p.one_time_price_cents ?? 0) / 100).toFixed(0)}` });
+      else setMsg("Checkout isn't available yet — ask your coach to finish Stripe setup.");
+    } catch (e) { setMsg(e instanceof Error && e.message.startsWith("promo_") ? promoMsg(e.message) : "Checkout isn't available yet — ask your coach to finish Stripe setup."); }
+  };
+  const onPaid = async () => {
+    setCheckout(null);
+    setMsg("Payment received — your access updates in a moment.");
+    await load();
+    await refresh();
   };
   const cancelRenew = async () => {
     setBusy(true); setMsg(null);
@@ -105,6 +127,9 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
       {packages.length > 0 && (
         <div className="space-y-3">
           <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Packages</h3>
+          {packages.some((p) => p.one_time_price_cents && !p.monthly_price_cents && !(p.installment_months && p.installment_months > 1)) && (
+            <Field label="Promo code (optional)" icon={Ticket} value={buyPromo} onChange={(e) => setBuyPromo(e.target.value.toUpperCase())} placeholder="SUMMER20" />
+          )}
           {packages.map((p) => (
             <Stagger key={p.id}>
               <Card>
@@ -114,12 +139,14 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
                     {p.description && <div className="mt-0.5 text-sm text-muted-foreground">{p.description}</div>}
                     <div className="mt-2 flex flex-wrap gap-1">{p.budgets.map((b, i) => <Badge key={i} tone="activity">{b.days}d {b.feature}</Badge>)}</div>
                   </div>
-                  <div className="numeral shrink-0 text-xl font-bold">{p.monthly_price_cents ? <span>${(p.monthly_price_cents / 100).toFixed(0)}<span className="text-sm font-medium text-muted-foreground">/mo</span></span> : p.one_time_price_cents ? `$${(p.one_time_price_cents / 100).toFixed(0)}` : <Badge tone="success">Free</Badge>}</div>
+                  <div className="numeral shrink-0 text-xl font-bold">{p.monthly_price_cents ? <span>${(p.monthly_price_cents / 100).toFixed(0)}<span className="text-sm font-medium text-muted-foreground">/mo</span></span> : p.one_time_price_cents ? (<span>${(p.one_time_price_cents / 100).toFixed(0)}{p.installment_months && p.installment_months > 1 ? <span className="text-sm font-medium text-muted-foreground"> · {p.installment_months}× ${Math.ceil(p.one_time_price_cents / 100 / p.installment_months)}/mo</span> : null}</span>) : <Badge tone="success">Free</Badge>}</div>
                 </div>
                 {p.monthly_price_cents ? (
                   <Button className="mt-4 w-full" onClick={() => void buy(p.id)}>Subscribe</Button>
+                ) : p.installment_months && p.installment_months > 1 && p.one_time_price_cents ? (
+                  <Button className="mt-4 w-full" onClick={() => void buy(p.id)}>Pay in {p.installment_months} months</Button>
                 ) : p.one_time_price_cents ? (
-                  <Button className="mt-4 w-full" onClick={() => void buy(p.id)}>Buy</Button>
+                  <Button className="mt-4 w-full" onClick={() => void buyInline(p)}>Buy</Button>
                 ) : (
                   <p className="mt-3 text-xs text-muted-foreground">Ask your coach to add this to your account.</p>
                 )}
@@ -141,6 +168,15 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
         cancelLabel="Keep it"
         destructive
         onConfirm={() => void cancelRenew()}
+      />
+
+      <PaymentSheet
+        open={!!checkout}
+        onClose={() => setCheckout(null)}
+        title={checkout ? `Buy ${checkout.name}` : "Checkout"}
+        intent={checkout?.intent ?? null}
+        submitLabel={checkout ? `Pay ${checkout.price}` : "Pay"}
+        onSuccess={onPaid}
       />
     </Page>
   );

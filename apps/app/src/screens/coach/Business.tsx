@@ -1,19 +1,22 @@
 /** Owner Business — tabbed: overview (plan + credits + AI usage), packages, staff. */
 
 import { useEffect, useState } from "react";
-import { Button, Card, Badge, StatCard, SegmentedControl, Page, Stagger, ChartCard, SectionHeader, IconBadge, EmptyState, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Sparkles, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, CheckCheck, Check, Lock } from "@mossa/ui";
+import { Button, Card, Badge, StatCard, SegmentedControl, Field, Page, Stagger, ChartCard, SectionHeader, IconBadge, EmptyState, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Sparkles, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, CheckCheck, Check, Lock, Tag } from "@mossa/ui";
 import { FEATURE_KEYS, FEATURE_META, QUOTA_KEYS, QUOTA_META, type Entitlements } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
+import { PaymentSheet, type CheckoutIntent } from "../../PaymentSheet.js";
 import { Staff } from "./Staff.js";
 import { Packages } from "./Packages.js";
 
 interface Billing {
   subscription: { planId: string; planName: string; status: string; comp: boolean; currentPeriodEnd?: string | null };
-  balance: { balance: number; available: number };
+  balance: { balance: number; purchased: number; granted: number; available: number };
   packs: { id: string; name: string; credits: number; price_usd: number }[];
+  plans?: { id: string; name: string; priceUsdMonth: number }[];
   ledger: { delta: number; reason: string; at: number }[];
   stripeEnabled?: boolean;
+  publishableKey?: string | null;
   connect?: { connected: boolean; chargesEnabled: boolean; detailsSubmitted: boolean };
   clientBilling?: { lapsed: number; expiringSoon: number; active: number };
 }
@@ -29,6 +32,19 @@ interface AiUsage { usage: { feature: string; calls: number; credits: number }[]
 type Tab = "overview" | "packages" | "staff";
 
 const featLabel = (f: string) => f.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+
+/** Friendly copy for a `promo_<reason>` checkout error. */
+function promoError(code: string): string {
+  const reason = code.replace("promo_", "");
+  return {
+    not_found: "That promo code isn't valid.",
+    inactive: "That promo code is no longer active.",
+    expired: "That promo code has expired.",
+    exhausted: "That promo code has been fully used.",
+    wrong_package: "That code doesn't apply to this item.",
+    wrong_client: "That code isn't available on your account.",
+  }[reason] ?? "That promo code can't be applied.";
+}
 
 export function Business() {
   const { ctx } = useSession();
@@ -74,6 +90,29 @@ function Overview() {
       const r = await api.post<{ url: string }>(path, { returnUrl: location.href });
       if (r.url) location.href = r.url;
     } catch { setBusy(null); }
+  };
+  // Inline (Payment Element) flows — no redirect; the Sheet confirms in place.
+  const [checkout, setCheckout] = useState<{ intent: CheckoutIntent; title: string; label: string } | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [packPromo, setPackPromo] = useState("");
+  const startInline = async (path: string, body: Record<string, unknown>, title: string, label: string, key: string) => {
+    setBusy(key);
+    try {
+      const r = await api.post<{ clientSecret?: string; publishableKey?: string; granted?: boolean }>(path, body);
+      if (r.granted) { onPaid(); return; } // promo covered it fully — nothing to charge
+      if (r.clientSecret && r.publishableKey) setCheckout({ intent: { clientSecret: r.clientSecret, publishableKey: r.publishableKey }, title, label });
+      else setFlash("Couldn't start checkout — Stripe isn't fully configured yet.");
+    } catch (e) {
+      const msg = e instanceof Error && e.message.startsWith("promo_") ? promoError(e.message) : "Couldn't start checkout. Please try again.";
+      setFlash(msg);
+    } finally { setBusy(null); }
+  };
+  const onPaid = () => {
+    setCheckout(null);
+    setFlash("Payment received — your balance updates in a moment.");
+    // The webhook grants asynchronously; refetch now and again shortly after.
+    setReloadKey((k) => k + 1);
+    setTimeout(() => setReloadKey((k) => k + 1), 2500);
   };
   const top = [...aiUsage].sort((a, b) => b.credits - a.credits).slice(0, 7);
   const maxCr = Math.max(...top.map((u) => u.credits), 1);
@@ -182,17 +221,53 @@ function Overview() {
           <Stagger>
             <Card className="space-y-3">
               <SectionHeader icon={CreditCard} tone="primary" title="Credit packs" />
+              {/* Purchased credits never expire; the monthly plan grant resets each period. */}
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="numeral">{billing.balance.purchased.toLocaleString()} purchased</span>
+                <span className="text-muted-foreground/40">·</span>
+                <span className="numeral">{billing.balance.granted.toLocaleString()} monthly</span>
+                <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[0.65rem]">resets monthly</span>
+              </div>
+              {isOwner && billing.stripeEnabled && (
+                <Field label="Promo code (optional)" icon={Tag} value={packPromo} onChange={(e) => setPackPromo(e.target.value.toUpperCase())} placeholder="SUMMER20" />
+              )}
               <div className="space-y-1.5">
                 {billing.packs.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2.5">
+                  <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5">
                     <div><div className="text-sm font-medium">{p.name}</div><div className="numeral text-xs text-muted-foreground">{p.credits.toLocaleString()} credits</div></div>
-                    <Badge tone="primary">${p.price_usd}</Badge>
+                    {isOwner && billing.stripeEnabled ? (
+                      <Button size="sm" variant="tonal" disabled={busy === `pack_${p.id}`} onClick={() => void startInline("/api/billing/pack-intent", { packId: p.id, promoCode: packPromo || undefined }, `Buy ${p.name}`, `Pay $${p.price_usd}`, `pack_${p.id}`)}>
+                        {busy === `pack_${p.id}` ? "…" : `$${p.price_usd}`}
+                      </Button>
+                    ) : (
+                      <Badge tone="primary">${p.price_usd}</Badge>
+                    )}
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">Purchasing arrives with the Stripe phase.</p>
+              {!billing.stripeEnabled && <p className="text-xs text-muted-foreground">Credit-pack purchasing turns on once Stripe is configured.</p>}
             </Card>
           </Stagger>
+
+          {/* Plan subscribe / change — inline (no redirect). Hidden for comped tenants. */}
+          {isOwner && billing.stripeEnabled && !billing.subscription.comp && billing.plans && billing.plans.filter((p) => p.priceUsdMonth > 0 && p.id !== billing.subscription.planId).length > 0 && (
+            <Stagger>
+              <Card className="space-y-3">
+                <SectionHeader icon={Sparkles} tone="primary" title={billing.subscription.status === "active" ? "Change plan" : "Choose a plan"} />
+                <div className="space-y-1.5">
+                  {billing.plans.filter((p) => p.priceUsdMonth > 0 && p.id !== billing.subscription.planId).map((p) => (
+                    <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5">
+                      <div><div className="text-sm font-medium">{p.name}</div><div className="numeral text-xs text-muted-foreground">${p.priceUsdMonth}/mo</div></div>
+                      <Button size="sm" variant="tonal" disabled={busy === `plan_${p.id}`} onClick={() => void startInline("/api/billing/plan-intent", { planId: p.id }, `Subscribe to ${p.name}`, `Subscribe · $${p.priceUsdMonth}/mo`, `plan_${p.id}`)}>
+                        {busy === `plan_${p.id}` ? "…" : "Select"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">Billed monthly. Plan credits refresh each period; unused plan credits don't roll over.</p>
+              </Card>
+            </Stagger>
+          )}
 
           {billing.ledger.length > 0 && (
             <Stagger>
@@ -214,6 +289,16 @@ function Overview() {
         )}
       </Reveal>
       )}
+
+      {flash && <p className="text-center text-sm text-muted-foreground" role="status">{flash}</p>}
+      <PaymentSheet
+        open={!!checkout}
+        onClose={() => setCheckout(null)}
+        title={checkout?.title ?? "Checkout"}
+        intent={checkout?.intent ?? null}
+        submitLabel={checkout?.label ?? "Pay"}
+        onSuccess={onPaid}
+      />
     </Page>
   );
 }

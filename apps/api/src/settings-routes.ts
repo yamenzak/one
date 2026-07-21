@@ -8,7 +8,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { AI_TONES, TTS_VOICES, TTS_VOICE_IDS } from "@mossa/protocol";
-import { categoriesForRole, resolveAllChannels, parseNotifPrefs, NOTIF_CATEGORIES, parseNotifPolicy, resolveEmailPolicy, sanitizeEmailPolicy, type NotifRole, type StoredNotifPrefs } from "@mossa/domain";
+import { categoriesForRole, resolveAllChannels, parseNotifPrefs, NOTIF_CATEGORIES, parseNotifPolicy, resolveEmailPolicy, sanitizeEmailPolicy, NOTIF_TYPES, notifTemplateOf, notifVarsOf, notifCategoryOf, notifTitleOf, type NotifRole, type NotifType, type StoredNotifPrefs } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { tenantEntitlements, getConfig } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
@@ -38,9 +38,13 @@ export const settingsRoutes = new Hono<AppEnv>()
       integrationProviders: PROVIDERS,
       email: maskEmailConfig(resolveEmailConfig(parseJson(row?.email_config_json ?? null, {}))),
       emailPlatformFrom: platformFrom,
-      // Owner-governed studio-wide email allow-list, by category.
+      // Owner-governed studio-wide email allow-list, by category AND audience
+      // (email clients vs staff about a category, separately).
       notifCategories: NOTIF_CATEGORIES,
-      notifPolicy: resolveEmailPolicy(parseNotifPolicy(row?.notif_policy_json ?? null)),
+      notifPolicy: {
+        client: resolveEmailPolicy(parseNotifPolicy(row?.notif_policy_json ?? null), "client"),
+        staff: resolveEmailPolicy(parseNotifPolicy(row?.notif_policy_json ?? null), "staff"),
+      },
       stripeConnected: Boolean(row?.stripe_account_id),
       entitlements: ent,
     });
@@ -89,8 +93,11 @@ export const settingsRoutes = new Hono<AppEnv>()
           senderEmail: z.string().max(200).optional(),
           senderName: z.string().max(120).optional(),
         }).optional(),
-        // Studio-wide email allow-list: category → whether members may be emailed.
-        notifPolicy: z.record(z.string(), z.boolean()).optional(),
+        // Studio-wide email allow-list, per audience: category → may email.
+        notifPolicy: z.object({
+          client: z.record(z.string(), z.boolean()).optional(),
+          staff: z.record(z.string(), z.boolean()).optional(),
+        }).optional(),
       })
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
@@ -144,8 +151,12 @@ export const settingsRoutes = new Hono<AppEnv>()
 
     // Studio-wide email allow-list, merged category-by-category (unknown keys dropped).
     if (d.notifPolicy) {
-      const cur = parseNotifPolicy((await c.env.DB.prepare("SELECT notif_policy_json FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ notif_policy_json: string | null }>())?.notif_policy_json ?? null).emailCategories ?? {};
-      const next = { emailCategories: { ...cur, ...sanitizeEmailPolicy(d.notifPolicy) } };
+      const cur = parseNotifPolicy((await c.env.DB.prepare("SELECT notif_policy_json FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ notif_policy_json: string | null }>())?.notif_policy_json ?? null);
+      const emailAudience: Record<string, Record<string, boolean>> = { ...(cur.emailAudience as Record<string, Record<string, boolean>> ?? {}) };
+      for (const a of ["client", "staff"] as const) {
+        if (d.notifPolicy[a]) emailAudience[a] = { ...(emailAudience[a] ?? {}), ...sanitizeEmailPolicy(d.notifPolicy[a]!) };
+      }
+      const next = { ...(cur.emailCategories ? { emailCategories: cur.emailCategories } : {}), emailAudience };
       await c.env.DB.prepare("UPDATE tenant_settings SET notif_policy_json = ?, updated_at = ? WHERE tenant_id = ?").bind(j(next), nowIso(), who.tenantId).run();
     }
     return c.json({ ok: true });
@@ -175,6 +186,66 @@ export const settingsRoutes = new Hono<AppEnv>()
     await c.env.DB.prepare(
       "INSERT INTO user_prefs (user_id, notif_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET notif_json = ?, updated_at = ?",
     ).bind(who.userId, j(cur), nowIso(), j(cur), nowIso()).run();
+    return c.json({ ok: true });
+  })
+
+  // ── Email white-label (owner): per-type template overrides + a signature ─────
+  // Lists every templatable type with its registry default merged with any
+  // tenant override, plus the exposed {{variables}} and the global signature.
+  .get("/email-templates", async (c) => {
+    const who = requireTenant(c)!;
+    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
+    const rows = await c.env.DB.prepare("SELECT type, subject, body, enabled FROM email_templates WHERE tenant_id = ?").bind(who.tenantId).all<{ type: string; subject: string | null; body: string | null; enabled: number }>();
+    const overrides = new Map((rows.results ?? []).map((r) => [r.type, r]));
+    const sig = await c.env.DB.prepare("SELECT email_signature FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ email_signature: string | null }>();
+    const templates = (Object.keys(NOTIF_TYPES) as NotifType[])
+      .filter((t) => notifTemplateOf(t))
+      .map((t) => {
+        const def = notifTemplateOf(t)!;
+        const ov = overrides.get(t);
+        return {
+          type: t,
+          label: notifTitleOf(t) ?? t.replace(/_/g, " "),
+          category: notifCategoryOf(t),
+          vars: ["studioName", ...notifVarsOf(t)],
+          defaultSubject: def.subject,
+          defaultBody: def.body,
+          subject: ov?.subject ?? def.subject,
+          body: ov?.body ?? def.body,
+          enabled: ov ? ov.enabled === 1 : true,
+          customized: !!ov,
+        };
+      });
+    return c.json({ templates, signature: sig?.email_signature ?? "" });
+  })
+
+  .put("/email-templates/:type", async (c) => {
+    const who = requireTenant(c)!;
+    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
+    const type = c.req.param("type");
+    if (!(type in NOTIF_TYPES) || !notifTemplateOf(type as NotifType)) return c.json({ error: "not a templatable type" }, 400);
+    const b = z.object({ subject: z.string().max(200), body: z.string().max(8000), enabled: z.boolean().default(true) }).safeParse(await c.req.json().catch(() => null));
+    if (!b.success) return c.json({ error: "invalid body" }, 400);
+    await c.env.DB.prepare(
+      "INSERT INTO email_templates (tenant_id, type, subject, body, enabled, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(tenant_id, type) DO UPDATE SET subject = excluded.subject, body = excluded.body, enabled = excluded.enabled, updated_at = excluded.updated_at",
+    ).bind(who.tenantId, type, b.data.subject, b.data.body, b.data.enabled ? 1 : 0, nowIso()).run();
+    return c.json({ ok: true });
+  })
+
+  // Reset a type to its registry default (drop the override).
+  .delete("/email-templates/:type", async (c) => {
+    const who = requireTenant(c)!;
+    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
+    await c.env.DB.prepare("DELETE FROM email_templates WHERE tenant_id = ? AND type = ?").bind(who.tenantId, c.req.param("type")).run();
+    return c.json({ ok: true });
+  })
+
+  .put("/email-signature", async (c) => {
+    const who = requireTenant(c)!;
+    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
+    const b = z.object({ signature: z.string().max(600) }).safeParse(await c.req.json().catch(() => null));
+    if (!b.success) return c.json({ error: "invalid body" }, 400);
+    await c.env.DB.prepare("UPDATE tenant_settings SET email_signature = ? WHERE tenant_id = ?").bind(b.data.signature || null, who.tenantId).run();
     return c.json({ ok: true });
   })
 

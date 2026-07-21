@@ -2,6 +2,7 @@ export * from "./credits.js";
 export * from "./entitlements.js";
 export * from "./perms.js";
 export * from "./budgets.js";
+export * from "./promo.js";
 export * from "./clientFlags.js";
 export * from "./nutrition.js";
 export * from "./body.js";

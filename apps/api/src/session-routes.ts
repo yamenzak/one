@@ -68,7 +68,7 @@ export const sessionRoutes = new Hono<AppEnv>()
       .bind(id, who.tenantId, access.client.id, who.userId, sub?.id ?? null, b.data.addOnTypeId, b.data.scheduledAt, b.data.durationMinutes, b.data.notes ?? null, nowIso())
       .run();
     if (access.client.user_id) {
-      await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "session_booked", message: new Date(b.data.scheduledAt).toLocaleString() });
+      await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "session_booked", message: new Date(b.data.scheduledAt).toLocaleString(), vars: { sessionTime: new Date(b.data.scheduledAt).toLocaleString() } });
     }
     return c.json({ ok: true, id }, 201);
   })
@@ -117,32 +117,35 @@ export const sessionRoutes = new Hono<AppEnv>()
     }
     if (changed && (target === "cancelled" || target === "no_show")) {
       const cl = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null }>();
-      if (cl?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: cl.user_id, type: "session_cancelled", message: new Date(row.scheduled_at).toLocaleString() });
+      if (cl?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: cl.user_id, type: "session_cancelled", message: new Date(row.scheduled_at).toLocaleString(), vars: { sessionTime: new Date(row.scheduled_at).toLocaleString() } });
     }
     return c.json({ ok: true });
   });
 
-/** Promo codes (Stripe discounts) — distinct from redemption day top-ups. */
+/** Promo codes (website-native discounts on a tenant's client purchases) —
+ *  distinct from redemption day top-ups. Percentage or fixed; optionally
+ *  exclusive to a specific package and/or a specific client. Applied at checkout
+ *  by the tenant rail (connect/pay-intent); never a Stripe coupon. */
 export const promoRoutes = new Hono<AppEnv>()
   .get("/promo-codes", async (c) => {
     const who = requireTenant(c)!;
-    const rows = await c.env.DB.prepare("SELECT id, code, discount_type, percent_off, amount_off_cents, max_redemptions, redemption_count, expires_at, active FROM promo_codes WHERE tenant_id = ? ORDER BY created_at DESC").bind(who.tenantId).all();
+    const rows = await c.env.DB.prepare("SELECT id, code, discount_type, percent_off, amount_off_cents, restricted_package_id, restricted_client_id, max_redemptions, redemption_count, expires_at, active FROM promo_codes WHERE tenant_id = ? AND scope = 'tenant' ORDER BY created_at DESC").bind(who.tenantId).all();
     return c.json({ codes: rows.results ?? [] });
   })
   .post("/promo-codes", async (c) => {
     const who = requireTenant(c)!;
-    const b = z.object({ code: z.string().min(3).max(40), discountType: z.enum(["percent", "amount"]).default("percent"), percentOff: z.number().int().min(1).max(100).nullish(), amountOffCents: z.number().int().positive().nullish(), maxRedemptions: z.number().int().positive().nullish(), expiresAt: z.string().nullish() }).safeParse(await c.req.json().catch(() => null));
+    const b = z.object({ code: z.string().min(3).max(40), discountType: z.enum(["percent", "amount"]).default("percent"), percentOff: z.number().int().min(1).max(100).nullish(), amountOffCents: z.number().int().positive().nullish(), restrictedPackageId: z.string().nullish(), restrictedClientId: z.string().nullish(), maxRedemptions: z.number().int().positive().nullish(), expiresAt: z.string().nullish() }).safeParse(await c.req.json().catch(() => null));
     if (!b.success) return c.json({ error: "invalid body" }, 400);
     const id = newId("promo");
     try {
-      await c.env.DB.prepare("INSERT INTO promo_codes (id, tenant_id, code, discount_type, percent_off, amount_off_cents, max_redemptions, expires_at, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .bind(id, who.tenantId, b.data.code.toUpperCase(), b.data.discountType, b.data.percentOff ?? null, b.data.amountOffCents ?? null, b.data.maxRedemptions ?? null, b.data.expiresAt ?? null, who.userId, nowIso())
+      await c.env.DB.prepare("INSERT INTO promo_codes (id, tenant_id, code, discount_type, percent_off, amount_off_cents, restricted_package_id, restricted_client_id, scope, max_redemptions, expires_at, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'tenant', ?, ?, ?, ?)")
+        .bind(id, who.tenantId, b.data.code.toUpperCase(), b.data.discountType, b.data.percentOff ?? null, b.data.amountOffCents ?? null, b.data.restrictedPackageId ?? null, b.data.restrictedClientId ?? null, b.data.maxRedemptions ?? null, b.data.expiresAt ?? null, who.userId, nowIso())
         .run();
     } catch { return c.json({ error: "code already exists" }, 409); }
     return c.json({ ok: true, id }, 201);
   })
   .delete("/promo-codes/:id", async (c) => {
     const who = requireTenant(c)!;
-    await c.env.DB.prepare("UPDATE promo_codes SET active = 0 WHERE id = ? AND tenant_id = ?").bind(c.req.param("id"), who.tenantId).run();
+    await c.env.DB.prepare("UPDATE promo_codes SET active = 0 WHERE id = ? AND tenant_id = ? AND scope = 'tenant'").bind(c.req.param("id"), who.tenantId).run();
     return c.json({ ok: true });
   });

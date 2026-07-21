@@ -333,6 +333,24 @@ describe("connect rail — webhook idempotency + grant", () => {
     expect(sub2.budgets.length).toBeGreaterThan(budgetsAfterCreate); // another period queued
     expect(sub2.daysRemaining).toBeGreaterThan(sub1.daysRemaining);
   });
+
+  it("inline one-time: payment_intent.succeeded grants the client package", async () => {
+    const db = env.DB as D1Database;
+    const secret = "whsec_connect_test";
+    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.connect_webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "InlineBuyer" }) })).json()) as { client: { id: string } };
+    const pkgId = "pkg_inline_ot";
+    await db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, active, created_at) VALUES (?, ?, ?, ?, ?, 'usd', 1, ?)")
+      .bind(pkgId, ctx.active.tenantId, "Inline Pack", 3000, JSON.stringify([{ feature: "all", days: 20 }]), new Date().toISOString()).run();
+    const payload = JSON.stringify({ id: "evt_pi_ot_1", type: "payment_intent.succeeded", data: { object: { id: "pi_ot_1", metadata: { mossa_tenant: ctx.active.tenantId, mossa_client: client.id, mossa_package: pkgId } } } });
+    const r = await SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
+    expect(r.status).toBe(200);
+    const subs = (await (await SELF.fetch(`http://x/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number; budgets: unknown[] }[] };
+    const granted = subs.subscriptions.find((s) => (s.budgets?.length ?? 0) > 0)!;
+    expect(granted.daysRemaining).toBeGreaterThan(15);
+  });
 });
 
 describe("auth — sign-out revokes the session", () => {
@@ -423,21 +441,24 @@ describe("notifications — email provider + per-user preferences", () => {
     expect(byDate["2026-04-01"]).toBe(null); // predates any reading → no context
   });
 
-  it("owner governs the studio-wide email allow-list, per category", async () => {
+  it("owner governs the studio-wide email allow-list, per audience (clients vs staff)", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const s0 = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as { notifCategories: { key: string }[]; notifPolicy: Record<string, boolean> };
+    type Pol = { notifCategories: { key: string }[]; notifPolicy: { client: Record<string, boolean>; staff: Record<string, boolean> } };
+    const s0 = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as Pol;
     expect(s0.notifCategories.some((c) => c.key === "body-composition")).toBe(true);
-    expect(s0.notifPolicy["body-composition"]).toBe(true); // default: allowed
+    expect(s0.notifPolicy.staff["body-composition"]).toBe(true); // default: allowed
 
-    // Disable one category's email studio-wide; junk keys are dropped.
-    await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ notifPolicy: { "body-composition": false, "nonsense-cat": true } }) });
-    const s1 = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as { notifPolicy: Record<string, boolean> };
-    expect(s1.notifPolicy["body-composition"]).toBe(false);
-    expect(s1.notifPolicy["labs"]).toBe(true); // untouched stays allowed
-    expect("nonsense-cat" in s1.notifPolicy).toBe(false);
+    // Disable STAFF email for a couple of categories; junk keys are dropped.
+    await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ notifPolicy: { staff: { "body-composition": false, labs: false, "nonsense-cat": true } } }) });
+    const s1 = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as Pol;
+    expect(s1.notifPolicy.staff["body-composition"]).toBe(false);
+    expect(s1.notifPolicy.staff["labs"]).toBe(false);
+    expect("nonsense-cat" in s1.notifPolicy.staff).toBe(false);
+    // The CLIENT audience is independent — labs email to clients stays allowed.
+    expect(s1.notifPolicy.client["labs"]).toBe(true);
 
-    // Re-enable so the flag doesn't leak into other suites.
-    await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ notifPolicy: { "body-composition": true } }) });
+    // Re-enable so the flags don't leak into other suites.
+    await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ notifPolicy: { staff: { "body-composition": true, labs: true } } }) });
   });
 });
 
@@ -1996,6 +2017,271 @@ describe("billing DO — reserve/settle invariants", () => {
     const broke = await stub.reserve(1000);
     expect(broke.ok).toBe(false);
     expect(broke.needed).toBe(1000);
+  });
+});
+
+describe("billing DO — two-bucket credits (purchased forever, granted no-rollover)", () => {
+  it("grant resets each period, purchased persist, and spending drains the grant first", async () => {
+    const BILLING = (env as unknown as { BILLING: DurableObjectNamespace }).BILLING;
+    type V = { ok?: boolean; balance: number; purchased: number; granted: number };
+    const stub = BILLING.get(BILLING.idFromName("do-buckets-tenant")) as unknown as {
+      bind: (t: string) => Promise<void>;
+      topUp: (c: number) => Promise<V>;
+      grantMonthly: (c: number, k: string) => Promise<V>;
+      charge: (c: number) => Promise<V>;
+    };
+    await stub.bind("do-buckets-tenant");
+    // A credit pack (purchased) plus this period's plan grant.
+    await stub.topUp(1000);
+    let v = await stub.grantMonthly(500, "2026-07");
+    expect([v.purchased, v.granted, v.balance]).toEqual([1000, 500, 1500]);
+    // Spend 300 — the grant drains first, purchased is untouched.
+    v = await stub.charge(300);
+    expect([v.granted, v.purchased]).toEqual([200, 1000]);
+    // A second grant in the SAME period is a no-op (idempotent).
+    v = await stub.grantMonthly(500, "2026-07");
+    expect(v.granted).toBe(200);
+    // A NEW period RESETS the grant: the unused 200 lapses (not 200+500=700).
+    v = await stub.grantMonthly(500, "2026-08");
+    expect([v.granted, v.purchased, v.balance]).toEqual([500, 1000, 1500]);
+    // Spending past the grant dips into the durable purchased bucket.
+    v = await stub.charge(700); // 500 from grant, 200 from purchased
+    expect([v.granted, v.purchased]).toEqual([0, 800]);
+  });
+});
+
+describe("platform rail — inline Stripe webhooks", () => {
+  async function sig(payload: string, secret: string): Promise<string> {
+    const t = Math.floor(Date.now() / 1000);
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${payload}`));
+    const hex = [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    return `t=${t},v1=${hex}`;
+  }
+  const secret = "whsec_platform_inline";
+  const post = async (payload: string) =>
+    SELF.fetch("http://x/api/stripe/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await sig(payload, secret) }, body: payload });
+
+  it("payment_intent.succeeded tops up the durable purchased bucket (inline pack)", async () => {
+    const db = env.DB as D1Database;
+    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const before = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
+    const payload = JSON.stringify({ id: "evt_pi_pack_1", type: "payment_intent.succeeded", data: { object: { id: "pi_pack_1", metadata: { mossa_tenant: ctx.active.tenantId, mossa_pack: "pack_1k", mossa_credits: "1000" } } } });
+    expect((await post(payload)).status).toBe(200);
+    const after = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
+    expect(after.balance.purchased - before.balance.purchased).toBe(1000);
+    // A redelivery of the same event id is a no-op (no double top-up).
+    await post(payload);
+    const again = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
+    expect(again.balance.purchased).toBe(after.balance.purchased);
+  });
+
+  it("an inline subscription going active (metadata-carried plan) activates the plan + grants credits", async () => {
+    // Isolated synthetic tenant so we don't perturb any cookie-backed tenant's plan.
+    const db = env.DB as D1Database;
+    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
+    const tenantId = "tenant_inline_sub_1";
+    await db.prepare("INSERT INTO subscriptions (tenant_id, plan_id, status, comp, stripe_customer_id, updated_at) VALUES (?, 'free', 'active', 0, 'cus_inline_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_customer_id = 'cus_inline_1'").bind(tenantId, new Date().toISOString()).run();
+    const cpe = Math.floor(Date.now() / 1000) + 30 * 86400;
+    const payload = JSON.stringify({ id: "evt_sub_inline_active", type: "customer.subscription.updated", data: { object: { id: "sub_inline_1", status: "active", customer: "cus_inline_1", current_period_end: cpe, metadata: { mossa_tenant: tenantId, mossa_plan: "solo" } } } });
+    expect((await post(payload)).status).toBe(200);
+    const row = (await db.prepare("SELECT plan_id, status FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<{ plan_id: string; status: string }>())!;
+    expect(row.plan_id).toBe("solo");
+    expect(row.status).toBe("active");
+    // The solo monthly grant (500) landed in the DO's `granted` bucket.
+    const BILLING = (env as unknown as { BILLING: DurableObjectNamespace }).BILLING;
+    const stub = BILLING.get(BILLING.idFromName(tenantId)) as unknown as { view: () => Promise<{ granted: number }> };
+    expect((await stub.view()).granted).toBeGreaterThanOrEqual(500);
+  });
+});
+
+describe("promo codes — website-native discounts (tenant rail)", () => {
+  it("a 100%-off code grants free, enforces max_redemptions, and honors client/package scope", async () => {
+    const db = env.DB as D1Database;
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    for (const [k, v] of [["stripe.mode", "test"], ["stripe.secret_key", "sk_test_x"]] as const) {
+      await db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v).run();
+    }
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, charges_enabled, updated_at) VALUES (?, 'acct_promo', 1, ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_promo', charges_enabled = 1").bind(ctx.active.tenantId, new Date().toISOString()).run();
+    const mk = async (name: string) => ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: name }) })).json()) as { client: { id: string } }).client.id;
+    const buyer = await mk("PromoBuyer");
+    const other = await mk("PromoOther");
+    const pkgId = "pkg_promo_ot";
+    await db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, visibility, active, created_at) VALUES (?, ?, ?, ?, ?, 'usd', 'marketplace', 1, ?)")
+      .bind(pkgId, ctx.active.tenantId, "Promo Pack", 5000, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
+
+    // A 100%-off code exclusive to `buyer` + this package, single use.
+    expect((await SELF.fetch("http://x/api/promo-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "FREE100", discountType: "percent", percentOff: 100, restrictedClientId: buyer, restrictedPackageId: pkgId, maxRedemptions: 1 }) })).status).toBe(201);
+
+    // Fully discounted → granted directly, no Stripe charge.
+    const r1 = await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: buyer, packageId: pkgId, promoCode: "FREE100" }) });
+    expect(r1.status).toBe(200);
+    expect((await r1.json() as { granted?: boolean }).granted).toBe(true);
+    const subs = (await (await SELF.fetch(`http://x/api/subscriptions?clientId=${buyer}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { budgets: unknown[] }[] };
+    expect(subs.subscriptions.some((s) => (s.budgets?.length ?? 0) > 0)).toBe(true);
+
+    // The single use is now spent.
+    const r2 = await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: buyer, packageId: pkgId, promoCode: "FREE100" }) });
+    expect(r2.status).toBe(400);
+    expect((await r2.json() as { error: string }).error).toBe("promo_exhausted");
+
+    // A code locked to `buyer` is rejected for another client.
+    await SELF.fetch("http://x/api/promo-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "ONLYME", discountType: "percent", percentOff: 100, restrictedClientId: buyer }) });
+    const r3 = await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: other, packageId: pkgId, promoCode: "ONLYME" }) });
+    expect(r3.status).toBe(400);
+    expect((await r3.json() as { error: string }).error).toBe("promo_wrong_client");
+
+    // A discount that lands the charge below Stripe's minimum → clean 400, not a 500.
+    await SELF.fetch("http://x/api/promo-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "ALMOSTALL", discountType: "amount", amountOffCents: 4980 }) }); // 5000 → 20¢
+    const r4 = await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: buyer, packageId: pkgId, promoCode: "ALMOSTALL" }) });
+    expect(r4.status).toBe(400);
+    expect((await r4.json() as { error: string }).error).toBe("promo_min_amount");
+  });
+});
+
+describe("installments — limited-term subscription (per-cycle unlock)", () => {
+  async function sig(payload: string, secret: string): Promise<string> {
+    const t = Math.floor(Date.now() / 1000);
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${payload}`));
+    return `t=${t},v1=${[...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+  }
+  it("each cycle unlocks 1/N of the term; the final payment completes and stops billing", async () => {
+    const db = env.DB as D1Database;
+    const secret = "whsec_connect_test";
+    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.connect_webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
+    // Isolated synthetic tenant (no connected account) so completion doesn't call Stripe.
+    const tenantId = "tenant_install_1";
+    const pkgId = "pkg_install_1";
+    await db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, installment_months, budgets_json, currency, visibility, active, created_at) VALUES (?, ?, ?, 9000, 3, ?, 'usd', 'marketplace', 1, ?)")
+      .bind(pkgId, tenantId, "3-Month Plan", JSON.stringify([{ feature: "all", days: 90 }]), new Date().toISOString()).run();
+    const post = async (payload: string) => SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await sig(payload, secret) }, body: payload });
+    const subId = "sub_install_1";
+
+    // Period one via installment-mode checkout (N=3).
+    await post(JSON.stringify({ id: "evt_inst_create", type: "checkout.session.completed", data: { object: { id: "cs_inst_1", mode: "subscription", subscription: subId, metadata: { mossa_tenant: tenantId, mossa_client: "cl_install_1", mossa_package: pkgId, mossa_installments: "3" } } } }));
+    let row = (await db.prepare("SELECT installments_total, installments_paid, payment_status, stripe_sub_id, budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ installments_total: number; installments_paid: number; payment_status: string; stripe_sub_id: string | null; budgets_json: string }>())!;
+    expect([row.installments_total, row.installments_paid]).toEqual([3, 1]);
+    const cycleBudgets = JSON.parse(row.budgets_json).length; // 'all' → workout+meal = 2 per cycle
+
+    // Cycle two (still billing, so keyed by the Stripe sub id).
+    await post(JSON.stringify({ id: "evt_inst_c2", type: "invoice.paid", data: { object: { subscription: subId, billing_reason: "subscription_cycle" } } }));
+    row = (await db.prepare("SELECT installments_total, installments_paid, payment_status, stripe_sub_id, budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first())!;
+    expect(row.installments_paid).toBe(2);
+    expect(JSON.parse(row.budgets_json).length).toBe(cycleBudgets * 2); // another period queued
+
+    // Final cycle → completed, billing stopped (stripe_sub_id cleared).
+    await post(JSON.stringify({ id: "evt_inst_c3", type: "invoice.paid", data: { object: { subscription: subId, billing_reason: "subscription_cycle" } } }));
+    row = (await db.prepare("SELECT installments_paid, payment_status, stripe_sub_id, budgets_json FROM client_subscriptions WHERE package_id = ? LIMIT 1").bind(pkgId).first())!;
+    expect(row.installments_paid).toBe(3);
+    expect(row.payment_status).toBe("completed");
+    expect(row.stripe_sub_id).toBeNull();
+    expect(JSON.parse(row.budgets_json).length).toBe(cycleBudgets * 3); // full term unlocked across 3 cycles
+  });
+});
+
+describe("notifications — surface-scoped mark-all-read", () => {
+  it("coach mode clears staff/owner notifications but leaves client ones unread", async () => {
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const owner = (await db.prepare("SELECT userId FROM member WHERE organizationId = ? AND role = 'owner' LIMIT 1").bind(ctx.active.tenantId).first<{ userId: string }>())!;
+    const mk = (id: string, type: string) => db.prepare("INSERT INTO notifications (id, tenant_id, recipient_user_id, type, title, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)").bind(id, ctx.active.tenantId, owner.userId, type, type, new Date().toISOString()).run();
+    await mk("ntf_s1", "check_in"); // staff audience
+    await mk("ntf_o1", "billing_past_due"); // owner audience
+    await mk("ntf_c1", "feedback"); // client audience
+
+    const r = await SELF.fetch("http://x/api/notifications/read-all", { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ surface: "staff" }) });
+    expect(r.status).toBe(200);
+    const read = async (id: string) => (await db.prepare("SELECT read FROM notifications WHERE id = ?").bind(id).first<{ read: number }>())!.read;
+    expect(await read("ntf_s1")).toBe(1); // staff → cleared
+    expect(await read("ntf_o1")).toBe(1); // owner → cleared in coach mode
+    expect(await read("ntf_c1")).toBe(0); // client → left unread (wrong surface)
+  });
+});
+
+describe("email templates — tenant white-label store", () => {
+  it("owner overrides a type's subject/body, GET merges it, reset restores the default", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    // A templatable type can be overridden.
+    const put = await SELF.fetch("http://x/api/email-templates/feedback", { method: "PUT", headers: H, body: JSON.stringify({ subject: "{{coachName}} says hi", body: "<p>Custom body for {{studioName}}.</p>", enabled: true }) });
+    expect(put.status).toBe(200);
+    const list1 = (await (await SELF.fetch("http://x/api/email-templates", { headers: auth(ownerCookie) })).json()) as { templates: { type: string; subject: string; customized: boolean; defaultSubject: string }[] };
+    const fb1 = list1.templates.find((t) => t.type === "feedback")!;
+    expect(fb1.customized).toBe(true);
+    expect(fb1.subject).toBe("{{coachName}} says hi");
+
+    // A non-templatable type is rejected.
+    expect((await SELF.fetch("http://x/api/email-templates/check_in", { method: "PUT", headers: H, body: JSON.stringify({ subject: "x", body: "y" }) })).status).toBe(400);
+
+    // Reset drops the override → back to the registry default.
+    expect((await SELF.fetch("http://x/api/email-templates/feedback", { method: "DELETE", headers: auth(ownerCookie) })).status).toBe(200);
+    const list2 = (await (await SELF.fetch("http://x/api/email-templates", { headers: auth(ownerCookie) })).json()) as { templates: { type: string; subject: string; customized: boolean; defaultSubject: string }[] };
+    const fb2 = list2.templates.find((t) => t.type === "feedback")!;
+    expect(fb2.customized).toBe(false);
+    expect(fb2.subject).toBe(fb2.defaultSubject);
+  });
+});
+
+describe("platform promo codes (Mossa → tenant)", () => {
+  it("admin creates a 100%-off pack promo; it grants free once, then is exhausted", async () => {
+    const db = env.DB as D1Database;
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    for (const [k, v] of [["stripe.mode", "test"], ["stripe.secret_key", "sk_test_x"]] as const) {
+      await db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v).run();
+    }
+    // Admin creates a single-use platform promo (ownerCookie is admin in tests).
+    expect((await SELF.fetch("http://x/api/admin/promo-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "PLAT100", discountType: "percent", percentOff: 100, maxRedemptions: 1 }) })).status).toBe(201);
+    const listed = (await (await SELF.fetch("http://x/api/admin/promo-codes", { headers: auth(ownerCookie) })).json()) as { codes: { code: string }[] };
+    expect(listed.codes.some((c) => c.code === "PLAT100")).toBe(true);
+
+    const before = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
+    // 100% off → free grant (no Stripe charge); purchased credits jump by the pack size.
+    const r1 = await SELF.fetch("http://x/api/billing/pack-intent", { method: "POST", headers: H, body: JSON.stringify({ packId: "pack_1k", promoCode: "PLAT100" }) });
+    expect(r1.status).toBe(200);
+    expect((await r1.json() as { granted?: boolean }).granted).toBe(true);
+    const after = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
+    expect(after.balance.purchased - before.balance.purchased).toBe(1000);
+
+    // The single slot is consumed — a repeat is rejected (no second free grant).
+    const r2 = await SELF.fetch("http://x/api/billing/pack-intent", { method: "POST", headers: H, body: JSON.stringify({ packId: "pack_1k", promoCode: "PLAT100" }) });
+    expect(r2.status).toBe(400);
+    expect((await r2.json() as { error: string }).error).toBe("promo_exhausted");
+  });
+});
+
+describe("package lifecycle + redemption scoping", () => {
+  it("blocks self-checkout of private / other-client packages and scopes redemption codes", async () => {
+    const db = env.DB as D1Database;
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    for (const [k, v] of [["stripe.mode", "test"], ["stripe.secret_key", "sk_test_x"]] as const) {
+      await db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v).run();
+    }
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, charges_enabled, updated_at) VALUES (?, 'acct_life', 1, ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_life', charges_enabled = 1").bind(ctx.active.tenantId, new Date().toISOString()).run();
+    const mk = async (n: string) => ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: n }) })).json()) as { client: { id: string } }).client.id;
+    const a = await mk("LifeA");
+    const b = await mk("LifeB");
+    const mkPkg = async (id: string, visibility: string, restricted: string | null) =>
+      db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, visibility, restricted_client_id, active, created_at) VALUES (?, ?, ?, 4000, ?, 'usd', ?, ?, 1, ?)")
+        .bind(id, ctx.active.tenantId, id, JSON.stringify([{ feature: "all", days: 30 }]), visibility, restricted, new Date().toISOString()).run();
+
+    // A `private` package is grant-only — not client-purchasable.
+    await mkPkg("pkg_priv", "private", null);
+    expect((await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: a, packageId: "pkg_priv" }) })).status).toBe(404);
+    // A `client_specific` package is purchasable only by its own client.
+    await mkPkg("pkg_cs", "client_specific", a);
+    expect((await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: b, packageId: "pkg_cs" }) })).status).toBe(404);
+
+    // Redemption code locked to client A: B is rejected, A succeeds.
+    await SELF.fetch("http://x/api/redemption-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "LOCKEDA", daysToAdd: 10, restrictedClientId: a }) });
+    expect((await SELF.fetch("http://x/api/redeem", { method: "POST", headers: H, body: JSON.stringify({ clientId: b, code: "LOCKEDA" }) })).status).toBe(404);
+    expect((await SELF.fetch("http://x/api/redeem", { method: "POST", headers: H, body: JSON.stringify({ clientId: a, code: "LOCKEDA" }) })).status).toBe(200);
+
+    // Redemption code locked to a package the client doesn't hold → rejected.
+    await SELF.fetch("http://x/api/redemption-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "NEEDPKG", daysToAdd: 10, restrictedPackageId: "pkg_cs" }) });
+    expect((await SELF.fetch("http://x/api/redeem", { method: "POST", headers: H, body: JSON.stringify({ clientId: b, code: "NEEDPKG" }) })).status).toBe(404);
   });
 });
 

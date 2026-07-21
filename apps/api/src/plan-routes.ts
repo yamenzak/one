@@ -209,7 +209,7 @@ function makePlanRoutes(kind: Kind): Hono<AppEnv> {
       const updated = await c.env.DB.prepare(`SELECT * FROM ${table} WHERE id = ?`).bind(row.id).first<PlanRow>();
       // Let the client know a fresh plan dropped.
       if (access.client.user_id) {
-        await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "plan_published", title: `Your new ${kind} plan is ready`, message: row.name, link: kind === "workout" ? "/train" : "/eat" });
+        await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "plan_published", title: `Your new ${kind} plan is ready`, message: row.name, link: kind === "workout" ? "/train" : "/eat", vars: { coachName: c.get("user")?.name || "Your coach", planName: row.name } });
       }
       await recordAudit(c.env, { tenantId: who.tenantId, clientId: row.client_id, actorUserId: who.userId, action: "plan.publish", summary: `${kind} · ${row.name}`, ref: row.id });
       return c.json({ plan: planView(updated!) });

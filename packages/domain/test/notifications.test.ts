@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultChannels, resolveChannels, parseNotifPrefs, categoriesForRole, categoryAppliesTo, resolveAllChannels,
-  parseNotifPolicy, emailAllowedByPolicy, resolveEmailPolicy, sanitizeEmailPolicy, isNotifCategory,
+  parseNotifPolicy, emailAllowedByPolicy, resolveEmailPolicy, sanitizeEmailPolicy, isNotifCategory, audienceForRole,
   NOTIF_TYPES, notifCategoryOf, notifTitleOf, notifLinkOf,
+  notifAudienceOf, notifVisibleInSurface, unreadInSurface, type NotifType,
+  renderTemplate, notifTemplateOf, notifVarsOf,
 } from "../src/notifications.js";
 
 describe("notification preferences", () => {
@@ -96,6 +98,79 @@ describe("notification types (the atom)", () => {
   });
 });
 
+describe("audience + surface (mode-aware in-app filtering)", () => {
+  it("the client surface shows only client-audience types", () => {
+    expect(notifVisibleInSurface("feedback", "client")).toBe(true); // to: client
+    expect(notifVisibleInSurface("plan_published", "client")).toBe(true);
+    expect(notifVisibleInSurface("check_in", "client")).toBe(false); // to: staff
+    expect(notifVisibleInSurface("billing_past_due", "client")).toBe(false); // to: owner
+  });
+
+  it("the staff surface shows staff + owner types, never client ones", () => {
+    expect(notifVisibleInSurface("check_in", "staff")).toBe(true); // to: staff
+    expect(notifVisibleInSurface("billing_past_due", "staff")).toBe(true); // to: owner
+    expect(notifVisibleInSurface("client_assigned", "staff")).toBe(true);
+    expect(notifVisibleInSurface("feedback", "staff")).toBe(false); // to: client
+  });
+
+  it("every type lands in exactly one surface", () => {
+    for (const type of Object.keys(NOTIF_TYPES) as NotifType[]) {
+      const inClient = notifVisibleInSurface(type, "client");
+      const inStaff = notifVisibleInSurface(type, "staff");
+      expect(inClient !== inStaff, `${type} must be in exactly one surface`).toBe(true);
+    }
+  });
+
+  it("an unknown type is shown everywhere rather than dropped", () => {
+    expect(notifVisibleInSurface("nope" as NotifType, "client")).toBe(true);
+    expect(notifAudienceOf("nope" as NotifType)).toBe("staff");
+  });
+
+  it("unreadInSurface counts only unread items visible in the surface", () => {
+    const items = [
+      { type: "feedback" as NotifType, read: false }, // client, unread
+      { type: "check_in" as NotifType, read: false }, // staff, unread
+      { type: "goal_set" as NotifType, read: true }, // client, read
+      { type: "plan_published" as NotifType, read: false }, // client, unread
+    ];
+    expect(unreadInSurface(items, "client")).toBe(2); // feedback + plan_published
+    expect(unreadInSurface(items, "staff")).toBe(1); // check_in
+  });
+});
+
+describe("email templates + variable rendering", () => {
+  it("substitutes known variables and blanks unknown/missing ones", () => {
+    expect(renderTemplate("Hi {{coachName}}, your {{planName}} is ready", { coachName: "Sam", planName: "Push/Pull" }))
+      .toBe("Hi Sam, your Push/Pull is ready");
+    expect(renderTemplate("Expires in {{daysLeft}} days", { daysLeft: 3 })).toBe("Expires in 3 days");
+    // Unknown / missing → empty, never a stray {{x}}.
+    expect(renderTemplate("Hi {{missing}}!", {})).toBe("Hi !");
+    expect(renderTemplate("{{ spaced }}", { spaced: "ok" })).toBe("ok");
+  });
+
+  it("templated types expose a subject/body and their declared vars are used in it", () => {
+    const tpl = notifTemplateOf("plan_published")!;
+    expect(tpl.subject).toContain("{{planName}}");
+    // Every declared var actually appears somewhere in the template.
+    for (const type of Object.keys(NOTIF_TYPES) as NotifType[]) {
+      const t = notifTemplateOf(type);
+      if (!t) continue;
+      const blob = t.subject + t.body;
+      for (const v of notifVarsOf(type)) {
+        expect(blob.includes(`{{${v}}}`) || blob.includes(`{{ ${v} }}`), `${type}: ${v} declared but unused`).toBe(true);
+      }
+    }
+  });
+
+  it("only client-facing + studio-billing types carry a template (phased scope)", () => {
+    expect(notifTemplateOf("feedback")).not.toBeNull();
+    expect(notifTemplateOf("billing_past_due")).not.toBeNull();
+    // Staff activity signals fall back to the generic card.
+    expect(notifTemplateOf("check_in")).toBeNull();
+    expect(notifTemplateOf("body_fat_logged")).toBeNull();
+  });
+});
+
 describe("tenant email policy (owner allow-list)", () => {
   it("categories are email-allowed by default (opt-out model)", () => {
     expect(emailAllowedByPolicy({}, "plans-goals")).toBe(true);
@@ -122,5 +197,26 @@ describe("tenant email policy (owner allow-list)", () => {
     expect(map["activity"]).toBe(false);
     expect(map["plans-goals"]).toBe(true);
     expect(Object.keys(map)).toContain("body-composition");
+  });
+
+  it("audience-split: an owner can email clients but not staff about a category", () => {
+    const pol = parseNotifPolicy(JSON.stringify({ emailAudience: { staff: { "plans-goals": false } } }));
+    expect(emailAllowedByPolicy(pol, "plans-goals", "client")).toBe(true);
+    expect(emailAllowedByPolicy(pol, "plans-goals", "staff")).toBe(false);
+    expect(emailAllowedByPolicy(pol, "plans-goals")).toBe(true); // no audience → legacy default
+    expect(resolveEmailPolicy(pol, "staff")["plans-goals"]).toBe(false);
+    expect(resolveEmailPolicy(pol, "client")["plans-goals"]).toBe(true);
+  });
+
+  it("an audience-specific setting overrides the legacy all-audiences map", () => {
+    const pol = parseNotifPolicy(JSON.stringify({ emailCategories: { labs: false }, emailAudience: { client: { labs: true } } }));
+    expect(emailAllowedByPolicy(pol, "labs", "client")).toBe(true); // audience override wins
+    expect(emailAllowedByPolicy(pol, "labs", "staff")).toBe(false); // falls back to legacy
+  });
+
+  it("audienceForRole maps owner/trainer/assistant → staff, client → client", () => {
+    expect(audienceForRole("owner")).toBe("staff");
+    expect(audienceForRole("assistant")).toBe("staff");
+    expect(audienceForRole("client")).toBe("client");
   });
 });

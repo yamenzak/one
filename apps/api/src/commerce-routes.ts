@@ -145,6 +145,7 @@ export const commerceRoutes = new Hono<AppEnv>()
     if (d.budgets !== undefined) put("budgets_json", j(d.budgets));
     if (d.flags !== undefined) put("flags_json", d.flags ? j(d.flags) : null);
     if (d.visibility !== undefined) put("visibility", d.visibility);
+    if (d.restrictedClientId !== undefined) put("restricted_client_id", d.restrictedClientId);
     if (d.oncePerCustomer !== undefined) put("once_per_customer", d.oncePerCustomer ? 1 : 0);
     if (sets.length === 0) return c.json({ ok: true });
     await c.env.DB.prepare(`UPDATE packages SET ${sets.join(", ")} WHERE id = ?`)
@@ -199,8 +200,13 @@ export const commerceRoutes = new Hono<AppEnv>()
       "SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1",
     )
       .bind(parsed.data.packageId, who.tenantId)
-      .first<{ id: string; name: string; budgets_json: string | null; addons_json: string | null; flags_json: string | null; once_per_customer: number }>();
+      .first<{ id: string; name: string; budgets_json: string | null; addons_json: string | null; flags_json: string | null; once_per_customer: number; visibility: string; restricted_client_id: string | null }>();
     if (!pkg) return c.json({ error: "package not found" }, 404);
+    // A client-specific package can only be granted to its own client (staff may
+    // still grant `private` grant-only packages to anyone).
+    if (pkg.visibility === "client_specific" && pkg.restricted_client_id && pkg.restricted_client_id !== access.client.id) {
+      return c.json({ error: "package is private to another client" }, 403);
+    }
 
     const now = nowIso();
     if (pkg.once_per_customer) {
@@ -255,7 +261,7 @@ export const commerceRoutes = new Hono<AppEnv>()
   .get("/redemption-codes", async (c) => {
     const who = requireTenant(c)!;
     const rows = await c.env.DB.prepare(
-      "SELECT id, code, days_to_add, target_feature, max_uses, used_count, expires_at, active FROM redemption_codes WHERE tenant_id = ? ORDER BY created_at DESC",
+      "SELECT id, code, days_to_add, target_feature, max_uses, used_count, restricted_package_id, restricted_client_id, expires_at, active FROM redemption_codes WHERE tenant_id = ? ORDER BY created_at DESC",
     )
       .bind(who.tenantId)
       .all();
@@ -271,6 +277,10 @@ export const commerceRoutes = new Hono<AppEnv>()
         daysToAdd: z.number().int().positive().max(730),
         targetFeature: z.enum(BUDGET_FEATURES).default("all"),
         maxUses: z.number().int().positive().default(1),
+        // Optional scoping: only this client may redeem, and/or only clients
+        // who hold this package (e.g. bonus days for buyers of package X).
+        restrictedPackageId: z.string().nullish(),
+        restrictedClientId: z.string().nullish(),
         expiresAt: z.string().nullish(),
       })
       .safeParse(await c.req.json().catch(() => null));
@@ -279,9 +289,9 @@ export const commerceRoutes = new Hono<AppEnv>()
     const id = newId("code");
     try {
       await c.env.DB.prepare(
-        "INSERT INTO redemption_codes (id, tenant_id, code, days_to_add, target_feature, max_uses, used_by_json, expires_at, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, '[]', ?, ?, ?)",
+        "INSERT INTO redemption_codes (id, tenant_id, code, days_to_add, target_feature, max_uses, used_by_json, restricted_package_id, restricted_client_id, expires_at, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, '[]', ?, ?, ?, ?, ?)",
       )
-        .bind(id, who.tenantId, d.code.toUpperCase(), d.daysToAdd, d.targetFeature, d.maxUses, d.expiresAt ?? null, who.userId, nowIso())
+        .bind(id, who.tenantId, d.code.toUpperCase(), d.daysToAdd, d.targetFeature, d.maxUses, d.restrictedPackageId ?? null, d.restrictedClientId ?? null, d.expiresAt ?? null, who.userId, nowIso())
         .run();
     } catch {
       return c.json({ error: "code already exists" }, 409);
@@ -304,10 +314,17 @@ export const commerceRoutes = new Hono<AppEnv>()
       "SELECT * FROM redemption_codes WHERE tenant_id = ? AND code = ? AND active = 1",
     )
       .bind(who.tenantId, parsed.data.code.toUpperCase())
-      .first<{ id: string; days_to_add: number; target_feature: Budget["feature"]; max_uses: number; used_count: number; used_by_json: string | null; expires_at: string | null }>();
-    // Disabled/unknown/expired all read as "not found" — no oracle.
+      .first<{ id: string; days_to_add: number; target_feature: Budget["feature"]; max_uses: number; used_count: number; used_by_json: string | null; restricted_package_id: string | null; restricted_client_id: string | null; expires_at: string | null }>();
+    // Disabled/unknown/expired/out-of-scope all read as "not found" — no oracle.
     if (!code) return c.json({ error: "code not found" }, 404);
     if (code.expires_at && code.expires_at < now) return c.json({ error: "code not found" }, 404);
+    // Per-client lock: only the named client may redeem this code.
+    if (code.restricted_client_id && code.restricted_client_id !== access.client.id) return c.json({ error: "code not found" }, 404);
+    // Per-package lock: only a client who holds that package may redeem.
+    if (code.restricted_package_id) {
+      const owns = await c.env.DB.prepare("SELECT 1 AS x FROM client_subscriptions WHERE client_id = ? AND package_id = ? LIMIT 1").bind(access.client.id, code.restricted_package_id).first();
+      if (!owns) return c.json({ error: "code not found" }, 404);
+    }
 
     // Per-client claim (atomic): the UNIQUE(code_id, client_id) child row dedupes
     // a second redemption by the same client without a lost-update on a JSON

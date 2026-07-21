@@ -24,6 +24,7 @@ import {
 } from "./stripe.js";
 import { newId, nowIso, nowMs, periodKey } from "./ids.js";
 import { parseJson, j } from "./db.js";
+import { resolveAndApplyPromo, bumpPromoRedemption, consumePromoRedemption } from "./promo-apply.js";
 
 export const stripeRoutes = new Hono<AppEnv>()
   // ── Platform rail ──────────────────────────────────────────────────────────
@@ -72,6 +73,88 @@ export const stripeRoutes = new Hono<AppEnv>()
       "metadata[mossa_credits]": pack.credits,
     });
     return c.json({ url: session.url });
+  })
+
+  // ── Inline (Payment Element) — platform rail ───────────────────────────────
+  // Preferred over the hosted redirect: the app confirms these client secrets
+  // with Stripe.js inline. The hosted checkout-plan/checkout-pack routes above
+  // remain as a fallback.
+  .post("/billing/pack-intent", async (c) => {
+    const who = requireTenant(c)!;
+    const cfg = await stripeConfig(c.env.DB);
+    if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
+    const body = z.object({ packId: z.string(), promoCode: z.string().optional() }).safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body" }, 400);
+    const pack = (await listPacks(c.env.DB)).find((p) => p.id === body.data.packId);
+    if (!pack) return c.json({ error: "unknown pack" }, 404);
+    let amount = Math.round(pack.price_usd * 100);
+    let promoId: string | null = null;
+    let discountCents = 0;
+    if (body.data.promoCode) {
+      const p = await resolveAndApplyPromo(c.env.DB, { scope: "platform", tenantId: who.tenantId, code: body.data.promoCode, amountCents: amount, nowIso: nowIso(), targetId: pack.id });
+      if (!p.ok) return c.json({ error: `promo_${p.reason}` }, 400);
+      amount = p.finalCents;
+      promoId = p.id;
+      discountCents = p.discountCents;
+    }
+    // A fully-discounted pack grants immediately — no Stripe charge to run. The
+    // free grant has NO payment gate, so consume the redemption slot ATOMICALLY
+    // and grant only if we won it (else a racing/repeat request could mint free
+    // credits against a one-use code).
+    if (amount <= 0) {
+      if (!promoId || !(await consumePromoRedemption(c.env.DB, promoId))) return c.json({ error: "promo_exhausted" }, 400);
+      const dobj = c.env.BILLING.get(c.env.BILLING.idFromName(who.tenantId));
+      await dobj.bind(who.tenantId);
+      await dobj.topUp(pack.credits, "pack.promo", pack.id);
+      return c.json({ granted: true, credits: pack.credits, discountCents });
+    }
+    // Below Stripe's minimum charge after a discount → clean 400, not a 500.
+    if (promoId && amount < 50) return c.json({ error: "promo_min_amount" }, 400);
+    const customer = await ensureCustomer(c.env.DB, cfg.secretKey, who.tenantId, c.get("user")?.email);
+    // A PaymentIntent whose success webhook tops up the durable `purchased`
+    // bucket. Credits ride on the PI metadata; the hosted-checkout path keeps
+    // them on the session, so payment_intent.succeeded can't double-grant.
+    try {
+      const pi = await stripeCall<{ client_secret: string; id: string }>(cfg.secretKey, "payment_intents", {
+        amount,
+        currency: "usd",
+        customer,
+        "automatic_payment_methods[enabled]": "true",
+        "metadata[mossa_tenant]": who.tenantId,
+        "metadata[mossa_pack]": pack.id,
+        "metadata[mossa_credits]": pack.credits,
+        ...(promoId ? { "metadata[mossa_promo]": promoId } : {}),
+      });
+      return c.json({ clientSecret: pi.client_secret, publishableKey: cfg.publishableKey, amountCents: amount, discountCents, credits: pack.credits });
+    } catch {
+      return c.json({ error: "checkout_failed" }, 402);
+    }
+  })
+
+  .post("/billing/plan-intent", async (c) => {
+    const who = requireTenant(c)!;
+    const cfg = await stripeConfig(c.env.DB);
+    if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
+    const body = z.object({ planId: z.string() }).safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body" }, 400);
+    const plan = (await listPlans(c.env.DB)).find((p) => p.id === body.data.planId);
+    if (!plan?.stripe_price_id) return c.json({ error: "plan not synced to stripe" }, 409);
+    const customer = await ensureCustomer(c.env.DB, cfg.secretKey, who.tenantId, c.get("user")?.email);
+    // default_incomplete: the subscription is created unpaid; confirming the
+    // first invoice's PaymentIntent inline activates it. The webhook
+    // (customer.subscription.updated → active) stamps the plan + grants credits.
+    const sub = await stripeCall<{ id: string; latest_invoice?: { payment_intent?: { client_secret?: string } } }>(cfg.secretKey, "subscriptions", {
+      customer,
+      "items[0][price]": plan.stripe_price_id,
+      payment_behavior: "default_incomplete",
+      "payment_settings[save_default_payment_method]": "on_subscription",
+      "expand[0]": "latest_invoice.payment_intent",
+      "metadata[mossa_tenant]": who.tenantId,
+      "metadata[mossa_plan]": plan.id,
+    });
+    const clientSecret = sub.latest_invoice?.payment_intent?.client_secret;
+    if (!clientSecret) return c.json({ error: "could not start subscription" }, 502);
+    return c.json({ clientSecret, subscriptionId: sub.id, publishableKey: cfg.publishableKey });
   })
 
   // Platform webhook (public lane; signature-verified).
@@ -143,32 +226,37 @@ export const stripeRoutes = new Hono<AppEnv>()
     if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
     // The account must actually be able to accept charges (onboarding done).
     if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
-    const pkg = await c.env.DB.prepare("SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; currency: string }>();
-    if (!pkg) return c.json({ error: "package not found" }, 404);
-    // A monthly price makes the package auto-renewing (a Stripe subscription on
-    // the connected account); otherwise it's a one-time day-pack. Either way the
-    // budget model is the source of truth — recurring just re-buys each period.
+    const pkg = await c.env.DB.prepare("SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_client_id: string | null }>();
+    if (!pkg || purchaseBlocked(pkg, access.client.id)) return c.json({ error: "package not found" }, 404);
+    // Three pricing modes. A monthly price = an open-ended subscription. An
+    // installment plan (installment_months N on a one-time package) = a
+    // LIMITED-term subscription: monthly = one_time/N, billed N times then
+    // self-cancels; each cycle unlocks 1/N of the term. Otherwise it's a
+    // one-time day-pack. The budget model stays the source of truth.
     const monthly = pkg.monthly_price_cents ?? 0;
     const recurring = monthly > 0;
-    const amount = recurring ? monthly : (pkg.one_time_price_cents ?? 0);
+    const installN = !recurring && (pkg.installment_months ?? 0) > 1 && (pkg.one_time_price_cents ?? 0) > 0 ? (pkg.installment_months as number) : 0;
+    const isSub = recurring || installN > 0;
+    const amount = recurring ? monthly : installN ? Math.ceil((pkg.one_time_price_cents ?? 0) / installN) : (pkg.one_time_price_cents ?? 0);
     if (amount <= 0) return c.json({ error: "use /subscriptions/grant for $0 packages" }, 400);
 
     // Optional platform cut — a basis-points application fee set by the platform
     // admin (default 0 = zero markup, tenant keeps 100%). Direct charge on the
     // connected account, so the fee routes to the platform on this payment.
     const feeBps = Number((await getConfig(c.env.DB))["stripe.platform_fee_bps"] ?? "0");
-    const meta = {
+    const meta: Record<string, string | number> = {
       "metadata[mossa_tenant]": who.tenantId,
       "metadata[mossa_client]": access.client.id,
       "metadata[mossa_package]": pkg.id,
+      ...(installN ? { "metadata[mossa_installments]": installN } : {}),
     };
     const priceData = {
       "line_items[0][price_data][currency]": pkg.currency || "usd",
-      "line_items[0][price_data][product_data][name]": pkg.name,
+      "line_items[0][price_data][product_data][name]": installN ? `${pkg.name} (${installN}-month plan)` : pkg.name,
       "line_items[0][price_data][unit_amount]": amount,
       "line_items[0][quantity]": 1,
     };
-    const params: Record<string, string | number | undefined> = recurring
+    const params: Record<string, string | number | undefined> = isSub
       ? {
           mode: "subscription",
           ...priceData,
@@ -178,6 +266,7 @@ export const stripeRoutes = new Hono<AppEnv>()
           "subscription_data[metadata][mossa_tenant]": who.tenantId,
           "subscription_data[metadata][mossa_client]": access.client.id,
           "subscription_data[metadata][mossa_package]": pkg.id,
+          ...(installN ? { "subscription_data[metadata][mossa_installments]": installN } : {}),
           success_url: `${body.data.returnUrl}?purchase=success`,
           cancel_url: `${body.data.returnUrl}?purchase=cancel`,
           ...meta,
@@ -192,6 +281,73 @@ export const stripeRoutes = new Hono<AppEnv>()
         };
     const session = await stripeCall<{ url: string }>(cfg.secretKey, "checkout/sessions", params, { connectedAccount: settings.stripe_account_id });
     return c.json({ url: session.url });
+  })
+
+  // Inline (Payment Element) one-time purchase on the tenant's connected account.
+  // Direct charge → the tenant stays merchant of record; the app confirms this
+  // client secret with Stripe.js scoped to `stripeAccount`. Recurring packages
+  // keep the hosted checkout above (Checkout auto-provisions the connected-account
+  // customer + price a bare Subscription call would need).
+  .post("/connect/pay-intent", async (c) => {
+    const who = requireTenant(c)!;
+    const cfg = await stripeConfig(c.env.DB);
+    if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
+    const body = z.object({ clientId: z.string(), packageId: z.string(), promoCode: z.string().optional() }).safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, body.data.clientId);
+    if ("response" in access) return access.response;
+    const settings = await c.env.DB.prepare("SELECT stripe_account_id, charges_enabled FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null }>();
+    if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
+    if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
+    const pkg = await c.env.DB.prepare("SELECT id, name, one_time_price_cents, monthly_price_cents, installment_months, currency, visibility, restricted_client_id FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_client_id: string | null }>();
+    if (!pkg || purchaseBlocked(pkg, access.client.id)) return c.json({ error: "package not found" }, 404);
+    // Subscriptions and installment plans go through hosted checkout (Stripe
+    // provisions the connected-account customer + recurring price); inline is
+    // one-time only.
+    if ((pkg.monthly_price_cents ?? 0) > 0 || (pkg.installment_months ?? 0) > 1) return c.json({ error: "use /connect/checkout for subscriptions" }, 400);
+    let amount = pkg.one_time_price_cents ?? 0;
+    if (amount <= 0) return c.json({ error: "use /subscriptions/grant for $0 packages" }, 400);
+    let promoId: string | null = null;
+    let discountCents = 0;
+    if (body.data.promoCode) {
+      const p = await resolveAndApplyPromo(c.env.DB, { scope: "tenant", tenantId: who.tenantId, code: body.data.promoCode, amountCents: amount, nowIso: nowIso(), targetId: pkg.id, clientId: access.client.id });
+      if (!p.ok) return c.json({ error: `promo_${p.reason}` }, 400);
+      amount = p.finalCents;
+      promoId = p.id;
+      discountCents = p.discountCents;
+    }
+    // Fully discounted → grant directly (no charge). No payment gate, so consume
+    // the redemption slot atomically and grant only if we won it.
+    if (amount <= 0) {
+      if (!promoId || !(await consumePromoRedemption(c.env.DB, promoId))) return c.json({ error: "promo_exhausted" }, 400);
+      await grantClientPackage(c.env.DB, who.tenantId, access.client.id, pkg.id, null, null);
+      return c.json({ granted: true, discountCents });
+    }
+    if (promoId && amount < 50) return c.json({ error: "promo_min_amount" }, 400);
+    const feeBps = Number((await getConfig(c.env.DB))["stripe.platform_fee_bps"] ?? "0");
+    // The application fee must stay strictly below the charge (Stripe rejects a
+    // fee >= amount on a direct charge), so clamp it — a 100% feeBps footgun.
+    const fee = feeBps > 0 ? Math.min(Math.round((amount * feeBps) / 10000), Math.max(0, amount - 1)) : 0;
+    try {
+      const pi = await stripeCall<{ client_secret: string; id: string }>(
+        cfg.secretKey,
+        "payment_intents",
+        {
+          amount,
+          currency: pkg.currency || "usd",
+          "automatic_payment_methods[enabled]": "true",
+          ...(fee > 0 ? { application_fee_amount: fee } : {}),
+          "metadata[mossa_tenant]": who.tenantId,
+          "metadata[mossa_client]": access.client.id,
+          "metadata[mossa_package]": pkg.id,
+          ...(promoId ? { "metadata[mossa_promo]": promoId } : {}),
+        },
+        { connectedAccount: settings.stripe_account_id },
+      );
+      return c.json({ clientSecret: pi.client_secret, publishableKey: cfg.publishableKey, stripeAccount: settings.stripe_account_id, discountCents });
+    } catch {
+      return c.json({ error: "checkout_failed" }, 402);
+    }
   })
 
   // Cancel a client's auto-renewing package (stops future billing; the current
@@ -246,9 +402,21 @@ export const stripeRoutes = new Hono<AppEnv>()
       const s = event.data.object as { id?: string; mode?: string; subscription?: string; metadata?: Record<string, string> };
       const m = s.metadata ?? {};
       if (m.mossa_client && m.mossa_package) {
-        // First period for both one-time and recurring; for recurring we also
-        // pin the Stripe subscription id so later invoices renew this same row.
-        await grantClientPackage(c.env.DB, m.mossa_tenant!, m.mossa_client, m.mossa_package, s.id ?? null, s.mode === "subscription" ? s.subscription ?? null : null);
+        // First period for one-time, recurring, and installments; for the last
+        // two we pin the Stripe subscription id so later invoices renew this row.
+        // `mossa_installments` (N) marks a limited-term plan → per-cycle unlock.
+        const installN = m.mossa_installments ? Number(m.mossa_installments) : null;
+        await grantClientPackage(c.env.DB, m.mossa_tenant!, m.mossa_client, m.mossa_package, s.id ?? null, s.mode === "subscription" ? s.subscription ?? null : null, installN);
+      }
+    } else if (event.type === "payment_intent.succeeded") {
+      // Inline one-time purchase (Payment Element on the connected account).
+      // Metadata rides on the PI; the hosted path keeps it on the session, so
+      // this and checkout.session.completed never both grant the same purchase.
+      const pi = event.data.object as { id?: string; metadata?: Record<string, string> };
+      const m = pi.metadata ?? {};
+      if (m.mossa_client && m.mossa_package && m.mossa_tenant) {
+        await grantClientPackage(c.env.DB, m.mossa_tenant, m.mossa_client, m.mossa_package, pi.id ?? null, null);
+        if (m.mossa_promo) await bumpPromoRedemption(c.env.DB, m.mossa_promo);
       }
     } else if (event.type === "invoice.paid") {
       // Renewal cycles top up the budget; the first invoice (subscription_create)
@@ -304,6 +472,16 @@ export const stripeRoutes = new Hono<AppEnv>()
     }
     return c.json({ received: true });
   });
+
+/** Can this client purchase this package directly (self-checkout)? Marketplace
+ *  packages are public; a client_specific package only its own client; `private`
+ *  packages are grant-only (staff assigns them, never client-purchasable). A
+ *  blocked package reads as "not found" at checkout — no oracle. */
+function purchaseBlocked(pkg: { visibility: string; restricted_client_id: string | null }, clientId: string): boolean {
+  if (pkg.visibility === "marketplace") return false;
+  if (pkg.visibility === "client_specific") return !(pkg.restricted_client_id && pkg.restricted_client_id === clientId);
+  return true;
+}
 
 /** Webhook idempotency: the first insert of a Stripe event id processes; a
  *  redelivery finds the row already present (changes = 0) and short-circuits. */
@@ -394,6 +572,18 @@ async function handlePlatformEvent(
       }
       break;
     }
+    case "payment_intent.succeeded": {
+      // Inline credit-pack purchase (Payment Element). Credits ride on the PI
+      // metadata; the hosted checkout path keeps them on the session, so this
+      // and checkout.session.completed never both fire for the same purchase.
+      if (meta.mossa_pack && meta.mossa_credits && meta.mossa_tenant) {
+        const dobj = billing.get(billing.idFromName(meta.mossa_tenant));
+        await dobj.bind(meta.mossa_tenant);
+        await dobj.topUp(Number(meta.mossa_credits), "pack.purchase", meta.mossa_pack);
+        if (meta.mossa_promo) await bumpPromoRedemption(db, meta.mossa_promo);
+      }
+      break;
+    }
     case "invoice.paid": {
       const tenantId = meta.mossa_tenant ?? (await tenantByCustomer(db, obj.customer as string));
       const planId = await planForTenant(db, tenantId);
@@ -421,6 +611,18 @@ async function handlePlatformEvent(
     }
     case "customer.subscription.created":
     case "customer.subscription.updated": {
+      // Inline (default_incomplete) subscriptions carry the plan on their
+      // metadata. Stamp the plan id as soon as we see it (even while
+      // `incomplete`) so a first invoice.paid resolves the right plan; only
+      // GRANT once the subscription is actually active/trialing.
+      const status = obj.status as string;
+      if (meta.mossa_plan && meta.mossa_tenant) {
+        await getSubscription(db, meta.mossa_tenant);
+        await db.prepare("UPDATE subscriptions SET plan_id = ? WHERE tenant_id = ?").bind(meta.mossa_plan, meta.mossa_tenant).run();
+        if (status === "active" || status === "trialing") {
+          await activatePlan(db, billing, meta.mossa_tenant, meta.mossa_plan);
+        }
+      }
       await syncStripeSubscription(db, obj);
       break;
     }
@@ -488,14 +690,41 @@ async function planForTenant(db: D1Database, tenantId: string | null): Promise<s
   return row?.plan_id ?? null;
 }
 
+/** Per-cycle share of a package's runway for an N-installment plan: each
+ *  payment unlocks days/N (min 1). N<=1 leaves the specs untouched. */
+function scaleSpecs(specs: { feature: Budget["feature"]; days: number }[], n: number): { feature: Budget["feature"]; days: number }[] {
+  return n > 1 ? specs.map((s) => ({ ...s, days: Math.max(1, Math.round(s.days / n)) })) : specs;
+}
+
+/** Stop an installment plan after its final payment: cancel the Stripe
+ *  subscription on the connected account, and only clear `stripe_sub_id` once
+ *  the cancel actually succeeded. Cancel-before-unlink means a failed cancel
+ *  leaves the row resolvable so a stray invoice hits the `alreadyDone` guard
+ *  (no extra grant) and the cancel is retried, rather than billing on with a
+ *  dangling, unresolvable subscription. */
+async function cancelInstallmentSub(db: D1Database, tenantId: string, stripeSubId: string, rowId: string): Promise<void> {
+  const settings = await db.prepare("SELECT stripe_account_id FROM tenant_settings WHERE tenant_id = ?").bind(tenantId).first<{ stripe_account_id: string | null }>();
+  const cfg = await stripeConfig(db);
+  let canceled = true;
+  if (settings?.stripe_account_id && stripeEnabled(cfg)) {
+    canceled = await stripeCall(cfg.secretKey, `subscriptions/${stripeSubId}`, undefined, { connectedAccount: settings.stripe_account_id, method: "DELETE" })
+      .then(() => true)
+      .catch(() => false);
+  }
+  if (canceled) await db.prepare("UPDATE client_subscriptions SET stripe_sub_id = NULL WHERE id = ?").bind(rowId).run();
+}
+
 /** Shared with commerce: create/extend a client subscription from a package.
  *  `checkoutId`/`subId` are the Stripe Checkout Session / Subscription ids;
- *  event-level idempotency (firstSeen) already prevents a redelivery twice. */
-async function grantClientPackage(db: D1Database, tenantId: string, clientId: string, packageId: string, checkoutId: string | null = null, subId: string | null = null): Promise<void> {
+ *  event-level idempotency (firstSeen) already prevents a redelivery twice.
+ *  `installmentsTotal` (>1) marks a limited-term installment plan: period one
+ *  unlocks the first 1/N of the term and pins the count on the row. */
+async function grantClientPackage(db: D1Database, tenantId: string, clientId: string, packageId: string, checkoutId: string | null = null, subId: string | null = null, installmentsTotal: number | null = null): Promise<void> {
   const pkg = await db.prepare("SELECT budgets_json, addons_json, flags_json FROM packages WHERE id = ?").bind(packageId).first<{ budgets_json: string | null; addons_json: string | null; flags_json: string | null }>();
   if (!pkg) return;
   const now = nowIso();
-  const specs = parseJson<{ feature: Budget["feature"]; days: number }[]>(pkg.budgets_json, []);
+  const n = installmentsTotal && installmentsTotal > 1 ? installmentsTotal : 1;
+  const specs = scaleSpecs(parseJson<{ feature: Budget["feature"]; days: number }[]>(pkg.budgets_json, []), n);
   const addOns = parseJson<{ addOnTypeId: string; quantity: number }[]>(pkg.addons_json, []);
 
   // Recurring purchase (a Stripe subscription): each subscription gets its OWN
@@ -513,9 +742,9 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
       await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, payment_status = 'paid', stripe_checkout_id = COALESCE(?, stripe_checkout_id), updated_at = ? WHERE id = ?").bind(j([...existing, ...added]), j(balances), checkoutId, now, bySub.id).run();
     } else {
       await db.prepare(
-        "INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, ?, 'stripe', ?, ?, ?, ?)",
+        "INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, installments_total, installments_paid, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, 'stripe', ?, ?, ?, ?, ?, ?)",
       )
-        .bind(newId("csub"), tenantId, clientId, packageId, j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, subId, now, now)
+        .bind(newId("csub"), tenantId, clientId, packageId, n > 1 ? "installments" : "paid", j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, subId, n > 1 ? n : null, n > 1 ? 1 : null, now, now)
         .run();
     }
     return;
@@ -542,15 +771,42 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
  *  row's budget up by another period. Resolved by the Stripe subscription id so
  *  it always hits the right row. Budgets stay the source of truth. */
 async function renewClientSubscription(db: D1Database, stripeSubId: string): Promise<void> {
-  const sub = await db.prepare("SELECT id, tenant_id, client_id, package_id, budgets_json, addons_json FROM client_subscriptions WHERE stripe_sub_id = ? ORDER BY started_at DESC LIMIT 1").bind(stripeSubId).first<{ id: string; tenant_id: string; client_id: string; package_id: string | null; budgets_json: string | null; addons_json: string | null }>();
+  const sub = await db.prepare("SELECT id, tenant_id, client_id, package_id, budgets_json, addons_json, installments_total, installments_paid FROM client_subscriptions WHERE stripe_sub_id = ? ORDER BY started_at DESC LIMIT 1").bind(stripeSubId).first<{ id: string; tenant_id: string; client_id: string; package_id: string | null; budgets_json: string | null; addons_json: string | null; installments_total: number | null; installments_paid: number | null }>();
   if (!sub?.package_id) return;
   const pkg = await db.prepare("SELECT budgets_json, addons_json FROM packages WHERE id = ?").bind(sub.package_id).first<{ budgets_json: string | null; addons_json: string | null }>();
   if (!pkg) return;
   const now = nowIso();
-  const specs = parseJson<{ feature: Budget["feature"]; days: number }[]>(pkg.budgets_json, []);
+  const n = sub.installments_total && sub.installments_total > 1 ? sub.installments_total : 1;
+  const specs = scaleSpecs(parseJson<{ feature: Budget["feature"]; days: number }[]>(pkg.budgets_json, []), n);
   const addOns = parseJson<{ addOnTypeId: string; quantity: number }[]>(pkg.addons_json, []);
   const existing = parseJson<Budget[]>(sub.budgets_json, []);
   const added = buildBudgetsForPurchase(existing, specs, now);
   const balances = mergeAddOnBalances(parseJson(sub.addons_json, []), addOns);
+  if (n > 1) {
+    // An installment cycle: unlock this payment's share, advance the counter,
+    // and on the final payment stop future billing (per-cycle unlock — no
+    // clawback; access rides out whatever's been paid if a cycle later fails).
+    const alreadyDone = (sub.installments_paid ?? 1) >= n;
+    if (alreadyDone) {
+      // A stray cycle after completion (the cancel below previously failed and
+      // Stripe billed again). Do NOT grant another share — just retry the cancel
+      // and clear the link once it sticks. This is what makes a webhook retry or
+      // an extra charge idempotent (no (N+1)th grant).
+      await cancelInstallmentSub(db, sub.tenant_id, stripeSubId, sub.id);
+      return;
+    }
+    const paid = (sub.installments_paid ?? 1) + 1;
+    const done = paid >= n;
+    // Single statement — the counter and budgets commit together, so a retry of
+    // a failed handler recomputes `paid` from the last committed value (never
+    // double-counts). `stripe_sub_id` is left intact here and only cleared once
+    // the Stripe cancel is confirmed (below), so a post-completion stray invoice
+    // still resolves this row and hits the `alreadyDone` guard.
+    await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, status = 'active', payment_status = ?, installments_paid = ?, updated_at = ? WHERE id = ?")
+      .bind(j([...existing, ...added]), j(balances), done ? "completed" : "installments", paid, now, sub.id)
+      .run();
+    if (done) await cancelInstallmentSub(db, sub.tenant_id, stripeSubId, sub.id);
+    return;
+  }
   await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, status = 'active', payment_status = 'paid', updated_at = ? WHERE id = ?").bind(j([...existing, ...added]), j(balances), now, sub.id).run();
 }

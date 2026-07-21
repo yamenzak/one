@@ -1,20 +1,22 @@
 /** Package editor + redemption codes + promo codes. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Switch, Sheet, Chip, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonHeader, SkeletonList, CreditCard, Ticket, Tag, Trash2, Plus, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Switch, Sheet, Chip, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonHeader, SkeletonList, CreditCard, Ticket, Tag, Trash2, Plus, X } from "@mossa/ui";
 import { CLIENT_FLAG_META, CLIENT_FLAG_CATEGORIES, CLIENT_FLAG_KEYS, DEFAULT_CLIENT_FLAGS, type ClientFlags } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { FeatureLock } from "../../FeatureLock.js";
 
-interface Pkg { id: string; name: string; one_time_price_cents: number | null; monthly_price_cents?: number | null; budgets: { feature: string; days: number }[]; visibility: string }
-interface Code { id: string; code: string; days_to_add: number; target_feature: string; used_count: number; max_uses: number }
-interface Promo { id: string; code: string; discount_type: string; percent_off: number | null; amount_off_cents: number | null; redemption_count: number; max_redemptions: number | null; active: number }
+interface Pkg { id: string; name: string; one_time_price_cents: number | null; monthly_price_cents?: number | null; installment_months?: number | null; budgets: { feature: string; days: number }[]; visibility: string }
+interface ClientOpt { id: string; displayName: string }
+interface Code { id: string; code: string; days_to_add: number; target_feature: string; used_count: number; max_uses: number; restricted_package_id?: string | null; restricted_client_id?: string | null }
+interface Promo { id: string; code: string; discount_type: string; percent_off: number | null; amount_off_cents: number | null; redemption_count: number; max_redemptions: number | null; restricted_package_id?: string | null; restricted_client_id?: string | null; active: number }
 
 export function Packages() {
   const { ctx } = useSession();
   const hasCommerce = ctx?.entitlements?.features?.commerce ?? false;
   const [packages, setPackages] = useState<Pkg[] | null>(null);
+  const [clients, setClients] = useState<ClientOpt[]>([]);
   const [codes, setCodes] = useState<Code[]>([]);
   const [promos, setPromos] = useState<Promo[]>([]);
   const [pkgOpen, setPkgOpen] = useState(false);
@@ -23,8 +25,8 @@ export function Packages() {
   const [promoToDelete, setPromoToDelete] = useState<Promo | null>(null);
 
   const load = useCallback(async () => {
-    const [p, c, pr] = await Promise.all([api.get<{ packages: Pkg[] }>("/api/packages"), api.get<{ codes: Code[] }>("/api/redemption-codes"), api.get<{ codes: Promo[] }>("/api/promo-codes").catch(() => ({ codes: [] }))]);
-    setPackages(p.packages); setCodes(c.codes); setPromos(pr.codes);
+    const [p, c, pr, cl] = await Promise.all([api.get<{ packages: Pkg[] }>("/api/packages"), api.get<{ codes: Code[] }>("/api/redemption-codes"), api.get<{ codes: Promo[] }>("/api/promo-codes").catch(() => ({ codes: [] })), api.get<{ clients: ClientOpt[] }>("/api/clients").catch(() => ({ clients: [] }))]);
+    setPackages(p.packages); setCodes(c.codes); setPromos(pr.codes); setClients(cl.clients);
   }, []);
   useEffect(() => { if (hasCommerce) void load(); }, [load, hasCommerce]);
   const deletePromo = async (id: string) => { await api.del(`/api/promo-codes/${id}`); await load(); };
@@ -52,7 +54,7 @@ export function Packages() {
           {packages.map((p) => (
             <Card key={p.id} className="flex items-center justify-between">
               <div><div className="font-semibold">{p.name}</div><div className="mt-1 flex flex-wrap gap-1">{p.budgets.map((b, i) => <Badge key={i} tone="activity">{b.days}d {b.feature}</Badge>)}</div></div>
-              <div className="text-right"><div className="numeral font-semibold">{p.monthly_price_cents ? `$${(p.monthly_price_cents / 100).toFixed(0)}/mo` : p.one_time_price_cents ? `$${(p.one_time_price_cents / 100).toFixed(0)}` : "Free"}</div><Badge tone="neutral">{p.visibility}</Badge></div>
+              <div className="text-right"><div className="numeral font-semibold">{p.monthly_price_cents ? `$${(p.monthly_price_cents / 100).toFixed(0)}/mo` : p.one_time_price_cents ? `$${(p.one_time_price_cents / 100).toFixed(0)}${p.installment_months && p.installment_months > 1 ? ` · ${p.installment_months}×` : ""}` : "Free"}</div><Badge tone="neutral">{p.visibility === "client_specific" ? "one client" : p.visibility}</Badge></div>
             </Card>
           ))}
         </Stagger>
@@ -84,9 +86,9 @@ export function Packages() {
         )}
       </Reveal>
 
-      {pkgOpen && <PackageSheet onClose={() => setPkgOpen(false)} onSaved={() => { setPkgOpen(false); void load(); }} />}
-      {codeOpen && <CodeSheet onClose={() => setCodeOpen(false)} onSaved={() => { setCodeOpen(false); void load(); }} />}
-      {promoOpen && <PromoSheet onClose={() => setPromoOpen(false)} onSaved={() => { setPromoOpen(false); void load(); }} />}
+      {pkgOpen && <PackageSheet clients={clients} onClose={() => setPkgOpen(false)} onSaved={() => { setPkgOpen(false); void load(); }} />}
+      {codeOpen && <CodeSheet packages={packages ?? []} clients={clients} onClose={() => setCodeOpen(false)} onSaved={() => { setCodeOpen(false); void load(); }} />}
+      {promoOpen && <PromoSheet packages={packages ?? []} clients={clients} onClose={() => setPromoOpen(false)} onSaved={() => { setPromoOpen(false); void load(); }} />}
 
       <ConfirmDialog
         open={!!promoToDelete}
@@ -102,13 +104,14 @@ export function Packages() {
   );
 }
 
-function PackageSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function PackageSheet({ clients, onClose, onSaved }: { clients: ClientOpt[]; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState("");
   const [priceMode, setPriceMode] = useState<"one_time" | "monthly" | "installment">("one_time");
   const [price, setPrice] = useState("");
   const [installmentMonths, setInstallmentMonths] = useState("3");
   const [budgets, setBudgets] = useState<{ feature: "all" | "workout" | "meal"; days: number }[]>([{ feature: "all", days: 30 }]);
-  const [visibility, setVisibility] = useState<"private" | "marketplace">("marketplace");
+  const [visibility, setVisibility] = useState<"private" | "marketplace" | "client_specific">("marketplace");
+  const [restrictedClientId, setRestrictedClientId] = useState("");
   const [oncePerCustomer, setOncePerCustomer] = useState(false);
   // Only keys the tenant explicitly toggled land here — untouched flags fall
   // back to the client defaults at resolve time (so a package needn't restate
@@ -132,6 +135,7 @@ function PackageSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         flags: Object.keys(flags).length ? flags : null,
         oncePerCustomer,
         visibility,
+        restrictedClientId: visibility === "client_specific" && restrictedClientId ? restrictedClientId : null,
       });
       onSaved();
     } finally { setBusy(false); }
@@ -185,18 +189,26 @@ function PackageSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         </div>
 
         <div className="flex items-center justify-between"><span className="text-sm">Once per customer</span><Switch checked={oncePerCustomer} onCheckedChange={setOncePerCustomer} /></div>
-        <div className="flex gap-2">{(["marketplace", "private"] as const).map((v) => <Chip key={v} selected={visibility === v} onClick={() => setVisibility(v)}>{v}</Chip>)}</div>
-        <Button size="lg" className="w-full" disabled={name.trim().length < 2 || budgets.length === 0 || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create package"}</Button>
+        <div className="space-y-2">
+          <span className="text-sm text-muted-foreground">Visibility</span>
+          <div className="flex flex-wrap gap-2">{([["marketplace", "Public"], ["private", "Private (grant only)"], ["client_specific", "One client"]] as const).map(([v, label]) => <Chip key={v} selected={visibility === v} onClick={() => setVisibility(v)}>{label}</Chip>)}</div>
+          {visibility === "client_specific" && (
+            <Select aria-label="Client" value={restrictedClientId} onChange={setRestrictedClientId} options={[{ value: "", label: "Choose a client…" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} />
+          )}
+        </div>
+        <Button size="lg" className="w-full" disabled={name.trim().length < 2 || budgets.length === 0 || (visibility === "client_specific" && !restrictedClientId) || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create package"}</Button>
       </div>
     </Sheet>
   );
 }
 
-function PromoSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function PromoSheet({ packages, clients, onClose, onSaved }: { packages: Pkg[]; clients: ClientOpt[]; onClose: () => void; onSaved: () => void }) {
   const [code, setCode] = useState("");
   const [discountType, setDiscountType] = useState<"percent" | "amount">("percent");
   const [value, setValue] = useState("");
   const [maxRedemptions, setMaxRedemptions] = useState("");
+  const [restrictedPackageId, setRestrictedPackageId] = useState("");
+  const [restrictedClientId, setRestrictedClientId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const save = async () => {
@@ -208,6 +220,8 @@ function PromoSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
         percentOff: discountType === "percent" ? Number(value) : undefined,
         amountOffCents: discountType === "amount" ? Math.round(Number(value) * 100) : undefined,
         maxRedemptions: maxRedemptions ? Number(maxRedemptions) : undefined,
+        restrictedPackageId: restrictedPackageId || undefined,
+        restrictedClientId: restrictedClientId || undefined,
       });
       onSaved();
     } catch { setError("That code already exists."); } finally { setBusy(false); }
@@ -219,6 +233,8 @@ function PromoSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
         <div className="flex gap-2">{(["percent", "amount"] as const).map((t) => <Chip key={t} selected={discountType === t} onClick={() => setDiscountType(t)}>{t === "percent" ? "% off" : "$ off"}</Chip>)}</div>
         <Field label={discountType === "percent" ? "Percent off" : "Amount off (USD)"} value={value} inputMode="decimal" onChange={(e) => setValue(e.target.value)} />
         <Field label="Max redemptions (blank = unlimited)" value={maxRedemptions} inputMode="numeric" onChange={(e) => setMaxRedemptions(e.target.value.replace(/\D/g, ""))} />
+        <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Limit to a package (optional)</span><Select aria-label="Package" value={restrictedPackageId} onChange={setRestrictedPackageId} options={[{ value: "", label: "Any package" }, ...packages.map((p) => ({ value: p.id, label: p.name }))]} /></div>
+        <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Limit to a client (optional)</span><Select aria-label="Client" value={restrictedClientId} onChange={setRestrictedClientId} options={[{ value: "", label: "Any client" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} /></div>
         {error && <p className="text-sm text-danger">{error}</p>}
         <Button size="lg" className="w-full" disabled={code.length < 3 || !value || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create promo"}</Button>
       </div>
@@ -226,12 +242,14 @@ function PromoSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
   );
 }
 
-function CodeSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function CodeSheet({ packages, clients, onClose, onSaved }: { packages: Pkg[]; clients: ClientOpt[]; onClose: () => void; onSaved: () => void }) {
   const [code, setCode] = useState("");
   const [days, setDays] = useState("7");
   const [feature, setFeature] = useState<"all" | "workout" | "meal">("all");
   const [maxUses, setMaxUses] = useState("1");
-  const save = async () => { await api.post("/api/redemption-codes", { code, daysToAdd: Number(days), targetFeature: feature, maxUses: Number(maxUses) }); onSaved(); };
+  const [restrictedPackageId, setRestrictedPackageId] = useState("");
+  const [restrictedClientId, setRestrictedClientId] = useState("");
+  const save = async () => { await api.post("/api/redemption-codes", { code, daysToAdd: Number(days), targetFeature: feature, maxUses: Number(maxUses), restrictedPackageId: restrictedPackageId || undefined, restrictedClientId: restrictedClientId || undefined }); onSaved(); };
   return (
     <Sheet open onClose={onClose} title="New redemption code">
       <div className="space-y-4">
@@ -239,6 +257,8 @@ function CodeSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () => v
         <Field label="Days to add" value={days} inputMode="numeric" onChange={(e) => setDays(e.target.value.replace(/\D/g, ""))} />
         <div className="flex gap-2">{(["all", "workout", "meal"] as const).map((f) => <Chip key={f} selected={feature === f} onClick={() => setFeature(f)}>{f}</Chip>)}</div>
         <Field label="Max uses" value={maxUses} inputMode="numeric" onChange={(e) => setMaxUses(e.target.value.replace(/\D/g, ""))} />
+        <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Only for holders of a package (optional)</span><Select aria-label="Package" value={restrictedPackageId} onChange={setRestrictedPackageId} options={[{ value: "", label: "Any package" }, ...packages.map((p) => ({ value: p.id, label: p.name }))]} /></div>
+        <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Only for one client (optional)</span><Select aria-label="Client" value={restrictedClientId} onChange={setRestrictedClientId} options={[{ value: "", label: "Any client" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} /></div>
         <Button size="lg" className="w-full" disabled={code.length < 4 || !days} onClick={() => void save()}>Create code</Button>
       </div>
     </Sheet>

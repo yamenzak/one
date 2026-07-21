@@ -188,11 +188,11 @@ async function reminderSweep(env: Env): Promise<void> {
     const budgets = parseJson<{ expiresAt: string }[]>(sub.budgets_json, []);
     if (!budgets.length) continue;
     const latest = Math.max(0, ...budgets.map((b) => Date.parse(b.expiresAt)));
-    const nudge = async (type: NotifType, message: string, marker: string) => {
+    const nudge = async (type: NotifType, message: string, marker: string, vars?: Record<string, string | number>) => {
       const client = await env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(sub.client_id).first<{ user_id: string | null }>();
       if (client?.user_id) {
-        // Title + link (/shop) come from the type's record.
-        await notify(env, { tenantId: sub.tenant_id, userId: client.user_id, type, message, dedupeKey: `${marker}_${sub.id}` });
+        // Title + link (/shop) come from the type's record; `studioName` is auto.
+        await notify(env, { tenantId: sub.tenant_id, userId: client.user_id, type, message, dedupeKey: `${marker}_${sub.id}`, vars });
       }
       await env.DB.prepare("UPDATE client_subscriptions SET notes = ? WHERE id = ?").bind(`${notes} ${marker}`.trim(), sub.id).run().catch(() => undefined);
     };
@@ -206,7 +206,7 @@ async function reminderSweep(env: Env): Promise<void> {
     }
     // Within 3 days of lapsing → one "expiring soon" nudge.
     if (latest > now && latest < soon && !notes.includes("expiry-notified")) {
-      await nudge("sub_expiring", "Renew to keep your coaching access.", "expiry-notified");
+      await nudge("sub_expiring", "Renew to keep your coaching access.", "expiry-notified", { daysLeft: Math.max(1, Math.ceil((latest - now) / 86_400_000)) });
     }
    } catch { /* skip this row; a bad record can't stall the whole sweep */ }
   }

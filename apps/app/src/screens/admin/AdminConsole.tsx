@@ -1,23 +1,24 @@
 /** Platform admin console — tenants (comp/topup/seed), Stripe config. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Sheet, Skeleton, Reveal, SkeletonLine, SegmentedControl, Switch, Chip, Page, Stagger, ConfirmDialog, ShieldCheck, Sparkles, ArrowLeft, KeyRound, Globe, Gift, cn, LayoutGrid } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, Reveal, SkeletonLine, SegmentedControl, Switch, Chip, Page, Stagger, ConfirmDialog, ShieldCheck, Sparkles, ArrowLeft, KeyRound, Globe, Gift, Tag, Trash2, Plus, cn, LayoutGrid } from "@mossa/ui";
 import { api } from "../../api.js";
 
 interface Tenant { id: string; name: string; slug: string; plan_id: string | null; status: string | null; comp: number | null }
 const PLANS = ["free", "solo", "studio", "team"];
 
-type AdminTab = "tenants" | "plans" | "stripe" | "domains" | "ai" | "security";
+type AdminTab = "tenants" | "plans" | "stripe" | "promos" | "domains" | "ai" | "security";
 
 export function AdminConsole({ onBack }: { onBack: () => void }) {
   const [tab, setTab] = useState<AdminTab>("tenants");
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <div className="flex items-center gap-3"><Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button><div className="flex items-center gap-2"><ShieldCheck className="size-5 text-primary" /><h1 className="text-xl font-bold tracking-tight">Platform admin</h1></div></div>
-      <div className="overflow-x-auto no-scrollbar"><SegmentedControl options={[{ value: "tenants", label: "Tenants" }, { value: "plans", label: "Plans" }, { value: "ai", label: "AI" }, { value: "stripe", label: "Stripe" }, { value: "domains", label: "Domains" }, { value: "security", label: "Security" }]} value={tab} onChange={setTab} /></div>
+      <div className="overflow-x-auto no-scrollbar"><SegmentedControl options={[{ value: "tenants", label: "Tenants" }, { value: "plans", label: "Plans" }, { value: "ai", label: "AI" }, { value: "stripe", label: "Stripe" }, { value: "promos", label: "Promos" }, { value: "domains", label: "Domains" }, { value: "security", label: "Security" }]} value={tab} onChange={setTab} /></div>
       {tab === "tenants" && <Tenants />}
       {tab === "plans" && <PlansConfig />}
       {tab === "stripe" && <StripeConfig />}
+      {tab === "promos" && <PlatformPromos />}
       {tab === "ai" && <AiConfig />}
       {tab === "domains" && <DomainsConfig />}
       {tab === "security" && <SecurityConfig />}
@@ -431,5 +432,87 @@ function StripeConfig() {
         {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
       </Card>
     </Stagger>
+  );
+}
+
+// ── Platform promo codes (Mossa → tenant): website-native discounts on a
+//    tenant's credit-pack purchase. Percentage or fixed, optional max uses. ─────
+interface PPromo { id: string; code: string; discount_type: string; percent_off: number | null; amount_off_cents: number | null; redemption_count: number; max_redemptions: number | null; active: number }
+
+function PlatformPromos() {
+  const [promos, setPromos] = useState<PPromo[] | null>(null);
+  const [open, setOpen] = useState(false);
+  const [toDelete, setToDelete] = useState<PPromo | null>(null);
+  const load = useCallback(async () => setPromos((await api.get<{ codes: PPromo[] }>("/api/admin/promo-codes")).codes), []);
+  useEffect(() => void load(), [load]);
+  const del = async (id: string) => { await api.del(`/api/admin/promo-codes/${id}`); await load(); };
+  return (
+    <Stagger className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div><h2 className="font-semibold">Platform promo codes</h2><p className="text-xs text-muted-foreground">Discounts on tenants' credit-pack purchases.</p></div>
+        <Button size="sm" onClick={() => setOpen(true)}><Plus /> New</Button>
+      </div>
+      <Reveal loading={!promos} skeleton={<SkeletonLine />}>
+        {promos && (promos.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No platform promo codes yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {promos.map((p) => (
+              <Card key={p.id} className={cn("flex items-center justify-between", !p.active && "opacity-50")}>
+                <div className="flex items-center gap-2.5">
+                  <div className="grid size-8 place-items-center rounded-full bg-primary/10 text-primary [&_svg]:size-4"><Tag /></div>
+                  <div><div className="font-mono font-semibold">{p.code}</div><div className="text-xs text-muted-foreground">{p.discount_type === "percent" ? `${p.percent_off}% off` : `$${((p.amount_off_cents ?? 0) / 100).toFixed(0)} off`} · used {p.redemption_count}{p.max_redemptions ? `/${p.max_redemptions}` : ""}</div></div>
+                </div>
+                {p.active ? <button onClick={() => setToDelete(p)} aria-label="Delete promo code" className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button> : <Badge tone="neutral">inactive</Badge>}
+              </Card>
+            ))}
+          </div>
+        ))}
+      </Reveal>
+      {open && <PlatformPromoSheet onClose={() => setOpen(false)} onSaved={() => { setOpen(false); void load(); }} />}
+      <ConfirmDialog
+        open={!!toDelete}
+        onOpenChange={(o) => !o && setToDelete(null)}
+        title={toDelete ? `Delete promo ${toDelete.code}?` : "Delete promo code?"}
+        description="This deactivates the code so it can no longer be applied at checkout."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => { if (toDelete) void del(toDelete.id); }}
+      />
+    </Stagger>
+  );
+}
+
+function PlatformPromoSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [code, setCode] = useState("");
+  const [discountType, setDiscountType] = useState<"percent" | "amount">("percent");
+  const [value, setValue] = useState("");
+  const [maxRedemptions, setMaxRedemptions] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const save = async () => {
+    setBusy(true); setError(null);
+    try {
+      await api.post("/api/admin/promo-codes", {
+        code,
+        discountType,
+        percentOff: discountType === "percent" ? Number(value) : undefined,
+        amountOffCents: discountType === "amount" ? Math.round(Number(value) * 100) : undefined,
+        maxRedemptions: maxRedemptions ? Number(maxRedemptions) : undefined,
+      });
+      onSaved();
+    } catch { setError("That code already exists."); } finally { setBusy(false); }
+  };
+  return (
+    <Sheet open onClose={onClose} title="New platform promo">
+      <div className="space-y-4">
+        <Field label="Code" icon={Tag} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="LAUNCH20" />
+        <div className="flex gap-2">{(["percent", "amount"] as const).map((t) => <Chip key={t} selected={discountType === t} onClick={() => setDiscountType(t)}>{t === "percent" ? "% off" : "$ off"}</Chip>)}</div>
+        <Field label={discountType === "percent" ? "Percent off" : "Amount off (USD)"} value={value} inputMode="decimal" onChange={(e) => setValue(e.target.value)} />
+        <Field label="Max redemptions (blank = unlimited)" value={maxRedemptions} inputMode="numeric" onChange={(e) => setMaxRedemptions(e.target.value.replace(/\D/g, ""))} />
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <Button size="lg" className="w-full" disabled={code.length < 3 || !value || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create promo"}</Button>
+      </div>
+    </Sheet>
   );
 }
