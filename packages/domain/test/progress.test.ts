@@ -7,6 +7,7 @@ import {
   longestStreak,
   presetRange,
   rangeStatus,
+  resolveGoalTimeline,
   seriesDelta,
   wellnessIndex,
 } from "../src/progress.js";
@@ -38,6 +39,28 @@ describe("progress aggregates", () => {
     expect(calorieAdherencePct(daily, 2000)).toBe(67);
     expect(calorieAdherencePct(daily, null)).toBeNull();
     expect(calorieAdherencePct(new Map(), 2000)).toBeNull();
+  });
+
+  it("adherence grades each day against a per-day target resolver", () => {
+    const daily = new Map([
+      ["2026-07-08", 2000], // graded vs 2000 → within
+      ["2026-07-09", 2000], // graded vs 2500 → out (below band)
+      ["2026-07-10", 1500], // no target that day → ungraded, not a miss
+    ]);
+    const target = (d: string) => (d < "2026-07-09" ? 2000 : d < "2026-07-10" ? 2500 : null);
+    expect(calorieAdherencePct(daily, target)).toBe(50); // 1 of 2 graded days
+  });
+
+  it("resolveGoalTimeline picks the goal in force on each day (later-created wins same day)", () => {
+    const resolve = resolveGoalTimeline([
+      { start: "2026-06-01", createdAt: "2026-06-01T10:00:00Z", targets: { targetCalories: 2200 } },
+      { start: "2026-07-01", createdAt: "2026-07-01T09:00:00Z", targets: { targetCalories: 1900 } },
+      { start: "2026-07-01", createdAt: "2026-07-01T18:00:00Z", targets: { targetCalories: 1850 } },
+    ]);
+    expect(resolve("2026-05-15")).toBeNull(); // before any goal
+    expect(resolve("2026-06-15")?.targetCalories).toBe(2200);
+    expect(resolve("2026-07-01")?.targetCalories).toBe(1850); // same-day: later created wins
+    expect(resolve("2026-08-01")?.targetCalories).toBe(1850); // latest carries forward
   });
 
   it("wellness index inverts stress around neutral 3 and clamps 1..5", () => {

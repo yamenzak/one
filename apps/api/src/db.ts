@@ -252,6 +252,12 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "ALTER TABLE redemption_codes ADD COLUMN restricted_client_id TEXT",
           // Tenant email white-label: a global signature appended to every email.
           "ALTER TABLE tenant_settings ADD COLUMN email_signature TEXT",
+          // Per-log goal snapshot: the calorie/protein target in force when the
+          // food was logged, frozen onto the row so adherence for a past day
+          // never re-grades when the goal later changes. NULL on historical rows
+          // (resolved from the goal timeline instead).
+          "ALTER TABLE food_entries ADD COLUMN target_calories REAL",
+          "ALTER TABLE food_entries ADD COLUMN target_protein_g REAL",
         ];
         for (const sql of alters) await db.exec(sql).catch(() => undefined);
         // Backfill: older body scans mirrored only weight + body-fat into

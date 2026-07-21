@@ -26,6 +26,7 @@ import {
 import { type AppEnv } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { parseJson } from "./db.js";
+import { loadGoalTimeline, dayCalorieTarget } from "./goals.js";
 
 interface SessionEntry { exerciseId: string; sets: LoggedSetLike[] }
 
@@ -47,13 +48,13 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
   const db = c.env.DB;
   const days = daysInRange(start, end);
 
-  const [measurements, checkIns, foods, sessions, activities, goal, scans] = await Promise.all([
+  const [measurements, checkIns, foods, sessions, activities, timeline, scans] = await Promise.all([
     db.prepare("SELECT date_local, weight_kg, body_fat_percent, waist_cm, neck_cm, hips_cm, chest_cm FROM measurements WHERE client_id=? AND date_local>=? AND date_local<=? ORDER BY date_local").bind(clientId, start, end).all<{ date_local: string; weight_kg: number | null; body_fat_percent: number | null; waist_cm: number | null; neck_cm: number | null; hips_cm: number | null; chest_cm: number | null }>(),
     db.prepare("SELECT date_local, mood, energy, stress, sleep_quality, sleep_hours FROM check_ins WHERE client_id=? AND date_local>=? AND date_local<=? ORDER BY date_local").bind(clientId, start, end).all<{ date_local: string; mood: number | null; energy: number | null; stress: number | null; sleep_quality: number | null; sleep_hours: number | null }>(),
-    db.prepare("SELECT date_local, SUM(calories) AS calories, SUM(protein_g) AS protein, SUM(carbs_g) AS carbs, SUM(fat_g) AS fat FROM food_entries WHERE client_id=? AND date_local>=? AND date_local<=? GROUP BY date_local").bind(clientId, start, end).all<{ date_local: string; calories: number; protein: number; carbs: number; fat: number }>(),
+    db.prepare("SELECT date_local, SUM(calories) AS calories, SUM(protein_g) AS protein, SUM(carbs_g) AS carbs, SUM(fat_g) AS fat, MAX(target_calories) AS day_target_cal FROM food_entries WHERE client_id=? AND date_local>=? AND date_local<=? GROUP BY date_local").bind(clientId, start, end).all<{ date_local: string; calories: number; protein: number; carbs: number; fat: number; day_target_cal: number | null }>(),
     db.prepare("SELECT date_local, entries_json FROM exercise_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(clientId, start, end).all<{ date_local: string; entries_json: string | null }>(),
     db.prepare("SELECT date_local, duration_min, calories FROM activity_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(clientId, start, end).all<{ date_local: string; duration_min: number | null; calories: number | null }>(),
-    db.prepare("SELECT targets_json FROM client_goals WHERE client_id=? AND status='active' ORDER BY created_at DESC LIMIT 1").bind(clientId).first<{ targets_json: string | null }>(),
+    loadGoalTimeline(db, clientId),
     db.prepare("SELECT date_local, posture_cva_deg, posture_severity, somatotype FROM body_scans WHERE client_id=? AND date_local>=? AND date_local<=? ORDER BY date_local").bind(clientId, start, end).all<{ date_local: string; posture_cva_deg: number | null; posture_severity: string | null; somatotype: string | null }>(),
   ]);
 
@@ -63,7 +64,12 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
   const latestScan = sRows.length ? sRows[sRows.length - 1]! : null;
   const ciRows = checkIns.results ?? [];
   const fRows = foods.results ?? [];
-  const targets = parseJson<{ targetCalories?: number; targetProteinG?: number; targetCarbsG?: number; targetFatG?: number }>(goal?.targets_json, {});
+  // Headline targets = the goal active today (drives the "target" display).
+  // Per-day adherence resolves the goal that was in force on each logged day.
+  const targets = timeline.active as { targetCalories?: number; targetProteinG?: number; targetCarbsG?: number; targetFatG?: number };
+  const calTargetSnap = new Map<string, number>();
+  for (const r of fRows) if (r.day_target_cal != null) calTargetSnap.set(r.date_local, r.day_target_cal);
+  const calTargetForDay = dayCalorieTarget(timeline, calTargetSnap);
 
   // ── Body composition series + latest + deltas ──
   const pickSeries = <K extends keyof (typeof mRows)[number]>(key: K) =>
@@ -90,7 +96,7 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
   const fByDay = new Map(fRows.map((r) => [r.date_local, r]));
   const calByDay = new Map<string, number>();
   for (const r of fRows) calByDay.set(r.date_local, r.calories ?? 0);
-  const nutritionPerDay = days.map((d) => { const r = fByDay.get(d); return { date: d, calories: Math.round(r?.calories ?? 0), protein: Math.round(r?.protein ?? 0), carbs: Math.round(r?.carbs ?? 0), fat: Math.round(r?.fat ?? 0), logged: !!r }; });
+  const nutritionPerDay = days.map((d) => { const r = fByDay.get(d); return { date: d, calories: Math.round(r?.calories ?? 0), protein: Math.round(r?.protein ?? 0), carbs: Math.round(r?.carbs ?? 0), fat: Math.round(r?.fat ?? 0), logged: !!r, target: calTargetForDay(d) }; });
 
   // ── Training: per-day tonnage/load/sets, weekly buckets, totals, PRs ──
   const trainByDay = new Map<string, { tonnage: number; load: number; sets: number }>();
@@ -172,7 +178,7 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
       },
       deltas: { weight: deltaOf(weight), bodyFat: deltaOf(bodyFat), waist: deltaOf(waist), chest: deltaOf(chest), hips: deltaOf(hips) },
     },
-    nutrition: { perDay: nutritionPerDay, targets, adherencePct: calorieAdherencePct(calByDay, targets.targetCalories), loggedDays: foodDays.size },
+    nutrition: { perDay: nutritionPerDay, targets, adherencePct: calorieAdherencePct(calByDay, calTargetForDay), loggedDays: foodDays.size },
     training: { perDay: trainingPerDay, weekly, totalTonnage: Math.round(totalTonnage), totalSets, workoutDays: workoutDaySet.size, prs },
     wellness: {
       perDay: wellnessPerDay,

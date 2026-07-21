@@ -44,6 +44,9 @@ interface AreaChartProps {
   tone?: Tone;
   height?: number;
   target?: number;
+  /** Per-slot target line (stepped) — for a target that changed over time, e.g.
+   *  a calorie goal that was superseded. Takes precedence over `target`. */
+  targetSeries?: (number | null)[];
   /** Overlay a centred moving-average line (window auto-sized). */
   trend?: boolean;
   /** Number of horizontal gridlines (incl. top/bottom). */
@@ -66,7 +69,7 @@ function movingAverage(vals: (number | null)[], win: number): (number | null)[] 
   });
 }
 
-export function AreaChart({ values, tone = "activity", height = 180, target, trend, grid = 4, format = (v) => `${Math.round(v)}`, label, className }: AreaChartProps) {
+export function AreaChart({ values, tone = "activity", height = 180, target, targetSeries, trend, grid = 4, format = (v) => `${Math.round(v)}`, label, className }: AreaChartProps) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [active, setActive] = useState<number | null>(null);
   const color = toneVar[tone];
@@ -75,9 +78,11 @@ export function AreaChart({ values, tone = "activity", height = 180, target, tre
 
   if (pts.length < 2) return <div ref={ref} className={cn("grid place-items-center rounded-2xl bg-surface-2 text-xs text-muted-foreground", className)} style={{ height }}>Not enough data yet</div>;
 
+  const tPts = targetSeries ? targetSeries.map((v, i) => ({ i, v })).filter((p): p is { i: number; v: number } => p.v != null) : [];
   const present = pts.map((p) => p.v);
-  const lo = Math.min(...present, ...(target != null ? [target] : []));
-  const hi = Math.max(...present, ...(target != null ? [target] : []));
+  const targetVals = tPts.length ? tPts.map((p) => p.v) : target != null ? [target] : [];
+  const lo = Math.min(...present, ...targetVals);
+  const hi = Math.max(...present, ...targetVals);
   const span = hi - lo || 1;
   const yLo = lo - span * 0.12, yHi = hi + span * 0.12, yspan = yHi - yLo;
   const n = values.length;
@@ -88,6 +93,13 @@ export function AreaChart({ values, tone = "activity", height = 180, target, tre
   const areaPath = `${linePath} L ${x(pts[pts.length - 1]!.i).toFixed(1)} ${(height - padBot).toFixed(1)} L ${x(pts[0]!.i).toFixed(1)} ${(height - padBot).toFixed(1)} Z`;
   const trendPts = trend ? movingAverage(values, Math.max(3, Math.round(n / 6))).map((v, i) => ({ i, v })).filter((p): p is { i: number; v: number } => p.v != null) : [];
   const trendPath = trendPts.map((p, k) => `${k === 0 ? "M" : "L"} ${x(p.i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
+
+  // Stepped target line: horizontal at the previous target until the goal
+  // changes, then a vertical step to the new one.
+  const stepPath = tPts.reduce((d, p, k) => {
+    if (k === 0) return `M ${x(p.i).toFixed(1)} ${y(p.v).toFixed(1)}`;
+    return `${d} L ${x(p.i).toFixed(1)} ${y(tPts[k - 1]!.v).toFixed(1)} L ${x(p.i).toFixed(1)} ${y(p.v).toFixed(1)}`;
+  }, "");
 
   const gid = `ac-${tone}`;
   const gridYs = Array.from({ length: grid }, (_, k) => yLo + (yspan * k) / (grid - 1));
@@ -115,7 +127,11 @@ export function AreaChart({ values, tone = "activity", height = 180, target, tre
             <text x={0} y={y(gv) - 3} className="fill-muted-foreground" style={{ fontSize: 9 }}>{format(gv)}</text>
           </g>
         ))}
-        {target != null && <line x1={padX} x2={width - padX} y1={y(target)} y2={y(target)} stroke={color} strokeDasharray="2 5" strokeWidth={1.5} opacity={0.7} />}
+        {stepPath ? (
+          <path d={stepPath} fill="none" stroke={color} strokeDasharray="2 5" strokeWidth={1.5} opacity={0.7} strokeLinejoin="round" />
+        ) : target != null ? (
+          <line x1={padX} x2={width - padX} y1={y(target)} y2={y(target)} stroke={color} strokeDasharray="2 5" strokeWidth={1.5} opacity={0.7} />
+        ) : null}
         <path d={areaPath} fill={`url(#${gid})`} />
         <motion.path d={linePath} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }} />
         {trendPath && <path d={trendPath} fill="none" stroke={color} strokeWidth={1.5} strokeDasharray="4 4" opacity={0.55} strokeLinecap="round" />}

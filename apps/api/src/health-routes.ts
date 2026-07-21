@@ -14,6 +14,7 @@ import {
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { gateFeature } from "./client-flags.js";
 import { requireClientAccess } from "./clients.js";
+import { loadGoalTimeline } from "./goals.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
 import { notify } from "./notify.js";
@@ -276,8 +277,8 @@ export const healthRoutes = new Hono<AppEnv>()
     const { start, end } = presetRange("7d", today);
     const prStart = addDays(today, -83); // longer window for a PR baseline
 
-    const [foods, sessionsWk, sessionsHist, acts, water, checkins, sleeps, moods, supps, suppLogs, measures, goal] = await Promise.all([
-      db.prepare("SELECT date_local, COALESCE(SUM(calories),0) AS cal, COALESCE(SUM(protein_g),0) AS pro FROM food_entries WHERE client_id=? AND date_local>=? AND date_local<=? GROUP BY date_local").bind(cid, start, end).all<{ date_local: string; cal: number; pro: number }>(),
+    const [foods, sessionsWk, sessionsHist, acts, water, checkins, sleeps, moods, supps, suppLogs, measures, timeline] = await Promise.all([
+      db.prepare("SELECT date_local, COALESCE(SUM(calories),0) AS cal, COALESCE(SUM(protein_g),0) AS pro, MAX(target_calories) AS tcal, MAX(target_protein_g) AS tpro FROM food_entries WHERE client_id=? AND date_local>=? AND date_local<=? GROUP BY date_local").bind(cid, start, end).all<{ date_local: string; cal: number; pro: number; tcal: number | null; tpro: number | null }>(),
       db.prepare("SELECT date_local, entries_json FROM exercise_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, start, end).all<{ date_local: string; entries_json: string | null }>(),
       db.prepare("SELECT date_local, entries_json FROM exercise_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, prStart, end).all<{ date_local: string; entries_json: string | null }>(),
       db.prepare("SELECT date_local, activity_key, duration_min FROM activity_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, start, end).all<{ date_local: string; activity_key: string | null; duration_min: number | null }>(),
@@ -288,20 +289,26 @@ export const healthRoutes = new Hono<AppEnv>()
       db.prepare("SELECT id, schedule_json FROM supplements WHERE client_id=? AND status='active'").bind(cid).all<{ id: string; schedule_json: string | null }>(),
       db.prepare("SELECT COUNT(*) AS n FROM supplement_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(cid, start, end).first<{ n: number }>(),
       db.prepare("SELECT date_local, weight_kg, body_fat_percent FROM measurements WHERE client_id=? AND date_local>=? ORDER BY date_local").bind(cid, addDays(today, -45)).all<{ date_local: string; weight_kg: number | null; body_fat_percent: number | null }>(),
-      db.prepare("SELECT targets_json, weekly_load_target, derivation_json FROM client_goals WHERE client_id=? AND status='active' ORDER BY created_at DESC LIMIT 1").bind(cid).first<{ targets_json: string | null; weekly_load_target: number | null; derivation_json: string | null }>(),
+      loadGoalTimeline(db, cid),
     ]);
 
-    const targets = parseJson<{ targetCalories?: number; targetProteinG?: number; targetWaterMl?: number }>(goal?.targets_json, {});
+    // Headline targets (water + relevance) = the goal active today. Per-day
+    // calorie/protein adherence resolves the goal in force on each logged day
+    // (frozen per-log snapshot first, then the goal timeline).
+    const targets = timeline.active;
     const loggedDays = new Set<string>();
     const mark = (d: string) => loggedDays.add(d);
 
-    // Nutrition: continuous adherence over logged days.
+    // Nutrition: continuous adherence over logged days, each graded against the
+    // day's own target so a later goal change never re-grades past days.
     const calParts: number[] = [];
     const proParts: number[] = [];
     for (const f of foods.results ?? []) {
       mark(f.date_local);
-      if (targets.targetCalories && f.cal > 0) calParts.push(1 - Math.min(1, Math.abs(f.cal - targets.targetCalories) / targets.targetCalories));
-      if (targets.targetProteinG && f.pro > 0) proParts.push(Math.min(1, f.pro / targets.targetProteinG));
+      const dayCal = f.tcal ?? timeline.resolve(f.date_local)?.targetCalories ?? null;
+      const dayPro = f.tpro ?? timeline.resolve(f.date_local)?.targetProteinG ?? null;
+      if (dayCal && f.cal > 0) calParts.push(1 - Math.min(1, Math.abs(f.cal - dayCal) / dayCal));
+      if (dayPro && f.pro > 0) proParts.push(Math.min(1, f.pro / dayPro));
     }
     const foodLoggedDays = (foods.results ?? []).filter((f) => f.cal > 0).length;
     // Nutrition only counts once it's relevant — the client has a calorie target
@@ -376,12 +383,12 @@ export const healthRoutes = new Hono<AppEnv>()
     }
 
     // Body: favourable weight movement given goal direction.
-    const bodyProgress = computeBodyProgress(measures.results ?? [], parseJson<{ primaryGoal?: string }>(goal?.derivation_json, {}).primaryGoal);
+    const bodyProgress = computeBodyProgress(measures.results ?? [], (timeline.derivation as { primaryGoal?: string })?.primaryGoal);
 
     const input: WellnessInput = {
       activeDays: activeDaySet.size,
       weeklyLoad,
-      weeklyLoadTarget: goal?.weekly_load_target ?? DEFAULT_WEEKLY_LOAD_TARGET,
+      weeklyLoadTarget: timeline.weeklyLoadTarget ?? DEFAULT_WEEKLY_LOAD_TARGET,
       prsThisWeek,
       calorieAdherence: calParts.length ? calParts.reduce((a, b) => a + b, 0) / calParts.length : null,
       proteinAdherence: proParts.length ? proParts.reduce((a, b) => a + b, 0) / proParts.length : null,

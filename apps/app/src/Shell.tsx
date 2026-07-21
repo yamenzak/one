@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNod
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
-  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, LifeBuoy, Spinner, toneVar, type TabDef, type Tone,
+  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, Palette, Bell, KeyRound, toneVar, type TabDef, type Tone,
 } from "@mossa/ui";
 import { useSession, useActiveClientId } from "./session.js";
 import { useTheme } from "./theme.js";
@@ -82,7 +82,12 @@ export function Shell() {
     <TourProvider>
     <Routes>
       {/* Full-screen surfaces (no tab chrome). */}
-      <Route path="/settings" element={<SettingsRoute />} />
+      <Route path="/settings" element={<SettingsRoute view="studio" />} />
+      <Route path="/profile" element={<SettingsRoute view="profile" />} />
+      <Route path="/preferences" element={<SettingsRoute view="preferences" />} />
+      <Route path="/appearance" element={<SettingsRoute view="appearance" />} />
+      <Route path="/notification-settings" element={<SettingsRoute view="notifications" />} />
+      <Route path="/passkeys" element={<SettingsRoute view="passkeys" />} />
       <Route path="/inbox" element={<InboxRoute />} />
       <Route path="/shop" element={<OverlayWithClient render={(cid, back) => <Shop clientId={cid} onBack={back} />} />} />
       <Route path="/explore" element={<OverlayWithClient render={(cid, back) => <Explore clientId={cid} onBack={back} />} />} />
@@ -275,10 +280,16 @@ function TabLayout() {
                 {clientSurface && clientId && (
                   <DropdownMenuItem onSelect={() => nav("/shop")}><Store /> Plans &amp; access</DropdownMenuItem>
                 )}
-                <DropdownMenuItem onSelect={() => nav("/settings")}><SettingsIcon /> Settings &amp; passkeys</DropdownMenuItem>
+                {/* Personal settings — each its own destination (no buried tabs). */}
+                {clientSurface && clientId && <DropdownMenuItem onSelect={() => nav("/profile")}><CircleUser /> Profile</DropdownMenuItem>}
+                {clientSurface && clientId && <DropdownMenuItem onSelect={() => nav("/preferences")}><SlidersHorizontal /> Preferences</DropdownMenuItem>}
+                <DropdownMenuItem onSelect={() => nav("/appearance")}><Palette /> Appearance &amp; units</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => nav("/notification-settings")}><Bell /> Notifications</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => nav("/passkeys")}><KeyRound /> Passkeys &amp; security</DropdownMenuItem>
+                {active.role === "owner" && <DropdownMenuItem onSelect={() => nav("/settings")}><SettingsIcon /> Studio settings</DropdownMenuItem>}
                 {ctx!.isPlatformAdmin && <DropdownMenuItem onSelect={() => nav("/admin")}><ShieldCheck /> Platform admin</DropdownMenuItem>}
-                <DropdownMenuItem onSelect={toggleMode}>{themeMode === "dark" ? <Sun /> : <Moon />} {themeMode === "dark" ? "Light mode" : "Dark mode"}</DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={toggleMode}>{themeMode === "dark" ? <Sun /> : <Moon />} {themeMode === "dark" ? "Light mode" : "Dark mode"}</DropdownMenuItem>
                 <DropdownMenuItem destructive onSelect={() => void signOut()}><LogOut /> Sign out</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -341,9 +352,9 @@ function NoClient() {
   );
 }
 
-function SettingsRoute() {
+function SettingsRoute({ view }: { view: import("./screens/Settings.js").SettingsView }) {
   const nav = useNavigate();
-  return <Settings onBack={() => nav(-1)} />;
+  return <Settings onBack={() => nav(-1)} view={view} />;
 }
 
 function InboxRoute() {

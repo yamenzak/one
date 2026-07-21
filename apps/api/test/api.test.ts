@@ -1043,6 +1043,35 @@ describe("progress analytics aggregation", () => {
     expect(p.consistency.streak).toBeGreaterThanOrEqual(1);
     expect(p.consistency.heatmap[today]).toBeGreaterThanOrEqual(2); // check-in + weigh-in
   });
+
+  it("grades calorie adherence against the goal in force on each day, not the current one", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "TimeGoal" }) })).json()) as { client: { id: string } };
+    // Goal A (2000 kcal) effective early, then Goal B (3000 kcal) effective later —
+    // manual targets, no calculator (the API accepts explicit targets).
+    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, label: "Cut", startDate: "2026-05-01", targets: { targetCalories: 2000, targetProteinG: 150 } }) });
+    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, label: "Bulk", startDate: "2026-05-10", targets: { targetCalories: 3000, targetProteinG: 200 } }) });
+
+    // Logged via the API — each row freezes the target in force on ITS date.
+    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-05-05", mealType: "lunch", label: "Meal A", calories: 2000, proteinG: 150, carbsG: 200, fatG: 60 } }) });
+    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-05-15", mealType: "lunch", label: "Meal B", calories: 3000, proteinG: 200, carbsG: 300, fatG: 90 } }) });
+    // A pre-existing (historical) row with NO snapshot — resolved via the goal timeline.
+    await (env.DB as D1Database).prepare("INSERT INTO food_entries (id, tenant_id, client_id, date_local, meal_type, label, calories, protein_g, carbs_g, fat_g, source, created_at) VALUES ('fen_hist_a', 'x', ?, '2026-05-03', 'breakfast', 'Legacy', 2000, 150, 200, 60, 'self_logged', '2026-05-03T08:00:00.000Z')").bind(client.id).run();
+
+    const p = (await (await SELF.fetch(`http://x/api/progress/${client.id}?range=30d&today=2026-05-20`, { headers: auth(ownerCookie) })).json()) as {
+      nutrition: { adherencePct: number | null; targets: { targetCalories?: number }; perDay: { date: string; target: number | null }[] };
+    };
+    // All three days are within ±10% of THEIR day's target → 100% (would be ~33%
+    // if every day were graded against the current 3000-kcal goal).
+    expect(p.nutrition.adherencePct).toBe(100);
+    // Headline target = the goal active today (Goal B).
+    expect(p.nutrition.targets.targetCalories).toBe(3000);
+    // Per-day target line reflects the goal in force each day (snapshot + timeline).
+    const byDate = new Map(p.nutrition.perDay.map((d) => [d.date, d.target]));
+    expect(byDate.get("2026-05-03")).toBe(2000); // timeline fallback (no snapshot)
+    expect(byDate.get("2026-05-05")).toBe(2000); // frozen snapshot under Goal A
+    expect(byDate.get("2026-05-15")).toBe(3000); // frozen snapshot under Goal B
+  });
 });
 
 describe("access economy", () => {
@@ -1199,22 +1228,36 @@ describe("activity history feed", () => {
     await SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, workoutPlanId: "wp-hist", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "ex1", sets: [{ setIndex: 0, reps: 8, weightKg: 50, completed: true }] } }) });
     await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, mood: 4, notes: "felt strong" } }) });
     const { id: labId } = (await (await SELF.fetch("http://x/api/labs", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, type: "blood_panel" }) })).json()) as { id: string };
+    // A body scan on the same day (inserted directly — capture needs image data).
+    await (env.DB as D1Database).prepare("INSERT INTO body_scans (id, tenant_id, client_id, date_local, body_fat_percent, weight_kg, created_at) VALUES ('scan_hist_1', 'x', ?, ?, 18.4, 80, ?)").bind(client.id, d, `${d}T09:00:00.000Z`).run();
+    // A goal set by the owner (records an audit entry → drives actor attribution).
+    // Give the acting user a display name so the audit join can attribute it.
+    const hctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const hOwner = (await (env.DB as D1Database).prepare("SELECT userId FROM member WHERE organizationId = ? AND role = 'owner' LIMIT 1").bind(hctx.active.tenantId).first<{ userId: string }>())!;
+    await (env.DB as D1Database).prepare("UPDATE \"user\" SET name = 'Coach One' WHERE id = ?").bind(hOwner.userId).run();
+    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, label: "Recomp", calculator: { gender: "male", ageYears: 30, heightCm: 178, weightKg: 80, activityLevel: "moderate", primaryGoal: "maintain", dietaryApproach: "balanced" } }) });
 
-    const feed = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2026-07-10`, { headers: auth(ownerCookie) })).json()) as { events: { kind: string; date: string; title: string; ref?: string; metric?: { unit: string; value: number } }[] };
+    const feed = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2026-07-10`, { headers: auth(ownerCookie) })).json()) as { events: { kind: string; date: string; title: string; ref?: string; actor?: string; metric?: { unit: string; value: number } }[] };
     const kinds = feed.events.map((e) => e.kind);
     expect(kinds).toContain("food:lunch");
     expect(kinds).toContain("water");
     expect(kinds).toContain("activity");
     expect(kinds).toContain("workout");
     expect(kinds).toContain("checkin");
+    expect(kinds).toContain("bodyscan"); // enriched: body scans now in the feed
     expect(feed.events.every((e) => e.date >= "2026-07-08" && e.date <= "2026-07-10")).toBe(true);
     const food = feed.events.find((e) => e.kind === "food:lunch")!;
     expect(food.metric).toMatchObject({ unit: "energy", value: 500 });
     // Deep-link ref: a check-in carries its date so the feed can open its detail.
     expect(feed.events.find((e) => e.kind === "checkin")!.ref).toBe(d);
     // A lab is dated by its creation time; a wide window catches it, ref = lab id.
-    const wide = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2030-01-01`, { headers: auth(ownerCookie) })).json()) as { events: { kind: string; ref?: string }[] };
+    const wide = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2030-01-01`, { headers: auth(ownerCookie) })).json()) as { events: { kind: string; ref?: string; actor?: string; subtitle?: string | null }[] };
     expect(wide.events.find((e) => e.kind === "lab")!.ref).toBe(labId);
+    // The goal is in the feed and carries the acting coach's name (actor attribution).
+    const goalEv = wide.events.find((e) => e.kind === "goal")!;
+    expect(goalEv.subtitle).toBe("Recomp");
+    expect(typeof goalEv.actor).toBe("string");
+    expect(goalEv.actor!.length).toBeGreaterThan(0);
     // Out-of-range window returns nothing.
     const empty = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-06-01&to=2026-06-02`, { headers: auth(ownerCookie) })).json()) as { events: unknown[] };
     expect(empty.events.length).toBe(0);
@@ -1928,6 +1971,29 @@ describe("client preferences + body metrics + goal staleness", () => {
     m = (await (await SELF.fetch(`http://x/api/clients/${id}`, { headers: H() })).json()) as { metrics: { staleness: { stale: boolean; weightDeltaKg: number | null } | null } };
     expect(m.metrics.staleness?.stale).toBe(true);
     expect(m.metrics.staleness?.weightDeltaKg).toBe(-8);
+  });
+
+  it("keeps a goal history log: manual targets round-trip, supersede is retained, attributed to who set it", async () => {
+    const id = await mkClient();
+    // Name the acting owner so the created_by join can attribute goals.
+    const gctx = (await (await SELF.fetch("http://x/api/context", { headers: H() })).json()) as { active: { tenantId: string } };
+    const gOwner = (await (env.DB as D1Database).prepare("SELECT userId FROM member WHERE organizationId = ? AND role = 'owner' LIMIT 1").bind(gctx.active.tenantId).first<{ userId: string }>())!;
+    await (env.DB as D1Database).prepare("UPDATE \"user\" SET name = 'Coach Nova' WHERE id = ?").bind(gOwner.userId).run();
+    // First goal, MANUAL targets (no calculator) — the coach hand-sets macros.
+    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, label: "Phase 1", startDate: "2026-01-01", targets: { targetCalories: 2100, targetProteinG: 160 } }) });
+    // Second goal supersedes it.
+    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, label: "Phase 2", startDate: "2026-02-01", targets: { targetCalories: 2600, targetProteinG: 190 } }) });
+
+    const { goals } = (await (await SELF.fetch(`http://x/api/goals?clientId=${id}`, { headers: H() })).json()) as { goals: { label: string; status: string; targets: Record<string, number> | null; start_date: string | null; created_by_name: string | null }[] };
+    expect(goals.length).toBe(2);
+    const active = goals.find((g) => g.status === "active")!;
+    const past = goals.find((g) => g.status === "superseded")!;
+    expect(active.label).toBe("Phase 2");
+    expect(active.targets?.targetCalories).toBe(2600); // manual macros persisted verbatim
+    expect(past.label).toBe("Phase 1"); // old goal retained, not deleted
+    expect(past.targets?.targetCalories).toBe(2100);
+    expect(active.start_date).toBe("2026-02-01"); // explicit effective date honored
+    expect(active.created_by_name).toBe("Coach Nova"); // attribution
   });
 
   it("records a coach action in the audit log and lists it newest-first", async () => {

@@ -33,7 +33,7 @@ interface ProgressData {
     latest: { weightKg: number | null; bodyFatPct: number | null; waistCm: number | null; neckCm: number | null; hipsCm: number | null; chestCm: number | null; leanMassKg: number | null; fatMassKg: number | null; ffmi: number | null; somatotype: string | null; postureSeverity: "good" | "mild" | "moderate" | "severe" | null; postureCva: number | null };
     deltas: { weight: SeriesDelta | null; bodyFat: SeriesDelta | null; waist: SeriesDelta | null; chest: SeriesDelta | null; hips: SeriesDelta | null };
   };
-  nutrition: { perDay: { date: string; calories: number; protein: number; carbs: number; fat: number; logged: boolean }[]; targets: { targetCalories?: number; targetProteinG?: number }; adherencePct: number | null; loggedDays: number };
+  nutrition: { perDay: { date: string; calories: number; protein: number; carbs: number; fat: number; logged: boolean; target: number | null }[]; targets: { targetCalories?: number; targetProteinG?: number }; adherencePct: number | null; loggedDays: number };
   training: { perDay: { date: string; tonnage: number; load: number; sets: number }[]; weekly: { week: string; tonnage: number; load: number; sets: number }[]; totalTonnage: number; totalSets: number; workoutDays: number; prs: { exerciseId: string; name: string; thumb: string | null; e1rm: number; weight: number; reps: number }[] };
   wellness: { perDay: { date: string; mood: number | null; energy: number | null; stress: number | null; sleepQuality: number | null; sleepHours: number | null }[]; averages: { mood: number | null; energy: number | null; stress: number | null; sleepQuality: number | null; sleepHours: number | null }; radar: { mood: number; energy: number; sleep: number; calm: number; consistency: number }; index: number | null };
   consistency: { heatmap: Record<string, number>; checkInDays: number; streak: number; longestStreak: number; consistencyPct: number; weekFlags: boolean[] };
@@ -111,6 +111,7 @@ function Overview({ data, units, dateLabel }: { data: ProgressData; units: Retur
   const { consistency, wellness, nutrition, body } = data;
   const days = data.range.days;
   const cals = nutrition.perDay.map((p) => (p.logged ? p.calories : null));
+  const calTargets = nutrition.perDay.map((p) => p.target);
   const idxPct = wellness.index != null ? wellness.index / 5 : 0;
   return (
     <>
@@ -134,7 +135,7 @@ function Overview({ data, units, dateLabel }: { data: ProgressData; units: Retur
 
       <Stagger>
         <ChartCard title="Calorie adherence" icon={METRICS.calories.icon} tone="calories" value={nutrition.adherencePct != null ? nutrition.adherencePct : "—"} unit={nutrition.adherencePct != null ? "%" : undefined} delta={nutrition.targets.targetCalories ? <Badge tone="neutral">target {fmtEnergy(nutrition.targets.targetCalories, units)}</Badge> : undefined}>
-          <AreaChart values={cals} tone="calories" target={nutrition.targets.targetCalories} trend label={dateLabel} format={(v) => `${kcalToDisplay(v, units)}`} />
+          <AreaChart values={cals} tone="calories" targetSeries={calTargets} target={nutrition.targets.targetCalories} trend label={dateLabel} format={(v) => `${kcalToDisplay(v, units)}`} />
         </ChartCard>
       </Stagger>
     </>
