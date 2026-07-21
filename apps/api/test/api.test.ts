@@ -1018,7 +1018,7 @@ describe("reports", () => {
     expect(rowB.items.map((i) => i.type)).toContain("checkin_unanswered");
     expect(rowB.items.map((i) => i.type)).not.toContain("client_quiet"); // logged today
     // Items carry a deep link to the client's relevant tab + the registry label.
-    expect(rowB.items.find((i) => i.type === "checkin_unanswered")!.link).toBe(`/clients/${b.id}?tab=activity`);
+    expect(rowB.items.find((i) => i.type === "checkin_unanswered")!.link).toBe(`/clients/${b.id}/manage`);
     expect(rowA.items.find((i) => i.type === "client_quiet")!.label).toBe("Gone quiet");
     expect(body.totals.client_quiet).toBeGreaterThanOrEqual(1);
   });

@@ -42,9 +42,9 @@ export interface AttentionMeta {
 
 export const ATTENTION_TYPES: Record<AttentionType, AttentionMeta> = {
   goal_stale: { label: "Stale goal", severity: "warn", permission: "goal", feature: "goals", actionLabel: "Update goal", clientTab: "goals" },
-  client_quiet: { label: "Gone quiet", severity: "urgent", permission: "tracking", actionLabel: "Reach out", clientTab: "activity" },
-  checkin_unanswered: { label: "Check-in to answer", severity: "warn", permission: "tracking", feature: "checkIns", actionLabel: "Reply", clientTab: "activity" },
-  lab_review: { label: "Lab to review", severity: "warn", permission: "lab", feature: "supplementsLabs", actionLabel: "Review", clientTab: "labs" },
+  client_quiet: { label: "Gone quiet", severity: "urgent", permission: "tracking", actionLabel: "Reach out", clientTab: "today" },
+  checkin_unanswered: { label: "Check-in to answer", severity: "warn", permission: "tracking", feature: "checkIns", actionLabel: "Reply", clientTab: "manage" },
+  lab_review: { label: "Lab to review", severity: "warn", permission: "lab", feature: "supplementsLabs", actionLabel: "Review", clientTab: "manage" },
   swap_pending: { label: "Swap request", severity: "warn", permission: "tracking", feature: "exerciseSwap", actionLabel: "Decide", clientTab: "manage" },
   access_expiring: { label: "Access expiring", severity: "warn", permission: "package", feature: "commerce", actionLabel: "Renew", clientTab: "manage" },
   access_expired: { label: "Access expired", severity: "urgent", permission: "package", feature: "commerce", actionLabel: "Renew", clientTab: "manage" },

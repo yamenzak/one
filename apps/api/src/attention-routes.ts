@@ -9,7 +9,7 @@
 
 import { Hono } from "hono";
 import {
-  ATTENTION_TYPES, rankByAttention, goalStaleness, calculateBMR, ageFromDob, profileGaps,
+  ATTENTION_TYPES, SEVERITY_RANK, rankByAttention, goalStaleness, calculateBMR, ageFromDob, profileGaps,
   overallDaysRemaining, isFullyExpired, addDays, type AttentionType, type AttentionSeverity, type Budget, type ClientPreferences,
 } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
@@ -66,7 +66,7 @@ export const attentionRoutes = new Hono<AppEnv>().get("/coach/attention", async 
   const mk = (type: AttentionType, severity: AttentionSeverity, detail: string | null, clientId: string): OutItem => {
     const meta = ATTENTION_TYPES[type];
     bump(type);
-    return { type, severity, label: meta.label, actionLabel: meta.actionLabel, detail, link: `/clients/${clientId}?tab=${meta.clientTab}` };
+    return { type, severity, label: meta.label, actionLabel: meta.actionLabel, detail, link: `/clients/${clientId}/${meta.clientTab}` };
   };
 
   const rows: { clientId: string; name: string; email: string | null; avatarUrl: string | null; items: OutItem[] }[] = [];
@@ -111,7 +111,10 @@ export const attentionRoutes = new Hono<AppEnv>().get("/coach/attention", async 
     const gaps = profileGaps({ gender: cl.gender, dateOfBirth: cl.date_of_birth, heightCm: cl.height_cm, prefs: parseJson<ClientPreferences>(cl.preferences_json, {}) });
     if (gaps.length > 0) items.push(mk("profile_incomplete", "info", `${gaps.length} field${gaps.length > 1 ? "s" : ""} missing`, cl.id));
 
-    if (items.length) rows.push({ clientId: cl.id, name: cl.display_name, email: cl.email, avatarUrl: cl.avatar_url, items });
+    if (items.length) {
+      items.sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]); // worst first
+      rows.push({ clientId: cl.id, name: cl.display_name, email: cl.email, avatarUrl: cl.avatar_url, items });
+    }
   }
 
   return c.json({ clients: rankByAttention(rows), totals, total: rows.length });

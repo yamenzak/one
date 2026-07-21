@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fmtWeight } from "@mossa/domain";
-import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, CountUp, type Tone, type LucideIcon } from "@mossa/ui";
+import { fmtWeight, type AttentionType } from "@mossa/domain";
+import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, CountUp, cn, type Tone, type LucideIcon } from "@mossa/ui";
+import { attentionCoding, SEVERITY_TONE } from "../../attention-ui.js";
 import type { WidgetItem } from "@mossa/protocol";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -14,8 +15,9 @@ import { WidgetCarousel, WidgetCustomizeSheet } from "../widget-kit.js";
 import { COACH_WIDGETS, DEFAULT_COACH_WIDGETS, type CoachWidgetData } from "./CoachWidgets.js";
 
 interface Notification { id: string; type: string; title: string; message: string; created_at: string; read: number }
-interface AtRisk { clientId: string; name: string; daysSinceLog: number | null; reason: string }
-interface PendingSwap { id: string; client_id: string; day_index: number | null; reason: string | null }
+interface AttentionItem { type: AttentionType; severity: "info" | "warn" | "urgent"; label: string; actionLabel: string; detail: string | null; link: string }
+interface AttentionRow { clientId: string; name: string; avatarUrl: string | null; items: AttentionItem[] }
+interface AttentionData { clients: AttentionRow[]; totals: Record<string, number>; total: number }
 interface RosterEvent { id: string; clientId: string; clientName: string; kind: string; date: string; at: string; title: string; subtitle: string | null; metric?: { unit: "weight"; value: number } }
 interface RosterAnalytics {
   roster: { total: number; active7: number; atRisk: number };
@@ -41,8 +43,7 @@ export function CoachToday() {
   const { ctx, refresh } = useSession();
   const [clients, setClients] = useState<ClientSummary[] | null>(null);
   const [notifications, setNotifications] = useState<Notification[] | null>(null);
-  const [atRisk, setAtRisk] = useState<AtRisk[]>([]);
-  const [swaps, setSwaps] = useState<PendingSwap[]>([]);
+  const [attention, setAttention] = useState<AttentionData>({ clients: [], totals: {}, total: 0 });
   const [activity, setActivity] = useState<RosterEvent[]>([]);
   const [analytics, setAnalytics] = useState<RosterAnalytics | null>(null);
   const [widgetsOpen, setWidgetsOpen] = useState(false);
@@ -59,15 +60,14 @@ export function CoachToday() {
   useEffect(() => {
     void (async () => {
       try {
-        const [c, n, ar, sw, ev, an] = await Promise.all([
+        const [c, n, att, ev, an] = await Promise.all([
           api.get<{ clients: ClientSummary[] }>("/api/clients"),
           api.get<{ notifications: Notification[] }>("/api/notifications"),
-          api.get<{ atRisk: AtRisk[] }>("/api/reports/retention").catch(() => ({ atRisk: [] as AtRisk[] })),
-          api.get<{ swaps: PendingSwap[] }>("/api/swaps").catch(() => ({ swaps: [] as PendingSwap[] })),
+          api.get<AttentionData>("/api/coach/attention").catch(() => ({ clients: [], totals: {}, total: 0 })),
           api.get<{ events: RosterEvent[] }>("/api/reports/roster-activity").catch(() => ({ events: [] as RosterEvent[] })),
           api.get<RosterAnalytics>(`/api/reports/roster-analytics?days=14&today=${todayLocal()}`).catch(() => null),
         ]);
-        setAtRisk(ar.atRisk); setSwaps(sw.swaps); setActivity(ev.events); setAnalytics(an);
+        setAttention(att); setActivity(ev.events); setAnalytics(an);
         setClients(c.clients); setNotifications(n.notifications);
       } catch { /* clients/notifications failed — stay in the skeleton */ }
     })();
@@ -95,13 +95,14 @@ export function CoachToday() {
         const widgetData: CoachWidgetData = {
           clientsTotal: clients.length,
           clientsActive: activated,
-          swaps: swaps.length,
-          atRisk: atRisk.length,
-          unreadCheckins: unread.filter((n) => n.type === "check_in").length,
+          // Real roster attention totals (not notification-feed proxies).
+          swaps: attention.totals.swap_pending ?? 0,
+          atRisk: attention.totals.client_quiet ?? 0,
+          unreadCheckins: attention.totals.checkin_unanswered ?? 0,
           unread: unread.length,
           activeToday: new Set(activity.filter((e) => e.date === today).map((e) => e.clientId)).size,
           logsToday: activity.filter((e) => e.date === today).length,
-          labsToReview: unread.filter((n) => n.type === "lab_uploaded").length,
+          labsToReview: attention.totals.lab_review ?? 0,
         };
         return (
           <>
@@ -160,29 +161,23 @@ export function CoachToday() {
         </Stagger>
       )}
 
-      {swaps.length > 0 && (
+      {attention.total > 0 && (
         <Stagger>
           <Card className="space-y-3">
-            <div className="flex items-center gap-2.5"><IconBadge icon={ArrowLeftRight} tone="cardio" size="sm" /><h2 className="font-semibold">Swap requests</h2><Badge tone="cardio">{swaps.length}</Badge></div>
-            {swaps.slice(0, 8).map((s) => (
-              <div key={s.id} className="flex items-center justify-between gap-2">
-                <span className="min-w-0 truncate font-medium">{nameOf(s.client_id)}</span>
-                <span className="shrink-0 text-sm text-muted-foreground">{s.reason ? `“${s.reason}”` : "Exercise swap"}{typeof s.day_index === "number" ? ` · Day ${s.day_index + 1}` : ""}</span>
-              </div>
-            ))}
-            <p className="text-xs text-muted-foreground">Open the client → Manage to choose the replacement.</p>
-          </Card>
-        </Stagger>
-      )}
-
-      {atRisk.length > 0 && (
-        <Stagger>
-          <Card className="space-y-3">
-            <div className="flex items-center gap-2.5"><IconBadge icon={AlertTriangle} tone="cardio" size="sm" /><h2 className="font-semibold">Retention radar</h2></div>
-            {atRisk.slice(0, 8).map((r) => (
-              <div key={r.clientId} className="flex items-center justify-between gap-2">
-                <span className="min-w-0 truncate font-medium">{r.name}</span>
-                <Badge tone={r.daysSinceLog === null || r.daysSinceLog >= 10 ? "danger" : "warning"}>{r.reason}</Badge>
+            <SectionHeader icon={Bell} tone="danger" title="Needs attention" action={<Badge tone="danger">{attention.total}</Badge>} />
+            {attention.clients.slice(0, 12).map((row) => (
+              <div key={row.clientId} className="space-y-1.5 border-t border-border/40 pt-3 first:border-0 first:pt-0">
+                <button onClick={() => nav(row.items[0]!.link)} className="truncate text-left text-sm font-semibold hover:underline">{row.name}</button>
+                <div className="flex flex-wrap gap-1.5">
+                  {row.items.map((it) => {
+                    const cd = attentionCoding(it.type);
+                    return (
+                      <button key={it.type} onClick={() => nav(it.link)} className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[0.7rem] font-medium transition-colors hover:opacity-80" style={{ background: `color-mix(in oklch, ${toneVar[cd.tone]} 14%, transparent)`, color: toneVar[cd.tone] }}>
+                        <cd.icon className="size-3.5" />{it.label}{it.detail ? ` · ${it.detail}` : ""}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             ))}
           </Card>
@@ -204,8 +199,8 @@ export function CoachToday() {
       )}
 
       <Stagger>
-        {unread.length === 0 && swaps.length === 0 ? (
-          <EmptyState icon={Bell} title="All caught up" description="Check-ins, swap requests, and at-risk clients land here." />
+        {unread.length === 0 ? (
+          <EmptyState icon={Bell} title="All caught up" description={attention.total > 0 ? "Your notifications will appear here." : "Anything that needs your attention will appear here."} />
         ) : (
           unread.slice(0, 10).map((n) => (
             <InsightCard key={n.id} timestamp={new Date(n.created_at).toLocaleString()} title={n.title}>
