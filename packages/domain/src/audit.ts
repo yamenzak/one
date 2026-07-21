@@ -27,7 +27,9 @@ export type AuditAction =
   | "content.assign"
   | "package.assign"
   | "client.archive"
-  | "member.role_change";
+  | "member.role_change"
+  | "variant.create"
+  | "variant.update";
 
 export interface AuditActionMeta {
   /** Human phrase for the log line ("set a goal", "published a plan"). */
@@ -51,6 +53,8 @@ export const AUDIT_ACTIONS: Record<AuditAction, AuditActionMeta> = {
   "package.assign": { label: "assigned a package", permission: "package", feature: "commerce" },
   "client.archive": { label: "archived the client", permission: "client" },
   "member.role_change": { label: "changed a staff role", permission: "member", feature: "staff" },
+  "variant.create": { label: "added a plan lane", permission: "plan", feature: "workoutPlan" },
+  "variant.update": { label: "updated a plan lane", permission: "plan", feature: "workoutPlan" },
 };
 
 /** True when `a` is a known audit action (guards writes from arbitrary strings). */

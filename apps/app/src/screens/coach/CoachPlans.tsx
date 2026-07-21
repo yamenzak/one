@@ -1,38 +1,75 @@
-/** Coach: workout + meal plans for a client — list, create, open builder. */
+/** Coach: workout + meal plans for a client — list, create, open builder.
+ *  Plans are organized into lanes (schedules): "Work week" vs "Off week", etc.
+ *  A client can run one published plan per lane in parallel; the lane chips here
+ *  filter the list and set which lane a new plan is created in. */
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Badge, Field, Sheet, Reveal, SkeletonList, SegmentedControl, Page, Stagger, EmptyState, SectionHeader, cn, Dumbbell, Utensils, Plus, Ellipsis, Trash2, Archive, History, Zap, PencilLine } from "@mossa/ui";
+import { Button, Card, Badge, Chip, Field, Sheet, Reveal, SkeletonList, SegmentedControl, Page, Stagger, EmptyState, SectionHeader, cn, Dumbbell, Utensils, Plus, Ellipsis, Trash2, Archive, History, Zap, PencilLine } from "@mossa/ui";
 import { api } from "../../api.js";
 
-interface Plan { id: string; name: string; status: string; publishedAt: string | null }
+interface Plan { id: string; name: string; status: string; publishedAt: string | null; variantId: string | null }
+interface Lane { id: string; label: string; archived: boolean }
 type Kind = "workout" | "meal";
 
 export function CoachPlans({ clientId }: { clientId: string }) {
   const nav = useNavigate();
   const [kind, setKind] = useState<Kind>("workout");
   const [plans, setPlans] = useState<Plan[] | null>(null);
+  const [variants, setVariants] = useState<Lane[]>([]);
+  const [laneId, setLaneId] = useState<string | null>(null); // null = Main (default lane)
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
+  const [lanesOpen, setLanesOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<Plan | null>(null);
   const endpoint = kind === "workout" ? "workout-plans" : "meal-plans";
   const open = (planId: string) => nav(`/clients/${clientId}/plans/${kind}/${planId}`);
 
-  const load = useCallback(async () => { setPlans((await api.get<{ plans: Plan[] }>(`/api/${endpoint}?clientId=${clientId}`)).plans); }, [clientId, endpoint]);
+  // Lanes are client-level, so the workout + meal lists share the same lane set;
+  // we take it from whichever list loads. Both endpoints return it.
+  const load = useCallback(async () => {
+    const r = await api.get<{ plans: Plan[]; variants: Lane[] }>(`/api/${endpoint}?clientId=${clientId}`);
+    setPlans(r.plans);
+    setVariants(r.variants ?? []);
+  }, [clientId, endpoint]);
   useEffect(() => { setPlans(null); void load(); }, [load]);
 
-  const create = async () => { const r = await api.post<{ plan: Plan }>(`/api/${endpoint}`, { clientId, name }); setCreateOpen(false); setName(""); open(r.plan.id); };
+  const create = async () => { const r = await api.post<{ plan: Plan }>(`/api/${endpoint}`, { clientId, name, variantId: laneId }); setCreateOpen(false); setName(""); open(r.plan.id); };
+
+  const liveLanes = variants.filter((v) => !v.archived);
+  // If the selected lane got archived out from under us, fall back to Main.
+  useEffect(() => { if (laneId && !variants.some((l) => l.id === laneId && !l.archived)) setLaneId(null); }, [laneId, variants]);
+  const shown = (plans ?? []).filter((p) => (p.variantId ?? null) === laneId);
+  const laneName = laneId ? liveLanes.find((l) => l.id === laneId)?.label ?? "" : "Main";
 
   return (
     <Page className="mx-auto max-w-xl space-y-3 p-4 pb-28">
       <SegmentedControl options={[{ value: "workout", label: "Workout" }, { value: "meal", label: "Meal" }]} value={kind} onChange={setKind} />
-      <SectionHeader icon={kind === "workout" ? Dumbbell : Utensils} tone={kind === "workout" ? "activity" : "nutrition"} title={`${kind === "workout" ? "Workout" : "Meal"} plans`} action={<Button size="sm" onClick={() => setCreateOpen(true)}><Plus /> New</Button>} />
+
+      {/* Lane (schedule) chips — filter + the lane a new plan lands in. Shown
+          once there's a second lane; a coach can always add one. */}
+      {(liveLanes.length > 0) && (
+        <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 no-scrollbar">
+          <Chip selected={laneId === null} onClick={() => setLaneId(null)}>Main</Chip>
+          {liveLanes.map((l) => (
+            <Chip key={l.id} selected={laneId === l.id} onClick={() => setLaneId(l.id)}>{l.label}</Chip>
+          ))}
+          <Chip onClick={() => setLanesOpen(true)}><PencilLine className="size-3.5" /> Edit</Chip>
+        </div>
+      )}
+
+      <SectionHeader
+        icon={kind === "workout" ? Dumbbell : Utensils}
+        tone={kind === "workout" ? "activity" : "nutrition"}
+        title={liveLanes.length > 0 ? `${laneName} · ${kind === "workout" ? "Workout" : "Meal"}` : `${kind === "workout" ? "Workout" : "Meal"} plans`}
+        action={<Button size="sm" onClick={() => setCreateOpen(true)}><Plus /> New</Button>}
+      />
       <Reveal loading={!plans} skeleton={<SkeletonList card rows={5} thumb={0} />}>
-        {plans && (plans.length === 0 ? (
-          <EmptyState icon={kind === "workout" ? Dumbbell : Utensils} title={`No ${kind} plans`} description={kind === "workout" ? "Create one and build it — or use the AI draft inside the builder." : "Create one and build the options bank."} />
+        {plans && (shown.length === 0 ? (
+          <EmptyState icon={kind === "workout" ? Dumbbell : Utensils} title={`No ${kind} plans${liveLanes.length > 0 ? ` in ${laneName}` : ""}`} description={liveLanes.length > 0 ? "New plans you create land in this lane." : (kind === "workout" ? "Create one and build it — or use the AI draft inside the builder." : "Create one and build the options bank.")} action={liveLanes.length === 0 ? undefined : <Button variant="secondary" size="sm" onClick={() => setLanesOpen(true)}>Manage lanes</Button>} />
         ) : (
           <Stagger className="space-y-2">
-            {plans.map((p) => (
+            {shown.map((p) => (
               <Card key={p.id} interactive onClick={() => open(p.id)} className="flex items-center justify-between gap-2">
                 <div className="min-w-0"><div className="truncate font-semibold">{p.name}</div>{p.publishedAt && <div className="text-xs text-muted-foreground">Published {new Date(p.publishedAt).toLocaleDateString()}</div>}</div>
                 <div className="flex shrink-0 items-center gap-1.5">
@@ -44,12 +81,24 @@ export function CoachPlans({ clientId }: { clientId: string }) {
           </Stagger>
         ))}
       </Reveal>
-      <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title={`New ${kind} plan`}>
+
+      {/* A quiet "add a schedule" entry when the client has no lanes yet. */}
+      {liveLanes.length === 0 && plans && (
+        <button onClick={() => setLanesOpen(true)} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border py-2.5 text-sm text-muted-foreground transition-colors hover:bg-surface-2">
+          <Plus className="size-4" /> Add a schedule (e.g. Off week / Night shift)
+        </button>
+      )}
+
+      <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title={`New ${kind} plan${liveLanes.length > 0 ? ` · ${laneName}` : ""}`}>
         <div className="space-y-4">
           <Field label="Plan name" icon={kind === "workout" ? Dumbbell : Utensils} value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "workout" ? "Push Pull Legs" : "Cutting Plan"} />
+          {liveLanes.length > 0 && <p className="text-xs text-muted-foreground">Lands in the <span className="font-medium text-foreground">{laneName}</span> schedule.</p>}
           <Button size="lg" className="w-full" disabled={name.trim().length < 2} onClick={() => void create()}>Create &amp; build</Button>
         </div>
       </Sheet>
+
+      {lanesOpen && <LaneManager clientId={clientId} variants={variants} onClose={() => setLanesOpen(false)} onChanged={() => void load()} />}
+
       {menuFor && (
         <PlanActions
           plan={menuFor}
@@ -60,6 +109,60 @@ export function CoachPlans({ clientId }: { clientId: string }) {
         />
       )}
     </Page>
+  );
+}
+
+/** Create / rename / archive a client's plan lanes (schedules). */
+function LaneManager({ clientId, variants, onClose, onChanged }: { clientId: string; variants: Lane[]; onClose: () => void; onChanged: () => void }) {
+  const [adding, setAdding] = useState("");
+  const [busy, setBusy] = useState(false);
+  const live = variants.filter((v) => !v.archived);
+
+  const add = async () => {
+    if (adding.trim().length < 1 || busy) return;
+    setBusy(true);
+    try { await api.post(`/api/clients/${clientId}/variants`, { label: adding.trim() }); setAdding(""); onChanged(); }
+    finally { setBusy(false); }
+  };
+  const patch = async (id: string, body: { label?: string; archived?: boolean }) => { await api.patch(`/api/clients/${clientId}/variants/${id}`, body); onChanged(); };
+
+  return (
+    <Sheet open onClose={onClose} title="Schedules">
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">Lanes let a client run parallel plans — a "Work week" and an "Off week", or "Night shift" and "Morning shift". Each lane keeps its own published plan; the client switches between them.</p>
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 rounded-xl bg-secondary/50 px-3 py-2.5 text-sm"><span className="font-medium">Main</span><span className="ml-auto text-xs text-muted-foreground">default</span></div>
+          {live.map((l) => (
+            <LaneRow key={l.id} lane={l} onRename={(label) => void patch(l.id, { label })} onArchive={() => void patch(l.id, { archived: true })} />
+          ))}
+        </div>
+        <div className="flex items-end gap-2">
+          <Field label="Add a schedule" className="flex-1" value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="Off week" onKeyDown={(e) => { if (e.key === "Enter") void add(); }} />
+          <Button disabled={adding.trim().length < 1 || busy} onClick={() => void add()}><Plus /> Add</Button>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
+function LaneRow({ lane, onRename, onArchive }: { lane: Lane; onRename: (label: string) => void; onArchive: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [label, setLabel] = useState(lane.label);
+  return (
+    <div className="flex items-center gap-2 rounded-xl bg-secondary/50 px-3 py-2">
+      {editing ? (
+        <>
+          <input value={label} onChange={(e) => setLabel(e.target.value)} className="min-w-0 flex-1 rounded-lg bg-card px-2 py-1 text-sm outline-none ring-ring focus:ring-2" autoFocus />
+          <button onClick={() => { setEditing(false); if (label.trim() && label.trim() !== lane.label) onRename(label.trim()); }} className="text-sm font-medium text-primary">Save</button>
+        </>
+      ) : (
+        <>
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">{lane.label}</span>
+          <button onClick={() => setEditing(true)} aria-label="Rename" className="grid size-7 place-items-center rounded-full text-muted-foreground hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><PencilLine /></button>
+          <button onClick={onArchive} aria-label="Archive" className="grid size-7 place-items-center rounded-full text-muted-foreground hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><Archive /></button>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -79,7 +182,7 @@ function PlanActions({ plan, endpoint, onClose, onOpen, onChanged }: { plan: Pla
     <Sheet open onClose={onClose} title={plan.name}>
       <div className="space-y-1">
         <ActionRow icon={PencilLine} label="Open in builder" onClick={onOpen} />
-        {isOld && <ActionRow icon={Zap} label="Make active again" hint="Re-publishes this plan and supersedes the current one" disabled={busy} onClick={act(() => api.post(`/api/${endpoint}/${plan.id}/publish`, {}))} />}
+        {isOld && <ActionRow icon={Zap} label="Make active again" hint="Re-publishes this plan and supersedes the current one in its lane" disabled={busy} onClick={act(() => api.post(`/api/${endpoint}/${plan.id}/publish`, {}))} />}
         {isOld && <ActionRow icon={History} label="Roll back to draft" hint="Make it editable again" disabled={busy} onClick={act(() => status("draft"))} />}
         {(plan.status === "published" || plan.status === "superseded") && <ActionRow icon={Archive} label="Archive" hint="Hide it without deleting" disabled={busy} onClick={act(() => status("archived"))} />}
         {plan.status === "draft" && (

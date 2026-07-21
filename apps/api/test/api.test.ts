@@ -1888,6 +1888,55 @@ describe("plan lifecycle — publish supersedes, restore, draft-only delete", ()
     expect(s.get(b)).toBe("superseded");
   });
 
+  it("plan lanes: publishing supersedes only within a lane; switching the lane changes the active plan", async () => {
+    const client = await mkClient();
+    // A second lane (e.g. "Off week"). Default lane = null.
+    const laneId = ((await (await SELF.fetch(`http://x/api/clients/${client}/variants`, { method: "POST", headers: H(), body: JSON.stringify({ label: "Off week" }) })).json()) as { id: string }).id;
+
+    // Default-lane plan (variantId omitted → null) + an off-week-lane plan.
+    const defA = await mkPlan(client, "Work A");
+    await publish(defA);
+    const offA = ((await (await SELF.fetch("http://x/api/workout-plans", { method: "POST", headers: H(), body: JSON.stringify({ clientId: client, name: "Off A", variantId: laneId }) })).json()) as { plan: { id: string } }).plan.id;
+    await publish(offA);
+
+    // Both are published concurrently — different lanes, no cross-supersede.
+    let s = await statusMap(client);
+    expect(s.get(defA)).toBe("published");
+    expect(s.get(offA)).toBe("published");
+
+    // A second default-lane plan supersedes ONLY the default-lane one.
+    const defB = await mkPlan(client, "Work B");
+    await publish(defB);
+    s = await statusMap(client);
+    expect(s.get(defA)).toBe("superseded"); // same lane → superseded
+    expect(s.get(defB)).toBe("published");
+    expect(s.get(offA)).toBe("published"); // other lane untouched
+
+    // The plan list carries lane context.
+    const list = (await (await SELF.fetch(`http://x/api/workout-plans?clientId=${client}`, { headers: H() })).json()) as { variants: { id: string; label: string }[]; currentVariantId: string | null; plans: { id: string; variantId: string | null }[] };
+    expect(list.variants.map((v) => v.label)).toContain("Off week");
+    expect(list.currentVariantId).toBeNull(); // default lane
+    expect(list.plans.find((p) => p.id === offA)!.variantId).toBe(laneId);
+
+    // Today resolves the DEFAULT lane's published plan…
+    const today = new Date().toISOString().slice(0, 10);
+    const bundle1 = (await (await SELF.fetch(`http://x/api/today?clientId=${client}&date=${today}`, { headers: H() })).json()) as { publishedWorkoutPlan: { id: string } | null };
+    expect(bundle1.publishedWorkoutPlan?.id).toBe(defB);
+
+    // …switch to the off-week lane → Today now serves the off-week plan.
+    expect((await SELF.fetch(`http://x/api/clients/${client}/current-variant`, { method: "PATCH", headers: H(), body: JSON.stringify({ variantId: laneId }) })).status).toBe(200);
+    const bundle2 = (await (await SELF.fetch(`http://x/api/today?clientId=${client}&date=${today}`, { headers: H() })).json()) as { publishedWorkoutPlan: { id: string } | null };
+    expect(bundle2.publishedWorkoutPlan?.id).toBe(offA);
+
+    // An unknown lane id is rejected.
+    expect((await SELF.fetch(`http://x/api/clients/${client}/current-variant`, { method: "PATCH", headers: H(), body: JSON.stringify({ variantId: "lane_bogus" }) })).status).toBe(400);
+
+    // Archiving the current lane drops the client back to the default lane.
+    await SELF.fetch(`http://x/api/clients/${client}/variants/${laneId}`, { method: "PATCH", headers: H(), body: JSON.stringify({ archived: true }) });
+    const after = (await (await SELF.fetch(`http://x/api/clients/${client}/variants`, { headers: H() })).json()) as { currentVariantId: string | null };
+    expect(after.currentVariantId).toBeNull();
+  });
+
   it("creates a client plan from a template, copying the template body", async () => {
     const client = await mkClient();
     const tpl = (await (await SELF.fetch("http://x/api/workout-templates", { method: "POST", headers: H(), body: JSON.stringify({ name: "PPL Template", visibility: "tenant", body: { days: [{ name: "Push", blocks: [] }, { name: "Pull", blocks: [] }] } }) })).json()) as { template: { id: string } };
