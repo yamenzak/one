@@ -166,13 +166,17 @@ We share personal data only as needed to run the Platform and as described here:
 
   | Sub-processor | Purpose | Notes |
   |---|---|---|
-  | **Cloudflare, Inc.** | Cloud hosting, database, object storage, edge delivery, bot-protection, and platform AI | Data hosted on Cloudflare's global network |
+  | **Cloudflare, Inc.** | Cloud hosting, database, object storage, edge delivery, bot-protection, platform AI, and transactional email (sign-in codes, notifications, digests) sent from our platform address via the Cloudflare Email Service | Data hosted on Cloudflare's global network |
   | **Stripe** | Payment processing (subscriptions, AI credits) and Studio Client payments via Stripe Connect | Card/bank data held by Stripe |
   | **Google (Gemini)** | AI vision features (body scan, meal photo, label reading) | Receives only the image and context needed |
-  | **`[Email delivery provider]`** | Transactional email (sign-in codes, notifications, digests) | `[Confirm provider]` |
 
-  `[Confirm this list matches your production configuration and keep it current; the
-  PDPL and good practice require you to maintain an accurate sub-processor list.]`
+  A Studio may optionally connect its **own** third-party email provider to send
+  messages from its own address (rather than through our platform sender). In that
+  case the Studio chooses and controls that provider, and it acts as the Studio's
+  sub-processor, not ours.
+
+  `[Keep this list current — the PDPL and good practice require you to maintain an
+  accurate sub-processor list.]`
 
 - **For legal reasons** — to comply with law, a lawful request from a competent
   authority, or to protect the rights, safety, or property of Four Degree Labs, our
