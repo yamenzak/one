@@ -1,7 +1,7 @@
 /** Owner Business — tabbed: overview (plan + credits + AI usage), packages, staff. */
 
 import { useEffect, useState } from "react";
-import { Button, Card, Badge, StatCard, SegmentedControl, Page, Stagger, ChartCard, SectionHeader, IconBadge, EmptyState, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Sparkles, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, CheckCheck, Check, Lock } from "@mossa/ui";
+import { Button, Card, Badge, StatCard, SegmentedControl, Field, Page, Stagger, ChartCard, SectionHeader, IconBadge, EmptyState, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Sparkles, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, CheckCheck, Check, Lock, Tag } from "@mossa/ui";
 import { FEATURE_KEYS, FEATURE_META, QUOTA_KEYS, QUOTA_META, type Entitlements } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -32,6 +32,19 @@ interface AiUsage { usage: { feature: string; calls: number; credits: number }[]
 type Tab = "overview" | "packages" | "staff";
 
 const featLabel = (f: string) => f.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+
+/** Friendly copy for a `promo_<reason>` checkout error. */
+function promoError(code: string): string {
+  const reason = code.replace("promo_", "");
+  return {
+    not_found: "That promo code isn't valid.",
+    inactive: "That promo code is no longer active.",
+    expired: "That promo code has expired.",
+    exhausted: "That promo code has been fully used.",
+    wrong_package: "That code doesn't apply to this item.",
+    wrong_client: "That code isn't available on your account.",
+  }[reason] ?? "That promo code can't be applied.";
+}
 
 export function Business() {
   const { ctx } = useSession();
@@ -81,14 +94,18 @@ function Overview() {
   // Inline (Payment Element) flows — no redirect; the Sheet confirms in place.
   const [checkout, setCheckout] = useState<{ intent: CheckoutIntent; title: string; label: string } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [packPromo, setPackPromo] = useState("");
   const startInline = async (path: string, body: Record<string, unknown>, title: string, label: string, key: string) => {
     setBusy(key);
     try {
-      const r = await api.post<{ clientSecret: string; publishableKey: string }>(path, body);
+      const r = await api.post<{ clientSecret?: string; publishableKey?: string; granted?: boolean }>(path, body);
+      if (r.granted) { onPaid(); return; } // promo covered it fully — nothing to charge
       if (r.clientSecret && r.publishableKey) setCheckout({ intent: { clientSecret: r.clientSecret, publishableKey: r.publishableKey }, title, label });
       else setFlash("Couldn't start checkout — Stripe isn't fully configured yet.");
-    } catch { setFlash("Couldn't start checkout. Please try again."); }
-    finally { setBusy(null); }
+    } catch (e) {
+      const msg = e instanceof Error && e.message.startsWith("promo_") ? promoError(e.message) : "Couldn't start checkout. Please try again.";
+      setFlash(msg);
+    } finally { setBusy(null); }
   };
   const onPaid = () => {
     setCheckout(null);
@@ -211,12 +228,15 @@ function Overview() {
                 <span className="numeral">{billing.balance.granted.toLocaleString()} monthly</span>
                 <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[0.65rem]">resets monthly</span>
               </div>
+              {isOwner && billing.stripeEnabled && (
+                <Field label="Promo code (optional)" icon={Tag} value={packPromo} onChange={(e) => setPackPromo(e.target.value.toUpperCase())} placeholder="SUMMER20" />
+              )}
               <div className="space-y-1.5">
                 {billing.packs.map((p) => (
                   <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5">
                     <div><div className="text-sm font-medium">{p.name}</div><div className="numeral text-xs text-muted-foreground">{p.credits.toLocaleString()} credits</div></div>
                     {isOwner && billing.stripeEnabled ? (
-                      <Button size="sm" variant="tonal" disabled={busy === `pack_${p.id}`} onClick={() => void startInline("/api/billing/pack-intent", { packId: p.id }, `Buy ${p.name}`, `Pay $${p.price_usd}`, `pack_${p.id}`)}>
+                      <Button size="sm" variant="tonal" disabled={busy === `pack_${p.id}`} onClick={() => void startInline("/api/billing/pack-intent", { packId: p.id, promoCode: packPromo || undefined }, `Buy ${p.name}`, `Pay $${p.price_usd}`, `pack_${p.id}`)}>
                         {busy === `pack_${p.id}` ? "…" : `$${p.price_usd}`}
                       </Button>
                     ) : (

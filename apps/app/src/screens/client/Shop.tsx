@@ -42,13 +42,16 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
   };
   // One-time packages check out inline (Payment Element) on the tenant's account.
   const [checkout, setCheckout] = useState<{ intent: CheckoutIntent; name: string; price: string } | null>(null);
+  const [buyPromo, setBuyPromo] = useState("");
+  const promoMsg = (m: string): string => ({ not_found: "That promo code isn't valid.", inactive: "That code is no longer active.", expired: "That code has expired.", exhausted: "That code has been fully used.", wrong_package: "That code doesn't apply to this package.", wrong_client: "That code isn't available on your account." }[m.replace("promo_", "")] ?? "That promo code can't be applied.");
   const buyInline = async (p: Pkg) => {
     setMsg(null);
     try {
-      const r = await api.post<{ clientSecret: string; publishableKey: string; stripeAccount: string }>("/api/connect/pay-intent", { clientId, packageId: p.id });
+      const r = await api.post<{ clientSecret?: string; publishableKey?: string; stripeAccount?: string; granted?: boolean }>("/api/connect/pay-intent", { clientId, packageId: p.id, promoCode: buyPromo || undefined });
+      if (r.granted) { setMsg("Access unlocked!"); await load(); await refresh(); return; } // promo covered it fully
       if (r.clientSecret && r.publishableKey) setCheckout({ intent: { clientSecret: r.clientSecret, publishableKey: r.publishableKey, stripeAccount: r.stripeAccount }, name: p.name, price: `$${((p.one_time_price_cents ?? 0) / 100).toFixed(0)}` });
       else setMsg("Checkout isn't available yet — ask your coach to finish Stripe setup.");
-    } catch { setMsg("Checkout isn't available yet — ask your coach to finish Stripe setup."); }
+    } catch (e) { setMsg(e instanceof Error && e.message.startsWith("promo_") ? promoMsg(e.message) : "Checkout isn't available yet — ask your coach to finish Stripe setup."); }
   };
   const onPaid = async () => {
     setCheckout(null);
@@ -124,6 +127,9 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
       {packages.length > 0 && (
         <div className="space-y-3">
           <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Packages</h3>
+          {packages.some((p) => p.one_time_price_cents && !p.monthly_price_cents && !(p.installment_months && p.installment_months > 1)) && (
+            <Field label="Promo code (optional)" icon={Ticket} value={buyPromo} onChange={(e) => setBuyPromo(e.target.value.toUpperCase())} placeholder="SUMMER20" />
+          )}
           {packages.map((p) => (
             <Stagger key={p.id}>
               <Card>
