@@ -110,7 +110,7 @@ function PermissionSheet({ member, onClose, onSaved }: { member: Member; onClose
   return (
     <Sheet open onClose={onClose} title={`Access — ${member.name || member.email}`}>
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">Override the role's defaults with a custom grant. Clear everything to fall back to the {member.role} role.</p>
+        <p className="text-sm text-muted-foreground">Override the role's defaults with a custom grant. Clear everything to fall back to the {personaLabel(member.role)} role.</p>
         <div className="max-h-[55vh] space-y-3 overflow-y-auto">
           {Object.entries(PERMISSION_CATALOG).map(([res, actions]) => (
             <div key={res}>

@@ -81,7 +81,7 @@ export const healthRoutes = new Hono<AppEnv>()
       .bind(id, who.tenantId, access.client.id, who.userId, d.name, d.brand ?? null, d.kind, d.dose ?? null, j(d.schedule), d.notes ?? null, d.startDate ?? null, d.endDate ?? null, nowIso())
       .run();
     if (access.client.user_id) {
-      await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "supplement_added", title: "New supplement added", message: `${d.name}${d.dose ? ` — ${d.dose}` : ""}`, link: "/wellness" });
+      await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "supplement_added", message: `${d.name}${d.dose ? ` — ${d.dose}` : ""}` });
     }
     await recordAudit(c.env, { tenantId: who.tenantId, clientId: access.client.id, actorUserId: who.userId, action: "supplement.add", summary: d.name, ref: id });
     return c.json({ ok: true, id }, 201);
