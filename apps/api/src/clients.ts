@@ -14,6 +14,7 @@ import { type AppEnv, type AppContext, requireTenant } from "./auth-context.js";
 import { withinQuota } from "./billing-store.js";
 import { notify } from "./notify.js";
 import { newId, nowIso } from "./ids.js";
+import { recordAudit } from "./audit.js";
 import { parseJson, j } from "./db.js";
 import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps, auditLabel, canAccessClient, seesWholeRoster } from "@mossa/domain";
 
@@ -372,6 +373,7 @@ export const clientRoutes = new Hono<AppEnv>()
     await c.env.DB.prepare("UPDATE clients SET status = 'archived', archived_at = ? WHERE id = ?")
       .bind(nowIso(), access.client.id)
       .run();
+    await recordAudit(c.env, { tenantId: access.client.tenant_id, clientId: access.client.id, actorUserId: c.get("user")?.id, action: "client.archive", summary: access.client.display_name });
     return c.json({ ok: true });
   })
 
