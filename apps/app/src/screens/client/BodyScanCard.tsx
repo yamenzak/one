@@ -78,7 +78,7 @@ export function BodyScanCard({ clientId }: { clientId: string }) {
 
   return (
     <BodyScanLauncher clientId={clientId} onSaved={() => void load()}>
-      {({ open, loading, profileReady }) => (
+      {({ open, loading, profileReady, hasHeight }) => (
         <>
         <Card className="space-y-4">
           <div className="flex items-center justify-between gap-2">
@@ -100,7 +100,9 @@ export function BodyScanCard({ clientId }: { clientId: string }) {
             <div className="grid h-24 place-items-center"><Spinner /></div>
           ) : !profileReady ? (
             <div className="rounded-2xl bg-warning-soft/40 px-4 py-3 text-sm text-warning">
-              Add your sex, birth date and height in your profile to use the body scan.
+              {!hasHeight
+                ? "Add your height in your profile first — the body scan needs it to calibrate your measurements."
+                : "Add your sex, birth date and height in your profile to use the body scan."}
             </div>
           ) : latest ? (
             <ScanSummary scans={scans} latest={latest} onOpenHistory={(initialId) => setHistory({ initialId })} />

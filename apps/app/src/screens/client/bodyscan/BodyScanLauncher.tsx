@@ -35,6 +35,10 @@ export interface BodyScanLauncherState {
   loading: boolean;
   /** Profile has sex + age + height — the scan can run. */
   profileReady: boolean;
+  /** Height specifically is on file (the measurement can't calibrate without it). */
+  hasHeight: boolean;
+  /** The studio has generated a full voice-cue pack — the camera scanner needs it. */
+  voiceReady: boolean;
 }
 
 export function BodyScanLauncher({
@@ -49,7 +53,8 @@ export function BodyScanLauncher({
 }) {
   const { ctx } = useSession();
   const units = useUnits();
-  const [profile, setProfile] = useState<{ p: ScanProfile | null; latestWeightKg: number | null } | null>(null);
+  const [profile, setProfile] = useState<{ p: ScanProfile | null; hasHeight: boolean; latestWeightKg: number | null } | null>(null);
+  const [voiceReady, setVoiceReady] = useState<boolean | null>(null);
   const [open, setOpen] = useState(false);
 
   // Known-off flag → render nothing (the surface just skips this entry point).
@@ -61,22 +66,31 @@ export function BodyScanLauncher({
       .get<ClientProfile>(`/api/clients/${clientId}`)
       .then((r) => {
         const g = r.client.gender;
+        const hasHeight = r.client.heightCm != null;
         const p: ScanProfile | null =
           (g === "male" || g === "female") && r.metrics.ageYears != null && r.client.heightCm != null
             ? { gender: g, ageYears: r.metrics.ageYears, heightCm: r.client.heightCm }
             : null;
-        setProfile({ p, latestWeightKg: r.metrics.weightKg });
+        setProfile({ p, hasHeight, latestWeightKg: r.metrics.weightKg });
       })
-      .catch(() => setProfile({ p: null, latestWeightKg: null }));
+      .catch(() => setProfile({ p: null, hasHeight: false, latestWeightKg: null }));
+    // The camera scanner is voice-guided; require the studio to have generated a
+    // full cue pack first. A cue with an empty url isn't voiced → not ready.
+    void api
+      .get<{ cues: { url: string }[] }>("/api/body-scan/cues")
+      .then((r) => setVoiceReady(r.cues.length > 0 && r.cues.every((c) => !!c.url)))
+      .catch(() => setVoiceReady(false));
   }, [clientId, flagOff]);
 
   if (flagOff) return null;
 
   const profileReady = !!profile?.p;
+  const hasHeight = !!profile?.hasHeight;
+  const voiceOk = voiceReady === true;
 
   return (
     <>
-      {children({ open: () => { if (profileReady) setOpen(true); }, loading: profile == null, profileReady })}
+      {children({ open: () => { if (profileReady) setOpen(true); }, loading: profile == null || voiceReady == null, profileReady, hasHeight, voiceReady: voiceOk })}
       {open && profile?.p && createPortal(
         // Portal to <body>: the full-screen overlay uses position:fixed, but an
         // ancestor's motion transform would otherwise become its containing block
@@ -89,6 +103,7 @@ export function BodyScanLauncher({
             profile={profile.p}
             latestWeightKg={profile.latestWeightKg}
             units={units}
+            voiceReady={voiceOk}
             onClose={() => setOpen(false)}
             onSaved={(r: ScanResult & { id: string }) => { setOpen(false); onSaved?.(r); }}
           />
