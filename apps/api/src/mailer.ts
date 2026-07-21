@@ -229,3 +229,178 @@ export function emailShell(
 </table>
 </body></html>`;
 }
+
+// ── Data-viz primitives for digests (email-safe) ─────────────────────────────
+// Email clients are hostile to modern CSS and Gmail strips inline SVG, so these
+// degrade gracefully: table/div bars render everywhere and carry the number in
+// text; the SVG sparkline/ring are progressive enhancement layered ABOVE a text
+// value, so a client that drops the SVG still shows the number. All inline, no
+// external assets, no flex/grid for anything load-bearing.
+
+/** Semantic status colors for at-a-glance coding, independent of brand accent. */
+export const EMAIL_TONE = { good: "#7fd6a2", warn: "#f2c56b", bad: "#f28b82", neutral: "#8a9099" } as const;
+export type EmailTone = keyof typeof EMAIL_TONE;
+
+const clamp01 = (n: number) => (Number.isFinite(n) ? (n < 0 ? 0 : n > 1 ? 1 : n) : 0);
+const brandAccent = (brand?: BrandKit) => brand?.accent ?? MOSSA_BRAND.accent;
+const toneOrAccent = (opts: { brand?: BrandKit; tone?: EmailTone }) =>
+  opts.tone ? EMAIL_TONE[opts.tone] : brandAccent(opts.brand);
+
+/** A muted section label above a chart/block — the digest's connective tissue. */
+export function emailKicker(text: string): string {
+  return `<div style="font-family:${EMAIL_FONT};font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:${T.muted};margin:0 0 12px">${escapeHtml(text)}</div>`;
+}
+
+/** A rounded inset block that groups a titled chart + caption, matching the
+ *  app's nested-surface language. `title` optional; `inner` is pre-built HTML. */
+export function emailPanel(inner: string, opts: { title?: string } = {}): string {
+  const title = opts.title
+    ? `<div style="font-family:${EMAIL_FONT};font-size:14px;font-weight:600;color:${T.fg};margin:0 0 14px">${escapeHtml(opts.title)}</div>`
+    : "";
+  return `<div style="background:${T.inset};border-radius:16px;padding:18px 18px 16px;margin:14px 0 0">${title}${inner}</div>`;
+}
+
+/** A single labelled horizontal progress bar: label + value on top, a track/fill
+ *  below. `pct` is 0..1; `tone` colours the fill (else the brand accent). */
+export function emailBar(
+  label: string,
+  valueText: string,
+  pct: number,
+  opts: { brand?: BrandKit; tone?: EmailTone } = {},
+): string {
+  const fill = toneOrAccent(opts);
+  const w = Math.round(clamp01(pct) * 100);
+  return `<div style="margin:0 0 13px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px"><tr>
+      <td style="font-family:${EMAIL_FONT};font-size:13px;line-height:1.3;color:${T.body}">${escapeHtml(label)}</td>
+      <td align="right" style="font-family:${EMAIL_FONT};font-size:13px;line-height:1.3;font-weight:600;color:${T.fg}">${escapeHtml(valueText)}</td>
+    </tr></table>
+    <div style="background:${T.card};border-radius:99px;height:8px;font-size:0;line-height:0">
+      <div style="width:${w}%;height:8px;background:${fill};border-radius:99px;font-size:0;line-height:0">&nbsp;</div>
+    </div>
+  </div>`;
+}
+
+/** A weekly mini-histogram: one vertical bar per point (label under), bottom
+ *  aligned, tone-coloured. Table-based → renders in every client. */
+export function emailBars(
+  points: { label: string; value: number; tone?: EmailTone }[],
+  opts: { brand?: BrandKit; height?: number } = {},
+): string {
+  if (!points.length) return "";
+  const H = opts.height ?? 52;
+  const max = Math.max(1, ...points.map((p) => (Number.isFinite(p.value) ? p.value : 0)));
+  const bar = (p: { label: string; value: number; tone?: EmailTone }) => {
+    const h = Math.max(3, Math.round(clamp01(p.value / max) * H));
+    const fill = p.tone ? EMAIL_TONE[p.tone] : brandAccent(opts.brand);
+    return `<td valign="bottom" align="center" height="${H}" style="height:${H}px;padding:0 3px">
+      <div style="width:100%;max-width:26px;height:${h}px;background:${fill};border-radius:5px 5px 2px 2px;font-size:0;line-height:0;margin:0 auto">&nbsp;</div>
+    </td>`;
+  };
+  const lbl = (p: { label: string }) =>
+    `<td align="center" style="padding:7px 3px 0;font-family:${EMAIL_FONT};font-size:10px;color:${T.muted}">${escapeHtml(p.label)}</td>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>${points.map(bar).join("")}</tr>
+    <tr>${points.map(lbl).join("")}</tr>
+  </table>`;
+}
+
+/** An inline-SVG area sparkline for a trend series (weight, active clients …).
+ *  Progressive enhancement: pair it with a text delta so Gmail (strips SVG)
+ *  still conveys the trend. Aspect ratio preserved so the end-dot stays round. */
+export function emailSparkline(values: number[], opts: { brand?: BrandKit; tone?: EmailTone } = {}): string {
+  const nums = values.filter((v) => Number.isFinite(v));
+  if (nums.length < 2) return "";
+  const n = nums.length;
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
+  const span = max - min || 1;
+  const W = 320;
+  const Hh = 60;
+  const pad = 6;
+  const pts = nums.map((v, i) => {
+    const x = pad + (i / (n - 1)) * (W - 2 * pad);
+    const y = pad + (1 - (v - min) / span) * (Hh - 2 * pad);
+    return [x, y] as const;
+  });
+  const line = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  const first = pts[0]!;
+  const last = pts[n - 1]!;
+  const area = `${line} L${last[0].toFixed(1)} ${(Hh - pad).toFixed(1)} L${first[0].toFixed(1)} ${(Hh - pad).toFixed(1)} Z`;
+  const c = toneOrAccent(opts);
+  return `<svg width="100%" height="auto" viewBox="0 0 ${W} ${Hh}" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto">
+    <path d="${area}" fill="${c}" fill-opacity="0.13"></path>
+    <path d="${line}" fill="none" stroke="${c}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
+    <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3.5" fill="${c}"></circle>
+  </svg>`;
+}
+
+/** An inline-SVG progress ring with a centred number. Pair with a caption below
+ *  (emailPanel title / a value line) so an SVG-stripping client still reads it. */
+export function emailRing(
+  pct: number,
+  centerText: string,
+  opts: { brand?: BrandKit; tone?: EmailTone; sub?: string } = {},
+): string {
+  const p = clamp01(pct);
+  const size = 104;
+  const sw = 11;
+  const r = (size - sw) / 2;
+  const circ = 2 * Math.PI * r;
+  const off = circ * (1 - p);
+  const c = toneOrAccent(opts);
+  const sub = opts.sub
+    ? `<text x="${size / 2}" y="${size / 2 + 17}" text-anchor="middle" font-family="${EMAIL_FONT}" font-size="10" fill="${T.muted}">${escapeHtml(opts.sub)}</text>`
+    : "";
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" style="display:block">
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${T.card}" stroke-width="${sw}"></circle>
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${c}" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 ${size / 2} ${size / 2})"></circle>
+    <text x="${size / 2}" y="${size / 2}" text-anchor="middle" dominant-baseline="central" font-family="${EMAIL_FONT}" font-size="26" font-weight="600" fill="${T.fg}">${escapeHtml(centerText)}</text>
+    ${sub}
+  </svg>`;
+}
+
+/** One stat cell (value + label, optional coloured delta) for a stat row. */
+export interface EmailStat {
+  value: string;
+  label: string;
+  delta?: string;
+  deltaTone?: EmailTone;
+}
+
+/** A row of 2–4 stat cells, evenly split, each in a rounded inset. The digest's
+ *  headline ledger — big numbers, muted labels, tone-coded deltas. */
+export function emailStatRow(stats: EmailStat[]): string {
+  if (!stats.length) return "";
+  const w = Math.floor(100 / stats.length);
+  const cell = (s: EmailStat) => {
+    const delta = s.delta
+      ? `<div style="font-family:${EMAIL_FONT};font-size:11px;font-weight:600;color:${s.deltaTone ? EMAIL_TONE[s.deltaTone] : T.muted};margin:4px 0 0">${escapeHtml(s.delta)}</div>`
+      : "";
+    return `<td width="${w}%" valign="top" style="padding:3px">
+      <div style="background:${T.inset};border-radius:14px;padding:15px 14px;text-align:center">
+        <div style="font-family:${EMAIL_FONT};font-size:24px;font-weight:600;letter-spacing:-0.02em;color:${T.fg};line-height:1.1">${escapeHtml(s.value)}</div>
+        <div style="font-family:${EMAIL_FONT};font-size:11px;color:${T.muted};margin:6px 0 0;line-height:1.3">${escapeHtml(s.label)}</div>
+        ${delta}
+      </div>
+    </td>`;
+  };
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:2px -3px"><tr>${stats.map(cell).join("")}</tr></table>`;
+}
+
+/** A hairline divider between digest sections. */
+export function emailDivider(): string {
+  return `<div style="height:1px;background:${T.hair};margin:24px 0;font-size:0;line-height:0">&nbsp;</div>`;
+}
+
+/** A compact labelled list row (name on the left, value on the right) — for
+ *  "top movers", attention breakdowns, per-client lines. `accentValue` colours
+ *  the right value with the brand accent. */
+export function emailListRow(label: string, value: string, opts: { brand?: BrandKit; tone?: EmailTone; sub?: string } = {}): string {
+  const color = opts.tone ? EMAIL_TONE[opts.tone] : opts.brand ? brandAccent(opts.brand) : T.fg;
+  const sub = opts.sub ? `<div style="font-family:${EMAIL_FONT};font-size:11px;color:${T.muted};margin:2px 0 0">${escapeHtml(opts.sub)}</div>` : "";
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 10px"><tr>
+    <td style="font-family:${EMAIL_FONT};font-size:14px;color:${T.body}">${escapeHtml(label)}${sub}</td>
+    <td align="right" valign="top" style="font-family:${EMAIL_FONT};font-size:14px;font-weight:600;color:${color};white-space:nowrap;padding-left:12px">${escapeHtml(value)}</td>
+  </tr></table>`;
+}

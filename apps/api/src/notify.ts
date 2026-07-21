@@ -7,7 +7,7 @@
  * transactional (invites, receipts).
  */
 
-import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, audienceForRole, notifCategoryOf, notifTitleOf, notifLinkOf, notifTemplateOf, renderTemplate, type NotifType, type NotifRole } from "@mossa/domain";
+import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, audienceForRole, notifCategoryOf, notifTitleOf, notifLinkOf, notifTemplateOf, renderTemplate, NOTIF_CATEGORIES, type NotifType, type NotifRole, type NotifCategory } from "@mossa/domain";
 import type { Env } from "./env.js";
 import { notifyUser } from "./inbox-do.js";
 import { sendTenantEmail } from "./email-provider.js";
@@ -66,11 +66,18 @@ export async function tenantBrandKit(db: D1Database, tenantId: string): Promise<
   return { name, accent, accentFg, logoUrl };
 }
 
-function notifEmailHtml(env: Env, brand: BrandKit, r: { title: string; message?: string | null; link: string | null; footnote?: string | null }): string {
+/** The friendly category kicker shown as an eyebrow above every notif email —
+ *  a small premium touch that orients the reader ("Personal record", "Body
+ *  composition") before they read the headline. */
+function categoryEyebrow(category: NotifCategory): string | undefined {
+  return NOTIF_CATEGORIES.find((c) => c.key === category)?.label;
+}
+
+function notifEmailHtml(env: Env, brand: BrandKit, r: { title: string; message?: string | null; link: string | null; footnote?: string | null; eyebrow?: string }): string {
   const base = env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
   const href = r.link && base ? `${base}${r.link.startsWith("/") ? "" : "/"}${r.link}` : null;
   const body = `${r.message ? `<p style="margin:0">${escapeHtml(r.message)}</p>` : ""}${href ? emailButton(`Open ${brand.name}`, href, brand) : ""}`;
-  return emailShell(escapeHtml(r.title), body, { brand, preheader: r.message ?? r.title, footnote: r.footnote ?? undefined });
+  return emailShell(escapeHtml(r.title), body, { brand, preheader: r.message ?? r.title, footnote: r.footnote ?? undefined, eyebrow: r.eyebrow });
 }
 
 /** Deliver a notification to one user, honoring their preferences. */
@@ -142,6 +149,7 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
         // card. Values are HTML-escaped for the body; the subject is plain text.
         const tpl = override && override.subject ? { subject: override.subject, body: override.body ?? "" } : notifTemplateOf(input.type);
         const footnote = signature ? escapeHtml(signature) : undefined;
+        const eyebrow = categoryEyebrow(category);
         let subject = title;
         let html: string;
         if (input.emailHtml) {
@@ -153,9 +161,9 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
           const esc = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, escapeHtml(v === undefined || v === null ? "" : String(v))]));
           subject = renderTemplate(tpl.subject, raw);
           const inner = renderTemplate(tpl.body, esc) + (href ? emailButton(`Open ${brand.name}`, href, brand) : "");
-          html = emailShell(escapeHtml(subject), inner, { brand, preheader: subject, footnote });
+          html = emailShell(escapeHtml(subject), inner, { brand, preheader: subject, footnote, eyebrow });
         } else {
-          html = notifEmailHtml(env, brand, { title, message: input.message, link, footnote: signature });
+          html = notifEmailHtml(env, brand, { title, message: input.message, link, footnote: signature, eyebrow });
         }
         if (isPlatformBilling) {
           await sendEmail(env.DB, { to: user.email, subject, html, text: input.message ?? subject }, env.EMAIL, undefined, env.ENVIRONMENT === "development").catch(() => undefined);
