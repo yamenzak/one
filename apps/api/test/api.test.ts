@@ -1015,6 +1015,7 @@ describe("reports", () => {
     const rowB = body.clients.find((r) => r.clientId === b.id)!;
     expect(rowA.items.map((i) => i.type)).toContain("client_quiet");
     expect(rowA.items.map((i) => i.type)).toContain("profile_incomplete");
+    expect(rowA.items.map((i) => i.type)).toContain("no_active_plan"); // no published plan
     expect(rowB.items.map((i) => i.type)).toContain("checkin_unanswered");
     expect(rowB.items.map((i) => i.type)).not.toContain("client_quiet"); // logged today
     // Items carry a deep link to the client's relevant tab + the registry label.

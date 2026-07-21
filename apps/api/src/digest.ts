@@ -5,11 +5,20 @@
  * doesn't sink the sweep.
  */
 
-import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, type NotifRole } from "@mossa/domain";
+import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, ATTENTION_TYPES, type NotifRole, type AttentionType } from "@mossa/domain";
 import type { Env } from "./env.js";
 import { sendTenantEmail } from "./email-provider.js";
 import { emailShell, emailButton, escapeHtml, type BrandKit } from "./mailer.js";
 import { tenantBrandKit } from "./notify.js";
+import { rollupAttention, type AttentionClientRow } from "./attention-routes.js";
+
+const ATTENTION_COLUMNS = "id, display_name, email, avatar_url, gender, date_of_birth, height_cm, preferences_json";
+/** Turn an attention-rollup's totals into digest ledger rows (non-zero only). */
+function attentionStats(totals: Record<string, number>): Stat[] {
+  return (Object.keys(ATTENTION_TYPES) as AttentionType[])
+    .filter((t) => (totals[t] ?? 0) > 0)
+    .map((t) => ({ label: ATTENTION_TYPES[t].label, value: totals[t]! }));
+}
 
 interface Stat { label: string; value: string | number }
 
@@ -74,6 +83,12 @@ async function digestForTenant(env: Env, tenantId: string, _brand: string, weekA
   const brand = await tenantBrandKit(db, tenantId);
   const appHref = env.BETTER_AUTH_URL?.replace(/\/$/, "") || null;
 
+  // Attention rollup over the whole active roster — the SAME computation the
+  // in-app "Needs attention" queue uses, so email and app never disagree. Owners
+  // get the tenant-wide view; each trainer filters it to their assigned clients.
+  const activeRows = (await db.prepare(`SELECT ${ATTENTION_COLUMNS} FROM clients WHERE tenant_id = ? AND status = 'active'`).bind(tenantId).all<AttentionClientRow>()).results ?? [];
+  const tenantAttention = await rollupAttention(db, activeRows);
+
   // ── Owners: studio health ─────────────────────────────────────────────────
   const [activeClients, activeThisWeek, checkIns, newSales, sub] = await Promise.all([
     db.prepare("SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ? AND status = 'active'").bind(tenantId).first(),
@@ -84,7 +99,6 @@ async function digestForTenant(env: Env, tenantId: string, _brand: string, weekA
   ]);
   const active = num(activeClients);
   const engaged = num(activeThisWeek);
-  const atRisk = Math.max(0, active - engaged);
   const owners = await db.prepare("SELECT userId FROM member WHERE organizationId = ? AND role = 'owner'").bind(tenantId).all<{ userId: string | null }>();
   for (const o of owners.results ?? []) {
     if (!o.userId || !(await digestOn(db, o.userId, "owner"))) continue;
@@ -94,11 +108,11 @@ async function digestForTenant(env: Env, tenantId: string, _brand: string, weekA
     const html = digestHtml(brand, "Your studio this week", `Here's how ${brand.name} did over the last 7 days.`, [
       { label: "Active clients", value: active },
       { label: "Engaged this week", value: engaged },
-      { label: "Quiet (no logs 7d)", value: atRisk },
+      { label: "Need attention", value: tenantAttention.total },
       { label: "Check-ins received", value: num(checkIns) },
       { label: "New sales", value: num(newSales) },
       { label: "Subscription", value: sub?.status ?? "active" },
-    ], appHref, atRisk > 0 ? `${atRisk} client${atRisk === 1 ? "" : "s"} went quiet — a nudge goes a long way.` : "Nice week — the roster's engaged.");
+    ], appHref, tenantAttention.total > 0 ? `${tenantAttention.total} client${tenantAttention.total === 1 ? "" : "s"} need${tenantAttention.total === 1 ? "s" : ""} attention — open the queue to triage.` : "Nice week — the roster's on track.");
     await sendTenantEmail(env, tenantId, { to: email, subject: `${brand.name} — your week`, html, brandName: brand.name }).catch(() => undefined);
   }
 
@@ -109,16 +123,18 @@ async function digestForTenant(env: Env, tenantId: string, _brand: string, weekA
     if (!(await claimSend(db, tr.trainer_user_id, period, "trainer", sentAt))) continue;
     const email = (await db.prepare('SELECT email FROM "user" WHERE id = ?').bind(tr.trainer_user_id).first<{ email: string | null }>())?.email;
     if (!email) continue;
-    const [assigned, awaiting, quiet] = await Promise.all([
-      db.prepare("SELECT COUNT(*) AS n FROM client_trainers WHERE tenant_id = ? AND trainer_user_id = ?").bind(tenantId, tr.trainer_user_id).first(),
-      db.prepare("SELECT COUNT(*) AS n FROM check_ins ci JOIN client_trainers ct ON ct.client_id = ci.client_id WHERE ct.trainer_user_id = ? AND ci.date_local >= ? AND ci.trainer_feedback IS NULL").bind(tr.trainer_user_id, weekAgoDate).first(),
-      db.prepare("SELECT COUNT(*) AS n FROM client_trainers ct JOIN clients c ON c.id = ct.client_id WHERE ct.trainer_user_id = ? AND c.status = 'active' AND ct.client_id NOT IN (SELECT client_id FROM exercise_logs WHERE date_local >= ? UNION SELECT client_id FROM check_ins WHERE date_local >= ?)").bind(tr.trainer_user_id, weekAgoDate, weekAgoDate).first(),
-    ]);
-    const html = digestHtml(brand, "Your clients this week", "A quick pulse on the clients assigned to you.", [
-      { label: "Assigned clients", value: num(assigned) },
-      { label: "Check-ins awaiting your feedback", value: num(awaiting) },
-      { label: "Clients gone quiet", value: num(quiet) },
-    ], appHref, num(awaiting) > 0 ? `${num(awaiting)} check-in${num(awaiting) === 1 ? "" : "s"} still need${num(awaiting) === 1 ? "s" : ""} your reply.` : undefined);
+    // Filter the tenant-wide attention rollup to this trainer's assigned clients —
+    // the exact same signals + thresholds the in-app queue shows them.
+    const assignedIds = new Set(((await db.prepare("SELECT client_id FROM client_trainers WHERE tenant_id = ? AND trainer_user_id = ?").bind(tenantId, tr.trainer_user_id).all<{ client_id: string }>()).results ?? []).map((r) => r.client_id));
+    const mine = tenantAttention.clients.filter((r) => assignedIds.has(r.clientId));
+    const totals: Record<string, number> = {};
+    for (const r of mine) for (const it of r.items) totals[it.type] = (totals[it.type] ?? 0) + 1;
+    const stats: Stat[] = [
+      { label: "Assigned clients", value: assignedIds.size },
+      { label: "Need attention", value: mine.length },
+      ...attentionStats(totals),
+    ];
+    const html = digestHtml(brand, "Your clients this week", "The clients assigned to you that need a look.", stats, appHref, mine.length > 0 ? `${mine.length} client${mine.length === 1 ? "" : "s"} need${mine.length === 1 ? "s" : ""} your attention.` : "Everyone's on track — nice work.");
     await sendTenantEmail(env, tenantId, { to: email, subject: `${brand.name} — your clients this week`, html, brandName: brand.name }).catch(() => undefined);
   }
 
