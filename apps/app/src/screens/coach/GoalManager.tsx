@@ -1,17 +1,18 @@
-/** Goal manager — set a client's nutrition/training goal by CALCULATING targets
- *  from their body (TDEE) or ENTERING macros manually, then review the change
- *  against the current goal before it takes effect. Every past goal is kept and
- *  shown with its window + who set it, so goal history is a real log. */
+/** Goal manager — the client's body (weight, body-fat, age, height, sex) is
+ *  already known server-side, so the coach never re-enters it. Pick the goal
+ *  formula (goal direction · activity · diet, pre-set from the client's
+ *  preferences), and targets autofill from a TDEE calc — editable for a tweak.
+ *  Every past goal is kept and shown with its window + who set it. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  fmtEnergy, fmtVolume, weightLabel, displayToKg, feetInchesToCm, kgToDisplay, cmToFeetInches,
+  fmtEnergy, fmtVolume, weightLabel, displayToKg, kgToDisplay,
   kcalToDisplay, displayToKcal, mlToVolumeDisplay, volumeDisplayToMl, energyLabel, volumeLabel,
   calculateNutritionTargets, validateCalculatorInputs,
   PRIMARY_GOAL_LABELS, ACTIVITY_LEVEL_LABELS, DIETARY_APPROACH_LABELS, WORKOUT_LOCATION_LABELS, BMI_CATEGORY_LABELS,
-  type ClientPreferences, type BmiCategory, type Gender, type ActivityLevel, type PrimaryGoal, type DietaryApproach, type UnitPrefs,
+  type ClientPreferences, type BmiCategory, type CalculatorInputs, type Gender, type ActivityLevel, type PrimaryGoal, type DietaryApproach, type UnitPrefs,
 } from "@mossa/domain";
-import { Button, Card, Badge, Field, Select, Reveal, SegmentedControl, SkeletonStatGrid, SkeletonList, Page, Stagger, SectionHeader, METRICS, toneVar, Target, History, Activity, Scale, Flame, AlertTriangle, Calculator, SlidersHorizontal, ArrowRight, Calendar, type MetricKey } from "@mossa/ui";
+import { Button, Card, Badge, Field, Select, Reveal, SkeletonStatGrid, SkeletonList, Page, Stagger, SectionHeader, METRICS, toneVar, Target, History, Activity, Scale, Flame, AlertTriangle, Calculator, ArrowRight, Calendar, type MetricKey } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 
@@ -23,14 +24,15 @@ interface Metrics {
   bmi: number | null; bmiCategory: BmiCategory | null; bmr: number | null; bmrFormula: string | null;
   hasActiveGoal: boolean; staleness: { stale: boolean; weightDeltaKg: number | null; reason: string | null } | null;
 }
+interface Formula { primaryGoal: PrimaryGoal; activityLevel: ActivityLevel; dietaryApproach: DietaryApproach }
 
-const TARGET_FIELDS: { key: TargetKey; metric: MetricKey; unit: string }[] = [
-  { key: "targetCalories", metric: "calories", unit: "kcal" },
-  { key: "targetProteinG", metric: "protein", unit: "g" },
-  { key: "targetCarbsG", metric: "carbs", unit: "g" },
-  { key: "targetFatG", metric: "fat", unit: "g" },
-  { key: "targetFiberG", metric: "fiber", unit: "g" },
-  { key: "targetWaterMl", metric: "water", unit: "ml" },
+const TARGET_FIELDS: { key: TargetKey; metric: MetricKey }[] = [
+  { key: "targetCalories", metric: "calories" },
+  { key: "targetProteinG", metric: "protein" },
+  { key: "targetCarbsG", metric: "carbs" },
+  { key: "targetFatG", metric: "fat" },
+  { key: "targetFiberG", metric: "fiber" },
+  { key: "targetWaterMl", metric: "water" },
 ];
 const emptyTargets = (): Record<TargetKey, string> => ({ targetCalories: "", targetProteinG: "", targetCarbsG: "", targetFatG: "", targetFiberG: "", targetWaterMl: "" });
 
@@ -40,9 +42,8 @@ function fmtTarget(field: TargetKey, v: number, units: UnitPrefs): string {
   return `${Math.round(v)} g`;
 }
 
-// Manual entry follows the coach's display units: calories in kcal/kJ, water in
-// ml/fl-oz; the macros (protein/carbs/fat/fiber) are always grams. Values are
-// stored metric (kcal, ml) — convert on fill and on save.
+// Editable targets follow the coach's display units: calories in kcal/kJ, water
+// in ml/fl-oz; macros are always grams. Stored metric — convert on fill + save.
 const unitLabelOf = (key: TargetKey, u: UnitPrefs): string => (key === "targetCalories" ? energyLabel(u) : key === "targetWaterMl" ? volumeLabel(u) : "g");
 const toDisplayVal = (key: TargetKey, metric: number, u: UnitPrefs): number => (key === "targetCalories" ? kcalToDisplay(metric, u) : key === "targetWaterMl" ? mlToVolumeDisplay(metric, u) : Math.round(metric));
 const toMetricVal = (key: TargetKey, display: number, u: UnitPrefs): number => Math.round(key === "targetCalories" ? displayToKcal(display, u) : key === "targetWaterMl" ? volumeDisplayToMl(display, u) : display);
@@ -51,9 +52,10 @@ export function GoalManager({ clientId }: { clientId: string }) {
   const [goals, setGoals] = useState<Goal[] | null>(null);
   const [client, setClient] = useState<ClientData | null>(null);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [mode, setMode] = useState<"calculate" | "manual">("calculate");
-  const [form, setForm] = useState({ label: "", startDate: "", gender: "male" as "male" | "female", ageYears: "", heightCm: "", heightFt: "", heightIn: "", weightKg: "", bodyFatPercent: "", activityLevel: "moderate", primaryGoal: "maintain", dietaryApproach: "balanced", weightMin: "", weightMax: "", bodyFatMin: "", bodyFatMax: "", notes: "" });
+  const [formula, setFormula] = useState<Formula>({ primaryGoal: "maintain", activityLevel: "moderate", dietaryApproach: "balanced" });
+  const [form, setForm] = useState({ label: "", startDate: "", weightMin: "", weightMax: "", bodyFatMin: "", bodyFatMax: "", notes: "" });
   const [targets, setTargets] = useState<Record<TargetKey, string>>(emptyTargets);
+  const [edited, setEdited] = useState(false); // coach hand-tweaked → don't auto-overwrite
   const [busy, setBusy] = useState(false);
   const [derivation, setDerivation] = useState<Record<string, unknown> | null>(null);
   const units = useUnits();
@@ -65,48 +67,36 @@ export function GoalManager({ clientId }: { clientId: string }) {
     void api.get<{ client: ClientData; metrics: Metrics }>(`/api/clients/${clientId}`).then((r) => { setClient(r.client); setMetrics(r.metrics); }).catch(() => undefined);
   }, [clientId]);
 
-  // Prefill the calculator once from the client's saved profile + latest body.
-  useEffect(() => {
-    if (prefilled.current || !client || !metrics) return;
-    prefilled.current = true;
-    const p = client.preferences ?? {};
-    const h = client.heightCm != null ? cmToFeetInches(client.heightCm) : null;
-    setForm((f) => ({
-      ...f,
-      gender: (client.gender as "male" | "female") || f.gender,
-      ageYears: metrics.ageYears != null ? String(metrics.ageYears) : f.ageYears,
-      heightCm: client.heightCm != null ? String(Math.round(client.heightCm)) : f.heightCm,
-      heightFt: h ? String(h.ft) : f.heightFt,
-      heightIn: h ? String(h.in) : f.heightIn,
-      weightKg: metrics.weightKg != null ? String(kgToDisplay(metrics.weightKg, units)) : f.weightKg,
-      bodyFatPercent: metrics.bodyFatPercent != null ? String(metrics.bodyFatPercent) : f.bodyFatPercent,
-      activityLevel: p.activityLevel ?? f.activityLevel,
-      primaryGoal: p.primaryGoal ?? f.primaryGoal,
-      dietaryApproach: p.dietaryApproach ?? f.dietaryApproach,
-      weightMax: p.targetWeightKg != null ? String(kgToDisplay(p.targetWeightKg, units)) : f.weightMax,
-    }));
-  }, [client, metrics, units]);
+  // The client's body — read straight from their profile + latest measurement,
+  // never typed by the coach. `bodyReady` gates the auto-calc.
+  const bodyInputs = useCallback((f: Formula): Partial<CalculatorInputs> => ({
+    gender: (client?.gender as Gender) ?? undefined,
+    ageYears: metrics?.ageYears ?? undefined,
+    heightCm: client?.heightCm ?? undefined,
+    weightKg: metrics?.weightKg ?? undefined,
+    bodyFatPercent: metrics?.bodyFatPercent ?? null,
+    activityLevel: f.activityLevel,
+    primaryGoal: f.primaryGoal,
+    dietaryApproach: f.dietaryApproach,
+  }), [client, metrics]);
 
-  const calcInputs = useCallback(() => {
-    const heightCm = units.height === "ft_in" ? feetInchesToCm(Number(form.heightFt || 0), Number(form.heightIn || 0)) : Number(form.heightCm);
-    return {
-      gender: form.gender as Gender,
-      ageYears: Number(form.ageYears),
-      heightCm,
-      weightKg: displayToKg(Number(form.weightKg), units),
-      bodyFatPercent: form.bodyFatPercent ? Number(form.bodyFatPercent) : null,
-      activityLevel: form.activityLevel as ActivityLevel,
-      primaryGoal: form.primaryGoal as PrimaryGoal,
-      dietaryApproach: form.dietaryApproach as DietaryApproach,
-    };
-  }, [form, units]);
+  const gaps = useMemo(() => {
+    const g: string[] = [];
+    if (!client) return g;
+    if (!client.gender) g.push("sex");
+    if (metrics?.ageYears == null) g.push("date of birth");
+    if (client.heightCm == null) g.push("height");
+    if (metrics?.weightKg == null) g.push("a recent weight");
+    return g;
+  }, [client, metrics]);
+  const bodyReady = client != null && metrics != null && gaps.length === 0;
 
-  // Calculate targets client-side and fill the (editable) macro fields so the
-  // coach can review and tweak before saving.
-  const calculate = () => {
-    const inputs = calcInputs();
+  // Run the TDEE calc from the client's body + the chosen formula, filling the
+  // editable target fields. Pure autofill — the coach can then tweak.
+  const runCalc = useCallback((f: Formula) => {
+    const inputs = bodyInputs(f);
     if (validateCalculatorInputs(inputs).length) return;
-    const r = calculateNutritionTargets(inputs);
+    const r = calculateNutritionTargets(inputs as CalculatorInputs);
     setTargets({
       targetCalories: String(toDisplayVal("targetCalories", r.targetCalories, units)),
       targetProteinG: String(r.targetProteinG),
@@ -116,6 +106,32 @@ export function GoalManager({ clientId }: { clientId: string }) {
       targetWaterMl: String(toDisplayVal("targetWaterMl", r.targetWaterMl, units)),
     });
     setDerivation(r.derivation as Record<string, unknown>);
+  }, [bodyInputs, units]);
+
+  // Prefill the formula from the client's preferences once, and autofill targets
+  // straight away so the coach lands on suggested numbers with nothing to type.
+  useEffect(() => {
+    if (prefilled.current || !client || !metrics) return;
+    prefilled.current = true;
+    const p = client.preferences ?? {};
+    const f: Formula = {
+      primaryGoal: (p.primaryGoal as PrimaryGoal) ?? "maintain",
+      activityLevel: (p.activityLevel as ActivityLevel) ?? "moderate",
+      dietaryApproach: (p.dietaryApproach as DietaryApproach) ?? "balanced",
+    };
+    setFormula(f);
+    setForm((prev) => ({
+      ...prev,
+      weightMax: p.targetWeightKg != null ? String(kgToDisplay(p.targetWeightKg, units)) : prev.weightMax,
+    }));
+    if (client.gender && metrics.ageYears != null && client.heightCm != null && metrics.weightKg != null) runCalc(f);
+  }, [client, metrics, units, runCalc]);
+
+  // Changing the formula recalculates — unless the coach has hand-edited targets.
+  const setFormulaField = (patch: Partial<Formula>) => {
+    const next = { ...formula, ...patch };
+    setFormula(next);
+    if (!edited && bodyReady) runCalc(next);
   };
 
   const create = async () => {
@@ -127,10 +143,11 @@ export function GoalManager({ clientId }: { clientId: string }) {
       if (form.weightMin || form.weightMax) rangesObj.weightKg = { min: form.weightMin ? displayToKg(Number(form.weightMin), units) : null, max: form.weightMax ? displayToKg(Number(form.weightMax), units) : null };
       if (form.bodyFatMin || form.bodyFatMax) rangesObj.bodyFatPercent = { min: form.bodyFatMin ? Number(form.bodyFatMin) : null, max: form.bodyFatMax ? Number(form.bodyFatMax) : null };
       const ranges = Object.keys(rangesObj).length ? rangesObj : undefined;
-      // In calculate mode we also send the calculator so the goal keeps its
-      // derivation snapshot (BMR/TDEE) for staleness detection; any manual tweak
-      // to the macro fields still wins (the API spreads targets over the calc).
-      const calculator = mode === "calculate" && validateCalculatorInputs(calcInputs()).length === 0 ? calcInputs() : undefined;
+      // Send the calculator (from the client's body) so the goal keeps its
+      // BMR/TDEE derivation snapshot for staleness detection; the explicit
+      // targets (possibly tweaked) still win server-side.
+      const inputs = bodyInputs(formula);
+      const calculator = bodyReady && validateCalculatorInputs(inputs).length === 0 ? inputs : undefined;
       const res = await api.post<{ derivation: Record<string, unknown> }>("/api/goals", {
         clientId, label: form.label || "New phase", notes: form.notes || undefined, ranges,
         startDate: form.startDate || undefined,
@@ -139,15 +156,14 @@ export function GoalManager({ clientId }: { clientId: string }) {
       });
       if (res.derivation) setDerivation(res.derivation);
       setForm((f) => ({ ...f, label: "", notes: "", startDate: "" }));
-      setTargets(emptyTargets());
+      setEdited(false);
       await load();
-      void api.get<{ metrics: Metrics }>(`/api/clients/${clientId}`).then((r) => setMetrics(r.metrics)).catch(() => undefined);
+      void api.get<{ client: ClientData; metrics: Metrics }>(`/api/clients/${clientId}`).then((r) => { setMetrics(r.metrics); }).catch(() => undefined);
     } catch { /* validation surfaces via disabled */ } finally { setBusy(false); }
   };
 
   const active = goals?.find((g) => g.status === "active");
   const history = goals?.filter((g) => g.status !== "active") ?? [];
-  // Effective end of each historical goal = the next (newer) goal's start.
   const windowEnd = useMemo(() => {
     const m = new Map<string, string>();
     const sorted = [...(goals ?? [])].sort((a, b) => (a.start_date || a.created_at).localeCompare(b.start_date || b.created_at));
@@ -155,27 +171,21 @@ export function GoalManager({ clientId }: { clientId: string }) {
     return m;
   }, [goals]);
 
-  const heightOk = units.height === "ft_in" ? form.heightFt : form.heightCm;
-  const calcReady = !!(form.ageYears && heightOk && form.weightKg);
   const canSave = Number(targets.targetCalories) > 0;
-  // Diff the pending calories against the active goal (the headline change) —
-  // both compared in METRIC kcal, then rendered in the coach's energy unit.
   const newCals = targets.targetCalories !== "" && Number.isFinite(Number(targets.targetCalories)) ? toMetricVal("targetCalories", Number(targets.targetCalories), units) : null;
   const oldCals = active?.targets?.targetCalories ?? null;
   const calDelta = newCals != null && oldCals != null ? newCals - oldCals : null;
 
   const prefs = client?.preferences ?? {};
   const prefRows: [string, string | null][] = [
-    ["Goal", prefs.primaryGoal ? PRIMARY_GOAL_LABELS[prefs.primaryGoal] : null],
-    ["Activity", prefs.activityLevel ? ACTIVITY_LEVEL_LABELS[prefs.activityLevel] : null],
     ["Target weight", prefs.targetWeightKg != null ? `${kgToDisplay(prefs.targetWeightKg, units)} ${weightLabel(units)}` : null],
     ["Workouts / week", prefs.workoutsPerWeek != null ? String(prefs.workoutsPerWeek) : null],
     ["Meals / day", prefs.mealsPerDay != null ? String(prefs.mealsPerDay) : null],
     ["Trains at", prefs.workoutLocation ? WORKOUT_LOCATION_LABELS[prefs.workoutLocation] : null],
-    ["Diet", prefs.dietaryApproach ? DIETARY_APPROACH_LABELS[prefs.dietaryApproach] : null],
   ];
   const hasPrefs = prefRows.some(([, v]) => v != null) || prefs.limitations;
   const fmtDate = (s: string | null | undefined) => (s ? new Date(`${s.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—");
+  const selRow = "mb-1.5 block text-sm font-medium text-muted-foreground";
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
@@ -186,7 +196,6 @@ export function GoalManager({ clientId }: { clientId: string }) {
         </>
       }>
       {goals && (<>
-      {/* Staleness nudge — the body has drifted from the active goal. */}
       {metrics?.staleness?.stale && (
         <Stagger>
           <Card className="flex items-start gap-3 border border-warning/25 bg-warning-soft/50">
@@ -196,7 +205,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
         </Stagger>
       )}
 
-      {/* Live body read-out — recomputed on every weight/body-fat entry. */}
+      {/* The client's body — pulled automatically, drives the calc. */}
       {metrics && (metrics.bmi != null || metrics.bmr != null || metrics.weightKg != null) && (
         <Stagger>
           <Card className="space-y-3">
@@ -211,7 +220,6 @@ export function GoalManager({ clientId }: { clientId: string }) {
         </Stagger>
       )}
 
-      {/* What the client asked for (from their Settings). */}
       {hasPrefs && (
         <Stagger>
           <Card className="space-y-3">
@@ -252,60 +260,39 @@ export function GoalManager({ clientId }: { clientId: string }) {
           <SectionHeader icon={Target} tone="nutrition" title="New goal phase" />
           <Field label="Phase label" icon={Target} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Cut — 8 weeks" />
 
-          {/* How to set targets: derive from the body, or type them in. */}
-          <SegmentedControl<"calculate" | "manual">
-            fill
-            value={mode}
-            onChange={setMode}
-            options={[
-              { value: "calculate", label: <span className="inline-flex items-center gap-1.5"><Calculator className="size-4" /> Calculate</span> },
-              { value: "manual", label: <span className="inline-flex items-center gap-1.5"><SlidersHorizontal className="size-4" /> Enter manually</span> },
-            ]}
-          />
+          {/* The formula — the only real choices; pre-set from the client's prefs.
+              Targets recalc automatically as these change (until hand-edited). */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div><label className={selRow}>Goal</label><Select value={formula.primaryGoal} onChange={(v) => setFormulaField({ primaryGoal: v as PrimaryGoal })} options={Object.entries(PRIMARY_GOAL_LABELS).map(([value, label]) => ({ value, label }))} /></div>
+            <div><label className={selRow}>Activity</label><Select value={formula.activityLevel} onChange={(v) => setFormulaField({ activityLevel: v as ActivityLevel })} options={Object.entries(ACTIVITY_LEVEL_LABELS).map(([value, label]) => ({ value, label }))} /></div>
+            <div><label className={selRow}>Diet</label><Select value={formula.dietaryApproach} onChange={(v) => setFormulaField({ dietaryApproach: v as DietaryApproach })} options={Object.entries(DIETARY_APPROACH_LABELS).map(([value, label]) => ({ value, label }))} /></div>
+          </div>
 
-          {mode === "calculate" && (
-            <div className="space-y-3 rounded-xl bg-secondary/50 p-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Gender</label><Select value={form.gender} onChange={(v) => setForm({ ...form, gender: v as "male" | "female" })} options={[{ value: "male", label: "Male" }, { value: "female", label: "Female" }]} /></div>
-                <Field label="Age" inputMode="numeric" value={form.ageYears} onChange={(e) => setForm({ ...form, ageYears: e.target.value.replace(/\D/g, "") })} />
-                {units.height === "ft_in" ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <Field label="Height (ft)" inputMode="numeric" value={form.heightFt} onChange={(e) => setForm({ ...form, heightFt: e.target.value.replace(/\D/g, "") })} />
-                    <Field label="(in)" inputMode="numeric" value={form.heightIn} onChange={(e) => setForm({ ...form, heightIn: e.target.value.replace(/\D/g, "") })} />
-                  </div>
-                ) : (
-                  <Field label="Height (cm)" inputMode="numeric" value={form.heightCm} onChange={(e) => setForm({ ...form, heightCm: e.target.value })} />
-                )}
-                <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={form.weightKg} onChange={(e) => setForm({ ...form, weightKg: e.target.value })} />
-                <Field label="Body fat % (optional)" inputMode="decimal" value={form.bodyFatPercent} onChange={(e) => setForm({ ...form, bodyFatPercent: e.target.value })} />
-              </div>
-              <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Activity level</label><Select value={form.activityLevel} onChange={(v) => setForm({ ...form, activityLevel: v })} options={Object.entries(ACTIVITY_LEVEL_LABELS).map(([value, label]) => ({ value, label }))} /></div>
-              <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Primary goal</label><Select value={form.primaryGoal} onChange={(v) => setForm({ ...form, primaryGoal: v })} options={Object.entries(PRIMARY_GOAL_LABELS).map(([value, label]) => ({ value, label }))} /></div>
-              <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Dietary approach</label><Select value={form.dietaryApproach} onChange={(v) => setForm({ ...form, dietaryApproach: v })} options={Object.entries(DIETARY_APPROACH_LABELS).map(([value, label]) => ({ value, label }))} /></div>
-              <Button variant="secondary" className="w-full" disabled={!calcReady} onClick={calculate}><Calculator className="size-4" /> Calculate targets from body</Button>
-              {derivation && <p className="text-xs text-muted-foreground">{String(derivation.bmrFormula)} · BMR {fmtEnergy(Number(derivation.bmr), units, false)} · TDEE {fmtEnergy(Number(derivation.tdee), units)}</p>}
+          {bodyReady ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Button variant="secondary" size="sm" onClick={() => { setEdited(false); runCalc(formula); }}><Calculator className="size-4" /> Recalculate from body</Button>
+              {derivation && <p className="text-xs text-muted-foreground">{String(derivation.bmrFormula) === "katch_mcardle" ? "Katch-McArdle" : "Mifflin-St Jeor"} · BMR {fmtEnergy(Number(derivation.bmr), units, false)} · TDEE {fmtEnergy(Number(derivation.tdee), units)}</p>}
+            </div>
+          ) : (
+            <div className="flex items-start gap-2 rounded-xl bg-secondary/60 p-3 text-sm text-muted-foreground">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+              <span>Add {gaps.join(", ")} to the client's profile to calculate targets automatically — or type them in below.</span>
             </div>
           )}
 
-          {/* Editable targets — the numbers the goal will actually save. In
-              calculate mode they fill from the button and stay tweakable. */}
+          {/* Targets — autofilled from the calc, editable for a tweak. */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-muted-foreground">{mode === "calculate" ? "Targets (tweak if needed)" : "Targets"}</label>
-              {mode === "calculate" && Object.values(targets).some((v) => v !== "") && <button type="button" className="text-xs text-muted-foreground underline" onClick={() => setTargets(emptyTargets())}>clear</button>}
-            </div>
+            <label className="text-sm font-medium text-muted-foreground">Targets{bodyReady ? " (tweak if needed)" : ""}</label>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {TARGET_FIELDS.map(({ key, metric }) => {
                 const m = METRICS[metric];
-                return <Field key={key} label={`${m.label} (${unitLabelOf(key, units)})`} icon={m.icon} inputMode="decimal" value={targets[key]} onChange={(e) => setTargets((t) => ({ ...t, [key]: e.target.value.replace(/[^\d.]/g, "") }))} />;
+                return <Field key={key} label={`${m.label} (${unitLabelOf(key, units)})`} icon={m.icon} inputMode="decimal" value={targets[key]} onChange={(e) => { setEdited(true); setTargets((t) => ({ ...t, [key]: e.target.value.replace(/[^\d.]/g, "") })); }} />;
               })}
             </div>
           </div>
 
-          {/* Effective date + a clear "what this replaces" statement. */}
           <Field type="date" label="Effective from" icon={Calendar} value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} hint={active ? `Replaces "${active.label}" from this date. Past days keep the goal they were logged under.` : "Defaults to today."} />
 
-          {/* Change preview: how the headline calorie target moves. */}
           {active?.targets && newCals != null && (
             <div className="flex items-center gap-2 rounded-xl bg-secondary p-3 text-sm">
               <span className="text-muted-foreground">Calories</span>
@@ -326,7 +313,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
           </div>
           <Field label="Notes (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Context for this phase" />
           <Button size="lg" className="w-full" disabled={!canSave || busy} onClick={() => void create()}>{busy ? "Saving…" : active ? "Replace goal" : "Set goal"}</Button>
-          {!canSave && <p className="text-center text-xs text-muted-foreground">{mode === "calculate" ? "Calculate targets (or type a calorie target) to save." : "Enter at least a calorie target to save."}</p>}
+          {!canSave && <p className="text-center text-xs text-muted-foreground">Calculate or type a calorie target to save.</p>}
         </Card>
       </Stagger>
 
