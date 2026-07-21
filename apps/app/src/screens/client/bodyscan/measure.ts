@@ -404,6 +404,43 @@ export function measureCapture(cap: Capture, heightCm: number): SiteWidths {
   };
 }
 
+/** Median of a numeric list (null when empty). Robust to the odd wild frame. */
+function median(xs: number[]): number | null {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m]! : Math.round(((s[m - 1]! + s[m]!) / 2) * 10) / 10;
+}
+
+/**
+ * Collapse a BURST of per-frame measurements (same pose, back-to-back frames)
+ * into one robust reading: the MEDIAN of each site across frames, ignoring
+ * frames that couldn't locate a given site. This is the single biggest lever on
+ * scan-to-scan repeatability — one frame's coarse segmentation mask + jittery
+ * landmarks can swing a girth several cm (and thus body-fat several %), so a lone
+ * frame makes back-to-back scans disagree even when nothing about the person
+ * changed. The median across ~5 frames cancels that per-frame noise. The outline
+ * is taken from the frame whose waist sits closest to the median (the most
+ * "typical" capture), so the saved silhouette matches the reported numbers.
+ */
+export function aggregateSiteWidths(list: SiteWidths[]): SiteWidths {
+  const pick = (k: "neckCm" | "chestCm" | "waistCm" | "hipsCm" | "pxPerCm"): number | null =>
+    median(list.map((s) => s[k]).filter((v): v is number => v != null));
+  const waistCm = pick("waistCm");
+  let contour: [number, number][] = [];
+  if (waistCm != null) {
+    let best = Infinity;
+    for (const s of list) {
+      if (s.waistCm != null && s.contour.length > 3) {
+        const d = Math.abs(s.waistCm - waistCm);
+        if (d < best) { best = d; contour = s.contour; }
+      }
+    }
+  }
+  if (contour.length === 0) contour = list.find((s) => s.contour.length > 3)?.contour ?? [];
+  return { pxPerCm: pick("pxPerCm"), neckCm: pick("neckCm"), chestCm: pick("chestCm"), waistCm, hipsCm: pick("hipsCm"), contour };
+}
+
 /**
  * Blend front + side site widths into circumferences (ellipse cross-section).
  * Neck + waist are required; hips + chest are included only when both views

@@ -24,7 +24,7 @@ import {
 } from "@mossa/ui";
 import { api, todayLocal } from "../../../api.js";
 import { loadScanner, analyzeAlignment, type Scanner, type ScanPhase, type Alignment } from "./pipeline.js";
-import { measureCapture, computeCircumferences, fullBodyContour, posturePoints, LM, type Capture, type NormLandmark, type Circumferences } from "./measure.js";
+import { measureCapture, aggregateSiteWidths, computeCircumferences, fullBodyContour, posturePoints, LM, type Capture, type NormLandmark, type Circumferences } from "./measure.js";
 import { CuePlayer } from "./cues.js";
 import { Silhouette } from "./Silhouette.js";
 import { scanProfile, modelSilhouette } from "./model.js";
@@ -54,12 +54,15 @@ const CONFIDENCE_LABEL = { high: "High confidence", medium: "Medium confidence",
 const CONFIDENCE_TONE = { high: "success", medium: "warning", low: "danger" } as const;
 
 export default function BodyScanFlow({
-  clientId, profile, latestWeightKg, units, onClose, onSaved,
+  clientId, profile, latestWeightKg, units, voiceReady = true, onClose, onSaved,
 }: {
   clientId: string;
   profile: ScanProfile;
   latestWeightKg: number | null;
   units: UnitPrefs;
+  /** The studio has a full voice-cue pack. The camera scanner is voice-guided, so
+   *  it's disabled without one; manual measurement entry stays available. */
+  voiceReady?: boolean;
   onClose: () => void;
   onSaved: (r: ScanResult & { id: string }) => void;
 }) {
@@ -70,7 +73,10 @@ export default function BodyScanFlow({
   const [fatalError, setFatalError] = useState<string | null>(null);
 
   const cueRef = useRef<CuePlayer | null>(null);
-  const capturesRef = useRef<{ front?: Capture; frontShape?: Capture; side?: Capture }>({});
+  // A BURST of frames per pose (not one) — the median across them is what makes
+  // repeat scans agree (see aggregateSiteWidths). frontShape/side keep a burst too
+  // (first frame drives the visual outline / posture).
+  const capturesRef = useRef<{ front?: Capture[]; frontShape?: Capture[]; side?: Capture[] }>({});
 
   // Spin up the cue player once (preload is fire-and-forget, degrades to TTS).
   useEffect(() => {
@@ -97,41 +103,42 @@ export default function BodyScanFlow({
         return `${c.mask.length ? Math.round((px / c.mask.length) * 100) : 0}% · ${c.width}×${c.height}`;
       };
       try {
-        if (!front) throw new Error("no front capture");
-        const f = measureCapture(front, profile.heightCm);
-        const s = side ? measureCapture(side, profile.heightCm) : f;
+        if (!front || front.length === 0) throw new Error("no front capture");
+        // Median across the burst per pose — cancels per-frame mask/landmark jitter.
+        const f = aggregateSiteWidths(front.map((c) => measureCapture(c, profile.heightCm)));
+        const s = side && side.length ? aggregateSiteWidths(side.map((c) => measureCapture(c, profile.heightCm))) : f;
         const circ = computeCircumferences(f, s);
-        if (!circ) throw new Error(`sites not found · outline ${coverage(front)}`);
+        if (!circ) throw new Error(`sites not found · outline ${coverage(front[0])}`);
         // Plausibility gate: a waist far outside the human range for this height
         // means a bad read (occlusion, loose clothing, a partial mask) — surface
         // manual entry rather than a confidently-wrong estimate (e.g. a 59 cm
         // waist reading 5% body-fat on a 90 kg frame). ~0.35–0.95 × height spans
         // very lean to very high girth.
         if (circ.waistCm < profile.heightCm * 0.35 || circ.waistCm > profile.heightCm * 0.95) {
-          throw new Error(`waist ${Math.round(circ.waistCm)}cm implausible · outline ${coverage(front)}`);
+          throw new Error(`waist ${Math.round(circ.waistCm)}cm implausible · outline ${coverage(front[0])}`);
         }
         const estimate = estimateBodyFat({
           gender: profile.gender, ageYears: profile.ageYears, heightCm: profile.heightCm,
           weightKg: latestWeightKg ?? 75,
           neckCm: circ.neckCm, waistCm: circ.waistCm, hipsCm: circ.hipsCm ?? null,
         });
-        if (!estimate) throw new Error(`estimate failed · outline ${coverage(front)}`);
+        if (!estimate) throw new Error(`estimate failed · outline ${coverage(front[0])}`);
         // Visualization outlines are the FULL body (arms) from the arms-down
         // frontShape + side captures — a natural human shape — while the numbers
         // above came from the torso-only measurement. Fall back to the torso
-        // outline if the shape capture is missing.
-        const contourFront = frontShape ? fullBodyContour(frontShape) : f.contour;
-        const contourSide = side ? fullBodyContour(side) : null;
+        // outline if the shape capture is missing. (First frame of each burst.)
+        const contourFront = frontShape && frontShape.length ? fullBodyContour(frontShape[0]!) : f.contour;
+        const contourSide = side && side.length ? fullBodyContour(side[0]!) : null;
         // Posture screen from the side view's ear/shoulder/hip (before we drop the
         // landmarks below). Null when the profile landmarks weren't clear enough.
-        const pp = side ? posturePoints(side) : null;
+        const pp = side && side.length ? posturePoints(side[0]!) : null;
         const posture = pp ? posturalMetrics(pp) : null;
         // Discard the masks now — we keep only numbers + the outline.
         capturesRef.current = {};
         setResult({ estimate, circumferences: circ, contourFront, contourSide, weightKg: latestWeightKg ?? 75, posture });
         setStep("result");
       } catch (err) {
-        const why = err instanceof Error ? err.message : coverage(front);
+        const why = err instanceof Error ? err.message : coverage(front?.[0]);
         setFatalError(`We couldn't read your measurements from the capture. Enter them by hand below.\n\nDiagnostic: ${why}`);
         setStep("manual");
       }
@@ -167,6 +174,7 @@ export default function BodyScanFlow({
       <div className="min-h-0 flex-1 overflow-y-auto">
         {step === "intro" && (
           <Intro
+            voiceReady={voiceReady}
             onStartCamera={() => setStep("front")}
             onManual={() => { setFatalError(null); setStep("manual"); }}
           />
@@ -176,8 +184,8 @@ export default function BodyScanFlow({
             key={step}
             phase={step}
             cue={cueRef.current}
-            onCaptured={(cap) => {
-              capturesRef.current[step] = cap;
+            onCaptured={(caps) => {
+              capturesRef.current[step] = caps;
               if (step === "front") { cueRef.current?.play("captured"); setStep("frontShape"); }
               else if (step === "frontShape") { cueRef.current?.play("captured"); setStep("side"); }
               else { cueRef.current?.play("done"); beginMeasure(); }
@@ -201,7 +209,7 @@ export default function BodyScanFlow({
 }
 
 // ── Intro + consent ──────────────────────────────────────────────────────────
-function Intro({ onStartCamera, onManual }: { onStartCamera: () => void; onManual: () => void }) {
+function Intro({ voiceReady, onStartCamera, onManual }: { voiceReady: boolean; onStartCamera: () => void; onManual: () => void }) {
   return (
     <div className="mx-auto max-w-md space-y-5 px-5 py-4">
       <div className="space-y-2 text-center">
@@ -234,9 +242,15 @@ function Intro({ onStartCamera, onManual }: { onStartCamera: () => void; onManua
         <Bullet icon={Ruler}>Stand tall with your feet shoulder-width apart. We'll tell you when to hold your arms out and when to relax them down.</Bullet>
       </div>
 
+      {!voiceReady && (
+        <div className="flex items-start gap-2.5 rounded-2xl bg-warning-soft/40 p-4 text-sm text-warning">
+          <Sparkles className="mt-0.5 size-5 shrink-0" />
+          <p>The guided camera scan needs your studio's voice pack, which your coach hasn't set up yet. You can still enter your measurements by hand below.</p>
+        </div>
+      )}
       <div className="space-y-2.5">
-        <Button size="lg" className="w-full" onClick={onStartCamera}><Camera /> Start camera scan</Button>
-        <Button variant="ghost" className="w-full" onClick={onManual}><Ruler /> Enter measurements by hand instead</Button>
+        <Button size="lg" className="w-full" disabled={!voiceReady} onClick={onStartCamera}><Camera /> Start camera scan</Button>
+        <Button variant={voiceReady ? "ghost" : "default"} className="w-full" onClick={onManual}><Ruler /> Enter measurements by hand{voiceReady ? " instead" : ""}</Button>
       </div>
       <p className="px-2 text-center text-xs text-muted-foreground">By continuing you agree to run the scan on your device. Your coach only ever sees the resulting numbers.</p>
     </div>
@@ -253,10 +267,16 @@ function Bullet({ icon: Icon, children }: { icon: typeof User; children: ReactNo
 }
 
 // ── Capture (front / side) ───────────────────────────────────────────────────
+/** How many frames to grab per pose. The median across the burst (see
+ *  aggregateSiteWidths) is what makes repeat scans agree; ~5 balances stability
+ *  against the ~1s it adds to each hold. */
+const BURST = 5;
+const BURST_GAP_MS = 90;
+
 function CaptureStep({ phase, cue, onCaptured, onFallback }: {
   phase: ScanPhase;
   cue: CuePlayer | null;
-  onCaptured: (cap: Capture) => void;
+  onCaptured: (caps: Capture[]) => void;
   onFallback: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -278,19 +298,24 @@ function CaptureStep({ phase, cue, onCaptured, onFallback }: {
     let stream: MediaStream | null = null;
     let stopped = false;
 
+    // Grab a BURST of frames (re-reading pose + segmenting each) so the caller can
+    // median away per-frame vision noise — the key to repeatable scans. Falls back
+    // to whatever frames it got; only fails if none segmented.
     const doCapture = async () => {
       const scanner = scannerRef.current;
       const video = videoRef.current;
-      const lm = latestLmRef.current;
-      if (!scanner || !video || !lm || capturingRef.current) return;
+      if (!scanner || !video || capturingRef.current) return;
       capturingRef.current = true;
-      const ts = performance.now();
-      const seg = await scanner.segment(video, ts);
-      if (seg && !stopped) {
-        onCapturedRef.current({ mask: seg.mask, width: seg.width, height: seg.height, landmarks: lm, frameW: video.videoWidth, frameH: video.videoHeight });
-      } else {
-        capturingRef.current = false;
+      const caps: Capture[] = [];
+      for (let i = 0; i < BURST && !stopped; i++) {
+        const ts = performance.now();
+        const lm = scanner.pose(video, ts) ?? latestLmRef.current;
+        const seg = await scanner.segment(video, ts);
+        if (seg && lm) caps.push({ mask: seg.mask, width: seg.width, height: seg.height, landmarks: lm, frameW: video.videoWidth, frameH: video.videoHeight });
+        if (i < BURST - 1) await new Promise((r) => setTimeout(r, BURST_GAP_MS));
       }
+      if (caps.length && !stopped) onCapturedRef.current(caps);
+      else capturingRef.current = false;
     };
 
     void (async () => {
@@ -355,10 +380,16 @@ function CaptureStep({ phase, cue, onCaptured, onFallback }: {
     const video = videoRef.current;
     if (!scanner || !video || capturingRef.current) return;
     capturingRef.current = true;
-    const ts = performance.now();
-    const lm = latestLmRef.current ?? scanner.pose(video, ts);
-    const seg = await scanner.segment(video, ts);
-    if (seg && lm) onCapturedRef.current({ mask: seg.mask, width: seg.width, height: seg.height, landmarks: lm, frameW: video.videoWidth, frameH: video.videoHeight });
+    // Same burst as the auto-capture so a manual shoot is just as repeatable.
+    const caps: Capture[] = [];
+    for (let i = 0; i < BURST; i++) {
+      const ts = performance.now();
+      const lm = scanner.pose(video, ts) ?? latestLmRef.current;
+      const seg = await scanner.segment(video, ts);
+      if (seg && lm) caps.push({ mask: seg.mask, width: seg.width, height: seg.height, landmarks: lm, frameW: video.videoWidth, frameH: video.videoHeight });
+      if (i < BURST - 1) await new Promise((r) => setTimeout(r, BURST_GAP_MS));
+    }
+    if (caps.length) onCapturedRef.current(caps);
     else capturingRef.current = false;
   })(); };
 
