@@ -120,6 +120,10 @@ export const FEATURES = {
     key: "branding", label: "White-label branding",
     entitlement: "branding", permission: "settings",
   },
+  aiSuite: {
+    key: "aiSuite", label: "AI suite",
+    entitlement: "aiSuite", permission: "ai",
+  },
   aiMealTools: {
     key: "aiMealTools", label: "AI food tools",
     entitlement: "aiSuite", clientFlag: "aiMealTools", permission: "ai",

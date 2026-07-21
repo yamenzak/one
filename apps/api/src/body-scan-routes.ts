@@ -15,7 +15,6 @@ import { estimateBodyFat, ageFromDob, bodyComposition, classifySomatotype, type 
 import { SubmitBodyScan, TTS_VOICE_IDS } from "@mossa/protocol";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
-import { hasFeature } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
 import { generateSpeech, DEFAULT_TTS_VOICE } from "./ai.js";
 import { newId, nowIso } from "./ids.js";
@@ -156,7 +155,7 @@ export const bodyScanRoutes = new Hono<AppEnv>()
   // url and the client speaks them with the browser's free speechSynthesis.
   .get("/body-scan/cues", async (c) => {
     const who = requireTenant(c)!;
-    if (!(await hasFeature(c.env.DB, who.tenantId, "bfCamera"))) return c.json({ error: "body scan not in your plan" }, 403);
+    { const g = await gateFeature(c, "bodyScan"); if (g) return g; }
     const voice = await resolveVoice(c.env.DB, who.tenantId, c.req.query("voice"));
     const lang = "en";
     const rows = await c.env.DB.prepare("SELECT phrase_id, media_key FROM tts_cues WHERE tenant_id=? AND voice=? AND lang=? AND version=?")
@@ -185,7 +184,7 @@ export const bodyScanRoutes = new Hono<AppEnv>()
   .post("/body-scan/voice-pack", async (c) => {
     const who = requireTenant(c)!;
     if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
-    if (!(await hasFeature(c.env.DB, who.tenantId, "bfCamera"))) return c.json({ error: "body scan not in your plan" }, 403);
+    { const g = await gateFeature(c, "bodyScan"); if (g) return g; }
     const body = (await c.req.json().catch(() => ({}))) as { voice?: string };
     const voice = await resolveVoice(c.env.DB, who.tenantId, body.voice);
     const lang = "en";
@@ -215,7 +214,7 @@ export const bodyScanRoutes = new Hono<AppEnv>()
   // cached like a cue (so previewing every voice costs a handful of credits once).
   .get("/body-scan/voice-preview", async (c) => {
     const who = requireTenant(c)!;
-    if (!(await hasFeature(c.env.DB, who.tenantId, "bfCamera"))) return c.json({ error: "body scan not in your plan" }, 403);
+    { const g = await gateFeature(c, "bodyScan"); if (g) return g; }
     const voice = await resolveVoice(c.env.DB, who.tenantId, c.req.query("voice"));
     const existing = await c.env.DB.prepare("SELECT media_key FROM tts_cues WHERE tenant_id=? AND voice=? AND lang='en' AND phrase_id='preview' AND version=?")
       .bind(who.tenantId, voice, TTS_VERSION)

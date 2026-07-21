@@ -11,15 +11,15 @@ import { z } from "zod";
 import { WorkoutBody, MealBody, stripBodyForTemplate } from "@mossa/protocol";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
-import { requireClientFlag } from "./client-flags.js";
+import { gateFeature } from "./client-flags.js";
 import { notify } from "./notify.js";
 import { recordAudit } from "./audit.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
 
 type Kind = "workout" | "meal";
-/** The client-access flag gating a client's own view of this plan kind. */
-const accessFlag = (kind: Kind) => (kind === "workout" ? ("canAccessWorkoutPlan" as const) : ("canAccessMealPlan" as const));
+/** The FEATURES key gating a client's own view of this plan kind. */
+const planFeature = (kind: Kind) => (kind === "workout" ? ("workoutPlan" as const) : ("mealPlan" as const));
 const planTable: Record<Kind, string> = { workout: "workout_plans", meal: "meal_plans" };
 const templateTable: Record<Kind, string> = { workout: "workout_templates", meal: "meal_templates" };
 const bodySchema = (kind: Kind) => (kind === "workout" ? WorkoutBody : MealBody);
@@ -77,7 +77,7 @@ function makePlanRoutes(kind: Kind): Hono<AppEnv> {
       if (!clientId) return c.json({ error: "clientId required" }, 400);
       const access = await requireClientAccess(c, clientId);
       if ("response" in access) return access.response;
-      const gate = await requireClientFlag(c, clientId, accessFlag(kind));
+      const gate = await gateFeature(c, planFeature(kind), clientId);
       if (gate) return gate;
       const isClient = c.get("role") === "client";
       const statusFilter = isClient ? "AND status IN ('published','superseded')" : "";
@@ -143,7 +143,7 @@ function makePlanRoutes(kind: Kind): Hono<AppEnv> {
       if (!row) return c.json({ error: "not found" }, 404);
       const access = await requireClientAccess(c, row.client_id);
       if ("response" in access) return access.response;
-      const gate = await requireClientFlag(c, row.client_id, accessFlag(kind));
+      const gate = await gateFeature(c, planFeature(kind), row.client_id);
       if (gate) return gate;
       if (c.get("role") === "client" && row.status === "draft") return c.json({ error: "not found" }, 404);
       return c.json({ plan: planView(row) });

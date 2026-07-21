@@ -12,7 +12,7 @@ import {
   DEFAULT_WEEKLY_LOAD_TARGET, type LoggedSetLike, type WellnessInput,
 } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
-import { hasFeature } from "./billing-store.js";
+import { gateFeature } from "./client-flags.js";
 import { requireClientAccess } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
@@ -55,7 +55,7 @@ export const healthRoutes = new Hono<AppEnv>()
   .post("/supplements", async (c) => {
     const who = requireTenant(c)!;
     if (!staffOnly(c)) return c.json({ error: "forbidden" }, 403);
-    if (!(await hasFeature(c.env.DB, who.tenantId, "supplementsLabs"))) return c.json({ error: "supplementsLabs not in your plan" }, 403);
+    { const g = await gateFeature(c, "supplementsLabs"); if (g) return g; }
     const parsed = z
       .object({
         clientId: z.string(),
@@ -173,7 +173,7 @@ export const healthRoutes = new Hono<AppEnv>()
   .post("/labs", async (c) => {
     const who = requireTenant(c)!;
     if (!staffOnly(c)) return c.json({ error: "forbidden" }, 403);
-    if (!(await hasFeature(c.env.DB, who.tenantId, "supplementsLabs"))) return c.json({ error: "supplementsLabs not in your plan" }, 403);
+    { const g = await gateFeature(c, "supplementsLabs"); if (g) return g; }
     const parsed = z
       .object({
         clientId: z.string(),

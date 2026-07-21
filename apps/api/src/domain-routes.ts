@@ -13,7 +13,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { type AppEnv, requireTenant, requirePermission, isPlatformAdmin } from "./auth-context.js";
-import { setConfig, getConfig, hasFeature } from "./billing-store.js";
+import { setConfig, getConfig } from "./billing-store.js";
+import { gateFeature } from "./client-flags.js";
 import { turnstileConfig } from "./turnstile.js";
 import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostname, type CustomHostname } from "./cloudflare.js";
 import { hostnameOf, isPlatformHost, invalidateHostCache, resolveSlugTenant } from "./host-context.js";
@@ -100,7 +101,7 @@ export const domainRoutes = new Hono<AppEnv>()
     const guard = requirePermission(c, { settings: ["manage"] });
     if (guard) return guard;
     const who = requireTenant(c)!;
-    if (!(await hasFeature(c.env.DB, who.tenantId, "branding"))) return c.json({ error: "branding not in your plan" }, 403);
+    { const g = await gateFeature(c, "branding"); if (g) return g; }
     const parsed = HOSTNAME.safeParse((await c.req.json().catch(() => ({})) as { hostname?: string }).hostname);
     if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "invalid hostname" }, 400);
     const hostname = parsed.data;
