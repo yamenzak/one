@@ -1,8 +1,8 @@
 # Notifications Overhaul — Design Plan
 
-Status: **proposed, awaiting approval.** No code until signed off. Same discipline
-as the registry and billing passes: map first (done — 3 read-only audits), agree
-the model, then implement in reviewable slices.
+Status: **shipped** — all 5 slices implemented, tested, and pushed to
+`claude/full-app-audit-fb3oya`. Full suite green: 162 domain / 121 API / 6 app /
+7 protocol. (Mapped first via 3 read-only audits, then built in reviewable slices.)
 
 ---
 
