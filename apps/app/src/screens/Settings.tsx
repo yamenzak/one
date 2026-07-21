@@ -9,7 +9,7 @@ import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger, ConfirmDialog,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
   KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, Mail, LogIn, ExternalLink, ArrowRight,
-  type Branding, type BrandTokens, type NeutralTint, type LucideIcon,
+  personaLabel, personaTone, type Branding, type BrandTokens, type NeutralTint, type LucideIcon,
 } from "@mossa/ui";
 import type { LoginBranding, TenantBranding } from "@mossa/protocol";
 import { resolveUnits, cmToFeetInches, feetInchesToCm, STUDIO_SETTINGS_SECTIONS, settingsSectionVisible } from "@mossa/domain";
@@ -62,7 +62,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
       <Stagger>
         <Card className="flex items-center justify-between gap-3">
           <div className="min-w-0"><div className="text-sm text-muted-foreground">Signed in as</div><div className="truncate font-semibold">{ctx?.user.email}</div></div>
-          <Badge tone="neutral" className="capitalize">{role}</Badge>
+          <Badge tone={personaTone(role)}>{personaLabel(role)}</Badge>
         </Card>
       </Stagger>
 
