@@ -2093,6 +2093,45 @@ describe("platform rail — inline Stripe webhooks", () => {
   });
 });
 
+describe("promo codes — website-native discounts (tenant rail)", () => {
+  it("a 100%-off code grants free, enforces max_redemptions, and honors client/package scope", async () => {
+    const db = env.DB as D1Database;
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    for (const [k, v] of [["stripe.mode", "test"], ["stripe.secret_key", "sk_test_x"]] as const) {
+      await db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v).run();
+    }
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, charges_enabled, updated_at) VALUES (?, 'acct_promo', 1, ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_promo', charges_enabled = 1").bind(ctx.active.tenantId, new Date().toISOString()).run();
+    const mk = async (name: string) => ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: name }) })).json()) as { client: { id: string } }).client.id;
+    const buyer = await mk("PromoBuyer");
+    const other = await mk("PromoOther");
+    const pkgId = "pkg_promo_ot";
+    await db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, active, created_at) VALUES (?, ?, ?, ?, ?, 'usd', 1, ?)")
+      .bind(pkgId, ctx.active.tenantId, "Promo Pack", 5000, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
+
+    // A 100%-off code exclusive to `buyer` + this package, single use.
+    expect((await SELF.fetch("http://x/api/promo-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "FREE100", discountType: "percent", percentOff: 100, restrictedClientId: buyer, restrictedPackageId: pkgId, maxRedemptions: 1 }) })).status).toBe(201);
+
+    // Fully discounted → granted directly, no Stripe charge.
+    const r1 = await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: buyer, packageId: pkgId, promoCode: "FREE100" }) });
+    expect(r1.status).toBe(200);
+    expect((await r1.json() as { granted?: boolean }).granted).toBe(true);
+    const subs = (await (await SELF.fetch(`http://x/api/subscriptions?clientId=${buyer}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { budgets: unknown[] }[] };
+    expect(subs.subscriptions.some((s) => (s.budgets?.length ?? 0) > 0)).toBe(true);
+
+    // The single use is now spent.
+    const r2 = await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: buyer, packageId: pkgId, promoCode: "FREE100" }) });
+    expect(r2.status).toBe(400);
+    expect((await r2.json() as { error: string }).error).toBe("promo_exhausted");
+
+    // A code locked to `buyer` is rejected for another client.
+    await SELF.fetch("http://x/api/promo-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "ONLYME", discountType: "percent", percentOff: 100, restrictedClientId: buyer }) });
+    const r3 = await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: other, packageId: pkgId, promoCode: "ONLYME" }) });
+    expect(r3.status).toBe(400);
+    expect((await r3.json() as { error: string }).error).toBe("promo_wrong_client");
+  });
+});
+
 describe("redemption codes — atomic over-redemption guard", () => {
   it("a max_uses=1 code is spent once: a second client and a re-redeem both 409", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

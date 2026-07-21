@@ -22,7 +22,7 @@ import {
   setConfig,
 } from "./billing-store.js";
 import { stripeConfig, stripeEnabled, stripeCall } from "./stripe.js";
-import { nowIso, periodKey } from "./ids.js";
+import { newId, nowIso, periodKey } from "./ids.js";
 import { parseJson } from "./db.js";
 
 function billingDO(c: { env: AppEnv["Bindings"] }, tenantId: string) {
@@ -283,6 +283,32 @@ export const adminRoutes = new Hono<AppEnv>()
     await c.env.DB.prepare("UPDATE subscriptions SET overrides_json = ?, updated_at = ? WHERE tenant_id = ?").bind(newOverride, nowIso(), tenantId).run();
     const plan = await c.env.DB.prepare("SELECT entitlements_json FROM plans WHERE id = ?").bind(sub.plan_id).first<{ entitlements_json: string | null }>();
     return c.json({ ok: true, effective: mergeOverrides(resolveEntitlements(plan?.entitlements_json), newOverride) });
+  })
+
+  // Platform promo codes (Mossa → tenant) — website-native discounts on a
+  // tenant's credit-pack purchase. scope='platform', stored tenant_id ''. Applied
+  // by billing/pack-intent. Percentage or fixed; optionally exclusive to a pack.
+  .get("/admin/promo-codes", async (c) => {
+    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    const rows = await c.env.DB.prepare("SELECT id, code, discount_type, percent_off, amount_off_cents, restricted_package_id, max_redemptions, redemption_count, expires_at, active FROM promo_codes WHERE scope = 'platform' ORDER BY created_at DESC").all();
+    return c.json({ codes: rows.results ?? [] });
+  })
+  .post("/admin/promo-codes", async (c) => {
+    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    const b = z.object({ code: z.string().min(3).max(40), discountType: z.enum(["percent", "amount"]).default("percent"), percentOff: z.number().int().min(1).max(100).nullish(), amountOffCents: z.number().int().positive().nullish(), restrictedPackageId: z.string().nullish(), maxRedemptions: z.number().int().positive().nullish(), expiresAt: z.string().nullish() }).safeParse(await c.req.json().catch(() => null));
+    if (!b.success) return c.json({ error: "invalid body" }, 400);
+    const id = newId("promo");
+    try {
+      await c.env.DB.prepare("INSERT INTO promo_codes (id, tenant_id, code, discount_type, percent_off, amount_off_cents, restricted_package_id, scope, max_redemptions, expires_at, created_by, created_at) VALUES (?, '', ?, ?, ?, ?, ?, 'platform', ?, ?, ?, ?)")
+        .bind(id, b.data.code.toUpperCase(), b.data.discountType, b.data.percentOff ?? null, b.data.amountOffCents ?? null, b.data.restrictedPackageId ?? null, b.data.maxRedemptions ?? null, b.data.expiresAt ?? null, c.get("user")?.id ?? null, nowIso())
+        .run();
+    } catch { return c.json({ error: "code already exists" }, 409); }
+    return c.json({ ok: true, id }, 201);
+  })
+  .delete("/admin/promo-codes/:id", async (c) => {
+    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    await c.env.DB.prepare("UPDATE promo_codes SET active = 0 WHERE id = ? AND scope = 'platform'").bind(c.req.param("id")).run();
+    return c.json({ ok: true });
   })
 
   .get("/admin/whoami", (c) => c.json({ admin: isPlatformAdmin(c), email: c.get("user")?.email }))

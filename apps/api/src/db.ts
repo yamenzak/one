@@ -138,14 +138,14 @@ export function ensureSchema(db: D1Database): Promise<void> {
           // the Stripe subscription id.
           "CREATE INDEX IF NOT EXISTS idx_csubs_status ON client_subscriptions(status);",
           "CREATE INDEX IF NOT EXISTS idx_csubs_stripe_sub ON client_subscriptions(stripe_sub_id);",
-          "CREATE TABLE IF NOT EXISTS redemption_codes (id TEXT PRIMARY KEY, tenant_id TEXT, code TEXT, days_to_add INTEGER, target_feature TEXT DEFAULT 'all', max_uses INTEGER DEFAULT 1, used_count INTEGER DEFAULT 0, used_by_json TEXT, expires_at TEXT, active INTEGER DEFAULT 1, created_by TEXT, created_at TEXT);",
+          "CREATE TABLE IF NOT EXISTS redemption_codes (id TEXT PRIMARY KEY, tenant_id TEXT, code TEXT, days_to_add INTEGER, target_feature TEXT DEFAULT 'all', max_uses INTEGER DEFAULT 1, used_count INTEGER DEFAULT 0, used_by_json TEXT, expires_at TEXT, active INTEGER DEFAULT 1, restricted_package_id TEXT, restricted_client_id TEXT, created_by TEXT, created_at TEXT);",
           "CREATE UNIQUE INDEX IF NOT EXISTS idx_redemption_code ON redemption_codes(tenant_id, code);",
           // Per-(code,client) redemption claim — the UNIQUE PK is what atomically
           // dedupes a client's second redemption (see /redeem), replacing the
           // lost-update-prone used_by_json array check.
           "CREATE TABLE IF NOT EXISTS redemption_uses (code_id TEXT, client_id TEXT, at TEXT, PRIMARY KEY (code_id, client_id));",
           // Promo codes = Stripe checkout discounts (distinct from redemption day top-ups).
-          "CREATE TABLE IF NOT EXISTS promo_codes (id TEXT PRIMARY KEY, tenant_id TEXT, code TEXT, discount_type TEXT DEFAULT 'percent', percent_off INTEGER, amount_off_cents INTEGER, restricted_package_id TEXT, max_redemptions INTEGER, redemption_count INTEGER DEFAULT 0, expires_at TEXT, active INTEGER DEFAULT 1, stripe_coupon_id TEXT, stripe_promo_id TEXT, created_by TEXT, created_at TEXT);",
+          "CREATE TABLE IF NOT EXISTS promo_codes (id TEXT PRIMARY KEY, tenant_id TEXT, code TEXT, discount_type TEXT DEFAULT 'percent', percent_off INTEGER, amount_off_cents INTEGER, restricted_package_id TEXT, restricted_client_id TEXT, scope TEXT DEFAULT 'tenant', max_redemptions INTEGER, redemption_count INTEGER DEFAULT 0, expires_at TEXT, active INTEGER DEFAULT 1, stripe_coupon_id TEXT, stripe_promo_id TEXT, created_by TEXT, created_at TEXT);",
           "CREATE UNIQUE INDEX IF NOT EXISTS idx_promo_code ON promo_codes(tenant_id, code);",
           // Personal unit preferences, per user (cross-tenant).
           "CREATE TABLE IF NOT EXISTS user_prefs (user_id TEXT PRIMARY KEY, units_json TEXT, updated_at TEXT);",
@@ -239,6 +239,13 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "ALTER TABLE body_scans ADD COLUMN posture_tilt_deg REAL",
           "ALTER TABLE body_scans ADD COLUMN posture_severity TEXT",
           "ALTER TABLE body_scans ADD COLUMN somatotype TEXT",
+          // Promo codes (billing centralization): per-client exclusivity + a
+          // rail discriminator ('tenant' = tenant→client, 'platform' = Mossa→tenant).
+          "ALTER TABLE promo_codes ADD COLUMN restricted_client_id TEXT",
+          "ALTER TABLE promo_codes ADD COLUMN scope TEXT DEFAULT 'tenant'",
+          // Redemption codes: optional per-package + per-client scoping.
+          "ALTER TABLE redemption_codes ADD COLUMN restricted_package_id TEXT",
+          "ALTER TABLE redemption_codes ADD COLUMN restricted_client_id TEXT",
         ];
         for (const sql of alters) await db.exec(sql).catch(() => undefined);
         // Backfill: older body scans mirrored only weight + body-fat into

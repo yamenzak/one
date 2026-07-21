@@ -24,6 +24,7 @@ import {
 } from "./stripe.js";
 import { newId, nowIso, nowMs, periodKey } from "./ids.js";
 import { parseJson, j } from "./db.js";
+import { resolveAndApplyPromo, bumpPromoRedemption } from "./promo-apply.js";
 
 export const stripeRoutes = new Hono<AppEnv>()
   // ── Platform rail ──────────────────────────────────────────────────────────
@@ -82,24 +83,43 @@ export const stripeRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const cfg = await stripeConfig(c.env.DB);
     if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
-    const body = z.object({ packId: z.string() }).safeParse(await c.req.json().catch(() => null));
+    const body = z.object({ packId: z.string(), promoCode: z.string().optional() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
     const pack = (await listPacks(c.env.DB)).find((p) => p.id === body.data.packId);
     if (!pack) return c.json({ error: "unknown pack" }, 404);
+    let amount = Math.round(pack.price_usd * 100);
+    let promoId: string | null = null;
+    let discountCents = 0;
+    if (body.data.promoCode) {
+      const p = await resolveAndApplyPromo(c.env.DB, { scope: "platform", tenantId: who.tenantId, code: body.data.promoCode, amountCents: amount, nowIso: nowIso(), targetId: pack.id });
+      if (!p.ok) return c.json({ error: `promo_${p.reason}` }, 400);
+      amount = p.finalCents;
+      promoId = p.id;
+      discountCents = p.discountCents;
+    }
+    // A fully-discounted pack grants immediately — no Stripe charge to run.
+    if (amount <= 0) {
+      const dobj = c.env.BILLING.get(c.env.BILLING.idFromName(who.tenantId));
+      await dobj.bind(who.tenantId);
+      await dobj.topUp(pack.credits, "pack.promo", pack.id);
+      if (promoId) await bumpPromoRedemption(c.env.DB, promoId);
+      return c.json({ granted: true, credits: pack.credits, discountCents });
+    }
     const customer = await ensureCustomer(c.env.DB, cfg.secretKey, who.tenantId, c.get("user")?.email);
     // A PaymentIntent whose success webhook tops up the durable `purchased`
     // bucket. Credits ride on the PI metadata; the hosted-checkout path keeps
     // them on the session, so payment_intent.succeeded can't double-grant.
     const pi = await stripeCall<{ client_secret: string; id: string }>(cfg.secretKey, "payment_intents", {
-      amount: Math.round(pack.price_usd * 100),
+      amount,
       currency: "usd",
       customer,
       "automatic_payment_methods[enabled]": "true",
       "metadata[mossa_tenant]": who.tenantId,
       "metadata[mossa_pack]": pack.id,
       "metadata[mossa_credits]": pack.credits,
+      ...(promoId ? { "metadata[mossa_promo]": promoId } : {}),
     });
-    return c.json({ clientSecret: pi.client_secret, publishableKey: cfg.publishableKey, amountCents: Math.round(pack.price_usd * 100), credits: pack.credits });
+    return c.json({ clientSecret: pi.client_secret, publishableKey: cfg.publishableKey, amountCents: amount, discountCents, credits: pack.credits });
   })
 
   .post("/billing/plan-intent", async (c) => {
@@ -257,7 +277,7 @@ export const stripeRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const cfg = await stripeConfig(c.env.DB);
     if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
-    const body = z.object({ clientId: z.string(), packageId: z.string() }).safeParse(await c.req.json().catch(() => null));
+    const body = z.object({ clientId: z.string(), packageId: z.string(), promoCode: z.string().optional() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, body.data.clientId);
     if ("response" in access) return access.response;
@@ -267,8 +287,23 @@ export const stripeRoutes = new Hono<AppEnv>()
     const pkg = await c.env.DB.prepare("SELECT id, name, one_time_price_cents, monthly_price_cents, currency FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; currency: string }>();
     if (!pkg) return c.json({ error: "package not found" }, 404);
     if ((pkg.monthly_price_cents ?? 0) > 0) return c.json({ error: "use /connect/checkout for subscriptions" }, 400);
-    const amount = pkg.one_time_price_cents ?? 0;
+    let amount = pkg.one_time_price_cents ?? 0;
     if (amount <= 0) return c.json({ error: "use /subscriptions/grant for $0 packages" }, 400);
+    let promoId: string | null = null;
+    let discountCents = 0;
+    if (body.data.promoCode) {
+      const p = await resolveAndApplyPromo(c.env.DB, { scope: "tenant", tenantId: who.tenantId, code: body.data.promoCode, amountCents: amount, nowIso: nowIso(), targetId: pkg.id, clientId: access.client.id });
+      if (!p.ok) return c.json({ error: `promo_${p.reason}` }, 400);
+      amount = p.finalCents;
+      promoId = p.id;
+      discountCents = p.discountCents;
+    }
+    // Fully discounted → grant the package directly (no charge on the connected account).
+    if (amount <= 0) {
+      await grantClientPackage(c.env.DB, who.tenantId, access.client.id, pkg.id, null, null);
+      if (promoId) await bumpPromoRedemption(c.env.DB, promoId);
+      return c.json({ granted: true, discountCents });
+    }
     const feeBps = Number((await getConfig(c.env.DB))["stripe.platform_fee_bps"] ?? "0");
     const pi = await stripeCall<{ client_secret: string; id: string }>(
       cfg.secretKey,
@@ -281,10 +316,11 @@ export const stripeRoutes = new Hono<AppEnv>()
         "metadata[mossa_tenant]": who.tenantId,
         "metadata[mossa_client]": access.client.id,
         "metadata[mossa_package]": pkg.id,
+        ...(promoId ? { "metadata[mossa_promo]": promoId } : {}),
       },
       { connectedAccount: settings.stripe_account_id },
     );
-    return c.json({ clientSecret: pi.client_secret, publishableKey: cfg.publishableKey, stripeAccount: settings.stripe_account_id });
+    return c.json({ clientSecret: pi.client_secret, publishableKey: cfg.publishableKey, stripeAccount: settings.stripe_account_id, discountCents });
   })
 
   // Cancel a client's auto-renewing package (stops future billing; the current
@@ -351,6 +387,7 @@ export const stripeRoutes = new Hono<AppEnv>()
       const m = pi.metadata ?? {};
       if (m.mossa_client && m.mossa_package && m.mossa_tenant) {
         await grantClientPackage(c.env.DB, m.mossa_tenant, m.mossa_client, m.mossa_package, pi.id ?? null, null);
+        if (m.mossa_promo) await bumpPromoRedemption(c.env.DB, m.mossa_promo);
       }
     } else if (event.type === "invoice.paid") {
       // Renewal cycles top up the budget; the first invoice (subscription_create)
@@ -504,6 +541,7 @@ async function handlePlatformEvent(
         const dobj = billing.get(billing.idFromName(meta.mossa_tenant));
         await dobj.bind(meta.mossa_tenant);
         await dobj.topUp(Number(meta.mossa_credits), "pack.purchase", meta.mossa_pack);
+        if (meta.mossa_promo) await bumpPromoRedemption(db, meta.mossa_promo);
       }
       break;
     }
