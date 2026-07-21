@@ -15,7 +15,7 @@ import { withinQuota } from "./billing-store.js";
 import { notify } from "./notify.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
-import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps, auditLabel } from "@mossa/domain";
+import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps, auditLabel, canAccessClient, seesWholeRoster } from "@mossa/domain";
 
 export interface ClientRow {
   id: string;
@@ -84,18 +84,16 @@ export async function requireClientAccess(
   const client = await getClient(c.env.DB, who.tenantId, clientId);
   if (!client) return { response: c.json({ error: "not found" }, 404) };
 
-  const role = c.get("role");
-  if (role === "owner" || role === "assistant") return { client };
-  if (role === "trainer") {
-    if (await isAssignedTrainer(c.env.DB, who.tenantId, clientId, who.userId)) return { client };
-    // A trainer may also BE this client (their own linked record).
-    if (client.user_id === who.userId) return { client };
-    return { response: c.json({ error: "forbidden" }, 403) };
-  }
-  if (role === "client") {
-    if (client.user_id === who.userId) return { client };
-    return { response: c.json({ error: "forbidden" }, 403) };
-  }
+  const role = c.get("role") ?? "";
+  // Resolve the two facts the multi-coach rule needs, then let the domain decide.
+  // Only a coach needs the (targeted) assignment lookup; everyone else's decision
+  // is settled by role + own-record.
+  const isOwnRecord = client.user_id === who.userId;
+  const isAssignedCoach =
+    role === "trainer" && !isOwnRecord
+      ? await isAssignedTrainer(c.env.DB, who.tenantId, clientId, who.userId)
+      : false;
+  if (canAccessClient(role, { isAssignedCoach, isOwnRecord })) return { client };
   return { response: c.json({ error: "forbidden" }, 403) };
 }
 
@@ -104,7 +102,7 @@ export async function visibleClientIds(c: AppContext): Promise<string[] | "all">
   const who = requireTenant(c);
   if (!who) return [];
   const role = c.get("role");
-  if (role === "owner" || role === "assistant") return "all";
+  if (seesWholeRoster(role ?? "")) return "all";
   if (role === "trainer") {
     const rows = await c.env.DB.prepare(
       "SELECT client_id FROM client_trainers WHERE tenant_id = ? AND trainer_user_id = ?",

@@ -15,3 +15,4 @@ export * from "./wellness.js";
 export * from "./notifications.js";
 export * from "./features.js";
 export * from "./audit.js";
+export * from "./coaching.js";
