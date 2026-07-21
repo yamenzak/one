@@ -11,7 +11,10 @@
 import { Hono } from "hono";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
+import { putMedia, StorageQuotaError, storageUsage } from "./storage.js";
 import { newId } from "./ids.js";
+
+const mb = (bytes: number): number => Math.round((bytes / (1024 * 1024)) * 10) / 10;
 
 const MAX_BYTES = 15 * 1024 * 1024; // 15 MB
 // No image/svg+xml: an SVG served same-origin can carry <script> and run in the
@@ -45,11 +48,26 @@ export const mediaRoutes = new Hono<AppEnv>()
       prefix = `t/${who.tenantId}/c/${access.client.id}/${purpose}`;
     }
     const key = `${prefix}/${newId("m")}.${ext}`;
-    await c.env.MEDIA.put(key, await file.arrayBuffer(), {
-      httpMetadata: { contentType: file.type ?? "application/octet-stream" },
-      customMetadata: { tenant: who.tenantId, uploadedBy: who.userId, purpose, ...(clientId ? { client: clientId } : {}) },
-    });
+    // Measure the REAL bytes (client-supplied file.size is only a pre-check) and
+    // gate on the tenant's storage quota before writing.
+    const bytes = await file.arrayBuffer();
+    try {
+      await putMedia(c.env, { tenantId: who.tenantId, key, bytes, contentType: file.type ?? "application/octet-stream", purpose, clientId, ownerUserId: who.userId });
+    } catch (e) {
+      if (e instanceof StorageQuotaError) {
+        return c.json({ error: "storage_full", message: `Your studio's ${mb(e.limitBytes)} MB storage is full (${mb(e.usedBytes)} MB used). Delete some media or upgrade your plan.`, usedMb: mb(e.usedBytes), limitMb: mb(e.limitBytes) }, 413);
+      }
+      throw e;
+    }
     return c.json({ key }, 201);
+  })
+
+  // The tenant's storage meter — used bytes vs the plan's storageMb ceiling.
+  // Drives the media-library header + the storage-full nudges.
+  .get("/storage-usage", async (c) => {
+    const who = requireTenant(c)!;
+    const { usedBytes, limitBytes } = await storageUsage(c.env, who.tenantId);
+    return c.json({ usedBytes, limitBytes, usedMb: mb(usedBytes), limitMb: limitBytes < 0 ? -1 : mb(limitBytes), unlimited: limitBytes < 0, pct: limitBytes > 0 ? Math.min(100, Math.round((usedBytes / limitBytes) * 100)) : 0 });
   })
 
   // Authed proxy read. Same-tenant callers only; client-scoped keys are

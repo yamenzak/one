@@ -2772,3 +2772,41 @@ describe("email digest — data-viz primitives + rich builders (pure render)", (
     expect(html).toContain("Open the attention queue");
   });
 });
+
+describe("storage accounting + quota gate", () => {
+  const B = "http://localhost:8787";
+  it("records uploads in the ledger, meters usage, and blocks over quota", async () => {
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tenantId = ctx.active.tenantId;
+
+    const usage0 = (await (await SELF.fetch(`${B}/api/storage-usage`, { headers: auth(ownerCookie) })).json()) as { usedBytes: number; limitBytes: number };
+    expect(usage0.limitBytes).toBeGreaterThan(0);
+
+    // Upload a 2 KB PNG → 201 + a ledger row with the REAL byte size.
+    const mkForm = () => { const f = new FormData(); f.set("file", new Blob([new Uint8Array(2048)], { type: "image/png" }), "x.png"); f.set("purpose", "avatar"); return f; };
+    const up = await SELF.fetch(`${B}/api/media/upload`, { method: "POST", headers: auth(ownerCookie), body: mkForm() });
+    expect(up.status).toBe(201);
+    const { key } = (await up.json()) as { key: string };
+    const row = (await db.prepare("SELECT size_bytes, purpose, tenant_id, deleted_at FROM media_assets WHERE r2_key = ?").bind(key).first<{ size_bytes: number; purpose: string; tenant_id: string; deleted_at: string | null }>())!;
+    expect(row.size_bytes).toBe(2048);
+    expect(row.purpose).toBe("avatar");
+    expect(row.tenant_id).toBe(tenantId);
+    expect(row.deleted_at).toBeNull();
+
+    const usage1 = (await (await SELF.fetch(`${B}/api/storage-usage`, { headers: auth(ownerCookie) })).json()) as { usedBytes: number };
+    expect(usage1.usedBytes).toBeGreaterThanOrEqual(usage0.usedBytes + 2048);
+
+    // Fill the ledger to the plan ceiling with a synthetic row → next upload 413s.
+    await db.prepare("INSERT INTO media_assets (id, tenant_id, r2_key, purpose, content_type, size_bytes, created_at) VALUES ('mda_test_fill', ?, 't/fill/big.bin', 'misc', 'application/octet-stream', ?, ?)")
+      .bind(tenantId, usage0.limitBytes, new Date().toISOString()).run();
+    const over = await SELF.fetch(`${B}/api/media/upload`, { method: "POST", headers: auth(ownerCookie), body: mkForm() });
+    expect(over.status).toBe(413);
+    expect(((await over.json()) as { error: string }).error).toBe("storage_full");
+
+    // Deleting the fill row (tombstone) frees room again — usage drops, upload works.
+    await db.prepare("UPDATE media_assets SET deleted_at = ? WHERE id = 'mda_test_fill'").bind(new Date().toISOString()).run();
+    const ok = await SELF.fetch(`${B}/api/media/upload`, { method: "POST", headers: auth(ownerCookie), body: mkForm() });
+    expect(ok.status).toBe(201);
+  });
+});

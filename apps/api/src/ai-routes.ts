@@ -57,6 +57,7 @@ const sys = (key: string): string => featureDef(key)!.defaultSystem;
  *  the underlying provider/parse detail. */
 function aiFail(c: Context<AppEnv>, r: { error: string; detail?: string; available?: number; needed?: number }) {
   if (r.error === "insufficient_credits") return c.json({ error: "Not enough AI credits to run this.", available: r.available, needed: r.needed }, 402);
+  if (r.error === "storage_full") return c.json({ error: "Your studio's media storage is full — delete some media or upgrade to generate images." }, 413);
   return c.json({ error: r.detail ? `AI failed — ${r.detail}` : "AI unavailable.", detail: r.detail }, 503);
 }
 

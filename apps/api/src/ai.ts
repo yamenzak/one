@@ -16,6 +16,7 @@ import type { TenantAiConfig, AiTone } from "@mossa/protocol";
 import type { Env } from "./env.js";
 import { newId, nowMs } from "./ids.js";
 import { getConfig } from "./billing-store.js";
+import { putMedia, storageUsage } from "./storage.js";
 import { featureDef, TONE_GUIDE } from "./ai-features.js";
 
 export interface AiModelRow {
@@ -506,6 +507,7 @@ export interface GenerateImageInput {
 export type GenerateImageResult =
   | { ok: true; key: string; credits: number; mocked: boolean }
   | { ok: false; error: "insufficient_credits"; available: number; needed: number }
+  | { ok: false; error: "storage_full"; usedBytes: number; limitBytes: number }
   | { ok: false; error: "unavailable"; detail?: string };
 
 /** A 1×1 transparent PNG — the deterministic dev/mock image. */
@@ -559,6 +561,14 @@ export async function generateImage(env: Env, input: GenerateImageInput): Promis
   const mockMode = cfg["ai.mock"] ?? "auto";
   const useMock = mockMode === "on" || (mockMode !== "off" && !geminiKey);
 
+  // Storage gate up front — refuse to spend credits generating an image the
+  // studio has no room to keep. (The per-image size isn't known yet, so this
+  // blocks only when already at/over quota; putMedia records the exact bytes.)
+  {
+    const { usedBytes, limitBytes } = await storageUsage(env, input.tenantId);
+    if (limitBytes >= 0 && usedBytes >= limitBytes) return { ok: false, error: "storage_full", usedBytes, limitBytes };
+  }
+
   const estUsage: Usage = { inputTokens: Math.ceil(prompt.length / 4), images: 1 };
   const estimate = creditsForUsage(estUsage, rate);
   const dobj = env.BILLING.get(env.BILLING.idFromName(input.tenantId));
@@ -579,7 +589,10 @@ export async function generateImage(env: Env, input: GenerateImageInput): Promis
 
   const ext = mimeType.includes("jpeg") ? "jpg" : mimeType.includes("webp") ? "webp" : "png";
   const mediaKey = `t/${input.tenantId}/ai/${newId("img")}.${ext}`;
-  await env.MEDIA.put(mediaKey, bytes, { httpMetadata: { contentType: mimeType } });
+  // enforce:false — we pre-gated above and the credits are already committed, so
+  // this records the ledger row + stores without failing (a single image can't
+  // meaningfully overshoot; the pre-check kept us under budget).
+  await putMedia(env, { tenantId: input.tenantId, key: mediaKey, bytes, contentType: mimeType, purpose: "ai", clientId: input.clientId ?? null, ownerUserId: input.actorUserId ?? null, enforce: false });
   const credits = creditsForUsage(usage, rate);
   // Image is stored and returned regardless — a settle failure must not orphan
   // the R2 object or lose the result; the hold self-reaps via HOLD_TTL_MS.
