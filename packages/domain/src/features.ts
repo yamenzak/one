@@ -153,3 +153,21 @@ export function gateSpecOf(key: FeatureKey): FeatureGate {
   const f: FeatureSpec = FEATURES[key];
   return { entitlement: f.entitlement, clientFlag: f.clientFlag };
 }
+
+/**
+ * Client-side capability check — the read-model mirror of the API's gateFeature.
+ * A feature is enabled when the tenant holds its entitlement AND (for a client
+ * context, where clientFlags is provided) the client holds its flag. Staff pass
+ * `clientFlags: null/undefined` and so are never limited by a client's package —
+ * exactly as `requireClientFlag` behaves server-side. Used by the UI to decide
+ * what to OFFER (widgets, nav, pickers), the same records the routes enforce.
+ */
+export function featureEnabled(
+  key: FeatureKey,
+  ctx: { features: Entitlements["features"]; clientFlags?: ClientFlags | null },
+): boolean {
+  const g = gateSpecOf(key);
+  if (g.entitlement && !ctx.features[g.entitlement]) return false;
+  if (g.clientFlag && ctx.clientFlags && !ctx.clientFlags[g.clientFlag]) return false;
+  return true;
+}

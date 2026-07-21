@@ -7,6 +7,7 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { Sheet, Button, IconBadge, MetricPill, ProgressRing, cn, ChevronDown, X, LayoutGrid, type Tone, type LucideIcon } from "@mossa/ui";
+import type { FeatureKey } from "@mossa/domain";
 import type { WidgetItem } from "@mossa/protocol";
 
 export type { WidgetItem };
@@ -18,7 +19,12 @@ export interface WidgetDef<D> {
   icon: LucideIcon;
   renderBig: (data: D) => ReactNode;
   renderSmall: (data: D) => ReactNode;
+  /** Data-driven visibility (hide when there's nothing to show). */
   available?: (data: D) => boolean;
+  /** Capability gate (FEATURES key) — the widget is only OFFERED when the
+   *  tenant/client actually holds the feature. Filtered by the caller via
+   *  featureEnabled(), so a locked capability never appears in the picker. */
+  feature?: FeatureKey;
 }
 
 /** Big widget: a bare, prominent metric ring filling its 1×3 cell (airy, like
