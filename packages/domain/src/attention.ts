@@ -20,10 +20,14 @@ export type AttentionType =
   | "client_quiet"
   | "checkin_unanswered"
   | "lab_review"
+  | "lab_flagged"
   | "swap_pending"
   | "access_expiring"
   | "access_expired"
-  | "profile_incomplete";
+  | "profile_incomplete"
+  | "weight_off_range"
+  | "adherence_low"
+  | "no_active_plan";
 
 export interface AttentionMeta {
   /** Short human label for the chip / list. */
@@ -45,10 +49,14 @@ export const ATTENTION_TYPES: Record<AttentionType, AttentionMeta> = {
   client_quiet: { label: "Gone quiet", severity: "urgent", permission: "tracking", actionLabel: "Reach out", clientTab: "today" },
   checkin_unanswered: { label: "Check-in to answer", severity: "warn", permission: "tracking", feature: "checkIns", actionLabel: "Reply", clientTab: "manage" },
   lab_review: { label: "Lab to review", severity: "warn", permission: "lab", feature: "supplementsLabs", actionLabel: "Review", clientTab: "manage" },
+  lab_flagged: { label: "Lab flagged", severity: "urgent", permission: "lab", feature: "supplementsLabs", actionLabel: "Review", clientTab: "manage" },
   swap_pending: { label: "Swap request", severity: "warn", permission: "tracking", feature: "exerciseSwap", actionLabel: "Decide", clientTab: "manage" },
   access_expiring: { label: "Access expiring", severity: "warn", permission: "package", feature: "commerce", actionLabel: "Renew", clientTab: "manage" },
   access_expired: { label: "Access expired", severity: "urgent", permission: "package", feature: "commerce", actionLabel: "Renew", clientTab: "manage" },
   profile_incomplete: { label: "Profile incomplete", severity: "info", permission: "client", actionLabel: "Complete", clientTab: "manage" },
+  weight_off_range: { label: "Off target weight", severity: "warn", permission: "tracking", feature: "goals", actionLabel: "Review", clientTab: "progress" },
+  adherence_low: { label: "Low adherence", severity: "info", permission: "tracking", feature: "foodLogging", actionLabel: "Review", clientTab: "progress" },
+  no_active_plan: { label: "No active plan", severity: "warn", permission: "plan", feature: "workoutPlan", actionLabel: "Build plan", clientTab: "plans" },
 };
 
 export const SEVERITY_RANK: Record<AttentionSeverity, number> = { urgent: 3, warn: 2, info: 1 };
