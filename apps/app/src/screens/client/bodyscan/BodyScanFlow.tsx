@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   estimateBodyFat, classifyBodyFat, bodyComposition, posturalMetrics, classifySomatotype, POSTURE_GUIDANCE, type BodyFatEstimate, type BodyFatCategory, type PostureResult,
-  displayToKg, kgToDisplay, lengthDisplayToCm, weightLabel, lengthLabel, type UnitPrefs,
+  displayToKg, kgToDisplay, lengthDisplayToCm, cmToLengthDisplay, weightLabel, lengthLabel, type UnitPrefs,
 } from "@mossa/domain";
 import {
   Button, Field, Switch, Badge, IconBadge, Spinner, cn, toneVar, useModalOverlay,
@@ -732,7 +732,7 @@ function MeasBox({ label, cm, units }: { label: string; cm: number | null | unde
   return (
     <div className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
       <div className="text-[0.65rem] font-medium text-muted-foreground">{label}</div>
-      <div className="numeral mt-0.5 text-sm font-bold">{cm != null ? Math.round(cmToLengthDisplayLocal(cm, units)) : "—"}<span className="ml-0.5 text-[0.55rem] text-muted-foreground">{cm != null ? lengthLabel(units) : ""}</span></div>
+      <div className="numeral mt-0.5 text-sm font-bold">{cm != null ? Math.round(cmToLengthDisplay(cm, units)) : "—"}<span className="ml-0.5 text-[0.55rem] text-muted-foreground">{cm != null ? lengthLabel(units) : ""}</span></div>
     </div>
   );
 }
@@ -744,10 +744,6 @@ function CompBox({ label, value, unit }: { label: string; value: number; unit: s
       <div className="numeral mt-0.5 text-sm font-bold"><CountUp value={value} decimals={1} /><span className="ml-0.5 text-[0.55rem] text-muted-foreground">{unit}</span></div>
     </motion.div>
   );
-}
-// Local re-export to avoid another import line churn.
-function cmToLengthDisplayLocal(cm: number, units: UnitPrefs): number {
-  return units.length === "in" ? cm / 2.54 : cm;
 }
 
 /** Animate 0 → target once on mount (respects reduced-motion). */

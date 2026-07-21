@@ -8,7 +8,7 @@ import { useState } from "react";
 import { ACTIVITIES, weightLabel, lengthLabel, volumeLabel, energyLabel, displayToKg, lengthDisplayToCm, volumeDisplayToMl, displayToKcal } from "@mossa/domain";
 import {
   Button, Field, Textarea, Sheet, Chip, IconBadge, Switch,
-  Utensils, Footprints, Droplet, Weight, Ruler, Bed, Smile, ClipboardList, Camera, Angry, Frown, Meh, Laugh,
+  Utensils, Footprints, Droplet, Weight, Ruler, Moon, Smile, ClipboardList, Camera, Angry, Frown, Meh, Laugh,
   type LucideIcon, type Tone,
 } from "@mossa/ui";
 import { api, todayLocal, uploadMedia } from "../../api.js";
@@ -23,7 +23,7 @@ const CHIPS: { kind: LogKind; label: string; icon: LucideIcon; tone: Tone }[] = 
   { kind: "water", label: "Water", icon: Droplet, tone: "hydration" },
   { kind: "weight", label: "Weight", icon: Weight, tone: "cardio" },
   { kind: "body", label: "Body", icon: Ruler, tone: "cardio" },
-  { kind: "sleep", label: "Sleep", icon: Bed, tone: "sleep" },
+  { kind: "sleep", label: "Sleep", icon: Moon, tone: "sleep" },
   { kind: "mood", label: "Mood", icon: Smile, tone: "nutrition" },
   { kind: "checkin", label: "Check-in", icon: ClipboardList, tone: "primary" },
 ];
@@ -172,7 +172,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
           </>)}
           {kind === "sleep" && (<>
             <h2 className="text-lg font-semibold">Log sleep</h2>
-            <Field label="Hours slept" icon={Bed} inputMode="decimal" value={f.hours ?? ""} onChange={(e) => setDec("hours", e.target.value)} />
+            <Field label="Hours slept" icon={Moon} inputMode="decimal" value={f.hours ?? ""} onChange={(e) => setDec("hours", e.target.value)} />
             <Rating label="Quality" value={ratings.sleepQ} onChange={(n) => setRatings((r) => ({ ...r, sleepQ: n }))} />
           </>)}
           {kind === "mood" && (<>

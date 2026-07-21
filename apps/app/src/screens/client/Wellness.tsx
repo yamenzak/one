@@ -12,7 +12,7 @@ import { fmtVolume, volumeLabel, volumeDisplayToMl, POSTURE_GUIDANCE } from "@mo
 import {
   Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, StatCard, WeekDots, Sparkline, MiniBars, EmptyState, cn, toneVar,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList,
-  ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Bed, Flame, Plus, ChevronRight, Smile, Upload, HeartPulse, AlertTriangle, POSTURE_SEVERITY_TONE, FASTING_ZONES, type FastingZone, type Tone,
+  ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Flame, Plus, ChevronRight, Upload, HeartPulse, AlertTriangle, METRICS, POSTURE_SEVERITY_TONE, FASTING_ZONES, type FastingZone, type Tone,
 } from "@mossa/ui";
 
 interface PostureScan {
@@ -197,8 +197,8 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
       {/* Quick-log chips */}
       <Stagger className="flex flex-wrap gap-2">
         <Chip icon={ClipboardList} selected onClick={() => setLogKind("checkin")}>Check in</Chip>
-        <Chip icon={Bed} onClick={() => setLogKind("sleep")}>Log sleep</Chip>
-        <Chip icon={Smile} onClick={() => setLogKind("mood")}>Log mood</Chip>
+        <Chip icon={METRICS.sleep.icon} onClick={() => setLogKind("sleep")}>Log sleep</Chip>
+        <Chip icon={METRICS.mood.icon} onClick={() => setLogKind("mood")}>Log mood</Chip>
         <Chip icon={Timer} onClick={() => void toggleFast()}>{fast?.activeFast ? "End fast" : "Start fast"}</Chip>
       </Stagger>
 
@@ -295,10 +295,10 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         <Stagger className="grid grid-cols-2 gap-3">
           <StatCard stack label="Check-in streak" value={week.streak} unit={week.streak === 1 ? "day" : "days"} icon={ClipboardList} tone="nutrition"
             chart={<WeekDots days={week.present} todayIndex={6} tone="nutrition" fill />} />
-          <StatCard stack label="Avg sleep" value={week.avgSleep != null ? week.avgSleep.toFixed(1) : "—"} unit={week.avgSleep != null ? "h" : undefined} icon={Bed} tone="sleep"
-            chart={week.sleepSeries.length >= 2 ? <Sparkline values={week.sleepSeries} tone="sleep" width={132} /> : undefined} />
-          <StatCard stack label="Avg mood" value={week.avgMood != null ? week.avgMood.toFixed(1) : "—"} unit={week.avgMood != null ? "/ 5" : undefined} icon={Smile} tone="cardio"
-            chart={week.moodSeries.length >= 2 ? <Sparkline values={week.moodSeries} tone="cardio" width={132} /> : undefined} />
+          <StatCard stack label="Avg sleep" value={week.avgSleep != null ? week.avgSleep.toFixed(1) : "—"} unit={week.avgSleep != null ? "h" : undefined} icon={METRICS.sleep.icon} tone={METRICS.sleep.tone}
+            chart={week.sleepSeries.length >= 2 ? <Sparkline values={week.sleepSeries} tone={METRICS.sleep.tone} width={132} /> : undefined} />
+          <StatCard stack label="Avg mood" value={week.avgMood != null ? week.avgMood.toFixed(1) : "—"} unit={week.avgMood != null ? "/ 5" : undefined} icon={METRICS.mood.icon} tone={METRICS.mood.tone}
+            chart={week.moodSeries.length >= 2 ? <Sparkline values={week.moodSeries} tone={METRICS.mood.tone} width={132} /> : undefined} />
           <StatCard stack label="Fasts done" value={week.fastsDone} icon={Timer} tone="activity"
             chart={week.fastHoursSeries.length >= 2 ? <MiniBars values={week.fastHoursSeries} tone="activity" width={132} target={16} /> : undefined} />
           <StatCard stack label="Supplements" value={week.suppSlots ? `${week.suppTaken}/${week.suppSlots}` : "—"} unit={week.suppSlots ? "today" : undefined} icon={Pill} tone="supplement" />
