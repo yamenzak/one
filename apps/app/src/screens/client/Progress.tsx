@@ -14,7 +14,7 @@ import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, fmtEnergy, kc
 
 const capp = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 import {
-  Card, Badge, Button, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger, EmptyState,
+  Card, Badge, Button, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger, EmptyState, SectionHeader, Sparkline,
   Reveal, SkeletonHero, SkeletonChart,
   AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, METRICS, POSTURE_SEVERITY_TONE, cn, toneVar,
   Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, Calendar, Scale, type Tone, type LucideIcon,
@@ -187,61 +187,80 @@ function Body({ data, units, dateLabel, clientId }: { data: ProgressData; units:
   const { body } = data;
   const wl = weightLabel(units), ll = lengthLabel(units);
   const weightVals = dense(body.weight, days).map((v) => (v == null ? null : kgToDisplay(v, units)));
-  const waistVals = dense(body.waist, days).map((v) => (v == null ? null : cmToLengthDisplay(v, units)));
-  const bfVals = dense(body.bodyFat, days);
+  const bfSpark = body.bodyFat.map((p) => p.v);
+  // Lean/fat split (derived when the client has a logged height) drives the
+  // composition ring + bar, folding four metrics into one richer card.
+  const lean = body.latest.leanMassKg, fat = body.latest.fatMassKg;
+  const comp = lean != null && fat != null && lean + fat > 0 ? lean + fat : null;
+  // Girth measurements with a trend become a compact sparkline stat-grid instead
+  // of three more full-width area charts.
+  const girth = ([
+    { key: "waist", label: METRICS.waist.label, icon: METRICS.waist.icon, tone: METRICS.waist.tone, series: body.waist, latest: body.latest.waistCm, delta: body.deltas.waist },
+    { key: "chest", label: METRICS.chest.label, icon: METRICS.chest.icon, tone: METRICS.chest.tone, series: body.chest, latest: body.latest.chestCm, delta: body.deltas.chest },
+    { key: "hips", label: METRICS.hips.label, icon: METRICS.hips.icon, tone: METRICS.hips.tone, series: body.hips, latest: body.latest.hipsCm, delta: body.deltas.hips },
+  ] as const)
+    .filter((m) => m.series.length >= 2 && m.latest != null)
+    .map((m) => ({ ...m, conv: (v: number) => cmToLengthDisplay(v, units) }));
   return (
     <>
       <Stagger><BodyScanCard clientId={clientId} /></Stagger>
+
+      {/* Hero — weight is the anchor metric, kept full-width. */}
       <Stagger>
         <ChartCard title="Weight" icon={METRICS.weight.icon} tone="cardio" value={body.latest.weightKg != null ? kgToDisplay(body.latest.weightKg, units).toFixed(1) : "—"} unit={wl} delta={<span className="flex flex-wrap items-center gap-1.5"><DeltaBadge d={body.deltas.weight} convert={(v) => kgToDisplay(v, units)} unit={wl} /><RangeChip status={body.latest.weightStatus} range={body.ranges?.weightKg} convert={(v) => kgToDisplay(v, units)} unit={wl} /></span>}>
           <AreaChart values={weightVals} tone="cardio" trend label={dateLabel} format={(v) => v.toFixed(1)} />
         </ChartCard>
       </Stagger>
-      <Stagger>
-        <ChartCard title="Body fat" icon={METRICS.bodyFat.icon} tone="sleep" value={body.latest.bodyFatPct != null ? body.latest.bodyFatPct.toFixed(1) : "—"} unit="%" delta={<DeltaBadge d={body.deltas.bodyFat} convert={(v) => v} unit="%" />}>
-          <AreaChart values={bfVals} tone="sleep" trend label={dateLabel} format={(v) => `${v.toFixed(1)}%`} />
-        </ChartCard>
-      </Stagger>
-      <Stagger>
-        <ChartCard title="Waist" icon={METRICS.waist.icon} tone="nutrition" value={body.latest.waistCm != null ? cmToLengthDisplay(body.latest.waistCm, units).toFixed(1) : "—"} unit={ll} delta={<DeltaBadge d={body.deltas.waist} convert={(v) => cmToLengthDisplay(v, units)} unit={ll} />}>
-          <AreaChart values={waistVals} tone="nutrition" trend label={dateLabel} format={(v) => v.toFixed(1)} />
-        </ChartCard>
-      </Stagger>
-      {body.chest.length >= 2 && (
+
+      {/* Body composition — ring + lean/fat split, a deliberate break from the
+          area-chart rhythm. Consolidates body-fat, lean/fat mass and FFMI. */}
+      {body.latest.bodyFatPct != null && (
         <Stagger>
-          <ChartCard title="Chest" icon={METRICS.chest.icon} tone={METRICS.chest.tone} value={body.latest.chestCm != null ? cmToLengthDisplay(body.latest.chestCm, units).toFixed(1) : "—"} unit={ll} delta={<DeltaBadge d={body.deltas.chest} convert={(v) => cmToLengthDisplay(v, units)} unit={ll} />}>
-            <AreaChart values={dense(body.chest, days).map((v) => (v == null ? null : cmToLengthDisplay(v, units)))} tone={METRICS.chest.tone} trend label={dateLabel} format={(v) => v.toFixed(1)} />
-          </ChartCard>
+          <Card className="space-y-4">
+            <SectionHeader icon={METRICS.bodyFat.icon} tone="sleep" title="Body composition"
+              action={<span className="flex items-center gap-1.5"><DeltaBadge d={body.deltas.bodyFat} convert={(v) => v} unit="%" />{body.latest.ffmi != null && <Badge tone="neutral">FFMI {body.latest.ffmi.toFixed(1)}</Badge>}</span>} />
+            <div className="flex items-center gap-4">
+              <ProgressRing size={116} strokeWidth={11} tone="sleep" progress={Math.min(1, (body.latest.bodyFatPct ?? 0) / 40)} value={body.latest.bodyFatPct.toFixed(1)} label="Body fat" sublabel="%" softTrack tintValue />
+              <div className="min-w-0 flex-1 space-y-3">
+                {comp != null ? (
+                  <>
+                    <MiniStat icon={METRICS.leanMass.icon} tone={METRICS.leanMass.tone} label="Lean mass" value={kgToDisplay(lean!, units).toFixed(1)} sub={wl} />
+                    <MiniStat icon={METRICS.fatMass.icon} tone={METRICS.fatMass.tone} label="Fat mass" value={kgToDisplay(fat!, units).toFixed(1)} sub={wl} />
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Add your height in profile to unlock lean &amp; fat mass.</p>
+                )}
+                {bfSpark.length >= 2 && <div className="overflow-hidden"><Sparkline values={bfSpark} tone="sleep" width={190} height={40} className="w-full" /></div>}
+              </div>
+            </div>
+            {comp != null && lean != null && fat != null && (
+              <div className="space-y-1.5">
+                <div className="flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-surface-2">
+                  <div style={{ width: `${(lean / comp) * 100}%`, backgroundColor: toneVar.cardio }} />
+                  <div style={{ width: `${(fat / comp) * 100}%`, backgroundColor: toneVar.sleep }} />
+                </div>
+                <div className="flex justify-between text-xs font-medium">
+                  <span style={{ color: toneVar.cardio }}>Lean {Math.round((lean / comp) * 100)}%</span>
+                  <span style={{ color: toneVar.sleep }}>Fat {Math.round((fat / comp) * 100)}%</span>
+                </div>
+              </div>
+            )}
+          </Card>
         </Stagger>
       )}
-      {body.hips.length >= 2 && (
-        <Stagger>
-          <ChartCard title="Hips" icon={METRICS.hips.icon} tone={METRICS.hips.tone} value={body.latest.hipsCm != null ? cmToLengthDisplay(body.latest.hipsCm, units).toFixed(1) : "—"} unit={ll} delta={<DeltaBadge d={body.deltas.hips} convert={(v) => cmToLengthDisplay(v, units)} unit={ll} />}>
-            <AreaChart values={dense(body.hips, days).map((v) => (v == null ? null : cmToLengthDisplay(v, units)))} tone={METRICS.hips.tone} trend label={dateLabel} format={(v) => v.toFixed(1)} />
-          </ChartCard>
+
+      {/* Girth measurements — compact sparkline stat grid. */}
+      {girth.length > 0 && (
+        <Stagger className="grid grid-cols-2 gap-3">
+          {girth.map((g) => (
+            <StatCard key={g.key} stack tone={g.tone} icon={g.icon} label={g.label}
+              value={g.conv(g.latest as number).toFixed(1)} unit={ll}
+              badge={<DeltaBadge d={g.delta} convert={g.conv} unit={ll} />}
+              chart={<Sparkline values={g.series.map((p) => g.conv(p.v))} tone={g.tone} width={150} height={44} className="w-full" />} />
+          ))}
         </Stagger>
       )}
-      {body.leanMass.length >= 2 && (
-        <Stagger>
-          <ChartCard title="Lean mass" icon={METRICS.leanMass.icon} tone={METRICS.leanMass.tone} value={body.latest.leanMassKg != null ? kgToDisplay(body.latest.leanMassKg, units).toFixed(1) : "—"} unit={wl}>
-            <AreaChart values={dense(body.leanMass, days).map((v) => (v == null ? null : kgToDisplay(v, units)))} tone={METRICS.leanMass.tone} trend label={dateLabel} format={(v) => v.toFixed(1)} />
-          </ChartCard>
-        </Stagger>
-      )}
-      {body.fatMass.length >= 2 && (
-        <Stagger>
-          <ChartCard title="Fat mass" icon={METRICS.fatMass.icon} tone={METRICS.fatMass.tone} value={body.latest.fatMassKg != null ? kgToDisplay(body.latest.fatMassKg, units).toFixed(1) : "—"} unit={wl}>
-            <AreaChart values={dense(body.fatMass, days).map((v) => (v == null ? null : kgToDisplay(v, units)))} tone={METRICS.fatMass.tone} trend label={dateLabel} format={(v) => v.toFixed(1)} />
-          </ChartCard>
-        </Stagger>
-      )}
-      {body.ffmi.length >= 2 && (
-        <Stagger>
-          <ChartCard title="FFMI" icon={METRICS.ffmi.icon} tone={METRICS.ffmi.tone} value={body.latest.ffmi != null ? body.latest.ffmi.toFixed(1) : "—"} unit={METRICS.ffmi.unit}>
-            <AreaChart values={dense(body.ffmi, days)} tone={METRICS.ffmi.tone} trend label={dateLabel} format={(v) => v.toFixed(1)} />
-          </ChartCard>
-        </Stagger>
-      )}
+
       {body.posture.length > 0 && (
         <Stagger>
           <ChartCard title="Posture" icon={METRICS.posture.icon} tone={METRICS.posture.tone}
