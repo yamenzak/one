@@ -3,20 +3,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fmtEnergy, fmtVolume, volumeDisplayToMl, kcalToDisplay } from "@mossa/domain";
 import {
-  Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MetricChip, ProgressRing, METRICS, toneSoft, Page, Stagger, EmptyState, motion, ConfirmDialog,
+  Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MetricChip, MetricPill, ProgressRing, METRICS, toneSoft, Eyebrow, Page, Stagger, EmptyState, motion, ConfirmDialog,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
-  Plus, Utensils, Croissant, Soup, Apple, Dumbbell, Droplet, Beef, Trash2, AlertTriangle, type LucideIcon,
+  Plus, Utensils, Croissant, Soup, Apple, Dumbbell, Trash2, AlertTriangle, type LucideIcon,
 } from "@mossa/ui";
 import type { UnitPrefs } from "@mossa/domain";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
-import { FoodRow, normFood } from "../food.js";
+import { FoodRow, FoodThumb, normFood } from "../food.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
 import { MealPlanDrawer } from "./MealPlanDrawer.js";
 import { CoachNote } from "./CoachNote.js";
 import { LaneSwitcher, type Lane } from "./LaneSwitcher.js";
 
 interface Entry { id: string; meal_type: string; label: string | null; calories: number; protein_g: number; carbs_g: number; fat_g: number; quantity: number | null; unit: string | null; image_url: string | null }
+/** A previously-logged food, ready to re-log at its last portion in one tap. */
+interface Recent { food_id: string | null; label: string; unit: string | null; quantity: number | null; calories: number; protein_g: number; carbs_g: number; fat_g: number; image_url: string | null }
 interface Targets { targetCalories?: number; targetProteinG?: number; targetCarbsG?: number; targetFatG?: number; targetWaterMl?: number }
 interface WeekDay { date: string; calories: number; proteinG: number; waterMl: number; logged: boolean }
 interface Week { days: WeekDay[]; targets: { calories: number | null; proteinG: number | null; waterMl: number | null } }
@@ -32,11 +34,15 @@ const MEAL_META: Record<string, { label: string; icon: LucideIcon }> = {
 };
 const MEAL_ORDER = ["breakfast", "lunch", "dinner", "snack", "pre_workout", "post_workout", "free"];
 const metaFor = (m: string) => MEAL_META[m] ?? { label: m.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase()), icon: Utensils };
+/** The sensible default meal for a one-tap quick-add, bucketed by time of day. */
+const mealBucket = (): string => { const h = new Date().getHours(); return h < 11 ? "breakfast" : h < 15 ? "lunch" : h < 17 ? "snack" : h < 22 ? "dinner" : "snack"; };
 
 export function Eat({ clientId }: { clientId: string }) {
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [targets, setTargets] = useState<Targets | null>(null);
   const [week, setWeek] = useState<Week | null>(null);
+  const [recents, setRecents] = useState<Recent[]>([]);
+  const [relogging, setRelogging] = useState<string | null>(null);
   const [waterMl, setWaterMl] = useState(0);
   const [logMeal, setLogMeal] = useState<string | undefined>(undefined);
   const [logOpen, setLogOpen] = useState(false);
@@ -57,14 +63,16 @@ export function Eat({ clientId }: { clientId: string }) {
     const rid = ++reqRef.current;
     setError(false);
     try {
-      const [e, today, wk, mp] = await Promise.all([
+      const [e, today, wk, mp, rc] = await Promise.all([
         api.get<{ entries: Entry[] }>(`/api/logs/food?clientId=${clientId}&date=${date}`),
         api.get<{ goal: { targets: Targets | null } | null }>(`/api/today?clientId=${clientId}&date=${date}`),
         api.get<Week>(`/api/logs/nutrition/week?clientId=${clientId}&date=${date}`),
         api.get<{ plans: { status: string; name: string; variantId: string | null; body?: { mealOptions?: { mealType: string }[] } }[]; variants: Lane[]; currentVariantId: string | null; defaultLabel?: string }>(`/api/meal-plans?clientId=${clientId}`).catch(() => ({ plans: [], variants: [], currentVariantId: null, defaultLabel: "Main" })),
+        api.get<{ recents: Recent[] }>(`/api/foods/recent?clientId=${clientId}&limit=8`).catch(() => ({ recents: [] as Recent[] })),
       ]);
       if (rid !== reqRef.current) return;
       setEntries(e.entries); setTargets(today.goal?.targets ?? null);
+      setRecents(rc.recents ?? []);
       setWeek(wk); setWaterMl(wk.days[wk.days.length - 1]?.waterMl ?? 0);
       setVariants(mp.variants ?? []); setCurrentVariantId(mp.currentVariantId ?? null); setDefaultLabel(mp.defaultLabel || "Main");
       const cur = mp.currentVariantId ?? null;
@@ -90,6 +98,18 @@ export function Eat({ clientId }: { clientId: string }) {
 
   const openLog = (meal?: string) => { setLogMeal(meal); setLogOpen(true); };
 
+  // One-tap re-log: write a recent food back at its last portion, bucketed to
+  // the current meal-time. A single busy flag guards double-taps from double-logging.
+  const relog = async (r: Recent) => {
+    if (relogging) return;
+    const key = r.food_id ?? r.label;
+    setRelogging(key);
+    try {
+      await api.post("/api/logs/food", { clientId, data: { date, mealType: mealBucket(), foodId: r.food_id ?? null, label: r.label, quantity: r.quantity, unit: r.unit, calories: r.calories, proteinG: r.protein_g, carbsG: r.carbs_g, fatG: r.fat_g } });
+      await load();
+    } finally { setRelogging(null); }
+  };
+
   const byMeal = new Map<string, Entry[]>();
   for (const e of entries ?? []) byMeal.set(e.meal_type, [...(byMeal.get(e.meal_type) ?? []), e]);
   const meals = [...MEAL_ORDER.filter((m) => byMeal.has(m)), ...[...byMeal.keys()].filter((m) => !MEAL_ORDER.includes(m))];
@@ -100,7 +120,6 @@ export function Eat({ clientId }: { clientId: string }) {
   const calTarget = targets?.targetCalories ?? 0;
   const pct = calTarget > 0 ? total / calTarget : 0;
   const remaining = calTarget - total;
-  const waterPct = Math.min(100, Math.max(3, (waterMl / waterTarget) * 100));
 
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
@@ -149,15 +168,15 @@ export function Eat({ clientId }: { clientId: string }) {
         </Stagger>
       )}
 
-      {/* Primary actions — directly available */}
-      <Stagger className="flex flex-wrap gap-2">
-        {mealPlan && <Chip icon={Utensils} selected onClick={() => setPlanOpen(true)}>View plan</Chip>}
-        <Chip icon={Plus} selected={!mealPlan} onClick={() => openLog()}>Log food</Chip>
+      {/* Primary actions — logging is always one prominent tap away */}
+      <Stagger className="flex gap-2">
+        <Button className="min-w-0 flex-1" onClick={() => openLog()}><Plus /> Log food</Button>
+        {mealPlan && <Button variant="secondary" onClick={() => setPlanOpen(true)}><Utensils /> View plan</Button>}
       </Stagger>
 
       {/* Today — intake, hydration + protein at a glance */}
       <section className="space-y-2">
-        <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today</h3>
+        <Eyebrow>Today</Eyebrow>
 
         {/* Hero — today's intake, the visual anchor */}
         <Stagger data-tour="eat-hero">
@@ -185,32 +204,71 @@ export function Eat({ clientId }: { clientId: string }) {
           </Card>
         </Stagger>
 
+        {/* Hydration + protein — same toneSoft-pill language as the MacroBar above */}
         <Stagger className="grid grid-cols-2 gap-3">
-          <div className="relative flex flex-col gap-2.5 overflow-hidden rounded-2xl bg-card p-4">
-            <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-hydration/10 blur-2xl" />
-            <div className="relative flex items-center gap-2 text-sm text-muted-foreground"><Droplet className="size-4 text-hydration" /><span>Water</span></div>
-            <div className="numeral relative text-[1.6rem] font-semibold leading-none">{fmtVolume(waterMl, units)}<span className="ml-1 text-sm font-medium text-muted-foreground">/ {fmtVolume(waterTarget, units)}</span></div>
-            <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-hydration transition-all duration-500" style={{ width: `${waterPct}%` }} /></div>
-            <div className="relative flex gap-1.5">
+          <div className="space-y-1.5">
+            <MetricPill
+              icon={METRICS.water.icon}
+              tone="hydration"
+              label="Water"
+              progress={waterMl / waterTarget}
+              value={<>{fmtVolume(waterMl, units)}<span className="text-xs font-medium text-muted-foreground"> / {fmtVolume(waterTarget, units)}</span></>}
+            />
+            <div className="flex gap-1.5">
               {waterPresets.map((v) => <button key={v} onClick={() => void addWater(v)} className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-transform active:scale-95 ${toneSoft.hydration}`}>+{v}</button>)}
             </div>
           </div>
-          <div className="relative flex flex-col gap-2.5 overflow-hidden rounded-2xl bg-card p-4">
-            <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-protein/10 blur-2xl" />
-            <div className="relative flex items-center gap-2 text-sm text-muted-foreground"><Beef className="size-4 text-protein" /><span>Protein</span></div>
-            <div className="numeral relative text-[1.6rem] font-semibold leading-none">{proteinTotal}<span className="ml-1 text-sm font-medium text-muted-foreground">{proteinTarget > 0 ? `/ ${proteinTarget} g` : "g"}</span></div>
-            <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-surface-2">{proteinTarget > 0 && <div className="h-full rounded-full bg-protein transition-all duration-500" style={{ width: `${Math.min(100, Math.max(3, (proteinTotal / proteinTarget) * 100))}%` }} />}</div>
-            <div className="relative text-xs text-muted-foreground">{proteinTarget > 0 ? (proteinTotal >= proteinTarget ? "Goal reached" : `${proteinTarget - proteinTotal} g to go`) : "No target set"}</div>
+          <div className="space-y-1.5">
+            <MetricPill
+              icon={METRICS.protein.icon}
+              tone="protein"
+              label="Protein"
+              progress={proteinTarget > 0 ? proteinTotal / proteinTarget : undefined}
+              value={<>{proteinTotal}<span className="text-xs font-medium text-muted-foreground">{proteinTarget > 0 ? ` / ${proteinTarget} g` : " g"}</span></>}
+            />
+            <div className="px-1 text-xs text-muted-foreground">{proteinTarget > 0 ? (proteinTotal >= proteinTarget ? "Goal reached" : `${proteinTarget - proteinTotal} g to go`) : "No target set"}</div>
           </div>
         </Stagger>
       </section>
 
+      {/* Quick add — one-tap re-log of the client's recent foods at their last portion */}
+      {recents.length > 0 && (
+        <section className="space-y-2">
+          <Eyebrow>Quick add</Eyebrow>
+          <Stagger className="no-scrollbar -mx-4 flex snap-x gap-2.5 overflow-x-auto px-4 pb-1">
+            {recents.map((r) => {
+              const key = r.food_id ?? r.label;
+              const busy = relogging === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => void relog(r)}
+                  disabled={!!relogging}
+                  className="flex w-36 shrink-0 snap-start flex-col gap-2 rounded-2xl bg-card p-3 text-left transition-transform active:scale-[0.97] disabled:opacity-60"
+                >
+                  <div className="flex items-center justify-between">
+                    <FoodThumb src={r.image_url} size={38} />
+                    <span className="grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary [&_svg]:size-4">
+                      {busy ? <span className="size-3.5 animate-spin rounded-full border-2 border-primary/30 border-t-primary" /> : <Plus />}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium leading-tight">{normFood(r).name}</div>
+                    <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                      <span className="numeral shrink-0 font-semibold text-calories">{fmtEnergy(r.calories, units)}</span>
+                      {r.quantity ? <span className="truncate">· {Math.round(r.quantity)} {r.unit ?? "g"}</span> : null}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </Stagger>
+        </section>
+      )}
+
       {/* Today's meals */}
       <section className="space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today's meals</h3>
-          {entries.length > 0 && <button onClick={() => openLog()} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><Plus /> Log</button>}
-        </div>
+        <Eyebrow action={entries.length > 0 ? <button onClick={() => openLog()} className="inline-flex items-center gap-1 text-sm font-medium normal-case tracking-normal text-primary [&_svg]:size-4"><Plus /> Log</button> : undefined}>Today's meals</Eyebrow>
         {entries.length === 0 ? (
           <EmptyState icon={Utensils} title="Nothing logged today" description="Log your first meal — search, barcode, snap a photo, or your plan." action={<Button onClick={() => openLog()}><Plus /> Log food</Button>} />
         ) : (
@@ -248,7 +306,7 @@ export function Eat({ clientId }: { clientId: string }) {
       {/* This week */}
       {week && (
         <section className="space-y-2">
-          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">This week</h3>
+          <Eyebrow>This week</Eyebrow>
           <Stagger><WeekStrip week={week} /></Stagger>
         </section>
       )}
