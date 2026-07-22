@@ -10,14 +10,14 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "motion/react";
-import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, fmtEnergy, kcalToDisplay, POSTURE_GUIDANCE, type RangePreset, type SeriesDelta } from "@mossa/domain";
+import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, fmtEnergy, kcalToDisplay, POSTURE_GUIDANCE, presetRange, type RangePreset, type SeriesDelta } from "@mossa/domain";
 
 const capp = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 import {
   Card, Badge, Button, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger, EmptyState,
   Reveal, SkeletonHero, SkeletonChart,
   AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, METRICS, POSTURE_SEVERITY_TONE, cn, toneVar,
-  Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, type Tone, type LucideIcon,
+  Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, Calendar, type Tone, type LucideIcon,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -60,24 +60,34 @@ export function Progress({ clientId }: { clientId: string }) {
     if (params.get("tab")) setParams((p) => { p.delete("tab"); return p; }, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [range, setRange] = useState<RangePreset>("30d");
+  const today = todayLocal();
+  // Range is a preset (7d/30d/90d) or a "custom" window with explicit start/end
+  // dates. Every chart & summary keys off the fetched range, so the custom
+  // window flows through all four lenses automatically.
+  const [range, setRange] = useState<RangePreset | "custom">("30d");
+  const [customStart, setCustomStart] = useState(() => presetRange("30d", today).start);
+  const [customEnd, setCustomEnd] = useState(today);
+  const customValid = customStart <= customEnd;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const units = useUnits();
-  const today = todayLocal();
 
   // Don't clear data on a range toggle — keep the current lens rendered (dimmed)
-  // while the next range loads, so 7d/30d/90d doesn't flash the full skeleton.
+  // while the next range loads, so switching doesn't flash the full skeleton.
   // An alive guard drops a stale response; a failure surfaces a retry.
   useEffect(() => {
+    if (range === "custom" && !customValid) return;
     let alive = true;
     setLoading(true); setError(false);
-    api.get<ProgressData>(`/api/progress/${clientId}?range=${range}&today=${today}`)
+    const qs = range === "custom"
+      ? `start=${customStart}&end=${customEnd}&today=${today}`
+      : `range=${range}&today=${today}`;
+    api.get<ProgressData>(`/api/progress/${clientId}?${qs}`)
       .then((d) => { if (alive) { setData(d); setLoading(false); } })
       .catch(() => { if (alive) { setError(true); setLoading(false); } });
     return () => { alive = false; };
-  }, [clientId, range, today, reloadKey]);
+  }, [clientId, range, customStart, customEnd, customValid, today, reloadKey]);
 
   const days = data?.range.days ?? [];
   const dateLabel = (i: number) => shortDate(days[i] ?? today);
@@ -87,8 +97,17 @@ export function Progress({ clientId }: { clientId: string }) {
       <h1 className="text-2xl font-bold tracking-tight">Progress</h1>
       <div className="flex flex-wrap items-center gap-2">
         <SegmentedControl options={[{ value: "overview", label: "Overview" }, { value: "body", label: "Body" }, { value: "training", label: "Training" }, { value: "wellness", label: "Wellness" }]} value={tab} onChange={(v) => setTab(v as Tab)} />
-        <SegmentedControl className="ml-auto" options={[{ value: "7d", label: "7d" }, { value: "30d", label: "30d" }, { value: "90d", label: "90d" }]} value={range} onChange={(v) => setRange(v as RangePreset)} />
+        <SegmentedControl className="ml-auto" options={[{ value: "7d", label: "7d" }, { value: "30d", label: "30d" }, { value: "90d", label: "90d" }, { value: "custom", label: "Custom" }]} value={range} onChange={(v) => setRange(v as RangePreset | "custom")} />
       </div>
+      {range === "custom" && (
+        <div className="flex items-center gap-2">
+          <DatePill value={customStart} max={customEnd} label="Start date"
+            onChange={(v) => { setCustomStart(v); if (v > customEnd) setCustomEnd(v); }} />
+          <span className="shrink-0 text-sm text-muted-foreground">→</span>
+          <DatePill value={customEnd} min={customStart} max={today} label="End date"
+            onChange={(v) => { setCustomEnd(v); if (v < customStart) setCustomStart(v); }} />
+        </div>
+      )}
 
       {error && !data ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load progress" description="Something went wrong loading your analytics. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />
@@ -142,7 +161,7 @@ function Overview({ data, units, dateLabel }: { data: ProgressData; units: Retur
 
       <Stagger>
         <ChartCard title="Consistency" icon={Activity} tone="activity" value={consistency.checkInDays} unit="days logged" delta={<Badge tone="neutral">best {consistency.longestStreak}d streak</Badge>}>
-          <CalendarHeatmap days={consistency.heatmap} today={data.today} tone="activity" weeks={data.range.days.length > 40 ? 16 : 10} />
+          <CalendarHeatmap days={consistency.heatmap} today={data.today} tone="activity" weeks={Math.min(53, Math.max(10, Math.ceil(data.range.days.length / 7)))} />
         </ChartCard>
       </Stagger>
 
@@ -343,6 +362,16 @@ function Wellness({ data, dateLabel }: { data: ProgressData; dateLabel: (i: numb
 }
 
 // ── Small pieces ──
+/** A glass date pill wrapping a native date input — the custom-range endpoints. */
+function DatePill({ value, min, max, label, onChange }: { value: string; min?: string; max?: string; label: string; onChange: (v: string) => void }) {
+  return (
+    <label className="relative flex-1">
+      <input type="date" value={value} min={min} max={max} onChange={(e) => e.target.value && onChange(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0 [color-scheme:dark]" aria-label={label} />
+      <div className="pointer-events-none flex items-center justify-center gap-1.5 rounded-xl bg-surface-2 px-3 py-2 text-sm font-semibold [&_svg]:size-4"><Calendar className="text-muted-foreground" />{shortDate(value)}</div>
+    </label>
+  );
+}
+
 function MiniStat({ icon: Icon, tone, label, value, sub }: { icon: LucideIcon; tone: Tone; label: string; value: string; sub?: string }) {
   return (
     <div className="flex items-center gap-2.5">
