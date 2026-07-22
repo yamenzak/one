@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, cn, Reveal, SkeletonRow, SkeletonLine, MacroInline, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Sparkles, Ellipsis, Send, History } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, cn, Reveal, SkeletonRow, SkeletonLine, MacroInline, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, List, PencilLine, ArrowLeftRight, Sparkles, Ellipsis, Send, History } from "@mossa/ui";
 import { api } from "../../api.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { AiErrorBox } from "../../AiError.js";
@@ -11,7 +11,7 @@ import { ExerciseEditor } from "./ExerciseEditor.js";
 import { FoodThumb } from "../food.js";
 import { fmtEnergy } from "@mossa/domain";
 import { useUnits } from "../../units.js";
-import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
+import { ExerciseRow, ExerciseThumb, metaText, splitList, pretty, type ExerciseInfo } from "../exercise.js";
 
 type Tab = "exercises" | "foods" | "templates" | "content";
 const TABS: Tab[] = ["exercises", "foods", "templates", "content"];
@@ -39,6 +39,10 @@ type ExEdit = { exerciseId?: string; initial?: Partial<ExerciseInfo> };
 function Exercises() {
   const [q, setQ] = useState("");
   const [items, setItems] = useState<LibraryExercise[] | null>(null);
+  const [view, setView] = useState<"list" | "grid">("list");
+  // Browse facets, composed with search — lifted from the plan-builder's picker.
+  const [muscle, setMuscle] = useState<string | null>(null);
+  const [equip, setEquip] = useState<string | null>(null);
   const [editor, setEditor] = useState<ExEdit | null>(null);
   const [altFor, setAltFor] = useState<LibraryExercise | null>(null);
   const [archiveFor, setArchiveFor] = useState<LibraryExercise | null>(null);
@@ -46,26 +50,75 @@ function Exercises() {
   useEffect(() => { const t = setTimeout(() => void load(), 200); return () => clearTimeout(t); }, [load]);
   // Tenant-owned rows edit in place; platform seeds fork into a tenant copy.
   const open = (e: LibraryExercise) => setEditor(e.tenant_id ? { exerciseId: e.id, initial: e } : { initial: { ...e, id: undefined } });
+
+  // Filter chips derived from the loaded library, most-common-first (same
+  // derivation as the picker). Facets read from the full loaded set so toggling
+  // one doesn't make the others vanish; the grid/rows then apply both.
+  const opts = (get: (e: LibraryExercise) => string[]) => {
+    const count = new Map<string, number>();
+    for (const e of items ?? []) for (const v of get(e)) count.set(v, (count.get(v) ?? 0) + 1);
+    return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([v]) => v).slice(0, 8);
+  };
+  const muscles = opts((e) => splitList(e.muscle_groups));
+  const equipment = opts((e) => splitList(e.equipment));
+  const filtered = (items ?? []).filter((e) =>
+    (!muscle || splitList(e.muscle_groups).concat(splitList(e.secondary_muscle_groups)).includes(muscle)) &&
+    (!equip || splitList(e.equipment).includes(equip)),
+  );
+
+  const actions = (e: LibraryExercise) => (
+    <>
+      <button onClick={() => open(e)} aria-label="Edit" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><PencilLine /></button>
+      <button onClick={() => setAltFor(e)} aria-label="Alternatives" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><ArrowLeftRight /></button>
+      {/* Only tenant-owned rows can be archived; platform seeds have no delete affordance. */}
+      {e.tenant_id ? <button onClick={() => setArchiveFor(e)} aria-label="Archive" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Archive /></button> : null}
+    </>
+  );
+
   return (
     <div className="space-y-3">
       <div className="flex items-end gap-2">
         <Field className="flex-1" label="Search exercises" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
+        <Button variant="ghost" aria-label={view === "list" ? "Grid view" : "List view"} onClick={() => setView((v) => (v === "list" ? "grid" : "list"))}>{view === "list" ? <LayoutGrid /> : <List />}</Button>
         <Button variant="tonal" aria-label="New exercise" onClick={() => setEditor({})}><Plus /></Button>
       </div>
+      {items && (muscles.length > 0 || equipment.length > 0) && (
+        <div className="space-y-1.5">
+          {muscles.length > 0 && (
+            <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
+              {muscles.map((m) => <span key={m} className="shrink-0"><Chip className="h-8 px-3 text-[0.8rem]" selected={muscle === m} onClick={() => setMuscle(muscle === m ? null : m)}>{pretty(m)}</Chip></span>)}
+            </div>
+          )}
+          {equipment.length > 0 && (
+            <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
+              {equipment.map((eq) => <span key={eq} className="shrink-0"><Chip className="h-8 px-3 text-[0.8rem]" selected={equip === eq} onClick={() => setEquip(equip === eq ? null : eq)}>{pretty(eq)}</Chip></span>)}
+            </div>
+          )}
+        </div>
+      )}
       <Reveal loading={!items} skeleton={
-        <div className="space-y-1">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="rounded-2xl bg-card px-3 py-2.5"><SkeletonRow thumb={40} /></div>)}</div>
+        <div className="space-y-1">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="rounded-2xl bg-card px-3 py-2.5"><SkeletonRow thumb={44} /></div>)}</div>
       }>
-        {items && (items.length === 0 ? <EmptyState icon={Dumbbell} title="No matches" /> : (
-        <Stagger className="space-y-1">{items.map((e) => (
-          <div key={e.id} className="rounded-2xl bg-card px-3 py-2.5">
-            <ExerciseRow ex={e} thumbSize={40} onClick={() => open(e)} trailing={
-              <div className="flex items-center gap-0">
-                <button onClick={() => open(e)} aria-label="Edit" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><PencilLine /></button>
-                <button onClick={() => setAltFor(e)} aria-label="Alternatives" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><ArrowLeftRight /></button>
-                {/* Only tenant-owned rows can be archived; platform seeds have no delete affordance. */}
-                {e.tenant_id ? <button onClick={() => setArchiveFor(e)} aria-label="Archive" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Archive /></button> : null}
+        {items && (filtered.length === 0 ? <EmptyState icon={Dumbbell} title="No matches" /> : view === "grid" ? (
+        <Stagger className="grid grid-cols-2 gap-3">{filtered.map((e) => (
+          <Card key={e.id} className="overflow-hidden p-0">
+            <button onClick={() => open(e)} className="block w-full text-left transition-opacity active:opacity-80">
+              <div className="aspect-square bg-surface-2"><ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={0} className="!size-full !rounded-none" /></div>
+              <div className="px-3 pt-2">
+                <div className="truncate text-sm font-semibold">{e.name}</div>
+                <div className="truncate text-xs text-muted-foreground">{metaText(e) || "—"}</div>
               </div>
-            } />
+            </button>
+            <div className="flex items-center justify-between gap-1 px-1.5 pb-1 pt-0.5">
+              {e.difficulty ? <Badge tone="neutral" className="ml-1.5">{e.difficulty}</Badge> : <span />}
+              <div className="flex items-center">{actions(e)}</div>
+            </div>
+          </Card>
+        ))}</Stagger>
+        ) : (
+        <Stagger className="space-y-1">{filtered.map((e) => (
+          <div key={e.id} className="rounded-2xl bg-card px-3 py-2.5">
+            <ExerciseRow ex={e} thumbSize={52} onClick={() => open(e)} trailing={<div className="flex items-center gap-0">{actions(e)}</div>} />
           </div>
         ))}</Stagger>
         ))}
