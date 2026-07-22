@@ -2,14 +2,19 @@
  *  cards), Stripe Connect / inline buy, redeem codes. */
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Button, Card, Badge, Field, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, toneVar, ArrowLeft, LogOut, Ticket, Store, Sparkles, Check, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, toneVar, ArrowLeft, LogOut, Ticket, Store, Sparkles, Check, RotateCcw, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
 import { CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { PaymentSheet, type CheckoutIntent } from "../../PaymentSheet.js";
 
 interface Pkg { id: string; name: string; description: string | null; one_time_price_cents: number | null; monthly_price_cents?: number | null; installment_months?: number | null; budgets: { feature: string; days: number }[]; flags?: Record<string, boolean> | null; visibility: string }
-interface Sub { status: string; daysRemaining: number; autoRenew?: boolean }
+interface Sub { status: string; daysRemaining: number; autoRenew?: boolean; packageId?: string | null }
+
+const priceLabel = (p: Pkg): string =>
+  p.monthly_price_cents ? `$${(p.monthly_price_cents / 100).toFixed(0)}/mo`
+  : p.one_time_price_cents ? `$${(p.one_time_price_cents / 100).toFixed(0)}`
+  : "Free";
 
 /** Cover-band tones cycled across the product grid so cards read as distinct
  *  merchandise rather than one repeated row. */
@@ -26,6 +31,8 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
   const [sub, setSub] = useState<Sub | null>(null);
   const [code, setCode] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const [redeemMsg, setRedeemMsg] = useState<string | null>(null);
+  const [redeemOpen, setRedeemOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
@@ -37,9 +44,9 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
   useEffect(() => void load(), [load]);
 
   const redeem = async () => {
-    setBusy(true); setMsg(null);
-    try { const r = await api.post<{ daysAdded: number; feature: string }>("/api/redeem", { clientId, code }); setMsg(`${r.daysAdded} days of ${r.feature} access added.`); setCode(""); await load(); await refresh(); }
-    catch (e) { setMsg(e instanceof Error && e.message.includes("not found") ? "That code isn't valid." : "Couldn't redeem that code."); }
+    setBusy(true); setRedeemMsg(null);
+    try { const r = await api.post<{ daysAdded: number; feature: string }>("/api/redeem", { clientId, code }); setRedeemMsg(`✓ ${r.daysAdded} days of ${r.feature} access added.`); setCode(""); await load(); await refresh(); }
+    catch (e) { setRedeemMsg(e instanceof Error && e.message.includes("not found") ? "That code isn't valid." : "Couldn't redeem that code."); }
     finally { setBusy(false); }
   };
   // Recurring subscriptions use hosted Checkout (Stripe provisions the
@@ -85,6 +92,12 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
   const oneTime = (packages ?? []).filter((p) => !isRecurring(p));
   const hasInlinePaid = oneTime.some((p) => p.one_time_price_cents);
 
+  // One-tap "extend" = re-buy the same package the current access came from.
+  // Only offered when it's a paid, non-renewing package still on sale.
+  const activePkg = sub?.packageId ? (packages ?? []).find((p) => p.id === sub.packageId) : undefined;
+  const canExtend = !!sub && !sub.autoRenew && !!activePkg && !!(activePkg.one_time_price_cents || activePkg.monthly_price_cents);
+  const extend = () => { if (activePkg) void (isRecurring(activePkg) ? buy(activePkg.id) : buyInline(activePkg)); };
+
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       {/* Storefront header */}
@@ -120,20 +133,27 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
       }>
         {packages && (
         <>
+      {msg && <Card className="border border-primary/20 bg-primary/5 text-sm text-foreground/85">{msg}</Card>}
+
       {sub ? (
         <div className="space-y-2">
-          <Card className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <span className="text-sm text-muted-foreground">Current access</span>
-              {sub.autoRenew && <div className="text-xs font-medium text-primary">Auto-renews monthly</div>}
+          <Card className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <span className="text-sm text-muted-foreground">Current access</span>
+                {sub.autoRenew && <div className="text-xs font-medium text-primary">Auto-renews monthly</div>}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Badge tone={sub.daysRemaining <= 7 ? "warning" : "success"}>{sub.daysRemaining} days left</Badge>
+                {sub.autoRenew && <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirmCancel(true)}>Cancel</Button>}
+              </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Badge tone={sub.daysRemaining <= 7 ? "warning" : "success"}>{sub.daysRemaining} days left</Badge>
-              {sub.autoRenew && <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirmCancel(true)}>Cancel</Button>}
-            </div>
+            {canExtend && activePkg && (
+              <Button variant="tonal" className="w-full" onClick={extend}><RotateCcw /> Extend {activePkg.name} · {priceLabel(activePkg)}</Button>
+            )}
           </Card>
           {!sub.autoRenew && (
-            <p className="px-1 text-xs text-muted-foreground">Buying another package <span className="font-medium text-foreground">extends</span> your access — new days stack on top of your current {sub.daysRemaining}, never wasted.</p>
+            <p className="px-1 text-xs text-muted-foreground">Extending <span className="font-medium text-foreground">stacks</span> on top of your current {sub.daysRemaining} days — nothing is wasted.</p>
           )}
         </div>
       ) : (
@@ -153,7 +173,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
         <section className="space-y-3">
           <Eyebrow>{memberships.length > 0 ? "Packages" : "Packages & access"}</Eyebrow>
           {hasInlinePaid && (
-            <Field label="Promo code (optional)" icon={Ticket} value={buyPromo} onChange={(e) => setBuyPromo(e.target.value.toUpperCase())} placeholder="SUMMER20" />
+            <Field label="Discount code — applied at checkout (optional)" icon={Ticket} value={buyPromo} onChange={(e) => setBuyPromo(e.target.value.toUpperCase())} placeholder="SUMMER20" />
           )}
           {oneTime.map((p, i) => <Stagger key={p.id}><PackageCard p={p} tone={CARD_TONES[(memberships.length + i) % CARD_TONES.length]!} cta={cta(p)} hasActive={!!sub} /></Stagger>)}
         </section>
@@ -163,19 +183,11 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
         <Card className="text-center text-sm text-muted-foreground">No packages are available to buy right now. Enter a code below, or ask your coach to set you up.</Card>
       )}
 
-      {/* Redeem — secondary to the storefront. */}
-      <section className="space-y-2">
-        <Eyebrow>Have a code?</Eyebrow>
-        <Stagger>
-          <Card className="space-y-3">
-            <div className="flex items-end gap-2">
-              <Field label="Redeem code" icon={Ticket} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className="flex-1" placeholder="WELCOME7" />
-              <Button disabled={code.length < 4 || busy} onClick={() => void redeem()}>Redeem</Button>
-            </div>
-            {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
-          </Card>
-        </Stagger>
-      </section>
+      {/* Access codes live in their own sheet — kept out of the storefront flow
+          so they don't get confused with checkout discount codes. */}
+      <div className="pt-1 text-center">
+        <button onClick={() => setRedeemOpen(true)} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-4"><Ticket /> Have an access code? Redeem it</button>
+      </div>
         </>
         )}
       </Reveal>
@@ -199,6 +211,17 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
         submitLabel={checkout ? `Pay ${checkout.price}` : "Pay"}
         onSuccess={onPaid}
       />
+
+      {redeemOpen && (
+        <Sheet open onClose={() => { setRedeemOpen(false); setRedeemMsg(null); }} title="Redeem an access code">
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">Have an access code from your coach? Enter it to add days to your plan. This is different from a checkout discount code.</p>
+            <Field label="Access code" icon={Ticket} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="WELCOME7" />
+            <Button size="lg" className="w-full" disabled={code.length < 4 || busy} onClick={() => void redeem()}>{busy ? "Redeeming…" : "Redeem"}</Button>
+            {redeemMsg && <p className="text-sm text-muted-foreground">{redeemMsg}</p>}
+          </div>
+        </Sheet>
+      )}
     </Page>
   );
 }
@@ -262,21 +285,30 @@ function PackageCard({ p, tone, cta, hasActive }: { p: Pkg; tone: (typeof CARD_T
  *  enabled for this client AND what the studio bought from Mossa (∩ live
  *  budget), so this shows exactly what they can actually do. Positive framing:
  *  only included capabilities are listed. */
+const PLAN_PREVIEW = 5;
 function PlanIncludes() {
   const { ctx } = useSession();
+  const [expanded, setExpanded] = useState(false);
   const flags = ctx?.clientFlags;
   if (!flags) return null;
   const included = CLIENT_FLAG_KEYS.filter((k) => flags[k]);
   if (!included.length) return null;
+  const shown = expanded ? included : included.slice(0, PLAN_PREVIEW);
+  const hidden = included.length - shown.length;
   return (
     <section className="space-y-2">
       <Eyebrow action={<span className="text-[0.65rem] font-medium text-muted-foreground">{included.length} included</span>}>What your plan includes</Eyebrow>
       <div className="flex flex-wrap gap-1.5 px-1">
-        {included.map((k) => (
+        {shown.map((k) => (
           <span key={k} className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success [&_svg]:size-3">
             <Check strokeWidth={3} />{CLIENT_FLAG_META[k].label}
           </span>
         ))}
+        {(hidden > 0 || expanded) && (
+          <button onClick={() => setExpanded((v) => !v)} className="inline-flex items-center rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+            {expanded ? "Show less" : `+${hidden} more`}
+          </button>
+        )}
       </div>
     </section>
   );
