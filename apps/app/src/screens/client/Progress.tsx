@@ -7,7 +7,7 @@
  * radar + per-day mood & sleep trends). Charts are the @mossa/ui chart set.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "motion/react";
 import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, fmtEnergy, kcalToDisplay, POSTURE_GUIDANCE, presetRange, type RangePreset, type SeriesDelta } from "@mossa/domain";
@@ -134,7 +134,7 @@ export function Progress({ clientId }: { clientId: string }) {
             {tab === "overview" && <Overview data={data} units={units} dateLabel={dateLabel} />}
             {tab === "body" && <Body data={data} units={units} dateLabel={dateLabel} clientId={clientId} />}
             {tab === "training" && <Training data={data} units={units} />}
-            {tab === "wellness" && <Wellness data={data} dateLabel={dateLabel} />}
+            {tab === "wellness" && <Wellness data={data} />}
           </motion.div>
         )}
       </Reveal>
@@ -165,6 +165,18 @@ function Overview({ data, units, dateLabel }: { data: ProgressData; units: Retur
           </div>
         </Card>
       </Stagger>
+
+      {/* Bare glance strip — activity coverage, deliberately card-less. */}
+      <section className="space-y-2">
+        <Eyebrow>At a glance</Eyebrow>
+        <Stagger>
+          <GlanceStrip items={[
+            { icon: Dumbbell, tone: "activity", value: data.training.workoutDays, label: "Workouts" },
+            { icon: METRICS.calories.icon, tone: "calories", value: nutrition.loggedDays, label: "Days logged" },
+            { icon: Activity, tone: "cardio", value: consistency.checkInDays, label: "Check-ins" },
+          ]} />
+        </Stagger>
+      </section>
 
       <Stagger>
         <ChartCard title="Consistency" icon={Activity} tone="activity" value={consistency.checkInDays} unit="days logged" delta={<Badge tone="neutral">best {consistency.longestStreak}d streak</Badge>}>
@@ -304,24 +316,37 @@ function Training({ data, units }: { data: ProgressData; units: ReturnType<typeo
   const maxE1 = training.prs[0]?.e1rm ?? 1;
   return (
     <>
-      <Stagger className="grid grid-cols-3 gap-3">
-        <StatCard stack label="Volume" value={Math.round(kgToDisplay(training.totalTonnage, units) / 1000).toLocaleString()} unit={`k ${wl}`} icon={Dumbbell} tone="activity" />
-        <StatCard stack label="Sets" value={training.totalSets} icon={Activity} tone="activity" />
-        <StatCard stack label="Sessions" value={training.workoutDays} icon={Flame} tone="cardio" />
-      </Stagger>
+      {/* Bare totals strip — card-less. */}
+      <section className="space-y-2">
+        <Eyebrow>Totals this period</Eyebrow>
+        <Stagger>
+          <GlanceStrip items={[
+            { icon: Dumbbell, tone: "activity", value: `${Math.round(kgToDisplay(training.totalTonnage, units) / 1000).toLocaleString()}k`, label: `Volume ${wl}` },
+            { icon: Activity, tone: "activity", value: training.totalSets, label: "Sets" },
+            { icon: Flame, tone: "cardio", value: training.workoutDays, label: "Sessions" },
+          ]} />
+        </Stagger>
+      </section>
+
+      {/* Weekly training — volume bars + a sets sparkline in one card (two forms). */}
       <Stagger>
         <ChartCard title="Weekly volume" icon={Dumbbell} tone="activity" value={training.weekly.length ? Math.round(kgToDisplay(training.weekly.at(-1)!.tonnage, units)).toLocaleString() : "—"} unit={wl} delta={<Badge tone="neutral">last week</Badge>}>
-          {training.weekly.length >= 2 ? <BarChart values={tonnageVals} labels={weekLabels} tone="activity" format={(v) => `${v.toLocaleString()} ${wl}`} /> : <EmptyMini label="Log a few weeks of training to see volume" />}
+          {training.weekly.length >= 2 ? (
+            <div className="space-y-4">
+              <BarChart values={tonnageVals} labels={weekLabels} tone="activity" format={(v) => `${v.toLocaleString()} ${wl}`} />
+              <div className="space-y-1.5 border-t border-border/40 pt-3">
+                <div className="flex items-center justify-between text-xs"><span className="font-medium text-muted-foreground">Sets per week</span><span className="numeral font-semibold">{training.totalSets} total</span></div>
+                <div className="overflow-hidden"><Sparkline values={setVals} tone="cardio" width={320} height={40} className="w-full" /></div>
+              </div>
+            </div>
+          ) : <EmptyMini label="Log a few weeks of training to see volume" />}
         </ChartCard>
       </Stagger>
-      <Stagger>
-        <ChartCard title="Weekly sets" icon={Activity} tone="cardio">
-          {training.weekly.length >= 2 ? <BarChart values={setVals} labels={weekLabels} tone="cardio" height={130} format={(v) => `${v} sets`} /> : <EmptyMini label="No sets logged in range" />}
-        </ChartCard>
-      </Stagger>
-      <Stagger>
+
+      <section className="space-y-2">
+        <Eyebrow action={<span className="text-[0.65rem] font-medium text-muted-foreground">est. 1RM</span>}>Personal records</Eyebrow>
+        <Stagger>
         <Card className="space-y-3">
-          <div className="flex items-center gap-2"><IconBadge icon={Trophy} tone="activity" size="sm" /><div className="text-sm font-semibold">Personal records · est. 1RM</div></div>
           {training.prs.length === 0 ? <EmptyMini label="Log weighted sets to build your PR board" /> : (
             <div className="space-y-1.5">
               {training.prs.map((p, i) => (
@@ -341,13 +366,14 @@ function Training({ data, units }: { data: ProgressData; units: ReturnType<typeo
             </div>
           )}
         </Card>
-      </Stagger>
+        </Stagger>
+      </section>
     </>
   );
 }
 
 // ── Wellness ──
-function Wellness({ data, dateLabel }: { data: ProgressData; dateLabel: (i: number) => string }) {
+function Wellness({ data }: { data: ProgressData }) {
   const { wellness } = data;
   const r = wellness.radar;
   const axes = [
@@ -357,8 +383,8 @@ function Wellness({ data, dateLabel }: { data: ProgressData; dateLabel: (i: numb
     { label: "Calm", value: r.calm },
     { label: "Consistency", value: r.consistency },
   ];
-  const moodVals = wellness.perDay.map((p) => p.mood);
-  const sleepVals = wellness.perDay.map((p) => p.sleepHours);
+  const moodSpark = wellness.perDay.map((p) => p.mood).filter((v): v is number => v != null);
+  const sleepSpark = wellness.perDay.map((p) => p.sleepHours).filter((v): v is number => v != null);
   const hasRadar = axes.some((a) => a.value > 0);
   return (
     <>
@@ -367,23 +393,42 @@ function Wellness({ data, dateLabel }: { data: ProgressData; dateLabel: (i: numb
           {hasRadar ? <RadarChart axes={axes} tone="cardio" size={230} /> : <EmptyMini label="Check in with mood, energy & sleep to build your radar" />}
         </ChartCard>
       </Stagger>
-      <Stagger className="grid grid-cols-2 gap-3">
-        <StatCard stack label="Avg mood" value={wellness.averages.mood ?? "—"} unit="/ 5" icon={Smile} tone="nutrition" />
-        <StatCard stack label="Avg energy" value={wellness.averages.energy ?? "—"} unit="/ 5" icon={Zap} tone="warning" />
-        <StatCard stack label="Avg sleep" value={wellness.averages.sleepHours ?? "—"} unit="h" icon={Moon} tone="sleep" />
-        <StatCard stack label="Avg stress" value={wellness.averages.stress ?? "—"} unit="/ 5" icon={Gauge} tone="danger" />
-      </Stagger>
-      <Stagger>
-        <ChartCard title="Mood trend" icon={Smile} tone="nutrition">
-          <AreaChart values={moodVals} tone="nutrition" grid={3} height={140} label={dateLabel} format={(v) => v.toFixed(1)} />
-        </ChartCard>
-      </Stagger>
-      <Stagger>
-        <ChartCard title="Sleep trend" icon={Moon} tone="sleep">
-          <AreaChart values={sleepVals} tone="sleep" grid={3} height={140} label={dateLabel} format={(v) => `${v.toFixed(1)}h`} />
-        </ChartCard>
-      </Stagger>
+
+      <section className="space-y-2">
+        <Eyebrow>Averages</Eyebrow>
+        <Stagger className="grid grid-cols-2 gap-3">
+          <StatCard stack label="Avg mood" value={wellness.averages.mood ?? "—"} unit="/ 5" icon={Smile} tone="nutrition" />
+          <StatCard stack label="Avg energy" value={wellness.averages.energy ?? "—"} unit="/ 5" icon={Zap} tone="warning" />
+          <StatCard stack label="Avg sleep" value={wellness.averages.sleepHours ?? "—"} unit="h" icon={Moon} tone="sleep" />
+          <StatCard stack label="Avg stress" value={wellness.averages.stress ?? "—"} unit="/ 5" icon={Gauge} tone="danger" />
+        </Stagger>
+      </section>
+
+      {/* Mood & sleep folded into one trends card (sparkline rows, not two areas). */}
+      {(moodSpark.length >= 2 || sleepSpark.length >= 2) && (
+        <Stagger>
+          <Card className="space-y-4">
+            <SectionHeader icon={HeartPulse} tone="sleep" title="Trends" />
+            <TrendRow icon={Smile} tone="nutrition" label="Mood" value={wellness.averages.mood} unit="/ 5" values={moodSpark} />
+            <TrendRow icon={Moon} tone="sleep" label="Sleep" value={wellness.averages.sleepHours} unit="h" values={sleepSpark} />
+          </Card>
+        </Stagger>
+      )}
     </>
+  );
+}
+
+/** A labeled metric row: icon + label + current average on the left, a trend
+ *  sparkline on the right. The atom of the wellness "Trends" card. */
+function TrendRow({ icon: Icon, tone, label, value, unit, values }: { icon: LucideIcon; tone: Tone; label: string; value: number | null; unit: string; values: number[] }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground"><Icon className="size-4 shrink-0" style={{ color: toneVar[tone] }} />{label}</div>
+        <div className="numeral mt-1 text-xl font-bold leading-none">{value != null ? value.toFixed(1) : "—"}{value != null && <span className="ml-1 text-sm font-medium text-muted-foreground">{unit}</span>}</div>
+      </div>
+      {values.length >= 2 ? <div className="overflow-hidden"><Sparkline values={values} tone={tone} width={150} height={44} /></div> : <span className="text-xs text-muted-foreground">Not enough data</span>}
+    </div>
   );
 }
 
@@ -422,6 +467,33 @@ function DatePill({ value, min, max, label, onChange }: { value: string; min?: s
       <input type="date" value={value} min={min} max={max} onChange={(e) => e.target.value && onChange(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0 [color-scheme:dark]" aria-label={label} />
       <div className="pointer-events-none flex items-center justify-center gap-1.5 rounded-full bg-secondary px-3 py-2 text-sm font-semibold [&_svg]:size-4"><Calendar className="text-muted-foreground" />{shortDate(value)}</div>
     </label>
+  );
+}
+
+/** A bare, uppercase section label (with optional trailing action) — the flow
+ *  device that keeps the page from reading as one long stack of cards. */
+function Eyebrow({ children, action }: { children: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between px-1">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{children}</h2>
+      {action}
+    </div>
+  );
+}
+
+/** A card-less stat strip: icon + big numeral + label, split by hairline
+ *  dividers. A deliberate break from the boxed-card rhythm. */
+function GlanceStrip({ items }: { items: { icon: LucideIcon; tone: Tone; value: ReactNode; label: string }[] }) {
+  return (
+    <div className="flex items-stretch divide-x divide-border/50">
+      {items.map((it, i) => (
+        <div key={i} className="flex flex-1 flex-col items-center gap-1.5 px-2 text-center">
+          <it.icon className="size-4" style={{ color: toneVar[it.tone] }} />
+          <span className="numeral text-2xl font-bold leading-none">{it.value}</span>
+          <span className="text-[0.65rem] font-medium leading-tight text-muted-foreground">{it.label}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 
