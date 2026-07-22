@@ -13,13 +13,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { kcalToDisplay, displayToKcal, energyLabel, featureEnabled, type UnitPrefs } from "@mossa/domain";
-import { FixedDrawer, Button, Field, Chip, SegmentedControl, cn, toneSoft, METRICS, Utensils, Barcode, ChevronDown, Sparkles, Globe, PencilLine, Search, Plus, X, ArrowLeft } from "@mossa/ui";
+import { FixedDrawer, Button, Field, Chip, SegmentedControl, cn, toneSoft, METRICS, Utensils, Barcode, ChevronDown, Sparkles, Globe, PencilLine, ScanLine, Search, Plus, X, ArrowLeft } from "@mossa/ui";
 import { api, uploadMedia } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
 import { AiImageField } from "../../AiImageField.js";
-import { ModeCard, StepFade } from "../../composer.js";
+import { ModeRow, StepFade } from "../../composer.js";
 import { BarcodeScanner } from "./BarcodeScanner.js";
 import { FoodRow, normFood } from "../food.js";
 
@@ -223,11 +223,14 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
             {step === "choose" ? (
               <div className="space-y-4">
                 <Field label="Food name" icon={Utensils} value={f.name} onChange={(e) => set("name", e.target.value)} autoFocus placeholder="e.g. Greek yogurt" />
-                <div className="grid grid-cols-2 gap-2">
-                  {aiMealTools && <ModeCard icon={Sparkles} tone="primary" label="With AI" hint="Estimate macros" busy={aiBusy} disabled={f.name.trim().length < 2} onClick={() => void estimateFromName()} />}
-                  <ModeCard icon={Globe} tone="cardio" label="Web / barcode" hint="From databases" active={webMode} onClick={() => setWebMode((v) => !v)} />
-                  {aiMealTools && <ModeCard icon={Barcode} tone="nutrition" label="Scan label" hint="Read the panel" onClick={() => labelInputRef.current?.click()} />}
-                  <ModeCard icon={PencilLine} tone="neutral" label="Manual" hint="Enter it yourself" disabled={f.name.trim().length < 2} onClick={() => setStep("review")} />
+                {/* A single-column list of mode rows — stable regardless of how many
+                    the entitlement unlocks (no 2×N grid reflow). The AI-powered
+                    paths lead and are badged so they read as first-class. */}
+                <div className="space-y-2">
+                  {aiMealTools && <ModeRow icon={Sparkles} tone="primary" smart label="Estimate with AI" hint="Fill the macros from the name" busy={aiBusy} disabled={f.name.trim().length < 2} onClick={() => void estimateFromName()} />}
+                  {aiMealTools && <ModeRow icon={ScanLine} tone="nutrition" smart label="Scan nutrition label" hint="Read the panel with your camera" onClick={() => labelInputRef.current?.click()} />}
+                  <ModeRow icon={Globe} tone="cardio" label="Search web & barcode" hint="Find it in food databases" active={webMode} onClick={() => setWebMode((v) => !v)} />
+                  <ModeRow icon={PencilLine} tone="neutral" label="Enter manually" hint="Type the values yourself" disabled={f.name.trim().length < 2} onClick={() => setStep("review")} />
                 </div>
                 <input ref={labelInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void scanLabel(e.target.files[0])} />
 
@@ -266,56 +269,67 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                 {err && <p className="text-sm text-warning">{err}</p>}
               </div>
             ) : (
-              <div className="space-y-4">
-                {!foodId && <button onClick={() => setStep("choose")} className="inline-flex items-center gap-1 text-sm text-muted-foreground [&_svg]:size-4"><ArrowLeft /> Back</button>}
-                <Field label="Name" icon={Utensils} value={f.name} onChange={(e) => set("name", e.target.value)} />
-                <AiImageField value={f.image} onChange={(url) => set("image", url)} feature="food-image" subject={f.name} canAi={!!isStaff && aiSuite} label="Photo" />
+              <div className="space-y-6">
+                {!foodId && <button onClick={() => setStep("choose")} className="-mb-1 inline-flex items-center gap-1 text-sm text-muted-foreground [&_svg]:size-4"><ArrowLeft /> Back</button>}
 
-                {aiMealTools && (
-                  <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary/15 px-3.5 text-sm font-medium text-primary transition-colors hover:bg-primary/25 [&_svg]:size-4">
-                    <Sparkles /> Scan nutrition label
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void scanLabel(e.target.files[0])} />
-                  </label>
-                )}
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Brand" value={f.brand} onChange={(e) => set("brand", e.target.value)} placeholder="Optional" />
-                  <div className="flex items-end gap-2">
-                    <Field className="flex-1" label="Barcode" icon={Barcode} inputMode="numeric" value={f.barcode} onChange={(e) => set("barcode", dec(e.target.value))} placeholder="Optional" />
-                    <Button type="button" variant="secondary" size="icon" aria-label="Scan barcode into the field" onClick={() => setFieldScanOpen(true)}><Barcode /></Button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Serving size" inputMode="decimal" value={f.serving} onChange={(e) => set("serving", dec(e.target.value))} />
-                  <Field label="Unit" value={f.unit} onChange={(e) => set("unit", e.target.value)} placeholder="g / ml / piece" />
-                </div>
-
-                <div className="text-xs text-muted-foreground">Per serving:</div>
-                <div className="grid grid-cols-4 gap-2">
-                  {([["cal", energyLabel(units), "calories"], ["p", "P", "protein"], ["c", "C", "carbs"], ["ft", "F", "fat"]] as const).map(([k, ph, metric]) => {
-                    const M = METRICS[metric];
-                    return (
-                      <label key={k} className={cn("flex flex-col items-center gap-1 rounded-xl p-2", toneSoft[M.tone])}>
-                        <M.icon className="size-4" />
-                        <input inputMode="decimal" value={f[k]} onChange={(e) => set(k, dec(e.target.value))} placeholder={ph} className="w-full bg-transparent text-center text-sm font-semibold outline-none placeholder:font-normal placeholder:opacity-60" />
-                      </label>
-                    );
-                  })}
-                </div>
-
-                <button type="button" onClick={() => setShowMicros((v) => !v)} className="flex w-full items-center justify-between text-sm text-muted-foreground">
-                  More nutrients <ChevronDown className={cn("size-4 transition-transform", showMicros && "rotate-180")} />
-                </button>
-                {showMicros && (
+                {/* ── Basics ─────────────────────────────────────────────── */}
+                <div className="space-y-3">
+                  <Field label="Name" icon={Utensils} value={f.name} onChange={(e) => set("name", e.target.value)} />
+                  <AiImageField value={f.image} onChange={(url) => set("image", url)} feature="food-image" subject={f.name} canAi={!!isStaff && aiSuite} label="Photo" />
+                  {aiMealTools && (
+                    <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary/15 px-3.5 text-sm font-medium text-primary transition-colors hover:bg-primary/25 [&_svg]:size-4">
+                      <ScanLine /> Scan nutrition label
+                      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void scanLabel(e.target.files[0])} />
+                    </label>
+                  )}
                   <div className="grid grid-cols-2 gap-3">
-                    {MICROS.map(([k, label, unit]) => (
-                      <Field key={k} label={`${label} (${unit})`} inputMode="decimal" value={f[k as MicroKey]} onChange={(e) => set(k as MicroKey, dec(e.target.value))} placeholder="0" />
-                    ))}
+                    <Field label="Brand" value={f.brand} onChange={(e) => set("brand", e.target.value)} placeholder="Optional" />
+                    <div className="flex items-end gap-2">
+                      <Field className="flex-1" label="Barcode" icon={Barcode} inputMode="numeric" value={f.barcode} onChange={(e) => set("barcode", dec(e.target.value))} placeholder="Optional" />
+                      <Button type="button" variant="secondary" size="icon" aria-label="Scan barcode into the field" onClick={() => setFieldScanOpen(true)}><Barcode /></Button>
+                    </div>
                   </div>
-                )}
+                </div>
 
+                {/* ── Nutrition (per serving) ────────────────────────────── */}
+                <div className="space-y-3">
+                  <div className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">Nutrition per serving</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Serving size" inputMode="decimal" value={f.serving} onChange={(e) => set("serving", dec(e.target.value))} />
+                    <Field label="Unit" value={f.unit} onChange={(e) => set("unit", e.target.value)} placeholder="g / ml / piece" />
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-2">
+                    {([["cal", "calories", "Cal", energyLabel(units)], ["p", "protein", "Protein", "g"], ["c", "carbs", "Carbs", "g"], ["ft", "fat", "Fat", "g"]] as const).map(([k, metric, label, unit]) => {
+                      const M = METRICS[metric];
+                      return (
+                        <label key={k} className={cn("flex flex-col gap-1.5 rounded-2xl p-2.5", toneSoft[M.tone])}>
+                          <span className="flex items-center gap-1 text-[0.64rem] font-semibold leading-none [&_svg]:size-3"><M.icon /> <span className="truncate">{label}</span></span>
+                          <span className="flex items-baseline gap-0.5 rounded-lg bg-background/70 px-1.5 py-1.5">
+                            <input inputMode="decimal" value={f[k]} onChange={(e) => set(k, dec(e.target.value))} placeholder="0" className="w-full min-w-0 bg-transparent text-center text-[0.95rem] font-bold text-foreground outline-none placeholder:font-medium placeholder:text-muted-foreground/50" />
+                            <span className="shrink-0 text-[0.58rem] font-medium text-muted-foreground">{unit}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  <button type="button" onClick={() => setShowMicros((v) => !v)} className="flex w-full items-center justify-between rounded-xl py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                    More nutrients <ChevronDown className={cn("size-4 transition-transform", showMicros && "rotate-180")} />
+                  </button>
+                  {showMicros && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {MICROS.map(([k, label, unit]) => (
+                        <Field key={k} label={`${label} (${unit})`} inputMode="decimal" value={f[k as MicroKey]} onChange={(e) => set(k as MicroKey, dec(e.target.value))} placeholder="0" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Sharing (staff only) ───────────────────────────────── */}
                 {isStaff && (
-                  <div className="space-y-1.5">
-                    <div className="text-xs text-muted-foreground">Who can use this food</div>
+                  <div className="space-y-2">
+                    <div className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">Who can use this food</div>
                     <div className="flex gap-2">
                       <Chip selected={f.visibility === "tenant"} onClick={() => set("visibility", "tenant")}>Shared with team</Chip>
                       <Chip selected={f.visibility === "private"} onClick={() => set("visibility", "private")}>Only me</Chip>
