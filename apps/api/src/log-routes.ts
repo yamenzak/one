@@ -200,6 +200,36 @@ export const logRoutes = new Hono<AppEnv>()
     });
   })
 
+  // "Last time" for a given exercise — the most recent prior session that logged
+  // it, with the completed sets, for the progressive-overload hint + one-tap
+  // repeat in the player. `before` (YYYY-MM-DD) excludes an in-progress day so
+  // "last time" means the previous session, not today's.
+  .get("/logs/exercise-last", async (c) => {
+    const clientId = c.req.query("clientId");
+    const exerciseId = c.req.query("exerciseId");
+    if (!clientId || !exerciseId) return c.json({ error: "clientId and exerciseId required" }, 400);
+    const access = await requireClientAccess(c, clientId);
+    if ("response" in access) return access.response;
+    const before = c.req.query("before") ?? "";
+    const rows = await c.env.DB.prepare(
+      `SELECT date_local, entries_json FROM exercise_logs
+       WHERE client_id = ? AND (? = '' OR date_local < ?)
+       ORDER BY date_local DESC LIMIT 120`,
+    )
+      .bind(clientId, before, before)
+      .all<{ date_local: string; entries_json: string | null }>();
+    interface Ent { exerciseId: string; sets: { reps?: number | null; weightKg?: number | null; durationSeconds?: number | null; distanceM?: number | null; effortLabel?: string | null; completed?: boolean }[] }
+    for (const r of rows.results ?? []) {
+      const entries = parseJson<Ent[]>(r.entries_json, []);
+      const hit = entries.find((e) => e.exerciseId === exerciseId && (e.sets ?? []).some((s) => s.completed !== false));
+      if (hit) {
+        const sets = hit.sets.filter((s) => s.completed !== false).map((s) => ({ reps: s.reps ?? null, weightKg: s.weightKg ?? null, durationSeconds: s.durationSeconds ?? null, distanceM: s.distanceM ?? null, effortLabel: s.effortLabel ?? null }));
+        return c.json({ last: { date: r.date_local, sets } });
+      }
+    }
+    return c.json({ last: null });
+  })
+
   // Recent free-form activities (for the Train tab's activity feed).
   .get("/logs/activities", async (c) => {
     const clientId = c.req.query("clientId");

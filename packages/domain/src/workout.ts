@@ -175,3 +175,41 @@ export function pickPlanForDate<T extends PlanLike>(plans: T[], dateIso?: string
   }
   return eligible.find((p) => p.status === "published") ?? null;
 }
+
+// ── Plate math (SSOT) ────────────────────────────────────────────────────────
+// The barbell-loading helper behind a "smart" weight input: given a target and
+// the plates on hand, what goes on EACH side. Greedy over denominations.
+
+export const DEFAULT_BARBELL_KG = 20;
+/** Standard metric plate denominations, heaviest-first. */
+export const DEFAULT_PLATES_KG = [25, 20, 15, 10, 5, 2.5, 1.25] as const;
+
+export interface PlateBreakdown {
+  /** Plates for ONE side of the bar, heaviest-first. */
+  perSide: number[];
+  /** Weight that couldn't be represented with the available plates (0 when exact). */
+  remainderKg: number;
+  /** The bar weight used. */
+  barKg: number;
+}
+
+/**
+ * Per-side plate breakdown to load `targetKg` on a barbell. Greedy over the
+ * (sorted) available denominations. A target at or below the bar yields no
+ * plates; anything the plates can't hit lands in `remainderKg` (never throws,
+ * never NaN).
+ */
+export function computePlates(
+  targetKg: number,
+  opts?: { barKg?: number; plates?: readonly number[] },
+): PlateBreakdown {
+  const barKg = opts?.barKg ?? DEFAULT_BARBELL_KG;
+  const plates = [...(opts?.plates ?? DEFAULT_PLATES_KG)].sort((a, b) => b - a);
+  const perSide: number[] = [];
+  let side = (targetKg - barKg) / 2;
+  if (!(side > 0)) return { perSide, remainderKg: 0, barKg };
+  for (const p of plates) {
+    while (side + 1e-9 >= p) { perSide.push(p); side -= p; }
+  }
+  return { perSide, remainderKg: Math.round(side * 100) / 100, barKg };
+}
