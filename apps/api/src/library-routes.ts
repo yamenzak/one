@@ -8,6 +8,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { type AppEnv, requireTenant } from "./auth-context.js";
+import { requireClientAccess } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
 import { seedExercises } from "./exercise-seed.js";
 
@@ -235,6 +236,29 @@ export const libraryRoutes = new Hono<AppEnv>()
     sql += all ? " ORDER BY verified DESC, name LIMIT 2000" : " ORDER BY verified DESC, name LIMIT 60";
     const rows = await c.env.DB.prepare(sql).bind(...binds).all();
     return c.json({ foods: rows.results ?? [] });
+  })
+
+  // A client's recently- and frequently-logged foods — the one-tap re-log rail.
+  // Grouped per distinct food (by food_id, or by label for library-less logs);
+  // SQLite's min/max bare-column rule pulls each group's LATEST entry, so the
+  // returned quantity/macros reproduce the last time they logged it.
+  .get("/foods/recent", async (c) => {
+    const access = await requireClientAccess(c, c.req.query("clientId") ?? "");
+    if ("response" in access) return access.response;
+    const limit = Math.min(30, Math.max(1, Number(c.req.query("limit")) || 20));
+    const rows = await c.env.DB.prepare(
+      `SELECT fe.food_id, fe.label, fe.unit, fe.quantity, fe.calories, fe.protein_g, fe.carbs_g, fe.fat_g,
+              COALESCE(fe.image_url, f.image_url) AS image_url,
+              f.serving_size, f.serving_unit,
+              COUNT(*) AS log_count, MAX(fe.created_at) AS last_at
+       FROM food_entries fe LEFT JOIN foods f ON f.id = fe.food_id
+       WHERE fe.client_id = ?
+       GROUP BY COALESCE(fe.food_id, LOWER(fe.label))
+       ORDER BY last_at DESC LIMIT ?`,
+    )
+      .bind(access.client.id, limit)
+      .all();
+    return c.json({ recents: rows.results ?? [] });
   })
 
   // Local-first barcode lookup (external fallback arrives with nutrition phase).

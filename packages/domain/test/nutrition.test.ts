@@ -1,5 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { calculateNutritionTargets, validateCalculatorInputs } from "../src/nutrition.js";
+import { calculateNutritionTargets, validateCalculatorInputs, scaleFood, servingsToQuantity } from "../src/nutrition.js";
+
+describe("portion scaling", () => {
+  const food = { servingSize: 100, calories: 200, proteinG: 20, carbsG: 10, fatG: 8 };
+  it("scales macros by quantity / serving size", () => {
+    expect(scaleFood(food, 100)).toEqual({ calories: 200, proteinG: 20, carbsG: 10, fatG: 8 });
+    expect(scaleFood(food, 50)).toEqual({ calories: 100, proteinG: 10, carbsG: 5, fatG: 4 });
+    expect(scaleFood(food, 250)).toEqual({ calories: 500, proteinG: 50, carbsG: 25, fatG: 20 });
+  });
+  it("rounds calories to whole and macros to 0.1g", () => {
+    expect(scaleFood({ servingSize: 100, calories: 233, proteinG: 2.5, carbsG: 10, fatG: 4 }, 150))
+      .toEqual({ calories: 350, proteinG: 3.8, carbsG: 15, fatG: 6 });
+  });
+  it("yields zeroes (never NaN) for a non-positive serving size", () => {
+    expect(scaleFood({ servingSize: 0, calories: 200, proteinG: 20, carbsG: 10, fatG: 8 }, 100))
+      .toEqual({ calories: 0, proteinG: 0, carbsG: 0, fatG: 0 });
+  });
+  it("converts serving multipliers to a gram quantity", () => {
+    expect(servingsToQuantity(30, 2)).toBe(60);
+    expect(servingsToQuantity(100, 0.5)).toBe(50);
+  });
+});
 
 describe("nutrition calculator", () => {
   const base = {
