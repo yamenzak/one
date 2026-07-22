@@ -1,11 +1,16 @@
 /**
- * Food search + log sheet — local library, Open Food Facts fallback, barcode,
- * quick entry, and ✦ AI (natural-language + snap-a-meal).
+ * Smart food logging hub — the heart of food logging. Two modes:
+ *
+ *  · LOG mode (default): a landing screen of hero AI actions (snap / barcode /
+ *    manual), a one-tap "recent / frequent" re-log rail, then search (local +
+ *    Open Food Facts) with a portion-aware detail view.
+ *  · PICK mode (`onPick`, meal-plan builder): the classic search list — choosing
+ *    a row imports the food and returns its id, no logging, no AI rail.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { kcalToDisplay, type UnitPrefs } from "@mossa/domain";
-import { Button, Field, Sheet, Chip, SegmentedControl, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, X } from "@mossa/ui";
+import { kcalToDisplay, scaleFood, servingsToQuantity, SERVING_PRESETS, type UnitPrefs } from "@mossa/domain";
+import { Button, Field, Sheet, Chip, SegmentedControl, IconBadge, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, Sparkles, ChevronRight, Plus, X } from "@mossa/ui";
 import { api, todayLocal, uploadMedia } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
@@ -19,6 +24,13 @@ import { FoodEditor, type EditableFood } from "./FoodEditor.js";
 
 /** A food the vision model detected in a snapped meal (pre-log, reviewable). */
 interface SnapEntry { label: string; mealType?: string; calories: number; proteinG: number; carbsG: number; fatG: number; quantity?: number | null; unit?: string | null }
+
+/** A previously-logged food, ready to re-log at its last portion in one tap. */
+interface Recent {
+  food_id: string | null; label: string; unit: string | null; quantity: number | null;
+  calories: number; protein_g: number; carbs_g: number; fat_g: number;
+  image_url: string | null; serving_size: number | null; serving_unit: string | null; log_count: number;
+}
 
 /** A stable client-side id — for keying editable/removable rows without
  *  falling back to array indices (which shift when rows are deleted). */
@@ -59,6 +71,8 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   const [extPage, setExtPage] = useState(0);
   const [extMore, setExtMore] = useState(false);
   const [filter, setFilter] = useState<"all" | "whole" | "branded">("all");
+  const [recents, setRecents] = useState<Recent[]>([]);
+  const [recentTab, setRecentTab] = useState<"recent" | "frequent">("recent");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [snapErr, setSnapErr] = useState<unknown>(null);
@@ -77,6 +91,7 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   // Web providers (keyless OFF/wger) fold into the same list when the plan
   // allows — no toggle. A logger doesn't care if a food is ours or the web's.
   const webEnabled = !!ctx?.entitlements?.features?.externalSearch;
+  const hasQuery = q.trim().length > 0;
 
   const searchExternal = useCallback(async (page = 1) => {
     if (q.trim().length < 2) return;
@@ -113,8 +128,18 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   }, [extMore, searching, extPage, searchExternal]);
   // "Snap a meal" entry point — open the camera picker as soon as the sheet mounts.
   useEffect(() => { if (autoCamera) snapInputRef.current?.click(); }, [autoCamera]);
+  // Recents rail — log mode only. A quiet failure just hides the rail.
+  useEffect(() => {
+    if (onPick || !clientId) return;
+    let alive = true;
+    api.get<{ recents: Recent[] }>(`/api/foods/recent?clientId=${clientId}`).then((r) => { if (alive) setRecents(r.recents ?? []); }).catch(() => {});
+    return () => { alive = false; };
+  }, [onPick, clientId]);
 
   const matchesFilter = (f: Food) => filter === "all" || (filter === "branded" ? !!f.brand : !f.brand);
+  const localFiltered = local.filter(matchesFilter);
+  const extFiltered = external.filter(matchesFilter);
+  const recentList = recentTab === "frequent" ? [...recents].sort((a, b) => b.log_count - a.log_count) : recents;
 
   /** Import an external food (or return an existing local id). */
   const importFood = async (f: Food): Promise<string | undefined> => {
@@ -146,6 +171,13 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
     onLogged?.(); onClose();
   };
 
+  /** One-tap re-log: log a recent food at the exact portion it was last logged,
+   *  under the currently-selected meal. The single biggest logging speed win. */
+  const relog = async (r: Recent) => {
+    await api.post("/api/logs/food", { clientId, data: { date: todayLocal(), mealType: meal, foodId: r.food_id ?? null, label: r.label, quantity: r.quantity, unit: r.unit, calories: r.calories, proteinG: r.protein_g, carbsG: r.carbs_g, fatG: r.fat_g } });
+    onLogged?.(); onClose();
+  };
+
   const snapMeal = async (photo: File) => {
     setAiBusy(true); setAiError(null); setSnapErr(null);
     try {
@@ -168,6 +200,8 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
     }
     setSnap(null); onLogged?.(); onClose();
   };
+
+  const openManual = (initial: Partial<EditableFood> = {}) => { setAiError(null); setSnapErr(null); setEditorAutoScan(false); setEditor(initial); };
 
   if (aiBusy && !snap) {
     return (
@@ -194,7 +228,10 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   if (selected) {
     const n = norm(selected);
     const mi = micros(selected);
-    const factor = Number(quantity || "0") / n.servingSize;
+    const qtyNum = Number(quantity || "0");
+    const factor = qtyNum / n.servingSize;
+    const scaled = scaleFood({ servingSize: n.servingSize, calories: n.calories, proteinG: n.proteinG, carbsG: n.carbsG, fatG: n.fatG }, qtyNum);
+    const scaledFor: Record<"calories" | "protein" | "carbs" | "fat", number> = { calories: scaled.calories, protein: scaled.proteinG, carbs: scaled.carbsG, fat: scaled.fatG };
     const img = selected.image_url ?? selected.imageUrl;
     const microRows: [string, number, string][] = [
       ["Fiber", mi.fiberG, "g"], ["Sugar", mi.sugarG, "g"], ["Sat. fat", mi.saturatedFatG, "g"], ["Sodium", mi.sodiumMg, "mg"],
@@ -209,14 +246,24 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
             <div className="min-w-0">{selected.brand && <div className="truncate text-sm text-muted-foreground">{selected.brand}</div>}<div className="text-xs text-muted-foreground">per {n.servingSize} {n.servingUnit}</div></div>
           </div>
           <div className="flex flex-wrap gap-2">{MEALS.map((m) => <Chip key={m} selected={meal === m} onClick={() => setMeal(m)}>{mealLabel(m)}</Chip>)}</div>
-          <Field label={`Quantity (${n.servingUnit})`} inputMode="numeric" value={quantity} onChange={(e) => setQuantity(e.target.value.replace(/[^\d.]/g, ""))} />
+          {/* Portion — quick serving multipliers + an exact amount, live-scaled. */}
+          <div className="space-y-2.5">
+            <div className="flex flex-wrap gap-2">
+              {SERVING_PRESETS.map((s) => {
+                const qv = servingsToQuantity(n.servingSize, s);
+                return <Chip key={s} selected={Math.abs(qtyNum - qv) < 0.05} onClick={() => setQuantity(String(qv))}>{s}×</Chip>;
+              })}
+            </div>
+            <Field label={`Amount (${n.servingUnit})`} inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1"))} />
+          </div>
           <div className="grid grid-cols-4 gap-2">
-            {([["calories", n.calories], ["protein", n.proteinG], ["carbs", n.carbsG], ["fat", n.fatG]] as const).map(([metric, v]) => {
+            {(["calories", "protein", "carbs", "fat"] as const).map((metric) => {
               const M = METRICS[metric];
+              const v = scaledFor[metric];
               return (
                 <div key={metric} className={cn("flex flex-col items-center gap-1 rounded-xl p-2.5", toneSoft[M.tone])}>
                   <M.icon className="size-4" />
-                  <div className="numeral text-lg font-semibold leading-none">{metric === "calories" ? kcalToDisplay(v * factor, units).toLocaleString() : Math.round(v * factor)}</div>
+                  <div className="numeral text-lg font-semibold leading-none">{metric === "calories" ? kcalToDisplay(v, units).toLocaleString() : Math.round(v)}</div>
                 </div>
               );
             })}
@@ -234,48 +281,128 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
     );
   }
 
+  const results = (
+    <div ref={resultsRef} className="max-h-80 space-y-1 overflow-y-auto">
+      {localFiltered.map((f) => <FoodResult key={f.id} food={f} onPick={() => rowClick(f)} />)}
+      {extFiltered.map((f, i) => <FoodResult key={`ext-${i}`} food={f} onPick={() => rowClick(f)} />)}
+      {searching && external.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Searching…</p>}
+      {hasQuery && q.trim().length >= 2 && !searching && localFiltered.length === 0 && extFiltered.length === 0 && (
+        <div className="space-y-1">
+          {/* Signpost inline creation when nothing matches. */}
+          <button onClick={() => openManual({ name: q.trim() })} className="flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-secondary">
+            <IconBadge icon={Plus} tone="primary" size="sm" />
+            <span className="min-w-0"><span className="block truncate font-medium">Create “{q.trim()}”</span><span className="block text-xs text-muted-foreground">Add it as a new food</span></span>
+          </button>
+          {!onPick && <p className="px-2 pt-0.5 text-xs text-muted-foreground">Or scan a barcode or snap a photo above.</p>}
+        </div>
+      )}
+      {extPage > 0 && extMore && (
+        <>
+          <div ref={sentinelRef} aria-hidden className="h-px" />
+          <Button variant="ghost" className="w-full" disabled={searching} onClick={() => void searchExternal(extPage + 1)}>{searching ? "Loading…" : "Load more results"}</Button>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <Sheet
       open
       onClose={onClose}
       title="Add food"
       titleAction={
-        <div className="flex items-center gap-1.5">
-          <button onClick={() => setScanOpen(true)} className="grid size-9 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]" aria-label="Scan barcode"><Barcode /></button>
-          {!onPick && (
-            <label className="grid size-9 cursor-pointer place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]" aria-label="Snap a meal">
-              {aiBusy ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Camera />}
-              <input ref={snapInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void snapMeal(e.target.files[0])} />
-            </label>
-          )}
-          <button onClick={() => { setEditorAutoScan(false); setEditor({}); }} className="grid size-9 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]" aria-label="Add manually"><PencilLine /></button>
-        </div>
+        // Pick mode keeps the compact header actions (no snap-a-meal); log mode
+        // promotes them to the hero tiles below.
+        onPick ? (
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setScanOpen(true)} className="grid size-9 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]" aria-label="Scan barcode"><Barcode /></button>
+            <button onClick={() => openManual()} className="grid size-9 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]" aria-label="Add manually"><PencilLine /></button>
+          </div>
+        ) : undefined
       }
     >
-      <div className="space-y-3">
-        <Field label="Search foods" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-        <SegmentedControl
-          options={[{ value: "all", label: "All" }, { value: "whole", label: "Whole" }, { value: "branded", label: "Branded" }]}
-          value={filter}
-          onChange={setFilter}
-        />
-        {aiError && <p className="text-sm text-warning">{aiError}</p>}
-        {snapErr != null && <AiErrorBox error={snapErr} />}
-        <div ref={resultsRef} className="max-h-80 space-y-1 overflow-y-auto">
-          {local.filter(matchesFilter).map((f) => <FoodResult key={f.id} food={f} onPick={() => rowClick(f)} />)}
-          {external.filter(matchesFilter).map((f, i) => <FoodResult key={`ext-${i}`} food={f} onPick={() => rowClick(f)} />)}
-          {searching && external.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Searching…</p>}
-          {q.length >= 2 && !searching && local.filter(matchesFilter).length === 0 && external.filter(matchesFilter).length === 0 && (
-            <p className="p-4 text-center text-sm text-muted-foreground">No matches — scan a barcode or add it manually.</p>
+      {/* Single hidden snap input — shared by the hero tile, the search toolbar,
+          the retake action, and autoCamera (log mode only). */}
+      {!onPick && (
+        <input ref={snapInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void snapMeal(e.target.files[0])} />
+      )}
+
+      <div className="space-y-4">
+        {/* LANDING (log mode, empty query): hero AI actions + recents rail. */}
+        {!onPick && !hasQuery && (
+          <>
+            <div className="space-y-2.5">
+              {/* Snap a meal — the premium hero (gated the same as before: log mode). */}
+              <button onClick={() => snapInputRef.current?.click()} className="group relative flex w-full items-center gap-4 overflow-hidden rounded-2xl bg-primary p-4 text-left text-primary-foreground shadow-sm transition-transform active:scale-[0.99]">
+                <span aria-hidden className="pointer-events-none absolute -right-6 -top-10 size-32 rounded-full bg-white/20 blur-2xl" />
+                <span className="relative grid size-12 shrink-0 place-items-center rounded-2xl bg-white/20 [&_svg]:size-6"><Camera /></span>
+                <span className="relative min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5 font-semibold"><Sparkles className="size-4" /> Snap a meal</span>
+                  <span className="mt-0.5 block text-sm text-primary-foreground/80">Photo → macros in seconds</span>
+                </span>
+                <ChevronRight className="relative size-5 shrink-0 opacity-80" />
+              </button>
+              <div className="grid grid-cols-2 gap-2.5">
+                <button onClick={() => setScanOpen(true)} className="flex items-center gap-3 rounded-2xl bg-card p-3 text-left transition-colors hover:bg-secondary">
+                  <IconBadge icon={Barcode} tone="nutrition" size="sm" />
+                  <span className="min-w-0"><span className="block truncate text-sm font-medium">Scan barcode</span><span className="block truncate text-xs text-muted-foreground">Packaged food</span></span>
+                </button>
+                <button onClick={() => openManual()} className="flex items-center gap-3 rounded-2xl bg-card p-3 text-left transition-colors hover:bg-secondary">
+                  <IconBadge icon={PencilLine} tone="neutral" size="sm" />
+                  <span className="min-w-0"><span className="block truncate text-sm font-medium">Add manually</span><span className="block truncate text-xs text-muted-foreground">Custom entry</span></span>
+                </button>
+              </div>
+            </div>
+
+            {recents.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{recentTab === "frequent" ? "Most logged" : "Recent"}</h3>
+                  <SegmentedControl
+                    options={[{ value: "recent", label: "Recent" }, { value: "frequent", label: "Frequent" }]}
+                    value={recentTab}
+                    onChange={setRecentTab}
+                  />
+                </div>
+                <div className="space-y-1">
+                  {recentList.map((r) => (
+                    <button key={`${r.food_id ?? r.label}`} onClick={() => void relog(r)} className="block w-full rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary">
+                      <FoodRow
+                        {...normFood(r)}
+                        sub={r.quantity ? `${Math.round(r.quantity)} ${r.unit ?? "g"}` : undefined}
+                        thumbSize={44}
+                        trailing={<span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary [&_svg]:size-4"><Plus /></span>}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        <div className="space-y-3">
+          <Field label="Search foods" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} autoFocus={!!onPick} />
+          {/* Compact action toolbar while searching (log mode) — keeps snap /
+              scan / manual one tap away, and snap still passes the query as a hint. */}
+          {!onPick && hasQuery && (
+            <div className="flex gap-2">
+              <button onClick={() => snapInputRef.current?.click()} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-4"><Camera /> Snap</button>
+              <button onClick={() => setScanOpen(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-4"><Barcode /> Scan</button>
+              <button onClick={() => openManual()} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-4"><PencilLine /> Manual</button>
+            </div>
           )}
-          {extPage > 0 && extMore && (
-            <>
-              <div ref={sentinelRef} aria-hidden className="h-px" />
-              <Button variant="ghost" className="w-full" disabled={searching} onClick={() => void searchExternal(extPage + 1)}>{searching ? "Loading…" : "Load more results"}</Button>
-            </>
-          )}
+          <SegmentedControl
+            options={[{ value: "all", label: "All" }, { value: "whole", label: "Whole" }, { value: "branded", label: "Branded" }]}
+            value={filter}
+            onChange={setFilter}
+          />
+          {snapErr != null && <AiErrorBox error={snapErr} />}
+          {aiError && <p className="text-sm text-warning">{aiError}</p>}
+          {results}
         </div>
       </div>
+
       {scanOpen && <BarcodeScanner onDetected={(code) => void lookupBarcode(code)} onClose={() => setScanOpen(false)} />}
       {editor && (
         <FoodEditor
