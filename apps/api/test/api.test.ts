@@ -1213,6 +1213,26 @@ describe("progress analytics aggregation", () => {
     expect(p.consistency.heatmap[today]).toBeGreaterThanOrEqual(2); // check-in + weigh-in
   });
 
+  it("scopes every series to an explicit custom start/end window", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "CustomRangePat" }) })).json()) as { client: { id: string } };
+    // Three weigh-ins spread across April; a custom window should include only
+    // the middle one and echo the exact window it was asked for.
+    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-01", weightKg: 85 } }) });
+    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-15", weightKg: 83 } }) });
+    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-30", weightKg: 81 } }) });
+
+    const p = (await (await SELF.fetch(`http://x/api/progress/${client.id}?start=2026-04-10&end=2026-04-20&today=2026-05-20`, { headers: auth(ownerCookie) })).json()) as {
+      range: { start: string; end: string; days: string[] };
+      body: { weight: { date: string; v: number }[]; latest: { weightKg: number | null } };
+    };
+    expect(p.range.start).toBe("2026-04-10");
+    expect(p.range.end).toBe("2026-04-20");
+    expect(p.range.days.length).toBe(11); // inclusive 10th→20th
+    expect(p.body.weight.map((w) => w.date)).toEqual(["2026-04-15"]);
+    expect(p.body.latest.weightKg).toBe(83);
+  });
+
   it("grades calorie adherence against the goal in force on each day, not the current one", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "TimeGoal" }) })).json()) as { client: { id: string } };
