@@ -135,8 +135,8 @@ export function MediaLibrary({ onBack }: { onBack: () => void }) {
                 {it.canDelete && (
                   <button
                     onClick={() => setToDelete(it)}
-                    aria-label="Delete media"
-                    className="absolute right-1.5 top-1.5 grid size-8 place-items-center rounded-full bg-background/80 text-muted-foreground opacity-0 backdrop-blur transition-opacity hover:text-danger focus:opacity-100 group-hover:opacity-100 [&_svg]:size-4"
+                    aria-label={`Delete ${PURPOSE_LABEL[it.purpose] ?? "media"}`}
+                    className="absolute right-1.5 top-1.5 grid size-8 place-items-center rounded-full bg-background/85 text-danger shadow-sm backdrop-blur transition-transform hover:scale-105 active:scale-95 [&_svg]:size-4"
                   >
                     <Trash2 />
                   </button>
