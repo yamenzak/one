@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@mossa/protocol";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, cn, colorToHex, Reveal, SkeletonLine, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, Save, History, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Input, Select, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, cn, colorToHex, Reveal, SkeletonLine, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, CheckCheck, Save, History, X } from "@mossa/ui";
 import { api, ApiError } from "../../api.js";
 import { ClientPrefsStrip } from "./ClientPrefsStrip.js";
 import { AiErrorBox } from "../../AiError.js";
@@ -46,7 +46,38 @@ function normalizeSetForMode(set: WorkoutSet, mode: MeasurementMode): void {
 }
 const emptyBlock = (): WorkoutBlock => ({ type: "single", slots: [] });
 const emptyDay = (name: string): WorkoutDay => ({ name, isRestDay: false, blocks: [] });
-const inputCls = "rounded-lg bg-surface-3 px-2.5 py-1.5 text-sm outline-none ring-ring focus:ring-2";
+
+const BLOCK_TYPES: { value: WorkoutBlock["type"]; label: string }[] = [
+  { value: "single", label: "Single" }, { value: "superset", label: "Superset" }, { value: "circuit", label: "Circuit" }, { value: "hiit", label: "HIIT" },
+];
+
+/** One-tap set templates — populate a slot's sets[] in a single action instead of
+ *  adding + hand-editing identical empty rows. `reps: null` + `amrap` = "to failure". */
+const SET_PRESETS: { label: string; count: number; reps: number | null; setType: WorkoutSet["setType"] }[] = [
+  { label: "3×10", count: 3, reps: 10, setType: "working" },
+  { label: "4×8", count: 4, reps: 8, setType: "working" },
+  { label: "5×5", count: 5, reps: 5, setType: "working" },
+  { label: "3× failure", count: 3, reps: null, setType: "amrap" },
+];
+
+/** Build a slot's sets from a preset, honouring the slot's current measurement
+ *  mode (rep targets only land on rep-based modes; others get the count alone). */
+const setsFromPreset = (preset: (typeof SET_PRESETS)[number], mode: MeasurementMode): WorkoutSet[] =>
+  Array.from({ length: preset.count }, () => {
+    const s = emptySetFor(mode);
+    s.setType = preset.setType;
+    if (mode === "reps" || mode === "reps_in_time") s.reps = preset.reps;
+    return s;
+  });
+
+/** Prescription fields fill-down copies from one set to its siblings. Each set's
+ *  own setType (warmup/working/amrap) and notes are intentionally preserved. */
+const copyPrescription = (src: WorkoutSet, dst: WorkoutSet): WorkoutSet => ({
+  ...dst,
+  reps: src.reps, timeSec: src.timeSec, distanceM: src.distanceM,
+  weightMode: src.weightMode, weightValue: src.weightValue, percent1rm: src.percent1rm,
+  rpe: src.rpe, rir: src.rir, restAfterSec: src.restAfterSec, tempo: src.tempo,
+});
 
 /** The tenant's live accent colour as #rrggbb (read from the applied --primary). */
 const accentHex = (): string => { try { return colorToHex(getComputedStyle(document.documentElement).getPropertyValue("--primary").trim()); } catch { return "#10b981"; } };
@@ -239,36 +270,49 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
           </Card>
 
           {!day.isRestDay && day.blocks.map((block, blockIdx) => (
-            <Card key={blockIdx} className="space-y-3">
-              <div className="flex items-center justify-between">
-                <select value={block.type} onChange={(e) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.type = e.target.value as WorkoutBlock["type"]))} className="rounded-full bg-secondary px-3 py-1.5 text-sm outline-none">
-                  <option value="single">Single</option><option value="superset">Superset</option><option value="circuit">Circuit</option><option value="hiit">HIIT</option>
-                </select>
-                <button onClick={() => mutate((d) => d[dayIdx]!.blocks.splice(blockIdx, 1))} className="grid size-8 place-items-center rounded-full text-danger hover:bg-danger-soft [&_svg]:size-4"><Trash2 /></button>
+            <Card key={blockIdx} className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Select value={block.type} onChange={(v) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.type = v as WorkoutBlock["type"]))} options={BLOCK_TYPES} aria-label="Block type" className="h-10 w-36" />
+                <div className="flex-1" />
+                <button onClick={() => mutate((d) => d[dayIdx]!.blocks.splice(blockIdx, 1))} aria-label="Remove block" className="grid size-9 place-items-center rounded-xl text-danger hover:bg-danger-soft [&_svg]:size-4"><Trash2 /></button>
               </div>
 
               {block.type !== "single" && (
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <label className="flex flex-col gap-1 text-muted-foreground">Rounds<input type="number" value={block.rounds ?? ""} placeholder="1" onChange={(e) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.rounds = e.target.value ? Number(e.target.value) : null))} className={inputCls} /></label>
-                  <label className="flex flex-col gap-1 text-muted-foreground">Rest/exercise<input type="number" value={block.restBetweenExercisesSec ?? ""} placeholder="s" onChange={(e) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.restBetweenExercisesSec = e.target.value ? Number(e.target.value) : null))} className={inputCls} /></label>
-                  <label className="flex flex-col gap-1 text-muted-foreground">Rest/round<input type="number" value={block.restBetweenRoundsSec ?? ""} placeholder="s" onChange={(e) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.restBetweenRoundsSec = e.target.value ? Number(e.target.value) : null))} className={inputCls} /></label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Field label="Rounds" type="number" inputMode="numeric" value={block.rounds ?? ""} placeholder="1" onChange={(e) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.rounds = e.target.value ? Number(e.target.value) : null))} />
+                  <Field label="Rest/exercise" type="number" inputMode="numeric" value={block.restBetweenExercisesSec ?? ""} placeholder="s" onChange={(e) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.restBetweenExercisesSec = e.target.value ? Number(e.target.value) : null))} />
+                  <Field label="Rest/round" type="number" inputMode="numeric" value={block.restBetweenRoundsSec ?? ""} placeholder="s" onChange={(e) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.restBetweenRoundsSec = e.target.value ? Number(e.target.value) : null))} />
                 </div>
               )}
 
-              {block.slots.map((slot, slotIdx) => (
-                <SubCard key={slotIdx} className="space-y-2">
+              {block.slots.map((slot, slotIdx) => {
+                const setSlot = (fn: (sl: ExerciseSlot) => void) => mutate((d) => fn(d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!));
+                const applyToAll = (setIdx: number) => setSlot((sl) => { const src = sl.sets[setIdx]!; sl.sets = sl.sets.map((s, i) => (i === setIdx ? s : copyPrescription(src, s))); });
+                return (
+                <SubCard key={slotIdx} className="space-y-3">
                   <ExerciseRow ex={exOf(slot.exerciseId)} name={nameOf(slot.exerciseId)} meta={false} thumbSize={34} trailing={<>
-                    <select value={slot.measurementMode} onChange={(e) => { const nm = e.target.value as MeasurementMode; mutate((d) => { const sl = d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!; sl.measurementMode = nm; sl.sets.forEach((s) => normalizeSetForMode(s, nm)); }); }} className="rounded-lg bg-surface-3 px-2 py-1 text-xs outline-none">{MEASURE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select>
-                    <button onClick={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots.splice(slotIdx, 1))} className="text-muted-foreground hover:text-danger [&_svg]:size-4"><X /></button>
+                    <Select value={slot.measurementMode} onChange={(v) => { const nm = v as MeasurementMode; setSlot((sl) => { sl.measurementMode = nm; sl.sets.forEach((s) => normalizeSetForMode(s, nm)); }); }} options={MEASURE_MODES} aria-label="Measurement mode" className="h-9 w-32 text-xs" />
+                    <button onClick={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots.splice(slotIdx, 1))} aria-label="Remove exercise" className="text-muted-foreground hover:text-danger [&_svg]:size-4"><X /></button>
                   </>} />
+
+                  {/* Bulk-set presets — replace the slot's sets in one tap. */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[0.7rem] font-medium uppercase tracking-wide text-muted-foreground">Quick sets</span>
+                    {SET_PRESETS.map((p) => (
+                      <Chip key={p.label} className="h-8 px-3 text-xs" onClick={() => setSlot((sl) => { sl.sets = setsFromPreset(p, sl.measurementMode); })}>{p.label}</Chip>
+                    ))}
+                  </div>
+
                   {slot.sets.map((set, setIdx) => (
                     <SetRow key={setIdx} set={set} index={setIdx} mode={slot.measurementMode}
                       onPatch={(p) => mutate((d) => Object.assign(d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.sets[setIdx]!, p))}
-                      onRemove={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.sets.splice(setIdx, 1))} />
+                      onApplyToAll={slot.sets.length > 1 ? () => applyToAll(setIdx) : undefined}
+                      onRemove={() => setSlot((sl) => sl.sets.splice(setIdx, 1))} />
                   ))}
-                  <button onClick={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.sets.push(emptySetFor(slot.measurementMode)))} className="text-xs font-medium text-primary">+ Set</button>
+                  <button onClick={() => setSlot((sl) => sl.sets.push(emptySetFor(sl.measurementMode)))} className="text-xs font-medium text-primary">+ Set</button>
                 </SubCard>
-              ))}
+                );
+              })}
               <button onClick={() => setPicker({ blockIdx })} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-secondary py-2.5 text-sm text-muted-foreground [&_svg]:size-4"><Plus /> Add exercise</button>
             </Card>
           ))}
@@ -342,50 +386,47 @@ function CopyWeekSheet({ dayCount, onClose, onCopy }: { dayCount: number; onClos
   );
 }
 
-function SetRow({ set, index, mode, onPatch, onRemove }: { set: WorkoutSet; index: number; mode: MeasurementMode; onPatch: (p: Partial<WorkoutSet>) => void; onRemove: () => void }) {
+function SetRow({ set, index, mode, onPatch, onApplyToAll, onRemove }: { set: WorkoutSet; index: number; mode: MeasurementMode; onPatch: (p: Partial<WorkoutSet>) => void; onApplyToAll?: () => void; onRemove: () => void }) {
   const [open, setOpen] = useState(false);
   const wm = WEIGHT_MODES.find((m) => m.value === set.weightMode);
   const num = (v: string) => (v ? Number(v) : null);
+  const cell = "h-10 w-16 shrink-0 px-2.5 text-center text-sm";
   return (
     <div className="rounded-xl bg-surface-3/40 p-2">
-      <div className="flex items-center gap-1.5 text-sm">
-        <button onClick={() => setOpen((o) => !o)} className="w-6 shrink-0 text-muted-foreground"><ChevronRight className={`size-3.5 transition-transform ${open ? "rotate-90" : ""}`} /></button>
-        <span className="w-4 shrink-0 text-xs text-muted-foreground">{index + 1}</span>
+      <div className="flex items-center gap-1.5">
+        <button onClick={() => setOpen((o) => !o)} aria-label={open ? "Collapse set" : "Expand set"} className="w-5 shrink-0 text-muted-foreground"><ChevronRight className={`size-3.5 transition-transform ${open ? "rotate-90" : ""}`} /></button>
+        <span className="w-4 shrink-0 text-center text-xs font-medium text-muted-foreground">{index + 1}</span>
         {(mode === "reps" || mode === "reps_in_time") && (
-          <input type="number" placeholder="reps" value={set.reps ?? ""} onChange={(e) => onPatch({ reps: num(e.target.value) })} className={`${inputCls} w-14`} />
+          <Input type="number" inputMode="numeric" aria-label="Reps" placeholder="reps" value={set.reps ?? ""} onChange={(e) => onPatch({ reps: num(e.target.value) })} className={cell} />
         )}
         {(mode === "time" || mode === "reps_in_time") && (
-          <input type="number" placeholder="sec" value={set.timeSec ?? ""} onChange={(e) => onPatch({ timeSec: num(e.target.value) })} className={`${inputCls} w-14`} />
+          <Input type="number" inputMode="numeric" aria-label="Seconds" placeholder="sec" value={set.timeSec ?? ""} onChange={(e) => onPatch({ timeSec: num(e.target.value) })} className={cell} />
         )}
         {mode === "distance" && (
-          <input type="number" placeholder="m" value={set.distanceM ?? ""} onChange={(e) => onPatch({ distanceM: num(e.target.value) })} className={`${inputCls} w-14`} />
+          <Input type="number" inputMode="numeric" aria-label="Metres" placeholder="m" value={set.distanceM ?? ""} onChange={(e) => onPatch({ distanceM: num(e.target.value) })} className={cell} />
         )}
-        <select value={set.weightMode} onChange={(e) => onPatch({ weightMode: e.target.value as WeightMode })} className={`${inputCls} min-w-0 flex-1`}>{WEIGHT_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select>
+        <Select value={set.weightMode} onChange={(v) => onPatch({ weightMode: v as WeightMode })} options={WEIGHT_MODES.map((m) => ({ value: m.value, label: m.label }))} aria-label="Weight mode" className="h-10 min-w-0 flex-1" />
         {wm?.unit && wm.value !== "bodyweight" && wm.value !== "unspecified" && (
-          <input type="number" placeholder={wm.unit} value={set.weightMode === "percent_1rm" ? (set.percent1rm ?? "") : (set.weightValue ?? "")} onChange={(e) => onPatch(set.weightMode === "percent_1rm" ? { percent1rm: num(e.target.value) } : { weightValue: num(e.target.value) })} className={`${inputCls} w-16`} />
+          <Input type="number" inputMode="decimal" aria-label={wm.unit} placeholder={wm.unit} value={set.weightMode === "percent_1rm" ? (set.percent1rm ?? "") : (set.weightValue ?? "")} onChange={(e) => onPatch(set.weightMode === "percent_1rm" ? { percent1rm: num(e.target.value) } : { weightValue: num(e.target.value) })} className={cell} />
         )}
-        <button onClick={onRemove} className="text-muted-foreground hover:text-danger [&_svg]:size-3.5"><X /></button>
+        {onApplyToAll && (
+          <button onClick={onApplyToAll} title="Apply this set's reps, load, RPE/RIR, rest & tempo to every set" aria-label="Apply to all sets" className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-surface-3 hover:text-primary [&_svg]:size-4"><CheckCheck /></button>
+        )}
+        <button onClick={onRemove} aria-label="Remove set" className="shrink-0 text-muted-foreground hover:text-danger [&_svg]:size-3.5"><X /></button>
       </div>
       {open && (
-        <div className="mt-2 grid grid-cols-2 gap-2 pl-6 text-xs sm:grid-cols-4">
-          <label className="flex flex-col gap-1 text-muted-foreground">Type
-            <select value={set.setType} onChange={(e) => onPatch({ setType: e.target.value as WorkoutSet["setType"] })} className={inputCls}>{SET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select>
-          </label>
-          <label className="flex flex-col gap-1 text-muted-foreground">RPE
-            <input type="number" min={1} max={10} value={set.rpe ?? ""} onChange={(e) => onPatch({ rpe: num(e.target.value) })} className={inputCls} />
-          </label>
-          <label className="flex flex-col gap-1 text-muted-foreground">RIR
-            <input type="number" min={0} max={10} value={set.rir ?? ""} onChange={(e) => onPatch({ rir: num(e.target.value) })} className={inputCls} />
-          </label>
-          <label className="flex flex-col gap-1 text-muted-foreground">Rest s
-            <input type="number" value={set.restAfterSec ?? ""} onChange={(e) => onPatch({ restAfterSec: num(e.target.value) })} className={inputCls} />
-          </label>
-          <label className="col-span-2 flex flex-col gap-1 text-muted-foreground sm:col-span-2">Tempo
-            <input value={set.tempo ?? ""} placeholder="3-1-1-0" onChange={(e) => onPatch({ tempo: e.target.value || null })} className={inputCls} />
-          </label>
-          <label className="col-span-2 flex flex-col gap-1 text-muted-foreground sm:col-span-2">Notes
-            <input value={set.notes ?? ""} onChange={(e) => onPatch({ notes: e.target.value || null })} className={inputCls} />
-          </label>
+        <div className="mt-2.5 space-y-2.5 pl-6">
+          <div>
+            <div className="mb-1.5 text-xs font-medium text-muted-foreground">Set type</div>
+            <SegmentedControl fill value={set.setType} onChange={(v) => onPatch({ setType: v as WorkoutSet["setType"] })} options={SET_TYPES.map((t) => ({ value: t, label: t }))} />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Field label="RPE" type="number" inputMode="decimal" min={1} max={10} value={set.rpe ?? ""} onChange={(e) => onPatch({ rpe: num(e.target.value) })} />
+            <Field label="RIR" type="number" inputMode="decimal" min={0} max={10} value={set.rir ?? ""} onChange={(e) => onPatch({ rir: num(e.target.value) })} />
+            <Field label="Rest s" type="number" inputMode="numeric" value={set.restAfterSec ?? ""} onChange={(e) => onPatch({ restAfterSec: num(e.target.value) })} />
+          </div>
+          <Field label="Tempo" value={set.tempo ?? ""} placeholder="3-1-1-0" onChange={(e) => onPatch({ tempo: e.target.value || null })} />
+          <Field label="Notes" value={set.notes ?? ""} onChange={(e) => onPatch({ notes: e.target.value || null })} />
         </div>
       )}
     </div>
