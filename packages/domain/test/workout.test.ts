@@ -1,14 +1,39 @@
 import { describe, expect, it } from "vitest";
 import { estimateBurnedCalories, estimateWorkoutBurn } from "../src/activity.js";
 import {
+  computePlates,
   detectPrs,
   epley1Rm,
   pickPlanForDate,
   recommendNextDay,
   sessionLoad,
   sessionTonnage,
+  DEFAULT_BARBELL_KG,
   type ExerciseBests,
 } from "../src/workout.js";
+
+describe("plate math", () => {
+  it("breaks a target into per-side plates on a 20kg bar", () => {
+    // 100kg → 40kg/side → 25 + 15
+    expect(computePlates(100)).toEqual({ perSide: [25, 15], remainderKg: 0, barKg: 20 });
+    // 60kg → 20kg/side → 20
+    expect(computePlates(60).perSide).toEqual([20]);
+    // 62.5kg → 21.25/side → 20 + 1.25
+    expect(computePlates(62.5)).toEqual({ perSide: [20, 1.25], remainderKg: 0, barKg: 20 });
+  });
+  it("returns no plates at or below the bar", () => {
+    expect(computePlates(20)).toEqual({ perSide: [], remainderKg: 0, barKg: 20 });
+    expect(computePlates(15).perSide).toEqual([]);
+  });
+  it("surfaces an unrepresentable remainder instead of throwing", () => {
+    // 21kg → 0.5/side, smallest plate is 1.25 → remainder 0.5
+    expect(computePlates(21)).toEqual({ perSide: [], remainderKg: 0.5, barKg: 20 });
+  });
+  it("honors a custom bar + plate set", () => {
+    expect(computePlates(50, { barKg: 10, plates: [20, 10] })).toEqual({ perSide: [20], remainderKg: 0, barKg: 10 });
+    expect(DEFAULT_BARBELL_KG).toBe(20);
+  });
+});
 
 describe("workout math", () => {
   it("Epley e1RM = w(1 + r/30)", () => {

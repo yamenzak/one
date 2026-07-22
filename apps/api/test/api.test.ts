@@ -1575,6 +1575,29 @@ describe("roster activity pulse (coach Today)", () => {
   });
 });
 
+describe("exercise last performance (progressive-overload hint)", () => {
+  it("returns the most recent prior session's sets for an exercise", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "LastPerf" }) })).json()) as { client: { id: string } };
+    const set = (date: string, weightKg: number) => SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date, workoutPlanId: "wp-lp", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "ex_squat", sets: [{ setIndex: 0, reps: 5, weightKg, completed: true }] } }) });
+    await set("2026-06-01", 60);
+    await set("2026-06-08", 65); // the most recent prior session
+    await set("2026-06-15", 70); // "today" (excluded by `before`)
+
+    const r = (await (await SELF.fetch(`http://x/api/logs/exercise-last?clientId=${client.id}&exerciseId=ex_squat&before=2026-06-15`, { headers: auth(ownerCookie) })).json()) as {
+      last: { date: string; sets: { reps: number | null; weightKg: number | null }[] } | null;
+    };
+    expect(r.last?.date).toBe("2026-06-08");
+    expect(r.last?.sets[0]?.weightKg).toBe(65);
+    expect(r.last?.sets[0]?.reps).toBe(5);
+    // An exercise never logged → null.
+    const none = (await (await SELF.fetch(`http://x/api/logs/exercise-last?clientId=${client.id}&exerciseId=ex_never`, { headers: auth(ownerCookie) })).json()) as { last: unknown };
+    expect(none.last).toBeNull();
+    // Another tenant is denied.
+    expect((await SELF.fetch(`http://x/api/logs/exercise-last?clientId=${client.id}&exerciseId=ex_squat`, { headers: auth(otherCookie) })).status).toBe(404);
+  });
+});
+
 describe("workout logging — measurement modes (SPEC §8.3)", () => {
   it("persists reps, time, and distance sets and reads them back per slot", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
