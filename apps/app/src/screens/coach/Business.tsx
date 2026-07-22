@@ -1,7 +1,7 @@
 /** Owner Business — tabbed: overview (plan + credits + AI usage), packages, staff. */
 
 import { useEffect, useState } from "react";
-import { Button, Card, Badge, StatCard, SegmentedControl, Field, Page, Stagger, ChartCard, SectionHeader, IconBadge, EmptyState, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Sparkles, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, CheckCheck, Check, Lock, Tag } from "@mossa/ui";
+import { Button, Card, Badge, SegmentedControl, Field, Page, Stagger, ChartCard, SectionHeader, Eyebrow, GlanceStrip, IconBadge, EmptyState, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Sparkles, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, CheckCheck, Check, Lock, Tag } from "@mossa/ui";
 import { FEATURE_KEYS, FEATURE_META, QUOTA_KEYS, QUOTA_META, type Entitlements } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -157,11 +157,12 @@ function Overview() {
             </Stagger>
           )}
 
-          <Stagger className="grid grid-cols-2 gap-3">
-            <StatCard stack label="Plan" value={billing.subscription.planName} icon={CreditCard} tone="primary"
-              badge={<Badge tone={billing.subscription.status === "active" || billing.subscription.status === "trialing" ? "success" : billing.subscription.comp ? "neutral" : "danger"}>{billing.subscription.comp ? "Comped" : billing.subscription.status}</Badge>} />
-            <StatCard stack label="AI credits" value={billing.balance.available.toLocaleString()} unit="left" icon={Sparkles} tone="warning"
-              badge={<Badge tone="neutral">1 cr = $0.001</Badge>} />
+          {/* Headline glance — plan + credit balance, deliberately card-less. */}
+          <Stagger>
+            <GlanceStrip items={[
+              { icon: CreditCard, tone: "primary", value: billing.subscription.planName, label: billing.subscription.comp ? "Comped plan" : `${billing.subscription.status} plan` },
+              { icon: Sparkles, tone: "warning", value: billing.balance.available.toLocaleString(), label: "AI credits left" },
+            ]} />
           </Stagger>
 
           {/* Stripe Connect — sell packages to clients. */}
@@ -186,12 +187,17 @@ function Overview() {
             </Stagger>
           )}
 
-          {/* Client delinquency roll-up. */}
+          {/* Client delinquency roll-up — card-less counts under a section label. */}
           {canSell && billing.clientBilling && (billing.clientBilling.lapsed > 0 || billing.clientBilling.expiringSoon > 0) && (
-            <Stagger className="grid grid-cols-2 gap-3">
-              <StatCard stack label="Lapsed access" value={String(billing.clientBilling.lapsed)} unit="clients" icon={AlertTriangle} tone="danger" />
-              <StatCard stack label="Expiring ≤7d" value={String(billing.clientBilling.expiringSoon)} unit="clients" icon={History} tone="warning" />
-            </Stagger>
+            <section className="space-y-2">
+              <Eyebrow>Client billing</Eyebrow>
+              <Stagger>
+                <GlanceStrip items={[
+                  { icon: AlertTriangle, tone: "danger", value: billing.clientBilling.lapsed, label: "Lapsed access" },
+                  { icon: History, tone: "warning", value: billing.clientBilling.expiringSoon, label: "Expiring ≤ 7d" },
+                ]} />
+              </Stagger>
+            </section>
           )}
 
           {top.length > 0 && (
@@ -218,9 +224,10 @@ function Overview() {
             <Stagger><PlanFeatures ent={ctx.entitlements} /></Stagger>
           )}
 
-          <Stagger>
+          <section className="space-y-2">
+            <Eyebrow>Credit packs</Eyebrow>
+            <Stagger>
             <Card className="space-y-3">
-              <SectionHeader icon={CreditCard} tone="primary" title="Credit packs" />
               {/* Purchased credits never expire; the monthly plan grant resets each period. */}
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="numeral">{billing.balance.purchased.toLocaleString()} purchased</span>
@@ -247,13 +254,15 @@ function Overview() {
               </div>
               {!billing.stripeEnabled && <p className="text-xs text-muted-foreground">Credit-pack purchasing turns on once Stripe is configured.</p>}
             </Card>
-          </Stagger>
+            </Stagger>
+          </section>
 
           {/* Plan subscribe / change — inline (no redirect). Hidden for comped tenants. */}
           {isOwner && billing.stripeEnabled && !billing.subscription.comp && billing.plans && billing.plans.filter((p) => p.priceUsdMonth > 0 && p.id !== billing.subscription.planId).length > 0 && (
-            <Stagger>
+            <section className="space-y-2">
+              <Eyebrow>{billing.subscription.status === "active" ? "Change plan" : "Choose a plan"}</Eyebrow>
+              <Stagger>
               <Card className="space-y-3">
-                <SectionHeader icon={Sparkles} tone="primary" title={billing.subscription.status === "active" ? "Change plan" : "Choose a plan"} />
                 <div className="space-y-1.5">
                   {billing.plans.filter((p) => p.priceUsdMonth > 0 && p.id !== billing.subscription.planId).map((p) => (
                     <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5">
@@ -266,13 +275,15 @@ function Overview() {
                 </div>
                 <p className="text-xs text-muted-foreground">Billed monthly. Plan credits refresh each period; unused plan credits don't roll over.</p>
               </Card>
-            </Stagger>
+              </Stagger>
+            </section>
           )}
 
           {billing.ledger.length > 0 && (
-            <Stagger>
+            <section className="space-y-2">
+              <Eyebrow>Recent credit activity</Eyebrow>
+              <Stagger>
               <Card className="space-y-3">
-                <SectionHeader icon={History} tone="cardio" title="Recent credit activity" />
                 <div className="divide-y divide-border/40">
                   {billing.ledger.slice(-8).reverse().map((e, i) => (
                     <div key={i} className="flex items-center gap-3 py-2">
@@ -283,7 +294,8 @@ function Overview() {
                   ))}
                 </div>
               </Card>
-            </Stagger>
+              </Stagger>
+            </section>
           )}
         </>
         )}

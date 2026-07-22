@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, PhotoGrid, ConfirmDialog, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon, User } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, PhotoGrid, ConfirmDialog, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon, User } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
@@ -97,6 +97,7 @@ export function ClientManage({ clientId }: { clientId: string }) {
   const setSuppStatus = async (id: string, status: "active" | "paused") => { await api.patch(`/api/supplements/${id}`, { status }); await load(); };
 
   const active = subs?.find((s) => s.status === "active");
+  const activePkg = active ? packages.find((p) => p.id === active.packageId) : undefined;
   const pending = swaps.filter((s) => s.status === "pending");
 
   return (
@@ -109,47 +110,54 @@ export function ClientManage({ clientId }: { clientId: string }) {
         </>
       }>
       {subs && (<>
-      <Stagger>
-        <Card>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5"><IconBadge icon={Ticket} tone="primary" size="sm" /><h2 className="font-semibold">Access</h2></div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="secondary" onClick={() => setReportOpen(true)}><BarChart3 /> Report</Button>
-              <Button size="sm" onClick={() => setGrantOpen(true)}><Plus /> Grant</Button>
-            </div>
+      <section className="space-y-2">
+        <Eyebrow action={
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setReportOpen(true)}><BarChart3 /> Report</Button>
+            <Button size="sm" onClick={() => setGrantOpen(true)}><Plus /> Grant</Button>
           </div>
-          {active ? <div className="mt-3 flex items-center justify-between"><span className="text-sm text-muted-foreground">Active subscription</span><Badge tone="success">{active.daysRemaining} days left</Badge></div> : <p className="mt-2 text-sm text-muted-foreground">No active subscription. Grant a package (or a $0 comp) to unlock features.</p>}
-        </Card>
-      </Stagger>
+        }>Access</Eyebrow>
+        <Stagger>
+          {active ? (
+            <GlanceStrip items={[
+              { icon: Check, tone: "activity", value: "Active", label: "Status" },
+              { icon: Ticket, tone: "primary", value: active.daysRemaining, label: "Days left" },
+              { icon: ClipboardList, tone: "neutral", value: activePkg?.name ?? "—", label: "Plan" },
+            ]} />
+          ) : (
+            <Card><p className="text-sm text-muted-foreground">No active subscription. Grant a package (or a $0 comp) to unlock features.</p></Card>
+          )}
+        </Stagger>
+      </section>
 
-      <Stagger>
-        <div className="mb-2 flex items-center gap-2.5 px-1"><IconBadge icon={ClipboardList} tone="nutrition" size="sm" /><h2 className="font-semibold">Profile &amp; preferences</h2></div>
-        <PreferencesEditorCard clientId={clientId} includeProfile onSaved={load} />
-      </Stagger>
+      <section className="space-y-2">
+        <Eyebrow>Profile &amp; preferences</Eyebrow>
+        <Stagger>
+          <PreferencesEditorCard clientId={clientId} includeProfile onSaved={load} />
+        </Stagger>
+      </section>
 
       {pending.length > 0 && (
-        <Stagger>
-          <Card className="space-y-3">
-            <div className="flex items-center gap-2.5"><IconBadge icon={ArrowLeftRight} tone="cardio" size="sm" /><h2 className="font-semibold">Swap requests</h2><Badge tone="cardio">{pending.length}</Badge></div>
+        <section className="space-y-2">
+          <Eyebrow action={<Badge tone="cardio">{pending.length}</Badge>}>Swap requests</Eyebrow>
+          <Stagger className="space-y-3">
             {pending.map((s) => <div key={s.id} id={`mng-swap-${s.id}`}><SwapResolver swap={s} exercises={exercises} onResolve={resolveSwap} /></div>)}
-          </Card>
-        </Stagger>
+          </Stagger>
+        </section>
       )}
 
-      <Stagger>
-        <CheckInReview clientId={clientId} checkIns={checkIns} onFeedback={load} />
-      </Stagger>
+      <CheckInReview clientId={clientId} checkIns={checkIns} onFeedback={load} />
 
       {canSuppLabs && (
-      <Stagger>
-        <Card className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5"><IconBadge icon={Pill} tone="supplement" size="sm" /><h2 className="font-semibold">Supplements</h2></div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="tonal" onClick={() => setSuggestOpen(true)}><Sparkles /> Suggest</Button>
-              <Button size="sm" variant="secondary" onClick={() => setSuppOpen(true)}><Plus /> Prescribe</Button>
-            </div>
+      <section className="space-y-2">
+        <Eyebrow action={
+          <div className="flex gap-2">
+            <Button size="sm" variant="tonal" onClick={() => setSuggestOpen(true)}><Sparkles /> Suggest</Button>
+            <Button size="sm" variant="secondary" onClick={() => setSuppOpen(true)}><Plus /> Prescribe</Button>
           </div>
+        }>Supplements</Eyebrow>
+        <Stagger>
+        <Card className="space-y-3">
           {supps.length === 0 ? <p className="text-sm text-muted-foreground">No supplements prescribed.</p> : supps.map((s) => (
             <SubCard key={s.id} className="space-y-2">
               <div className="flex items-center justify-between gap-2">
@@ -166,16 +174,15 @@ export function ClientManage({ clientId }: { clientId: string }) {
             </SubCard>
           ))}
         </Card>
-      </Stagger>
+        </Stagger>
+      </section>
       )}
 
       {canSuppLabs && (
-      <Stagger>
+      <section className="space-y-2">
+        <Eyebrow action={<Button size="sm" variant="secondary" onClick={() => setLabOpen(true)}><Plus /> Request</Button>}>Lab tests</Eyebrow>
+        <Stagger>
         <Card className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5"><IconBadge icon={FlaskConical} tone="lab" size="sm" /><h2 className="font-semibold">Lab tests</h2></div>
-            <Button size="sm" variant="secondary" onClick={() => setLabOpen(true)}><Plus /> Request</Button>
-          </div>
           {labs.length === 0 ? <p className="text-sm text-muted-foreground">No lab tests.</p> : labs.map((l) => (
             <div key={l.id} className="flex items-center justify-between gap-2">
               <span className="min-w-0 truncate">{l.display_name}</span>
@@ -183,7 +190,8 @@ export function ClientManage({ clientId }: { clientId: string }) {
             </div>
           ))}
         </Card>
-      </Stagger>
+        </Stagger>
+      </section>
       )}
       </>)}
       </Reveal>
@@ -239,9 +247,10 @@ function ActivityLog({ clientId }: { clientId: string }) {
   }, [clientId]);
   if (items && items.length === 0) return null; // nothing to show yet — stay quiet
   return (
-    <Stagger>
+    <section className="space-y-2">
+      <Eyebrow>Activity log</Eyebrow>
+      <Stagger>
       <Card className="space-y-3">
-        <div className="flex items-center gap-2.5"><IconBadge icon={ClipboardList} tone="neutral" size="sm" /><h2 className="font-semibold">Activity log</h2></div>
         {!items ? (
           <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-8 animate-pulse rounded-lg bg-surface-2" />)}</div>
         ) : (
@@ -261,7 +270,8 @@ function ActivityLog({ clientId }: { clientId: string }) {
           </div>
         )}
       </Card>
-    </Stagger>
+      </Stagger>
+    </section>
   );
 }
 
@@ -332,11 +342,10 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
   };
   const send = async (id: string) => { const fb = draft[id]?.trim(); if (!fb) return; await api.post(`/api/check-ins/${id}/feedback`, { clientId, feedback: fb }); setDraft((d) => ({ ...d, [id]: "" })); await onFeedback(); };
   return (
-    <Card className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5"><IconBadge icon={ClipboardList} tone="nutrition" size="sm" /><h2 className="font-semibold">Check-ins</h2></div>
-        <Button size="sm" variant="tonal" disabled={busy || checkIns.length === 0} onClick={() => void summarize()}><Sparkles /> {busy ? "…" : "Summarize"}</Button>
-      </div>
+    <section className="space-y-2">
+      <Eyebrow action={<Button size="sm" variant="tonal" disabled={busy || checkIns.length === 0} onClick={() => void summarize()}><Sparkles /> {busy ? "…" : "Summarize"}</Button>}>Check-ins</Eyebrow>
+      <Stagger>
+      <Card className="space-y-3">
       {err ? <AiErrorBox error={err} /> : null}
       {summary && <SubCard className="flex items-start gap-2.5 text-sm"><AiAvatar className="size-7" /><Markdown className="min-w-0 flex-1">{summary}</Markdown></SubCard>}
       {checkIns.length === 0 ? <p className="text-sm text-muted-foreground">No check-ins yet.</p> : checkIns.slice(0, 5).map((c) => {
@@ -361,6 +370,8 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
         );
       })}
     </Card>
+    </Stagger>
+    </section>
   );
 }
 

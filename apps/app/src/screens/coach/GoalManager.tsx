@@ -12,7 +12,7 @@ import {
   PRIMARY_GOAL_LABELS, ACTIVITY_LEVEL_LABELS, DIETARY_APPROACH_LABELS, WORKOUT_LOCATION_LABELS, BMI_CATEGORY_LABELS,
   type ClientPreferences, type BmiCategory, type CalculatorInputs, type Gender, type ActivityLevel, type PrimaryGoal, type DietaryApproach, type UnitPrefs,
 } from "@mossa/domain";
-import { Button, Card, Badge, Field, Select, Reveal, SkeletonStatGrid, SkeletonList, Page, Stagger, SectionHeader, METRICS, toneVar, Target, History, Activity, Scale, Flame, AlertTriangle, Calculator, ArrowRight, Calendar, type MetricKey } from "@mossa/ui";
+import { Button, Card, Badge, Field, Select, Reveal, SkeletonStatGrid, SkeletonList, Page, Stagger, Eyebrow, GlanceStrip, METRICS, toneVar, Target, Activity, Scale, Flame, AlertTriangle, Calculator, ArrowRight, Calendar, type MetricKey } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 
@@ -213,25 +213,27 @@ export function GoalManager({ clientId }: { clientId: string }) {
         </Stagger>
       )}
 
-      {/* The client's body — pulled automatically, drives the calc. */}
+      {/* The client's body — pulled automatically, drives the calc. A card-less
+          glance strip: a deliberate break from the boxed-card rhythm below. */}
       {metrics && (metrics.bmi != null || metrics.bmr != null || metrics.weightKg != null) && (
-        <Stagger>
-          <Card className="space-y-3">
-            <SectionHeader icon={Scale} tone="cardio" title="Body snapshot" action={metrics.measuredAt ? <Badge tone="neutral">{new Date(`${metrics.measuredAt}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</Badge> : undefined} />
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-xl bg-secondary p-3"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Scale className="size-3.5" style={{ color: toneVar.cardio }} /> Weight</div><div className="numeral mt-0.5 text-xl font-semibold">{metrics.weightKg != null ? kgToDisplay(metrics.weightKg, units) : "—"}<span className="ml-1 text-xs font-medium text-muted-foreground">{weightLabel(units)}</span></div><StatusChip status={metrics.weightStatus} /></div>
-              <div className="rounded-xl bg-secondary p-3"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Activity className="size-3.5" style={{ color: toneVar.activity }} /> BMI</div><div className="numeral mt-0.5 text-xl font-semibold">{metrics.bmi ?? "—"}</div>{metrics.bmiCategory && <div className="text-[0.7rem] font-medium text-muted-foreground">{BMI_CATEGORY_LABELS[metrics.bmiCategory]}</div>}</div>
-              <div className="rounded-xl bg-secondary p-3"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Flame className="size-3.5" style={{ color: toneVar.calories }} /> BMR</div><div className="numeral mt-0.5 text-xl font-semibold">{metrics.bmr ?? "—"}</div>{metrics.bmr != null && <div className="text-[0.7rem] font-medium text-muted-foreground">kcal/day</div>}</div>
-              <div className="rounded-xl bg-secondary p-3"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Target className="size-3.5" style={{ color: toneVar.sleep }} /> Body fat</div><div className="numeral mt-0.5 text-xl font-semibold">{metrics.bodyFatPercent != null ? `${metrics.bodyFatPercent}%` : "—"}</div></div>
-            </div>
-          </Card>
-        </Stagger>
+        <section className="space-y-2">
+          <Eyebrow action={metrics.measuredAt ? <Badge tone="neutral">{new Date(`${metrics.measuredAt}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</Badge> : undefined}>Body snapshot</Eyebrow>
+          <Stagger>
+            <GlanceStrip items={[
+              { icon: Scale, tone: "cardio", value: <>{metrics.weightKg != null ? kgToDisplay(metrics.weightKg, units) : "—"}<span className="ml-1 text-xs font-medium text-muted-foreground">{weightLabel(units)}</span></>, label: <>Weight<StatusChip status={metrics.weightStatus} /></> },
+              { icon: Activity, tone: "activity", value: metrics.bmi ?? "—", label: metrics.bmiCategory ? BMI_CATEGORY_LABELS[metrics.bmiCategory] : "BMI" },
+              { icon: Flame, tone: "calories", value: metrics.bmr ?? "—", label: metrics.bmr != null ? "BMR · kcal/day" : "BMR" },
+              { icon: Target, tone: "sleep", value: metrics.bodyFatPercent != null ? `${metrics.bodyFatPercent}%` : "—", label: "Body fat" },
+            ]} />
+          </Stagger>
+        </section>
       )}
 
       {hasPrefs && (
-        <Stagger>
+        <section className="space-y-2">
+          <Eyebrow>Client preferences</Eyebrow>
+          <Stagger>
           <Card className="space-y-3">
-            <SectionHeader icon={Target} tone="primary" title="Client preferences" />
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
               {prefRows.filter(([, v]) => v != null).map(([k, v]) => (
                 <div key={k} className="min-w-0"><div className="text-xs text-muted-foreground">{k}</div><div className="truncate text-sm font-medium">{v}</div></div>
@@ -239,14 +241,19 @@ export function GoalManager({ clientId }: { clientId: string }) {
             </div>
             {prefs.limitations && <p className="rounded-xl bg-secondary p-3 text-sm text-muted-foreground"><span className="font-medium text-foreground">Limitations · </span>{prefs.limitations}</p>}
           </Card>
-        </Stagger>
+          </Stagger>
+        </section>
       )}
 
       {active?.targets && (
-        <Stagger>
+        <section className="space-y-2">
+          <Eyebrow action={<Badge tone="success">Active</Badge>}>Active goal</Eyebrow>
+          <Stagger>
           <Card className="space-y-3">
-            <SectionHeader icon={Target} tone="nutrition" title={active.label} action={<Badge tone="success">Active</Badge>} />
-            <div className="text-xs text-muted-foreground">Since {fmtDate(active.start_date || active.created_at)}{active.created_by_name ? ` · set by ${active.created_by_name}` : ""}</div>
+            <div>
+              <div className="font-semibold">{active.label}</div>
+              <div className="text-xs text-muted-foreground">Since {fmtDate(active.start_date || active.created_at)}{active.created_by_name ? ` · set by ${active.created_by_name}` : ""}</div>
+            </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {TARGET_FIELDS.map(({ key, metric }) => {
                 const m = METRICS[metric];
@@ -260,12 +267,14 @@ export function GoalManager({ clientId }: { clientId: string }) {
               })}
             </div>
           </Card>
-        </Stagger>
+          </Stagger>
+        </section>
       )}
 
-      <Stagger>
+      <section className="space-y-2">
+        <Eyebrow>New goal phase</Eyebrow>
+        <Stagger>
         <Card className="space-y-3">
-          <SectionHeader icon={Target} tone="nutrition" title="New goal phase" />
           <Field label="Phase label" icon={Target} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Cut — 8 weeks" />
 
           {/* The formula — the only real choices; pre-set from the client's prefs.
@@ -334,12 +343,14 @@ export function GoalManager({ clientId }: { clientId: string }) {
           <Button size="lg" className="w-full" disabled={!canSave || busy} onClick={() => void create()}>{busy ? "Saving…" : active ? "Replace goal" : "Set goal"}</Button>
           {!canSave && <p className="text-center text-xs text-muted-foreground">Calculate or type a calorie target to save.</p>}
         </Card>
-      </Stagger>
+        </Stagger>
+      </section>
 
       {history.length > 0 && (
-        <Stagger>
+        <section className="space-y-2">
+          <Eyebrow action={<Badge tone="neutral">{history.length}</Badge>}>Goal history</Eyebrow>
+          <Stagger>
           <Card className="space-y-3">
-            <SectionHeader icon={History} tone="cardio" title="Goal history" action={<Badge tone="neutral">{history.length}</Badge>} />
             {history.map((g) => (
               <div key={g.id} className="space-y-1.5 border-t border-border/40 pt-3 first:border-0 first:pt-0">
                 <div className="flex items-center justify-between gap-2">
@@ -357,7 +368,8 @@ export function GoalManager({ clientId }: { clientId: string }) {
               </div>
             ))}
           </Card>
-        </Stagger>
+          </Stagger>
+        </section>
       )}
       </>)}
       </Reveal>
