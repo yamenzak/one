@@ -1,19 +1,27 @@
-/** Client Shop — marketplace packages, Stripe Connect buy, redeem codes. */
+/** Client Shop — the tenant's storefront: marketplace packages (rich product
+ *  cards), Stripe Connect / inline buy, redeem codes. */
 
-import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, ArrowLeft, LogOut, Ticket, Store, Sparkles, Check, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Button, Card, Badge, Field, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, toneVar, ArrowLeft, LogOut, Ticket, Store, Sparkles, Check, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
 import { CLIENT_FLAG_CATEGORIES, CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { PaymentSheet, type CheckoutIntent } from "../../PaymentSheet.js";
 
-interface Pkg { id: string; name: string; description: string | null; one_time_price_cents: number | null; monthly_price_cents?: number | null; installment_months?: number | null; budgets: { feature: string; days: number }[]; visibility: string }
+interface Pkg { id: string; name: string; description: string | null; one_time_price_cents: number | null; monthly_price_cents?: number | null; installment_months?: number | null; budgets: { feature: string; days: number }[]; flags?: Record<string, boolean> | null; visibility: string }
 interface Sub { status: string; daysRemaining: number; autoRenew?: boolean }
+
+/** Cover-band tones cycled across the product grid so cards read as distinct
+ *  merchandise rather than one repeated row. */
+const CARD_TONES = ["primary", "cardio", "activity", "nutrition"] as const;
+const budgetLabel = (f: string) => (f === "all" ? "Full access" : f === "workout" ? "Workout plans" : f === "meal" ? "Meal plans" : f);
+const isRecurring = (p: Pkg) => !!p.monthly_price_cents || !!(p.installment_months && p.installment_months > 1);
 
 /** The client Shop. In `locked` mode it IS the access gate: no way back into the
  *  app until a plan/package covers them, plus a sign-out escape. */
 export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: () => void; locked?: boolean }) {
-  const { refresh, signOut } = useSession();
+  const { host, refresh, signOut } = useSession();
+  const studio = host?.tenant?.name ?? null;
   const [packages, setPackages] = useState<Pkg[] | null>(null);
   const [sub, setSub] = useState<Sub | null>(null);
   const [code, setCode] = useState("");
@@ -66,34 +74,48 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
     finally { setBusy(false); }
   };
 
+  const cta = (p: Pkg): ReactNode => {
+    if (p.monthly_price_cents) return <Button size="lg" className="mt-4 w-full" onClick={() => void buy(p.id)}>Subscribe</Button>;
+    if (p.installment_months && p.installment_months > 1 && p.one_time_price_cents) return <Button size="lg" className="mt-4 w-full" onClick={() => void buy(p.id)}>Pay in {p.installment_months} months</Button>;
+    if (p.one_time_price_cents) return <Button size="lg" className="mt-4 w-full" onClick={() => void buyInline(p)}>Buy now</Button>;
+    return <p className="mt-3 text-center text-xs text-muted-foreground">Ask your coach to add this to your account.</p>;
+  };
+
+  const memberships = (packages ?? []).filter(isRecurring);
+  const oneTime = (packages ?? []).filter((p) => !isRecurring(p));
+  const hasInlinePaid = oneTime.some((p) => p.one_time_price_cents);
+
   return (
-    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
-      {locked ? (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <h1 className="text-xl font-bold tracking-tight">Plans &amp; access</h1>
-            <Button size="sm" variant="ghost" onClick={() => void signOut()}><LogOut /> Sign out</Button>
-          </div>
-          <Card className="flex items-start gap-3">
-            <IconBadge icon={Sparkles} tone="primary" size="sm" />
-            <div className="min-w-0 text-sm"><div className="font-medium">Choose a plan to get started</div><div className="text-muted-foreground">Your access is inactive. Pick a package or enter a code below — or ask your coach to set you up.</div></div>
-          </Card>
-        </div>
-      ) : (
-        <div className="flex items-center gap-3">
+    <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+      {/* Storefront header */}
+      <div className="flex items-center gap-3">
+        {locked ? (
+          <IconBadge icon={Store} tone="primary" />
+        ) : (
           <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
-          <h1 className="text-xl font-bold tracking-tight">Plans &amp; access</h1>
+        )}
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl font-bold tracking-tight">Shop</h1>
+          <p className="truncate text-xs text-muted-foreground">Plans &amp; packages{studio ? ` from ${studio}` : ""}</p>
         </div>
+        {locked && <Button size="sm" variant="ghost" onClick={() => void signOut()}><LogOut /> Sign out</Button>}
+      </div>
+
+      {locked && (
+        <Card className="relative overflow-hidden">
+          <div className="pointer-events-none absolute -right-10 -top-12 size-40 rounded-full bg-primary/15 blur-3xl" />
+          <div className="relative flex items-start gap-3">
+            <IconBadge icon={Sparkles} tone="primary" size="sm" />
+            <div className="min-w-0 text-sm"><div className="font-medium">Choose a plan to get started</div><div className="text-muted-foreground">Your access is inactive. Pick a package below or enter a code — or ask your coach to set you up.</div></div>
+          </div>
+        </Card>
       )}
 
-      <Reveal loading={!packages} className="space-y-4" skeleton={
+      <Reveal loading={!packages} className="space-y-5" skeleton={
         <>
           <SkeletonList card rows={1} />
-          <SkeletonList card rows={2} thumb={36} />
-          <div className="space-y-3">
-            <SkeletonLine w="6rem" h="xs" className="ml-1" />
-            <SkeletonList card rows={3} thumb={44} />
-          </div>
+          <SkeletonLine w="6rem" h="xs" className="ml-1" />
+          <SkeletonList card rows={2} thumb={0} />
         </>
       }>
         {packages && (
@@ -111,50 +133,42 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
         </Card>
       )}
 
-      <Stagger><PlanIncludes /></Stagger>
+      <PlanIncludes />
 
-      <Stagger>
-        <Card className="space-y-3">
-          <div className="flex items-center gap-2.5"><IconBadge icon={Ticket} tone="primary" size="sm" /><h2 className="font-semibold">Have a code?</h2></div>
-          <div className="flex items-end gap-2">
-            <Field label="Redeem code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className="flex-1" />
-            <Button disabled={code.length < 4 || busy} onClick={() => void redeem()}>Redeem</Button>
-          </div>
-          {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
-        </Card>
-      </Stagger>
-
-      {packages.length > 0 && (
+      {memberships.length > 0 && (
         <section className="space-y-3">
-          <Eyebrow>Packages</Eyebrow>
-          {packages.some((p) => p.one_time_price_cents && !p.monthly_price_cents && !(p.installment_months && p.installment_months > 1)) && (
-            <Field label="Promo code (optional)" icon={Ticket} value={buyPromo} onChange={(e) => setBuyPromo(e.target.value.toUpperCase())} placeholder="SUMMER20" />
-          )}
-          {packages.map((p) => (
-            <Stagger key={p.id}>
-              <Card>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2"><Store className="size-4 text-primary" /><span className="font-semibold">{p.name}</span></div>
-                    {p.description && <div className="mt-0.5 text-sm text-muted-foreground">{p.description}</div>}
-                    <div className="mt-2 flex flex-wrap gap-1">{p.budgets.map((b, i) => <Badge key={i} tone="activity">{b.days}d {b.feature}</Badge>)}</div>
-                  </div>
-                  <div className="numeral shrink-0 text-xl font-bold">{p.monthly_price_cents ? <span>${(p.monthly_price_cents / 100).toFixed(0)}<span className="text-sm font-medium text-muted-foreground">/mo</span></span> : p.one_time_price_cents ? (<span>${(p.one_time_price_cents / 100).toFixed(0)}{p.installment_months && p.installment_months > 1 ? <span className="text-sm font-medium text-muted-foreground"> · {p.installment_months}× ${Math.ceil(p.one_time_price_cents / 100 / p.installment_months)}/mo</span> : null}</span>) : <Badge tone="success">Free</Badge>}</div>
-                </div>
-                {p.monthly_price_cents ? (
-                  <Button className="mt-4 w-full" onClick={() => void buy(p.id)}>Subscribe</Button>
-                ) : p.installment_months && p.installment_months > 1 && p.one_time_price_cents ? (
-                  <Button className="mt-4 w-full" onClick={() => void buy(p.id)}>Pay in {p.installment_months} months</Button>
-                ) : p.one_time_price_cents ? (
-                  <Button className="mt-4 w-full" onClick={() => void buyInline(p)}>Buy</Button>
-                ) : (
-                  <p className="mt-3 text-xs text-muted-foreground">Ask your coach to add this to your account.</p>
-                )}
-              </Card>
-            </Stagger>
-          ))}
+          <Eyebrow>Memberships &amp; plans</Eyebrow>
+          {memberships.map((p, i) => <Stagger key={p.id}><PackageCard p={p} tone={CARD_TONES[i % CARD_TONES.length]!} cta={cta(p)} /></Stagger>)}
         </section>
       )}
+
+      {oneTime.length > 0 && (
+        <section className="space-y-3">
+          <Eyebrow>{memberships.length > 0 ? "Packages" : "Packages & access"}</Eyebrow>
+          {hasInlinePaid && (
+            <Field label="Promo code (optional)" icon={Ticket} value={buyPromo} onChange={(e) => setBuyPromo(e.target.value.toUpperCase())} placeholder="SUMMER20" />
+          )}
+          {oneTime.map((p, i) => <Stagger key={p.id}><PackageCard p={p} tone={CARD_TONES[(memberships.length + i) % CARD_TONES.length]!} cta={cta(p)} /></Stagger>)}
+        </section>
+      )}
+
+      {packages.length === 0 && !sub && (
+        <Card className="text-center text-sm text-muted-foreground">No packages are available to buy right now. Enter a code below, or ask your coach to set you up.</Card>
+      )}
+
+      {/* Redeem — secondary to the storefront. */}
+      <section className="space-y-2">
+        <Eyebrow>Have a code?</Eyebrow>
+        <Stagger>
+          <Card className="space-y-3">
+            <div className="flex items-end gap-2">
+              <Field label="Redeem code" icon={Ticket} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className="flex-1" placeholder="WELCOME7" />
+              <Button disabled={code.length < 4 || busy} onClick={() => void redeem()}>Redeem</Button>
+            </div>
+            {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+          </Card>
+        </Stagger>
+      </section>
         </>
         )}
       </Reveal>
@@ -179,6 +193,50 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
         onSuccess={onPaid}
       />
     </Page>
+  );
+}
+
+/** A storefront product card: a tone-tinted cover band (name + price), then a
+ *  "what's included" checklist (budgets + package capabilities) and the CTA. */
+function PackageCard({ p, tone, cta }: { p: Pkg; tone: (typeof CARD_TONES)[number]; cta: ReactNode }) {
+  const tv = toneVar[tone];
+  const price: { big: string; cadence: string } =
+    p.monthly_price_cents ? { big: `$${(p.monthly_price_cents / 100).toFixed(0)}`, cadence: "/ month" }
+    : p.installment_months && p.installment_months > 1 && p.one_time_price_cents ? { big: `$${(p.one_time_price_cents / 100).toFixed(0)}`, cadence: `${p.installment_months}× $${Math.ceil(p.one_time_price_cents / 100 / p.installment_months)}/mo` }
+    : p.one_time_price_cents ? { big: `$${(p.one_time_price_cents / 100).toFixed(0)}`, cadence: "one-time" }
+    : { big: "Free", cadence: "" };
+  const capabilities = p.flags ? CLIENT_FLAG_KEYS.filter((k) => p.flags![k] === true).slice(0, 4).map((k) => CLIENT_FLAG_META[k].label) : [];
+  const includes = [...p.budgets.map((b) => `${b.days}-day ${budgetLabel(b.feature)}`), ...capabilities];
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="relative overflow-hidden px-5 pb-4 pt-5" style={{ background: `linear-gradient(135deg, color-mix(in oklch, ${tv} 20%, transparent), color-mix(in oklch, ${tv} 5%, transparent))` }}>
+        <Store className="pointer-events-none absolute -right-4 -top-4 size-28 opacity-[0.08]" style={{ color: tv }} />
+        <div className="relative flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <span className="grid size-9 place-items-center rounded-xl [&_svg]:size-[1.1rem]" style={{ backgroundColor: `color-mix(in oklch, ${tv} 18%, transparent)`, color: tv }}><Store /></span>
+            <h3 className="mt-2.5 text-lg font-bold tracking-tight">{p.name}</h3>
+            {p.description && <p className="mt-0.5 text-sm text-muted-foreground">{p.description}</p>}
+          </div>
+          <div className="shrink-0 text-right">
+            <div className="numeral text-2xl font-extrabold leading-none" style={{ color: tv }}>{price.big}</div>
+            {price.cadence && <div className="mt-1 text-[0.7rem] font-medium text-muted-foreground">{price.cadence}</div>}
+          </div>
+        </div>
+      </div>
+      <div className="p-5 pt-4">
+        {includes.length > 0 && (
+          <ul className="space-y-2">
+            {includes.map((f, i) => (
+              <li key={i} className="flex items-center gap-2.5 text-sm">
+                <span className="grid size-5 shrink-0 place-items-center rounded-full [&_svg]:size-3" style={{ backgroundColor: `color-mix(in oklch, ${tv} 16%, transparent)`, color: tv }}><Check strokeWidth={3} /></span>
+                {f}
+              </li>
+            ))}
+          </ul>
+        )}
+        {cta}
+      </div>
+    </Card>
   );
 }
 
