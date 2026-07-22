@@ -95,24 +95,26 @@ export function Progress({ clientId }: { clientId: string }) {
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <h1 className="text-2xl font-bold tracking-tight">Progress</h1>
-      {/* Lens tabs collapse to icons (active one keeps its label, navbar-style),
-          freeing room for the range control — and the custom date pickers — to
-          sit on the same row. */}
+      {/* Lens tabs collapse to icons (active one keeps its label, navbar-style)
+          so the whole row — tabs + range — fits the Progress column. "Custom"
+          is a calendar icon; picking it reveals the start→end pickers below. */}
       <div className="flex flex-wrap items-center gap-2">
         <LensTabs tab={tab} onChange={setTab} />
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          {range === "custom" && (
-            <div className="flex items-center gap-1.5">
-              <DatePill value={customStart} max={customEnd} label="Start date"
-                onChange={(v) => { setCustomStart(v); if (v > customEnd) setCustomEnd(v); }} />
-              <span className="shrink-0 text-sm text-muted-foreground">→</span>
-              <DatePill value={customEnd} min={customStart} max={today} label="End date"
-                onChange={(v) => { setCustomEnd(v); if (v < customStart) setCustomStart(v); }} />
-            </div>
-          )}
-          <SegmentedControl options={[{ value: "7d", label: "7d" }, { value: "30d", label: "30d" }, { value: "90d", label: "90d" }, { value: "custom", label: "Custom" }]} value={range} onChange={(v) => setRange(v as RangePreset | "custom")} />
-        </div>
+        <SegmentedControl className="ml-auto" value={range} onChange={(v) => setRange(v as RangePreset | "custom")}
+          options={[
+            { value: "7d", label: "7d" }, { value: "30d", label: "30d" }, { value: "90d", label: "90d" },
+            { value: "custom", label: <span title="Custom range" className="flex items-center [&_svg]:size-4"><Calendar /><span className="sr-only">Custom range</span></span> },
+          ]} />
       </div>
+      {range === "custom" && (
+        <div className="flex items-center gap-2">
+          <DatePill value={customStart} max={customEnd} label="Start date"
+            onChange={(v) => { setCustomStart(v); if (v > customEnd) setCustomEnd(v); }} />
+          <span className="shrink-0 text-sm text-muted-foreground">→</span>
+          <DatePill value={customEnd} min={customStart} max={today} label="End date"
+            onChange={(v) => { setCustomEnd(v); if (v < customStart) setCustomStart(v); }} />
+        </div>
+      )}
 
       {error && !data ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load progress" description="Something went wrong loading your analytics. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />
@@ -383,7 +385,7 @@ function LensTabs({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
         const on = tab === l.value;
         return (
           <button key={l.value} onClick={() => onChange(l.value)} aria-current={on ? "page" : undefined} title={l.label}
-            className={cn("relative z-10 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors", on ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+            className={cn("relative z-10 flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium transition-colors", on ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
             {on && <motion.span layoutId="progress-lens-pill" initial={false} transition={{ type: "spring", stiffness: 380, damping: 32 }} className="absolute inset-0 rounded-full bg-primary" />}
             <l.icon className="relative size-4 shrink-0" strokeWidth={on ? 2.4 : 2} />
             {on && <motion.span initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: "auto" }} transition={{ duration: 0.2 }} className="relative overflow-hidden whitespace-nowrap">{l.label}</motion.span>}
@@ -397,9 +399,9 @@ function LensTabs({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
 /** A date pill wrapping a native date input — the custom-range endpoints. */
 function DatePill({ value, min, max, label, onChange }: { value: string; min?: string; max?: string; label: string; onChange: (v: string) => void }) {
   return (
-    <label className="relative">
+    <label className="relative flex-1">
       <input type="date" value={value} min={min} max={max} onChange={(e) => e.target.value && onChange(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0 [color-scheme:dark]" aria-label={label} />
-      <div className="pointer-events-none flex min-w-[6rem] items-center justify-center gap-1.5 rounded-full bg-secondary px-3 py-2 text-sm font-semibold [&_svg]:size-4"><Calendar className="text-muted-foreground" />{shortDate(value)}</div>
+      <div className="pointer-events-none flex items-center justify-center gap-1.5 rounded-full bg-secondary px-3 py-2 text-sm font-semibold [&_svg]:size-4"><Calendar className="text-muted-foreground" />{shortDate(value)}</div>
     </label>
   );
 }
