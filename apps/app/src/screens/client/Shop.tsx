@@ -1,7 +1,7 @@
 /** Client Shop — marketplace packages, Stripe Connect buy, redeem codes. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Page, Stagger, IconBadge, SectionHeader, ConfirmDialog, ArrowLeft, LogOut, Ticket, Store, Sparkles, Check, CheckCheck, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
+import { Button, Card, Badge, Field, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, ArrowLeft, LogOut, Ticket, Store, Sparkles, Check, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
 import { CLIENT_FLAG_CATEGORIES, CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -125,8 +125,8 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
       </Stagger>
 
       {packages.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Packages</h3>
+        <section className="space-y-3">
+          <Eyebrow>Packages</Eyebrow>
           {packages.some((p) => p.one_time_price_cents && !p.monthly_price_cents && !(p.installment_months && p.installment_months > 1)) && (
             <Field label="Promo code (optional)" icon={Ticket} value={buyPromo} onChange={(e) => setBuyPromo(e.target.value.toUpperCase())} placeholder="SUMMER20" />
           )}
@@ -153,7 +153,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
               </Card>
             </Stagger>
           ))}
-        </div>
+        </section>
       )}
         </>
         )}
@@ -197,9 +197,9 @@ function PlanIncludes() {
     .filter((g) => g.keys.length > 0);
   if (!groups.length) return null;
   return (
-    <Card className="space-y-3">
-      <SectionHeader icon={CheckCheck} tone="success" title="What your plan includes" />
-      <div className="space-y-3">
+    <section className="space-y-2">
+      <Eyebrow>What your plan includes</Eyebrow>
+      <div className="space-y-3 px-1">
         {groups.map((g) => (
           <div key={g.cat.key} className="space-y-1">
             <div className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">{g.cat.label}</div>
@@ -212,6 +212,6 @@ function PlanIncludes() {
           </div>
         ))}
       </div>
-    </Card>
+    </section>
   );
 }

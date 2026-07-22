@@ -9,9 +9,9 @@
 import { useEffect, useState } from "react";
 import { kgToDisplay, weightLabel, type RangePreset } from "@mossa/domain";
 import {
-  Button, Card, Badge, SegmentedControl, Page, Stagger, StatCard, ChartCard, AreaChart, SectionHeader, toneVar,
+  Button, Card, Badge, SegmentedControl, Page, Stagger, StatCard, ChartCard, AreaChart, SectionHeader, Eyebrow, GlanceStrip, Sparkline, toneVar,
   Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList,
-  Flame, Gauge, Dumbbell, Utensils, Scale, Moon, Smile, Trophy, Sparkles, TrendingUp, Percent, cn,
+  Flame, Gauge, Dumbbell, Utensils, Scale, Moon, Smile, Sparkles, TrendingUp, Percent, cn,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -85,16 +85,25 @@ export function ClientReport({ clientId }: { clientId: string }) {
       }>
         {report && (
         <>
-          <Stagger className="grid grid-cols-2 gap-3">
-            <StatCard stack label="Check-in streak" value={report.compliance.currentStreak} unit={report.compliance.currentStreak === 1 ? "day" : "days"} icon={Flame} tone="calories"
-              badge={<Badge tone="neutral">{report.compliance.checkInDays} check-ins</Badge>} />
-            <StatCard stack label="Consistency" value={report.compliance.checkInConsistencyPct} unit="%" icon={Gauge} tone="activity" />
-            <StatCard stack label="Workouts" value={report.compliance.workoutDays} unit="days" icon={Dumbbell} tone="activity" />
-            <StatCard stack label="Days logged" value={report.compliance.foodDays} unit="days" icon={Utensils} tone="nutrition" />
-            <StatCard stack label="Cal adherence" value={report.compliance.calorieAdherencePct ?? "—"} unit={report.compliance.calorieAdherencePct != null ? "%" : undefined} icon={Flame} tone="calories" />
-            <StatCard stack label="Tonnage" value={Math.round(kgToDisplay(report.totalTonnage, units) / 1000).toLocaleString()} unit={`k ${weightLabel(units)}`} icon={TrendingUp} tone="activity" />
-          </Stagger>
+          {/* Compliance — card-less glance strips (two rows of three) so the
+              headline adherence numbers read as a summary, not a card grid. */}
+          <section className="space-y-2">
+            <Eyebrow>Compliance</Eyebrow>
+            <Stagger className="space-y-3">
+              <GlanceStrip items={[
+                { icon: Flame, tone: "calories", value: report.compliance.currentStreak, label: "Day streak" },
+                { icon: Gauge, tone: "activity", value: `${report.compliance.checkInConsistencyPct}%`, label: "Consistency" },
+                { icon: Dumbbell, tone: "activity", value: report.compliance.workoutDays, label: "Workout days" },
+              ]} />
+              <GlanceStrip items={[
+                { icon: Utensils, tone: "nutrition", value: report.compliance.foodDays, label: "Days logged" },
+                { icon: Flame, tone: "calories", value: report.compliance.calorieAdherencePct != null ? `${report.compliance.calorieAdherencePct}%` : "—", label: "Cal adherence" },
+                { icon: TrendingUp, tone: "activity", value: `${Math.round(kgToDisplay(report.totalTonnage, units) / 1000).toLocaleString()}k`, label: `Volume ${weightLabel(units)}` },
+              ]} />
+            </Stagger>
+          </section>
 
+          {/* Hero — weight is the anchor metric, kept full-width. */}
           {weightVals.length >= 2 && (
             <Stagger>
               <ChartCard title="Weight trajectory" icon={Scale} tone="cardio" value={weightVals.at(-1)!.toFixed(1)} unit={weightLabel(units)}
@@ -104,24 +113,30 @@ export function ClientReport({ clientId }: { clientId: string }) {
             </Stagger>
           )}
 
+          {/* Body-fat — compact secondary: current value + delta + a sparkline,
+              a deliberate break from a second full-width area chart. */}
           {bfVals.length >= 2 && (
             <Stagger>
-              <ChartCard title="Body-fat trajectory" icon={Percent} tone="sleep" value={bfVals.at(-1)!.toFixed(1)} unit="%"
-                delta={bfDelta != null && bfDelta !== 0 ? <Badge tone={bfDelta < 0 ? "success" : "neutral"}><TrendingUp className={cn("size-3", bfDelta < 0 && "rotate-180")} />{bfDelta > 0 ? "+" : ""}{bfDelta}%</Badge> : undefined}>
-                <AreaChart values={bfVals} tone="sleep" trend label={(i) => shortDate(bf[i]!.date)} format={(v) => v.toFixed(1)} />
-              </ChartCard>
+              <StatCard stack tone="sleep" icon={Percent} label="Body-fat trajectory"
+                value={bfVals.at(-1)!.toFixed(1)} unit="%"
+                badge={bfDelta != null && bfDelta !== 0 ? <Badge tone={bfDelta < 0 ? "success" : "neutral"}><TrendingUp className={cn("size-3", bfDelta < 0 && "rotate-180")} />{bfDelta > 0 ? "+" : ""}{bfDelta}%</Badge> : undefined}
+                chart={<Sparkline values={bfVals} tone="sleep" width={320} height={44} className="w-full" />} />
             </Stagger>
           )}
 
-          <Stagger className="grid grid-cols-2 gap-3">
-            <StatCard stack label="Avg mood" value={report.averages.mood ?? "—"} unit={report.averages.mood != null ? "/ 5" : undefined} icon={Smile} tone="nutrition" />
-            <StatCard stack label="Avg sleep" value={report.averages.sleepHours ?? "—"} unit={report.averages.sleepHours != null ? "h" : undefined} icon={Moon} tone="sleep" />
-          </Stagger>
+          <section className="space-y-2">
+            <Eyebrow>Averages</Eyebrow>
+            <Stagger className="grid grid-cols-2 gap-3">
+              <StatCard stack label="Avg mood" value={report.averages.mood ?? "—"} unit={report.averages.mood != null ? "/ 5" : undefined} icon={Smile} tone="nutrition" />
+              <StatCard stack label="Avg sleep" value={report.averages.sleepHours ?? "—"} unit={report.averages.sleepHours != null ? "h" : undefined} icon={Moon} tone="sleep" />
+            </Stagger>
+          </section>
 
           {report.prs.length > 0 && (
-            <Stagger>
+            <section className="space-y-2">
+              <Eyebrow action={<span className="text-[0.65rem] font-medium text-muted-foreground">est. 1RM</span>}>Personal records</Eyebrow>
+              <Stagger>
               <Card className="space-y-3">
-                <SectionHeader icon={Trophy} tone="activity" title="Top lifts · est. 1RM" />
                 <div className="space-y-3">
                   {report.prs.slice(0, 8).map((p) => (
                     <div key={p.exerciseId} className="space-y-1.5">
@@ -135,7 +150,8 @@ export function ClientReport({ clientId }: { clientId: string }) {
                   ))}
                 </div>
               </Card>
-            </Stagger>
+              </Stagger>
+            </section>
           )}
         </>
         )}
