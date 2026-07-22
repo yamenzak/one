@@ -20,6 +20,35 @@ interface MetricPillProps {
   className?: string;
 }
 
+/** A bare, uppercase section label (optional trailing action) — the flow device
+ *  that keeps a page from reading as one long stack of cards. Pair with a
+ *  `<section className="space-y-2">` wrapper around the grouped content. */
+export function Eyebrow({ children, action, className }: { children: ReactNode; action?: ReactNode; className?: string }) {
+  return (
+    <div className={cn("flex items-center justify-between px-1", className)}>
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{children}</h2>
+      {action}
+    </div>
+  );
+}
+
+/** A card-less stat strip: icon + big numeral + label per item, split by
+ *  hairline dividers. A deliberate break from the boxed-card rhythm — use for a
+ *  quick "at a glance" row that shouldn't compete with the real cards. */
+export function GlanceStrip({ items, className }: { items: { icon: LucideIcon; tone: Tone; value: ReactNode; label: ReactNode }[]; className?: string }) {
+  return (
+    <div className={cn("flex items-stretch divide-x divide-border/50", className)}>
+      {items.map((it, i) => (
+        <div key={i} className="flex flex-1 flex-col items-center gap-1.5 px-2 text-center">
+          <it.icon className="size-4 shrink-0" style={{ color: toneVar[it.tone] }} />
+          <span className="numeral text-2xl font-bold leading-none">{it.value}</span>
+          <span className="text-[0.65rem] font-medium leading-tight text-muted-foreground">{it.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function MetricPill({ icon: Icon, label, value, tone = "activity", progress, onClick, className }: MetricPillProps) {
   const pct = progress === undefined ? null : Math.min(1, Math.max(0, progress));
   const Comp = onClick ? motion.button : motion.div;

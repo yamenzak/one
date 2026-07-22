@@ -7,14 +7,14 @@
  * radar + per-day mood & sleep trends). Charts are the @mossa/ui chart set.
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "motion/react";
 import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, fmtEnergy, kcalToDisplay, POSTURE_GUIDANCE, presetRange, type RangePreset, type SeriesDelta } from "@mossa/domain";
 
 const capp = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 import {
-  Card, Badge, Button, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger, EmptyState, SectionHeader, Sparkline,
+  Card, Badge, Button, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger, EmptyState, SectionHeader, Sparkline, Eyebrow, GlanceStrip,
   Reveal, SkeletonHero, SkeletonChart,
   AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, METRICS, POSTURE_SEVERITY_TONE, cn, toneVar,
   Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, Calendar, Scale, type Tone, type LucideIcon,
@@ -467,33 +467,6 @@ function DatePill({ value, min, max, label, onChange }: { value: string; min?: s
       <input type="date" value={value} min={min} max={max} onChange={(e) => e.target.value && onChange(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0 [color-scheme:dark]" aria-label={label} />
       <div className="pointer-events-none flex items-center justify-center gap-1.5 rounded-full bg-secondary px-3 py-2 text-sm font-semibold [&_svg]:size-4"><Calendar className="text-muted-foreground" />{shortDate(value)}</div>
     </label>
-  );
-}
-
-/** A bare, uppercase section label (with optional trailing action) — the flow
- *  device that keeps the page from reading as one long stack of cards. */
-function Eyebrow({ children, action }: { children: ReactNode; action?: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between px-1">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{children}</h2>
-      {action}
-    </div>
-  );
-}
-
-/** A card-less stat strip: icon + big numeral + label, split by hairline
- *  dividers. A deliberate break from the boxed-card rhythm. */
-function GlanceStrip({ items }: { items: { icon: LucideIcon; tone: Tone; value: ReactNode; label: string }[] }) {
-  return (
-    <div className="flex items-stretch divide-x divide-border/50">
-      {items.map((it, i) => (
-        <div key={i} className="flex flex-1 flex-col items-center gap-1.5 px-2 text-center">
-          <it.icon className="size-4" style={{ color: toneVar[it.tone] }} />
-          <span className="numeral text-2xl font-bold leading-none">{it.value}</span>
-          <span className="text-[0.65rem] font-medium leading-tight text-muted-foreground">{it.label}</span>
-        </div>
-      ))}
-    </div>
   );
 }
 
