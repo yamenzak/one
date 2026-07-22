@@ -11,14 +11,15 @@
  * managed from an optional nested drawer once the exercise exists.
  */
 
-import { useEffect, useState } from "react";
-import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Sparkles, Globe, PencilLine, ArrowLeft, Search, Plus, Trash2 } from "@mossa/ui";
+import { useEffect, useState, type ReactNode } from "react";
+import { motion } from "motion/react";
+import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Sparkles, Globe, PencilLine, ArrowLeft, ArrowRight, Search, Plus, Trash2, Check, toneSoft, cn, type Tone } from "@mossa/ui";
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@mossa/protocol";
 import { api, ApiError, uploadMedia } from "../../api.js";
 import { useSession } from "../../session.js";
 import { AiImageField } from "../../AiImageField.js";
 import { splitWideImageToHalves } from "../../imageSplit.js";
-import { ModeCard, StepFade } from "../../composer.js";
+import { ModeRow, StepFade } from "../../composer.js";
 import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
 
 const DIFFICULTIES = ["beginner", "intermediate", "advanced"] as const;
@@ -38,6 +39,55 @@ function ChipStrip({ options, selected, onChange }: { options: readonly string[]
     <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
       {all.map((o) => <span key={o} className="shrink-0"><Chip selected={selected.includes(o)} onClick={() => toggle(o)}>{pretty(o)}</Chip></span>)}
     </div>
+  );
+}
+
+/** A quiet uppercase section eyebrow that groups the review fields. */
+function SectionLabel({ children }: { children: ReactNode }) {
+  return <div className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground/70">{children}</div>;
+}
+
+/**
+ * The choose-step's primary create path. Reads as one large, premium tone tile —
+ * bigger than a ModeRow — so the featured way in (AI when entitled, Web search
+ * otherwise) is unmistakably the hero. Its footprint is identical across tones,
+ * so the choose step never shifts when the AI entitlement is off.
+ */
+function HeroChoice({ icon: Icon, tone, title, subtitle, badge, active, busy, disabled, onClick }: {
+  icon: (p: { className?: string }) => ReactNode;
+  tone: Tone; title: string; subtitle: string; badge?: string;
+  active?: boolean; busy?: boolean; disabled?: boolean; onClick: () => void;
+}) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || busy}
+      whileTap={{ scale: 0.985 }}
+      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+      className={cn(
+        "group relative flex w-full items-center gap-3.5 overflow-hidden rounded-2xl border p-4 text-left transition-colors disabled:pointer-events-none disabled:opacity-40",
+        active
+          ? "border-primary bg-primary/[0.07] ring-1 ring-inset ring-primary/35"
+          : tone === "primary"
+            ? "border-primary/45 bg-gradient-to-br from-primary/[0.16] to-primary/[0.03] hover:from-primary/[0.2]"
+            : "border-border/60 bg-card hover:border-border hover:bg-surface-2",
+      )}
+    >
+      <span className={cn("grid size-12 shrink-0 place-items-center rounded-xl transition-transform duration-200 group-hover:scale-105 group-active:scale-95 [&_svg]:size-[1.35rem]", tone === "primary" ? "bg-primary text-primary-foreground shadow-sm" : toneSoft[tone])}>
+        {busy ? <span className="size-5 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Icon />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5">
+          <span className="text-[0.95rem] font-semibold leading-tight text-foreground">{title}</span>
+          {badge && <span className="rounded-full bg-primary/15 px-1.5 py-px text-[0.6rem] font-bold uppercase leading-none tracking-wide text-primary">{badge}</span>}
+        </span>
+        <span className="mt-1 block text-xs leading-snug text-muted-foreground">{subtitle}</span>
+      </span>
+      {active
+        ? <span className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground [&_svg]:size-3"><Check strokeWidth={3} /></span>
+        : <ArrowRight className="size-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" />}
+    </motion.button>
   );
 }
 
@@ -175,10 +225,20 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
         {step === "choose" ? (
           <div className="space-y-4">
             <Field label="Exercise name" icon={Dumbbell} value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="e.g. Barbell Back Squat" />
-            <div className="grid grid-cols-3 gap-2">
-              {canAi && <ModeCard icon={Sparkles} tone="primary" label="With AI" hint="Fill everything" busy={autoBusy} disabled={name.trim().length < 2} onClick={() => void startWithAi()} />}
-              <ModeCard icon={Globe} tone="cardio" label="Web search" hint="From libraries" active={webMode} onClick={() => setWebMode((v) => !v)} />
-              <ModeCard icon={PencilLine} tone="neutral" label="Manual" hint="Enter it yourself" disabled={name.trim().length < 2} onClick={() => setStep("review")} />
+            {/* One full-width hero + a single-column list of secondary rows. The
+                hero is always present (AI when entitled, else Web search) and the
+                secondary rows stack vertically, so the layout never jumps when
+                the AI entitlement is off — it just swaps which path is featured. */}
+            <div className="space-y-2.5">
+              {canAi ? (
+                <HeroChoice icon={Sparkles} tone="primary" badge="AI" title="Create with AI" subtitle="Name it — AI fills the muscles, equipment, how-to guide & start/end demo frames." busy={autoBusy} disabled={name.trim().length < 2} onClick={() => void startWithAi()} />
+              ) : (
+                <HeroChoice icon={Globe} tone="cardio" title="Search exercise libraries" subtitle="Import a ready-made exercise — muscles, images & instructions — from wger, free-exercise-db & more." active={webMode} onClick={() => setWebMode((v) => !v)} />
+              )}
+              <div className="space-y-2">
+                {canAi && <ModeRow icon={Globe} tone="cardio" label="Web search" hint="Import from wger, free-exercise-db & more" active={webMode} onClick={() => setWebMode((v) => !v)} />}
+                <ModeRow icon={PencilLine} tone="neutral" label="Enter it manually" hint="Fill in the details yourself" disabled={name.trim().length < 2} onClick={() => setStep("review")} />
+              </div>
             </div>
 
             {webMode && (
@@ -201,51 +261,56 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
             {err && <p className="text-sm text-warning">{err}</p>}
           </div>
         ) : (
-          <div className="space-y-4">
-            {startAtChoose && <button onClick={() => setStep("choose")} className="inline-flex items-center gap-1 text-sm text-muted-foreground [&_svg]:size-4"><ArrowLeft /> Back</button>}
+          <div className="space-y-6">
+            {startAtChoose && <button onClick={() => setStep("choose")} className="-mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground [&_svg]:size-4"><ArrowLeft /> Back</button>}
             <Field label="Name" icon={Dumbbell} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Barbell Back Squat" />
 
-            <div className="grid grid-cols-2 gap-3">
-              <AiImageField value={image} onChange={setImage} feature="exercise-image" subject={name} canAi={false} label="Start" stacked loading={pairBusy} contain />
-              <AiImageField value={image2} onChange={setImage2} feature="exercise-image" subject={name} canAi={false} label="End" stacked loading={pairBusy} contain />
-            </div>
-            {canAi && (
-              <Button variant="secondary" size="sm" className="w-full" disabled={pairBusy || name.trim().length < 2} onClick={() => void runPair()}>
-                <Sparkles /> {pairBusy ? "Creating both frames…" : image || image2 ? "Regenerate start & end" : "Generate start & end"}
-              </Button>
-            )}
-
-            <div className="space-y-1.5">
-              <div className="text-xs text-muted-foreground">Demo video (optional)</div>
+            {/* Demo — the animated start/end frames, plus an optional video. The
+                AI pair-generate reads as a first-class smart affordance. */}
+            <div className="space-y-3">
+              <SectionLabel>Demo</SectionLabel>
+              <div className="grid grid-cols-2 gap-3">
+                <AiImageField value={image} onChange={setImage} feature="exercise-image" subject={name} canAi={false} label="Start" stacked loading={pairBusy} contain />
+                <AiImageField value={image2} onChange={setImage2} feature="exercise-image" subject={name} canAi={false} label="End" stacked loading={pairBusy} contain />
+              </div>
+              {canAi && (
+                <Button variant="tonal" size="sm" className="w-full" disabled={pairBusy || name.trim().length < 2} onClick={() => void runPair()}>
+                  <Sparkles /> {pairBusy ? "Creating both frames…" : image || image2 ? "Regenerate start & end frames" : "Generate start & end frames"}
+                </Button>
+              )}
               {video ? (
                 <div className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-sm">
                   <Play className="size-4 shrink-0 text-primary" />
-                  <span className="min-w-0 flex-1 truncate text-muted-foreground">Video attached</span>
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground">Demo video attached</span>
                   <button onClick={() => setVideo("")} aria-label="Remove video" className="grid size-7 place-items-center rounded-full text-muted-foreground hover:text-danger [&_svg]:size-4"><X /></button>
                 </div>
               ) : (
                 <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4">
                   {videoBusy ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Play />}
-                  {videoBusy ? "Uploading…" : "Upload video"}
+                  {videoBusy ? "Uploading…" : "Upload demo video"}
                   <input type="file" accept="video/mp4,video/webm" className="hidden" disabled={videoBusy} onChange={(e) => e.target.files?.[0] && void uploadVideo(e.target.files[0])} />
                 </label>
               )}
             </div>
 
-            <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Primary muscles</div><ChipStrip options={MUSCLE_GROUPS} selected={muscles} onChange={setMuscles} /></div>
-            <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Secondary muscles</div><ChipStrip options={MUSCLE_GROUPS} selected={secondary} onChange={setSecondary} /></div>
-            <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Equipment</div><ChipStrip options={EQUIPMENT_TYPES} selected={equipment} onChange={setEquipment} /></div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Difficulty</div><div className="flex flex-wrap gap-1.5">{DIFFICULTIES.map((d) => <Chip key={d} selected={difficulty === d} onClick={() => setDifficulty(difficulty === d ? null : d)}>{d.slice(0, 4)}</Chip>)}</div></div>
-              <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Force</div><div className="flex flex-wrap gap-1.5">{FORCES.map((x) => <Chip key={x} selected={force === x} onClick={() => setForce(force === x ? null : x)}>{x}</Chip>)}</div></div>
-              <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Mechanic</div><div className="flex flex-wrap gap-1.5">{MECHANICS.map((x) => <Chip key={x} selected={mechanic === x} onClick={() => setMechanic(mechanic === x ? null : x)}>{x.slice(0, 4)}</Chip>)}</div></div>
+            {/* Classification — muscles, equipment, and the movement tags. */}
+            <div className="space-y-3">
+              <SectionLabel>Muscles & equipment</SectionLabel>
+              <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Primary muscles</div><ChipStrip options={MUSCLE_GROUPS} selected={muscles} onChange={setMuscles} /></div>
+              <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Secondary muscles</div><ChipStrip options={MUSCLE_GROUPS} selected={secondary} onChange={setSecondary} /></div>
+              <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Equipment</div><ChipStrip options={EQUIPMENT_TYPES} selected={equipment} onChange={setEquipment} /></div>
+              <div className="grid grid-cols-3 gap-3 pt-0.5">
+                <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Difficulty</div><div className="flex flex-wrap gap-1.5">{DIFFICULTIES.map((d) => <Chip key={d} selected={difficulty === d} onClick={() => setDifficulty(difficulty === d ? null : d)}>{d.slice(0, 4)}</Chip>)}</div></div>
+                <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Force</div><div className="flex flex-wrap gap-1.5">{FORCES.map((x) => <Chip key={x} selected={force === x} onClick={() => setForce(force === x ? null : x)}>{x}</Chip>)}</div></div>
+                <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Mechanic</div><div className="flex flex-wrap gap-1.5">{MECHANICS.map((x) => <Chip key={x} selected={mechanic === x} onClick={() => setMechanic(mechanic === x ? null : x)}>{x.slice(0, 4)}</Chip>)}</div></div>
+              </div>
             </div>
 
-            <div>
-              <div className="mb-1.5 flex items-center justify-between gap-2">
-                <span className="text-sm text-muted-foreground">How to perform it</span>
-                {canAi && <Button size="sm" variant="tonal" disabled={guideBusy || name.trim().length < 2} onClick={() => void runGuide()}><Sparkles /> {guideBusy ? "Writing…" : instructions.trim() ? "Rewrite" : "Generate"}</Button>}
+            {/* Instructions — the how-to guide, with an AI writer. */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <SectionLabel>How to perform it</SectionLabel>
+                {canAi && <Button size="sm" variant="tonal" disabled={guideBusy || name.trim().length < 2} onClick={() => void runGuide()}><Sparkles /> {guideBusy ? "Writing…" : instructions.trim() ? "Rewrite with AI" : "Write with AI"}</Button>}
               </div>
               <Textarea rows={5} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Setup, steps, coaching cues… or generate with AI." />
             </div>

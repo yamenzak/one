@@ -6,11 +6,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Fragment, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet } from "@mossa/protocol";
-import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, type ExerciseBests } from "@mossa/domain";
+import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, computePlates, type ExerciseBests, type PlateBreakdown, type UnitPrefs } from "@mossa/domain";
 import {
-  Button, Card, Badge, Field, Sheet, SubCard, ProgressRing, EmptyState,
+  Button, Card, Badge, Field, Input, Label, Sheet, SubCard, ProgressRing, EmptyState,
   Reveal, SkeletonLine, SkeletonList, useModalOverlay,
-  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, LifeBuoy, cn,
+  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, LifeBuoy, Plus, Minus, RotateCcw, cn,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -22,6 +22,8 @@ interface PublishedPlan { id: string; name: string; body: WorkoutBody }
 type PlanRow = PublishedPlan & { status: string; publishedAt?: string | null };
 interface LoggedSet { setIndex: number; reps?: number | null; weightKg?: number | null; durationSeconds?: number | null; distanceM?: number | null; effortLabel?: "easy" | "perfect" | "hard" | null; completed: boolean }
 interface SessionEntry { blockIndex: number; slotIndex: number; exerciseId: string; sets: LoggedSet[] }
+/** The client's previous session for one exercise (the "last time" marquee). */
+interface ExerciseLast { date: string; sets: { reps: number | null; weightKg: number | null; durationSeconds: number | null; distanceM: number | null; effortLabel: string | null }[] }
 type ExerciseLite = ExerciseInfo;
 
 export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: string; initialDay?: number; onExit?: () => void }) {
@@ -39,8 +41,28 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   const [detailSlot, setDetailSlot] = useState<ExerciseSlot | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [bests, setBests] = useState<Map<string, ExerciseBests>>(new Map());
+  // Nonce-per-step: bumped when a set is logged so that step's rest timer
+  // auto-starts (see RestTimer's `autoStart`). Single = "b:s", group = "g:b".
+  const [restSignals, setRestSignals] = useState<Map<string, number>>(new Map());
+  const pingRest = (key: string) => setRestSignals((m) => new Map(m).set(key, (m.get(key) ?? 0) + 1));
   const units = useUnits();
   const date = todayLocal();
+
+  // "Last time" cache — one fetch per exercise, reused across every set/round of
+  // the session (mirrors the food recents marquee). Cleared on client switch.
+  const lastCacheRef = useRef<Map<string, ExerciseLast | null>>(new Map());
+  const fetchLast = useCallback(async (exerciseId: string): Promise<ExerciseLast | null> => {
+    const cache = lastCacheRef.current;
+    if (cache.has(exerciseId)) return cache.get(exerciseId)!;
+    try {
+      const r = await api.get<{ last: ExerciseLast | null }>(`/api/logs/exercise-last?clientId=${clientId}&exerciseId=${exerciseId}&before=${date}`);
+      cache.set(exerciseId, r.last);
+      return r.last;
+    } catch {
+      cache.set(exerciseId, null);
+      return null;
+    }
+  }, [clientId, date]);
   const { startIfNew, start: startTour, active: tourActive } = useTour();
 
   // First time a client actually trains, walk them through the session player.
@@ -82,6 +104,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   // data can't linger under the new client while the reload is in flight.
   useEffect(() => {
     setPlan(null); setAllPlans([]); setSession(new Map()); setBests(new Map()); setViewId(null);
+    lastCacheRef.current = new Map();
   }, [clientId]);
 
   useEffect(() => {
@@ -215,6 +238,8 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
     if (broke.includes("weight")) { setToast(`New weight PR — ${fmtWeight(set.weightKg, units)}`); navigator.vibrate?.([30, 40, 60]); setTimeout(() => setToast(null), 3000); }
     else if (broke.includes("duration")) { setToast(`Time PR — ${fmtDuration(set.durationSeconds!)}`); navigator.vibrate?.([30, 40, 60]); setTimeout(() => setToast(null), 3000); }
     else if (broke.includes("reps")) { setToast(`Rep PR — ${set.reps} reps`); setTimeout(() => setToast(null), 3000); }
+    else navigator.vibrate?.(15); // subtle "set logged" confirmation when it isn't a PR
+    pingRest(`${blockIndex}:${slotIndex}`); // auto-start this step's rest countdown
   };
 
   // Superset/circuit/hiit: log every exercise of one round together. Persist each
@@ -242,6 +267,8 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
     }
     setBests(nextBests);
     if (pr) { setToast(pr); navigator.vibrate?.([30, 40, 60]); setTimeout(() => setToast(null), 3000); }
+    else navigator.vibrate?.(15); // subtle "round logged" confirmation
+    pingRest(`g:${blockIndex}`); // auto-start the block's between-round rest
   };
 
   // Flatten the day into a linear timeline: each single-exercise slot is its own
@@ -335,7 +362,8 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                 {!last && (
                   <div data-tour={i === 0 ? "wp-timer" : undefined} className="mt-2.5 flex items-center gap-2 pl-0.5">
                     <span className="h-px w-4 bg-border/60" />
-                    <RestTimer seconds={single ? stepRestSeconds(step.block, step.slot) : stepRestSeconds(step.block)} label />
+                    <RestTimer seconds={single ? stepRestSeconds(step.block, step.slot) : stepRestSeconds(step.block)} label
+                      autoStart={restSignals.get(single ? `${step.blockIndex}:${step.slotIndex}` : `g:${step.blockIndex}`)} />
                     <span className="text-[0.65rem] text-muted-foreground">before next</span>
                   </div>
                 )}
@@ -354,10 +382,10 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
       </AnimatePresence>
 
       {logSlot && (
-        <SetLogDrawer slot={logSlot.slot} exerciseName={exercises.get(logSlot.slot.exerciseId)?.name ?? "Exercise"} logged={session.get(`${logSlot.blockIndex}:${logSlot.slotIndex}`) ?? []} onClose={() => setLogSlot(null)} onSave={(s) => saveSet(logSlot.blockIndex, logSlot.slotIndex, logSlot.slot.exerciseId, s)} />
+        <SetLogDrawer slot={logSlot.slot} exerciseId={logSlot.slot.exerciseId} exerciseName={exercises.get(logSlot.slot.exerciseId)?.name ?? "Exercise"} logged={session.get(`${logSlot.blockIndex}:${logSlot.slotIndex}`) ?? []} fetchLast={fetchLast} onClose={() => setLogSlot(null)} onSave={(s) => saveSet(logSlot.blockIndex, logSlot.slotIndex, logSlot.slot.exerciseId, s)} />
       )}
       {roundBlock && (
-        <RoundLogDrawer block={roundBlock.block} roundIndex={roundBlock.roundIndex} exercises={exercises} onClose={() => setRoundBlock(null)} onSave={(entries) => saveRound(roundBlock.blockIndex, roundBlock.roundIndex, entries)} />
+        <RoundLogDrawer block={roundBlock.block} roundIndex={roundBlock.roundIndex} exercises={exercises} fetchLast={fetchLast} onClose={() => setRoundBlock(null)} onSave={(entries) => saveRound(roundBlock.blockIndex, roundBlock.roundIndex, entries)} />
       )}
       {swapSlot && (
         <SwapDrawer clientId={clientId} planId={plan.id} dayIndex={dayIndex} coords={swapSlot} currentName={exercises.get(swapSlot.exerciseId)?.name ?? "Exercise"} onClose={() => setSwapSlot(null)} onDone={(m) => { setSwapSlot(null); void load(); setToast(m); setTimeout(() => setToast(null), 3000); }} />
@@ -503,7 +531,7 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
   );
 }
 
-function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: ExerciseSlot; exerciseName: string; logged: LoggedSet[]; onClose: () => void; onSave: (s: LoggedSet) => Promise<void> }) {
+function SetLogDrawer({ slot, exerciseId, exerciseName, logged, fetchLast, onClose, onSave }: { slot: ExerciseSlot; exerciseId: string; exerciseName: string; logged: LoggedSet[]; fetchLast: (exerciseId: string) => Promise<ExerciseLast | null>; onClose: () => void; onSave: (s: LoggedSet) => Promise<void> }) {
   const units = useUnits();
   const mode = slot.measurementMode;
   const completed = logged.filter((s) => s.completed).sort((a, b) => a.setIndex - b.setIndex);
@@ -513,9 +541,31 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
   const [distance, setDistance] = useState("");
   const [weight, setWeight] = useState("");
   const [effort, setEffort] = useState<"easy" | "perfect" | "hard" | null>(null);
+  const [last, setLast] = useState<ExerciseLast | null>(null);
   const prescribed = slot.sets[Math.min(setIndex, slot.sets.length - 1)];
   const showWeight = prescribed?.weightMode !== "bodyweight";
   const editing = completed.some((s) => s.setIndex === setIndex);
+
+  // Fetch this exercise's last session once (cached by the parent).
+  useEffect(() => {
+    let alive = true;
+    void fetchLast(exerciseId).then((l) => { if (alive) setLast(l); });
+    return () => { alive = false; };
+  }, [exerciseId, fetchLast]);
+
+  // Fill the inputs from a set-shaped source (a previous set, or the coach's target).
+  const fill = (src: { reps: number | null; durationSeconds: number | null; distanceM: number | null; weightKg: number | null }) => {
+    if (needsReps(mode)) setReps(src.reps != null ? String(src.reps) : "");
+    if (needsDuration(mode)) setDuration(src.durationSeconds != null ? String(src.durationSeconds) : "");
+    if (needsDistance(mode)) setDistance(src.distanceM != null ? String(src.distanceM) : "");
+    if (showWeight) setWeight(src.weightKg != null ? String(kgToDisplay(src.weightKg, units)) : "");
+  };
+  // "Repeat last": the matching previous set, else the coach's prescribed target.
+  const repeatLast = () => {
+    const src = last?.sets[Math.min(setIndex, last.sets.length - 1)];
+    if (src) fill(src);
+    else if (prescribed) fill({ reps: prescribed.reps ?? null, durationSeconds: prescribed.timeSec ?? null, distanceM: prescribed.distanceM ?? null, weightKg: prescribed.weightMode === "absolute" ? (prescribed.weightValue ?? null) : null });
+  };
 
   // Tap a logged set to pull it back into the inputs and correct it.
   const edit = (s: LoggedSet) => {
@@ -561,13 +611,26 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
             ))}
           </div>
         )}
-        <div className="text-sm text-muted-foreground">{editing ? `Editing set ${setIndex + 1}` : `Set ${setIndex + 1} of ${slot.sets.length}`}{target ? ` · target ${target}` : ""}</div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0 text-sm text-muted-foreground">{editing ? `Editing set ${setIndex + 1}` : `Set ${setIndex + 1} of ${slot.sets.length}`}{target ? ` · target ${target}` : ""}</div>
+          {(last || target) && (
+            <button type="button" onClick={repeatLast} className="inline-flex shrink-0 items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-3.5">
+              <RotateCcw />{last ? "Repeat last" : "Use target"}
+            </button>
+          )}
+        </div>
+        {last && (
+          <div className="rounded-xl bg-surface-2 px-3 py-2">
+            <div className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">Last time · {relativeDate(last.date)}</div>
+            <div className="truncate text-sm font-medium tabular-nums">{summarizeLast(last.sets, units)}</div>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           {needsReps(mode) && <Field label="Reps" inputMode="numeric" value={reps} onChange={(e) => setReps(e.target.value.replace(/\D/g, ""))} />}
           {needsDuration(mode) && <Field label="Duration (sec)" inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value.replace(/\D/g, ""))} />}
           {needsDistance(mode) && <Field label="Distance (m)" inputMode="numeric" value={distance} onChange={(e) => setDistance(e.target.value.replace(/\D/g, ""))} />}
-          {showWeight && <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={weight} onChange={(e) => setWeight(setDec(e.target.value))} />}
         </div>
+        {showWeight && <WeightInput value={weight} onChange={setWeight} units={units} />}
         <div>
           <div className="mb-2 text-sm text-muted-foreground">How did it feel?</div>
           <div className="flex gap-2">
@@ -583,13 +646,39 @@ function SetLogDrawer({ slot, exerciseName, logged, onClose, onSave }: { slot: E
 }
 
 /** Round-grouped logging for supersets/circuits/HIIT: one set of every exercise. */
-function RoundLogDrawer({ block, roundIndex, exercises, onClose, onSave }: { block: WorkoutBlock; roundIndex: number; exercises: Map<string, ExerciseLite>; onClose: () => void; onSave: (entries: { slotIndex: number; exerciseId: string; set: LoggedSet }[]) => Promise<void> }) {
+function RoundLogDrawer({ block, roundIndex, exercises, fetchLast, onClose, onSave }: { block: WorkoutBlock; roundIndex: number; exercises: Map<string, ExerciseLite>; fetchLast: (exerciseId: string) => Promise<ExerciseLast | null>; onClose: () => void; onSave: (entries: { slotIndex: number; exerciseId: string; set: LoggedSet }[]) => Promise<void> }) {
   type Vals = { reps: string; duration: string; distance: string; weight: string };
   const [vals, setVals] = useState<Record<number, Vals>>({});
+  const [lasts, setLasts] = useState<Record<number, ExerciseLast | null>>({});
   const [busy, setBusy] = useState(false);
   const units = useUnits();
   const rounds = block.rounds ?? 1;
   const setV = (si: number, patch: Partial<Vals>) => setVals((v) => ({ ...v, [si]: { reps: "", duration: "", distance: "", weight: "", ...v[si], ...patch } }));
+
+  // Prefetch each exercise's last session (cached by the parent) for the marquee.
+  useEffect(() => {
+    let alive = true;
+    void Promise.all(block.slots.map((slot, si) => fetchLast(slot.exerciseId).then((l) => [si, l] as const)))
+      .then((pairs) => { if (alive) setLasts(Object.fromEntries(pairs)); });
+    return () => { alive = false; };
+  }, [block, fetchLast]);
+
+  // Fill one slot's inputs from its last round, else the coach's prescribed target.
+  const repeat = (si: number, slot: ExerciseSlot) => {
+    const mode = slot.measurementMode;
+    const prescribed = slot.sets[Math.min(roundIndex, slot.sets.length - 1)];
+    const showWeight = prescribed?.weightMode !== "bodyweight";
+    const l = lasts[si];
+    const src = l?.sets[Math.min(roundIndex, l.sets.length - 1)]
+      ?? (prescribed ? { reps: prescribed.reps ?? null, durationSeconds: prescribed.timeSec ?? null, distanceM: prescribed.distanceM ?? null, weightKg: prescribed.weightMode === "absolute" ? (prescribed.weightValue ?? null) : null } : null);
+    if (!src) return;
+    setV(si, {
+      reps: needsReps(mode) && src.reps != null ? String(src.reps) : "",
+      duration: needsDuration(mode) && src.durationSeconds != null ? String(src.durationSeconds) : "",
+      distance: needsDistance(mode) && src.distanceM != null ? String(src.distanceM) : "",
+      weight: showWeight && src.weightKg != null ? String(kgToDisplay(src.weightKg, units)) : "",
+    });
+  };
 
   const save = async () => {
     setBusy(true);
@@ -633,12 +722,18 @@ function RoundLogDrawer({ block, roundIndex, exercises, onClose, onSave }: { blo
             <SubCard key={si} className="space-y-2">
               <ExerciseRow ex={exercises.get(slot.exerciseId)} meta={false} thumbSize={36}
                 trailing={target ? <span className="shrink-0 text-xs text-muted-foreground">target {target}</span> : null} />
+              {lasts[si] && (
+                <button type="button" onClick={() => repeat(si, slot)} className="flex w-full items-center justify-between gap-2 rounded-lg bg-surface-2 px-2.5 py-1.5 text-left transition-colors hover:bg-surface-3 [&_svg]:size-3.5">
+                  <span className="min-w-0 truncate text-xs"><span className="font-semibold text-foreground">Last · {relativeDate(lasts[si]!.date)}</span> <span className="tabular-nums text-muted-foreground">{summarizeLast(lasts[si]!.sets, units)}</span></span>
+                  <RotateCcw className="shrink-0 text-muted-foreground" />
+                </button>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 {needsReps(mode) && <Field label="Reps" inputMode="numeric" value={v.reps} onChange={(e) => setV(si, { reps: e.target.value.replace(/\D/g, "") })} />}
                 {needsDuration(mode) && <Field label="Duration (sec)" inputMode="numeric" value={v.duration} onChange={(e) => setV(si, { duration: e.target.value.replace(/\D/g, "") })} />}
                 {needsDistance(mode) && <Field label="Distance (m)" inputMode="numeric" value={v.distance} onChange={(e) => setV(si, { distance: e.target.value.replace(/\D/g, "") })} />}
-                {showWeight && <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={v.weight} onChange={(e) => setV(si, { weight: setDec(e.target.value) })} />}
               </div>
+              {showWeight && <WeightInput value={v.weight} onChange={(w) => setV(si, { weight: w })} units={units} />}
             </SubCard>
           );
         })}
@@ -758,6 +853,60 @@ function blockLabel(type: string): string {
   return type === "single" ? "Exercise" : type === "hiit" ? "HIIT" : type[0]!.toUpperCase() + type.slice(1);
 }
 
+/** A past YYYY-MM-DD as a compact relative label ("yesterday", "3d ago", "2w ago"). */
+function relativeDate(dateStr: string): string {
+  const then = new Date(`${dateStr}T00:00:00`);
+  const now = new Date(`${todayLocal()}T00:00:00`);
+  const days = Math.round((now.getTime() - then.getTime()) / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days}d ago`;
+  if (days < 14) return "last week";
+  if (days < 60) return `${Math.round(days / 7)}w ago`;
+  return then.toLocaleDateString();
+}
+
+/** One-line summary of a past session's sets, collapsing identical ones:
+ *  "3 × 10 · 60 kg" when uniform, else each set comma-joined. */
+function summarizeLast(sets: ExerciseLast["sets"], units: Parameters<typeof fmtWeight>[1]): string {
+  if (!sets.length) return "—";
+  const labels = sets.map((s) => loggedLabel({ setIndex: 0, completed: true, reps: s.reps, durationSeconds: s.durationSeconds, distanceM: s.distanceM, weightKg: s.weightKg }, units));
+  if (labels.every((l) => l === labels[0])) return labels.length > 1 ? `${labels.length} × ${labels[0]}` : labels[0]!;
+  return labels.join(", ");
+}
+
+/** Barbell loading hint, e.g. "20kg bar + 15 + 5 per side" (+ "+0.5 kg" remainder). */
+function plateLine(bd: PlateBreakdown): string {
+  const parts = [`${bd.barKg}kg bar`];
+  if (bd.perSide.length) parts.push(`${bd.perSide.join(" + ")} per side`);
+  let s = parts.join(" + ");
+  if (bd.remainderKg > 0) s += ` +${bd.remainderKg} kg`;
+  return s;
+}
+
+/** Smart weight control: unit-aware ± steppers (2.5 kg / 5 lb) around the amount,
+ *  with a subtle plate-loading breakdown beneath (kg contexts only). */
+function WeightInput({ value, onChange, units, label }: { value: string; onChange: (v: string) => void; units: UnitPrefs; label?: string }) {
+  const step = units.weight === "lb" ? 5 : 2.5;
+  const num = Number(value);
+  const has = value !== "" && Number.isFinite(num);
+  const bump = (d: number) => onChange(String(Math.max(0, Math.round(((has ? num : 0) + d) * 100) / 100)));
+  // Plate math is defined in kg (20 kg bar); only offer it in kg-ish contexts.
+  const plates = units.weight === "kg" && has && num > 0 ? computePlates(num) : null;
+  const showPlates = !!plates && (plates.perSide.length > 0 || plates.remainderKg > 0);
+  return (
+    <div>
+      <Label className="mb-1.5 block">{label ?? `Weight (${weightLabel(units)})`}</Label>
+      <div className="flex items-center gap-2">
+        <Button type="button" size="icon-sm" variant="secondary" onClick={() => bump(-step)} aria-label={`Minus ${step} ${weightLabel(units)}`}><Minus /></Button>
+        <Input inputMode="decimal" className="flex-1 text-center tabular-nums" value={value} onChange={(e) => onChange(setDec(e.target.value))} />
+        <Button type="button" size="icon-sm" variant="secondary" onClick={() => bump(step)} aria-label={`Plus ${step} ${weightLabel(units)}`}><Plus /></Button>
+      </div>
+      {showPlates && <p className="mt-1.5 text-xs text-muted-foreground">{plateLine(plates)}</p>}
+    </div>
+  );
+}
+
 /** Very short per-set measure for the dot labels: "10" / "30s" / "500m" / "10·30s". */
 function setMeasureShort(s: WorkoutSet, mode: MeasureMode): string {
   const bits: string[] = [];
@@ -817,8 +966,16 @@ function fmtClock(sec: number): string {
  * countdown, tap again to reset. Buzzes and flashes "Go" when it lands on zero.
  * Used between the set dots (per-set rest) and between exercises (step rest).
  */
-function RestTimer({ seconds, label, className }: { seconds: number; label?: boolean; className?: string }) {
+function RestTimer({ seconds, label, className, autoStart }: { seconds: number; label?: boolean; className?: string; autoStart?: number }) {
   const [left, setLeft] = useState<number | null>(null);
+  // Auto-start when the parent bumps `autoStart` (a set was just logged). The
+  // nonce only changes on a real save, so this never fires on mount or twice.
+  const prevAuto = useRef(autoStart);
+  useEffect(() => {
+    if (autoStart === undefined || autoStart === prevAuto.current) return;
+    prevAuto.current = autoStart;
+    setLeft(seconds);
+  }, [autoStart, seconds]);
   useEffect(() => {
     if (left === null) return;
     if (left <= 0) { navigator.vibrate?.([40, 30, 60]); const t = setTimeout(() => setLeft(null), 1100); return () => clearTimeout(t); }
