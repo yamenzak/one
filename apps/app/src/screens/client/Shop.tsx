@@ -120,17 +120,24 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
       }>
         {packages && (
         <>
-      {sub && (
-        <Card className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <span className="text-sm text-muted-foreground">Current access</span>
-            {sub.autoRenew && <div className="text-xs font-medium text-primary">Auto-renews monthly</div>}
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Badge tone={sub.daysRemaining <= 7 ? "warning" : "success"}>{sub.daysRemaining} days left</Badge>
-            {sub.autoRenew && <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirmCancel(true)}>Cancel</Button>}
-          </div>
-        </Card>
+      {sub ? (
+        <div className="space-y-2">
+          <Card className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <span className="text-sm text-muted-foreground">Current access</span>
+              {sub.autoRenew && <div className="text-xs font-medium text-primary">Auto-renews monthly</div>}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Badge tone={sub.daysRemaining <= 7 ? "warning" : "success"}>{sub.daysRemaining} days left</Badge>
+              {sub.autoRenew && <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirmCancel(true)}>Cancel</Button>}
+            </div>
+          </Card>
+          {!sub.autoRenew && (
+            <p className="px-1 text-xs text-muted-foreground">Buying another package <span className="font-medium text-foreground">extends</span> your access — new days stack on top of your current {sub.daysRemaining}, never wasted.</p>
+          )}
+        </div>
+      ) : (
+        !locked && <p className="px-1 text-xs text-muted-foreground">Pick a package below to unlock your plan. Buy again anytime to extend — access stacks, it never resets.</p>
       )}
 
       <PlanIncludes />
@@ -138,7 +145,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
       {memberships.length > 0 && (
         <section className="space-y-3">
           <Eyebrow>Memberships &amp; plans</Eyebrow>
-          {memberships.map((p, i) => <Stagger key={p.id}><PackageCard p={p} tone={CARD_TONES[i % CARD_TONES.length]!} cta={cta(p)} /></Stagger>)}
+          {memberships.map((p, i) => <Stagger key={p.id}><PackageCard p={p} tone={CARD_TONES[i % CARD_TONES.length]!} cta={cta(p)} hasActive={!!sub} /></Stagger>)}
         </section>
       )}
 
@@ -148,7 +155,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
           {hasInlinePaid && (
             <Field label="Promo code (optional)" icon={Ticket} value={buyPromo} onChange={(e) => setBuyPromo(e.target.value.toUpperCase())} placeholder="SUMMER20" />
           )}
-          {oneTime.map((p, i) => <Stagger key={p.id}><PackageCard p={p} tone={CARD_TONES[(memberships.length + i) % CARD_TONES.length]!} cta={cta(p)} /></Stagger>)}
+          {oneTime.map((p, i) => <Stagger key={p.id}><PackageCard p={p} tone={CARD_TONES[(memberships.length + i) % CARD_TONES.length]!} cta={cta(p)} hasActive={!!sub} /></Stagger>)}
         </section>
       )}
 
@@ -198,8 +205,16 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
 
 /** A storefront product card: a tone-tinted cover band (name + price), then a
  *  "what's included" checklist (budgets + package capabilities) and the CTA. */
-function PackageCard({ p, tone, cta }: { p: Pkg; tone: (typeof CARD_TONES)[number]; cta: ReactNode }) {
+function PackageCard({ p, tone, cta, hasActive }: { p: Pkg; tone: (typeof CARD_TONES)[number]; cta: ReactNode; hasActive: boolean }) {
   const tv = toneVar[tone];
+  const days = Math.max(0, ...p.budgets.map((b) => b.days));
+  // Make the access model explicit on the card: recurring vs a fixed run of
+  // days, and — when they're already covered — that it queues (never resets).
+  const note = p.monthly_price_cents
+    ? "Billed monthly · cancel anytime"
+    : days > 0
+      ? hasActive ? `${days} days · begins when your current access ends` : `${days} days of access`
+      : null;
   const price: { big: string; cadence: string } =
     p.monthly_price_cents ? { big: `$${(p.monthly_price_cents / 100).toFixed(0)}`, cadence: "/ month" }
     : p.installment_months && p.installment_months > 1 && p.one_time_price_cents ? { big: `$${(p.one_time_price_cents / 100).toFixed(0)}`, cadence: `${p.installment_months}× $${Math.ceil(p.one_time_price_cents / 100 / p.installment_months)}/mo` }
@@ -234,6 +249,7 @@ function PackageCard({ p, tone, cta }: { p: Pkg; tone: (typeof CARD_TONES)[numbe
             ))}
           </ul>
         )}
+        {note && <p className="mt-3 text-xs text-muted-foreground">{note}</p>}
         {cta}
       </div>
     </Card>
