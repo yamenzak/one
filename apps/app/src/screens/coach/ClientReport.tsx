@@ -16,6 +16,7 @@ import {
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { AiAvatar } from "../../AiAvatar.js";
+import { Markdown } from "../../Markdown.js";
 import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
 
 interface Report {
@@ -67,7 +68,7 @@ export function ClientReport({ clientId }: { clientId: string }) {
           {summaryBusy ? (
             <p className="text-sm text-muted-foreground">Reading this client's context…</p>
           ) : summary ? (
-            <div className="flex items-start gap-3"><AiAvatar className="mt-0.5 size-8 shrink-0" /><p className="text-sm leading-relaxed text-foreground/85">{summary}</p></div>
+            <div className="flex items-start gap-3"><AiAvatar className="mt-0.5 size-8 shrink-0" /><Markdown className="min-w-0 flex-1 text-sm text-foreground/85">{summary}</Markdown></div>
           ) : (
             <p className="text-sm text-muted-foreground">Generate a coach-facing read: current phase, adherence, trajectory, and the single most important thing to address next.</p>
           )}

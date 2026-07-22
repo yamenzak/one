@@ -13,6 +13,7 @@ import { featureEnabled } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { AiAvatar } from "../../AiAvatar.js";
+import { Markdown } from "../../Markdown.js";
 
 export function SupplementGuide({ clientId }: { clientId: string }) {
   const { ctx } = useSession();
@@ -49,7 +50,7 @@ export function SupplementGuide({ clientId }: { clientId: string }) {
           <AiAvatar className="mt-0.5 size-8 shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-primary">Supplement tips</div>
-            <p className="mt-1 whitespace-pre-line text-[0.95rem] leading-relaxed text-foreground/85">{guide}</p>
+            <Markdown className="mt-1 text-[0.95rem] text-foreground/85">{guide}</Markdown>
             <p className="mt-1.5 text-[0.7rem] text-muted-foreground">General info — ask your coach before starting, stopping, or changing anything.</p>
           </div>
         </motion.div>

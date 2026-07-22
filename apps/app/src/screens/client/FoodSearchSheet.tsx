@@ -11,6 +11,7 @@ import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { FoodRow, normFood } from "../food.js";
 import { AiAvatar } from "../../AiAvatar.js";
+import { Markdown } from "../../Markdown.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
 import { AiErrorBox } from "../../AiError.js";
 import { BarcodeScanner } from "./BarcodeScanner.js";
@@ -321,7 +322,7 @@ function SnapReview({ entries, note, defaultMeal, units, onCancel, onRetake, onC
             <AiAvatar className="size-8 shrink-0" />
             <div className="min-w-0">
               <div className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">AI read</div>
-              <p className="mt-0.5 text-sm leading-relaxed">{note}</p>
+              <Markdown className="mt-0.5 text-sm">{note}</Markdown>
             </div>
           </div>
         )}
