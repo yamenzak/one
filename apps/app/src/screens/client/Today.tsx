@@ -179,14 +179,14 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
         <>
           {/* Date navigator — the whole day (macros + agenda + feed) rewinds. */}
           <Stagger className="flex items-center gap-2">
-            <button onClick={() => setDate((d) => shiftDay(d, -1))} aria-label="Previous day" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-4"><ChevronLeft /></button>
+            <button onClick={() => setDate((d) => shiftDay(d, -1))} aria-label="Previous day" className="grid size-9 shrink-0 place-items-center rounded-full border border-border/40 bg-background/50 text-muted-foreground backdrop-blur-md transition-colors hover:bg-background/70 hover:text-foreground [&_svg]:size-4"><ChevronLeft /></button>
             <label className="relative flex-1">
               <input type="date" max={today} value={date} onChange={(e) => e.target.value && setDate(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0 [color-scheme:dark]" aria-label="Pick a date" />
-              <div className="pointer-events-none flex items-center justify-center gap-1.5 rounded-xl bg-surface-2 px-3 py-2 text-sm font-semibold [&_svg]:size-4"><Calendar className="text-muted-foreground" />{dayLabel(date, today)}</div>
+              <div className="pointer-events-none flex items-center justify-center gap-1.5 rounded-xl border border-border/40 bg-background/50 px-3 py-2 text-sm font-semibold backdrop-blur-md [&_svg]:size-4"><Calendar className="text-muted-foreground" />{dayLabel(date, today)}</div>
             </label>
             {isToday
               ? <div className="size-9 shrink-0" />
-              : <button onClick={() => setDate((d) => (d < today ? shiftDay(d, 1) : d))} aria-label="Next day" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-4"><ChevronRight /></button>}
+              : <button onClick={() => setDate((d) => (d < today ? shiftDay(d, 1) : d))} aria-label="Next day" className="grid size-9 shrink-0 place-items-center rounded-full border border-border/40 bg-background/50 text-muted-foreground backdrop-blur-md transition-colors hover:bg-background/70 hover:text-foreground [&_svg]:size-4"><ChevronRight /></button>}
           </Stagger>
           {!isToday && <button onClick={() => setDate(today)} className="mx-auto block text-xs font-medium text-primary">Jump to today</button>}
 
