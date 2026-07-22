@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Button, Card, Badge, Field, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, toneVar, ArrowLeft, LogOut, Ticket, Store, Sparkles, Check, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
-import { CLIENT_FLAG_CATEGORIES, CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "@mossa/domain";
+import { CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { PaymentSheet, type CheckoutIntent } from "../../PaymentSheet.js";
@@ -250,24 +250,16 @@ function PlanIncludes() {
   const { ctx } = useSession();
   const flags = ctx?.clientFlags;
   if (!flags) return null;
-  const groups = CLIENT_FLAG_CATEGORIES
-    .map((cat) => ({ cat, keys: CLIENT_FLAG_KEYS.filter((k) => CLIENT_FLAG_META[k].category === cat.key && flags[k]) }))
-    .filter((g) => g.keys.length > 0);
-  if (!groups.length) return null;
+  const included = CLIENT_FLAG_KEYS.filter((k) => flags[k]);
+  if (!included.length) return null;
   return (
     <section className="space-y-2">
-      <Eyebrow>What your plan includes</Eyebrow>
-      <div className="space-y-3 px-1">
-        {groups.map((g) => (
-          <div key={g.cat.key} className="space-y-1">
-            <div className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">{g.cat.label}</div>
-            {g.keys.map((k) => (
-              <div key={k} className="flex items-center gap-2 text-sm">
-                <Check className="size-4 shrink-0 text-success" />
-                <span>{CLIENT_FLAG_META[k].label}</span>
-              </div>
-            ))}
-          </div>
+      <Eyebrow action={<span className="text-[0.65rem] font-medium text-muted-foreground">{included.length} included</span>}>What your plan includes</Eyebrow>
+      <div className="flex flex-wrap gap-1.5 px-1">
+        {included.map((k) => (
+          <span key={k} className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success [&_svg]:size-3">
+            <Check strokeWidth={3} />{CLIENT_FLAG_META[k].label}
+          </span>
         ))}
       </div>
     </section>
