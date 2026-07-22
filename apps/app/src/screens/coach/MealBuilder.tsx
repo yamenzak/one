@@ -1,20 +1,30 @@
 /** Meal plan builder — bank-of-options with live macro totals + free meals. */
 
 import { useCallback, useEffect, useState } from "react";
-import type { MealBody, MealOption } from "@mossa/protocol";
+import type { MealBody, MealOption, MealFood } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
-import { fmtEnergy } from "@mossa/domain";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, ArrowLeft, Plus, Sparkles, Utensils, History, X } from "@mossa/ui";
+import { fmtEnergy, scaleFood, servingsToQuantity, SERVING_PRESETS } from "@mossa/domain";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, Chip, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, cn, ArrowLeft, Plus, Sparkles, Utensils, History, X } from "@mossa/ui";
 import { api, ApiError } from "../../api.js";
 import { ClientPrefsStrip } from "./ClientPrefsStrip.js";
 import { AiErrorBox } from "../../AiError.js";
 import { useUnits } from "../../units.js";
 import { FoodSearchSheet } from "../client/FoodSearchSheet.js";
-import { FoodRow as FoodRowUI } from "../food.js";
+import { FoodThumb } from "../food.js";
 
-interface Plan { id: string; clientId: string; name: string; status: string; body: MealBody; targetGoal?: { targets?: Record<string, number> | null } | null }
+/** Client daily targets (flat shape, as stored on the active goal). */
+interface Targets { targetCalories?: number; targetProteinG?: number; targetCarbsG?: number; targetFatG?: number }
+interface Plan { id: string; clientId: string; name: string; status: string; body: MealBody; targetGoal?: Record<string, unknown> | null }
 interface FoodRow { id: string; name: string; serving_size: number; calories: number; protein_g: number; carbs_g: number; fat_g: number }
 const BUILTIN_TYPES = ["breakfast", "lunch", "dinner", "snack", "pre_workout", "post_workout"];
+
+/** Normalize a plan's snapshotted goal (flat or `{targets}`-nested) into flat targets. */
+function asTargets(src: unknown): Targets | null {
+  if (!src || typeof src !== "object") return null;
+  const o = src as Record<string, unknown>;
+  const t = (o.targets && typeof o.targets === "object" ? o.targets : o) as Targets;
+  return typeof t.targetCalories === "number" ? t : null;
+}
 
 export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => void }) {
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -22,6 +32,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const [customTypes, setCustomTypes] = useState<{ label: string }[]>([]);
   const [foods, setFoods] = useState<Map<string, FoodLike>>(new Map());
   const [names, setNames] = useState<Map<string, string>>(new Map());
+  const [targets, setTargets] = useState<Targets | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [foodPicker, setFoodPicker] = useState<{ optIdx: number } | null>(null);
@@ -30,14 +41,43 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const [typeOpen, setTypeOpen] = useState(false);
   const [newType, setNewType] = useState("");
 
+  const foodsFromRows = (rows: FoodRow[]): Map<string, FoodLike> =>
+    new Map(rows.map((x) => [x.id, { id: x.id, servingSize: x.serving_size, caloriesPerServing: x.calories, proteinG: x.protein_g, carbsG: x.carbs_g, fatG: x.fat_g }]));
+
   const load = useCallback(async () => {
     const [p, f] = await Promise.all([api.get<{ plan: Plan }>(`/api/meal-plans/${planId}`), api.get<{ foods: FoodRow[] }>("/api/foods?scope=all")]);
     setPlan(p.plan); setOptions(p.plan.body.mealOptions ?? []); setCustomTypes(p.plan.body.customMealTypes ?? []);
-    setFoods(new Map(f.foods.map((x) => [x.id, { id: x.id, servingSize: x.serving_size, caloriesPerServing: x.calories, proteinG: x.protein_g, carbsG: x.carbs_g, fatG: x.fat_g }])));
+    setFoods(foodsFromRows(f.foods));
     setNames(new Map(f.foods.map((x) => [x.id, x.name])));
   }, [planId]);
   useEffect(() => void load(), [load]);
+
+  // Live target feedback: the client's ACTIVE goal targets (canonical, guarded
+  // by requireClientAccess). Drafts don't snapshot a goal — only published
+  // plans do — so we read the live goal here and fall back to the plan's
+  // snapshot. A quiet miss just hides the target cues.
+  useEffect(() => {
+    const cid = plan?.clientId;
+    if (!cid) return;
+    let alive = true;
+    api.get<{ goals: { status: string; targets: Targets | null }[] }>(`/api/goals?clientId=${cid}`)
+      .then((r) => { if (!alive) return; const g = r.goals?.find((x) => x.status === "active") ?? r.goals?.[0]; setTargets(g?.targets ?? asTargets(plan?.targetGoal)); })
+      .catch(() => { if (alive) setTargets(asTargets(plan?.targetGoal)); });
+    return () => { alive = false; };
+  }, [plan?.clientId, plan?.targetGoal]);
+
   const nameOf = useCallback((id: string) => names.get(id) ?? "Food", [names]);
+
+  // Pull the food reference map fresh WITHOUT touching plan/option edits — used
+  // after a pick or AI draft so newly-imported foods get live macros + serving
+  // presets immediately (onPick only hands back an id + name).
+  const refreshFoods = useCallback(async () => {
+    try {
+      const f = await api.get<{ foods: FoodRow[] }>("/api/foods?scope=all");
+      setFoods(foodsFromRows(f.foods));
+      setNames((prev) => { const m = new Map(prev); for (const x of f.foods) m.set(x.id, x.name); return m; });
+    } catch { /* keep optimistic names */ }
+  }, []);
 
   const mutate = (fn: (d: MealOption[]) => void) => { const next = structuredClone(options); fn(next); setOptions(next); setDirty(true); };
   const save = async () => { setSaving(true); try { await api.patch(`/api/meal-plans/${planId}`, { body: { customMealTypes: customTypes, mealOptions: options } }); setDirty(false); } finally { setSaving(false); } };
@@ -51,12 +91,12 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
     if (!plan) return;
     const res = await api.post<{ draft: MealBody }>("/api/ai/draft-meal", { clientId: plan.clientId, instructions });
     setOptions((prev) => [...prev, ...(res.draft.mealOptions ?? [])]); setDirty(true); setAiOpen(false);
+    void refreshFoods();
   };
 
   const readOnly = plan?.status === "superseded" || plan?.status === "archived";
   const byType = new Map<string, { opt: MealOption; idx: number }[]>();
   options.forEach((opt, idx) => byType.set(opt.mealType, [...(byType.get(opt.mealType) ?? []), { opt, idx }]));
-  const targets = plan?.targetGoal?.targets ?? null;
   const allTypes = [...BUILTIN_TYPES, ...customTypes.map((t) => t.label)];
 
   return (
@@ -104,47 +144,57 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
       {allTypes.map((type) => {
         const opts = byType.get(type) ?? [];
         return (
-          <Card key={type} className="space-y-3">
+          <Card key={type} className="space-y-3 p-4">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold capitalize">{type.replace("_", " ")}</h2>
-              <button onClick={() => mutate((d) => d.push({ mealType: type, mealName: `Option ${opts.length + 1}`, isFree: false, foods: [] }))} className="text-sm font-medium text-primary">+ Option</button>
+              <button onClick={() => mutate((d) => d.push({ mealType: type, mealName: `Option ${opts.length + 1}`, isFree: false, foods: [] }))} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><Plus /> Option</button>
             </div>
             {opts.length === 0 && <p className="text-sm text-muted-foreground">No options yet.</p>}
             {opts.map(({ opt, idx }) => {
               const t = optionMacroTotals(opt, foods);
+              const over = !!(targets?.targetCalories && t.calories > targets.targetCalories);
               return (
-                <SubCard key={idx} className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <input value={opt.mealName} placeholder="Option name" onChange={(e) => mutate((d) => (d[idx]!.mealName = e.target.value))} className="flex-1 rounded-lg bg-surface-3 px-3 py-2 text-sm outline-none" />
-                    <button onClick={() => mutate((d) => d.splice(idx, 1))} className="text-muted-foreground hover:text-danger [&_svg]:size-4"><X /></button>
+                <SubCard key={idx} className="space-y-3">
+                  {/* Header: name + macro summary vs target + remove */}
+                  <div className="flex items-end gap-2">
+                    <Field label="Option name" value={opt.mealName} placeholder="e.g. Oats & berries" onChange={(e) => mutate((d) => (d[idx]!.mealName = e.target.value))} className="flex-1" />
+                    <Button size="icon-sm" variant="ghost" aria-label="Remove option" className="mb-0.5 text-muted-foreground hover:text-danger" onClick={() => mutate((d) => d.splice(idx, 1))}><X /></Button>
                   </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <button onClick={() => mutate((d) => { d[idx]!.isFree = !d[idx]!.isFree; if (d[idx]!.isFree) d[idx]!.foods = []; })} className={`rounded-full px-3 py-1 ${opt.isFree ? "bg-nutrition-soft text-nutrition" : "bg-surface-3 text-muted-foreground"}`}>Free meal</button>
-                    <span className="numeral ml-auto flex items-center gap-2"><span className="text-calories">{fmtEnergy(t.calories, units)}</span><MacroInline proteinG={t.proteinG} carbsG={t.carbsG} fatG={t.fatG} /></span>
+                  <div className="flex items-center justify-between gap-2">
+                    <button onClick={() => mutate((d) => { d[idx]!.isFree = !d[idx]!.isFree; if (d[idx]!.isFree) d[idx]!.foods = []; })} className={cn("rounded-full px-3 py-1 text-xs font-medium transition-colors", opt.isFree ? "bg-nutrition-soft text-nutrition" : "bg-surface-3 text-muted-foreground hover:text-foreground")}>Free meal</button>
+                    <span className="numeral flex items-center gap-2 text-xs">
+                      {targets?.targetCalories ? (
+                        <span className="flex items-center gap-1">
+                          <span className={cn("font-semibold", over ? "text-warning" : "text-calories")}>{fmtEnergy(t.calories, units)}</span>
+                          <span className="text-muted-foreground">/ {fmtEnergy(targets.targetCalories, units)}</span>
+                        </span>
+                      ) : (
+                        <span className="font-semibold text-calories">{fmtEnergy(t.calories, units)}</span>
+                      )}
+                      <MacroInline proteinG={t.proteinG} carbsG={t.carbsG} fatG={t.fatG} />
+                    </span>
                   </div>
+
                   {opt.isFree ? (
-                    <input type="number" placeholder="Max calories" value={opt.freeMealMaxCalories ?? ""} onChange={(e) => mutate((d) => (d[idx]!.freeMealMaxCalories = e.target.value ? Number(e.target.value) : null))} className="w-full rounded-lg bg-surface-3 px-3 py-2 text-sm outline-none" />
+                    <Field label="Max calories" type="number" inputMode="numeric" placeholder="Optional cap" value={opt.freeMealMaxCalories ?? ""} onChange={(e) => mutate((d) => (d[idx]!.freeMealMaxCalories = e.target.value ? Number(e.target.value) : null))} className="max-w-[12rem]" />
                   ) : (
-                    <>
+                    <div className="space-y-3">
                       {opt.foods.map((mf, fi) => (
-                        <FoodRowUI
+                        <FoodPortionRow
                           key={fi}
+                          mf={mf}
                           name={nameOf(mf.foodId)}
-                          macros={false}
-                          energy={false}
-                          thumbSize={34}
-                          trailing={
-                            <div className="flex items-center gap-2 text-sm">
-                              <input type="number" value={mf.quantity} onChange={(e) => mutate((d) => (d[idx]!.foods[fi]!.quantity = Number(e.target.value)))} className="w-16 rounded-lg bg-surface-3 px-2 py-1 outline-none" />
-                              <span className="text-xs text-muted-foreground">{mf.unit}</span>
-                              <button onClick={() => mutate((d) => d[idx]!.foods.splice(fi, 1))} className="text-muted-foreground hover:text-danger [&_svg]:size-3.5"><X /></button>
-                            </div>
-                          }
+                          food={foods.get(mf.foodId)}
+                          onQty={(q) => mutate((d) => (d[idx]!.foods[fi]!.quantity = q))}
+                          onRemove={() => mutate((d) => d[idx]!.foods.splice(fi, 1))}
                         />
                       ))}
-                      <button onClick={() => setFoodPicker({ optIdx: idx })} className="text-xs font-medium text-primary">+ Food</button>
+                      <div className="space-y-1.5">
+                        <button onClick={() => setFoodPicker({ optIdx: idx })} className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-xs font-medium text-primary transition-colors hover:bg-surface-3 [&_svg]:size-4"><Plus /> Add food</button>
+                        {opt.foods.length === 0 && <p className="px-1 text-center text-[0.7rem] text-muted-foreground">Search the library — or create a new food from the search if it's not there yet.</p>}
+                      </div>
                       {opt.foods.length > 0 && <MealImage mealName={opt.mealName} foodNames={opt.foods.map((mf) => nameOf(mf.foodId))} value={opt.imageUrl} onChange={(url) => mutate((d) => (d[idx]!.imageUrl = url))} />}
-                    </>
+                    </div>
                   )}
                 </SubCard>
               );
@@ -178,7 +228,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
         )}
       </Reveal>
 
-      {foodPicker && <FoodSearchSheet onClose={() => setFoodPicker(null)} onPick={(id, name) => { mutate((d) => d[foodPicker.optIdx]!.foods.push({ foodId: id, quantity: 100, unit: "g" })); setNames((p) => new Map(p).set(id, name)); setFoodPicker(null); }} />}
+      {foodPicker && <FoodSearchSheet onClose={() => setFoodPicker(null)} onPick={(id, name) => { mutate((d) => d[foodPicker.optIdx]!.foods.push({ foodId: id, quantity: 100, unit: "g" })); setNames((p) => new Map(p).set(id, name)); setFoodPicker(null); void refreshFoods(); }} />}
       {aiOpen && <AiMealSheet onClose={() => setAiOpen(false)} onRun={runAi} />}
       <Sheet open={typeOpen} onClose={() => setTypeOpen(false)} title="New meal type">
         <div className="space-y-4">
@@ -187,6 +237,42 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
         </div>
       </Sheet>
     </Page>
+  );
+}
+
+/** One food in an option: identity + live scaled macros, one-tap serving presets,
+ *  and an exact-amount field. Portion math is shared (`scaleFood`/`servingsToQuantity`). */
+function FoodPortionRow({ mf, name, food, onQty, onRemove }: { mf: MealFood; name: string; food?: FoodLike; onQty: (q: number) => void; onRemove: () => void }) {
+  const units = useUnits();
+  const scaled = food ? scaleFood({ servingSize: food.servingSize, calories: food.caloriesPerServing, proteinG: food.proteinG, carbsG: food.carbsG, fatG: food.fatG }, mf.quantity) : null;
+  const serving = food?.servingSize ?? 0;
+  return (
+    <div className="space-y-2.5 border-t border-border/50 pt-3 first:border-t-0 first:pt-0">
+      <div className="flex items-center gap-3">
+        <FoodThumb size={34} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium leading-tight">{name}</div>
+          {scaled ? (
+            <MacroInline proteinG={scaled.proteinG} carbsG={scaled.carbsG} fatG={scaled.fatG} className="mt-0.5 text-[0.7rem]" />
+          ) : (
+            <div className="mt-0.5 text-[0.7rem] text-muted-foreground">Macros update after saving</div>
+          )}
+        </div>
+        {scaled && <div className="numeral shrink-0 text-sm font-semibold text-calories">{fmtEnergy(scaled.calories, units)}</div>}
+        <button onClick={onRemove} aria-label="Remove food" className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-3 hover:text-danger [&_svg]:size-3.5"><X /></button>
+      </div>
+      <div className="space-y-2 pl-[calc(34px+0.75rem)]">
+        {serving > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {SERVING_PRESETS.map((mult) => {
+              const q = servingsToQuantity(serving, mult);
+              return <Chip key={mult} selected={Math.abs(mf.quantity - q) < 0.05} onClick={() => onQty(q)} className="h-8 px-3 text-xs">{mult}×</Chip>;
+            })}
+          </div>
+        )}
+        <Field label={`Amount (${mf.unit})`} type="number" inputMode="decimal" value={mf.quantity} onChange={(e) => onQty(Number(e.target.value))} className="max-w-[10rem]" />
+      </div>
+    </div>
   );
 }
 
@@ -244,4 +330,3 @@ function AiMealSheet({ onClose, onRun }: { onClose: () => void; onRun: (i: strin
     </Sheet>
   );
 }
-
