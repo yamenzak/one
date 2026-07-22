@@ -1410,6 +1410,30 @@ describe("weekly nutrition strip (Eat tab)", () => {
   });
 });
 
+describe("recent foods (one-tap re-log rail)", () => {
+  it("groups a client's logs per food, keeping the latest quantity + a count", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "RecentTest" }) })).json()) as { client: { id: string } };
+    // Log "Chicken" twice (different portions) and "Rice" once, Chicken most recent.
+    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-01", mealType: "lunch", label: "Rice", calories: 300, proteinG: 8, carbsG: 60, fatG: 2, quantity: 100, unit: "g" } }) });
+    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-02", mealType: "lunch", label: "Chicken", calories: 250, proteinG: 40, carbsG: 0, fatG: 8, quantity: 150, unit: "g" } }) });
+    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-03", mealType: "dinner", label: "Chicken", calories: 330, proteinG: 53, carbsG: 0, fatG: 11, quantity: 200, unit: "g" } }) });
+
+    const r = (await (await SELF.fetch(`http://x/api/foods/recent?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as {
+      recents: { label: string; quantity: number; calories: number; log_count: number }[];
+    };
+    expect(r.recents.length).toBe(2); // Chicken grouped, Rice
+    expect(r.recents[0]!.label).toBe("Chicken"); // most-recently logged first
+    expect(r.recents[0]!.log_count).toBe(2);
+    expect(r.recents[0]!.quantity).toBe(200); // latest entry's portion
+    expect(r.recents[0]!.calories).toBe(330);
+    expect(r.recents[1]!.label).toBe("Rice");
+    expect(r.recents[1]!.log_count).toBe(1);
+    // Another tenant can't read this client's recents.
+    expect((await SELF.fetch(`http://x/api/foods/recent?clientId=${client.id}`, { headers: auth(otherCookie) })).status).toBe(404);
+  });
+});
+
 describe("home widget prefs", () => {
   it("persists per-surface widget layout and surfaces it on /context", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

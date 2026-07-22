@@ -155,3 +155,45 @@ export function calculateNutritionTargets(i: CalculatorInputs): NutritionTargets
     },
   };
 }
+
+// ── Portion scaling (SSOT) ───────────────────────────────────────────────────
+// One place for the `factor = quantity / servingSize` math that every food
+// surface (log, meal-plan, library) was re-implementing inline. A food's macros
+// are stored per-serving; `scaleFood` rescales them to an eaten quantity.
+
+/** Per-serving macros + the serving size they're stated against. */
+export interface ScalableFood {
+  servingSize: number; // grams (or the food's serving unit) one serving is stated in
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+}
+
+export interface ScaledMacros {
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+}
+
+/** Quick serving multipliers offered in the portion UI. */
+export const SERVING_PRESETS = [0.5, 1, 1.5, 2] as const;
+
+/** Scale a food's per-serving macros to `quantity` of its serving unit. Rounds
+ *  calories to whole and macros to 0.1 g. A non-positive serving size yields
+ *  zeroes (never NaN). */
+export function scaleFood(food: ScalableFood, quantity: number): ScaledMacros {
+  const factor = food.servingSize > 0 ? quantity / food.servingSize : 0;
+  return {
+    calories: Math.round(food.calories * factor),
+    proteinG: Math.round(food.proteinG * factor * 10) / 10,
+    carbsG: Math.round(food.carbsG * factor * 10) / 10,
+    fatG: Math.round(food.fatG * factor * 10) / 10,
+  };
+}
+
+/** The gram quantity for a serving multiplier (e.g. 2× a 30 g serving = 60 g). */
+export function servingsToQuantity(servingSize: number, servings: number): number {
+  return Math.round(servingSize * servings * 10) / 10;
+}
