@@ -15,6 +15,7 @@ import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
 import { PreferencesEditorCard } from "../PreferencesEditor.js";
 import { checkInPhotos } from "../client/WellnessDetails.js";
 import { AiAvatar } from "../../AiAvatar.js";
+import { Markdown } from "../../Markdown.js";
 import { AiErrorBox } from "../../AiError.js";
 
 interface Sub { id: string; status: string; daysRemaining: number; packageId: string | null }
@@ -337,7 +338,7 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
         <Button size="sm" variant="tonal" disabled={busy || checkIns.length === 0} onClick={() => void summarize()}><Sparkles /> {busy ? "…" : "Summarize"}</Button>
       </div>
       {err ? <AiErrorBox error={err} /> : null}
-      {summary && <SubCard className="flex items-start gap-2.5 text-sm"><AiAvatar className="size-7" /><p>{summary}</p></SubCard>}
+      {summary && <SubCard className="flex items-start gap-2.5 text-sm"><AiAvatar className="size-7" /><Markdown className="min-w-0 flex-1">{summary}</Markdown></SubCard>}
       {checkIns.length === 0 ? <p className="text-sm text-muted-foreground">No check-ins yet.</p> : checkIns.slice(0, 5).map((c) => {
         const photos = checkInPhotos(c.photos_json);
         const meta = [c.mood != null ? `mood ${c.mood}/5` : null, c.energy != null ? `energy ${c.energy}/5` : null, c.sleep_hours ? `${c.sleep_hours}h sleep` : null, c.steps_count ? `${c.steps_count.toLocaleString()} steps` : null].filter(Boolean).join(" · ");
@@ -422,7 +423,7 @@ function SuggestSuppSheet({ clientId, onClose, onPrescribed }: { clientId: strin
             )))}
           </Reveal>
         )}
-        {note && <SubCard className="flex items-start gap-2 text-xs text-muted-foreground"><Sparkles className="mt-0.5 size-3.5 shrink-0 text-primary" /><span>{note}</span></SubCard>}
+        {note && <SubCard className="flex items-start gap-2 text-xs text-muted-foreground"><Sparkles className="mt-0.5 size-3.5 shrink-0 text-primary" /><Markdown className="min-w-0 flex-1">{note}</Markdown></SubCard>}
       </div>
     </Sheet>
   );

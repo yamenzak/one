@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { api, todayLocal } from "../../api.js";
 import { AiAvatar } from "../../AiAvatar.js";
+import { Markdown } from "../../Markdown.js";
 
 type Surface = "home" | "train" | "eat" | "wellness" | "progress";
 
@@ -32,7 +33,7 @@ export function CoachNote({ clientId, surface }: { clientId: string; surface: Su
       <AiAvatar className="mt-0.5 size-8 shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-primary">Your coach</div>
-        <p className="mt-1 text-[0.95rem] leading-relaxed text-foreground/85">{msg}</p>
+        <Markdown className="mt-1 text-[0.95rem] text-foreground/85">{msg}</Markdown>
       </div>
     </motion.div>
   );
