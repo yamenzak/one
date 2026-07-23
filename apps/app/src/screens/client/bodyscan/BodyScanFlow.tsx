@@ -19,10 +19,11 @@ import {
 } from "@mossa/domain";
 import {
   Button, Field, Switch, Badge, IconBadge, Spinner, cn, toneVar, useModalOverlay,
-  Camera, ScanLine, ShieldCheck, Sparkles, Ruler, User, Check, RotateCcw, X, AlertTriangle, ArrowRight, Percent,
+  Camera, ScanLine, ShieldCheck, Ruler, User, Check, RotateCcw, X, AlertTriangle, ArrowRight, Percent,
   motion, stagger, popIn, CountUp,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../../api.js";
+import { AiAvatar } from "../../../AiAvatar.js";
 import { loadScanner, analyzeAlignment, type Scanner, type ScanPhase, type Alignment } from "./pipeline.js";
 import { measureCapture, aggregateSiteWidths, computeCircumferences, fullBodyContour, posturePoints, LM, type Capture, type NormLandmark, type Circumferences } from "./measure.js";
 import { CuePlayer } from "./cues.js";
@@ -164,7 +165,7 @@ export default function BodyScanFlow({
         <div className="flex items-center gap-1.5">
           {(step === "front" || step === "frontShape" || step === "side") && (
             <Button size="icon-sm" variant="ghost" aria-pressed={muted} aria-label={muted ? "Unmute voice guidance" : "Mute voice guidance"} onClick={() => setMuted((m) => !m)}>
-              <Sparkles className={cn(muted && "opacity-40")} />
+              <AiAvatar className={cn("size-5", muted && "opacity-40")} />
             </Button>
           )}
           <Button size="icon-sm" variant="ghost" aria-label="Close body scan" data-autofocus onClick={onClose}><X /></Button>
@@ -230,7 +231,7 @@ function Intro({ voiceReady, onStartCamera, onManual }: { voiceReady: boolean; o
       </div>
 
       <div className="space-y-2.5 rounded-2xl bg-card p-4">
-        <div className="flex items-center gap-2 font-semibold"><Sparkles className="size-5" style={{ color: toneVar.nutrition }} /> An honest estimate</div>
+        <div className="flex items-center gap-2 font-semibold"><AiAvatar className="size-5" /> An honest estimate</div>
         <p className="text-sm leading-relaxed text-muted-foreground">
           A camera estimate is accurate to about ±4%. Think of the number as a ballpark — <span className="font-medium text-foreground">the trend over time is the real story</span>. Scan under similar lighting and clothing each time for the most consistent trend.
         </p>
@@ -244,7 +245,7 @@ function Intro({ voiceReady, onStartCamera, onManual }: { voiceReady: boolean; o
 
       {!voiceReady && (
         <div className="flex items-start gap-2.5 rounded-2xl bg-warning-soft/40 p-4 text-sm text-warning">
-          <Sparkles className="mt-0.5 size-5 shrink-0" />
+          <AiAvatar className="mt-0.5 size-5 shrink-0" />
           <p>The guided camera scan needs your studio's voice pack, which your coach hasn't set up yet. You can still enter your measurements by hand below.</p>
         </div>
       )}

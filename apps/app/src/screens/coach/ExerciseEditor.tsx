@@ -13,9 +13,10 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Sparkles, Globe, PencilLine, ArrowLeft, ArrowRight, Search, Plus, Trash2, Check, toneSoft, cn, type Tone } from "@mossa/ui";
+import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Globe, PencilLine, ArrowLeft, ArrowRight, Search, Plus, Trash2, Check, toneSoft, cn, type Tone } from "@mossa/ui";
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@mossa/protocol";
 import { api, ApiError, uploadMedia } from "../../api.js";
+import { AiAvatar } from "../../AiAvatar.js";
 import { useSession } from "../../session.js";
 import { AiImageField } from "../../AiImageField.js";
 import { splitWideImageToHalves } from "../../imageSplit.js";
@@ -231,7 +232,7 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
                 the AI entitlement is off — it just swaps which path is featured. */}
             <div className="space-y-2.5">
               {canAi ? (
-                <HeroChoice icon={Sparkles} tone="primary" badge="AI" title="Create with AI" subtitle="Name it — AI fills the muscles, equipment, how-to guide & start/end demo frames." busy={autoBusy} disabled={name.trim().length < 2} onClick={() => void startWithAi()} />
+                <HeroChoice icon={AiAvatar} tone="primary" badge="AI" title="Create with AI" subtitle="Name it — AI fills the muscles, equipment, how-to guide & start/end demo frames." busy={autoBusy} disabled={name.trim().length < 2} onClick={() => void startWithAi()} />
               ) : (
                 <HeroChoice icon={Globe} tone="cardio" title="Search exercise libraries" subtitle="Import a ready-made exercise — muscles, images & instructions — from wger, free-exercise-db & more." active={webMode} onClick={() => setWebMode((v) => !v)} />
               )}
@@ -275,7 +276,7 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
               </div>
               {canAi && (
                 <Button variant="tonal" size="sm" className="w-full" disabled={pairBusy || name.trim().length < 2} onClick={() => void runPair()}>
-                  <Sparkles /> {pairBusy ? "Creating both frames…" : image || image2 ? "Regenerate start & end frames" : "Generate start & end frames"}
+                  <AiAvatar className="size-5" /> {pairBusy ? "Creating both frames…" : image || image2 ? "Regenerate start & end frames" : "Generate start & end frames"}
                 </Button>
               )}
               {video ? (
@@ -310,7 +311,7 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <SectionLabel>How to perform it</SectionLabel>
-                {canAi && <Button size="sm" variant="tonal" disabled={guideBusy || name.trim().length < 2} onClick={() => void runGuide()}><Sparkles /> {guideBusy ? "Writing…" : instructions.trim() ? "Rewrite with AI" : "Write with AI"}</Button>}
+                {canAi && <Button size="sm" variant="tonal" disabled={guideBusy || name.trim().length < 2} onClick={() => void runGuide()}><AiAvatar className="size-5" /> {guideBusy ? "Writing…" : instructions.trim() ? "Rewrite with AI" : "Write with AI"}</Button>}
               </div>
               <Textarea rows={5} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Setup, steps, coaching cues… or generate with AI." />
             </div>

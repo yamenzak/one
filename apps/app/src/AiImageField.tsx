@@ -11,8 +11,9 @@
  */
 
 import { useState, type CSSProperties } from "react";
-import { Button, cn, Camera, Sparkles, ImageIcon } from "@mossa/ui";
+import { Button, cn, Camera, ImageIcon } from "@mossa/ui";
 import { api, ApiError, uploadMedia } from "./api.js";
+import { AiAvatar } from "./AiAvatar.js";
 
 type ImageFeature = "food-image" | "exercise-image";
 
@@ -68,7 +69,7 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
     <label style={style} className={cn("relative grid cursor-pointer place-items-center overflow-hidden rounded-2xl bg-surface-2 text-muted-foreground transition-colors hover:bg-surface-3", busy && "pointer-events-none", className)}>
       {creating ? (
         <div className="flex flex-col items-center gap-1 text-primary">
-          <Sparkles className="size-5 animate-pulse" />
+          <AiAvatar className="size-6 animate-pulse" />
           <span className="text-[0.6rem] font-medium">Creating…</span>
         </div>
       ) : uploading ? (
@@ -84,7 +85,7 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
 
   const genButton = (className?: string) => (
     <Button size="sm" variant={value ? "secondary" : "tonal"} className={className} disabled={busy} onClick={() => void generate()}>
-      {value ? <><ImageIcon /> Regenerate</> : <><Sparkles /> Generate</>}
+      {value ? <><ImageIcon /> Regenerate</> : <><AiAvatar className="size-4" /> Generate</>}
     </Button>
   );
 

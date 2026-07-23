@@ -68,6 +68,7 @@ export const settingsRoutes = new Hono<AppEnv>()
             logoUrl: z.string().max(500).nullish(),
             iconUrl: z.string().max(500).nullish(),
             aiAvatarUrl: z.string().max(500).nullish(),
+            aiName: z.string().max(40).nullish(),
             tokens: z.object({ light: tokenMap.nullish(), dark: tokenMap.nullish() }).nullish(),
             // Sign-in screen copy + affordances (branded login).
             login: z.object({

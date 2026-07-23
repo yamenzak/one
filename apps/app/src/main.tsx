@@ -9,14 +9,42 @@ import { Login } from "./screens/Login.js";
 import { Start } from "./screens/Start.js";
 import { Shell } from "./Shell.js";
 import { PasskeyProvider } from "./PasskeyPrompt.js";
-import { Spinner } from "@mossa/ui";
 
+/**
+ * Branded boot screen — the studio's logo on a soft brand glow with a gentle
+ * reveal and shimmer, so the app feels premium from the first frame. On a
+ * white-label tenant (custom domain / branded host) the uploaded logo/icon
+ * shows; otherwise the default Mossa mark. Branding is applied before this
+ * paints, so it already sits in the tenant's palette and mode.
+ */
 function BootSplash() {
+  const { host, ctx } = useSession();
+  const branding = ctx?.branding ?? host?.tenant?.branding;
+  const logo = branding?.iconUrl || branding?.logoUrl || null;
+  const name = host?.tenant?.name ?? null;
   return (
-    <div className="grid min-h-dvh place-items-center">
-      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-4">
-        <div className="grid size-16 place-items-center rounded-3xl bg-primary text-2xl font-black text-primary-foreground">M</div>
-        <Spinner />
+    <div className="relative grid min-h-dvh place-items-center overflow-hidden bg-background">
+      <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(58% 46% at 50% 42%, color-mix(in oklch, var(--primary) 16%, transparent), transparent 72%)" }} />
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className="relative flex flex-col items-center gap-7">
+        <div className="relative grid size-24 place-items-center">
+          <motion.span aria-hidden className="absolute inset-0 rounded-[2rem]" style={{ boxShadow: "inset 0 0 0 1px color-mix(in oklch, var(--primary) 22%, transparent)" }} animate={{ rotate: 360 }} transition={{ duration: 9, repeat: Infinity, ease: "linear" }} />
+          <motion.div
+            initial={{ scale: 0.82, opacity: 0, y: 4 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            className="grid size-20 place-items-center overflow-hidden rounded-[1.6rem] bg-primary text-primary-foreground shadow-[0_16px_50px_-12px_color-mix(in_oklch,var(--primary)_65%,transparent)]"
+          >
+            {logo ? <img src={logo} alt="" className="size-full object-cover" /> : <span className="text-3xl font-black tracking-tight">{(name?.[0] ?? "M").toUpperCase()}</span>}
+          </motion.div>
+        </div>
+        {name && (
+          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 0.5 }} className="text-[0.95rem] font-semibold tracking-tight text-foreground/85">
+            {name}
+          </motion.div>
+        )}
+        <div className="h-1 w-36 overflow-hidden rounded-full bg-surface-2">
+          <motion.div className="h-full w-1/3 rounded-full bg-primary" animate={{ x: ["-120%", "320%"] }} transition={{ duration: 1.15, repeat: Infinity, ease: "easeInOut" }} />
+        </div>
       </motion.div>
     </div>
   );

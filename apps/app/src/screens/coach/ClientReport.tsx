@@ -64,7 +64,7 @@ export function ClientReport({ clientId }: { clientId: string }) {
       <Stagger>
         <Card className="space-y-3">
           <SectionHeader icon={Sparkles} tone="primary" title="AI status"
-            action={<Button size="sm" variant="tonal" disabled={summaryBusy} onClick={() => void genSummary()}><Sparkles /> {summary ? "Refresh" : "Generate"}</Button>} />
+            action={<Button size="sm" variant="tonal" disabled={summaryBusy} onClick={() => void genSummary()}><AiAvatar className="size-5" /> {summary ? "Refresh" : "Generate"}</Button>} />
           {summaryBusy ? (
             <p className="text-sm text-muted-foreground">Reading this client's context…</p>
           ) : summary ? (

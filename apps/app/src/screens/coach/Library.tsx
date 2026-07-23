@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, cn, Reveal, SkeletonRow, SkeletonLine, MacroInline, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, List, PencilLine, ArrowLeftRight, Sparkles, Ellipsis, Send, History } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, cn, Reveal, SkeletonRow, SkeletonLine, MacroInline, Avatar, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, List, PencilLine, ArrowLeftRight, Ellipsis, Send, History } from "@mossa/ui";
 import { api } from "../../api.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { AiErrorBox } from "../../AiError.js";
@@ -386,7 +386,7 @@ function Templates() {
               <p className="p-4 text-center text-sm text-muted-foreground">No clients yet.</p>
             ) : clients.map((cl) => (
               <button key={cl.id} disabled={busy} onClick={() => void applyTo(cl.id)} className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-colors hover:bg-secondary disabled:opacity-60">
-                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/15 text-sm font-semibold text-primary">{cl.displayName.charAt(0).toUpperCase()}</span>
+                <Avatar name={cl.displayName} src={cl.avatarUrl} seed={cl.avatarSeed ?? cl.id} className="size-9 shrink-0" />
                 <span className="min-w-0 flex-1 truncate font-medium">{cl.displayName}</span>
                 <Send className="size-4 shrink-0 text-primary" />
               </button>
@@ -399,7 +399,7 @@ function Templates() {
 }
 
 interface Resource { id: string; type: string; title: string; status: string; audience: string; category?: string | null; topics?: string[] }
-interface ClientOpt { id: string; displayName: string }
+interface ClientOpt { id: string; displayName: string; avatarUrl?: string | null; avatarSeed?: string | null }
 
 const AUDIENCE_LABEL: Record<string, string> = { clients: "All clients", public: "Public", assigned: "Specific clients" };
 
@@ -521,7 +521,7 @@ function ArticleEditor({ id, clients, onClose, onSaved }: { id?: string; clients
           </div>
           <div className="space-y-2">
             {coverUrl && <img src={coverUrl} alt="Cover" className="h-32 w-full rounded-xl object-cover" />}
-            <Button size="sm" variant="secondary" className="w-full" disabled={coverBusy || (!title && !aiTopic)} onClick={() => void genCover()}><Sparkles /> {coverBusy ? "Generating…" : coverUrl ? "Regenerate cover" : "Generate cover image"}</Button>
+            <Button size="sm" variant="secondary" className="w-full" disabled={coverBusy || (!title && !aiTopic)} onClick={() => void genCover()}><AiAvatar className="size-5" /> {coverBusy ? "Generating…" : coverUrl ? "Regenerate cover" : "Generate cover image"}</Button>
           </div>
           <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Body (markdown — supports tables)</label><Textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} /></div>
           <div className="space-y-1.5">

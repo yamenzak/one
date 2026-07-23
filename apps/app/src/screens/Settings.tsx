@@ -1146,6 +1146,7 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
   const [logoUrl, setLogoUrl] = useState<string | null>(initial?.logoUrl ?? null);
   const [iconUrl, setIconUrl] = useState<string | null>(initial?.iconUrl ?? null);
   const [aiAvatarUrl, setAiAvatarUrl] = useState<string | null>(initial?.aiAvatarUrl ?? null);
+  const [aiName, setAiName] = useState<string>(initial?.aiName ?? "");
   const [advanced, setAdvanced] = useState(false);
   const [themeCss, setThemeCss] = useState("");
   const [saving, setSaving] = useState(false);
@@ -1193,7 +1194,7 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
   const save = async () => {
     setSaving(true);
     // Tokens carry everything now — null out legacy preset/primary fields.
-    try { await api.patch("/api/settings", { branding: { tokens, radius, logoUrl, iconUrl, aiAvatarUrl, preset: null, primary: null, primaryForeground: null } }); onSaved(); setMsg("Branding saved."); }
+    try { await api.patch("/api/settings", { branding: { tokens, radius, logoUrl, iconUrl, aiAvatarUrl, aiName: aiName.trim() || null, preset: null, primary: null, primaryForeground: null } }); onSaved(); setMsg("Branding saved."); }
     finally { setSaving(false); }
   };
 
@@ -1239,18 +1240,22 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
           </div>
         </div>
 
-        {/* AI coach avatar — the face of the AI on every AI surface (bottts fallback) */}
+        {/* AI identity — the avatar + name shown on every AI surface (bottts /
+            "Coach" fallbacks). This is the face clients see instead of a sparkle. */}
         <div className="space-y-2">
-          <div className="text-sm font-medium">AI coach avatar <span className="font-normal text-muted-foreground">— shown on AI notes</span></div>
+          <div className="text-sm font-medium">AI coach <span className="font-normal text-muted-foreground">— its face + name across every AI surface</span></div>
           <div className="flex items-center gap-3">
             <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full border border-border/60 bg-surface-2">
               <img src={aiAvatarUrl ?? dicebearUrl(`${ctx?.active?.tenantSlug ?? "mossa"}-ai-coach`, "bottts")} alt="AI coach" className="size-full object-cover" />
             </div>
-            <div className="flex flex-1 flex-wrap gap-2">
-              <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
-                <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAsset(e.target.files[0], setAiAvatarUrl)} />
-              </label>
-              {aiAvatarUrl && <Button size="icon" variant="secondary" aria-label="Reset to bottts" onClick={() => setAiAvatarUrl(null)}><Trash2 /></Button>}
+            <div className="flex flex-1 flex-col gap-2">
+              <input value={aiName} onChange={(e) => setAiName(e.target.value)} maxLength={40} placeholder="AI name (e.g. Nova, Coach K) — defaults to “Coach”" className="h-9 w-full rounded-full border border-border/60 bg-surface-2 px-3.5 text-sm outline-none focus:border-primary" />
+              <div className="flex flex-wrap gap-2">
+                <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload avatar
+                  <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAsset(e.target.files[0], setAiAvatarUrl)} />
+                </label>
+                {aiAvatarUrl && <Button size="icon" variant="secondary" aria-label="Reset to bottts" onClick={() => setAiAvatarUrl(null)}><Trash2 /></Button>}
+              </div>
             </div>
           </div>
         </div>

@@ -6,6 +6,7 @@ import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy, scaleFood, servingsToQuantity, SERVING_PRESETS } from "@mossa/domain";
 import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, MacroBar, ProgressRing, Eyebrow, Chip, IconBadge, ConfirmDialog, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, ArrowLeft, Plus, Sparkles, Utensils, Flame, History, LayoutGrid, ChevronRight, Trash2, X } from "@mossa/ui";
 import { api, ApiError } from "../../api.js";
+import { AiAvatar } from "../../AiAvatar.js";
 import { ClientPrefsStrip } from "./ClientPrefsStrip.js";
 import { AiErrorBox } from "../../AiError.js";
 import { useUnits } from "../../units.js";
@@ -188,7 +189,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
       <PlanHealth allTypes={allTypes} byType={byType} foods={foods} targets={targets} />
 
       <div className="flex gap-2">
-        <Button variant="tonal" className="flex-1" onClick={() => setAiOpen(true)}><Sparkles /> AI meal draft</Button>
+        <Button variant="tonal" className="flex-1" onClick={() => setAiOpen(true)}><AiAvatar className="size-5" /> AI meal draft</Button>
         <Button variant="secondary" onClick={() => setTypeOpen(true)}><Plus /> Meal type</Button>
       </div>
 
@@ -475,7 +476,7 @@ function MealImage({ mealName, foodNames, value, onChange }: { mealName: string;
         <img src={value} alt="" className="h-24 w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
         <div className="absolute right-2 top-2 flex gap-1.5">
-          <button onClick={() => void gen()} disabled={busy} className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><Sparkles /> {busy ? "…" : "Redo"}</button>
+          <button onClick={() => void gen()} disabled={busy} className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><AiAvatar className="size-3.5" /> {busy ? "…" : "Redo"}</button>
           <button onClick={() => onChange(null)} aria-label="Remove photo" className="grid size-7 place-items-center rounded-full bg-black/50 text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><X /></button>
         </div>
       </div>
@@ -484,7 +485,7 @@ function MealImage({ mealName, foodNames, value, onChange }: { mealName: string;
   return (
     <>
       <button onClick={() => void gen()} disabled={busy} className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface-3 text-xs text-muted-foreground transition-colors hover:bg-surface-2 disabled:opacity-50 [&_svg]:size-3.5">
-        {busy ? <><span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" /> Plating…</> : <><Sparkles /> Generate plated-meal photo</>}
+        {busy ? <><span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" /> Plating…</> : <><AiAvatar className="size-3.5" /> Generate plated-meal photo</>}
       </button>
       {err && <p className="text-xs text-warning">{err}</p>}
     </>
