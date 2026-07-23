@@ -5,15 +5,17 @@
  */
 
 import { useState } from "react";
-import { ACTIVITIES, weightLabel, lengthLabel, volumeLabel, energyLabel, displayToKg, lengthDisplayToCm, volumeDisplayToMl, displayToKcal } from "@mossa/domain";
+import { ACTIVITIES, activitiesByCategory, weightLabel, lengthLabel, volumeLabel, energyLabel, displayToKg, lengthDisplayToCm, volumeDisplayToMl, displayToKcal, kcalToDisplay } from "@mossa/domain";
 import {
   Button, Field, Textarea, Sheet, Chip, IconBadge, Switch,
-  Utensils, Footprints, Droplet, Weight, Ruler, Moon, Smile, ClipboardList, Camera, Angry, Frown, Meh, Laugh,
-  type LucideIcon, type Tone,
+  Utensils, Footprints, Droplet, Weight, Ruler, Moon, Smile, ClipboardList, Camera, Angry, Frown, Meh, Laugh, Search, Timer, HeartPulse, MapPin, Flame,
+  cn, toneVar, type LucideIcon, type Tone,
 } from "@mossa/ui";
 import { api, todayLocal, uploadMedia } from "../../api.js";
 import { useUnits } from "../../units.js";
+import { AiAvatar, useAiIdentity } from "../../AiAvatar.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
+import { activityIcon } from "./activityIcons.js";
 import { BodyScanLauncher } from "./bodyscan/BodyScanLauncher.js";
 
 type LogKind = "food" | "activity" | "water" | "weight" | "body" | "sleep" | "mood" | "checkin";
@@ -51,11 +53,15 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
   const [f, setF] = useState<Record<string, string>>({});
   const [ratings, setRatings] = useState<{ mood: number | null; energy: number | null; stress: number | null; sleepQ: number | null }>({ mood: null, energy: null, stress: null, sleepQ: null });
   const [activityKey, setActivityKey] = useState("walking");
+  const [actSearch, setActSearch] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiNote, setAiNote] = useState<string | null>(null);
   const [photos, setPhotos] = useState<{ key: string; consentToFeature: boolean }[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [photoErr, setPhotoErr] = useState<string | null>(null);
   const date = todayLocal();
   const units = useUnits();
+  const ai = useAiIdentity();
   const num = (k: string) => (f[k] ? Number(f[k]) : undefined);
   const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
   // Decimal entry: allow digits and a single decimal point only — never let a
@@ -66,8 +72,30 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
   const cm = (k: string) => { const v = num(k); return v != null ? round2(lengthDisplayToCm(v, units)) : undefined; };
   const kcal = (k: string) => { const v = num(k); return v != null ? Math.round(displayToKcal(v, units)) : undefined; };
   const waterPresets = units.volume === "oz" ? [8, 12, 16, 24] : [250, 500, 750, 1000];
+  // Distance rides the client's length preference: metric → km, imperial → mi.
+  const distUnit = units.length === "in" ? "mi" : "km";
+  const distanceToM = (): number | undefined => { const v = num("distance"); return v != null ? Math.round(v * (distUnit === "mi" ? 1609.34 : 1000)) : undefined; };
+  const activityLabel = ACTIVITIES.find((a) => a.key === activityKey)?.label ?? "Activity";
 
-  const close = () => { setKind(null); setFoodMode(false); setF({}); setRatings({ mood: null, energy: null, stress: null, sleepQ: null }); setPhotos([]); setErr(null); setPhotoErr(null); onClose(); };
+  // Grounded AI estimate — fill calories (and HR if blank) when the user doesn't
+  // have the number from their watch.
+  const askAi = async () => {
+    const duration = num("duration");
+    if (!duration) { setErr("Add a duration first so the estimate has something to go on."); return; }
+    setErr(null); setAiBusy(true); setAiNote(null);
+    try {
+      const r = await api.post<{ calories: number; avgHrBpm: number | null; rationale: string }>("/api/ai/activity-estimate", {
+        clientId, activityKey, label: activityLabel, durationMin: duration, avgHrBpm: num("hr") ?? null, distanceM: distanceToM() ?? null,
+      });
+      set("kcal", String(kcalToDisplay(r.calories, units)));
+      if (r.avgHrBpm && !f.hr) set("hr", String(r.avgHrBpm));
+      setAiNote(r.rationale || `Estimated ~${kcalToDisplay(r.calories, units)} ${energyLabel(units)}.`);
+    } catch {
+      setErr("Couldn't estimate right now — enter it manually.");
+    } finally { setAiBusy(false); }
+  };
+
+  const close = () => { setKind(null); setFoodMode(false); setF({}); setRatings({ mood: null, energy: null, stress: null, sleepQ: null }); setActSearch(""); setAiNote(null); setPhotos([]); setErr(null); setPhotoErr(null); onClose(); };
 
   const uploadPhoto = async (file: File) => {
     setPhotoErr(null);
@@ -102,7 +130,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
       if (kind === "water") await api.post("/api/logs/water", { clientId, data: { date, amountMl: num("amount") != null ? Math.round(volumeDisplayToMl(num("amount")!, units)) : undefined } });
       else if (kind === "weight") await api.post("/api/measurements", { clientId, data: { date, weightKg: kg("amount") } });
       else if (kind === "body") await api.post("/api/measurements", { clientId, data: { date, weightKg: kg("weight"), bodyFatPercent: num("bf"), neckCm: cm("neck"), waistCm: cm("waist"), hipsCm: cm("hips"), chestCm: cm("chest") } });
-      else if (kind === "activity") await api.post("/api/logs/activity", { clientId, data: { date, activityKey, label: ACTIVITIES.find((a) => a.key === activityKey)?.label, durationMin: num("duration") ?? 0, avgHrBpm: num("hr") ?? null, caloriesBurned: kcal("kcal") ?? null } });
+      else if (kind === "activity") await api.post("/api/logs/activity", { clientId, data: { date, activityKey, label: activityKey === "other" && f.actLabel ? f.actLabel : activityLabel, durationMin: num("duration") ?? 0, avgHrBpm: num("hr") ?? null, distanceM: distanceToM() ?? null, notes: f.actNotes || null, caloriesBurned: kcal("kcal") ?? null } });
       else if (kind === "sleep") await api.post("/api/logs/sleep", { clientId, data: { date, durationMinutes: Math.round((num("hours") ?? 0) * 60), quality: ratings.sleepQ ?? undefined, notes: f.notes || undefined } });
       else if (kind === "mood") await api.post("/api/logs/mood", { clientId, data: { date, mood: ratings.mood ?? undefined, energy: ratings.energy ?? undefined, stress: ratings.stress ?? undefined, notes: f.notes || undefined } });
       else if (kind === "checkin") await api.post("/api/check-ins", { clientId, data: { date, weightKg: kg("weight"), mood: ratings.mood ?? undefined, energy: ratings.energy ?? undefined, stress: ratings.stress ?? undefined, sleepHours: num("sleepHours"), stepsCount: num("steps"), notes: f.notes || undefined, progressPhotos: photos.length ? photos : undefined } });
@@ -163,12 +191,52 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
           </>)}
           {kind === "activity" && (<>
             <h2 className="text-lg font-semibold">Log activity</h2>
-            <div className="flex flex-wrap gap-2">{ACTIVITIES.slice(0, 12).map((a) => <Chip key={a.key} selected={activityKey === a.key} onClick={() => setActivityKey(a.key)}>{a.label}</Chip>)}</div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Duration (min)" inputMode="numeric" value={f.duration ?? ""} onChange={(e) => set("duration", e.target.value.replace(/\D/g, ""))} />
-              <Field label="Avg HR (opt)" inputMode="numeric" value={f.hr ?? ""} onChange={(e) => set("hr", e.target.value.replace(/\D/g, ""))} />
+            {/* Searchable, categorized picker with a per-sport glyph. */}
+            <div className="rounded-2xl border border-border/60 bg-surface-2 p-2">
+              <div className="mb-2 flex items-center gap-2 px-1">
+                <IconBadge icon={activityIcon(activityKey)} tone="activity" size="sm" />
+                <span className="flex-1 text-sm font-semibold">{activityLabel}</span>
+              </div>
+              <div className="relative mb-2">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <input value={actSearch} onChange={(e) => setActSearch(e.target.value)} placeholder="Search sports & workouts…" className="h-9 w-full rounded-full bg-background pl-8 pr-3 text-sm outline-none" />
+              </div>
+              <div className="max-h-52 space-y-2 overflow-y-auto pr-0.5">
+                {activitiesByCategory().map((g) => {
+                  const q = actSearch.trim().toLowerCase();
+                  const items = g.activities.filter((a) => a.label.toLowerCase().includes(q));
+                  if (!items.length) return null;
+                  return (
+                    <div key={g.key}>
+                      <div className="px-1 pb-1 text-[0.62rem] font-semibold uppercase tracking-wide text-muted-foreground">{g.label}</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {items.map((a) => {
+                          const Icon = activityIcon(a.key);
+                          const on = activityKey === a.key;
+                          return (
+                            <button key={a.key} onClick={() => setActivityKey(a.key)} style={on ? { background: toneVar.activity, color: "#fff" } : undefined} className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors [&_svg]:size-3.5", !on && "bg-background hover:bg-surface-3")}>
+                              <Icon /> {a.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <Field label={`Energy (${energyLabel(units)}, opt — else estimated)`} inputMode="numeric" value={f.kcal ?? ""} onChange={(e) => set("kcal", e.target.value.replace(/\D/g, ""))} hint="Wearables are more accurate; leave blank to estimate from MET × weight." />
+            {activityKey === "other" && <Field label="What was it?" value={f.actLabel ?? ""} onChange={(e) => set("actLabel", e.target.value)} placeholder="Name your activity" />}
+            {/* Numbers — typed straight from a wearable, or estimated by AI. */}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Duration (min)" icon={Timer} inputMode="numeric" value={f.duration ?? ""} onChange={(e) => set("duration", e.target.value.replace(/\D/g, ""))} />
+              <Field label={`Distance (${distUnit}, opt)`} icon={MapPin} inputMode="decimal" value={f.distance ?? ""} onChange={(e) => setDec("distance", e.target.value)} />
+              <Field label="Avg HR (opt)" icon={HeartPulse} inputMode="numeric" value={f.hr ?? ""} onChange={(e) => set("hr", e.target.value.replace(/\D/g, ""))} />
+              <Field label={`Energy (${energyLabel(units)}, opt)`} icon={Flame} inputMode="numeric" value={f.kcal ?? ""} onChange={(e) => set("kcal", e.target.value.replace(/\D/g, ""))} />
+            </div>
+            <p className="text-xs text-muted-foreground">Enter what your watch, Whoop, Apple Health or Fitbit shows. No numbers? Ask {ai.name} to estimate them from your body &amp; training.</p>
+            <Button variant="tonal" size="sm" disabled={aiBusy} onClick={() => void askAi()}><AiAvatar className="size-5" /> {aiBusy ? "Estimating…" : `Ask ${ai.name} to estimate`}</Button>
+            {aiNote && <p className="rounded-xl px-3 py-2 text-xs" style={{ background: `color-mix(in oklch, ${toneVar.activity} 12%, transparent)`, color: toneVar.activity }}>{aiNote}</p>}
+            <Textarea rows={2} placeholder="Notes (optional)…" value={f.actNotes ?? ""} onChange={(e) => set("actNotes", e.target.value)} />
           </>)}
           {kind === "sleep" && (<>
             <h2 className="text-lg font-semibold">Log sleep</h2>
