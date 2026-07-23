@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { MealBody, MealOption, MealFood } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy, scaleFood, servingsToQuantity, SERVING_PRESETS } from "@mossa/domain";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, MacroBar, ProgressRing, Eyebrow, Chip, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, ArrowLeft, Plus, Sparkles, Utensils, Flame, History, Trash2, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, MacroBar, ProgressRing, Eyebrow, Chip, IconBadge, ConfirmDialog, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, ArrowLeft, Plus, Sparkles, Utensils, Flame, History, LayoutGrid, ChevronRight, Trash2, X } from "@mossa/ui";
 import { api, ApiError } from "../../api.js";
 import { ClientPrefsStrip } from "./ClientPrefsStrip.js";
 import { AiErrorBox } from "../../AiError.js";
@@ -41,6 +41,12 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const [aiOpen, setAiOpen] = useState(false);
   const [typeOpen, setTypeOpen] = useState(false);
   const [newType, setNewType] = useState("");
+  // Seed-the-draft: the client's most recent OTHER plan + a template picker.
+  const [latestOther, setLatestOther] = useState<{ id: string; name: string; body: MealBody } | null>(null);
+  const [plansLoaded, setPlansLoaded] = useState(false);
+  const [seedTemplateOpen, setSeedTemplateOpen] = useState(false);
+  // A pending destructive replace, held until the coach confirms.
+  const [seedConfirm, setSeedConfirm] = useState<{ source: string; apply: () => void } | null>(null);
 
   const foodsFromRows = (rows: FoodRow[]): Map<string, FoodLike> =>
     new Map(rows.map((x) => [x.id, { id: x.id, servingSize: x.serving_size, caloriesPerServing: x.calories, proteinG: x.protein_g, carbsG: x.carbs_g, fatG: x.fat_g }]));
@@ -79,6 +85,34 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
       setNames((prev) => { const m = new Map(prev); for (const x of f.foods) m.set(x.id, x.name); return m; });
     } catch { /* keep optimistic names */ }
   }, []);
+
+  // Fetch the client's plans (created_at DESC) to offer "Latest plan" as a
+  // seed — the first plan that isn't THIS draft. A quiet miss just disables it.
+  useEffect(() => {
+    const cid = plan?.clientId;
+    if (!cid) return;
+    let alive = true;
+    api.get<{ plans: { id: string; name: string; body: MealBody }[] }>(`/api/meal-plans?clientId=${cid}`)
+      .then((r) => { if (!alive) return; setLatestOther(r.plans?.find((pl) => pl.id !== planId) ?? null); setPlansLoaded(true); })
+      .catch(() => { if (alive) setPlansLoaded(true); });
+    return () => { alive = false; };
+  }, [plan?.clientId, planId]);
+
+  // Replace the current draft's body with a seed body, then refresh the food
+  // reference map so foods referenced by the seed resolve their macros.
+  const applySeedBody = (body: MealBody) => {
+    setOptions(body.mealOptions ?? []);
+    setCustomTypes(body.customMealTypes ?? []);
+    setHiddenTypes(body.hiddenMealTypes ?? []);
+    setDirty(true);
+    void refreshFoods();
+  };
+  // Guard: replacing is destructive, so confirm only when the draft has options.
+  const seedDraft = (source: string, body: MealBody) => {
+    const apply = () => applySeedBody(body);
+    if (options.length > 0) setSeedConfirm({ source, apply });
+    else apply();
+  };
 
   const mutate = (fn: (d: MealOption[]) => void) => { const next = structuredClone(options); fn(next); setOptions(next); setDirty(true); };
   const save = async () => { setSaving(true); try { await api.patch(`/api/meal-plans/${planId}`, { body: { customMealTypes: customTypes, hiddenMealTypes: hiddenTypes, mealOptions: options } }); setDirty(false); } finally { setSaving(false); } };
@@ -151,6 +185,18 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
         <Button variant="tonal" className="flex-1" onClick={() => setAiOpen(true)}><Sparkles /> AI meal draft</Button>
         <Button variant="secondary" onClick={() => setTypeOpen(true)}><Plus /> Meal type</Button>
       </div>
+
+      {/* Seed the draft — load the client's most recent other plan, or a saved
+          template, into this draft (each REPLACES the current meals). */}
+      {!readOnly && (
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" disabled={!latestOther} onClick={() => latestOther && seedDraft(latestOther.name, latestOther.body)}><History /> Latest plan</Button>
+            <Button variant="secondary" size="sm" onClick={() => setSeedTemplateOpen(true)}><LayoutGrid /> From template</Button>
+          </div>
+          {plansLoaded && !latestOther && <p className="px-1 text-[0.7rem] text-muted-foreground">No previous plan for this client — start from a template instead.</p>}
+        </div>
+      )}
 
       <Stagger className="space-y-4">
       {allTypes.map((type) => {
@@ -259,6 +305,16 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
           <Button size="lg" className="w-full" disabled={newType.trim().length < 2} onClick={addCustomType}>Add meal type</Button>
         </div>
       </Sheet>
+      {seedTemplateOpen && <SeedTemplateSheet onClose={() => setSeedTemplateOpen(false)} onPick={(body, name) => { setSeedTemplateOpen(false); seedDraft(name, body); }} />}
+      <ConfirmDialog
+        open={!!seedConfirm}
+        onOpenChange={(o) => { if (!o) setSeedConfirm(null); }}
+        title="Replace this draft?"
+        description={`The current meals will be replaced with “${seedConfirm?.source ?? ""}”.`}
+        confirmLabel="Replace"
+        destructive
+        onConfirm={() => seedConfirm?.apply()}
+      />
     </Page>
   );
 }
@@ -426,6 +482,45 @@ function MealImage({ mealName, foodNames, value, onChange }: { mealName: string;
       </button>
       {err && <p className="text-xs text-warning">{err}</p>}
     </>
+  );
+}
+
+/** Pick a saved meal template to seed the draft with. Fetches on open; each row
+ *  shows the template name + its option count. Picking hands the body up. */
+function SeedTemplateSheet({ onClose, onPick }: { onClose: () => void; onPick: (body: MealBody, name: string) => void }) {
+  const [templates, setTemplates] = useState<{ id: string; name: string; description?: string | null; body: MealBody }[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    api.get<{ templates: { id: string; name: string; description?: string | null; body: MealBody }[] }>("/api/meal-templates")
+      .then((r) => { if (alive) setTemplates(r.templates ?? []); })
+      .catch(() => { if (alive) setTemplates([]); });
+    return () => { alive = false; };
+  }, []);
+  return (
+    <Sheet open onClose={onClose} title="Start from a template">
+      <p className="mb-3 text-sm text-muted-foreground">Loads a saved template into this draft, replacing the current meals.</p>
+      {templates === null ? (
+        <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>
+      ) : templates.length === 0 ? (
+        <p className="px-3 py-6 text-center text-sm text-muted-foreground">No templates yet — save one from a plan's builder.</p>
+      ) : (
+        <div className="max-h-96 space-y-1.5 overflow-y-auto">
+          {templates.map((t) => {
+            const n = t.body.mealOptions?.length ?? 0;
+            return (
+              <button key={t.id} onClick={() => onPick(t.body, t.name)} className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-card p-3 text-left transition-colors hover:bg-surface-2">
+                <IconBadge icon={LayoutGrid} tone="nutrition" size="sm" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold">{t.name}</div>
+                  <div className="truncate text-xs text-muted-foreground">{n} option{n === 1 ? "" : "s"}{t.description ? ` · ${t.description}` : ""}</div>
+                </div>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </Sheet>
   );
 }
 
