@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@mossa/protocol";
-import { Button, Card, Badge, Field, Input, Select, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, Eyebrow, GlanceStrip, toneVar, type Tone, cn, colorToHex, Reveal, SkeletonLine, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, CheckCheck, Save, History, X, BarChart3, AlertTriangle } from "@mossa/ui";
+import { Button, Card, Badge, Field, Input, Select, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, Eyebrow, GlanceStrip, IconBadge, ConfirmDialog, toneVar, type Tone, cn, colorToHex, Reveal, SkeletonLine, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, CheckCheck, Save, History, LayoutGrid, X, BarChart3, AlertTriangle } from "@mossa/ui";
 import { api, ApiError } from "../../api.js";
 import { ClientPrefsStrip } from "./ClientPrefsStrip.js";
 import { AiErrorBox } from "../../AiError.js";
@@ -268,6 +268,12 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   const [aiOpen, setAiOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [copyWeekOpen, setCopyWeekOpen] = useState(false);
+  // Seed-the-draft: the client's most recent OTHER plan + a template picker.
+  const [latestOther, setLatestOther] = useState<{ id: string; name: string; body: WorkoutBody } | null>(null);
+  const [plansLoaded, setPlansLoaded] = useState(false);
+  const [seedTemplateOpen, setSeedTemplateOpen] = useState(false);
+  // A pending destructive replace, held until the coach confirms.
+  const [seedConfirm, setSeedConfirm] = useState<{ source: string; apply: () => void } | null>(null);
 
   const load = useCallback(async () => {
     const [p, ex] = await Promise.all([api.get<{ plan: Plan }>(`/api/workout-plans/${planId}`), api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all")]);
@@ -281,6 +287,33 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   const reloadLibrary = useCallback(async () => {
     setLibrary((await api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all")).exercises);
   }, []);
+
+  // Fetch the client's plans (created_at DESC) to offer "Latest plan" as a
+  // seed — the first plan that isn't THIS draft. A quiet miss just disables it.
+  useEffect(() => {
+    const cid = plan?.clientId;
+    if (!cid) return;
+    let alive = true;
+    api.get<{ plans: { id: string; name: string; body: WorkoutBody }[] }>(`/api/workout-plans?clientId=${cid}`)
+      .then((r) => { if (!alive) return; setLatestOther(r.plans?.find((pl) => pl.id !== planId) ?? null); setPlansLoaded(true); })
+      .catch(() => { if (alive) setPlansLoaded(true); });
+    return () => { alive = false; };
+  }, [plan?.clientId, planId]);
+
+  // Replace the current draft's body with a seed body, then refresh the library
+  // so exercises referenced by ids not yet loaded resolve their name/thumb.
+  const applySeedBody = (body: WorkoutBody) => {
+    setDays(body.days ?? []);
+    setDayIdx(0);
+    setDirty(true);
+    void reloadLibrary();
+  };
+  // Guard: replacing is destructive, so confirm only when the draft has days.
+  const seedDraft = (source: string, body: WorkoutBody) => {
+    const apply = () => applySeedBody(body);
+    if (days.length > 0) setSeedConfirm({ source, apply });
+    else apply();
+  };
 
   const mutate = (fn: (d: WorkoutDay[]) => void) => { const next = structuredClone(days); fn(next); setDays(next); setDirty(true); };
   const save = async () => { setSaving(true); try { await api.patch(`/api/workout-plans/${planId}`, { body: { days } }); setDirty(false); } finally { setSaving(false); } };
@@ -354,6 +387,18 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
       </div>
 
       <ClientPrefsStrip clientId={plan.clientId} focus="workout" />
+
+      {/* Seed the draft — load the client's most recent other plan, or a saved
+          template, into this draft (each REPLACES the current days). */}
+      {!readOnly && (
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" disabled={!latestOther} onClick={() => latestOther && seedDraft(latestOther.name, latestOther.body)}><History /> Latest plan</Button>
+            <Button variant="secondary" size="sm" onClick={() => setSeedTemplateOpen(true)}><LayoutGrid /> From template</Button>
+          </div>
+          {plansLoaded && !latestOther && <p className="px-1 text-[0.7rem] text-muted-foreground">No previous plan for this client — start from a template instead.</p>}
+        </div>
+      )}
 
       {/* Live "is this plan balanced?" read — volume by muscle group. */}
       <PlanHealthCard days={days} lib={libMap} />
@@ -483,6 +528,16 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
       {aiOpen && <AiDraftSheet onClose={() => setAiOpen(false)} onRun={runAi} />}
       {exportOpen && plan && <ExportTemplateSheet body={{ days }} defaultName={plan.name} onClose={() => setExportOpen(false)} />}
       {copyWeekOpen && <CopyWeekSheet dayCount={days.length} onClose={() => setCopyWeekOpen(false)} onCopy={copyWeek} />}
+      {seedTemplateOpen && <SeedTemplateSheet onClose={() => setSeedTemplateOpen(false)} onPick={(body, name) => { setSeedTemplateOpen(false); seedDraft(name, body); }} />}
+      <ConfirmDialog
+        open={!!seedConfirm}
+        onOpenChange={(o) => { if (!o) setSeedConfirm(null); }}
+        title="Replace this draft?"
+        description={`The current days will be replaced with “${seedConfirm?.source ?? ""}”.`}
+        confirmLabel="Replace"
+        destructive
+        onConfirm={() => seedConfirm?.apply()}
+      />
     </Page>
   );
 }
@@ -627,6 +682,45 @@ function AiDraftSheet({ onClose, onRun }: { onClose: () => void; onRun: (i: stri
         <Button size="lg" className="w-full" disabled={busy} onClick={() => void run()}>{busy ? "Drafting…" : "Generate draft"}</Button>
         {err ? <AiErrorBox error={err} /> : null}
       </div>
+    </Sheet>
+  );
+}
+
+/** Pick a saved workout template to seed the draft with. Fetches on open;
+ *  each row shows the template name + its day count. Picking hands the body up. */
+function SeedTemplateSheet({ onClose, onPick }: { onClose: () => void; onPick: (body: WorkoutBody, name: string) => void }) {
+  const [templates, setTemplates] = useState<{ id: string; name: string; description?: string | null; body: WorkoutBody }[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    api.get<{ templates: { id: string; name: string; description?: string | null; body: WorkoutBody }[] }>("/api/workout-templates")
+      .then((r) => { if (alive) setTemplates(r.templates ?? []); })
+      .catch(() => { if (alive) setTemplates([]); });
+    return () => { alive = false; };
+  }, []);
+  return (
+    <Sheet open onClose={onClose} title="Start from a template">
+      <p className="mb-3 text-sm text-muted-foreground">Loads a saved template into this draft, replacing the current days.</p>
+      {templates === null ? (
+        <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>
+      ) : templates.length === 0 ? (
+        <p className="px-3 py-6 text-center text-sm text-muted-foreground">No templates yet — save one from a plan's builder.</p>
+      ) : (
+        <div className="max-h-96 space-y-1.5 overflow-y-auto">
+          {templates.map((t) => {
+            const n = t.body.days?.length ?? 0;
+            return (
+              <button key={t.id} onClick={() => onPick(t.body, t.name)} className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-card p-3 text-left transition-colors hover:bg-surface-2">
+                <IconBadge icon={LayoutGrid} tone="activity" size="sm" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold">{t.name}</div>
+                  <div className="truncate text-xs text-muted-foreground">{n} day{n === 1 ? "" : "s"}{t.description ? ` · ${t.description}` : ""}</div>
+                </div>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+              </button>
+            );
+          })}
+        </div>
+      )}
     </Sheet>
   );
 }
