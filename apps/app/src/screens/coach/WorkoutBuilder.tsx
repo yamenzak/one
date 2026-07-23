@@ -325,7 +325,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   // WITHOUT a save first (which would 409); rollback returns it to an editable draft.
   const makeActive = async () => { await api.post(`/api/workout-plans/${planId}/publish`); await load(); };
   const rollback = async () => { await api.post(`/api/workout-plans/${planId}/status`, { status: "draft" }); await load(); };
-  const runAi = async (instructions: string) => { if (!plan) return; const res = await api.post<{ draft: WorkoutBody }>("/api/ai/draft-plan", { clientId: plan.clientId, instructions }); setDays(res.draft.days); setDirty(true); setAiOpen(false); };
+  const runAi = async (instructions: string): Promise<string[]> => { if (!plan) return []; const res = await api.post<{ draft: WorkoutBody; dropped?: string[] }>("/api/ai/draft-plan", { clientId: plan.clientId, instructions }); setDays(res.draft.days); setDirty(true); const dropped = res.dropped ?? []; if (!dropped.length) setAiOpen(false); return dropped; };
 
   // Copy week: duplicate every current day as a new mesocycle week, with an
   // optional linear progression (reps / load / %1RM) applied to each set.
@@ -672,17 +672,19 @@ function ExercisePicker({ library, onClose, onPick, reloadLibrary }: { library: 
   );
 }
 
-function AiDraftSheet({ onClose, onRun }: { onClose: () => void; onRun: (i: string) => Promise<void> }) {
+function AiDraftSheet({ onClose, onRun }: { onClose: () => void; onRun: (i: string) => Promise<string[]> }) {
   const [instructions, setInstructions] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<unknown>(null);
-  const run = async () => { setBusy(true); setErr(null); try { await onRun(instructions); } catch (e) { setErr(e); } finally { setBusy(false); } };
+  const [dropped, setDropped] = useState<string[] | null>(null);
+  const run = async () => { setBusy(true); setErr(null); setDropped(null); try { const d = await onRun(instructions); if (d.length) setDropped(d); } catch (e) { setErr(e); } finally { setBusy(false); } };
   return (
     <Sheet open onClose={onClose} title="AI Plan Draft">
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">Generate a starting draft from this client's intake and your library. You'll review and edit before publishing.</p>
+        <p className="text-sm text-muted-foreground">Generate a starting draft from this client's full profile — their goal, body, training history and limitations. Every exercise comes from your library; you'll review and edit before publishing.</p>
         <Field label="Instructions (optional)" icon={Sparkles} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="e.g. 4-day upper/lower, dumbbells only" />
         <Button size="lg" className="w-full" disabled={busy} onClick={() => void run()}>{busy ? "Drafting…" : "Generate draft"}</Button>
+        {dropped ? <div className="rounded-xl border border-border/60 bg-surface-2 p-3 text-xs text-muted-foreground">Draft applied. {dropped.length} suggested exercise{dropped.length === 1 ? "" : "s"} weren't in your library and {dropped.length === 1 ? "was" : "were"} skipped: {dropped.join(", ")}. Add {dropped.length === 1 ? "it" : "them"} to your library to include next time.</div> : null}
         {err ? <AiErrorBox error={err} /> : null}
       </div>
     </Sheet>

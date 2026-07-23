@@ -68,38 +68,60 @@ function aiFail(c: Context<AppEnv>, r: { error: string; detail?: string; availab
   return c.json({ error: r.detail ? `AI failed — ${r.detail}` : "AI unavailable.", detail: r.detail }, 503);
 }
 
-interface DraftFoodQuery { query?: string; quantity?: number; unit?: string; calories?: number; proteinG?: number; carbsG?: number; fatG?: number }
+interface DraftFoodQuery { foodId?: string; query?: string; name?: string; quantity?: number; unit?: string; calories?: number; proteinG?: number; carbsG?: number; fatG?: number }
 interface DraftMealOption { mealType: string; mealName: string; isFree?: boolean; foods?: DraftFoodQuery[] }
 interface ResolvedMealFood { foodId: string; quantity: number; unit: string }
 
-// Loose shapes for the model's workout draft (exercises named, not id'd).
-interface RawSlot { exercise?: string; exerciseName?: string; name?: string; measurementMode?: string; slotNotes?: string | null; sets?: unknown[] }
+// Loose shapes for the model's workout draft (exercise picked by library id, or
+// named as a fallback the resolver maps to a real library row).
+interface RawSlot { exerciseId?: string; exercise?: string; exerciseName?: string; name?: string; measurementMode?: string; slotNotes?: string | null; sets?: unknown[] }
 interface RawBlock { type?: string; rounds?: number | null; restBetweenExercisesSec?: number | null; restBetweenRoundsSec?: number | null; blockNotes?: string | null; slots?: RawSlot[] }
 interface RawDay { name?: string; dayNotes?: string | null; isRestDay?: boolean; blocks?: RawBlock[] }
 
-/** Turn the model's food queries into real library food ids: our library →
- *  integrated web providers (imported with photo) → a custom row from the
- *  model's macro estimate. Only truly unresolvable foods drop. */
-async function resolveMealFoods(env: ResolveEnv, tenantId: string, userId: string, cfg: Integrations, allowExternal: boolean, options: DraftMealOption[]): Promise<(DraftMealOption & { foods: ResolvedMealFood[] })[]> {
+/** Bounded food library (tenant + platform) formatted for the meal-draft prompt,
+ *  with the id set used to whitelist what the model may reference. */
+async function foodLibraryForPrompt(db: D1Database, tenantId: string, limit = 160): Promise<{ ids: Set<string>; text: string; count: number; sample: { id: string; name: string; serving_size: number; serving_unit: string }[] }> {
+  const rows = await db
+    .prepare("SELECT id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g FROM foods WHERE active = 1 AND (tenant_id IS NULL OR tenant_id = ?) ORDER BY verified DESC, name LIMIT ?")
+    .bind(tenantId, limit)
+    .all<{ id: string; name: string; brand: string | null; serving_size: number; serving_unit: string; calories: number; protein_g: number; carbs_g: number; fat_g: number }>();
+  const list = rows.results ?? [];
+  const ids = new Set(list.map((r) => r.id));
+  const text = list
+    .map((r) => `${r.id}: ${r.name}${r.brand ? ` (${r.brand})` : ""} — ${Math.round(r.calories)}kcal ${Math.round(r.protein_g)}P/${Math.round(r.carbs_g)}C/${Math.round(r.fat_g)}F per ${r.serving_size}${r.serving_unit}`)
+    .join("\n");
+  return { ids, text, count: list.length, sample: list.slice(0, 3).map((r) => ({ id: r.id, name: r.name, serving_size: r.serving_size, serving_unit: r.serving_unit })) };
+}
+
+/** Turn the model's chosen foods into REAL library food ids. The model picks a
+ *  `foodId` from the fed library (validated against `libIds`); a bare name is
+ *  resolved against the library (and, if enabled, web providers) but NEVER
+ *  fabricated. Anything unresolvable is dropped and reported. */
+async function resolveMealFoods(env: ResolveEnv, tenantId: string, userId: string, cfg: Integrations, allowExternal: boolean, options: DraftMealOption[], libIds: Set<string>): Promise<{ options: (DraftMealOption & { foods: ResolvedMealFood[] })[]; dropped: string[] }> {
   const cache = new Map<string, string | null>();
   const out: (DraftMealOption & { foods: ResolvedMealFood[] })[] = [];
+  const dropped: string[] = [];
   for (const opt of options) {
     if (!opt?.mealType || !opt?.mealName) continue;
     const foods: ResolvedMealFood[] = [];
-    for (const f of (opt.foods ?? []).slice(0, 5)) {
-      const q = String(f?.query ?? "").trim();
-      if (!q) continue;
+    for (const f of (opt.foods ?? []).slice(0, 6)) {
       const qty = Number(f.quantity) > 0 ? Number(f.quantity) : 100;
       const unit = (f.unit || "g").slice(0, 20);
-      const estimate = Number(f.calories) > 0
-        ? { calories: Number(f.calories), proteinG: Number(f.proteinG) || 0, carbsG: Number(f.carbsG) || 0, fatG: Number(f.fatG) || 0, servingSize: qty, servingUnit: unit }
-        : null;
-      const id = await resolveFoodId(env, tenantId, userId, q, cfg, allowExternal, estimate, cache);
+      // 1) an explicit library id the model picked from the fed list.
+      let id: string | null = typeof f.foodId === "string" && libIds.has(f.foodId) ? f.foodId : null;
+      // 2) fall back to a name → library-only match (invent disabled).
+      if (!id) {
+        const q = String(f?.query ?? f?.name ?? "").trim();
+        if (q) {
+          id = await resolveFoodId(env, tenantId, userId, q, cfg, allowExternal, null, cache, false);
+          if (!id) dropped.push(q);
+        }
+      }
       if (id) foods.push({ foodId: id, quantity: qty, unit });
     }
     out.push({ mealType: opt.mealType, mealName: opt.mealName, isFree: !!opt.isFree, foods });
   }
-  return out;
+  return { options: out, dropped };
 }
 
 /** Compact style reference from a studio's recent published meal plans. */
@@ -182,15 +204,15 @@ export const aiRoutes = new Hono<AppEnv>()
     )
       .bind(who.tenantId)
       .all<{ id: string; name: string; muscle_groups: string | null; equipment: string | null }>();
-    const intake = parseJson<Record<string, unknown>>(access.client.intake_json, {});
+    const libIds = new Set((library.results ?? []).map((e) => e.id));
     const nameOf = new Map((library.results ?? []).map((e) => [e.id, e.name]));
     // Few-shot: this studio's recent published plans as a style reference.
     const examples = await workoutPlanExamples(c.env.DB, who.tenantId, nameOf);
-    const compLine = await bodyCompLine(c.env.DB, access.client);
+    // Deep client understanding, straight from the combined knowledge base.
+    const ctx = await buildClientContext(c.env, access.client, { today: new Date().toISOString().slice(0, 10), hour: 12, units: await unitsFor(c.env.DB, who.userId), sections: ["client", "preferences", "goal", "body", "training", "wellness"] });
     const prompt = [
-      `CLIENT: ${access.client.display_name}; gender=${access.client.gender ?? "?"}; intake=${JSON.stringify(intake)}`,
-      compLine,
-      `EXERCISE LIBRARY (id: name [muscles] {equipment}):`,
+      ctx.text,
+      `EXERCISE LIBRARY — you MUST choose exercises ONLY from this list, by id (format "exerciseId: name [muscles] {equipment}"):`,
       ...(library.results ?? []).map(
         (e) => `${e.id}: ${e.name} [${e.muscle_groups ?? ""}] {${e.equipment ?? ""}}`,
       ),
@@ -222,7 +244,7 @@ export const aiRoutes = new Hono<AppEnv>()
                   rounds: null,
                   slots: [
                     {
-                      exercise: library.results?.[0]?.name ?? "Barbell Back Squat",
+                      exerciseId: library.results?.[0]?.id ?? "",
                       measurementMode: "reps",
                       sets: [
                         { setType: "warmup", reps: 10, weightMode: "unspecified", restAfterSec: 60 },
@@ -245,22 +267,29 @@ export const aiRoutes = new Hono<AppEnv>()
       raw: result.output.slice(0, 2500),
       mocked: result.mocked,
     }, 422);
-    // Resolve each named exercise to a real id: our library → integrated web
-    // providers (imported WITH its photo/gif) → a custom row. Only truly empty
-    // slots drop; nothing is silently discarded for lacking a library match.
+    // Resolve each slot to a REAL library id. The model picks an `exerciseId`
+    // from the fed list (validated against libIds); a bare name falls back to a
+    // library match (and, if enabled, a web import WITH its photo/gif) but is
+    // NEVER fabricated. Off-library items are dropped and reported to the coach.
     const appCfg = await getConfig(c.env.DB);
     const allowExternal = (await hasFeature(c.env.DB, who.tenantId, "externalSearch")) && appCfg["ai.mock"] !== "on";
     const cfg = await tenantIntegrations(c.env.DB, who.tenantId);
     const cache = new Map<string, string | null>();
+    const dropped: string[] = [];
     const days: unknown[] = [];
     for (const d of raw.days) {
       const blocks: unknown[] = [];
       for (const b of d.blocks ?? []) {
         const slots: unknown[] = [];
         for (const s of b.slots ?? []) {
-          const name = String(s.exercise ?? s.exerciseName ?? s.name ?? "").trim();
-          if (!name) continue;
-          const id = await resolveExerciseId(c.env as ResolveEnv, who.tenantId, who.userId, name, cfg, allowExternal, cache);
+          let id: string | null = typeof s.exerciseId === "string" && libIds.has(s.exerciseId) ? s.exerciseId : null;
+          if (!id) {
+            const name = String(s.exercise ?? s.exerciseName ?? s.name ?? "").trim();
+            if (name) {
+              id = await resolveExerciseId(c.env as ResolveEnv, who.tenantId, who.userId, name, cfg, allowExternal, cache, false);
+              if (!id) dropped.push(name);
+            }
+          }
           if (id) slots.push({ exerciseId: id, measurementMode: s.measurementMode ?? "reps", slotNotes: s.slotNotes ?? null, sets: Array.isArray(s.sets) ? s.sets : [] });
         }
         if (slots.length) blocks.push({ type: b.type ?? "single", rounds: b.rounds ?? null, restBetweenExercisesSec: b.restBetweenExercisesSec ?? null, restBetweenRoundsSec: b.restBetweenRoundsSec ?? null, blockNotes: b.blockNotes ?? null, slots });
@@ -276,12 +305,12 @@ export const aiRoutes = new Hono<AppEnv>()
     }, 422);
     const totalSlots = body.data.days.reduce((n, d) => n + d.blocks.reduce((m, b) => m + b.slots.length, 0), 0);
     if (totalSlots === 0) return c.json({
-      error: "The AI plan came back empty.",
-      detail: `parsed ${body.data.days.length} day(s) but no exercises resolved`,
+      error: dropped.length ? "None of the drafted exercises matched your library." : "The AI plan came back empty.",
+      detail: dropped.length ? `off-library exercises the AI chose: ${[...new Set(dropped)].slice(0, 12).join(", ")}` : `parsed ${body.data.days.length} day(s) but no exercises resolved`,
       raw: result.output.slice(0, 2500),
       mocked: result.mocked,
     }, 422);
-    return c.json({ draft: body.data, credits: result.credits, mocked: result.mocked });
+    return c.json({ draft: body.data, dropped: [...new Set(dropped)], credits: result.credits, mocked: result.mocked });
   })
 
   /**
@@ -403,12 +432,21 @@ export const aiRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
-    const goal = await c.env.DB.prepare("SELECT targets_json FROM client_goals WHERE client_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(access.client.id).first<{ targets_json: string | null }>();
-    const targets = parseJson<Record<string, number>>(goal?.targets_json, {});
-    const intake = parseJson<Record<string, unknown>>(access.client.intake_json, {});
-    // Few-shot: this studio's recent published meal plans as a style reference.
-    const examples = await mealPlanExamples(c.env.DB, who.tenantId);
-    const compLine = await bodyCompLine(c.env.DB, access.client);
+    // Deep client understanding + the real food library the model must build from.
+    const [ctx, foodLib, examples] = await Promise.all([
+      buildClientContext(c.env, access.client, { today: new Date().toISOString().slice(0, 10), hour: 12, units: await unitsFor(c.env.DB, who.userId), sections: ["client", "preferences", "goal", "body", "nutrition"] }),
+      foodLibraryForPrompt(c.env.DB, who.tenantId),
+      mealPlanExamples(c.env.DB, who.tenantId),
+    ]);
+    if (foodLib.count === 0) return c.json({ error: "Your food library is empty — add foods first so the AI can build meals from them.", detail: "meal generation only uses foods that exist in your library" }, 409);
+    const s = foodLib.sample;
+    const prompt = [
+      ctx.text,
+      `FOOD LIBRARY — you MUST build meals ONLY from these foods, each referenced by its id (format "foodId: name — macros per serving"):`,
+      foodLib.text,
+      examples,
+      parsed.data.instructions && `COACH INSTRUCTIONS: ${parsed.data.instructions}`,
+    ].filter(Boolean).join("\n");
 
     const result = await generate(c.env, {
       tenantId: who.tenantId,
@@ -418,25 +456,25 @@ export const aiRoutes = new Hono<AppEnv>()
       task: "text",
       expectsJson: true,
       system: sys("draft-meal"),
-      prompt: [`TARGETS: ${JSON.stringify(targets)}`, `INTAKE: ${JSON.stringify(intake)}`, compLine, examples, parsed.data.instructions].filter(Boolean).join("\n"),
+      prompt,
       maxOutputTokens: 1536,
+      // Mock builds valid options straight from the fed library (real ids).
       mock: () => JSON.stringify({ mealOptions: [
-        { mealType: "breakfast", mealName: "Oats, whey & berries", isFree: false, foods: [{ query: "rolled oats", quantity: 80, unit: "g", calories: 304, proteinG: 11, carbsG: 54, fatG: 6 }, { query: "whey protein", quantity: 30, unit: "g", calories: 120, proteinG: 24, carbsG: 3, fatG: 2 }, { query: "blueberries", quantity: 100, unit: "g", calories: 57, proteinG: 1, carbsG: 14, fatG: 0 }] },
-        { mealType: "lunch", mealName: "Chicken, rice & greens", isFree: false, foods: [{ query: "chicken breast", quantity: 180, unit: "g", calories: 297, proteinG: 56, carbsG: 0, fatG: 6 }, { query: "white rice", quantity: 150, unit: "g", calories: 195, proteinG: 4, carbsG: 42, fatG: 0 }, { query: "broccoli", quantity: 100, unit: "g", calories: 34, proteinG: 3, carbsG: 7, fatG: 0 }] },
-        { mealType: "dinner", mealName: "Salmon, potato & salad", isFree: false, foods: [{ query: "salmon", quantity: 170, unit: "g", calories: 354, proteinG: 34, carbsG: 0, fatG: 23 }, { query: "potato", quantity: 200, unit: "g", calories: 154, proteinG: 4, carbsG: 35, fatG: 0 }] },
+        { mealType: "breakfast", mealName: s[0] ? `${s[0].name} bowl` : "Breakfast", isFree: false, foods: s[0] ? [{ foodId: s[0].id, quantity: s[0].serving_size || 100, unit: s[0].serving_unit || "g" }] : [] },
+        { mealType: "lunch", mealName: s[1] ? `${s[1].name} plate` : "Lunch", isFree: false, foods: (s[1] ? [{ foodId: s[1].id, quantity: s[1].serving_size || 100, unit: s[1].serving_unit || "g" }] : []).concat(s[0] ? [{ foodId: s[0].id, quantity: s[0].serving_size || 100, unit: s[0].serving_unit || "g" }] : []) },
+        { mealType: "dinner", mealName: s[2] ? `${s[2].name} dinner` : "Dinner", isFree: false, foods: s[2] ? [{ foodId: s[2].id, quantity: s[2].serving_size || 100, unit: s[2].serving_unit || "g" }] : (s[0] ? [{ foodId: s[0].id, quantity: s[0].serving_size || 100, unit: s[0].serving_unit || "g" }] : []) },
       ] }),
     });
     if (!result.ok) return aiFail(c, result);
     const draft = extractJson<{ mealOptions: DraftMealOption[] }>(result.output);
     if (!draft?.mealOptions) return c.json({ error: "The AI didn't return valid meals.", raw: result.output.slice(0, 1800), mocked: result.mocked }, 422);
-    // Resolve each drafted food query to a real library food id: our library →
-    // integrated web providers (imported with photo) → a custom row from the
-    // model's estimate — so every option carries real, editable macros.
+    // Resolve each drafted food to a REAL library id (fed id → library name match),
+    // never a fabricated row. Off-library foods are dropped and reported.
     const appCfg = await getConfig(c.env.DB);
     const allowExternal = (await hasFeature(c.env.DB, who.tenantId, "externalSearch")) && appCfg["ai.mock"] !== "on";
     const cfg = await tenantIntegrations(c.env.DB, who.tenantId);
-    const resolved = await resolveMealFoods(c.env as ResolveEnv, who.tenantId, who.userId, cfg, allowExternal, draft.mealOptions);
-    return c.json({ draft: { customMealTypes: [], mealOptions: resolved }, credits: result.credits, mocked: result.mocked });
+    const { options: resolved, dropped } = await resolveMealFoods(c.env as ResolveEnv, who.tenantId, who.userId, cfg, allowExternal, draft.mealOptions, foodLib.ids);
+    return c.json({ draft: { customMealTypes: [], mealOptions: resolved }, dropped: [...new Set(dropped)], credits: result.credits, mocked: result.mocked });
   })
 
   /** Check-in Summarizer: recent check-ins → digest + suggested reply (trainer). */
