@@ -13,7 +13,7 @@ import { requireClientAccess } from "./clients.js";
 import { gateFeature, resolveClientFlagsFor } from "./client-flags.js";
 import { tenantEntitlements, hasFeature, getConfig, setConfig } from "./billing-store.js";
 import { generate, generateImage, extractJson, listModels } from "./ai.js";
-import { buildClientContext, bodyCompLine } from "./ai-context.js";
+import { buildClientContext } from "./ai-context.js";
 import { featureDef } from "./ai-features.js";
 import { parseWorkersAiPricing, parseGeminiPricing } from "./ai-pricing.js";
 import { tenantIntegrations, type Integrations } from "./integrations.js";
@@ -627,18 +627,18 @@ export const aiRoutes = new Hono<AppEnv>()
     }
     const supps = await c.env.DB.prepare("SELECT name, dose, schedule_json FROM supplements WHERE client_id = ? AND status = 'active'").bind(access.client.id).all<{ name: string; dose: string | null; schedule_json: string | null }>();
     if (!(supps.results ?? []).length) return c.json({ guide: "" });
-    const goalRow = await c.env.DB.prepare("SELECT derivation_json FROM client_goals WHERE client_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1").bind(access.client.id).first<{ derivation_json: string | null }>();
-    const primaryGoal = parseJson<{ primaryGoal?: string }>(goalRow?.derivation_json, {}).primaryGoal ?? "general fitness";
-    const compLine = await bodyCompLine(c.env.DB, access.client);
+    // Full client understanding from the knowledge base (goal, diet, body, labs)
+    // so the guide connects each supplement to what it supports for THIS client.
+    const ctx = await buildClientContext(c.env, access.client, { today: new Date().toISOString().slice(0, 10), hour: 12, units: await unitsFor(c.env.DB, who.userId), sections: ["client", "preferences", "goal", "body", "labs"] });
     const stack = (supps.results ?? []).map((s) => {
       const sched = parseJson<{ slot: string }[]>(s.schedule_json, []).map((x) => x.slot.replace(/_/g, " ")).join(", ");
       return `- ${s.name}${s.dose ? ` (${s.dose})` : ""}${sched ? ` — ${sched}` : ""}`;
     }).join("\n");
-    const prompt = [`GOAL: ${primaryGoal}`, compLine, `YOUR SUPPLEMENTS:\n${stack}`].filter(Boolean).join("\n");
+    const prompt = [ctx.text, `YOUR SUPPLEMENTS:\n${stack}`].join("\n");
     const result = await generate(c.env, {
       tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
       feature: "supplement-guide", task: "text-small", system: sys("supplement-guide"), prompt, maxOutputTokens: 500,
-      mock: () => (supps.results ?? []).map((s) => `${s.name}: supports your ${primaryGoal} goal — take it consistently, ideally with a meal.`).join("\n") + "\n\nOverall: keep timing consistent and pair with food where it helps absorption. Ask your coach before changing anything.",
+      mock: () => (supps.results ?? []).map((s) => `${s.name}: supports your training goal — take it consistently, ideally with a meal.`).join("\n") + "\n\nOverall: keep timing consistent and pair with food where it helps absorption. Ask your coach before changing anything.",
     });
     if (!result.ok) return aiFail(c, result);
     return c.json({ guide: result.output.trim(), credits: result.credits, mocked: result.mocked });
