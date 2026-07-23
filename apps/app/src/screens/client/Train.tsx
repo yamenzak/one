@@ -16,6 +16,7 @@ import {
   Dumbbell, Play, Moon, ChevronRight, Plus, Footprints, Flame, TrendingUp, Trophy, Activity, AlertTriangle,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
+import { activityIcon } from "./activityIcons.js";
 import { useUnits } from "../../units.js";
 import { LogSheet } from "./LogSheet.js";
 import { pretty } from "../exercise.js";
@@ -132,7 +133,7 @@ export function Train({ clientId }: { clientId: string }) {
       items.push({ id: s.id, date: s.date_local, title: "Workout", sub: `${sets.length} sets · ${kgToDisplay(sessionTonnage(sets), units).toLocaleString()} ${weightLabel(units)}`, icon: Dumbbell, tone: "activity", load: sessionLoad({ sets }) });
     }
     for (const a of activities) {
-      items.push({ id: a.id, date: a.date_local, title: a.label || pretty(a.activity_key), sub: [a.duration_min ? `${a.duration_min} min` : null, a.calories ? fmtEnergy(a.calories, units) : null].filter(Boolean).join(" · ") || "Logged", icon: Footprints, tone: "cardio", load: sessionLoad({ cardio: [{ met: activityByKey(a.activity_key).met, durationMin: a.duration_min ?? 0 }] }) });
+      items.push({ id: a.id, date: a.date_local, title: a.label || pretty(a.activity_key), sub: [a.duration_min ? `${a.duration_min} min` : null, a.calories ? fmtEnergy(a.calories, units) : null].filter(Boolean).join(" · ") || "Logged", icon: activityIcon(a.activity_key), tone: "cardio", load: sessionLoad({ cardio: [{ met: activityByKey(a.activity_key).met, durationMin: a.duration_min ?? 0 }] }) });
     }
     return items.sort((x, y) => y.date.localeCompare(x.date)).slice(0, 6);
   }, [sessions, activities, units]);
