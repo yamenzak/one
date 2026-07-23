@@ -221,41 +221,100 @@ function Foods() {
   const units = useUnits();
   const [q, setQ] = useState("");
   const [items, setItems] = useState<FoodRow[] | null>(null);
+  const [view, setView] = useState<"list" | "grid">("list");
+  // Browse facets, composed with search — mirrors the exercise library.
+  const [kind, setKind] = useState<"whole" | "branded" | null>(null);
+  const [owner, setOwner] = useState<"seed" | "shared" | "private" | null>(null);
   // `null` = closed; `{}` = new; `{ id }` = edit that food.
   const [editor, setEditor] = useState<{ id?: string } | null>(null);
   const [archiveFor, setArchiveFor] = useState<FoodRow | null>(null);
   const load = useCallback(async () => setItems((await api.get<{ foods: FoodRow[] }>(`/api/foods?q=${encodeURIComponent(q)}`)).foods), [q]);
   useEffect(() => { const t = setTimeout(() => void load(), 200); return () => clearTimeout(t); }, [load]);
-  const tag = (f: FoodRow) => (f.tenant_id === null ? "seed" : f.visibility === "private" ? "private" : "shared");
+  const tag = (f: FoodRow): "seed" | "private" | "shared" => (f.tenant_id === null ? "seed" : f.visibility === "private" ? "private" : "shared");
+  const tagLabel = { seed: "Library", shared: "Shared", private: "Mine" } as const;
+  const tagTone = (t: "seed" | "private" | "shared") => (t === "seed" ? "cardio" : t === "private" ? "neutral" : "activity");
+
+  // Type (whole vs branded) + ownership facets — only shown when they'd split
+  // the loaded set. Facets read from the full set so toggling one keeps the
+  // others; the list/grid then applies both alongside search.
+  const kinds = [
+    ...((items ?? []).some((f) => !f.brand) ? [{ v: "whole" as const, label: "Whole" }] : []),
+    ...((items ?? []).some((f) => f.brand) ? [{ v: "branded" as const, label: "Branded" }] : []),
+  ];
+  const owners = (["private", "shared", "seed"] as const).filter((o) => (items ?? []).some((f) => tag(f) === o));
+  const filtered = (items ?? []).filter((f) =>
+    (!kind || (kind === "branded" ? !!f.brand : !f.brand)) && (!owner || tag(f) === owner),
+  );
+
+  const macros = (f: FoodRow) => (
+    <>
+      <span className="numeral font-semibold text-calories">{fmtEnergy(f.calories, units)}</span>
+      {f.protein_g != null && <MacroInline proteinG={f.protein_g} carbsG={f.carbs_g ?? 0} fatG={f.fat_g ?? 0} className="text-[0.7rem]" />}
+    </>
+  );
+  const actions = (f: FoodRow) => (
+    <>
+      <button onClick={() => setEditor({ id: f.id })} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground [&_svg]:size-4" aria-label="Edit food"><PencilLine /></button>
+      {/* Seeds (tenant_id null) can't be archived — only a tenant's own rows. */}
+      {f.tenant_id !== null ? <button onClick={() => setArchiveFor(f)} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4" aria-label="Archive food"><Archive /></button> : null}
+    </>
+  );
+
   return (
     <div className="space-y-3">
       <div className="flex items-end gap-2">
         <Field className="flex-1" label="Search foods" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
+        <Button variant="ghost" aria-label={view === "list" ? "Grid view" : "List view"} onClick={() => setView((v) => (v === "list" ? "grid" : "list"))}>{view === "list" ? <LayoutGrid /> : <List />}</Button>
         <Button variant="tonal" aria-label="New food" onClick={() => setEditor({})}><Plus /></Button>
       </div>
+      {items && (kinds.length > 1 || owners.length > 1) && (
+        <div className="space-y-1.5">
+          {kinds.length > 1 && (
+            <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
+              {kinds.map((k) => <span key={k.v} className="shrink-0"><Chip className="h-8 px-3 text-[0.8rem]" selected={kind === k.v} onClick={() => setKind(kind === k.v ? null : k.v)}>{k.label}</Chip></span>)}
+            </div>
+          )}
+          {owners.length > 1 && (
+            <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
+              {owners.map((o) => <span key={o} className="shrink-0"><Chip className="h-8 px-3 text-[0.8rem]" selected={owner === o} onClick={() => setOwner(owner === o ? null : o)}>{tagLabel[o]}</Chip></span>)}
+            </div>
+          )}
+        </div>
+      )}
       <Reveal loading={!items} skeleton={
         <div className="space-y-1">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="rounded-2xl bg-card p-4"><SkeletonRow thumb={40} /></div>)}</div>
       }>
-        {items && (items.length === 0 ? <EmptyState icon={Utensils} title="No foods yet" description="Add one, or build your library from the Eat tab." action={<Button onClick={() => setEditor({})}><Plus /> New food</Button>} /> : (
+        {items && (filtered.length === 0 ? <EmptyState icon={Utensils} title="No foods" description="Add one, or build your library from the Eat tab." action={<Button onClick={() => setEditor({})}><Plus /> New food</Button>} /> : view === "grid" ? (
+        <Stagger className="grid grid-cols-2 gap-3">{filtered.map((f) => (
+          <Card key={f.id} className="overflow-hidden p-0">
+            <button onClick={() => setEditor({ id: f.id })} className="block w-full text-left transition-opacity active:opacity-80">
+              <div className="aspect-square bg-nutrition-soft"><FoodThumb src={f.image_url} size={0} className="!size-full !rounded-none" /></div>
+              <div className="px-3 pt-2">
+                <div className="truncate text-sm font-semibold">{f.name}</div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">{macros(f)}</div>
+              </div>
+            </button>
+            <div className="flex items-center justify-between gap-1 px-1.5 pb-1 pt-0.5">
+              <Badge tone={tagTone(tag(f))} className="ml-1.5">{tagLabel[tag(f)]}</Badge>
+              <div className="flex items-center">{actions(f)}</div>
+            </div>
+          </Card>
+        ))}</Stagger>
+        ) : (
         // Two-line row so the food NAME gets the full width — it only shares its
         // line with the actions; kcal, macros and the visibility tag sit beneath.
-        <Stagger className="space-y-1">{items.map((f) => (
+        <Stagger className="space-y-1">{filtered.map((f) => (
           <Card key={f.id} className="p-3">
             <div className="flex items-center gap-3">
-              <FoodThumb src={f.image_url} size={40} />
+              <FoodThumb src={f.image_url} size={44} />
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{f.name}</div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                  <span className="numeral font-semibold text-calories">{fmtEnergy(f.calories, units)}</span>
-                  {f.protein_g != null && <MacroInline proteinG={f.protein_g} carbsG={f.carbs_g ?? 0} fatG={f.fat_g ?? 0} className="text-[0.7rem]" />}
-                  <Badge tone={tag(f) === "seed" ? "cardio" : tag(f) === "private" ? "neutral" : "activity"}>{tag(f)}</Badge>
+                  {macros(f)}
+                  <Badge tone={tagTone(tag(f))}>{tagLabel[tag(f)]}</Badge>
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <button onClick={() => setEditor({ id: f.id })} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground [&_svg]:size-4" aria-label="Edit food"><PencilLine /></button>
-                {/* Seeds (tenant_id null) can't be archived — only a tenant's own rows. */}
-                {f.tenant_id !== null ? <button onClick={() => setArchiveFor(f)} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4" aria-label="Archive food"><Archive /></button> : null}
-              </div>
+              <div className="flex shrink-0 items-center gap-1">{actions(f)}</div>
             </div>
           </Card>
         ))}</Stagger>
