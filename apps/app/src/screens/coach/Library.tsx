@@ -291,6 +291,7 @@ function Foods() {
               <div className="aspect-square bg-nutrition-soft"><FoodThumb src={f.image_url} size={0} className="!size-full !rounded-none" /></div>
               <div className="px-3 pt-2">
                 <div className="truncate text-sm font-semibold">{f.name}</div>
+                {f.brand && <div className="truncate text-xs text-muted-foreground">{f.brand}</div>}
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">{macros(f)}</div>
               </div>
             </button>
@@ -308,7 +309,7 @@ function Foods() {
             <div className="flex items-center gap-3">
               <FoodThumb src={f.image_url} size={44} />
               <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{f.name}</div>
+                <div className="truncate font-medium">{f.name}{f.brand && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{f.brand}</span>}</div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                   {macros(f)}
                   <Badge tone={tagTone(tag(f))}>{tagLabel[tag(f)]}</Badge>
