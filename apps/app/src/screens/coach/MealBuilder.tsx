@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { MealBody, MealOption, MealFood } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy, scaleFood, servingsToQuantity, SERVING_PRESETS } from "@mossa/domain";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, MacroBar, ProgressRing, Eyebrow, Chip, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, ArrowLeft, Plus, Sparkles, Utensils, Flame, History, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, MacroBar, ProgressRing, Eyebrow, Chip, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, ArrowLeft, Plus, Sparkles, Utensils, Flame, History, Trash2, X } from "@mossa/ui";
 import { api, ApiError } from "../../api.js";
 import { ClientPrefsStrip } from "./ClientPrefsStrip.js";
 import { AiErrorBox } from "../../AiError.js";
@@ -30,6 +30,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const [plan, setPlan] = useState<Plan | null>(null);
   const [options, setOptions] = useState<MealOption[]>([]);
   const [customTypes, setCustomTypes] = useState<{ label: string }[]>([]);
+  const [hiddenTypes, setHiddenTypes] = useState<string[]>([]);
   const [foods, setFoods] = useState<Map<string, FoodLike>>(new Map());
   const [names, setNames] = useState<Map<string, string>>(new Map());
   const [targets, setTargets] = useState<Targets | null>(null);
@@ -46,7 +47,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
 
   const load = useCallback(async () => {
     const [p, f] = await Promise.all([api.get<{ plan: Plan }>(`/api/meal-plans/${planId}`), api.get<{ foods: FoodRow[] }>("/api/foods?scope=all")]);
-    setPlan(p.plan); setOptions(p.plan.body.mealOptions ?? []); setCustomTypes(p.plan.body.customMealTypes ?? []);
+    setPlan(p.plan); setOptions(p.plan.body.mealOptions ?? []); setCustomTypes(p.plan.body.customMealTypes ?? []); setHiddenTypes(p.plan.body.hiddenMealTypes ?? []);
     setFoods(foodsFromRows(f.foods));
     setNames(new Map(f.foods.map((x) => [x.id, x.name])));
   }, [planId]);
@@ -80,7 +81,15 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   }, []);
 
   const mutate = (fn: (d: MealOption[]) => void) => { const next = structuredClone(options); fn(next); setOptions(next); setDirty(true); };
-  const save = async () => { setSaving(true); try { await api.patch(`/api/meal-plans/${planId}`, { body: { customMealTypes: customTypes, mealOptions: options } }); setDirty(false); } finally { setSaving(false); } };
+  const save = async () => { setSaving(true); try { await api.patch(`/api/meal-plans/${planId}`, { body: { customMealTypes: customTypes, hiddenMealTypes: hiddenTypes, mealOptions: options } }); setDirty(false); } finally { setSaving(false); } };
+  // Remove a meal type from THIS plan: built-ins are hidden (restorable via
+  // "+ Meal type"); custom types are dropped outright. Either way its options go.
+  const removeType = (type: string) => {
+    setOptions((prev) => prev.filter((o) => o.mealType !== type));
+    if (BUILTIN_TYPES.includes(type)) setHiddenTypes((p) => (p.includes(type) ? p : [...p, type]));
+    else setCustomTypes((p) => p.filter((t) => t.label !== type));
+    setDirty(true);
+  };
   const publish = async () => { await save(); await api.post(`/api/meal-plans/${planId}/publish`); await load(); };
   // Superseded/archived plans are read-only (PATCH 409s). "Make active" re-publishes
   // WITHOUT a save first (which would 409); rollback returns it to an editable draft.
@@ -97,7 +106,8 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const readOnly = plan?.status === "superseded" || plan?.status === "archived";
   const byType = new Map<string, { opt: MealOption; idx: number }[]>();
   options.forEach((opt, idx) => byType.set(opt.mealType, [...(byType.get(opt.mealType) ?? []), { opt, idx }]));
-  const allTypes = [...BUILTIN_TYPES, ...customTypes.map((t) => t.label)];
+  const allTypes = [...BUILTIN_TYPES.filter((t) => !hiddenTypes.includes(t)), ...customTypes.map((t) => t.label)];
+  const restorable = BUILTIN_TYPES.filter((t) => hiddenTypes.includes(t)); // hidden built-ins, offered for re-add
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-32">
@@ -147,9 +157,12 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
         const opts = byType.get(type) ?? [];
         return (
           <Card key={type} className="space-y-3 p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <h2 className="font-semibold capitalize">{type.replace("_", " ")}</h2>
-              <button onClick={() => mutate((d) => d.push({ mealType: type, mealName: `Option ${opts.length + 1}`, isFree: false, foods: [] }))} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><Plus /> Option</button>
+              <div className="flex items-center gap-1">
+                <button onClick={() => mutate((d) => d.push({ mealType: type, mealName: `Option ${opts.length + 1}`, isFree: false, foods: [] }))} className="inline-flex items-center gap-1 text-sm font-medium text-nutrition [&_svg]:size-4"><Plus /> Option</button>
+                {!readOnly && <button onClick={() => removeType(type)} aria-label={`Remove ${type.replace("_", " ")}`} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button>}
+              </div>
             </div>
             {opts.length === 0 && <p className="text-sm text-muted-foreground">No options yet.</p>}
             {opts.map(({ opt, idx }) => {
@@ -192,7 +205,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
                         />
                       ))}
                       <div className="space-y-1.5">
-                        <button onClick={() => setFoodPicker({ optIdx: idx })} className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-xs font-medium text-primary transition-colors hover:bg-surface-3 [&_svg]:size-4"><Plus /> Add food</button>
+                        <button onClick={() => setFoodPicker({ optIdx: idx })} className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-xs font-medium text-nutrition transition-colors hover:bg-surface-3 [&_svg]:size-4"><Plus /> Add food</button>
                         {opt.foods.length === 0 && <p className="px-1 text-center text-[0.7rem] text-muted-foreground">Search the library — or create a new food from the search if it's not there yet.</p>}
                       </div>
                       {opt.foods.length > 0 && <MealImage mealName={opt.mealName} foodNames={opt.foods.map((mf) => nameOf(mf.foodId))} value={opt.imageUrl} onChange={(url) => mutate((d) => (d[idx]!.imageUrl = url))} />}
@@ -232,9 +245,17 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
 
       {foodPicker && <FoodSearchSheet onClose={() => setFoodPicker(null)} onPick={(id, name) => { mutate((d) => d[foodPicker.optIdx]!.foods.push({ foodId: id, quantity: 100, unit: "g" })); setNames((p) => new Map(p).set(id, name)); setFoodPicker(null); void refreshFoods(); }} />}
       {aiOpen && <AiMealSheet onClose={() => setAiOpen(false)} onRun={runAi} />}
-      <Sheet open={typeOpen} onClose={() => setTypeOpen(false)} title="New meal type">
+      <Sheet open={typeOpen} onClose={() => setTypeOpen(false)} title="Add meal type">
         <div className="space-y-4">
-          <Field label="Name" icon={Utensils} value={newType} onChange={(e) => setNewType(e.target.value)} placeholder="e.g. Second breakfast" autoFocus />
+          {restorable.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Bring back a removed meal</span>
+              <div className="flex flex-wrap gap-2">
+                {restorable.map((t) => <Chip key={t} onClick={() => { setHiddenTypes((p) => p.filter((x) => x !== t)); setDirty(true); setTypeOpen(false); }}>{t.replace("_", " ")}</Chip>)}
+              </div>
+            </div>
+          )}
+          <Field label="Or add a custom meal" icon={Utensils} value={newType} onChange={(e) => setNewType(e.target.value)} placeholder="e.g. Second breakfast" autoFocus />
           <Button size="lg" className="w-full" disabled={newType.trim().length < 2} onClick={addCustomType}>Add meal type</Button>
         </div>
       </Sheet>

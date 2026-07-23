@@ -38,6 +38,10 @@ export type MealOption = z.infer<typeof MealOption>;
 
 export const MealBody = z.object({
   customMealTypes: z.array(z.object({ label: z.string().min(1).max(40) })).default([]),
+  /** Built-in meal types the coach removed from THIS plan (e.g. "pre_workout").
+   *  Built-ins render by default; listing one here hides it. Custom types are
+   *  removed by dropping them from customMealTypes instead. */
+  hiddenMealTypes: z.array(z.string().max(40)).default([]),
   mealOptions: z.array(MealOption).default([]),
 });
 export type MealBody = z.infer<typeof MealBody>;
