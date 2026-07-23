@@ -133,11 +133,14 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const makeActive = async () => { await api.post(`/api/meal-plans/${planId}/publish`); await load(); };
   const rollback = async () => { await api.post(`/api/meal-plans/${planId}/status`, { status: "draft" }); await load(); };
   const addCustomType = () => { const label = newType.trim(); if (label && !customTypes.some((t) => t.label === label)) { setCustomTypes((p) => [...p, { label }]); setDirty(true); } setNewType(""); setTypeOpen(false); };
-  const runAi = async (instructions: string) => {
-    if (!plan) return;
-    const res = await api.post<{ draft: MealBody }>("/api/ai/draft-meal", { clientId: plan.clientId, instructions });
-    setOptions((prev) => [...prev, ...(res.draft.mealOptions ?? [])]); setDirty(true); setAiOpen(false);
+  const runAi = async (instructions: string): Promise<string[]> => {
+    if (!plan) return [];
+    const res = await api.post<{ draft: MealBody; dropped?: string[] }>("/api/ai/draft-meal", { clientId: plan.clientId, instructions });
+    setOptions((prev) => [...prev, ...(res.draft.mealOptions ?? [])]); setDirty(true);
     void refreshFoods();
+    const dropped = res.dropped ?? [];
+    if (!dropped.length) setAiOpen(false);
+    return dropped;
   };
 
   const readOnly = plan?.status === "superseded" || plan?.status === "archived";
@@ -527,17 +530,19 @@ function SeedTemplateSheet({ onClose, onPick }: { onClose: () => void; onPick: (
   );
 }
 
-function AiMealSheet({ onClose, onRun }: { onClose: () => void; onRun: (i: string) => Promise<void> }) {
+function AiMealSheet({ onClose, onRun }: { onClose: () => void; onRun: (i: string) => Promise<string[]> }) {
   const [instructions, setInstructions] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<unknown>(null);
-  const run = async () => { setBusy(true); setErr(null); try { await onRun(instructions); } catch (e) { setErr(e); } finally { setBusy(false); } };
+  const [dropped, setDropped] = useState<string[] | null>(null);
+  const run = async () => { setBusy(true); setErr(null); setDropped(null); try { const d = await onRun(instructions); if (d.length) setDropped(d); } catch (e) { setErr(e); } finally { setBusy(false); } };
   return (
     <Sheet open onClose={onClose} title="AI meal draft">
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">Drafts meal options from this client's targets and intake. You'll fill exact foods and review before publishing.</p>
+        <p className="text-sm text-muted-foreground">Drafts meal options from this client's targets, body and dietary preferences — every food comes from your library. You'll review before publishing.</p>
         <Field label="Instructions (optional)" icon={Sparkles} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="e.g. high-protein, no dairy, 4 meals" />
         <Button size="lg" className="w-full" disabled={busy} onClick={() => void run()}>{busy ? "Drafting…" : "Generate options"}</Button>
+        {dropped ? <div className="rounded-xl border border-border/60 bg-surface-2 p-3 text-xs text-muted-foreground">Options added. {dropped.length} suggested food{dropped.length === 1 ? "" : "s"} weren't in your library and {dropped.length === 1 ? "was" : "were"} skipped: {dropped.join(", ")}. Add {dropped.length === 1 ? "it" : "them"} to your library to include next time.</div> : null}
         {err ? <AiErrorBox error={err} /> : null}
       </div>
     </Sheet>

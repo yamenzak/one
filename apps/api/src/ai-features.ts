@@ -27,9 +27,9 @@ export const AI_FEATURES: AiFeatureMeta[] = [
     audience: "trainer",
     task: "text",
     tonable: false,
-    defaultSystem: `You are a certified strength coach drafting a workout plan.
-Reply with ONLY JSON matching: {"days": [{"name": string, "isRestDay": boolean, "blocks": [{"type": "single"|"superset"|"circuit"|"hiit", "rounds": number|null, "slots": [{"exercise": string, "measurementMode": "reps"|"time", "sets": [{"setType": "warmup"|"working", "reps": number|null, "weightMode": "unspecified"|"bodyweight", "restAfterSec": number}]}]}]}]}.
-Name each exercise by its common name in "exercise" (e.g. "Barbell Back Squat", "Romanian Deadlift"). PREFER exercises from the provided library list when they fit; otherwise name the best exercise for the goal and it will be sourced automatically. 3-6 sets per exercise, sensible rest. Respect injuries, equipment, experience, goals and available days. No commentary.`,
+    defaultSystem: `You are a certified strength coach drafting a workout plan for a specific client.
+Reply with ONLY JSON matching: {"days": [{"name": string, "isRestDay": boolean, "blocks": [{"type": "single"|"superset"|"circuit"|"hiit", "rounds": number|null, "slots": [{"exerciseId": string, "measurementMode": "reps"|"time", "sets": [{"setType": "warmup"|"working", "reps": number|null, "weightMode": "unspecified"|"bodyweight", "restAfterSec": number}]}]}]}]}.
+Choose every exercise ONLY from the provided EXERCISE LIBRARY and set "exerciseId" to that item's exact id — never invent an exercise or use one that is not in the list. Prefer movements the client's equipment/training location supports and work around any stated injuries or limitations. 3-6 sets per exercise, sensible rest, volume and split matched to the client's goal, experience and available days. No commentary.`,
   },
   {
     key: "draft-meal",
@@ -38,7 +38,7 @@ Name each exercise by its common name in "exercise" (e.g. "Barbell Back Squat", 
     audience: "trainer",
     task: "text",
     tonable: false,
-    defaultSystem: `You are a nutrition coach drafting a day of meal options for a specific client. Reply with ONLY JSON: {"mealOptions":[{"mealType":"breakfast"|"lunch"|"dinner"|"snack","mealName":string,"isFree":false,"foods":[{"query":string,"quantity":number,"unit":string,"calories":number,"proteinG":number,"carbsG":number,"fatG":number}]}]}. For each meal list 2-4 real whole foods as short search queries (e.g. "rolled oats", "chicken breast", "blueberries") with a sensible amount — quantity in grams (unit "g") or millilitres (unit "ml"). For each food also give your best macro estimate FOR THAT AMOUNT (calories + protein/carbs/fat in grams) so it can be used if the food isn't in the library. Hit the client's calorie and macro targets and respect their dietary approach. If STYLE EXAMPLES are given, match that coach's style. No commentary.`,
+    defaultSystem: `You are a nutrition coach drafting a day of meal options for a specific client. Reply with ONLY JSON: {"mealOptions":[{"mealType":"breakfast"|"lunch"|"dinner"|"snack","mealName":string,"isFree":false,"foods":[{"foodId":string,"quantity":number,"unit":string}]}]}. Build every meal ONLY from the provided FOOD LIBRARY and set "foodId" to that food's exact id — never invent a food or use one that is not in the list. Give each a sensible quantity in the food's own unit (grams or millilitres). Combine 2-4 foods per meal so the day's options hit the client's calorie and macro targets and respect their dietary approach and any restrictions. If STYLE EXAMPLES are given, match that coach's style. No commentary.`,
   },
   {
     key: "lab-extract",

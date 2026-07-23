@@ -798,25 +798,37 @@ describe("AI model catalog + markup (platform admin)", () => {
   });
 });
 
-describe("AI meal draft — food import from the library", () => {
-  it("resolves drafted food queries to real library food ids", async () => {
+describe("AI meal draft — library-grounded (never fabricated)", () => {
+  it("builds meals ONLY from real library food ids, dropping nothing off-library", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
-    // Seed a food that the mock draft will reference ("rolled oats").
+    // Seed a food; the library-grounded mock draft references it by id.
     const { id: foodId } = (await (await SELF.fetch("http://x/api/foods", { method: "POST", headers: H, body: JSON.stringify({ name: "Rolled Oats", calories: 380, proteinG: 13, carbsG: 67, fatG: 7 }) })).json()) as { id: string };
     const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "MealAI" }) })).json()) as { client: { id: string } };
 
-    const r = (await (await SELF.fetch("http://x/api/ai/draft-meal", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { draft: { mealOptions: { mealType: string; foods: { foodId: string; quantity: number; unit: string }[] }[] } };
+    const r = (await (await SELF.fetch("http://x/api/ai/draft-meal", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { draft: { mealOptions: { mealType: string; foods: { foodId: string; quantity: number; unit: string }[] }[] }; dropped: string[] };
     const breakfast = r.draft.mealOptions.find((o) => o.mealType === "breakfast")!;
     expect(breakfast.foods.length).toBeGreaterThan(0);
-    // The "rolled oats" query resolved to our seeded food id.
-    expect(breakfast.foods.some((f) => f.foodId === foodId)).toBe(true);
+    // Every drafted food is a REAL library row — here, the seeded food id.
+    const all = r.draft.mealOptions.flatMap((o) => o.foods);
+    expect(all.every((f) => f.foodId === foodId)).toBe(true);
     expect(breakfast.foods[0]!.quantity).toBeGreaterThan(0);
-    // A food not in the library ("whey protein") still resolves — to a custom
-    // row minted from the model's macro estimate, so no meal item is dropped.
-    const wheyResolved = breakfast.foods.length >= 2;
-    expect(wheyResolved).toBe(true);
+    // Nothing was fabricated, so nothing was dropped either.
+    expect(r.dropped).toEqual([]);
+  });
+
+  it("refuses to draft meals when the food library is empty", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    // A fresh client in a tenant whose food library is empty — deactivate any
+    // seeded foods first so the library truly has nothing to build from.
+    const foods = (await (await SELF.fetch("http://x/api/foods", { headers: auth(ownerCookie) })).json()) as { foods: { id: string }[] };
+    for (const f of foods.foods) await SELF.fetch(`http://x/api/foods/${f.id}`, { method: "DELETE", headers: auth(ownerCookie) });
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "EmptyLib" }) })).json()) as { client: { id: string } };
+    const res = await SELF.fetch("http://x/api/ai/draft-meal", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) });
+    expect(res.status).toBe(409);
   });
 });
 

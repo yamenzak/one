@@ -47,11 +47,14 @@ async function customFood(db: D1Database, tenantId: string, userId: string, name
 
 export interface FoodEstimate { calories: number; proteinG?: number; carbsG?: number; fatG?: number; servingSize?: number; servingUnit?: string }
 
-/** Resolve a food search query to a real food id: library → web import → custom
- *  (only when the model gave a usable calorie estimate). Null if unresolvable. */
+/** Resolve a food search query to a REAL food id: library → (opt.) web import →
+ *  (opt.) custom row from the model's estimate. `invent` gates that last resort:
+ *  the AI plan path passes `invent=false` so it only ever references foods that
+ *  actually exist in the library — it never fabricates a made-up row. Returns
+ *  null when nothing real matched (the caller drops the item). */
 export async function resolveFoodId(
   env: ResolveEnv, tenantId: string, userId: string, query: string, cfg: Integrations, allowExternal: boolean,
-  estimate: FoodEstimate | null, cache: Map<string, string | null>,
+  estimate: FoodEstimate | null, cache: Map<string, string | null>, invent = true,
 ): Promise<string | null> {
   const key = query.trim().toLowerCase();
   if (!key) return null;
@@ -64,7 +67,7 @@ export async function resolveFoodId(
     const hits = await searchFoodProviders(env.CACHE, cfg, query, 1).catch(() => [] as NormFood[]);
     if (hits[0]) id = await importFood(env.DB, tenantId, userId, hits[0]);
   }
-  if (!id && estimate && estimate.calories > 0) id = await customFood(env.DB, tenantId, userId, query, estimate);
+  if (!id && invent && estimate && estimate.calories > 0) id = await customFood(env.DB, tenantId, userId, query, estimate);
   cache.set(key, id);
   return id;
 }
@@ -96,11 +99,14 @@ async function customExercise(db: D1Database, tenantId: string, userId: string, 
   return id;
 }
 
-/** Resolve an exercise name to a real exercise id: library → web import (with
- *  its photo/gif) → custom. Always returns an id (custom is the last resort). */
+/** Resolve an exercise name to a REAL exercise id: library → (opt.) web import
+ *  (with its photo/gif) → (opt.) custom. `invent` gates that last resort: the AI
+ *  plan path passes `invent=false` so a drafted exercise only ever references a
+ *  real library row — never a fabricated one. Returns null when nothing real
+ *  matched (the caller drops the slot). */
 export async function resolveExerciseId(
   env: ResolveEnv, tenantId: string, userId: string, name: string, cfg: Integrations, allowExternal: boolean,
-  cache: Map<string, string | null>,
+  cache: Map<string, string | null>, invent = true,
 ): Promise<string | null> {
   const key = name.trim().toLowerCase();
   if (!key) return null;
@@ -113,7 +119,7 @@ export async function resolveExerciseId(
     const hits = await searchExerciseProviders(env.CACHE, cfg, name).catch(() => [] as NormExercise[]);
     if (hits[0]) id = await importExercise(env.DB, tenantId, userId, hits[0]);
   }
-  if (!id) id = await customExercise(env.DB, tenantId, userId, name);
+  if (!id && invent) id = await customExercise(env.DB, tenantId, userId, name);
   cache.set(key, id);
   return id;
 }
