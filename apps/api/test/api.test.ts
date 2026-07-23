@@ -1383,6 +1383,44 @@ describe("activities feed (Train tab)", () => {
     // Another tenant can't read this client's activities.
     expect((await SELF.fetch(`http://x/api/logs/activities?clientId=${client.id}&from=2026-06-01&to=2026-07-31`, { headers: auth(otherCookie) })).status).toBe(404);
   });
+
+  it("carries distance + notes, estimates calories from weight, and re-estimates on edit; a typed number locks", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "ActEdit" }) })).json()) as { client: { id: string } };
+    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-01", weightKg: 80 } }) });
+    // No caloriesBurned → server MET-estimates from the 80kg weight.
+    const created = (await (await SELF.fetch("http://x/api/logs/activity", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-02", activityKey: "swimming", durationMin: 60, distanceM: 1500, notes: "pool laps" } }) })).json()) as { id: string; calories: number };
+    expect(created.calories).toBe(480); // swimming MET 6 × 80kg × 1h
+    let list = (await (await SELF.fetch(`http://x/api/logs/activities?clientId=${client.id}&from=2026-07-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as { activities: { id: string; distance_m: number; notes: string; calories: number; calories_locked: number }[] };
+    expect(list.activities[0]!.distance_m).toBe(1500);
+    expect(list.activities[0]!.notes).toBe("pool laps");
+    expect(list.activities[0]!.calories_locked).toBe(0);
+    // Editing the duration re-estimates (still unlocked).
+    await SELF.fetch(`http://x/api/logs/activity/${created.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ clientId: client.id, durationMin: 30 }) });
+    list = (await (await SELF.fetch(`http://x/api/logs/activities?clientId=${client.id}&from=2026-07-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as typeof list;
+    expect(list.activities[0]!.calories).toBe(240);
+    // A typed calorie number locks the row against further re-estimation.
+    await SELF.fetch(`http://x/api/logs/activity/${created.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ clientId: client.id, caloriesBurned: 999 }) });
+    await SELF.fetch(`http://x/api/logs/activity/${created.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ clientId: client.id, durationMin: 10 }) });
+    list = (await (await SELF.fetch(`http://x/api/logs/activities?clientId=${client.id}&from=2026-07-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as typeof list;
+    expect(list.activities[0]!.calories).toBe(999);
+    expect(list.activities[0]!.calories_locked).toBe(1);
+    // Delete removes it.
+    await SELF.fetch(`http://x/api/logs/activity/${created.id}?clientId=${client.id}`, { method: "DELETE", headers: auth(ownerCookie) });
+    list = (await (await SELF.fetch(`http://x/api/logs/activities?clientId=${client.id}&from=2026-07-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as typeof list;
+    expect(list.activities.length).toBe(0);
+  });
+
+  it("estimates activity calories with AI, grounded on the client's body (mock)", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "ActAI" }) })).json()) as { client: { id: string } };
+    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-01", weightKg: 90 } }) });
+    const est = (await (await SELF.fetch("http://x/api/ai/activity-estimate", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, activityKey: "running", durationMin: 40 }) })).json()) as { calories: number; rationale: string };
+    // Mock grounds on the 90kg weight: running MET 9.8 × 90 × (40/60) ≈ 588.
+    expect(est.calories).toBe(Math.round(9.8 * 90 * (40 / 60)));
+  });
 });
 
 describe("weekly nutrition strip (Eat tab)", () => {
