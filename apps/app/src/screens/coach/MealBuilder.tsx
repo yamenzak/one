@@ -14,7 +14,7 @@ import { FoodThumb } from "../food.js";
 
 /** Client daily targets (flat shape, as stored on the active goal). */
 interface Targets { targetCalories?: number; targetProteinG?: number; targetCarbsG?: number; targetFatG?: number }
-interface Plan { id: string; clientId: string; name: string; status: string; body: MealBody; targetGoal?: Record<string, unknown> | null }
+interface Plan { id: string; clientId: string; name: string; status: string; body: MealBody; targetGoal?: Record<string, unknown> | null; variantId?: string | null }
 interface FoodRow { id: string; name: string; serving_size: number; calories: number; protein_g: number; carbs_g: number; fat_g: number }
 const BUILTIN_TYPES = ["breakfast", "lunch", "dinner", "snack", "pre_workout", "post_workout"];
 
@@ -87,16 +87,19 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   }, []);
 
   // Fetch the client's plans (created_at DESC) to offer "Latest plan" as a
-  // seed — the first plan that isn't THIS draft. A quiet miss just disables it.
+  // seed — the most recent plan that isn't THIS draft AND shares its lane
+  // (variant), so a "Cutting" draft doesn't seed from a "Main" plan. A quiet
+  // miss just disables it.
   useEffect(() => {
     const cid = plan?.clientId;
     if (!cid) return;
+    const lane = plan?.variantId ?? null;
     let alive = true;
-    api.get<{ plans: { id: string; name: string; body: MealBody }[] }>(`/api/meal-plans?clientId=${cid}`)
-      .then((r) => { if (!alive) return; setLatestOther(r.plans?.find((pl) => pl.id !== planId) ?? null); setPlansLoaded(true); })
+    api.get<{ plans: { id: string; name: string; body: MealBody; variantId?: string | null }[] }>(`/api/meal-plans?clientId=${cid}`)
+      .then((r) => { if (!alive) return; setLatestOther(r.plans?.find((pl) => pl.id !== planId && (pl.variantId ?? null) === lane) ?? null); setPlansLoaded(true); })
       .catch(() => { if (alive) setPlansLoaded(true); });
     return () => { alive = false; };
-  }, [plan?.clientId, planId]);
+  }, [plan?.clientId, plan?.variantId, planId]);
 
   // Replace the current draft's body with a seed body, then refresh the food
   // reference map so foods referenced by the seed resolve their macros.
