@@ -14,7 +14,7 @@ import { AiErrorBox } from "../../AiError.js";
 import { ExerciseRow, splitList, pretty, type ExerciseInfo } from "../exercise.js";
 import { ExerciseEditor } from "./ExerciseEditor.js";
 
-interface Plan { id: string; clientId: string; name: string; status: string; body: WorkoutBody }
+interface Plan { id: string; clientId: string; name: string; status: string; body: WorkoutBody; variantId?: string | null }
 type ExerciseLite = ExerciseInfo;
 
 const WEIGHT_MODES: { value: WeightMode; label: string; unit?: string }[] = [
@@ -289,16 +289,19 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   }, []);
 
   // Fetch the client's plans (created_at DESC) to offer "Latest plan" as a
-  // seed — the first plan that isn't THIS draft. A quiet miss just disables it.
+  // seed — the most recent plan that isn't THIS draft AND shares its lane
+  // (variant), so seeding stays within the same plan variant. A quiet miss
+  // just disables it.
   useEffect(() => {
     const cid = plan?.clientId;
     if (!cid) return;
+    const lane = plan?.variantId ?? null;
     let alive = true;
-    api.get<{ plans: { id: string; name: string; body: WorkoutBody }[] }>(`/api/workout-plans?clientId=${cid}`)
-      .then((r) => { if (!alive) return; setLatestOther(r.plans?.find((pl) => pl.id !== planId) ?? null); setPlansLoaded(true); })
+    api.get<{ plans: { id: string; name: string; body: WorkoutBody; variantId?: string | null }[] }>(`/api/workout-plans?clientId=${cid}`)
+      .then((r) => { if (!alive) return; setLatestOther(r.plans?.find((pl) => pl.id !== planId && (pl.variantId ?? null) === lane) ?? null); setPlansLoaded(true); })
       .catch(() => { if (alive) setPlansLoaded(true); });
     return () => { alive = false; };
-  }, [plan?.clientId, planId]);
+  }, [plan?.clientId, plan?.variantId, planId]);
 
   // Replace the current draft's body with a seed body, then refresh the library
   // so exercises referenced by ids not yet loaded resolve their name/thumb.
