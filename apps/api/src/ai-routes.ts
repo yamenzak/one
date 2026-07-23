@@ -20,6 +20,13 @@ import { tenantIntegrations, type Integrations } from "./integrations.js";
 import { resolveFoodId, resolveExerciseId, type ResolveEnv } from "./library-resolve.js";
 import { parseJson } from "./db.js";
 
+/** The acting user's display units — every AI context reads the client's numbers
+ *  in the units the viewer expects. */
+async function unitsFor(db: D1Database, userId: string) {
+  const row = await db.prepare("SELECT units_json FROM user_prefs WHERE user_id = ?").bind(userId).first<{ units_json: string | null }>();
+  return resolveUnits(parseJson(row?.units_json ?? null, null));
+}
+
 const SURFACE_FOCUS: Record<string, string> = {
   home: "Give an overall snapshot and the single most useful nudge for right now.",
   train: "Focus on their training — today's workout, recent PRs, load and momentum.",
@@ -444,7 +451,7 @@ export const aiRoutes = new Hono<AppEnv>()
     if ("response" in access) return access.response;
     const rows = await c.env.DB.prepare("SELECT date_local, weight_kg, mood, energy, stress, sleep_hours, notes FROM check_ins WHERE client_id = ? ORDER BY date_local DESC LIMIT 14").bind(access.client.id).all();
     if ((rows.results ?? []).length === 0) return c.json({ error: "no check-ins yet" }, 404);
-    const compLine = await bodyCompLine(c.env.DB, access.client);
+    const ctx = await buildClientContext(c.env, access.client, { today: new Date().toISOString().slice(0, 10), hour: 12, units: await unitsFor(c.env.DB, who.userId) });
 
     const result = await generate(c.env, {
       tenantId: who.tenantId,
@@ -454,7 +461,7 @@ export const aiRoutes = new Hono<AppEnv>()
       task: "text-small",
       expectsJson: true,
       system: sys("checkin-reply"),
-      prompt: [compLine, `CHECK-INS: ${JSON.stringify(rows.results)}`].filter(Boolean).join("\n"),
+      prompt: [ctx.text, `RAW CHECK-INS (last 14): ${JSON.stringify(rows.results)}`].join("\n\n"),
       maxOutputTokens: 400,
       mock: () => JSON.stringify({ summary: `${access.client.display_name} checked in ${(rows.results ?? []).length} times recently. Mood and sleep look steady; weight trending as expected.`, suggestedReply: "Great consistency this week — keep the sleep dialed in and let's push the next session." }),
     });
@@ -464,15 +471,18 @@ export const aiRoutes = new Hono<AppEnv>()
     return c.json({ ...out, credits: result.credits, mocked: result.mocked });
   })
 
-  /** Progress Narrative: aggregates → readable recap (client or trainer). */
+  /** Progress Narrative: the client's own knowledge base → readable recap
+   *  (client or trainer). Built server-side from `buildClientContext` — never
+   *  from numbers the client's device supplies (which could be stale or spoofed);
+   *  any `stats` still sent are appended only as optional colour. */
   .post("/ai/narrative", async (c) => {
     const who = requireTenant(c)!;
-    const parsed = z.object({ clientId: z.string(), stats: z.record(z.string(), z.unknown()) }).safeParse(await c.req.json().catch(() => null));
+    const parsed = z.object({ clientId: z.string(), stats: z.record(z.string(), z.unknown()).optional() }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
     { const g = await gateFeature(c, "aiCoachInsights", access.client.id); if (g) return g; }
-    const compLine = await bodyCompLine(c.env.DB, access.client);
+    const ctx = await buildClientContext(c.env, access.client, { today: new Date().toISOString().slice(0, 10), hour: 12, units: await unitsFor(c.env.DB, who.userId) });
     const result = await generate(c.env, {
       tenantId: who.tenantId,
       actorUserId: who.userId,
@@ -480,7 +490,7 @@ export const aiRoutes = new Hono<AppEnv>()
       feature: "narrative",
       task: "text-small",
       system: sys("narrative"),
-      prompt: [compLine, `STATS: ${JSON.stringify(parsed.data.stats)}`].filter(Boolean).join("\n"),
+      prompt: [ctx.text, parsed.data.stats && Object.keys(parsed.data.stats).length ? `EXTRA STATS FROM APP: ${JSON.stringify(parsed.data.stats)}` : null].filter(Boolean).join("\n\n"),
       maxOutputTokens: 300,
       mock: () => `You've been remarkably consistent this month. Your logging streak and steady weight trend show the habits are sticking — that's the hard part. Keep the momentum, and let's build on this next phase.`,
     });
@@ -538,8 +548,7 @@ export const aiRoutes = new Hono<AppEnv>()
     // training adherence, measurements, check-ins, plans, active stack) PLUS the
     // complete reviewed lab panel and any paused supplements — so the reco reads
     // every data source, not just a handful of labs.
-    const prefRow = await c.env.DB.prepare("SELECT units_json FROM user_prefs WHERE user_id = ?").bind(who.userId).first<{ units_json: string | null }>();
-    const units = resolveUnits(parseJson(prefRow?.units_json ?? null, null));
+    const units = await unitsFor(c.env.DB, who.userId);
     const [ctx, labs, supps] = await Promise.all([
       buildClientContext(c.env, access.client, { today: new Date().toISOString().slice(0, 10), hour: 12, units }),
       c.env.DB.prepare("SELECT display_name, values_json FROM lab_tests WHERE client_id = ? AND status = 'reviewed' ORDER BY created_at DESC LIMIT 30").bind(access.client.id).all<{ display_name: string; values_json: string | null }>(),
@@ -838,8 +847,7 @@ export const aiRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
-    const prefRow = await c.env.DB.prepare("SELECT units_json FROM user_prefs WHERE user_id = ?").bind(who.userId).first<{ units_json: string | null }>();
-    const units = resolveUnits(parseJson(prefRow?.units_json ?? null, null));
+    const units = await unitsFor(c.env.DB, who.userId);
     const ctx = await buildClientContext(c.env, access.client, { today: parsed.data.today ?? new Date().toISOString().slice(0, 10), hour: parsed.data.hour ?? 12, units });
 
     const result = await generate(c.env, {
@@ -878,8 +886,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const today = parsed.data.today ?? new Date().toISOString().slice(0, 10);
     const hour = parsed.data.hour ?? 12;
 
-    const prefRow = await c.env.DB.prepare("SELECT units_json FROM user_prefs WHERE user_id = ?").bind(c.get("user")!.id).first<{ units_json: string | null }>();
-    const units = resolveUnits(parseJson(prefRow?.units_json ?? null, null));
+    const units = await unitsFor(c.env.DB, c.get("user")!.id);
     const ctx = await buildClientContext(c.env, access.client, { today, hour, units });
 
     // Content-hash cache: material change → new key → fresh; else 1h reuse.
