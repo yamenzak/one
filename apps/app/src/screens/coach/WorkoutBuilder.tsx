@@ -5,9 +5,9 @@
  * export-to-template.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@mossa/protocol";
-import { Button, Card, Badge, Field, Input, Select, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, cn, colorToHex, Reveal, SkeletonLine, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, CheckCheck, Save, History, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Input, Select, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, Eyebrow, GlanceStrip, toneVar, type Tone, cn, colorToHex, Reveal, SkeletonLine, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, CheckCheck, Save, History, X, BarChart3, AlertTriangle } from "@mossa/ui";
 import { api, ApiError } from "../../api.js";
 import { ClientPrefsStrip } from "./ClientPrefsStrip.js";
 import { AiErrorBox } from "../../AiError.js";
@@ -141,6 +141,122 @@ function DayCover({ dayName, value, onChange }: { dayName: string; value?: strin
   );
 }
 
+// ── Plan health (live, pure over in-memory days + library) ───────────────────
+// A set counts as "working" when its type isn't a warm-up (working + amrap).
+//
+// Muscle-volume rule: each slot's WORKING-set count is attributed IN FULL to
+// EVERY primary muscle group its exercise lists (comma list via splitList of
+// `muscle_groups`) — a set that trains two primaries counts once toward each,
+// the standard "weekly sets per muscle" convention (so the per-muscle totals
+// can sum to more than the raw working-set count). Exercises the library can't
+// resolve, or with no primary muscle, fall to "Other". We aggregate by the raw
+// muscle-group token (e.g. "quadriceps"), pretty()-labelled at render.
+type ExLib = Map<string, ExerciseLite>;
+
+/** Coarse muscle families — used both to tone-code the bars and to spot a
+ *  major group with zero volume. `re` is tested against the lowercased token. */
+const MUSCLE_MAJORS: { key: string; label: string; tone: Tone; re: RegExp }[] = [
+  { key: "chest", label: "chest", tone: "cardio", re: /chest|pec/ },
+  { key: "back", label: "back", tone: "activity", re: /back|lat|trap|rhomboid|erector/ },
+  { key: "legs", label: "leg", tone: "nutrition", re: /quad|hamstring|glute|calf|calve|adductor|abductor|leg/ },
+  { key: "shoulders", label: "shoulder", tone: "hydration", re: /shoulder|delt/ },
+  { key: "arms", label: "arm", tone: "sleep", re: /bicep|tricep|forearm|arm/ },
+  { key: "core", label: "core", tone: "warning", re: /abdomin|oblique|core/ },
+];
+const muscleMajor = (m: string) => MUSCLE_MAJORS.find((mj) => mj.re.test(m.toLowerCase()));
+const muscleTone = (m: string): Tone => muscleMajor(m)?.tone ?? "neutral";
+
+const isWorking = (s: WorkoutSet) => s.setType !== "warmup";
+
+interface PlanHealth {
+  trainingDays: number;
+  restDays: number;
+  totalSets: number;
+  workingSets: number;
+  warmupSets: number;
+  byMuscle: { muscle: string; sets: number }[];
+  missingMajors: string[];
+  hasExercises: boolean;
+}
+
+function computePlanHealth(days: WorkoutDay[], lib: ExLib): PlanHealth {
+  let trainingDays = 0, restDays = 0, totalSets = 0, workingSets = 0, exerciseCount = 0;
+  const byMuscle = new Map<string, number>();
+  for (const d of days) {
+    if (d.isRestDay) { restDays++; continue; }
+    trainingDays++;
+    for (const b of d.blocks) for (const s of b.slots) {
+      exerciseCount++;
+      const working = s.sets.filter(isWorking).length;
+      totalSets += s.sets.length;
+      workingSets += working;
+      if (working === 0) continue;
+      const primaries = splitList(lib.get(s.exerciseId)?.muscle_groups);
+      const targets = primaries.length ? primaries.map((m) => m.toLowerCase()) : ["Other"];
+      for (const m of targets) byMuscle.set(m, (byMuscle.get(m) ?? 0) + working);
+    }
+  }
+  const ranked = [...byMuscle.entries()].map(([muscle, sets]) => ({ muscle, sets })).sort((a, b) => b.sets - a.sets);
+  const present = new Set(ranked.flatMap(({ muscle }) => (muscleMajor(muscle) ? [muscleMajor(muscle)!.key] : [])));
+  const missingMajors = exerciseCount > 0 ? MUSCLE_MAJORS.filter((mj) => !present.has(mj.key)).map((mj) => mj.label) : [];
+  return { trainingDays, restDays, totalSets, workingSets, warmupSets: totalSets - workingSets, byMuscle: ranked, missingMajors, hasExercises: exerciseCount > 0 };
+}
+
+/** Per-day working-set count + heaviest muscle, for the day-cover cards. */
+function daySummary(day: WorkoutDay, lib: ExLib): { sets: number; topMuscle?: string } {
+  let sets = 0;
+  const bm = new Map<string, number>();
+  for (const b of day.blocks) for (const s of b.slots) {
+    const working = s.sets.filter(isWorking).length;
+    sets += working;
+    if (working === 0) continue;
+    for (const m of splitList(lib.get(s.exerciseId)?.muscle_groups)) bm.set(m.toLowerCase(), (bm.get(m.toLowerCase()) ?? 0) + working);
+  }
+  let topMuscle: string | undefined, top = 0;
+  for (const [m, n] of bm) if (n > top) { top = n; topMuscle = m; }
+  return { sets, topMuscle };
+}
+
+/** A live "is this plan balanced?" read: top-line counts + weekly set-volume by
+ *  muscle group. Renders nothing until the plan has at least one exercise. */
+function PlanHealthCard({ days, lib }: { days: WorkoutDay[]; lib: ExLib }) {
+  const h = useMemo(() => computePlanHealth(days, lib), [days, lib]);
+  if (!h.hasExercises) return null;
+  const top = h.byMuscle.slice(0, 8);
+  const max = top[0]?.sets ?? 1;
+  return (
+    <Card className="space-y-3.5">
+      <Eyebrow>Plan health</Eyebrow>
+      <GlanceStrip
+        items={[
+          { icon: Dumbbell, tone: "activity", value: h.trainingDays, label: h.trainingDays === 1 ? "Training day" : "Training days" },
+          { icon: Moon, tone: "sleep", value: h.restDays, label: h.restDays === 1 ? "Rest day" : "Rest days" },
+          { icon: BarChart3, tone: "primary", value: h.workingSets, label: h.warmupSets > 0 ? `Working sets · +${h.warmupSets} wu` : "Working sets" },
+        ]}
+      />
+      <div className="space-y-2">
+        <div className="px-1 text-[0.7rem] font-medium uppercase tracking-wide text-muted-foreground/80">Weekly sets by muscle</div>
+        <div className="space-y-1.5">
+          {top.map((mv) => (
+            <div key={mv.muscle} className="flex items-center gap-2.5">
+              <span className="w-20 shrink-0 truncate text-xs font-medium">{pretty(mv.muscle)}</span>
+              <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
+                <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.max(6, (mv.sets / max) * 100)}%`, backgroundColor: toneVar[muscleTone(mv.muscle)] }} />
+              </div>
+              <span className="numeral w-5 shrink-0 text-right text-xs font-semibold tabular-nums">{mv.sets}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      {h.missingMajors.length > 0 && (
+        <div className="flex items-center gap-1.5 rounded-xl bg-warning-soft px-3 py-2 text-xs text-warning [&_svg]:size-3.5">
+          <AlertTriangle /> No {h.missingMajors.slice(0, 3).join(" · no ")} volume
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () => void }) {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [days, setDays] = useState<WorkoutDay[]>([]);
@@ -197,6 +313,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
 
   const readOnly = plan?.status === "superseded" || plan?.status === "archived";
   const day = days[dayIdx];
+  const libMap = useMemo(() => new Map(library.map((e) => [e.id, e] as const)), [library]);
   const exOf = (id: string) => library.find((e) => e.id === id);
   const nameOf = (id: string) => exOf(id)?.name ?? "Exercise";
 
@@ -231,11 +348,15 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
 
       <ClientPrefsStrip clientId={plan.clientId} focus="workout" />
 
+      {/* Live "is this plan balanced?" read — volume by muscle group. */}
+      <PlanHealthCard days={days} lib={libMap} />
+
       {/* Day cards — 2 per row, each showing its branded cover; tap to edit. */}
       {days.length > 0 && (
         <div className="grid grid-cols-2 gap-2.5">
           {days.map((d, i) => {
-            const exs = d.blocks.reduce((n, b) => n + b.slots.length, 0);
+            const { sets, topMuscle } = daySummary(d, libMap);
+            const sub = d.isRestDay ? "Rest day" : sets > 0 ? `${sets} set${sets === 1 ? "" : "s"}${topMuscle ? ` · ${pretty(topMuscle)}` : ""}` : "No sets yet";
             return (
               <button key={i} onClick={() => setDayIdx(i)} className={cn("relative aspect-[16/10] overflow-hidden rounded-2xl text-left transition-all active:scale-[0.98]", i === dayIdx && "ring-2 ring-primary ring-offset-2 ring-offset-background")}>
                 {d.imageUrl ? <img src={d.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className="absolute inset-0 bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2" />}
@@ -243,7 +364,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                 {d.isRestDay && <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-[0.6rem] font-semibold text-sleep">Rest</span>}
                 <div className="absolute inset-x-0 bottom-0 p-2.5">
                   <div className="truncate text-sm font-semibold text-white">{d.name || `Day ${i + 1}`}</div>
-                  <div className="text-[0.68rem] text-white/70">{d.isRestDay ? "Rest day" : `${exs} exercise${exs === 1 ? "" : "s"}`}</div>
+                  <div className="truncate text-[0.68rem] text-white/70">{sub}</div>
                 </div>
               </button>
             );
