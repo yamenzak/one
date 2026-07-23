@@ -297,6 +297,11 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "ALTER TABLE clients ADD COLUMN default_lane_label TEXT",
           "ALTER TABLE workout_plans ADD COLUMN variant_id TEXT",
           "ALTER TABLE meal_plans ADD COLUMN variant_id TEXT",
+          // Activity logging: distance (metres, stored metric like everything
+          // else) + a free-text note, so a wearable-sourced session (Whoop /
+          // Apple Health / Fitbit) can carry its distance and any context.
+          "ALTER TABLE activity_logs ADD COLUMN distance_m REAL",
+          "ALTER TABLE activity_logs ADD COLUMN notes TEXT",
         ];
         for (const sql of alters) await db.exec(sql).catch(() => undefined);
         // Backfill: older body scans mirrored only weight + body-fat into

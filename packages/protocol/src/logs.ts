@@ -32,7 +32,9 @@ export const LogWorkoutSets = z.object({
 });
 export type LogWorkoutSets = z.infer<typeof LogWorkoutSets>;
 
-/** Freestyle activity (24 MET activities or a custom label). */
+/** Freestyle activity (a MET-catalog sport/workout or a custom label). Numeric
+ *  fields are meant to be typed straight from a wearable (Whoop / Apple Health /
+ *  Fitbit) — or left blank and estimated. */
 export const LogActivity = z.object({
   date: LocalDate,
   activityKey: z.string().max(40).nullish(),
@@ -40,6 +42,9 @@ export const LogActivity = z.object({
   startTime: z.string().max(8).nullish(), // HH:MM local
   durationMin: z.number().int().positive(),
   avgHrBpm: z.number().int().positive().nullish(),
+  /** Distance in metres (stored metric; displayed in the client's length unit). */
+  distanceM: z.number().min(0).nullish(),
+  notes: z.string().max(300).nullish(),
   /** Manual override; omitted -> server estimates from MET × weight. */
   caloriesBurned: z.number().int().min(0).nullish(),
 });

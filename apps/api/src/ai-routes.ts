@@ -7,7 +7,7 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { WorkoutBody, MUSCLE_GROUPS, EQUIPMENT_TYPES, normalizeMuscle, normalizeEquipment } from "@mossa/protocol";
-import { resolveUnits } from "@mossa/domain";
+import { resolveUnits, activityByKey, estimateBurnedCalories } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { gateFeature, resolveClientFlagsFor } from "./client-flags.js";
@@ -774,6 +774,38 @@ export const aiRoutes = new Hono<AppEnv>()
       fiberG: numField(raw.fiberG), sugarG: numField(raw.sugarG), sodiumMg: numField(raw.sodiumMg),
     };
     return c.json({ food, credits: result.credits, mocked: result.mocked });
+  })
+
+  /** Activity calorie estimate (client-facing) — for when the user doesn't have
+   *  the number from their watch/Whoop/Apple Health. Grounded on the client's
+   *  body + training so the estimate fits THEM, not a generic MET table. */
+  .post("/ai/activity-estimate", async (c) => {
+    const who = requireTenant(c)!;
+    const parsed = z
+      .object({ clientId: z.string(), activityKey: z.string().max(40).optional(), label: z.string().max(80).optional(), durationMin: z.number().int().positive(), avgHrBpm: z.number().int().positive().nullish(), distanceM: z.number().min(0).nullish() })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, parsed.data.clientId);
+    if ("response" in access) return access.response;
+    { const g = await gateFeature(c, "aiSuite"); if (g) return g; }
+    const p = parsed.data;
+    const activityLabel = p.label?.trim() || activityByKey(p.activityKey ?? "other").label;
+    const ctx = await buildClientContext(c.env, access.client, { today: new Date().toISOString().slice(0, 10), hour: 12, units: await unitsFor(c.env.DB, who.userId), sections: ["client", "body", "training"] });
+    const detail = `ACTIVITY: ${activityLabel}, ${p.durationMin} min${p.distanceM ? `, ${(p.distanceM / 1000).toFixed(2)} km` : ""}${p.avgHrBpm ? `, avg HR ${p.avgHrBpm} bpm` : ""}.`;
+    const result = await generate(c.env, {
+      tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
+      feature: "activity-estimate", task: "text-small", expectsJson: true, system: sys("activity-estimate"),
+      prompt: [ctx.text, detail, "Estimate the calories burned for THIS client."].join("\n\n"), maxOutputTokens: 200,
+      mock: () => {
+        const kg = ctx.knowledge.body.weightKg ?? 75;
+        const kcal = estimateBurnedCalories({ met: activityByKey(p.activityKey ?? "other").met, weightKg: kg, durationMin: p.durationMin, avgHrBpm: p.avgHrBpm });
+        return JSON.stringify({ calories: kcal || Math.round(p.durationMin * 7), avgHrBpm: p.avgHrBpm ?? null, rationale: `Based on ${activityLabel.toLowerCase()} for ${p.durationMin} min at ${Math.round(kg)}kg.` });
+      },
+    });
+    if (!result.ok) return aiFail(c, result);
+    const out = extractJson<{ calories?: number; avgHrBpm?: number | null; rationale?: string }>(result.output);
+    if (!out || typeof out.calories !== "number" || !(out.calories >= 0)) return c.json({ error: "Couldn't estimate that activity.", raw: result.output.slice(0, 800), mocked: result.mocked }, 422);
+    return c.json({ calories: Math.round(out.calories), avgHrBpm: out.avgHrBpm ?? null, rationale: out.rationale ?? "", credits: result.credits, mocked: result.mocked });
   })
 
   /** Recommend a recipe from a meal option's foods (client-facing). */

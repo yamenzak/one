@@ -6,41 +6,114 @@
  * MET values from the Compendium of Physical Activities (Ainsworth).
  */
 
+/** Grouping for the activity picker (drives sections + a category fallback icon
+ *  in the app). Kept coarse so the list stays browsable. */
+export type ActivityCategory = "cardio" | "strength" | "sport" | "water" | "studio" | "combat" | "winter" | "other";
+
+export const ACTIVITY_CATEGORY_META: { key: ActivityCategory; label: string }[] = [
+  { key: "cardio", label: "Cardio" },
+  { key: "strength", label: "Strength & calisthenics" },
+  { key: "sport", label: "Sports" },
+  { key: "water", label: "Water" },
+  { key: "studio", label: "Studio & mind-body" },
+  { key: "combat", label: "Combat" },
+  { key: "winter", label: "Winter" },
+  { key: "other", label: "Other" },
+];
+
 export interface ActivityDef {
   key: string;
   label: string;
   met: number;
+  category: ActivityCategory;
 }
 
+/**
+ * The activity catalog — key/label/MET/category. MET values from the Compendium
+ * of Physical Activities (Ainsworth). Existing keys are kept stable so already-
+ * logged rows still resolve. Bodyweight moves (push-ups, pull-ups…) live here as
+ * DURATION-based activities for quick casual logging; the exercise library still
+ * holds their rep-based counterparts for structured plans. `other` stays LAST —
+ * `activityByKey` falls back to it.
+ */
 export const ACTIVITIES: ActivityDef[] = [
-  { key: "walking", label: "Walking", met: 3.5 },
-  { key: "running", label: "Running", met: 9.8 },
-  { key: "jogging", label: "Jogging", met: 7.0 },
-  { key: "cycling", label: "Cycling", met: 7.5 },
-  { key: "swimming", label: "Swimming", met: 6.0 },
-  { key: "hiking", label: "Hiking", met: 6.0 },
-  { key: "yoga", label: "Yoga", met: 2.5 },
-  { key: "pilates", label: "Pilates", met: 3.0 },
-  { key: "football", label: "Football", met: 7.0 },
-  { key: "basketball", label: "Basketball", met: 6.5 },
-  { key: "tennis", label: "Tennis", met: 7.3 },
-  { key: "padel", label: "Padel", met: 7.0 },
-  { key: "badminton", label: "Badminton", met: 5.5 },
-  { key: "squash", label: "Squash", met: 7.3 },
-  { key: "volleyball", label: "Volleyball", met: 4.0 },
-  { key: "dancing", label: "Dancing", met: 5.0 },
-  { key: "boxing", label: "Boxing", met: 9.0 },
-  { key: "martial_arts", label: "Martial arts", met: 10.3 },
-  { key: "rowing", label: "Rowing", met: 7.0 },
-  { key: "elliptical", label: "Elliptical", met: 5.0 },
-  { key: "hiit", label: "HIIT", met: 8.0 },
-  { key: "weightlifting", label: "Weightlifting", met: 3.5 },
-  { key: "stretching", label: "Stretching", met: 2.3 },
-  { key: "other", label: "Other", met: 4.0 },
+  // Cardio
+  { key: "walking", label: "Walking", met: 3.5, category: "cardio" },
+  { key: "brisk_walking", label: "Brisk walking", met: 4.3, category: "cardio" },
+  { key: "running", label: "Running", met: 9.8, category: "cardio" },
+  { key: "jogging", label: "Jogging", met: 7.0, category: "cardio" },
+  { key: "treadmill", label: "Treadmill", met: 8.0, category: "cardio" },
+  { key: "cycling", label: "Cycling", met: 7.5, category: "cardio" },
+  { key: "spinning", label: "Spin class", met: 8.5, category: "cardio" },
+  { key: "elliptical", label: "Elliptical", met: 5.0, category: "cardio" },
+  { key: "rowing", label: "Rowing", met: 7.0, category: "cardio" },
+  { key: "stair_climbing", label: "Stair climbing", met: 8.0, category: "cardio" },
+  { key: "jump_rope", label: "Jump rope", met: 11.0, category: "cardio" },
+  { key: "hiking", label: "Hiking", met: 6.0, category: "cardio" },
+  // Strength & calisthenics
+  { key: "push_ups", label: "Push-ups", met: 8.0, category: "strength" },
+  { key: "pull_ups", label: "Pull-ups", met: 8.0, category: "strength" },
+  { key: "dips", label: "Dips", met: 8.0, category: "strength" },
+  { key: "burpees", label: "Burpees", met: 8.0, category: "strength" },
+  { key: "calisthenics", label: "Calisthenics", met: 5.0, category: "strength" },
+  { key: "core_abs", label: "Core & abs", met: 3.8, category: "strength" },
+  { key: "kettlebell", label: "Kettlebell", met: 9.8, category: "strength" },
+  { key: "crossfit", label: "CrossFit", met: 8.0, category: "strength" },
+  { key: "circuit_training", label: "Circuit training", met: 7.0, category: "strength" },
+  { key: "hiit", label: "HIIT", met: 8.0, category: "strength" },
+  { key: "weightlifting", label: "Weightlifting", met: 3.5, category: "strength" },
+  // Sports
+  { key: "football", label: "Football", met: 7.0, category: "sport" },
+  { key: "basketball", label: "Basketball", met: 6.5, category: "sport" },
+  { key: "tennis", label: "Tennis", met: 7.3, category: "sport" },
+  { key: "padel", label: "Padel", met: 7.0, category: "sport" },
+  { key: "badminton", label: "Badminton", met: 5.5, category: "sport" },
+  { key: "squash", label: "Squash", met: 7.3, category: "sport" },
+  { key: "volleyball", label: "Volleyball", met: 4.0, category: "sport" },
+  { key: "table_tennis", label: "Table tennis", met: 4.0, category: "sport" },
+  { key: "golf", label: "Golf", met: 4.8, category: "sport" },
+  { key: "cricket", label: "Cricket", met: 5.0, category: "sport" },
+  { key: "rugby", label: "Rugby", met: 8.3, category: "sport" },
+  { key: "handball", label: "Handball", met: 8.0, category: "sport" },
+  { key: "field_hockey", label: "Hockey", met: 7.8, category: "sport" },
+  { key: "rock_climbing", label: "Climbing", met: 8.0, category: "sport" },
+  { key: "skateboarding", label: "Skateboarding", met: 5.0, category: "sport" },
+  // Water
+  { key: "swimming", label: "Swimming", met: 6.0, category: "water" },
+  { key: "swimming_laps", label: "Swimming (laps)", met: 8.3, category: "water" },
+  { key: "water_aerobics", label: "Water aerobics", met: 5.5, category: "water" },
+  { key: "surfing", label: "Surfing", met: 5.0, category: "water" },
+  { key: "kayaking", label: "Kayaking", met: 5.0, category: "water" },
+  { key: "paddleboarding", label: "Paddleboarding", met: 6.0, category: "water" },
+  // Studio & mind-body
+  { key: "yoga", label: "Yoga", met: 2.5, category: "studio" },
+  { key: "pilates", label: "Pilates", met: 3.0, category: "studio" },
+  { key: "barre", label: "Barre", met: 3.5, category: "studio" },
+  { key: "dancing", label: "Dancing", met: 5.0, category: "studio" },
+  { key: "stretching", label: "Stretching", met: 2.3, category: "studio" },
+  // Combat
+  { key: "boxing", label: "Boxing", met: 9.0, category: "combat" },
+  { key: "kickboxing", label: "Kickboxing", met: 10.0, category: "combat" },
+  { key: "martial_arts", label: "Martial arts", met: 10.3, category: "combat" },
+  { key: "wrestling", label: "Wrestling", met: 6.0, category: "combat" },
+  // Winter
+  { key: "skiing", label: "Skiing", met: 7.0, category: "winter" },
+  { key: "snowboarding", label: "Snowboarding", met: 5.3, category: "winter" },
+  { key: "ice_skating", label: "Ice skating", met: 7.0, category: "winter" },
+  // Fallback (must stay last)
+  { key: "other", label: "Other", met: 4.0, category: "other" },
 ];
 
 export const activityByKey = (key: string): ActivityDef =>
   ACTIVITIES.find((a) => a.key === key) ?? ACTIVITIES[ACTIVITIES.length - 1]!;
+
+/** The catalog grouped into category sections (category order), skipping empties.
+ *  Drives the sectioned activity picker. */
+export function activitiesByCategory(): { key: ActivityCategory; label: string; activities: ActivityDef[] }[] {
+  return ACTIVITY_CATEGORY_META.map((c) => ({ ...c, activities: ACTIVITIES.filter((a) => a.category === c.key) })).filter(
+    (g) => g.activities.length > 0,
+  );
+}
 
 /** Heart-rate intensity factor bands (avg bpm). */
 export function hrFactor(avgHrBpm?: number | null): number {

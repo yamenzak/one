@@ -159,6 +159,15 @@ Be specific and practical, but concise — finish every section. No title, no pr
     defaultSystem: `You estimate nutrition for a food from its name. Reply with ONLY JSON: {"servingSize": number, "servingUnit": "g"|"ml", "calories": number, "proteinG": number, "carbsG": number, "fatG": number, "fiberG": number, "sugarG": number, "sodiumMg": number}. Use a realistic common serving size and accurate typical values for that food. Numbers only.`,
   },
   {
+    key: "activity-estimate",
+    label: "Estimate activity calories",
+    description: "Estimate calories burned for an activity, personalised to the client's body and fitness.",
+    audience: "client",
+    task: "text-small",
+    tonable: false,
+    defaultSystem: `You estimate energy expenditure for ONE physical activity, personalised to the specific client whose body and training context are provided. Reply with ONLY JSON: {"calories": number, "avgHrBpm": number|null, "rationale": string}. Base the kcal on the activity and its duration, any distance or heart rate given, and the client's body weight, composition and typical training intensity — a heavier or fitter client burns differently. If no heart rate was provided, estimate a realistic average for this effort (else null). Keep rationale to one short sentence. Numbers only, no commentary.`,
+  },
+  {
     key: "meal-recipe",
     label: "Recommend a recipe",
     description: "Turn a meal option's foods into a simple recipe the client can cook.",

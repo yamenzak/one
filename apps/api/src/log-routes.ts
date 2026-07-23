@@ -239,7 +239,7 @@ export const logRoutes = new Hono<AppEnv>()
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
     const rows = await c.env.DB.prepare(
-      "SELECT id, date_local, activity_key, label, start_time, duration_min, avg_hr_bpm, calories FROM activity_logs WHERE client_id = ? AND date_local >= ? AND date_local <= ? ORDER BY date_local DESC, created_at DESC LIMIT 60",
+      "SELECT id, date_local, activity_key, label, start_time, duration_min, avg_hr_bpm, distance_m, notes, calories, calories_locked FROM activity_logs WHERE client_id = ? AND date_local >= ? AND date_local <= ? ORDER BY date_local DESC, created_at DESC LIMIT 60",
     )
       .bind(clientId, from ?? "0000", to ?? "9999")
       .all();
@@ -289,7 +289,7 @@ export const logRoutes = new Hono<AppEnv>()
     }
     const id = newId("act");
     await c.env.DB.prepare(
-      "INSERT INTO activity_logs (id, tenant_id, client_id, date_local, activity_key, label, start_time, duration_min, avg_hr_bpm, calories, calories_locked, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO activity_logs (id, tenant_id, client_id, date_local, activity_key, label, start_time, duration_min, avg_hr_bpm, distance_m, notes, calories, calories_locked, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
       .bind(
         id,
@@ -301,12 +301,78 @@ export const logRoutes = new Hono<AppEnv>()
         d.startTime ?? null,
         d.durationMin,
         d.avgHrBpm ?? null,
+        d.distanceM ?? null,
+        d.notes ?? null,
         calories,
         locked ? 1 : 0,
         nowIso(),
       )
       .run();
     return c.json({ ok: true, id, calories }, 201);
+  })
+
+  // Edit a logged activity. A user/wearable calorie number locks the row; if
+  // duration/activity/HR change and calories aren't locked, re-estimate.
+  .patch("/logs/activity/:id", async (c) => {
+    const parsed = z
+      .object({
+        clientId: z.string(),
+        activityKey: z.string().max(40).nullish(),
+        label: z.string().max(80).nullish(),
+        startTime: z.string().max(8).nullish(),
+        durationMin: z.number().int().positive().optional(),
+        avgHrBpm: z.number().int().positive().nullish(),
+        distanceM: z.number().min(0).nullish(),
+        notes: z.string().max(300).nullish(),
+        caloriesBurned: z.number().int().min(0).nullish(),
+      })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, parsed.data.clientId);
+    if ("response" in access) return access.response;
+    const d = parsed.data;
+    const row = await c.env.DB.prepare("SELECT activity_key, duration_min, avg_hr_bpm, calories_locked FROM activity_logs WHERE id = ? AND client_id = ?")
+      .bind(c.req.param("id"), access.client.id)
+      .first<{ activity_key: string | null; duration_min: number; avg_hr_bpm: number | null; calories_locked: number }>();
+    if (!row) return c.json({ error: "not found" }, 404);
+
+    const map: Record<string, unknown> = {
+      activity_key: d.activityKey, label: d.label, start_time: d.startTime,
+      duration_min: d.durationMin, avg_hr_bpm: d.avgHrBpm, distance_m: d.distanceM, notes: d.notes,
+    };
+    // Calories: an explicit number locks; otherwise re-estimate when a driver
+    // changed and the row isn't already a locked (user-supplied) value.
+    if (d.caloriesBurned != null) {
+      map.calories = d.caloriesBurned;
+      map.calories_locked = 1;
+    } else if (!row.calories_locked && (d.durationMin !== undefined || d.activityKey !== undefined || d.avgHrBpm !== undefined)) {
+      const weight = await c.env.DB.prepare("SELECT weight_kg FROM measurements WHERE client_id = ? AND weight_kg IS NOT NULL ORDER BY date_local DESC LIMIT 1").bind(access.client.id).first<{ weight_kg: number }>();
+      if (weight?.weight_kg) {
+        map.calories = estimateBurnedCalories({
+          met: activityByKey((d.activityKey ?? row.activity_key) ?? "other").met,
+          weightKg: weight.weight_kg,
+          durationMin: d.durationMin ?? row.duration_min,
+          avgHrBpm: d.avgHrBpm !== undefined ? d.avgHrBpm : row.avg_hr_bpm,
+        });
+      }
+    }
+    const sets = Object.entries(map).filter(([, v]) => v !== undefined);
+    if (!sets.length) return c.json({ ok: true });
+    await c.env.DB.prepare(`UPDATE activity_logs SET ${sets.map(([k]) => `${k} = ?`).join(", ")} WHERE id = ? AND client_id = ?`)
+      .bind(...sets.map(([, v]) => v), c.req.param("id"), access.client.id)
+      .run();
+    return c.json({ ok: true, calories: map.calories });
+  })
+
+  .delete("/logs/activity/:id", async (c) => {
+    const clientId = c.req.query("clientId");
+    if (!clientId) return c.json({ error: "clientId required" }, 400);
+    const access = await requireClientAccess(c, clientId);
+    if ("response" in access) return access.response;
+    await c.env.DB.prepare("DELETE FROM activity_logs WHERE id = ? AND client_id = ?")
+      .bind(c.req.param("id"), access.client.id)
+      .run();
+    return c.json({ ok: true });
   })
 
   // ── Food diary. ────────────────────────────────────────────────────────────
