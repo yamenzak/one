@@ -50,6 +50,8 @@ export interface Branding {
   iconUrl?: string | null;
   /** Avatar for the AI coach persona (falls back to a bottts robot). */
   aiAvatarUrl?: string | null;
+  /** Name for the AI coach persona (falls back to "Coach"). */
+  aiName?: string | null;
   /** Granular token overrides (e.g. from a pasted shadcn theme). */
   tokens?: BrandTokens | null;
 }

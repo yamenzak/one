@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy, kcalToDisplay, featureEnabled } from "@mossa/domain";
-import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, ConfirmDialog, useModalOverlay, Utensils, ShoppingCart, Plus, Minus, Sparkles, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw } from "@mossa/ui";
+import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, ConfirmDialog, useModalOverlay, Utensils, ShoppingCart, Plus, Minus, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
@@ -521,7 +521,7 @@ function OptionDetailSheet({ opt, index, units, foods, foodMap, image, logged, l
             {opt.notes && <p className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-muted-foreground">{opt.notes}</p>}
             {aiMealTools && opt.foods.length > 0 && (
               <Button size="sm" variant="tonal" className="w-full" disabled={recipeBusy} onClick={onRecipe}>
-                <Sparkles /> {recipeBusy ? "Cooking up a recipe…" : "Recommend a recipe"}
+                <AiAvatar className="size-5" /> {recipeBusy ? "Cooking up a recipe…" : "Recommend a recipe"}
               </Button>
             )}
             {hasMicros && (

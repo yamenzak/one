@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Button, Sparkles } from "@mossa/ui";
+import { Button } from "@mossa/ui";
 import { featureEnabled } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -43,7 +43,7 @@ export function SupplementGuide({ clientId }: { clientId: string }) {
     <div className="px-1">
       {!guide ? (
         <Button variant="tonal" size="sm" disabled={busy} onClick={() => void ask()}>
-          <Sparkles /> {busy ? "Thinking…" : "Explain my supplements"}
+          <AiAvatar className="size-5" /> {busy ? "Thinking…" : "Explain my supplements"}
         </Button>
       ) : (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} className="flex items-start gap-3">

@@ -13,7 +13,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { kcalToDisplay, displayToKcal, energyLabel, featureEnabled, type UnitPrefs } from "@mossa/domain";
-import { FixedDrawer, Button, Field, Chip, SegmentedControl, cn, toneSoft, METRICS, Utensils, Barcode, ChevronDown, Sparkles, Globe, PencilLine, ScanLine, Search, Plus, X, ArrowLeft } from "@mossa/ui";
+import { FixedDrawer, Button, Field, Chip, SegmentedControl, cn, toneSoft, METRICS, Utensils, Barcode, ChevronDown, Globe, PencilLine, ScanLine, Search, Plus, X, ArrowLeft } from "@mossa/ui";
+import { AiAvatar } from "../../AiAvatar.js";
 import { api, uploadMedia } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
@@ -227,7 +228,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                     the entitlement unlocks (no 2×N grid reflow). The AI-powered
                     paths lead and are badged so they read as first-class. */}
                 <div className="space-y-2">
-                  {aiMealTools && <ModeRow icon={Sparkles} tone="primary" smart label="Estimate with AI" hint="Fill the macros from the name" busy={aiBusy} disabled={f.name.trim().length < 2} onClick={() => void estimateFromName()} />}
+                  {aiMealTools && <ModeRow icon={AiAvatar} tone="primary" smart label="Estimate with AI" hint="Fill the macros from the name" busy={aiBusy} disabled={f.name.trim().length < 2} onClick={() => void estimateFromName()} />}
                   {aiMealTools && <ModeRow icon={ScanLine} tone="nutrition" smart label="Scan nutrition label" hint="Read the panel with your camera" onClick={() => labelInputRef.current?.click()} />}
                   <ModeRow icon={Globe} tone="cardio" label="Search web & barcode" hint="Find it in food databases" active={webMode} onClick={() => setWebMode((v) => !v)} />
                   <ModeRow icon={PencilLine} tone="neutral" label="Enter manually" hint="Type the values yourself" disabled={f.name.trim().length < 2} onClick={() => setStep("review")} />

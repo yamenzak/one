@@ -122,7 +122,7 @@ export const contextRoutes = new Hono<AppEnv>()
     const widgets = parseJson<SessionContext["user"]["widgets"]>(prefRow?.widgets_json ?? null, {});
 
     const ctx: SessionContext = {
-      user: { id: user.id, email: user.email, name: user.name ?? null, units, widgets },
+      user: { id: user.id, email: user.email, name: user.name ?? null, image: user.image ?? null, units, widgets },
       personas,
       active,
       mode: "coach", // the app decides coach/train client-side; server default

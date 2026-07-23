@@ -126,11 +126,11 @@ export function NavRail({ tabs, active, onSelect, footer, brand, tinted }: { tab
 }
 
 // ── Timeline feed ────────────────────────────────────────────────────────────
-export function InsightCard({ timestamp, title, ai, tone, children, onFeedback }: { timestamp: string; title: string; ai?: boolean; tone?: "default" | "primary"; children?: ReactNode; onFeedback?: (v: 1 | -1) => void }) {
+export function InsightCard({ timestamp, title, ai, aiGlyph, tone, children, onFeedback }: { timestamp: string; title: string; ai?: boolean; aiGlyph?: ReactNode; tone?: "default" | "primary"; children?: ReactNode; onFeedback?: (v: 1 | -1) => void }) {
   return (
     <motion.article initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.4 }} className="py-3">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        {ai && <Sparkles className="size-4 text-primary" />}
+        {ai && (aiGlyph ?? <Sparkles className="size-4 text-primary" />)}
         <span>{timestamp}</span>
       </div>
       <h3 className={cn("mt-1 text-xl font-semibold tracking-tight", tone === "primary" ? "text-foreground" : "text-foreground")}>{title}</h3>

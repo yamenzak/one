@@ -254,7 +254,7 @@ function TabLayout() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="rounded-full outline-none ring-ring focus-visible:ring-2" aria-label="Account">
-                  <Avatar name={ctx!.user.name || ctx!.user.email} seed={ctx!.user.email} className="size-9" />
+                  <Avatar name={ctx!.user.name || ctx!.user.email} src={ctx!.user.image} seed={ctx!.user.email} className="size-9" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>

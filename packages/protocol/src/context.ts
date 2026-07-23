@@ -25,6 +25,8 @@ export interface TenantBranding {
   iconUrl?: string | null;
   /** Studio's avatar for the AI coach persona; falls back to a bottts robot. */
   aiAvatarUrl?: string | null;
+  /** Studio's name for its AI (e.g. "Nova", "Coach K"); falls back to "Coach". */
+  aiName?: string | null;
   /** Granular per-mode CSS-variable overrides (e.g. a pasted shadcn theme). */
   tokens?: { light?: Record<string, string> | null; dark?: Record<string, string> | null } | null;
   /** Sign-in screen copy + affordances, shown on the tenant's branded login
@@ -63,7 +65,7 @@ export interface WidgetPrefs {
 }
 
 export interface SessionContext {
-  user: { id: string; email: string; name: string | null; units: UnitPrefs; widgets: WidgetPrefs };
+  user: { id: string; email: string; name: string | null; image: string | null; units: UnitPrefs; widgets: WidgetPrefs };
   /** Every (tenant, role) pair the user holds — feeds the context switcher. */
   personas: PersonaRef[];
   /** The active persona (null until one is chosen). */

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@mossa/protocol";
 import { Button, Card, Badge, Field, Input, Select, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, Eyebrow, GlanceStrip, IconBadge, ConfirmDialog, toneVar, type Tone, cn, colorToHex, Reveal, SkeletonLine, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, CheckCheck, Save, History, LayoutGrid, X, BarChart3, AlertTriangle } from "@mossa/ui";
 import { api, ApiError } from "../../api.js";
+import { AiAvatar } from "../../AiAvatar.js";
 import { ClientPrefsStrip } from "./ClientPrefsStrip.js";
 import { AiErrorBox } from "../../AiError.js";
 import { ExerciseRow, splitList, pretty, type ExerciseInfo } from "../exercise.js";
@@ -112,13 +113,13 @@ function DayCover({ dayName, value, onChange }: { dayName: string; value?: strin
           <img src={value} alt="" className="h-32 w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
           <div className="absolute right-2 top-2 flex gap-1.5">
-            <button onClick={() => setPickOpen(true)} disabled={busy} className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><Sparkles /> {busy ? "…" : "Restyle"}</button>
+            <button onClick={() => setPickOpen(true)} disabled={busy} className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><AiAvatar className="size-3.5" /> {busy ? "…" : "Restyle"}</button>
             <button onClick={() => onChange(null)} aria-label="Remove cover" className="grid size-7 place-items-center rounded-full bg-black/50 text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><Trash2 /></button>
           </div>
         </div>
       ) : (
         <button onClick={() => setPickOpen(true)} disabled={busy} className="flex h-24 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface-2 text-sm text-muted-foreground transition-colors hover:bg-surface-3 disabled:opacity-60 [&_svg]:size-4">
-          {busy ? <><span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> Generating cover…</> : <><Sparkles /> Generate a branded day cover</>}
+          {busy ? <><span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> Generating cover…</> : <><AiAvatar className="size-4" /> Generate a branded day cover</>}
         </button>
       )}
       {err && <p className="text-xs text-warning">{err}</p>}
@@ -434,7 +435,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
 
       <Stagger className="space-y-4">
       {days.length === 0 ? (
-        <EmptyState icon={Dumbbell} title="Empty plan" description="Add a day, or let AI draft one from the client's intake." action={<Button onClick={() => setAiOpen(true)}><Sparkles /> AI draft plan</Button>} />
+        <EmptyState icon={Dumbbell} title="Empty plan" description="Add a day, or let AI draft one from the client's intake." action={<Button onClick={() => setAiOpen(true)}><AiAvatar className="size-5" /> AI draft plan</Button>} />
       ) : day ? (
         <>
           <Card className="space-y-3">
@@ -496,7 +497,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
           {!day.isRestDay && (
             <div className="flex gap-2">
               <Button variant="ghost" className="flex-1" onClick={() => mutate((d) => d[dayIdx]!.blocks.push(emptyBlock()))}><Plus /> Block</Button>
-              <Button variant="ghost" className="flex-1" onClick={() => setAiOpen(true)}><Sparkles /> AI draft</Button>
+              <Button variant="ghost" className="flex-1" onClick={() => setAiOpen(true)}><AiAvatar className="size-5" /> AI draft</Button>
             </div>
           )}
         </>

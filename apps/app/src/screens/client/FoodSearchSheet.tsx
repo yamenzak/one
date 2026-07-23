@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { kcalToDisplay, scaleFood, servingsToQuantity, SERVING_PRESETS, type UnitPrefs } from "@mossa/domain";
-import { Button, Field, Sheet, Chip, SegmentedControl, IconBadge, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, Sparkles, ChevronRight, Plus, X } from "@mossa/ui";
+import { Button, Field, Sheet, Chip, SegmentedControl, IconBadge, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, ChevronRight, Plus, X } from "@mossa/ui";
 import { api, todayLocal, uploadMedia } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
@@ -337,7 +337,7 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
                 <span aria-hidden className="pointer-events-none absolute -right-6 -top-10 size-32 rounded-full bg-white/20 blur-2xl" />
                 <span className="relative grid size-12 shrink-0 place-items-center rounded-2xl bg-white/20 [&_svg]:size-6"><Camera /></span>
                 <span className="relative min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5 font-semibold"><Sparkles className="size-4" /> Snap a meal</span>
+                  <span className="flex items-center gap-1.5 font-semibold"><AiAvatar className="size-4" /> Snap a meal</span>
                   <span className="mt-0.5 block text-sm text-primary-foreground/80">Photo → macros in seconds</span>
                 </span>
                 <ChevronRight className="relative size-5 shrink-0 opacity-80" />

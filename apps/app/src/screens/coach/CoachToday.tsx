@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fmtWeight, type AttentionType } from "@mossa/domain";
-import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, CountUp, cn, type Tone, type LucideIcon } from "@mossa/ui";
+import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, Avatar, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, CountUp, cn, type Tone, type LucideIcon } from "@mossa/ui";
 import { attentionCoding, SEVERITY_TONE } from "../../attention-ui.js";
 import type { WidgetItem } from "@mossa/protocol";
 import { api, todayLocal } from "../../api.js";
@@ -167,7 +167,10 @@ export function CoachToday() {
             <SectionHeader icon={Bell} tone="danger" title="Needs attention" action={<Badge tone="danger">{attention.total}</Badge>} />
             {attention.clients.slice(0, 12).map((row) => (
               <div key={row.clientId} className="space-y-1.5 border-t border-border/40 pt-3 first:border-0 first:pt-0">
-                <button onClick={() => nav(row.items[0]!.link)} className="truncate text-left text-sm font-semibold hover:underline">{row.name}</button>
+                <button onClick={() => nav(row.items[0]!.link)} className="flex items-center gap-2 text-left hover:underline">
+                  <Avatar name={row.name} src={row.avatarUrl} seed={row.clientId} className="size-7" />
+                  <span className="truncate text-sm font-semibold">{row.name}</span>
+                </button>
                 <div className="flex flex-wrap gap-1.5">
                   {row.items.map((it) => {
                     const cd = attentionCoding(it.type);

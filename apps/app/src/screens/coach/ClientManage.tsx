@@ -152,7 +152,7 @@ export function ClientManage({ clientId }: { clientId: string }) {
       <section className="space-y-2">
         <Eyebrow action={
           <div className="flex gap-2">
-            <Button size="sm" variant="tonal" onClick={() => setSuggestOpen(true)}><Sparkles /> Suggest</Button>
+            <Button size="sm" variant="tonal" onClick={() => setSuggestOpen(true)}><AiAvatar className="size-5" /> Suggest</Button>
             <Button size="sm" variant="secondary" onClick={() => setSuppOpen(true)}><Plus /> Prescribe</Button>
           </div>
         }>Supplements</Eyebrow>
@@ -343,7 +343,7 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
   const send = async (id: string) => { const fb = draft[id]?.trim(); if (!fb) return; await api.post(`/api/check-ins/${id}/feedback`, { clientId, feedback: fb }); setDraft((d) => ({ ...d, [id]: "" })); await onFeedback(); };
   return (
     <section className="space-y-2">
-      <Eyebrow action={<Button size="sm" variant="tonal" disabled={busy || checkIns.length === 0} onClick={() => void summarize()}><Sparkles /> {busy ? "…" : "Summarize"}</Button>}>Check-ins</Eyebrow>
+      <Eyebrow action={<Button size="sm" variant="tonal" disabled={busy || checkIns.length === 0} onClick={() => void summarize()}><AiAvatar className="size-5" /> {busy ? "…" : "Summarize"}</Button>}>Check-ins</Eyebrow>
       <Stagger>
       <Card className="space-y-3">
       {err ? <AiErrorBox error={err} /> : null}
@@ -434,7 +434,7 @@ function SuggestSuppSheet({ clientId, onClose, onPrescribed }: { clientId: strin
             )))}
           </Reveal>
         )}
-        {note && <SubCard className="flex items-start gap-2 text-xs text-muted-foreground"><Sparkles className="mt-0.5 size-3.5 shrink-0 text-primary" /><Markdown className="min-w-0 flex-1">{note}</Markdown></SubCard>}
+        {note && <SubCard className="flex items-start gap-2 text-xs text-muted-foreground"><AiAvatar className="mt-0.5 size-4 shrink-0" /><Markdown className="min-w-0 flex-1">{note}</Markdown></SubCard>}
       </div>
     </Sheet>
   );
@@ -505,7 +505,7 @@ function ReviewLabSheet({ clientId, lab, onClose, onDone }: { clientId: string; 
           </div>
         )}
         {lab.client_notes && <SubCard className="text-sm text-muted-foreground">Client note: {lab.client_notes}</SubCard>}
-        {fileUrl && <Button size="sm" variant="tonal" className="w-full" disabled={extracting} onClick={() => void autofill()}><Sparkles /> {extracting ? "Reading report…" : "Auto-fill from report"}</Button>}
+        {fileUrl && <Button size="sm" variant="tonal" className="w-full" disabled={extracting} onClick={() => void autofill()}><AiAvatar className="size-5" /> {extracting ? "Reading report…" : "Auto-fill from report"}</Button>}
         {extractErr ? <AiErrorBox error={extractErr} /> : null}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-muted-foreground">Values</label>
