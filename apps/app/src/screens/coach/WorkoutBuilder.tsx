@@ -437,7 +437,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                       onApplyToAll={slot.sets.length > 1 ? () => applyToAll(setIdx) : undefined}
                       onRemove={() => setSlot((sl) => sl.sets.splice(setIdx, 1))} />
                   ))}
-                  <button onClick={() => setSlot((sl) => sl.sets.push(emptySetFor(sl.measurementMode)))} className="text-xs font-medium text-primary">+ Set</button>
+                  <button onClick={() => setSlot((sl) => sl.sets.push(emptySetFor(sl.measurementMode)))} className="text-xs font-medium text-activity">+ Set</button>
                 </SubCard>
                 );
               })}
@@ -538,7 +538,7 @@ function SetRow({ set, index, mode, onPatch, onApplyToAll, onRemove }: { set: Wo
           <Input type="number" inputMode="decimal" aria-label={wm.unit} placeholder={wm.unit} value={set.weightMode === "percent_1rm" ? (set.percent1rm ?? "") : (set.weightValue ?? "")} onChange={(e) => onPatch(set.weightMode === "percent_1rm" ? { percent1rm: num(e.target.value) } : { weightValue: num(e.target.value) })} className={cell} />
         )}
         {onApplyToAll && (
-          <button onClick={onApplyToAll} title="Apply this set's reps, load, RPE/RIR, rest & tempo to every set" aria-label="Apply to all sets" className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-surface-3 hover:text-primary [&_svg]:size-4"><CheckCheck /></button>
+          <button onClick={onApplyToAll} title="Apply this set's reps, load, RPE/RIR, rest & tempo to every set" aria-label="Apply to all sets" className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-surface-3 hover:text-activity [&_svg]:size-4"><CheckCheck /></button>
         )}
         <button onClick={onRemove} aria-label="Remove set" className="shrink-0 text-muted-foreground hover:text-danger [&_svg]:size-3.5"><X /></button>
       </div>
