@@ -275,6 +275,13 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   }, [planId]);
   useEffect(() => void load(), [load]);
 
+  // Library-only refresh — used after an inline "create exercise" so the new
+  // row resolves its name/thumb WITHOUT reloading the plan (which would reset
+  // `days` from the server and discard the just-added slot + unsaved edits).
+  const reloadLibrary = useCallback(async () => {
+    setLibrary((await api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all")).exercises);
+  }, []);
+
   const mutate = (fn: (d: WorkoutDay[]) => void) => { const next = structuredClone(days); fn(next); setDays(next); setDirty(true); };
   const save = async () => { setSaving(true); try { await api.patch(`/api/workout-plans/${planId}`, { body: { days } }); setDirty(false); } finally { setSaving(false); } };
   const publish = async () => { await save(); await api.post(`/api/workout-plans/${planId}/publish`); await load(); };
@@ -472,7 +479,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
         )}
       </Reveal>
 
-      {picker && <ExercisePicker library={library} reloadLibrary={load} onClose={() => setPicker(null)} onPick={(id) => { mutate((d) => d[dayIdx]!.blocks[picker.blockIdx]!.slots.push(emptySlot(id))); setPicker(null); }} />}
+      {picker && <ExercisePicker library={library} reloadLibrary={reloadLibrary} onClose={() => setPicker(null)} onPick={(id) => { mutate((d) => d[dayIdx]!.blocks[picker.blockIdx]!.slots.push(emptySlot(id))); setPicker(null); }} />}
       {aiOpen && <AiDraftSheet onClose={() => setAiOpen(false)} onRun={runAi} />}
       {exportOpen && plan && <ExportTemplateSheet body={{ days }} defaultName={plan.name} onClose={() => setExportOpen(false)} />}
       {copyWeekOpen && <CopyWeekSheet dayCount={days.length} onClose={() => setCopyWeekOpen(false)} onCopy={copyWeek} />}
@@ -578,7 +585,7 @@ function ExercisePicker({ library, onClose, onPick, reloadLibrary }: { library: 
 
   // "Create new" opens the unified composer (AI / web / manual) in plan mode.
   if (compose) {
-    return <ExerciseEditor planMode onClose={() => setCompose(false)} onSaved={(id) => { setCompose(false); reloadLibrary(); if (id) onPick(id); }} />;
+    return <ExerciseEditor planMode onClose={() => setCompose(false)} onSaved={async (id) => { setCompose(false); await reloadLibrary(); if (id) onPick(id); }} />;
   }
 
   return (
