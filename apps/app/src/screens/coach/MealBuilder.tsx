@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { MealBody, MealOption, MealFood } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy, scaleFood, servingsToQuantity, SERVING_PRESETS } from "@mossa/domain";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, Chip, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, cn, ArrowLeft, Plus, Sparkles, Utensils, History, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, MacroBar, ProgressRing, Eyebrow, Chip, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, ArrowLeft, Plus, Sparkles, Utensils, Flame, History, X } from "@mossa/ui";
 import { api, ApiError } from "../../api.js";
 import { ClientPrefsStrip } from "./ClientPrefsStrip.js";
 import { AiErrorBox } from "../../AiError.js";
@@ -135,6 +135,8 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
         </Card>
       ) : null}
 
+      <PlanHealth allTypes={allTypes} byType={byType} foods={foods} targets={targets} />
+
       <div className="flex gap-2">
         <Button variant="tonal" className="flex-1" onClick={() => setAiOpen(true)}><Sparkles /> AI meal draft</Button>
         <Button variant="secondary" onClick={() => setTypeOpen(true)}><Plus /> Meal type</Button>
@@ -237,6 +239,98 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
         </div>
       </Sheet>
     </Page>
+  );
+}
+
+/** Live "daily plan health" intelligence over the in-memory plan. A meal plan is a
+ *  bank of options (the client picks ONE option per meal), so we derive a
+ *  representative SAMPLE DAY = the first option of each meal type (meals with no
+ *  options are skipped; free meals contribute their max-calories cap via
+ *  optionMacroTotals). Pure derivation — no fetches, no plan mutation. */
+function PlanHealth({ allTypes, byType, foods, targets }: {
+  allTypes: string[];
+  byType: Map<string, { opt: MealOption; idx: number }[]>;
+  foods: Map<string, FoodLike>;
+  targets: Targets | null;
+}) {
+  const units = useUnits();
+  const meals = allTypes
+    .map((type) => ({ type, opts: (byType.get(type) ?? []).map((o) => o.opt) }))
+    .filter((m) => m.opts.length > 0);
+
+  // Nothing to summarise until at least one meal has an option carrying food (or a
+  // free-meal cap) — an all-empty draft gets no card, not a card full of zeroes.
+  const hasContent = meals.some((m) => m.opts.some((o) => (!o.isFree && o.foods.length > 0) || (o.isFree && !!o.freeMealMaxCalories)));
+  if (!hasContent) return null;
+
+  // Sample day = FIRST option of each meal type, summed.
+  const total = meals.reduce(
+    (a, m) => { const t = optionMacroTotals(m.opts[0]!, foods); return { calories: a.calories + t.calories, proteinG: a.proteinG + t.proteinG, carbsG: a.carbsG + t.carbsG, fatG: a.fatG + t.fatG }; },
+    { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
+  );
+  // Per-meal calorie range across ALL that meal's options (shows the coach the
+  // variability the client can pick within, e.g. "Lunch 520–740 kcal").
+  const ranges = meals.map((m) => {
+    const cals = m.opts.map((o) => optionMacroTotals(o, foods).calories);
+    return { type: m.type, min: Math.min(...cals), max: Math.max(...cals) };
+  });
+
+  const target = targets?.targetCalories;
+  const delta = target ? total.calories - target : 0;
+  const onTarget = target ? Math.abs(delta) <= target * 0.05 : false;
+  const over = delta > 0;
+  const deltaTone = onTarget ? "success" : over ? "warning" : "neutral";
+  const deltaLabel = !target ? null : onTarget ? "On target" : `${fmtEnergy(Math.abs(delta), units)} ${over ? "over" : "under"}`;
+
+  return (
+    <Card className="space-y-4 p-4">
+      <Eyebrow action={<Badge tone="neutral">{meals.length} meal{meals.length > 1 ? "s" : ""}</Badge>}>Daily plan health</Eyebrow>
+      <div className="flex items-center gap-4">
+        {target ? (
+          <ProgressRing
+            size={104}
+            strokeWidth={10}
+            progress={total.calories / target}
+            tone={over && !onTarget ? "warning" : "calories"}
+            softTrack
+            value={fmtEnergy(total.calories, units, false)}
+            label="Sample day"
+            sublabel={`of ${fmtEnergy(target, units)}`}
+          />
+        ) : (
+          <div className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-2xl bg-surface-2 px-5 py-4 text-center">
+            <Flame className="size-5" style={{ color: toneVar.calories }} />
+            <span className="numeral text-2xl font-bold leading-none">{fmtEnergy(total.calories, units, false)}</span>
+            <span className="text-[0.65rem] font-medium text-muted-foreground">Sample day</span>
+          </div>
+        )}
+        <div className="min-w-0 flex-1 space-y-2">
+          <MacroBar
+            proteinG={total.proteinG}
+            carbsG={total.carbsG}
+            fatG={total.fatG}
+            targets={target ? { proteinG: targets?.targetProteinG, carbsG: targets?.targetCarbsG, fatG: targets?.targetFatG } : null}
+          />
+          {deltaLabel && (
+            <div className="flex justify-end"><Badge tone={deltaTone}>{deltaLabel}</Badge></div>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Eyebrow>Per-meal range</Eyebrow>
+        {ranges.map((r) => (
+          <div key={r.type} className="flex items-center justify-between gap-2 text-sm">
+            <span className="flex items-center gap-1.5 capitalize text-muted-foreground [&_svg]:size-3.5">
+              <Flame style={{ color: toneVar.calories }} /> {r.type.replace("_", " ")}
+            </span>
+            <span className="numeral font-medium text-calories">
+              {r.min === r.max ? fmtEnergy(r.min, units) : `${fmtEnergy(r.min, units, false)}–${fmtEnergy(r.max, units)}`}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 
