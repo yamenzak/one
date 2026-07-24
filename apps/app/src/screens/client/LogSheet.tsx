@@ -21,7 +21,7 @@ import { BodyScanLauncher } from "./bodyscan/BodyScanLauncher.js";
 type LogKind = "food" | "activity" | "water" | "weight" | "body" | "sleep" | "mood" | "checkin";
 const CHIPS: { kind: LogKind; label: string; icon: LucideIcon; tone: Tone }[] = [
   { kind: "food", label: "Food", icon: Utensils, tone: "nutrition" },
-  { kind: "activity", label: "Activity", icon: Footprints, tone: "activity" },
+  { kind: "activity", label: "Activity", icon: Footprints, tone: "cardio" },
   { kind: "water", label: "Water", icon: Droplet, tone: "hydration" },
   { kind: "weight", label: "Weight", icon: Weight, tone: "cardio" },
   { kind: "body", label: "Body", icon: Ruler, tone: "cardio" },
@@ -202,7 +202,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
             {/* Searchable, categorized picker with a per-sport glyph. */}
             <div className="rounded-2xl border border-border/60 bg-surface-2 p-2">
               <div className="mb-2 flex items-center gap-2 px-1">
-                <IconBadge icon={activityIcon(activityKey)} tone="activity" size="sm" />
+                <IconBadge icon={activityIcon(activityKey)} tone="cardio" size="sm" />
                 <span className="flex-1 text-sm font-semibold">{activityLabel}</span>
               </div>
               <div className="relative mb-2">
@@ -222,7 +222,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
                           const Icon = activityIcon(a.key);
                           const on = activityKey === a.key;
                           return (
-                            <button key={a.key} onClick={() => setActivityKey(a.key)} style={on ? { background: toneVar.activity, color: "#fff" } : undefined} className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors [&_svg]:size-3.5", !on && "bg-background hover:bg-surface-3")}>
+                            <button key={a.key} onClick={() => setActivityKey(a.key)} style={on ? { background: toneVar.cardio, color: "#fff" } : undefined} className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors [&_svg]:size-3.5", !on && "bg-background hover:bg-surface-3")}>
                               <Icon /> {a.label}
                             </button>
                           );
@@ -245,7 +245,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
             </div>
             <p className="text-xs text-muted-foreground">Enter what your watch, Whoop, Apple Health or Fitbit shows. No numbers? Ask {ai.name} to estimate them from your body &amp; training.</p>
             <Button variant="tonal" size="sm" disabled={aiBusy} onClick={() => void askAi()}><AiAvatar className="size-5" /> {aiBusy ? "Estimating…" : `Ask ${ai.name} to estimate`}</Button>
-            {aiNote && <p className="rounded-xl px-3 py-2 text-xs" style={{ background: `color-mix(in oklch, ${toneVar.activity} 12%, transparent)`, color: toneVar.activity }}>{aiNote}</p>}
+            {aiNote && <p className="rounded-xl px-3 py-2 text-xs" style={{ background: `color-mix(in oklch, ${toneVar.cardio} 12%, transparent)`, color: toneVar.cardio }}>{aiNote}</p>}
             <Textarea rows={2} placeholder="Notes (optional)…" value={f.actNotes ?? ""} onChange={(e) => set("actNotes", e.target.value)} />
           </>)}
           {kind === "sleep" && (<>
