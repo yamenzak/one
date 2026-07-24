@@ -301,7 +301,7 @@ function withTimeout<T>(p: Promise<T>): Promise<T> {
 
 interface GeminiPart { text?: string }
 interface GeminiResponse {
-  candidates?: { content?: { parts?: GeminiPart[] } }[];
+  candidates?: { content?: { parts?: GeminiPart[] }; finishReason?: string }[];
   usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
 }
 
@@ -351,8 +351,17 @@ async function runGemini(
   );
   if (!res.ok) throw new Error(`HTTP ${res.status} ${(await res.text().catch(() => "")).slice(0, 300)}`);
   const json = (await res.json()) as GeminiResponse;
-  if (!json.candidates?.[0]) throw new Error(`no candidates ${JSON.stringify(json).slice(0, 200)}`);
-  const output = (json.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("");
+  const cand = json.candidates?.[0];
+  if (!cand) throw new Error(`no candidates ${JSON.stringify(json).slice(0, 200)}`);
+  const output = (cand.content?.parts ?? []).map((p) => p.text ?? "").join("");
+  // An output-side block (finishReason SAFETY/RECITATION/OTHER/…) or an empty
+  // candidate is NOT a success — the model returned nothing usable. Treat it as
+  // an error so generate()'s catch releases the hold, nothing settles, and no
+  // empty message is cached. STOP (normal) and MAX_TOKENS (truncated but has
+  // content, which the normalizer repairs) are the only acceptable reasons.
+  const finish = cand.finishReason;
+  if (finish && finish !== "STOP" && finish !== "MAX_TOKENS") throw new Error(`response stopped (finishReason=${finish})`);
+  if (!output.trim()) throw new Error("empty model response");
   return {
     output,
     usage: { inputTokens: json.usageMetadata?.promptTokenCount ?? 0, outputTokens: json.usageMetadata?.candidatesTokenCount ?? 0 },
@@ -421,7 +430,17 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   const isGoogle = model.provider === "google";
   // Real run needs the matching credential: Workers AI binding, or a Gemini key.
   const canRunReal = isGoogle ? !!geminiKey : !!env.AI;
-  const useMock = mockMode === "on" || (mockMode !== "off" && !canRunReal);
+  // The `auto` mock fallback is a DEV convenience ONLY — in production a missing
+  // credential must fail closed, never silently bill for fabricated output (the
+  // same hardening the mailer got). `ai.mock = "on"` stays an explicit admin
+  // override in any environment.
+  const useMock = mockMode === "on" || (mockMode !== "off" && !canRunReal && env.ENVIRONMENT === "development");
+  if (!useMock && !canRunReal) return { ok: false, error: "unavailable", detail: "AI provider not configured" };
+  // Vision safety: the Workers AI branch below never attaches input.image, so a
+  // non-Google model asked to read a photo would fabricate output that parses as
+  // valid JSON and gets billed. Refuse before reserving — never bill hallucinated
+  // vision output as real.
+  if (input.image && !isGoogle && !useMock) return { ok: false, error: "unavailable", detail: "model cannot read images" };
 
   // Worst-case estimate for the hold: prompt tokens (~chars/4) in, cap out, plus
   // a worst-case image allowance so a vision call reserves for the image tokens
@@ -559,7 +578,10 @@ export async function generateImage(env: Env, input: GenerateImageInput): Promis
   const cfg = await getConfig(env.DB);
   const geminiKey = cfg["google.gemini_key"];
   const mockMode = cfg["ai.mock"] ?? "auto";
-  const useMock = mockMode === "on" || (mockMode !== "off" && !geminiKey);
+  // Auto mock is dev-only; production fails closed on a missing key (never bills
+  // for a fabricated image). `ai.mock = "on"` stays an explicit admin override.
+  const useMock = mockMode === "on" || (mockMode !== "off" && !geminiKey && env.ENVIRONMENT === "development");
+  if (!useMock && !geminiKey) return { ok: false, error: "unavailable", detail: "AI provider not configured" };
 
   // Storage gate up front — refuse to spend credits generating an image the
   // studio has no room to keep. (The per-image size isn't known yet, so this
@@ -684,7 +706,12 @@ const TTS_FALLBACK_RATE: ModelRate = { inputRate: 45_455, outputRate: 909_091, m
 export async function generateSpeech(env: Env, input: { tenantId: string; feature: string; text: string; voice?: string }): Promise<GenerateSpeechResult> {
   const cfg = await getConfig(env.DB);
   const geminiKey = cfg["google.gemini_key"];
-  const useMock = (cfg["ai.mock"] ?? "auto") === "on" || ((cfg["ai.mock"] ?? "auto") !== "off" && !geminiKey);
+  const mockMode = cfg["ai.mock"] ?? "auto";
+  // Auto mock (silent WAV) is dev-only; production fails closed on a missing key
+  // so a client's scan never bills the owner for silent cues that then cache
+  // permanently. `ai.mock = "on"` stays an explicit admin override.
+  const useMock = mockMode === "on" || (mockMode !== "off" && !geminiKey && env.ENVIRONMENT === "development");
+  if (!useMock && !geminiKey) return { ok: false, error: "unavailable", detail: "AI provider not configured" };
 
   const model = await modelForTask(env.DB, "speech");
   const rate = model ? rateOf(model) : TTS_FALLBACK_RATE;
@@ -734,6 +761,52 @@ async function audit(
     )
     .run()
     .catch(() => undefined);
+}
+
+// ── Per-client AI spend cap + rate limit (SPEC §6) ───────────────────────────
+// Bounds how much of the tenant's shared balance ONE client persona can consume,
+// so a hostile/compromised/enthusiastic client can't drain the monthly grant and
+// the owner's purchased credits. Two guards, both enforced BEFORE the reserve:
+//   (1) an owner-configurable per-client DAILY CREDIT cap (tenant_settings
+//       ai_config_json.perClientDailyCreditCap; 0/unset = off), and
+//   (2) an always-on per-client DAILY REQUEST ceiling as a backstop.
+// Usage is summed from the actor's ai_generations rows over a rolling 24h window
+// (server clock — never a client-supplied date, so it can't be gamed).
+
+/** Hard per-client daily request ceiling (backstop when no owner cap is set). */
+export const CLIENT_DAILY_REQUEST_LIMIT = 120;
+
+/** The owner's per-client daily AI credit cap (SPEC §6), read from the tenant's
+ *  ai_config_json. Returns 0 when unset/invalid (cap disabled). */
+export async function perClientDailyCreditCap(db: D1Database, tenantId: string): Promise<number> {
+  const row = await db.prepare("SELECT ai_config_json FROM tenant_settings WHERE tenant_id = ?").bind(tenantId).first<{ ai_config_json: string | null }>();
+  try {
+    const cfg = row?.ai_config_json ? (JSON.parse(row.ai_config_json) as { perClientDailyCreditCap?: unknown }) : {};
+    const v = Number(cfg.perClientDailyCreditCap);
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  } catch { return 0; }
+}
+
+export type ClientBudgetResult =
+  | { ok: true }
+  | { ok: false; reason: "rate_limited" | "daily_cap"; used: number; limit: number };
+
+/** Enforce the per-client daily AI budget for a client persona. Sums today's
+ *  successful generations for the actor and refuses when either the hard request
+ *  ceiling or the owner-set credit cap is hit. Call BEFORE generate()/reserve. */
+export async function checkClientDailyBudget(env: Env, tenantId: string, actorUserId: string): Promise<ClientBudgetResult> {
+  const since = nowMs() - 86_400_000;
+  const agg = await env.DB
+    .prepare("SELECT COUNT(*) AS n, COALESCE(SUM(credits), 0) AS c FROM ai_generations WHERE tenant_id = ? AND actor_user_id = ? AND ok = 1 AND at >= ?")
+    .bind(tenantId, actorUserId, since)
+    .first<{ n: number; c: number }>()
+    .catch(() => null);
+  const count = agg?.n ?? 0;
+  const spent = agg?.c ?? 0;
+  if (count >= CLIENT_DAILY_REQUEST_LIMIT) return { ok: false, reason: "rate_limited", used: count, limit: CLIENT_DAILY_REQUEST_LIMIT };
+  const cap = await perClientDailyCreditCap(env.DB, tenantId);
+  if (cap > 0 && spent >= cap) return { ok: false, reason: "daily_cap", used: Math.round(spent), limit: cap };
+  return { ok: true };
 }
 
 // ── Response normalizer ──────────────────────────────────────────────────────

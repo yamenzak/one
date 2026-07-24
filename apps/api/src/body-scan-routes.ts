@@ -241,6 +241,9 @@ export const bodyScanRoutes = new Hono<AppEnv>()
   // cached like a cue (so previewing every voice costs a handful of credits once).
   .get("/body-scan/voice-preview", async (c) => {
     const who = requireTenant(c)!;
+    // Owner-only: this generates paid TTS on a miss (the settings voice picker).
+    // A client must never be able to trigger a billed voice generation.
+    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
     { const g = await gateFeature(c, "bodyScan"); if (g) return g; }
     const voice = await resolveVoice(c.env.DB, who.tenantId, c.req.query("voice"));
     const existing = await c.env.DB.prepare("SELECT media_key FROM tts_cues WHERE tenant_id=? AND voice=? AND lang='en' AND phrase_id='preview' AND version=?")

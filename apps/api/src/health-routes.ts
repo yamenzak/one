@@ -461,6 +461,17 @@ export const healthRoutes = new Hono<AppEnv>()
     if ("response" in access) return access.response;
     const d = parsed.data;
 
+    // The plan being swapped must belong to THIS client — requireClientAccess
+    // above only scoped the clientId, not the workoutPlanId. Without this a
+    // client could pass their own clientId but another client's plan id and,
+    // on the auto-approve path, overwrite that client's plan (cross-client IDOR
+    // write, tenant scope alone doesn't stop it). Mirror plan-routes: resolve
+    // the plan's owner and require access to it.
+    const planRow = await c.env.DB.prepare("SELECT client_id FROM workout_plans WHERE id = ? AND tenant_id = ?")
+      .bind(d.workoutPlanId, access.client.tenant_id)
+      .first<{ client_id: string }>();
+    if (!planRow || planRow.client_id !== access.client.id) return c.json({ error: "plan not found" }, 404);
+
     // Auto-approve ONLY when the client picked a bound alternative (per tenant).
     const alt = d.suggestedExerciseId
       ? await c.env.DB.prepare(
@@ -504,6 +515,10 @@ export const healthRoutes = new Hono<AppEnv>()
       .bind(c.req.param("id"), who.tenantId)
       .first<{ client_id: string; workout_plan_id: string; day_index: number; block_index: number; slot_index: number; current_exercise_id: string; suggested_exercise_id: string | null }>();
     if (!row) return c.json({ error: "not found" }, 404);
+    // Tenant match alone lets an UNASSIGNED trainer mutate any client's plan.
+    // Enforce row-level scope on the swap's client (trainer = assignment).
+    const access = await requireClientAccess(c, row.client_id);
+    if ("response" in access) return access.response;
     const replacement = parsed.data.replacementExerciseId ?? row.suggested_exercise_id;
     if (parsed.data.status === "approved" && !replacement) return c.json({ error: "choose a replacement exercise to approve" }, 400);
     await c.env.DB.prepare("UPDATE swap_requests SET status = ?, trainer_note = ?, suggested_exercise_id = ?, resolved_by = ?, resolved_at = ? WHERE id = ?")
