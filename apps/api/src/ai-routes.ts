@@ -782,24 +782,27 @@ export const aiRoutes = new Hono<AppEnv>()
   .post("/ai/activity-estimate", async (c) => {
     const who = requireTenant(c)!;
     const parsed = z
-      .object({ clientId: z.string(), activityKey: z.string().max(40).optional(), label: z.string().max(80).optional(), durationMin: z.number().int().positive(), avgHrBpm: z.number().int().positive().nullish(), distanceM: z.number().min(0).nullish() })
+      .object({ clientId: z.string(), activityKey: z.string().max(40).optional(), label: z.string().max(80).optional(), durationMin: z.number().int().positive().nullish(), reps: z.number().int().positive().nullish(), avgHrBpm: z.number().int().positive().nullish(), distanceM: z.number().min(0).nullish() })
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const p = parsed.data;
+    if (!p.durationMin && !p.reps && !p.distanceM) return c.json({ error: "give a duration, count or distance to estimate from" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
     { const g = await gateFeature(c, "aiSuite"); if (g) return g; }
-    const p = parsed.data;
     const activityLabel = p.label?.trim() || activityByKey(p.activityKey ?? "other").label;
     const ctx = await buildClientContext(c.env, access.client, { today: new Date().toISOString().slice(0, 10), hour: 12, units: await unitsFor(c.env.DB, who.userId), sections: ["client", "body", "training"] });
-    const detail = `ACTIVITY: ${activityLabel}, ${p.durationMin} min${p.distanceM ? `, ${(p.distanceM / 1000).toFixed(2)} km` : ""}${p.avgHrBpm ? `, avg HR ${p.avgHrBpm} bpm` : ""}.`;
+    const detail = `ACTIVITY: ${activityLabel}${p.durationMin ? `, ${p.durationMin} min` : ""}${p.reps ? `, ${p.reps} reps` : ""}${p.distanceM ? `, ${(p.distanceM / 1000).toFixed(2)} km` : ""}${p.avgHrBpm ? `, avg HR ${p.avgHrBpm} bpm` : ""}.`;
     const result = await generate(c.env, {
       tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
       feature: "activity-estimate", task: "text-small", expectsJson: true, system: sys("activity-estimate"),
-      prompt: [ctx.text, detail, "Estimate the calories burned for THIS client."].join("\n\n"), maxOutputTokens: 200,
+      prompt: [ctx.text, detail, "Estimate the calories burned and speak to them directly."].join("\n\n"), maxOutputTokens: 200,
       mock: () => {
         const kg = ctx.knowledge.body.weightKg ?? 75;
-        const kcal = estimateBurnedCalories({ met: activityByKey(p.activityKey ?? "other").met, weightKg: kg, durationMin: p.durationMin, avgHrBpm: p.avgHrBpm });
-        return JSON.stringify({ calories: kcal || Math.round(p.durationMin * 7), avgHrBpm: p.avgHrBpm ?? null, rationale: `Based on ${activityLabel.toLowerCase()} for ${p.durationMin} min at ${Math.round(kg)}kg.` });
+        const kcal = p.durationMin
+          ? estimateBurnedCalories({ met: activityByKey(p.activityKey ?? "other").met, weightKg: kg, durationMin: p.durationMin, avgHrBpm: p.avgHrBpm })
+          : Math.round((p.reps ?? 0) * (kg / 75) * 0.5);
+        return JSON.stringify({ calories: kcal || Math.round((p.durationMin ?? 0) * 7) || 30, avgHrBpm: p.avgHrBpm ?? null, rationale: `At your weight, ${activityLabel.toLowerCase()}${p.durationMin ? ` for ${p.durationMin} min` : p.reps ? ` × ${p.reps}` : ""} lands around here.` });
       },
     });
     if (!result.ok) return aiFail(c, result);

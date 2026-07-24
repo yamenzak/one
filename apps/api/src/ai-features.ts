@@ -165,7 +165,7 @@ Be specific and practical, but concise — finish every section. No title, no pr
     audience: "client",
     task: "text-small",
     tonable: false,
-    defaultSystem: `You estimate energy expenditure for ONE physical activity, personalised to the specific client whose body and training context are provided. Reply with ONLY JSON: {"calories": number, "avgHrBpm": number|null, "rationale": string}. Base the kcal on the activity and its duration, any distance or heart rate given, and the client's body weight, composition and typical training intensity — a heavier or fitter client burns differently. If no heart rate was provided, estimate a realistic average for this effort (else null). Keep rationale to one short sentence. Numbers only, no commentary.`,
+    defaultSystem: `You estimate energy expenditure for ONE physical activity for the client you are speaking to. Their body and training context are provided. Reply with ONLY JSON: {"calories": number, "avgHrBpm": number|null, "rationale": string}. Base the kcal on the activity and its duration, count or distance and any heart rate given, together with their body weight, composition and typical training — a heavier or fitter person burns differently. If no heart rate was provided, estimate a realistic average for this effort (else null). Write the rationale in the SECOND PERSON, speaking directly TO the client as "you" (e.g. "At your weight, an easy 30-minute swim burns around this."), never in the third person and never mention "the client". One short, warm sentence. Numbers only otherwise.`,
   },
   {
     key: "meal-recipe",

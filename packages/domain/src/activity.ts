@@ -107,6 +107,23 @@ export const ACTIVITIES: ActivityDef[] = [
 export const activityByKey = (key: string): ActivityDef =>
   ACTIVITIES.find((a) => a.key === key) ?? ACTIVITIES[ACTIVITIES.length - 1]!;
 
+/** What an activity is naturally measured in — drives which input fields the
+ *  logger shows. `distance` sports lead with distance, `reps` bodyweight moves
+ *  lead with a count (push-ups → reps), everything else with duration. */
+export type ActivityTrack = "duration" | "distance" | "reps";
+
+const DISTANCE_ACTIVITIES = new Set([
+  "walking", "brisk_walking", "running", "jogging", "treadmill", "cycling", "rowing",
+  "hiking", "swimming", "swimming_laps", "kayaking", "paddleboarding", "skiing", "snowboarding",
+]);
+const REPS_ACTIVITIES = new Set(["push_ups", "pull_ups", "dips", "burpees"]);
+
+export function activityTrack(key: string): ActivityTrack {
+  if (REPS_ACTIVITIES.has(key)) return "reps";
+  if (DISTANCE_ACTIVITIES.has(key)) return "distance";
+  return "duration";
+}
+
 /** The catalog grouped into category sections (category order), skipping empties.
  *  Drives the sectioned activity picker. */
 export function activitiesByCategory(): { key: ActivityCategory; label: string; activities: ActivityDef[] }[] {

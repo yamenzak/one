@@ -5,10 +5,10 @@
  */
 
 import { useState } from "react";
-import { ACTIVITIES, activitiesByCategory, weightLabel, lengthLabel, volumeLabel, energyLabel, displayToKg, lengthDisplayToCm, volumeDisplayToMl, displayToKcal, kcalToDisplay } from "@mossa/domain";
+import { ACTIVITIES, activitiesByCategory, activityTrack, weightLabel, lengthLabel, volumeLabel, energyLabel, displayToKg, lengthDisplayToCm, volumeDisplayToMl, displayToKcal, kcalToDisplay } from "@mossa/domain";
 import {
   Button, Field, Textarea, Sheet, Chip, IconBadge, Switch,
-  Utensils, Footprints, Droplet, Weight, Ruler, Moon, Smile, ClipboardList, Camera, Angry, Frown, Meh, Laugh, Search, Timer, HeartPulse, MapPin, Flame,
+  Utensils, Footprints, Droplet, Weight, Ruler, Moon, Smile, ClipboardList, Camera, Angry, Frown, Meh, Laugh, Search, Timer, HeartPulse, MapPin, Flame, Dumbbell,
   cn, toneVar, type LucideIcon, type Tone,
 } from "@mossa/ui";
 import { api, todayLocal, uploadMedia } from "../../api.js";
@@ -76,16 +76,20 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
   const distUnit = units.length === "in" ? "mi" : "km";
   const distanceToM = (): number | undefined => { const v = num("distance"); return v != null ? Math.round(v * (distUnit === "mi" ? 1609.34 : 1000)) : undefined; };
   const activityLabel = ACTIVITIES.find((a) => a.key === activityKey)?.label ?? "Activity";
+  const track = activityTrack(activityKey); // "reps" | "distance" | "duration"
 
   // Grounded AI estimate — fill calories (and HR if blank) when the user doesn't
   // have the number from their watch.
   const askAi = async () => {
+    const track = activityTrack(activityKey);
     const duration = num("duration");
-    if (!duration) { setErr("Add a duration first so the estimate has something to go on."); return; }
+    const reps = num("reps");
+    const distanceM = distanceToM();
+    if (!duration && !reps && !distanceM) { setErr(track === "reps" ? "Add a count first so the estimate has something to go on." : "Add a duration first so the estimate has something to go on."); return; }
     setErr(null); setAiBusy(true); setAiNote(null);
     try {
       const r = await api.post<{ calories: number; avgHrBpm: number | null; rationale: string }>("/api/ai/activity-estimate", {
-        clientId, activityKey, label: activityLabel, durationMin: duration, avgHrBpm: num("hr") ?? null, distanceM: distanceToM() ?? null,
+        clientId, activityKey, label: activityLabel, durationMin: duration ?? null, reps: reps ?? null, avgHrBpm: num("hr") ?? null, distanceM: distanceM ?? null,
       });
       set("kcal", String(kcalToDisplay(r.calories, units)));
       if (r.avgHrBpm && !f.hr) set("hr", String(r.avgHrBpm));
@@ -124,13 +128,17 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
       const n = Number(s);
       if (!Number.isFinite(n) || n < min || n > max) { setErr(`Enter a valid ${label}.`); return; }
     }
+    if (kind === "activity") {
+      if (track === "reps" && !num("reps")) { setErr("Enter a count."); return; }
+      if (track !== "reps" && !num("duration")) { setErr("Enter a duration."); return; }
+    }
     setErr(null);
     setBusy(true);
     try {
       if (kind === "water") await api.post("/api/logs/water", { clientId, data: { date, amountMl: num("amount") != null ? Math.round(volumeDisplayToMl(num("amount")!, units)) : undefined } });
       else if (kind === "weight") await api.post("/api/measurements", { clientId, data: { date, weightKg: kg("amount") } });
       else if (kind === "body") await api.post("/api/measurements", { clientId, data: { date, weightKg: kg("weight"), bodyFatPercent: num("bf"), neckCm: cm("neck"), waistCm: cm("waist"), hipsCm: cm("hips"), chestCm: cm("chest") } });
-      else if (kind === "activity") await api.post("/api/logs/activity", { clientId, data: { date, activityKey, label: activityKey === "other" && f.actLabel ? f.actLabel : activityLabel, durationMin: num("duration") ?? 0, avgHrBpm: num("hr") ?? null, distanceM: distanceToM() ?? null, notes: f.actNotes || null, caloriesBurned: kcal("kcal") ?? null } });
+      else if (kind === "activity") await api.post("/api/logs/activity", { clientId, data: { date, activityKey, label: activityKey === "other" && f.actLabel ? f.actLabel : activityLabel, durationMin: num("duration") ?? null, reps: track === "reps" ? (num("reps") ?? null) : null, avgHrBpm: num("hr") ?? null, distanceM: track === "distance" ? (distanceToM() ?? null) : null, notes: f.actNotes || null, caloriesBurned: kcal("kcal") ?? null } });
       else if (kind === "sleep") await api.post("/api/logs/sleep", { clientId, data: { date, durationMinutes: Math.round((num("hours") ?? 0) * 60), quality: ratings.sleepQ ?? undefined, notes: f.notes || undefined } });
       else if (kind === "mood") await api.post("/api/logs/mood", { clientId, data: { date, mood: ratings.mood ?? undefined, energy: ratings.energy ?? undefined, stress: ratings.stress ?? undefined, notes: f.notes || undefined } });
       else if (kind === "checkin") await api.post("/api/check-ins", { clientId, data: { date, weightKg: kg("weight"), mood: ratings.mood ?? undefined, energy: ratings.energy ?? undefined, stress: ratings.stress ?? undefined, sleepHours: num("sleepHours"), stepsCount: num("steps"), notes: f.notes || undefined, progressPhotos: photos.length ? photos : undefined } });
@@ -226,10 +234,12 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
               </div>
             </div>
             {activityKey === "other" && <Field label="What was it?" value={f.actLabel ?? ""} onChange={(e) => set("actLabel", e.target.value)} placeholder="Name your activity" />}
-            {/* Numbers — typed straight from a wearable, or estimated by AI. */}
+            {/* Only the fields that fit this activity — typed from a wearable
+                (push-ups → a count, running → distance) or estimated by AI. */}
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Duration (min)" icon={Timer} inputMode="numeric" value={f.duration ?? ""} onChange={(e) => set("duration", e.target.value.replace(/\D/g, ""))} />
-              <Field label={`Distance (${distUnit}, opt)`} icon={MapPin} inputMode="decimal" value={f.distance ?? ""} onChange={(e) => setDec("distance", e.target.value)} />
+              {track === "reps" && <Field label="Count (reps)" icon={Dumbbell} inputMode="numeric" value={f.reps ?? ""} onChange={(e) => set("reps", e.target.value.replace(/\D/g, ""))} />}
+              {track === "distance" && <Field label={`Distance (${distUnit})`} icon={MapPin} inputMode="decimal" value={f.distance ?? ""} onChange={(e) => setDec("distance", e.target.value)} />}
+              <Field label={track === "reps" ? "Duration (min, opt)" : "Duration (min)"} icon={Timer} inputMode="numeric" value={f.duration ?? ""} onChange={(e) => set("duration", e.target.value.replace(/\D/g, ""))} />
               <Field label="Avg HR (opt)" icon={HeartPulse} inputMode="numeric" value={f.hr ?? ""} onChange={(e) => set("hr", e.target.value.replace(/\D/g, ""))} />
               <Field label={`Energy (${energyLabel(units)}, opt)`} icon={Flame} inputMode="numeric" value={f.kcal ?? ""} onChange={(e) => set("kcal", e.target.value.replace(/\D/g, ""))} />
             </div>

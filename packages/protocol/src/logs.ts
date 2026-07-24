@@ -40,10 +40,13 @@ export const LogActivity = z.object({
   activityKey: z.string().max(40).nullish(),
   label: z.string().max(80).nullish(),
   startTime: z.string().max(8).nullish(), // HH:MM local
-  durationMin: z.number().int().positive(),
+  /** Optional now: rep-based moves (push-ups) may carry a count with no time. */
+  durationMin: z.number().int().positive().nullish(),
   avgHrBpm: z.number().int().positive().nullish(),
   /** Distance in metres (stored metric; displayed in the client's length unit). */
   distanceM: z.number().min(0).nullish(),
+  /** Rep count for bodyweight moves (push-ups, pull-ups…). */
+  reps: z.number().int().positive().nullish(),
   notes: z.string().max(300).nullish(),
   /** Manual override; omitted -> server estimates from MET × weight. */
   caloriesBurned: z.number().int().min(0).nullish(),

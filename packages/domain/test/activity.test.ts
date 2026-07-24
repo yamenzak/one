@@ -4,6 +4,7 @@ import {
   ACTIVITY_CATEGORY_META,
   activitiesByCategory,
   activityByKey,
+  activityTrack,
   estimateBurnedCalories,
   hrFactor,
 } from "../src/activity.js";
@@ -34,6 +35,15 @@ describe("activity catalog", () => {
     for (const k of ["push_ups", "pull_ups", "jump_rope", "swimming_laps", "kickboxing", "spinning"]) {
       expect(keys.has(k), k).toBe(true);
     }
+  });
+
+  it("assigns a natural measurement track per activity", () => {
+    expect(activityTrack("push_ups")).toBe("reps");
+    expect(activityTrack("pull_ups")).toBe("reps");
+    expect(activityTrack("running")).toBe("distance");
+    expect(activityTrack("swimming")).toBe("distance");
+    expect(activityTrack("yoga")).toBe("duration");
+    expect(activityTrack("unknown")).toBe("duration");
   });
 
   it("groups by category in order, covering every activity exactly once", () => {
