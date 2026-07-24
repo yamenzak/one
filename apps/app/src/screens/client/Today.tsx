@@ -84,18 +84,23 @@ const GAP_LABELS: Record<string, string> = {
   workoutLocation: "Where you train",
 };
 
-/** The route (with any deep-link query) a feed event opens — client context
- *  only. Check-ins and labs open their detail sheet on the Wellness page. */
+/** Loggable kinds that open their own detail page (`/log/:kind/:ref`). Coach /
+ *  plan events keep routing to their existing surfaces (sheets / tabs). */
+const DETAIL_KINDS = new Set(["water", "workout", "activity", "measurement", "checkin", "sleep", "mood", "supplement", "fast", "bodyscan", "goal"]);
+
+/** The route a feed event opens. A logged thing → its dedicated detail page;
+ *  coach feedback / labs → their Wellness sheet; plan events → the plan tab. */
 const routeForEvent = (ev: FeedEvent): string | null => {
   const k = ev.kind;
-  if (k.startsWith("food")) return "/eat";
+  // Food meals carry `food:<meal>`; the ":" is encoded as "." in the path.
+  if (k.startsWith("food") && ev.ref) return `/log/${k.replace(":", ".")}/${encodeURIComponent(ev.ref)}`;
+  if (DETAIL_KINDS.has(k) && ev.ref) return `/log/${k}/${encodeURIComponent(ev.ref)}`;
   switch (k) {
-    case "checkin": case "feedback": return ev.ref ? `/wellness?checkin=${ev.ref}` : "/wellness";
+    case "feedback": return ev.ref ? `/wellness?checkin=${ev.ref}` : "/wellness";
     case "lab": return ev.ref ? `/wellness?lab=${ev.ref}` : "/wellness";
-    case "fast": case "sleep": case "supplement": case "session": return "/wellness";
-    case "water": case "plan_meal": return "/eat";
-    case "workout": case "activity": case "swap": case "plan_workout": return "/train";
-    case "measurement": case "mood": case "bodyscan": case "goal": return "/progress";
+    case "session": return "/wellness";
+    case "plan_meal": return "/eat";
+    case "swap": case "plan_workout": return "/train";
     default: return null;
   }
 };
