@@ -61,6 +61,10 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   const snapInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  // Monotonic search token — every fresh query bumps it; a response is applied
+  // only if its token is still current, so out-of-order responses (a slow query
+  // resolving after a newer one) never overwrite the latest results.
+  const searchSeq = useRef(0);
   const [q, setQ] = useState("");
   const [local, setLocal] = useState<Food[]>([]);
   const [external, setExternal] = useState<Food[]>([]);
@@ -74,6 +78,9 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   const [recents, setRecents] = useState<Recent[]>([]);
   const [recentTab, setRecentTab] = useState<"recent" | "frequent">("recent");
   const [aiBusy, setAiBusy] = useState(false);
+  // In-flight guard for the log/re-log POST — food logs are append-only rows, so
+  // a double-tap would create duplicate diary entries and double-count macros.
+  const [logging, setLogging] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [snapErr, setSnapErr] = useState<unknown>(null);
   // Snap-a-meal review: the AI's detected foods + its note + the photo, held
@@ -95,9 +102,11 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
 
   const searchExternal = useCallback(async (page = 1) => {
     if (q.trim().length < 2) return;
+    const seq = searchSeq.current;
     setSearching(true);
     try {
       const res = (await api.get<{ foods: Food[] }>(`/api/foods/search-external?q=${encodeURIComponent(q)}&page=${page}`)).foods;
+      if (seq !== searchSeq.current) return; // a newer query superseded this one
       setExternal((prev) => {
         if (page === 1) return res;
         const seen = new Set(prev.map((f) => `${f.source}:${f.sourceId ?? f.name}`));
@@ -105,12 +114,15 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
       });
       setExtPage(page);
       setExtMore(res.length >= 10);
-    } finally { setSearching(false); }
+    } finally { if (seq === searchSeq.current) setSearching(false); }
   }, [q]);
 
   const search = useCallback(async () => {
-    if (q.trim().length < 2) { setLocal([]); setExternal([]); setExtPage(0); return; }
-    setLocal((await api.get<{ foods: Food[] }>(`/api/foods?q=${encodeURIComponent(q)}`)).foods);
+    if (q.trim().length < 2) { searchSeq.current++; setLocal([]); setExternal([]); setExtPage(0); return; }
+    const seq = ++searchSeq.current;
+    const foods = (await api.get<{ foods: Food[] }>(`/api/foods?q=${encodeURIComponent(q)}`)).foods;
+    if (seq !== searchSeq.current) return; // a newer query started while this was in flight
+    setLocal(foods);
     setExternal([]); setExtPage(0); setExtMore(false);
     if (webEnabled) void searchExternal(1);
   }, [q, webEnabled, searchExternal]);
@@ -163,19 +175,26 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   };
 
   const log = async () => {
-    if (!selected) return;
-    const foodId = await importFood(selected);
-    const n = norm(selected);
-    const factor = Number(quantity) / n.servingSize;
-    await api.post("/api/logs/food", { clientId, data: { date: todayLocal(), mealType: meal, foodId: foodId ?? null, label: selected.name, quantity: Number(quantity), unit: n.servingUnit, calories: Math.round(n.calories * factor), proteinG: Math.round(n.proteinG * factor), carbsG: Math.round(n.carbsG * factor), fatG: Math.round(n.fatG * factor) } });
-    onLogged?.(); onClose();
+    if (!selected || logging) return;
+    setLogging(true);
+    try {
+      const foodId = await importFood(selected);
+      const n = norm(selected);
+      const factor = Number(quantity) / n.servingSize;
+      await api.post("/api/logs/food", { clientId, data: { date: todayLocal(), mealType: meal, foodId: foodId ?? null, label: selected.name, quantity: Number(quantity), unit: n.servingUnit, calories: Math.round(n.calories * factor), proteinG: Math.round(n.proteinG * factor), carbsG: Math.round(n.carbsG * factor), fatG: Math.round(n.fatG * factor) } });
+      onLogged?.(); onClose();
+    } finally { setLogging(false); }
   };
 
   /** One-tap re-log: log a recent food at the exact portion it was last logged,
    *  under the currently-selected meal. The single biggest logging speed win. */
   const relog = async (r: Recent) => {
-    await api.post("/api/logs/food", { clientId, data: { date: todayLocal(), mealType: meal, foodId: r.food_id ?? null, label: r.label, quantity: r.quantity, unit: r.unit, calories: r.calories, proteinG: r.protein_g, carbsG: r.carbs_g, fatG: r.fat_g } });
-    onLogged?.(); onClose();
+    if (logging) return;
+    setLogging(true);
+    try {
+      await api.post("/api/logs/food", { clientId, data: { date: todayLocal(), mealType: meal, foodId: r.food_id ?? null, label: r.label, quantity: r.quantity, unit: r.unit, calories: r.calories, proteinG: r.protein_g, carbsG: r.carbs_g, fatG: r.fat_g } });
+      onLogged?.(); onClose();
+    } finally { setLogging(false); }
   };
 
   const snapMeal = async (photo: File) => {
@@ -275,7 +294,7 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
               ))}
             </div>
           )}
-          <div className="flex gap-3"><Button variant="ghost" onClick={() => setSelected(null)}>Back</Button><Button size="lg" className="flex-1" onClick={() => void log()}>Log it</Button></div>
+          <div className="flex gap-3"><Button variant="ghost" onClick={() => setSelected(null)}>Back</Button><Button size="lg" className="flex-1" disabled={logging} onClick={() => void log()}>{logging ? "Logging…" : "Log it"}</Button></div>
         </div>
       </Sheet>
     );
@@ -366,7 +385,7 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
                 </div>
                 <div className="space-y-1">
                   {recentList.map((r) => (
-                    <button key={`${r.food_id ?? r.label}`} onClick={() => void relog(r)} className="block w-full rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary">
+                    <button key={`${r.food_id ?? r.label}`} disabled={logging} onClick={() => void relog(r)} className="block w-full rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary disabled:opacity-60">
                       <FoodRow
                         {...normFood(r)}
                         sub={r.quantity ? `${Math.round(r.quantity)} ${r.unit ?? "g"}` : undefined}
@@ -448,7 +467,7 @@ function SnapReview({ entries, note, defaultMeal, units, onCancel, onRetake, onC
           <div className="flex items-start gap-3 rounded-2xl bg-primary/10 p-3">
             <AiAvatar className="size-8 shrink-0" />
             <div className="min-w-0">
-              <div className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">AI read</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-primary">AI read</div>
               <Markdown className="mt-0.5 text-sm">{note}</Markdown>
             </div>
           </div>

@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { currentStreak, fmtVolume, fmtEnergy, kcalToDisplay, kgToDisplay, weightLabel, energyLabel, type UnitPrefs } from "@mossa/domain";
 import { Chip, Button, IconBadge, ProgressRing, METRICS, FASTING_ZONES, Timer, FlaskConical, Pill, HeartPulse } from "@mossa/ui";
-import { api } from "../../api.js";
+import { api, todayLocal } from "../../api.js";
 import { RingCard, MiniCard, type WidgetDef, type WidgetSize } from "../widget-kit.js";
 import type { TodayBundle } from "./Today.js";
 
@@ -190,7 +190,7 @@ function SupplementsWidget({ clientId, size }: { clientId: string; size: WidgetS
   const [total, setTotal] = useState<number | null>(null);
   const [taken, setTaken] = useState(0);
   useEffect(() => {
-    const date = new Date().toISOString().slice(0, 10);
+    const date = todayLocal();
     void Promise.all([
       api.get<{ supplements: Supp[] }>(`/api/supplements?clientId=${clientId}`),
       api.get<{ taken: { supplement_id: string; slot: string }[] }>(`/api/supplements/logs?clientId=${clientId}&date=${date}`),

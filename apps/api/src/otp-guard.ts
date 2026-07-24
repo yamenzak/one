@@ -31,6 +31,13 @@ import { verifyTurnstile } from "./turnstile.js";
  *  (Better Auth's callback) still applies on top of this. */
 const OTP_COOLDOWN_MS = 30_000;
 
+/** Per-IP hourly ceiling on OTP sends. The per-email cooldown/hourly cap only
+ *  slows an attacker rotating addresses; this bounds a single source so an
+ *  email-flood or roster-fill (self-register creates a pending client per new
+ *  address) can't be driven from one host. Keyed on CF-Connecting-IP. */
+const OTP_MAX_PER_IP_PER_HOUR = 20;
+const OTP_IP_WINDOW_MS = 60 * 60 * 1000;
+
 interface SendBody { email?: unknown; type?: unknown; slug?: unknown; turnstileToken?: unknown }
 
 export const otpSendGuard: MiddlewareHandler<AppEnv> = async (c) => {
@@ -59,6 +66,23 @@ export const otpSendGuard: MiddlewareHandler<AppEnv> = async (c) => {
   const sinceLast = last?.at ? nowMs() - last.at : Infinity;
   if (sinceLast < OTP_COOLDOWN_MS) {
     return c.json({ error: "cooldown", retryAfterSec: Math.ceil((OTP_COOLDOWN_MS - sinceLast) / 1000) }, 429);
+  }
+
+  // 2b) Per-IP flood/roster-fill limit. Count this source's recent attempts
+  // (across all addresses) and block past the hourly ceiling; log the attempt so
+  // it counts toward the window regardless of the eligibility outcome below —
+  // otherwise probing invite-only tenants would slip the limit.
+  if (ip) {
+    const seen = await c.env.DB
+      .prepare("SELECT COUNT(*) AS n FROM auth_logs WHERE event = 'otp-ip' AND ip = ? AND at > ?")
+      .bind(ip, nowMs() - OTP_IP_WINDOW_MS)
+      .first<{ n: number }>()
+      .catch(() => null);
+    if ((seen?.n ?? 0) >= OTP_MAX_PER_IP_PER_HOUR) {
+      await logAuthEvent(c.env.DB, "otp-ip-throttled", email, false, ip);
+      return c.json({ error: "too_many_requests", retryAfterSec: Math.ceil(OTP_IP_WINDOW_MS / 1000) }, 429);
+    }
+    await logAuthEvent(c.env.DB, "otp-ip", email, true, ip);
   }
 
   // 3) Eligibility — only on a tenant login (branded domain or /t/<slug>).

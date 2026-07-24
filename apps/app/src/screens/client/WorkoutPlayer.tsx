@@ -9,7 +9,7 @@ import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet } 
 import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, computePlates, type ExerciseBests, type PlateBreakdown, type UnitPrefs } from "@mossa/domain";
 import {
   Button, Card, Badge, Field, Input, Label, Sheet, SubCard, ProgressRing, EmptyState,
-  Reveal, SkeletonLine, SkeletonList, useModalOverlay,
+  Reveal, Skeleton, SkeletonLine, SkeletonList, useModalOverlay,
   ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, LifeBuoy, Plus, Minus, RotateCcw, cn,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
@@ -27,7 +27,7 @@ interface ExerciseLast { date: string; sets: { reps: number | null; weightKg: nu
 type ExerciseLite = ExerciseInfo;
 
 export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: string; initialDay?: number; onExit?: () => void }) {
-  const [plan, setPlan] = useState<PlanRow | null>(null);
+  const [plan, setPlan] = useState<PlanRow | null | undefined>(undefined); // undefined = still loading
   const [allPlans, setAllPlans] = useState<PlanRow[]>([]);
   const [viewId, setViewId] = useState<string | null>(null); // null = current published plan
   const [histOpen, setHistOpen] = useState(false);
@@ -46,7 +46,10 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   const [restSignals, setRestSignals] = useState<Map<string, number>>(new Map());
   const pingRest = (key: string) => setRestSignals((m) => new Map(m).set(key, (m.get(key) ?? 0) + 1));
   const units = useUnits();
-  const date = todayLocal();
+  // Capture the session date ONCE (lazy initializer) — re-deriving todayLocal()
+  // each render would flip `date` at midnight, reloading the player and splitting
+  // an in-progress workout across two day buckets.
+  const [date] = useState(todayLocal);
 
   // "Last time" cache — one fetch per exercise, reused across every set/round of
   // the session (mirrors the food recents marquee). Cleared on client switch.
@@ -103,7 +106,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   // On a client switch, clear the previous client's plan/session/bests so their
   // data can't linger under the new client while the reload is in flight.
   useEffect(() => {
-    setPlan(null); setAllPlans([]); setSession(new Map()); setBests(new Map()); setViewId(null);
+    setPlan(undefined); setAllPlans([]); setSession(new Map()); setBests(new Map()); setViewId(null);
     lastCacheRef.current = new Map();
   }, [clientId]);
 
@@ -136,6 +139,20 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   const pastPlans = allPlans.filter((p) => p.status === "superseded");
   const pickPlan = (id: string | null) => { setViewId(id); setHistOpen(false); };
 
+  // Still loading — show a skeleton rather than flashing "No published plan"
+  // (which is indistinguishable from an empty result before the fetch resolves).
+  if (plan === undefined) return (
+    <PlanShell onEscape={onExit}>
+      <HeaderBar title="Workout plan" onBack={onExit} />
+      <div className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+        <Skeleton className="h-28 w-full rounded-2xl" />
+        <div className="grid grid-cols-2 gap-3">
+          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="aspect-[4/5] w-full rounded-2xl" />)}
+        </div>
+      </div>
+    </PlanShell>
+  );
+
   if (!plan) return (
     <PlanShell onEscape={onExit}>
       <HeaderBar title="Workout plan" onBack={onExit} />
@@ -143,7 +160,9 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
     </PlanShell>
   );
 
-  if (dayIndex === null) {
+  // Day picker — also the fallback for an invalid/out-of-range day index (e.g. a
+  // stale `/train/session/:day` deep link), so a bad param can't crash the player.
+  if (dayIndex === null || !plan.body.days[dayIndex]) {
     const trainingDays = active ? active.body.days.filter((d) => !d.isRestDay).length : 0;
     return (
       <PlanShell onEscape={onExit}>
@@ -185,7 +204,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                   {day.imageUrl ? <img src={day.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className={`absolute inset-0 ${day.isRestDay ? "bg-gradient-to-br from-sleep/20 to-surface-2" : "bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2"}`} />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
                   {!day.imageUrl && <div className="absolute inset-0 grid place-items-center text-white/35 [&_svg]:size-9">{day.isRestDay ? <Moon /> : <Dumbbell />}</div>}
-                  {day.isRestDay ? <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-[0.6rem] font-semibold text-sleep">Rest</span> : rec ? <span className="absolute right-2 top-2 rounded-full bg-activity px-2 py-0.5 text-[0.6rem] font-semibold text-white">Recommended</span> : null}
+                  {day.isRestDay ? <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-[0.6rem] font-semibold text-sleep">Rest</span> : rec ? <span className="absolute right-2 top-2 rounded-full bg-activity px-2 py-0.5 text-[0.6rem] font-semibold text-[var(--tone-foreground)]">Recommended</span> : null}
                   <div className="absolute inset-x-0 bottom-0 p-3">
                     <div className="truncate font-semibold text-white">{day.name || `Day ${i + 1}`}</div>
                     <div className="truncate text-xs text-white/75">{day.isRestDay ? "Rest day" : `${exercises} exercise${exercises === 1 ? "" : "s"} · ${sets} sets`}</div>
@@ -228,7 +247,14 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   const loggedSets = [...session.values()].reduce((n, sets) => n + sets.filter((s) => s.completed).length, 0);
 
   const saveSet = async (blockIndex: number, slotIndex: number, exerciseId: string, set: LoggedSet) => {
-    await api.post("/api/logs/workout-sets", { clientId, data: { date, workoutPlanId: plan.id, planDayIndex: dayIndex, blockIndex, slotIndex, exerciseId, sets: [set] } });
+    try {
+      await api.post("/api/logs/workout-sets", { clientId, data: { date, workoutPlanId: plan.id, planDayIndex: dayIndex, blockIndex, slotIndex, exerciseId, sets: [set] } });
+    } catch (e) {
+      // Offline / failed save — surface it and re-throw so the drawer keeps the
+      // inputs for a retry instead of silently advancing (or dying unhandled).
+      setToast("Couldn't save — check your connection"); setTimeout(() => setToast(null), 3000);
+      throw e;
+    }
     const key = `${blockIndex}:${slotIndex}`;
     const cur = session.get(key) ?? [];
     setSession(new Map(session).set(key, cur.filter((s) => s.setIndex !== set.setIndex).concat(set).sort((a, b) => a.setIndex - b.setIndex)));
@@ -245,8 +271,13 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   // Superset/circuit/hiit: log every exercise of one round together. Persist each
   // slot's set, then update session + PRs once so the round applies atomically.
   const saveRound = async (blockIndex: number, roundIndex: number, entries: { slotIndex: number; exerciseId: string; set: LoggedSet }[]) => {
-    for (const e of entries) {
-      await api.post("/api/logs/workout-sets", { clientId, data: { date, workoutPlanId: plan.id, planDayIndex: dayIndex, blockIndex, slotIndex: e.slotIndex, exerciseId: e.exerciseId, sets: [e.set] } });
+    try {
+      for (const e of entries) {
+        await api.post("/api/logs/workout-sets", { clientId, data: { date, workoutPlanId: plan.id, planDayIndex: dayIndex, blockIndex, slotIndex: e.slotIndex, exerciseId: e.exerciseId, sets: [e.set] } });
+      }
+    } catch (e) {
+      setToast("Couldn't save — check your connection"); setTimeout(() => setToast(null), 3000);
+      throw e;
     }
     const nextSession = new Map(session);
     for (const e of entries) {
@@ -298,7 +329,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
             <li key={i} className="flex gap-3">
               {/* Timeline rail — numbered node + connector down to the next step. */}
               <div className="flex flex-col items-center">
-                <div className={cn("z-10 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ring-4 ring-background transition-colors [&_svg]:size-4", done ? "bg-activity text-white" : "bg-surface-3 text-muted-foreground")}>
+                <div className={cn("z-10 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ring-4 ring-background transition-colors [&_svg]:size-4", done ? "bg-activity text-[var(--tone-foreground)]" : "bg-surface-3 text-muted-foreground")}>
                   {done ? <Check strokeWidth={3} /> : i + 1}
                 </div>
                 {!last && <div className="w-px flex-1 bg-border/60" />}
@@ -411,7 +442,7 @@ function PlanShell({ children, onEscape }: { children: ReactNode; onEscape?: () 
  *  session, matching the meal-plan drawer so plans feel identical app-wide. */
 function HeaderBar({ title, subtitle, onBack, right }: { title: string; subtitle?: ReactNode; onBack?: () => void; right?: ReactNode }) {
   return (
-    <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-border/40 bg-background/85 px-4 py-3 backdrop-blur-xl">
+    <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-border/40 bg-background/85 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 backdrop-blur-xl">
       {onBack && <button onClick={onBack} aria-label="Back" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><ArrowLeft /></button>}
       <div className="min-w-0 flex-1"><div className="truncate text-base font-bold tracking-tight">{title}</div>{subtitle != null && <div className="truncate text-xs text-muted-foreground">{subtitle}</div>}</div>
       {right}
@@ -542,6 +573,7 @@ function SetLogDrawer({ slot, exerciseId, exerciseName, logged, fetchLast, onClo
   const [weight, setWeight] = useState("");
   const [effort, setEffort] = useState<"easy" | "perfect" | "hard" | null>(null);
   const [last, setLast] = useState<ExerciseLast | null>(null);
+  const [busy, setBusy] = useState(false);
   const prescribed = slot.sets[Math.min(setIndex, slot.sets.length - 1)];
   const showWeight = prescribed?.weightMode !== "bodyweight";
   const editing = completed.some((s) => s.setIndex === setIndex);
@@ -578,22 +610,28 @@ function SetLogDrawer({ slot, exerciseId, exerciseName, logged, fetchLast, onClo
   };
 
   const save = async () => {
+    if (busy) return; // in-flight guard: a double-tap must not double-advance setIndex
+    setBusy(true);
     const wasEditing = editing;
     // Guard a bad decimal (e.g. "70.5.5" → NaN): drop it rather than posting NaN
     // and feeding a bogus PR into detectPrs.
     const wNum = Number(weight);
-    await onSave({
-      setIndex,
-      reps: needsReps(mode) ? (reps ? Number(reps) : prescribed?.reps ?? null) : null,
-      durationSeconds: needsDuration(mode) ? (duration ? Number(duration) : prescribed?.timeSec ?? null) : null,
-      distanceM: needsDistance(mode) ? (distance ? Number(distance) : prescribed?.distanceM ?? null) : null,
-      weightKg: showWeight && weight && Number.isFinite(wNum) ? Math.round(displayToKg(wNum, units) * 100) / 100 : null,
-      effortLabel: effort,
-      completed: true,
-    });
-    setReps(""); setDuration(""); setDistance(""); setWeight(""); setEffort(null);
-    if (wasEditing) setSetIndex(completed.length);
-    else setSetIndex((i) => i + 1);
+    try {
+      await onSave({
+        setIndex,
+        reps: needsReps(mode) ? (reps ? Number(reps) : prescribed?.reps ?? null) : null,
+        durationSeconds: needsDuration(mode) ? (duration ? Number(duration) : prescribed?.timeSec ?? null) : null,
+        distanceM: needsDistance(mode) ? (distance ? Number(distance) : prescribed?.distanceM ?? null) : null,
+        weightKg: showWeight && weight && Number.isFinite(wNum) ? Math.round(displayToKg(wNum, units) * 100) / 100 : null,
+        effortLabel: effort,
+        completed: true,
+      });
+      setReps(""); setDuration(""); setDistance(""); setWeight(""); setEffort(null);
+      if (wasEditing) setSetIndex(completed.length);
+      else setSetIndex((i) => i + 1);
+    } catch {
+      // The parent surfaced the failure — keep the inputs so the set can be retried.
+    } finally { setBusy(false); }
   };
 
   const canLog = editing || setIndex < slot.sets.length;
@@ -639,7 +677,7 @@ function SetLogDrawer({ slot, exerciseId, exerciseName, logged, fetchLast, onClo
             ))}
           </div>
         </div>
-        <Button size="lg" className="w-full" onClick={() => void save()} disabled={!canLog}>{editing ? `Update set ${setIndex + 1}` : setIndex >= slot.sets.length ? "All sets logged" : "Log set"}</Button>
+        <Button size="lg" className="w-full" onClick={() => void save()} disabled={!canLog || busy}>{editing ? `Update set ${setIndex + 1}` : setIndex >= slot.sets.length ? "All sets logged" : "Log set"}</Button>
       </div>
     </Sheet>
   );
@@ -681,6 +719,7 @@ function RoundLogDrawer({ block, roundIndex, exercises, fetchLast, onClose, onSa
   };
 
   const save = async () => {
+    if (busy) return;
     setBusy(true);
     try {
       const entries = block.slots.map((slot, si) => {
@@ -705,6 +744,8 @@ function RoundLogDrawer({ block, roundIndex, exercises, fetchLast, onClose, onSa
       });
       await onSave(entries);
       onClose();
+    } catch {
+      // The parent surfaced the failure — keep the round open so it can be retried.
     } finally { setBusy(false); }
   };
 
@@ -966,29 +1007,56 @@ function fmtClock(sec: number): string {
  * countdown, tap again to reset. Buzzes and flashes "Go" when it lands on zero.
  * Used between the set dots (per-set rest) and between exercises (step rest).
  */
+/** A minimal WakeLock sentinel shape — enough to hold + release without relying
+ *  on the DOM lib's (still-optional) WakeLock typings. */
+type WakeSentinel = { release: () => Promise<void> };
+
 function RestTimer({ seconds, label, className, autoStart }: { seconds: number; label?: boolean; className?: string; autoStart?: number }) {
   const [left, setLeft] = useState<number | null>(null);
+  // Wall-clock target: the countdown is derived from this absolute end time, not
+  // by decrementing per tick — so it stays accurate (never drifts or freezes)
+  // even when setInterval is throttled/paused while the phone locks mid-rest.
+  const endAtRef = useRef<number | null>(null);
+  const wakeRef = useRef<WakeSentinel | null>(null);
+  const prevAuto = useRef(autoStart);
+
+  const releaseWake = () => { try { void wakeRef.current?.release(); } catch { /* ignore */ } wakeRef.current = null; };
+  const requestWake = () => {
+    const wl = (navigator as unknown as { wakeLock?: { request: (t: string) => Promise<WakeSentinel> } }).wakeLock;
+    if (!wl) return; // unsupported (e.g. iOS Safari) — countdown still works
+    wl.request("screen").then((s) => { wakeRef.current = s; }).catch(() => { /* denied / not visible */ });
+  };
+  const begin = (secs: number) => { endAtRef.current = Date.now() + secs * 1000; setLeft(secs); requestWake(); };
+  const stop = () => { endAtRef.current = null; setLeft(null); releaseWake(); };
+
   // Auto-start when the parent bumps `autoStart` (a set was just logged). The
   // nonce only changes on a real save, so this never fires on mount or twice.
-  const prevAuto = useRef(autoStart);
   useEffect(() => {
     if (autoStart === undefined || autoStart === prevAuto.current) return;
     prevAuto.current = autoStart;
-    setLeft(seconds);
-  }, [autoStart, seconds]);
+    begin(seconds);
+  }, [autoStart, seconds]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (left === null) return;
-    if (left <= 0) { navigator.vibrate?.([40, 30, 60]); const t = setTimeout(() => setLeft(null), 1100); return () => clearTimeout(t); }
-    const t = setInterval(() => setLeft((r) => (r == null ? null : r - 1)), 1000);
+    if (left <= 0) { navigator.vibrate?.([40, 30, 60]); releaseWake(); const t = setTimeout(() => { setLeft(null); endAtRef.current = null; }, 1100); return () => clearTimeout(t); }
+    const tick = () => { const end = endAtRef.current; if (end != null) setLeft(Math.max(0, Math.round((end - Date.now()) / 1000))); };
+    const t = setInterval(tick, 250);
     return () => clearInterval(t);
   }, [left]);
+  // Re-acquire the wake lock when returning to a still-running timer (a screen
+  // lock auto-releases it), and release it if unmounted mid-rest.
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible" && endAtRef.current != null && !wakeRef.current) requestWake(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { document.removeEventListener("visibilitychange", onVisible); releaseWake(); };
+  }, []);
   const running = left !== null && left > 0;
   const done = left === 0;
   return (
-    <button type="button" onClick={(e) => { e.stopPropagation(); setLeft((r) => (r === null ? seconds : null)); }}
+    <button type="button" onClick={(e) => { e.stopPropagation(); if (left === null) begin(seconds); else stop(); }}
       aria-label={running ? "Reset rest timer" : "Start rest timer"}
       className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-semibold tabular-nums transition-colors [&_svg]:size-3",
-        done ? "bg-activity text-white" : running ? "bg-cardio text-white" : "bg-surface-3 text-muted-foreground hover:bg-surface-2", className)}>
+        done ? "bg-activity text-[var(--tone-foreground)]" : running ? "bg-cardio text-[var(--tone-foreground)]" : "bg-surface-3 text-muted-foreground hover:bg-surface-2", className)}>
       <Timer />{done ? "Go!" : `${label ? "Rest " : ""}${fmtClock(running ? left! : seconds)}`}
     </button>
   );

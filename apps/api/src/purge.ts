@@ -16,6 +16,8 @@ import type { Env } from "./env.js";
 import { purgePrefix } from "./storage.js";
 import { stripeConfig, stripeEnabled, stripeCall } from "./stripe.js";
 import { notifyUser } from "./inbox-do.js";
+import { saasConfig, deleteCustomHostname } from "./cloudflare.js";
+import { invalidateHostCache } from "./host-context.js";
 
 /** Tables that carry a `client_id` — everything a single client's record owns. */
 const CLIENT_TABLES = [
@@ -54,6 +56,20 @@ export async function purgeClient(env: Env, tenantId: string, clientId: string):
   await purgePrefix(env, `t/${tenantId}/c/${clientId}/`);
   for (const table of CLIENT_TABLES) await run(env.DB, `DELETE FROM ${table} WHERE client_id = ?`, clientId);
   await run(env.DB, "DELETE FROM clients WHERE id = ?", clientId);
+}
+
+/** Deregister a tenant's custom domains (Cloudflare for SaaS) and drop their
+ *  host→tenant KV cache entries — otherwise a purged tenant's hostname keeps a
+ *  live CF custom hostname and a stale cache row pointing at a deleted tenant.
+ *  Best-effort; teardown proceeds even if Cloudflare is unreachable. */
+async function purgeTenantDomains(env: Env, tenantId: string): Promise<void> {
+  const rows = (await env.DB.prepare("SELECT hostname, cf_hostname_id FROM tenant_domains WHERE tenant_id = ?").bind(tenantId).all<{ hostname: string; cf_hostname_id: string | null }>().catch(() => ({ results: [] as { hostname: string; cf_hostname_id: string | null }[] }))).results ?? [];
+  if (!rows.length) return;
+  const cfg = await saasConfig(env.DB).catch(() => null);
+  for (const r of rows) {
+    if (cfg && r.cf_hostname_id) await deleteCustomHostname(cfg, r.cf_hostname_id).catch(() => undefined);
+    await invalidateHostCache(env, r.hostname);
+  }
 }
 
 /** Cancel a tenant's platform Stripe subscription (best-effort). */
@@ -115,6 +131,9 @@ async function purgeUserIdentity(env: Env, userId: string): Promise<void> {
  */
 export async function purgeTenant(env: Env, tenantId: string): Promise<void> {
   await cancelTenantStripe(env, tenantId);
+  // Deregister CF custom hostnames + drop their host-cache KV entries BEFORE the
+  // tenant_domains rows go, so nothing keeps routing to a deleted tenant.
+  await purgeTenantDomains(env, tenantId);
 
   // Members up front — we need their ids to decide identity deletion later.
   const members = (await env.DB.prepare('SELECT userId FROM "member" WHERE organizationId = ?').bind(tenantId).all<{ userId: string }>().catch(() => ({ results: [] as { userId: string }[] }))).results ?? [];

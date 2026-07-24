@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
 import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, PhotoGrid, ConfirmDialog, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon, User } from "@mossa/ui";
-import { api } from "../../api.js";
+import { api, todayLocal } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
@@ -170,7 +170,7 @@ export function ClientManage({ clientId }: { clientId: string }) {
                   <button onClick={() => setSuppToDiscontinue(s)} aria-label="Discontinue supplement" className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:text-danger [&_svg]:size-4"><X /></button>
                 </div>
               </div>
-              {s.schedule && s.schedule.length > 0 && <div className="flex flex-wrap gap-1.5">{s.schedule.map((sc, i) => <span key={i} className="rounded-full bg-surface-3 px-2 py-0.5 text-[0.65rem] font-medium capitalize text-muted-foreground">{sc.slot.replace(/_/g, " ")}</span>)}</div>}
+              {s.schedule && s.schedule.length > 0 && <div className="flex flex-wrap gap-1.5">{s.schedule.map((sc, i) => <span key={i} className="rounded-full bg-surface-3 px-2 py-0.5 text-xs font-medium capitalize text-muted-foreground">{sc.slot.replace(/_/g, " ")}</span>)}</div>}
             </SubCard>
           ))}
         </Card>
@@ -263,7 +263,7 @@ function ActivityLog({ clientId }: { clientId: string }) {
                   <div className="min-w-0 flex-1">
                     <div className="text-sm"><span className="font-medium">{it.actor ?? "A coach"}</span> {it.label}{it.summary ? <span className="text-muted-foreground"> · {it.summary}</span> : null}</div>
                   </div>
-                  <span className="shrink-0 text-[0.7rem] text-muted-foreground">{timeAgo(it.at)}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(it.at)}</span>
                 </div>
               );
             })}
@@ -354,7 +354,7 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
         return (
           <SubCard key={c.id} id={`mng-ci-${c.id}`} className="space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-medium">{new Date(c.date_local).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}</span>
+              <span className="font-medium">{new Date(`${c.date_local}T00:00:00`).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}</span>
               {c.weight_kg && <span className="numeral text-xs font-medium text-muted-foreground">{fmtWeight(c.weight_kg, units)}</span>}
             </div>
             {meta && <div className="text-xs text-muted-foreground">{meta}</div>}
@@ -542,7 +542,7 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
   useEffect(() => {
     let alive = true;
     setReport(null);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayLocal();
     void api.get<Report>(`/api/reports/client/${clientId}?range=${range}&today=${today}`).then((r) => { if (alive) setReport(r); });
     return () => { alive = false; };
   }, [clientId, range]);
@@ -583,5 +583,5 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) {
-  return <div className="rounded-xl bg-secondary p-3"><div className="numeral text-lg font-semibold">{value}</div><div className="text-[0.65rem] text-muted-foreground">{label}</div></div>;
+  return <div className="rounded-xl bg-secondary p-3"><div className="numeral text-lg font-semibold">{value}</div><div className="text-xs text-muted-foreground">{label}</div></div>;
 }

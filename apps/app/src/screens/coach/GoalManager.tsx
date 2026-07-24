@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fmtEnergy, fmtVolume, weightLabel, displayToKg, kgToDisplay,
   kcalToDisplay, displayToKcal, mlToVolumeDisplay, volumeDisplayToMl, energyLabel, volumeLabel,
-  calculateNutritionTargets, validateCalculatorInputs,
+  calculateNutritionTargets, validateCalculatorInputs, DEFAULT_WEEKLY_LOAD_TARGET,
   PRIMARY_GOAL_LABELS, ACTIVITY_LEVEL_LABELS, DIETARY_APPROACH_LABELS, WORKOUT_LOCATION_LABELS, BMI_CATEGORY_LABELS,
   type ClientPreferences, type BmiCategory, type CalculatorInputs, type Gender, type ActivityLevel, type PrimaryGoal, type DietaryApproach, type UnitPrefs,
 } from "@mossa/domain";
@@ -61,6 +61,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [formula, setFormula] = useState<Formula>({ primaryGoal: "maintain", activityLevel: "moderate", dietaryApproach: "balanced" });
   const [form, setForm] = useState({ label: "", startDate: "", weightMin: "", weightMax: "", notes: "" });
+  const [weeklyLoad, setWeeklyLoad] = useState(""); // trainer-set weekly Training-Load target (SPEC §8.11)
   const [rangeOpen, setRangeOpen] = useState(false);
   const [targets, setTargets] = useState<Record<TargetKey, string>>(emptyTargets);
   const [edited, setEdited] = useState(false); // coach hand-tweaked → don't auto-overwrite
@@ -148,6 +149,9 @@ export function GoalManager({ clientId }: { clientId: string }) {
     try {
       const targetsObj: Record<string, number> = {};
       for (const { key } of TARGET_FIELDS) if (targets[key] !== "" && Number.isFinite(Number(targets[key]))) targetsObj[key] = toMetricVal(key, Number(targets[key]), units);
+      // Weekly Training-Load target rides on targets_json ("weeklyTrainingLoad"),
+      // read back by the client's Train tab (SPEC §8.11). Metric — no unit convert.
+      if (weeklyLoad !== "" && Number.isFinite(Number(weeklyLoad)) && Number(weeklyLoad) > 0) targetsObj.weeklyTrainingLoad = Math.round(Number(weeklyLoad));
       const rangesObj: Record<string, { min: number | null; max: number | null }> = {};
       if (rangeOpen && (form.weightMin || form.weightMax)) rangesObj.weightKg = { min: form.weightMin ? displayToKg(Number(form.weightMin), units) : null, max: form.weightMax ? displayToKg(Number(form.weightMax), units) : null };
       const ranges = Object.keys(rangesObj).length ? rangesObj : undefined;
@@ -171,6 +175,12 @@ export function GoalManager({ clientId }: { clientId: string }) {
   };
 
   const active = goals?.find((g) => g.status === "active");
+  // Seed the weekly-load input from the active goal so the coach edits the live
+  // value rather than a blank (falls back to the domain default when unset).
+  useEffect(() => {
+    const v = active?.targets?.weeklyTrainingLoad;
+    if (typeof v === "number" && v > 0) setWeeklyLoad(String(v));
+  }, [active]);
   const history = goals?.filter((g) => g.status !== "active") ?? [];
   const windowEnd = useMemo(() => {
     const m = new Map<string, string>();
@@ -308,6 +318,10 @@ export function GoalManager({ clientId }: { clientId: string }) {
             </div>
           </div>
 
+          {/* Weekly Training-Load target — the client's Train tab rings against
+              this (SPEC §8.11); blank falls back to the default. */}
+          <Field label="Weekly training-load target" icon={Activity} inputMode="numeric" value={weeklyLoad} onChange={(e) => setWeeklyLoad(e.target.value.replace(/[^\d]/g, ""))} placeholder={String(DEFAULT_WEEKLY_LOAD_TARGET)} hint="Summed session load the client aims for each week." />
+
           <Field type="date" label="Effective from" icon={Calendar} value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} hint={active ? `Replaces "${active.label}" from this date. Past days keep the goal they were logged under.` : "Defaults to today."} />
 
           {active?.targets && newCals != null && (
@@ -359,7 +373,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {TARGET_FIELDS.filter(({ key }) => g.targets?.[key] != null).map(({ key, metric }) => (
-                    <span key={key} className="numeral inline-flex items-center gap-1 rounded-md bg-secondary px-1.5 py-0.5 text-[0.7rem] text-muted-foreground">
+                    <span key={key} className="numeral inline-flex items-center gap-1 rounded-md bg-secondary px-1.5 py-0.5 text-xs text-muted-foreground">
                       {METRICS[metric].label} {fmtTarget(key, g.targets![key]!, units)}
                     </span>
                   ))}

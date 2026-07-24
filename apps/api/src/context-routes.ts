@@ -14,7 +14,7 @@ import { resolveUnits, overallDaysRemaining, NOTIF_TYPES, notifVisibleInSurface,
 import { type AppEnv, isPlatformAdmin, requireTenant } from "./auth-context.js";
 import { clientForUser } from "./clients.js";
 import { resolveClientFlagsFor } from "./client-flags.js";
-import { tenantEntitlements, seedBilling } from "./billing-store.js";
+import { tenantEntitlements, seedBilling, withinQuota } from "./billing-store.js";
 import { parseJson, j } from "./db.js";
 import { nowIso } from "./ids.js";
 
@@ -55,6 +55,50 @@ export const contextRoutes = new Hono<AppEnv>()
           .run()
           .catch(() => undefined);
       }
+    }
+
+    // Staff invitation auto-accept (SPEC §4): a pending `invitation` row addressed
+    // to this email mints the staff membership on sign-in — the mirror of the
+    // client auto-link above, so an invited trainer/assistant lands in the studio
+    // the moment they verify their code (the /accept-invitation deep link is a
+    // convenience, not the only path). Seat quota is enforced here, at the point
+    // the seat is actually consumed: past the plan's staffSeats ceiling the
+    // invite stays pending (the owner must free a seat or upgrade) rather than
+    // over-filling the roster.
+    const nowMsT = Date.now();
+    const invites = await c.env.DB.prepare(
+      "SELECT id, organizationId, role, expiresAt FROM \"invitation\" WHERE status = 'pending' AND LOWER(email) = LOWER(?)",
+    )
+      .bind(user.email)
+      .all<{ id: string; organizationId: string; role: string | null; expiresAt: string | number | null }>();
+    for (const inv of invites.results ?? []) {
+      const exp = inv.expiresAt != null ? new Date(inv.expiresAt as string).getTime() : NaN;
+      if (Number.isFinite(exp) && exp < nowMsT) continue; // expired — leave it
+      const already = await c.env.DB.prepare(
+        'SELECT 1 AS x FROM "member" WHERE organizationId = ? AND userId = ?',
+      )
+        .bind(inv.organizationId, user.id)
+        .first<{ x: number }>();
+      if (!already) {
+        const staff = await c.env.DB.prepare(
+          "SELECT COUNT(*) AS n FROM \"member\" WHERE organizationId = ? AND role != 'client'",
+        )
+          .bind(inv.organizationId)
+          .first<{ n: number }>();
+        const seat = await withinQuota(c.env.DB, inv.organizationId, "staffSeats", staff?.n ?? 0);
+        if (!seat.ok) continue; // over the seat ceiling — keep the invite pending
+        const role = inv.role && inv.role !== "client" ? inv.role : "trainer";
+        await c.env.DB.prepare(
+          'INSERT INTO "member" (id, organizationId, userId, role, createdAt) VALUES (?, ?, ?, ?, ?)',
+        )
+          .bind(`mem_${inv.id}`, inv.organizationId, user.id, role, new Date().toISOString())
+          .run()
+          .catch(() => undefined);
+      }
+      await c.env.DB.prepare('UPDATE "invitation" SET status = ? WHERE id = ?')
+        .bind("accepted", inv.id)
+        .run()
+        .catch(() => undefined);
     }
 
     const memberships = await c.env.DB.prepare(

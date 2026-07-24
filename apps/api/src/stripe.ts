@@ -39,6 +39,23 @@ const encodeForm = (obj: Record<string, string | number | undefined>): string =>
   return p.toString();
 };
 
+/**
+ * Pinned Stripe API version. Our webhook handlers + expands read pre-"Basil"
+ * field shapes — `invoice.subscription`, `invoice.payment_intent`, and the
+ * `latest_invoice.payment_intent` expand on a Subscription — which the Basil
+ * series (2025-03-31+, the default for accounts created after that date) moved
+ * or removed. Pinning EVERY API call to the last Acacia version keeps those
+ * shapes stable regardless of when the Stripe account was created, so inline
+ * plan checkout and Connect renewals behave identically everywhere.
+ *
+ * NOTE: this header pins REQUEST/response shapes. Webhook EVENT payload shapes
+ * follow the version configured on the webhook endpoint (or the account
+ * default), so the platform + connect webhook endpoints must be created/pinned
+ * at this same version in the Stripe dashboard for `invoice.subscription` etc.
+ * to arrive in the shape the handlers expect.
+ */
+export const STRIPE_API_VERSION = "2025-02-24.acacia";
+
 export async function stripeCall<T = unknown>(
   secretKey: string,
   path: string,
@@ -48,6 +65,7 @@ export async function stripeCall<T = unknown>(
   const headers: Record<string, string> = {
     Authorization: `Bearer ${secretKey}`,
     "Content-Type": "application/x-www-form-urlencoded",
+    "Stripe-Version": STRIPE_API_VERSION,
   };
   if (opts?.connectedAccount) headers["Stripe-Account"] = opts.connectedAccount;
   if (opts?.idempotencyKey) headers["Idempotency-Key"] = opts.idempotencyKey;
@@ -67,10 +85,22 @@ const WEBHOOK_TOLERANCE_S = 300;
 
 /** HMAC-SHA256 webhook signature verification (t + v1 scheme). */
 export async function verifyWebhook(payload: string, sigHeader: string, secret: string): Promise<boolean> {
-  const parts = Object.fromEntries(sigHeader.split(",").map((p) => p.split("=") as [string, string]));
-  const t = parts["t"];
-  const v1 = parts["v1"];
-  if (!t || !v1) return false;
+  // The signature header is a comma-separated list of `k=v` pairs. During a
+  // webhook-secret ROTATION Stripe signs the payload with BOTH the old and the
+  // new secret and emits MULTIPLE `v1=` entries — so collect EVERY v1 (not just
+  // the last, which `Object.fromEntries` would keep) and accept if ANY matches,
+  // or a legitimate webhook is rejected mid-rotation.
+  let t: string | undefined;
+  const v1s: string[] = [];
+  for (const part of sigHeader.split(",")) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    const k = part.slice(0, eq);
+    const v = part.slice(eq + 1);
+    if (k === "t") t = v;
+    else if (k === "v1") v1s.push(v);
+  }
+  if (!t || v1s.length === 0) return false;
   // Timestamp tolerance: a captured, validly-signed payload must not be
   // replayable indefinitely (not every handler is idempotent by event id).
   const ts = Number(t);
@@ -78,11 +108,13 @@ export async function verifyWebhook(payload: string, sigHeader: string, secret: 
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${payload}`));
   const expected = [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
-  // Constant-time-ish compare.
-  if (expected.length !== v1.length) return false;
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ v1.charCodeAt(i);
-  return diff === 0;
+  // Constant-time-ish compare against each provided v1 signature.
+  return v1s.some((v1) => {
+    if (expected.length !== v1.length) return false;
+    let diff = 0;
+    for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ v1.charCodeAt(i);
+    return diff === 0;
+  });
 }
 
 /** Lazily ensure a Stripe customer for the tenant; returns its id. */

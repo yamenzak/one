@@ -34,6 +34,7 @@ import { Shop } from "./screens/client/Shop.js";
 import { Explore } from "./screens/client/Explore.js";
 import { AdminConsole } from "./screens/admin/AdminConsole.js";
 import { NotificationBell } from "./NotificationBell.js";
+import { ErrorBoundary } from "./ErrorBoundary.js";
 import { TourProvider, useTour, type TourId } from "./tour.js";
 
 const CLIENT_TABS: TabDef[] = [
@@ -61,6 +62,7 @@ function useClientSurface(): boolean {
 export function Shell() {
   const { ctx } = useSession();
   const active = ctx!.active!;
+  const loc = useLocation();
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
   const gateClientId = active.role === "client" ? active.clientId : null;
   useEffect(() => {
@@ -81,6 +83,10 @@ export function Shell() {
 
   return (
     <TourProvider>
+    {/* Backstop boundary: a crash in any full-screen route (admin, settings,
+        plan builder…) recovers here instead of white-screening the app. Keyed by
+        pathname so navigating away clears the error. */}
+    <ErrorBoundary resetKey={loc.pathname}>
     <Routes>
       {/* Full-screen surfaces (no tab chrome). */}
       <Route path="/settings" element={<SettingsRoute view="studio" />} />
@@ -116,6 +122,7 @@ export function Shell() {
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Route>
     </Routes>
+    </ErrorBoundary>
     </TourProvider>
   );
 }
@@ -303,7 +310,7 @@ function TabLayout() {
       {/* Remount the routed content when the APP tour toggles, so screens refetch
           through the (mock ↔ live) api interceptor. The workout/meal tours annotate
           the real screen in place, so they must NOT remount it. */}
-      <main key={activeTour === "app" ? "tour" : "live"}><Outlet /></main>
+      <main key={activeTour === "app" ? "tour" : "live"}><ErrorBoundary resetKey={loc.pathname}><Outlet /></ErrorBoundary></main>
       </div>
 
       <BottomTabs tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} tinted={tintedNav} />
@@ -399,5 +406,10 @@ function PlanBuilderRoute() {
 function TrainSessionRoute({ clientId }: { clientId: string }) {
   const nav = useNavigate();
   const { day } = useParams<{ day?: string }>();
-  return <WorkoutPlayer clientId={clientId} initialDay={day != null ? Number(day) : undefined} onExit={() => nav("/train")} />;
+  // Sanitize the route param: only a non-negative integer is a valid day index.
+  // Junk ("abc") or a negative value falls back to the day picker rather than
+  // indexing plan.body.days out of bounds; the player clamps the upper end.
+  const parsed = day != null ? Number(day) : NaN;
+  const initialDay = Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
+  return <WorkoutPlayer clientId={clientId} initialDay={initialDay} onExit={() => nav("/train")} />;
 }

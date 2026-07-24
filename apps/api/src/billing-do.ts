@@ -218,14 +218,52 @@ export class TenantBillingDO extends DurableObject<Env> {
    * grant) keep the non-rollover visible in history.
    */
   async grantMonthly(credits: number, periodKey: string): Promise<BalanceView> {
-    const last = await this.ctx.storage.get<string>("lastGrantKey");
-    if (last === periodKey) return this.view();
     const grant = Math.max(0, Math.floor(credits));
+    const last = await this.ctx.storage.get<string>("lastGrantKey");
     const { purchased, granted } = await this.buckets();
+    if (last === periodKey) {
+      // Same period, called AGAIN. The two shapes:
+      //  - Same plan re-run (the cron on the 1st + a renewal invoice.paid in the
+      //    same month): grant === the amount already granted → NO-OP, so a
+      //    re-grant can't refill credits the tenant already spent this period
+      //    (use-it-or-lose-it holds).
+      //  - A mid-month PLAN UPGRADE (Solo→Studio) grants a LARGER amount for the
+      //    same calendar month. A plain reset would refill spent credits; a plain
+      //    no-op (the old behaviour) would leave the paid-for upgrade ungranted
+      //    until next month. Instead TOP UP by the delta so the tenant gets the
+      //    bigger plan's allotment while keeping whatever they've already used.
+      const lastAmount = (await this.ctx.storage.get<number>("lastGrantAmount")) ?? granted;
+      const delta = grant - lastAmount;
+      if (delta <= 0) return this.view();
+      await this.ctx.storage.put("lastGrantAmount", grant);
+      await this.ctx.storage.put("granted", granted + delta);
+      await this.record(delta, purchased + granted + delta, "grant.upgrade", periodKey);
+      return this.view();
+    }
     await this.ctx.storage.put("lastGrantKey", periodKey);
+    await this.ctx.storage.put("lastGrantAmount", grant);
     await this.ctx.storage.put("granted", grant);
     if (granted > 0) await this.record(-granted, purchased, "grant.expire", periodKey);
     if (grant > 0) await this.record(grant, purchased + grant, "grant.monthly", periodKey);
+    return this.view();
+  }
+
+  /**
+   * Reverse a `purchased`-bucket credit (a refunded or disputed credit pack).
+   * Debits from `purchased` ONLY — never the plan grant — clamped at zero, so a
+   * tenant who already spent the refunded credits simply lands on their
+   * remaining balance and never goes negative. Mirrors `topUp` in reverse.
+   */
+  async revokePurchased(credits: number, reason = "pack.refund", ref?: string): Promise<BalanceView> {
+    const remove = Math.max(0, Math.floor(credits));
+    const { purchased, granted } = await this.buckets();
+    if (remove > 0) {
+      const nextPurchased = Math.max(0, purchased - remove);
+      if (nextPurchased !== purchased) {
+        await this.ctx.storage.put("purchased", nextPurchased);
+        await this.record(nextPurchased - purchased, nextPurchased + granted, reason, ref);
+      }
+    }
     return this.view();
   }
 

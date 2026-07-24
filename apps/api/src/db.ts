@@ -15,10 +15,34 @@
 
 let schemaReady: Promise<void> | null = null;
 
+/** Bump when the DDL or `alters` below change, to force one re-run across every
+ *  isolate. A matching `schema_version` marker row lets subsequent cold starts
+ *  skip the full DDL+ALTER+backfill (a single SELECT instead of ~110 DDL + ~45
+ *  ALTER round-trips against live D1). */
+const SCHEMA_VERSION = "2026-07-24";
+
 export function ensureSchema(db: D1Database): Promise<void> {
   if (!schemaReady) {
-    schemaReady = db
-      .exec(
+    schemaReady = applySchema(db).catch((err) => {
+      schemaReady = null; // allow retry on next request
+      throw err;
+    });
+  }
+  return schemaReady;
+}
+
+async function applySchema(db: D1Database): Promise<void> {
+  // Fast path: the marker row records the last fully-applied schema version. If
+  // it matches, the DDL + ALTER + backfill already ran against this D1 — skip it
+  // (best-effort read: on a brand-new database app_config may not exist yet).
+  const applied = await db
+    .prepare("SELECT value FROM app_config WHERE key = 'schema_version'")
+    .first<{ value: string }>()
+    .catch(() => null);
+  if (applied?.value === SCHEMA_VERSION) return;
+
+  await db
+    .exec(
         [
           // ── Better Auth (org = tenant; 100% passwordless: OTP + passkey) ──
           'CREATE TABLE IF NOT EXISTS "user" (id TEXT PRIMARY KEY, name TEXT, email TEXT UNIQUE, emailVerified INTEGER, image TEXT, createdAt DATE, updatedAt DATE);',
@@ -88,6 +112,10 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "CREATE INDEX IF NOT EXISTS idx_wplans_client ON workout_plans(client_id, status);",
           "CREATE TABLE IF NOT EXISTS workout_templates (id TEXT PRIMARY KEY, tenant_id TEXT, visibility TEXT DEFAULT 'private', name TEXT, description TEXT, body_json TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
           "CREATE TABLE IF NOT EXISTS swap_requests (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, workout_plan_id TEXT, day_index INTEGER, block_index INTEGER, slot_index INTEGER, current_exercise_id TEXT, suggested_exercise_id TEXT, reason TEXT, status TEXT DEFAULT 'pending', trainer_note TEXT, resolved_by TEXT, created_at TEXT, resolved_at TEXT);",
+          // Per-client swap list + the roster/attention scans (client_id IN …);
+          // the tenant queue reads WHERE tenant_id = ? AND status = 'pending'.
+          "CREATE INDEX IF NOT EXISTS idx_swaps_client ON swap_requests(client_id, status);",
+          "CREATE INDEX IF NOT EXISTS idx_swaps_tenant ON swap_requests(tenant_id, status);",
 
           // ── Nutrition system (SPEC §8.4) ───────────────────────────────────
           "CREATE TABLE IF NOT EXISTS foods (id TEXT PRIMARY KEY, tenant_id TEXT, name TEXT, brand TEXT, barcode TEXT, serving_size REAL DEFAULT 100, serving_unit TEXT DEFAULT 'g', calories REAL DEFAULT 0, protein_g REAL DEFAULT 0, carbs_g REAL DEFAULT 0, fat_g REAL DEFAULT 0, fiber_g REAL DEFAULT 0, sugar_g REAL DEFAULT 0, sodium_mg REAL DEFAULT 0, saturated_fat_g REAL DEFAULT 0, cholesterol_mg REAL DEFAULT 0, potassium_mg REAL DEFAULT 0, calcium_mg REAL DEFAULT 0, iron_mg REAL DEFAULT 0, description TEXT, image_url TEXT, visibility TEXT DEFAULT 'tenant', source TEXT DEFAULT 'custom', source_id TEXT, verified INTEGER DEFAULT 0, active INTEGER DEFAULT 1, created_by TEXT, created_at TEXT);",
@@ -130,8 +158,12 @@ export function ensureSchema(db: D1Database): Promise<void> {
 
           // ── Supplements & labs (SPEC §8.8) ─────────────────────────────────
           "CREATE TABLE IF NOT EXISTS supplements (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, prescribed_by TEXT, name TEXT, brand TEXT, kind TEXT, dose TEXT, schedule_json TEXT, notes TEXT, linked_lab_id TEXT, start_date TEXT, end_date TEXT, status TEXT DEFAULT 'active', created_at TEXT);",
+          // Every supplements read is per-client (WHERE client_id = ? AND status).
+          "CREATE INDEX IF NOT EXISTS idx_supplements_client ON supplements(client_id, status);",
           "CREATE TABLE IF NOT EXISTS supplement_logs (client_id TEXT, supplement_id TEXT, date_local TEXT, slot TEXT, tenant_id TEXT, taken_at TEXT, PRIMARY KEY (client_id, supplement_id, date_local, slot));",
           "CREATE TABLE IF NOT EXISTS lab_tests (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, requested_by TEXT, type TEXT, custom_type TEXT, display_name TEXT, instructions TEXT, due_by TEXT, status TEXT DEFAULT 'requested', file_key TEXT, uploaded_at TEXT, values_json TEXT, client_notes TEXT, trainer_feedback TEXT, reviewed_at TEXT, created_at TEXT);",
+          // Per-client lab list + the roster scans (client_id IN …, filter status).
+          "CREATE INDEX IF NOT EXISTS idx_labtests_client ON lab_tests(client_id, status);",
 
           // ── Commerce: the access economy (SPEC §7) ─────────────────────────
           "CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, tenant_id TEXT, name TEXT, description TEXT, one_time_price_cents INTEGER, monthly_price_cents INTEGER, installment_months INTEGER, currency TEXT DEFAULT 'usd', budgets_json TEXT, addons_json TEXT, flags_json TEXT, visibility TEXT DEFAULT 'private', restricted_client_id TEXT, once_per_customer INTEGER DEFAULT 0, stripe_product_id TEXT, stripe_price_id TEXT, stripe_monthly_price_id TEXT, active INTEGER DEFAULT 1, created_at TEXT);",
@@ -159,6 +191,10 @@ export function ensureSchema(db: D1Database): Promise<void> {
           "CREATE TABLE IF NOT EXISTS user_prefs (user_id TEXT PRIMARY KEY, units_json TEXT, updated_at TEXT);",
           "CREATE TABLE IF NOT EXISTS addon_types (id TEXT PRIMARY KEY, tenant_id TEXT, slug TEXT, label TEXT, kind TEXT DEFAULT 'consultation', duration_minutes INTEGER, standalone_price_cents INTEGER, active INTEGER DEFAULT 1);",
           "CREATE TABLE IF NOT EXISTS trainer_sessions (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, trainer_user_id TEXT, subscription_id TEXT, addon_type_id TEXT, scheduled_at TEXT, duration_minutes INTEGER, status TEXT DEFAULT 'scheduled', completed_at TEXT, notes TEXT, created_at TEXT);",
+          // Per-client session history (WHERE client_id = ?) + the tenant calendar
+          // scan (WHERE tenant_id = ? AND status = 'scheduled' ORDER BY scheduled_at).
+          "CREATE INDEX IF NOT EXISTS idx_tsessions_client ON trainer_sessions(client_id, scheduled_at);",
+          "CREATE INDEX IF NOT EXISTS idx_tsessions_tenant ON trainer_sessions(tenant_id, status);",
 
           // ── Content hub + notifications (SPEC §8.10) ───────────────────────
           "CREATE TABLE IF NOT EXISTS resources (id TEXT PRIMARY KEY, tenant_id TEXT, type TEXT DEFAULT 'article', title TEXT, summary TEXT, body_md TEXT, cover_url TEXT, topics TEXT, muscle_groups TEXT, duration_minutes INTEGER, audience TEXT DEFAULT 'clients', assigned_json TEXT, status TEXT DEFAULT 'draft', author_user_id TEXT, published_at TEXT, created_at TEXT, updated_at TEXT);",
@@ -209,11 +245,9 @@ export function ensureSchema(db: D1Database): Promise<void> {
           // stored, never the code. `attempts` caps brute force.
           "CREATE TABLE IF NOT EXISTS action_otps (subject TEXT, purpose TEXT, code_hash TEXT, expires_at INTEGER, attempts INTEGER DEFAULT 0, created_at INTEGER, PRIMARY KEY (subject, purpose));",
         ].join(" "),
-      )
-      .then(async () => {
-        // Best-effort column migrations for tables that predate a column.
-        // Each is harmless (and errors ignored) once the column exists.
-        const alters = [
+    );
+  // Best-effort column migrations for tables that predate a column.
+  const alters = [
           "ALTER TABLE clients ADD COLUMN avatar_url TEXT",
           "ALTER TABLE clients ADD COLUMN avatar_seed TEXT",
           // Rich micronutrients on foods (ByShujaa parity).
@@ -241,6 +275,10 @@ export function ensureSchema(db: D1Database): Promise<void> {
           // Content: a single category + a URL slug for headless/public fetch.
           "ALTER TABLE resources ADD COLUMN category TEXT",
           "ALTER TABLE resources ADD COLUMN slug TEXT",
+          // Scheduled publish (SPEC §8.10): a published resource with a future
+          // publish_at stays hidden from every client/public read until the time
+          // passes (honored on read — no cron needed). NULL = live immediately.
+          "ALTER TABLE resources ADD COLUMN publish_at TEXT",
           // Client preferences (settings-managed profile: target weight, goal,
           // activity, workouts/week, meals/day, workout location, dietary).
           "ALTER TABLE clients ADD COLUMN preferences_json TEXT",
@@ -306,7 +344,24 @@ export function ensureSchema(db: D1Database): Promise<void> {
           // reps rather than distance/duration).
           "ALTER TABLE activity_logs ADD COLUMN reps INTEGER",
         ];
-        for (const sql of alters) await db.exec(sql).catch(() => undefined);
+        // A "duplicate column" error means the column already exists (expected —
+        // swallow); ANY OTHER error is a real migration failure (D1 timeout /
+        // transient) that must NOT be silently skipped — it would otherwise 500
+        // every write referencing the missing column for the isolate's lifetime.
+        const failures: string[] = [];
+        for (const sql of alters) {
+          try {
+            await db.exec(sql);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            if (/duplicate column/i.test(msg)) continue;
+            failures.push(`${sql.slice(0, 64)} → ${msg}`);
+          }
+        }
+        if (failures.length) {
+          console.error("[ensureSchema] migration failures:", failures);
+          throw new Error(`schema migration failed (${failures.length})`);
+        }
         // Backfill: older body scans mirrored only weight + body-fat into
         // measurements, so the Body progress "latest" showed empty waist/neck/
         // hips/chest. Carry the circumferences across for any day that has a
@@ -325,13 +380,13 @@ export function ensureSchema(db: D1Database): Promise<void> {
           )
           .run()
           .catch(() => undefined);
-      })
-      .catch((err) => {
-        schemaReady = null; // allow retry on next request
-        throw err;
-      });
-  }
-  return schemaReady;
+  // Stamp the version LAST — only a fully-applied schema records the marker, so
+  // a failed run retries on the next request instead of being marked done.
+  await db
+    .prepare("INSERT INTO app_config (key, value) VALUES ('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .bind(SCHEMA_VERSION)
+    .run()
+    .catch(() => undefined);
 }
 
 /** Small helpers shared by stores. */

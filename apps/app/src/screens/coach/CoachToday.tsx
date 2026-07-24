@@ -6,7 +6,7 @@ import { fmtWeight, type AttentionType } from "@mossa/domain";
 import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, Avatar, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, CountUp, cn, type Tone, type LucideIcon } from "@mossa/ui";
 import { attentionCoding, SEVERITY_TONE } from "../../attention-ui.js";
 import type { WidgetItem } from "@mossa/protocol";
-import { api, todayLocal } from "../../api.js";
+import { api, todayLocal, shiftDay } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
 import type { UnitPrefs } from "@mossa/domain";
@@ -175,7 +175,7 @@ export function CoachToday() {
                   {row.items.map((it) => {
                     const cd = attentionCoding(it.type);
                     return (
-                      <button key={it.type} onClick={() => nav(it.link)} className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[0.7rem] font-medium transition-colors hover:opacity-80" style={{ background: `color-mix(in oklch, ${toneVar[cd.tone]} 14%, transparent)`, color: toneVar[cd.tone] }}>
+                      <button key={it.type} onClick={() => nav(it.link)} className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-colors hover:opacity-80" style={{ background: `color-mix(in oklch, ${toneVar[cd.tone]} 14%, transparent)`, color: toneVar[cd.tone] }}>
                         <cd.icon className="size-3.5" />{it.label}{it.detail ? ` · ${it.detail}` : ""}
                       </button>
                     );
@@ -230,11 +230,6 @@ function rosterSubtab(kind: string): string {
   return "today";
 }
 
-const shiftDay = (date: string, delta: number): string => {
-  const d = new Date(`${date}T00:00:00`);
-  d.setDate(d.getDate() + delta);
-  return d.toISOString().slice(0, 10);
-};
 function groupByDay(events: RosterEvent[]): [string, RosterEvent[]][] {
   const out: [string, RosterEvent[]][] = [];
   for (const ev of events) {
@@ -263,7 +258,7 @@ function RosterRow({ ev, units, onOpen }: { ev: RosterEvent; units: UnitPrefs; o
         <div className="truncate text-sm"><span className="font-semibold">{ev.clientName}</span> <span className="text-muted-foreground">· {ev.title}</span></div>
         {sub && <div className="truncate text-xs text-muted-foreground">{sub}</div>}
       </div>
-      <span className="shrink-0 text-[0.7rem] tabular-nums text-muted-foreground">{time}</span>
+      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{time}</span>
       <ChevronRight className="size-4 shrink-0 text-muted-foreground/40" />
     </button>
   );

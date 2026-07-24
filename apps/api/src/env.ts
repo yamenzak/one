@@ -25,7 +25,9 @@ export interface Env {
   ENVIRONMENT?: string;
 
   // ── Better Auth ───────────────────────────────────────────────────────────
-  /** Signing/encryption key. MUST be set in production. */
+  /** Signing/encryption key. Optional only on the dev lane (ENVIRONMENT=development
+   *  or a localhost origin); anywhere else `createAuth` fails CLOSED when it is
+   *  unset rather than signing sessions with a repo-public fallback. */
   BETTER_AUTH_SECRET?: string;
   /** Public origin (e.g. https://mossa.4dl.app); falls back to request origin. */
   BETTER_AUTH_URL?: string;

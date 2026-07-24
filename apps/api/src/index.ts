@@ -139,7 +139,9 @@ async function dailySweep(env: Env): Promise<void> {
     if (grant <= 0) continue;
     const dobj = env.BILLING.get(env.BILLING.idFromName(sub.tenant_id));
     await dobj.bind(sub.tenant_id);
-    await dobj.grantMonthly(grant, key).catch(() => undefined);
+    // Money path: a swallowed grant failure means a paid tenant silently never
+    // receives its monthly credits — surface it so it's observable.
+    await dobj.grantMonthly(grant, key).catch((e) => console.error(`[dailySweep] grantMonthly failed for ${sub.tenant_id}:`, e));
   }
 
   // 2) Dunning: past_due older than the grace window → suspended. Select first
@@ -153,7 +155,7 @@ async function dailySweep(env: Env): Promise<void> {
   )
     .bind(nowIso, new Date(nowMs + DELETE_DAYS * 86_400_000).toISOString(), graceCutoff)
     .run()
-    .catch(() => undefined);
+    .catch((e) => console.error("[dailySweep] dunning suspend UPDATE failed:", e));
   for (const s of toSuspend.results ?? []) {
     await notifyOwners(env, s.tenant_id, {
       type: "billing_suspended",
@@ -172,7 +174,7 @@ async function dailySweep(env: Env): Promise<void> {
   )
     .bind(nowIso)
     .run()
-    .catch(() => undefined);
+    .catch((e) => console.error("[dailySweep] dunning cancel UPDATE failed:", e));
   for (const s of toCancel.results ?? []) {
     await notifyOwners(env, s.tenant_id, {
       type: "billing_canceled",
@@ -188,8 +190,17 @@ async function dailySweep(env: Env): Promise<void> {
     "SELECT tenant_id FROM subscriptions WHERE status = 'closing' AND delete_at IS NOT NULL AND delete_at < ?",
   ).bind(nowIso).all<{ tenant_id: string }>().catch(() => ({ results: [] as { tenant_id: string }[] }));
   for (const s of toPurge.results ?? []) {
-    await purgeTenant(env, s.tenant_id).catch(() => undefined);
+    await purgeTenant(env, s.tenant_id).catch((e) => console.error(`[dailySweep] purgeTenant failed for ${s.tenant_id}:`, e));
   }
+
+  // 5) Housekeeping: bound the growth of the append-only dedup/cache/ledger
+  //    tables. Webhook dedup only needs a window wider than Stripe's retry
+  //    horizon; the AI cache and weekly-digest ledger likewise need only recent
+  //    rows (stripe_events.at / ai_cache.at are ms; digest_sent.at is ISO text).
+  const pruneMs = nowMs - 45 * 86_400_000;
+  await env.DB.prepare("DELETE FROM stripe_events WHERE at < ?").bind(pruneMs).run().catch((e) => console.error("[dailySweep] stripe_events prune failed:", e));
+  await env.DB.prepare("DELETE FROM ai_cache WHERE at < ?").bind(pruneMs).run().catch((e) => console.error("[dailySweep] ai_cache prune failed:", e));
+  await env.DB.prepare("DELETE FROM digest_sent WHERE at < ?").bind(new Date(pruneMs).toISOString()).run().catch((e) => console.error("[dailySweep] digest_sent prune failed:", e));
 }
 
 /**

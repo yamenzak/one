@@ -22,14 +22,33 @@ import { recordAudit } from "./audit.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
 
+/** YYYY-MM-DD — the goal timeline orders by string comparison on start_date, so
+ *  a non-LocalDate start silently corrupts per-day goal resolution. */
+const LocalDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD");
+
+/** Strict, numeric goal targets (mirrors the GoalTargets interface in goals.ts).
+ *  Bounded + finite so junk can never reach targets_json — a non-numeric or NaN
+ *  target would otherwise 500 every subsequent food log that binds the snapshot
+ *  and poison adherence math downstream. */
+const GoalTargetsSchema = z
+  .object({
+    targetCalories: z.number().min(0).max(20000).optional(),
+    targetProteinG: z.number().min(0).max(2000).optional(),
+    targetCarbsG: z.number().min(0).max(3000).optional(),
+    targetFatG: z.number().min(0).max(2000).optional(),
+    targetFiberG: z.number().min(0).max(500).optional(),
+    targetWaterMl: z.number().min(0).max(30000).optional(),
+  })
+  .strict();
+
 const CreateGoal = z.object({
   clientId: z.string().min(1),
   label: z.string().min(1).max(120),
-  startDate: z.string().nullish(),
-  endDate: z.string().nullish(),
+  startDate: LocalDate.nullish(),
+  endDate: LocalDate.nullish(),
   weeklyLoadTarget: z.number().int().min(0).max(2000).default(DEFAULT_WEEKLY_LOAD_TARGET),
   /** Explicit targets, or `calculator` inputs to derive them server-side. */
-  targets: z.record(z.string(), z.unknown()).nullish(),
+  targets: GoalTargetsSchema.nullish(),
   calculator: z
     .object({
       gender: z.enum(["male", "female"]),
@@ -79,6 +98,9 @@ export const goalRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body", issues: parsed.error.issues }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    // Goal targets are trainer-set (SPEC §8.2) — a client must not author their
+    // own "trainer-set" targets even for their own record.
+    if (c.get("role") === "client") return c.json({ error: "forbidden" }, 403);
     const d = parsed.data;
 
     let targets = d.targets ?? null;

@@ -6,14 +6,15 @@ import { Button, Card, Badge, Field, Sheet, Page, Stagger, IconBadge, Eyebrow, C
 import { CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
+import { fmtPrice } from "../../money.js";
 import { PaymentSheet, type CheckoutIntent } from "../../PaymentSheet.js";
 
 interface Pkg { id: string; name: string; description: string | null; one_time_price_cents: number | null; monthly_price_cents?: number | null; installment_months?: number | null; budgets: { feature: string; days: number }[]; flags?: Record<string, boolean> | null; visibility: string }
 interface Sub { status: string; daysRemaining: number; autoRenew?: boolean; packageId?: string | null }
 
 const priceLabel = (p: Pkg): string =>
-  p.monthly_price_cents ? `$${(p.monthly_price_cents / 100).toFixed(0)}/mo`
-  : p.one_time_price_cents ? `$${(p.one_time_price_cents / 100).toFixed(0)}`
+  p.monthly_price_cents ? `${fmtPrice(p.monthly_price_cents)}/mo`
+  : p.one_time_price_cents ? fmtPrice(p.one_time_price_cents)
   : "Free";
 
 /** Cover-band tones cycled across the product grid so cards read as distinct
@@ -34,6 +35,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
   const [redeemMsg, setRedeemMsg] = useState<string | null>(null);
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [buying, setBuying] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
   const load = useCallback(async () => {
@@ -52,21 +54,25 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
   // Recurring subscriptions use hosted Checkout (Stripe provisions the
   // connected-account customer + price for us).
   const buy = async (packageId: string) => {
+    if (buying) return;
+    setBuying(true); setMsg(null);
     try { const r = await api.post<{ url: string }>("/api/connect/checkout", { clientId, packageId, returnUrl: location.href }); location.href = r.url; }
-    catch { setMsg("Checkout isn't available yet — ask your coach to finish Stripe setup."); }
+    catch { setMsg("Checkout isn't available yet — ask your coach to finish Stripe setup."); setBuying(false); }
   };
   // One-time packages check out inline (Payment Element) on the tenant's account.
   const [checkout, setCheckout] = useState<{ intent: CheckoutIntent; name: string; price: string } | null>(null);
   const [buyPromo, setBuyPromo] = useState("");
   const promoMsg = (m: string): string => ({ not_found: "That promo code isn't valid.", inactive: "That code is no longer active.", expired: "That code has expired.", exhausted: "That code has been fully used.", wrong_package: "That code doesn't apply to this package.", wrong_client: "That code isn't available on your account." }[m.replace("promo_", "")] ?? "That promo code can't be applied.");
   const buyInline = async (p: Pkg) => {
-    setMsg(null);
+    if (buying) return;
+    setBuying(true); setMsg(null);
     try {
       const r = await api.post<{ clientSecret?: string; publishableKey?: string; stripeAccount?: string; granted?: boolean }>("/api/connect/pay-intent", { clientId, packageId: p.id, promoCode: buyPromo || undefined });
       if (r.granted) { setMsg("Access unlocked!"); await load(); await refresh(); return; } // promo covered it fully
-      if (r.clientSecret && r.publishableKey) setCheckout({ intent: { clientSecret: r.clientSecret, publishableKey: r.publishableKey, stripeAccount: r.stripeAccount }, name: p.name, price: `$${((p.one_time_price_cents ?? 0) / 100).toFixed(0)}` });
+      if (r.clientSecret && r.publishableKey) setCheckout({ intent: { clientSecret: r.clientSecret, publishableKey: r.publishableKey, stripeAccount: r.stripeAccount }, name: p.name, price: fmtPrice(p.one_time_price_cents ?? 0) });
       else setMsg("Checkout isn't available yet — ask your coach to finish Stripe setup.");
     } catch (e) { setMsg(e instanceof Error && e.message.startsWith("promo_") ? promoMsg(e.message) : "Checkout isn't available yet — ask your coach to finish Stripe setup."); }
+    finally { setBuying(false); }
   };
   const onPaid = async () => {
     setCheckout(null);
@@ -82,9 +88,9 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
   };
 
   const cta = (p: Pkg): ReactNode => {
-    if (p.monthly_price_cents) return <Button size="lg" className="mt-4 w-full" onClick={() => void buy(p.id)}>Subscribe</Button>;
-    if (p.installment_months && p.installment_months > 1 && p.one_time_price_cents) return <Button size="lg" className="mt-4 w-full" onClick={() => void buy(p.id)}>Pay in {p.installment_months} months</Button>;
-    if (p.one_time_price_cents) return <Button size="lg" className="mt-4 w-full" onClick={() => void buyInline(p)}>Buy now</Button>;
+    if (p.monthly_price_cents) return <Button size="lg" className="mt-4 w-full" disabled={buying} onClick={() => void buy(p.id)}>Subscribe</Button>;
+    if (p.installment_months && p.installment_months > 1 && p.one_time_price_cents) return <Button size="lg" className="mt-4 w-full" disabled={buying} onClick={() => void buy(p.id)}>Pay in {p.installment_months} months</Button>;
+    if (p.one_time_price_cents) return <Button size="lg" className="mt-4 w-full" disabled={buying} onClick={() => void buyInline(p)}>Buy now</Button>;
     return <p className="mt-3 text-center text-xs text-muted-foreground">Ask your coach to add this to your account.</p>;
   };
 
@@ -149,7 +155,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
               </div>
             </div>
             {canExtend && activePkg && (
-              <Button variant="tonal" className="w-full" onClick={extend}><RotateCcw /> Extend {activePkg.name} · {priceLabel(activePkg)}</Button>
+              <Button variant="tonal" className="w-full" disabled={buying} onClick={extend}><RotateCcw /> Extend {activePkg.name} · {priceLabel(activePkg)}</Button>
             )}
           </Card>
           {!sub.autoRenew && (
@@ -239,9 +245,9 @@ function PackageCard({ p, tone, cta, hasActive }: { p: Pkg; tone: (typeof CARD_T
       ? hasActive ? `${days} days · begins when your current access ends` : `${days} days of access`
       : null;
   const price: { big: string; cadence: string } =
-    p.monthly_price_cents ? { big: `$${(p.monthly_price_cents / 100).toFixed(0)}`, cadence: "/ month" }
-    : p.installment_months && p.installment_months > 1 && p.one_time_price_cents ? { big: `$${(p.one_time_price_cents / 100).toFixed(0)}`, cadence: `${p.installment_months}× $${Math.ceil(p.one_time_price_cents / 100 / p.installment_months)}/mo` }
-    : p.one_time_price_cents ? { big: `$${(p.one_time_price_cents / 100).toFixed(0)}`, cadence: "one-time" }
+    p.monthly_price_cents ? { big: fmtPrice(p.monthly_price_cents), cadence: "/ month" }
+    : p.installment_months && p.installment_months > 1 && p.one_time_price_cents ? { big: fmtPrice(p.one_time_price_cents), cadence: `${p.installment_months}× ${fmtPrice(Math.ceil(p.one_time_price_cents / p.installment_months))}/mo` }
+    : p.one_time_price_cents ? { big: fmtPrice(p.one_time_price_cents), cadence: "one-time" }
     : { big: "Free", cadence: "" };
   const capabilities = p.flags ? CLIENT_FLAG_KEYS.filter((k) => p.flags![k] === true).slice(0, 4).map((k) => CLIENT_FLAG_META[k].label) : [];
   const includes = [...p.budgets.map((b) => `${b.days}-day ${budgetLabel(b.feature)}`), ...capabilities];
@@ -257,7 +263,7 @@ function PackageCard({ p, tone, cta, hasActive }: { p: Pkg; tone: (typeof CARD_T
           </div>
           <div className="shrink-0 text-right">
             <div className="numeral text-2xl font-extrabold leading-none" style={{ color: tv }}>{price.big}</div>
-            {price.cadence && <div className="mt-1 text-[0.7rem] font-medium text-muted-foreground">{price.cadence}</div>}
+            {price.cadence && <div className="mt-1 text-xs font-medium text-muted-foreground">{price.cadence}</div>}
           </div>
         </div>
       </div>
@@ -297,7 +303,7 @@ function PlanIncludes() {
   const hidden = included.length - shown.length;
   return (
     <section className="space-y-2">
-      <Eyebrow action={<span className="text-[0.65rem] font-medium text-muted-foreground">{included.length} included</span>}>What your plan includes</Eyebrow>
+      <Eyebrow action={<span className="text-xs font-medium text-muted-foreground">{included.length} included</span>}>What your plan includes</Eyebrow>
       <div className="flex flex-wrap gap-1.5 px-1">
         {shown.map((k) => (
           <span key={k} className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success [&_svg]:size-3">

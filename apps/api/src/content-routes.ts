@@ -34,6 +34,10 @@ const ResourceBody = z.object({
   durationMinutes: z.number().int().positive().nullish(),
   audience: z.enum(["public", "clients", "assigned"]).default("clients"),
   assignedClientIds: z.array(z.string()).default([]),
+  /** Scheduled publish (SPEC §8.10): ISO instant the resource goes live. A
+   *  future value keeps a `published` resource hidden from client/public reads
+   *  until it passes. NULL = live as soon as it's published. */
+  publishAt: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/, "expected ISO datetime").nullish(),
 });
 
 interface ResourceRow {
@@ -54,6 +58,7 @@ interface ResourceRow {
   status: string;
   author_user_id: string;
   published_at: string | null;
+  publish_at: string | null;
   created_at: string;
 }
 
@@ -74,6 +79,7 @@ const view = (r: ResourceRow, includeAssigned = false) => ({
   audience: r.audience,
   status: r.status,
   publishedAt: r.published_at,
+  publishAt: r.publish_at,
   createdAt: r.created_at,
   ...(includeAssigned ? { assignedClientIds: parseJson<string[]>(r.assigned_json, []) } : {}),
 });
@@ -102,9 +108,9 @@ export const contentHubRoutes = new Hono<AppEnv>()
       if ("response" in access) return access.response;
     }
     const rows = await c.env.DB.prepare(
-      "SELECT * FROM resources WHERE tenant_id = ? AND status = 'published' ORDER BY published_at DESC LIMIT 60",
+      "SELECT * FROM resources WHERE tenant_id = ? AND status = 'published' AND (publish_at IS NULL OR publish_at <= ?) ORDER BY published_at DESC LIMIT 60",
     )
-      .bind(who.tenantId)
+      .bind(who.tenantId, nowIso())
       .all<ResourceRow>();
     const visible = (rows.results ?? []).filter((r) => {
       if (r.audience === "public" || r.audience === "clients") return true;
@@ -139,10 +145,10 @@ export const contentHubRoutes = new Hono<AppEnv>()
     // A stable, URL-safe slug (title + short id suffix) for headless fetch.
     const slug = `${slugify(d.title) || "post"}-${id.slice(-6)}`;
     await c.env.DB.prepare(
-      `INSERT INTO resources (id, tenant_id, type, title, summary, body_md, cover_url, category, slug, topics, muscle_groups, duration_minutes, audience, assigned_json, status, author_user_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`,
+      `INSERT INTO resources (id, tenant_id, type, title, summary, body_md, cover_url, category, slug, topics, muscle_groups, duration_minutes, audience, assigned_json, status, author_user_id, publish_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
     )
-      .bind(id, who.tenantId, d.type, d.title, d.summary ?? null, d.bodyMd ?? null, d.coverUrl ?? null, d.category ?? null, slug, d.topics.join(","), d.muscleGroups.join(","), d.durationMinutes ?? null, d.audience, j(d.assignedClientIds), who.userId, nowIso(), nowIso())
+      .bind(id, who.tenantId, d.type, d.title, d.summary ?? null, d.bodyMd ?? null, d.coverUrl ?? null, d.category ?? null, slug, d.topics.join(","), d.muscleGroups.join(","), d.durationMinutes ?? null, d.audience, j(d.assignedClientIds), who.userId, d.publishAt ?? null, nowIso(), nowIso())
       .run();
     return c.json({ ok: true, id, slug }, 201);
   })
@@ -168,6 +174,7 @@ export const contentHubRoutes = new Hono<AppEnv>()
     if (d.audience === "public") { const g = await gateFeature(c, "branding"); if (g) return g; }
     if (d.audience) put("audience", d.audience);
     if (d.assignedClientIds) put("assigned_json", j(d.assignedClientIds));
+    if (d.publishAt !== undefined) put("publish_at", d.publishAt);
     put("updated_at", nowIso());
     await c.env.DB.prepare(`UPDATE resources SET ${sets.join(", ")} WHERE id = ? AND tenant_id = ?`)
       .bind(...binds, c.req.param("id"), who.tenantId)
@@ -178,16 +185,32 @@ export const contentHubRoutes = new Hono<AppEnv>()
   .post("/resources/:id/publish", async (c) => {
     const who = requireTenant(c)!;
     if (!staffOnly(c)) return c.json({ error: "forbidden" }, 403);
-    const parsed = z.object({ status: z.enum(["draft", "published", "archived"]) }).safeParse(await c.req.json().catch(() => null));
+    // Optional `publishAt` schedules the go-live (SPEC §8.10): a future value
+    // publishes the row but keeps it hidden from client/public reads until then.
+    const parsed = z
+      .object({ status: z.enum(["draft", "published", "archived"]), publishAt: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/, "expected ISO datetime").nullish() })
+      .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
-    const publishedAt = parsed.data.status === "published" ? nowIso() : null;
-    await c.env.DB.prepare(
-      "UPDATE resources SET status = ?, published_at = COALESCE(?, published_at), updated_at = ? WHERE id = ? AND tenant_id = ?",
-    )
-      .bind(parsed.data.status, publishedAt, nowIso(), c.req.param("id"), who.tenantId)
-      .run();
-    // On publish of a client-assigned resource, notify each assigned client.
-    if (parsed.data.status === "published") {
+    const now = nowIso();
+    const publishing = parsed.data.status === "published";
+    if (publishing) {
+      await c.env.DB.prepare(
+        "UPDATE resources SET status = 'published', published_at = COALESCE(?, published_at), publish_at = ?, updated_at = ? WHERE id = ? AND tenant_id = ?",
+      )
+        .bind(now, parsed.data.publishAt ?? null, now, c.req.param("id"), who.tenantId)
+        .run();
+    } else {
+      await c.env.DB.prepare(
+        "UPDATE resources SET status = ?, updated_at = ? WHERE id = ? AND tenant_id = ?",
+      )
+        .bind(parsed.data.status, now, c.req.param("id"), who.tenantId)
+        .run();
+    }
+    // On publish of a client-assigned resource that is LIVE NOW, notify each
+    // assigned client. A future-scheduled resource notifies nobody yet (it
+    // surfaces via the read gate once the time passes).
+    const liveNow = publishing && (!parsed.data.publishAt || parsed.data.publishAt <= now);
+    if (liveNow) {
       const res = await c.env.DB.prepare("SELECT title, audience, assigned_json FROM resources WHERE id = ? AND tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ title: string; audience: string; assigned_json: string | null }>();
       const ids = res?.audience === "assigned" ? parseJson<string[]>(res.assigned_json, []) : [];
       if (ids.length) {
@@ -236,9 +259,9 @@ export const marketplaceRoutes = new Hono<AppEnv>()
         .bind(org.id)
         .all(),
       c.env.DB.prepare(
-        "SELECT id, type, title, summary, cover_url, category, slug, topics, published_at FROM resources WHERE tenant_id = ? AND status = 'published' AND audience = 'public' ORDER BY published_at DESC LIMIT 12",
+        "SELECT id, type, title, summary, cover_url, category, slug, topics, published_at FROM resources WHERE tenant_id = ? AND status = 'published' AND audience = 'public' AND (publish_at IS NULL OR publish_at <= ?) ORDER BY published_at DESC LIMIT 12",
       )
-        .bind(org.id)
+        .bind(org.id, nowIso())
         .all<ResourceRow>(),
     ]);
     return c.json({
@@ -257,9 +280,9 @@ export const marketplaceRoutes = new Hono<AppEnv>()
     if (!org) return c.json({ error: "not found" }, 404);
     const category = c.req.query("category");
     const rows = await c.env.DB.prepare(
-      `SELECT * FROM resources WHERE tenant_id = ? AND status = 'published' AND audience = 'public'${category ? " AND category = ?" : ""} ORDER BY published_at DESC LIMIT 100`,
+      `SELECT * FROM resources WHERE tenant_id = ? AND status = 'published' AND audience = 'public' AND (publish_at IS NULL OR publish_at <= ?)${category ? " AND category = ?" : ""} ORDER BY published_at DESC LIMIT 100`,
     )
-      .bind(...(category ? [org.id, category] : [org.id]))
+      .bind(...(category ? [org.id, nowIso(), category] : [org.id, nowIso()]))
       .all<ResourceRow>();
     return c.json({ posts: (rows.results ?? []).map((r) => publicPost(r)) });
   })
@@ -270,9 +293,9 @@ export const marketplaceRoutes = new Hono<AppEnv>()
     if (!org) return c.json({ error: "not found" }, 404);
     const key = c.req.param("postSlug");
     const row = await c.env.DB.prepare(
-      "SELECT * FROM resources WHERE tenant_id = ? AND status = 'published' AND audience = 'public' AND (slug = ? OR id = ?) LIMIT 1",
+      "SELECT * FROM resources WHERE tenant_id = ? AND status = 'published' AND audience = 'public' AND (publish_at IS NULL OR publish_at <= ?) AND (slug = ? OR id = ?) LIMIT 1",
     )
-      .bind(org.id, key, key)
+      .bind(org.id, nowIso(), key, key)
       .first<ResourceRow>();
     if (!row) return c.json({ error: "not found" }, 404);
     return c.json({ post: publicPost(row, true) });

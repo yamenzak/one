@@ -16,7 +16,9 @@ import { organization, emailOTP } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import type { Env } from "./env.js";
 import { ac, roles } from "./access.js";
-import { sendEmail, emailShell, MOSSA_BRAND } from "./mailer.js";
+import { sendEmail, emailShell, emailButton, escapeHtml, MOSSA_BRAND } from "./mailer.js";
+import { sendTenantEmail } from "./email-provider.js";
+import { tenantBrandKit } from "./notify.js";
 import { newId, nowMs } from "./ids.js";
 
 /** Best-effort auth audit trail — also the rate-limiter's backing store. */
@@ -72,12 +74,26 @@ export function createAuth(env: Env, origin?: string) {
     : origin
       ? [origin]
       : undefined;
+
+  // Signing/encryption key. A dev-only fallback keeps local `wrangler dev`
+  // frictionless, but FAIL CLOSED anywhere else: signing every session cookie
+  // with a repo-public constant lets an attacker forge sessions for any user.
+  // The fallback is gated on an explicit dev signal (ENVIRONMENT=development or a
+  // localhost serving origin) — never the mere absence of the secret — mirroring
+  // the ADMIN_EMAILS and mock-mailer hardening. In production the missing secret
+  // must refuse to boot auth, not silently serve on a forgeable key.
+  const devLane = env.ENVIRONMENT === "development" || isLocal;
+  const secret = env.BETTER_AUTH_SECRET || (devLane ? "mossa-dev-insecure-secret-change-me" : "");
+  if (!secret) {
+    throw new Error(
+      "BETTER_AUTH_SECRET is not set — refusing to start auth on an insecure fallback key outside development. Set it with `wrangler secret put BETTER_AUTH_SECRET`.",
+    );
+  }
+
   return betterAuth({
     database: env.DB,
     baseURL,
-    // Dev-only fallback keeps local `wrangler dev` frictionless; production
-    // MUST set BETTER_AUTH_SECRET (wrangler secret put BETTER_AUTH_SECRET).
-    secret: env.BETTER_AUTH_SECRET || "mossa-dev-insecure-secret-change-me",
+    secret,
     trustedOrigins,
 
     // Passwordless-only: the email/password provider stays OFF.
@@ -120,7 +136,40 @@ export function createAuth(env: Env, origin?: string) {
     },
 
     plugins: [
-      organization({ ac, roles, creatorRole: "owner" }),
+      organization({
+        ac,
+        roles,
+        creatorRole: "owner",
+        // Staff invite delivery (SPEC §4): the owner invites a trainer/assistant
+        // by email → a branded email with an /accept-invitation/<id> deep link.
+        // Acceptance is belt-and-suspenders: the accept screen calls Better
+        // Auth's accept-invitation, and /api/context also auto-accepts a pending
+        // invite matching the signed-in email (mirroring the client auto-link),
+        // so the membership is minted the moment they verify their code even if
+        // the deep link is lost. Without this the invite silently dead-ended.
+        async sendInvitationEmail(data) {
+          const acceptUrl = `${baseURL.replace(/\/$/, "")}/accept-invitation/${data.id}`;
+          const brand = await tenantBrandKit(env.DB, data.organization.id).catch(() => MOSSA_BRAND);
+          const inviter = data.inviter.user.name || data.inviter.user.email || "Your studio";
+          const roleLabel = data.role === "assistant" ? "an assistant" : "a coach";
+          const html = emailShell(
+            `You're invited to ${escapeHtml(brand.name)}`,
+            `<p style="margin:0 0 4px">${escapeHtml(inviter)} invited you to join <strong>${escapeHtml(data.organization.name)}</strong> as ${roleLabel}.</p>
+             <p style="margin:0">Accept to set up your account — you'll sign in with a one-time code, no password to create.</p>
+             ${emailButton("Accept invitation", acceptUrl, brand)}
+             <p style="margin:18px 0 0;color:#8b9099;font-size:13px;line-height:1.6">If you weren't expecting this, you can safely ignore this email.</p>`,
+            { brand, preheader: `Join ${brand.name} on Mossa`, eyebrow: "Staff invitation" },
+          );
+          const text = `${inviter} invited you to join ${data.organization.name} as ${roleLabel}. Accept your invitation: ${acceptUrl}`;
+          await sendTenantEmail(env, data.organization.id, {
+            to: data.email,
+            subject: `Join ${brand.name}`,
+            html,
+            text,
+            brandName: brand.name,
+          }).catch(() => undefined);
+        },
+      }),
       // THE sign-in method: 6-digit emailed code, 10-min TTL, DB rate-limited.
       emailOTP({
         otpLength: 6,
@@ -131,8 +180,13 @@ export function createAuth(env: Env, origin?: string) {
             await logAuthEvent(env.DB, "otp-throttled", email, false);
             return; // silently drop: same UX as a wrong address, no oracle
           }
-          await logAuthEvent(env.DB, "otp-request", email, true);
-          await sendEmail(
+          // Deliver the code. The mock provider only "succeeds" on the dev lane
+          // (localhost or ENVIRONMENT=development) — in production a deploy left
+          // on the mock (or with no provider configured) fails closed. Surface
+          // that failure LOUDLY: throw so Better Auth returns a non-200 the login
+          // UI can show, instead of the silent "code sent" lie that would strand
+          // first sign-in on a misconfigured production worker.
+          const res = await sendEmail(
             env.DB,
             {
               to: email,
@@ -150,8 +204,13 @@ export function createAuth(env: Env, origin?: string) {
             },
             env.EMAIL,
             undefined,
-            env.ENVIRONMENT === "development",
-          ).catch(() => undefined);
+            devLane,
+          ).catch((err) => ({ ok: false, error: String(err) }));
+          if (!res.ok) {
+            await logAuthEvent(env.DB, "otp-send-failed", email, false);
+            throw new Error("otp_delivery_failed");
+          }
+          await logAuthEvent(env.DB, "otp-request", email, true);
         },
       }),
       // One-tap re-auth once enrolled; multiple passkeys per user.

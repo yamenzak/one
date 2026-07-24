@@ -11,6 +11,7 @@ import { z } from "zod";
 import { WorkoutBody, MealBody, stripBodyForTemplate } from "@mossa/protocol";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
+import { withinQuota } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
 import { notify } from "./notify.js";
 import { recordAudit } from "./audit.js";
@@ -39,6 +40,18 @@ interface PlanRow {
   created_by: string;
   created_at: string;
   updated_at: string;
+}
+
+/** A variantId supplied on plan create must name a LIVE lane belonging to THIS
+ *  client — otherwise the plan binds to a nonexistent (or another client's) lane
+ *  and vanishes from every lane-filtered read. Null = the default lane (valid). */
+async function variantBelongsToClient(db: D1Database, variantId: string | null | undefined, clientId: string): Promise<boolean> {
+  if (!variantId) return true;
+  const row = await db
+    .prepare("SELECT id FROM plan_variants WHERE id = ? AND client_id = ? AND archived = 0")
+    .bind(variantId, clientId)
+    .first<{ id: string }>();
+  return !!row;
 }
 
 function planView(row: PlanRow) {
@@ -103,6 +116,9 @@ function makePlanRoutes(kind: Kind): Hono<AppEnv> {
       if (!body.success) return c.json({ error: "invalid body" }, 400);
       const access = await requireClientAccess(c, body.data.clientId);
       if ("response" in access) return access.response;
+      if (!(await variantBelongsToClient(c.env.DB, body.data.variantId, access.client.id))) {
+        return c.json({ error: "unknown lane" }, 400);
+      }
       const id = newId(kind === "workout" ? "wpl" : "mpl");
       const emptyBody = kind === "workout" ? { days: [] } : { customMealTypes: [], mealOptions: [] };
       await c.env.DB.prepare(
@@ -126,6 +142,9 @@ function makePlanRoutes(kind: Kind): Hono<AppEnv> {
       if (!parsed.success) return c.json({ error: "invalid body" }, 400);
       const access = await requireClientAccess(c, parsed.data.clientId);
       if ("response" in access) return access.response;
+      if (!(await variantBelongsToClient(c.env.DB, parsed.data.variantId, access.client.id))) {
+        return c.json({ error: "unknown lane" }, 400);
+      }
       const tpl = await c.env.DB.prepare(
         `SELECT * FROM ${templateTable[kind]} WHERE id = ? AND tenant_id = ? AND (visibility = 'tenant' OR created_by = ?)`,
       )
@@ -309,6 +328,15 @@ function makeTemplateRoutes(kind: Kind): Hono<AppEnv> {
         })
         .safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+      // Template capacity gate (SPEC §5): the quota is workout + meal combined,
+      // so count both tables. -1 (Studio/Team) = unlimited.
+      const counts = await c.env.DB.prepare(
+        "SELECT (SELECT COUNT(*) FROM workout_templates WHERE tenant_id = ?) + (SELECT COUNT(*) FROM meal_templates WHERE tenant_id = ?) AS n",
+      )
+        .bind(who.tenantId, who.tenantId)
+        .first<{ n: number }>();
+      const cap = await withinQuota(c.env.DB, who.tenantId, "templates", counts?.n ?? 0);
+      if (!cap.ok) return c.json({ error: "template limit reached", limit: cap.max }, 403);
       let bodyJson = j(kind === "workout" ? { days: [] } : { customMealTypes: [], mealOptions: [] });
       if (parsed.data.body !== undefined) {
         const validated = bodySchema(kind).safeParse(parsed.data.body);

@@ -116,6 +116,22 @@ describe("workout math", () => {
     expect(pickPlanForDate(plans, "2026-07-01")!.id).toBe("new");
     expect(pickPlanForDate(plans)!.id).toBe("new");
   });
+
+  it("pickPlanForDate resolves on a calendar-day basis (publish day is inclusive)", () => {
+    // The newer plan is published late in its UTC day; it must count for that
+    // whole calendar day — not spill onto the previous day — when matched
+    // against a client-local YYYY-MM-DD. This is the same-basis comparison that
+    // replaces the old UTC-instant window (off-by-one around publish time).
+    const plans = [
+      { id: "old", status: "superseded" as const, publishedAt: "2026-07-01T09:00:00Z" },
+      { id: "new", status: "published" as const, publishedAt: "2026-07-24T23:30:00Z" },
+    ];
+    // Day before the new plan's publish day → the superseded plan still owns it.
+    expect(pickPlanForDate(plans, "2026-07-23")!.id).toBe("old");
+    // The publish day itself → the new plan, despite the late 23:30 UTC time.
+    expect(pickPlanForDate(plans, "2026-07-24")!.id).toBe("new");
+    expect(pickPlanForDate(plans, "2026-07-25")!.id).toBe("new");
+  });
 });
 
 describe("activity burn", () => {

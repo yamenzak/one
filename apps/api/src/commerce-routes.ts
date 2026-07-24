@@ -23,6 +23,7 @@ import { newId, nowIso } from "./ids.js";
 import { recordAudit } from "./audit.js";
 import { notify } from "./notify.js";
 import { parseJson, j } from "./db.js";
+import { updateSubscriptionRunway } from "./subscription-runway.js";
 
 const PackageBody = z.object({
   name: z.string().min(1).max(120),
@@ -75,12 +76,18 @@ function subView(row: SubRow, nowIsoStr: string) {
 /** Lazy reconcile (SPEC §7): flip active → expired when every budget lapsed. */
 async function reconcile(db: D1Database, row: SubRow, now: string): Promise<SubRow> {
   if (row.status === "active" && isFullyExpired(parseJson<Budget[]>(row.budgets_json, []), now)) {
-    await db
-      .prepare("UPDATE client_subscriptions SET status = 'expired', updated_at = ? WHERE id = ?")
-      .bind(now, row.id)
+    // Guard on the exact status + budgets we read: a concurrent /redeem or
+    // renewal that just appended fresh budgets and set the row active again must
+    // not be clobbered back to 'expired' (no read path ever flips expired→active,
+    // so that would strand the client's just-paid-for days). If the guard fails
+    // (someone changed the row under us) leave it active — the next read
+    // reconciles correctly.
+    const r = await db
+      .prepare("UPDATE client_subscriptions SET status = 'expired', updated_at = ? WHERE id = ? AND status = 'active' AND budgets_json IS ?")
+      .bind(now, row.id, row.budgets_json ?? null)
       .run()
       .catch(() => undefined);
-    return { ...row, status: "expired" };
+    if (r && (r.meta?.changes ?? 0) > 0) return { ...row, status: "expired" };
   }
   return row;
 }
@@ -219,10 +226,12 @@ export const commerceRoutes = new Hono<AppEnv>()
       if (prior) return c.json({ error: "package is once per customer" }, 409);
     }
 
-    // Queue-not-sum: extend the client's current subscription if one is live,
-    // else open a new one.
+    // Queue-not-sum: extend the client's current NON-recurring subscription if
+    // one is live, else open a new one. Recurring rows are owned by their Stripe
+    // subscription (they renew off their own package) — never fold a manual grant
+    // into one, matching grantClientPackage.
     const current = await c.env.DB.prepare(
-      "SELECT * FROM client_subscriptions WHERE client_id = ? AND status = 'active' ORDER BY started_at DESC LIMIT 1",
+      "SELECT * FROM client_subscriptions WHERE client_id = ? AND status = 'active' AND stripe_sub_id IS NULL ORDER BY started_at DESC LIMIT 1",
     )
       .bind(access.client.id)
       .first<SubRow>();
@@ -231,14 +240,13 @@ export const commerceRoutes = new Hono<AppEnv>()
     const purchasedAddOns = parseJson<{ addOnTypeId: string; quantity: number }[]>(pkg.addons_json, []);
 
     if (current) {
-      const existing = parseJson<Budget[]>(current.budgets_json, []);
-      const added = buildBudgetsForPurchase(existing, specs, now);
-      const addOns = mergeAddOnBalances(parseJson(current.addons_json, []), purchasedAddOns);
-      await c.env.DB.prepare(
-        "UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, updated_at = ? WHERE id = ?",
-      )
-        .bind(j([...existing, ...added]), j(addOns), now, current.id)
-        .run();
+      // CAS append so a concurrent redeem / renewal on the same row can't lose
+      // this grant's budget days (last-writer-wins on the JSON columns).
+      await updateSubscriptionRunway(c.env.DB, current.id, (existing, addOnsPrev) => ({
+        budgets: [...existing, ...buildBudgetsForPurchase(existing, specs, now)],
+        addOns: mergeAddOnBalances(addOnsPrev, purchasedAddOns),
+        extra: { sql: "updated_at = ?", binds: [now] },
+      }));
       await recordAudit(c.env, { tenantId: who.tenantId, clientId: access.client.id, actorUserId: who.userId, action: "package.assign", summary: `${pkg.name} (extended)`, ref: pkg.id });
       if (access.client.user_id && access.client.user_id !== who.userId) {
         await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "access_granted", title: "Your access was extended", message: `${pkg.name} — more time added`, vars: { coachName: c.get("user")?.name || "Your coach", packageName: pkg.name } });
@@ -367,19 +375,24 @@ export const commerceRoutes = new Hono<AppEnv>()
     // `all` code splits per feature and never leaves a covered feature with a gap.
     const codeSpec = [{ feature: code.target_feature, days: code.days_to_add }];
     try {
+      // Fold into the client's active/expired NON-recurring runway (recurring
+      // rows renew off their own Stripe subscription — leave them owned by it).
       const current = await c.env.DB.prepare(
-        "SELECT * FROM client_subscriptions WHERE client_id = ? AND status IN ('active','expired') ORDER BY started_at DESC LIMIT 1",
+        "SELECT * FROM client_subscriptions WHERE client_id = ? AND status IN ('active','expired') AND stripe_sub_id IS NULL ORDER BY started_at DESC LIMIT 1",
       )
         .bind(access.client.id)
         .first<SubRow>();
       if (current) {
-        const budgets = parseJson<Budget[]>(current.budgets_json, []);
-        budgets.push(...buildBudgetsForPurchase(budgets, codeSpec, now));
-        await c.env.DB.prepare(
-          "UPDATE client_subscriptions SET budgets_json = ?, status = 'active', updated_at = ? WHERE id = ?",
-        )
-          .bind(j(budgets), now, current.id)
-          .run();
+        // CAS append: a concurrent grant / renewal on this same row must not
+        // overwrite the days this burned redemption slot just paid for. On a
+        // lost race (row gone or contended out) throw so the compensation below
+        // releases the slot + claim and the client can retry cleanly.
+        const ok = await updateSubscriptionRunway(c.env.DB, current.id, (budgets, addOns) => ({
+          budgets: [...budgets, ...buildBudgetsForPurchase(budgets, codeSpec, now)],
+          addOns,
+          extra: { sql: "status = 'active', updated_at = ?", binds: [now] },
+        }));
+        if (!ok) throw new Error("redeem_cas_failed");
       } else {
         await c.env.DB.prepare(
           `INSERT INTO client_subscriptions (id, tenant_id, client_id, status, payment_status, budgets_json, addons_json, source, started_at, updated_at)

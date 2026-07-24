@@ -344,7 +344,7 @@ function Training({ data, units }: { data: ProgressData; units: ReturnType<typeo
       </Stagger>
 
       <section className="space-y-2">
-        <Eyebrow action={<span className="text-[0.65rem] font-medium text-muted-foreground">est. 1RM</span>}>Personal records</Eyebrow>
+        <Eyebrow action={<span className="text-xs font-medium text-muted-foreground">est. 1RM</span>}>Personal records</Eyebrow>
         <Stagger>
         <Card className="space-y-3">
           {training.prs.length === 0 ? <EmptyMini label="Log weighted sets to build your PR board" /> : (
@@ -358,8 +358,8 @@ function Training({ data, units }: { data: ProgressData; units: ReturnType<typeo
                     <div className="relative mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full" style={{ width: `${Math.max(6, (p.e1rm / maxE1) * 100)}%`, backgroundColor: toneVar.activity }} /></div>
                   </div>
                   <div className="shrink-0 text-right">
-                    <div className="numeral text-sm font-bold">{kgToDisplay(p.e1rm, units).toFixed(0)} <span className="text-[0.65rem] font-medium text-muted-foreground">{wl}</span></div>
-                    <div className="numeral text-[0.65rem] text-muted-foreground">{kgToDisplay(p.weight, units).toFixed(0)}×{p.reps}</div>
+                    <div className="numeral text-sm font-bold">{kgToDisplay(p.e1rm, units).toFixed(0)} <span className="text-xs font-medium text-muted-foreground">{wl}</span></div>
+                    <div className="numeral text-xs text-muted-foreground">{kgToDisplay(p.weight, units).toFixed(0)}×{p.reps}</div>
                   </div>
                 </div>
               ))}
@@ -464,7 +464,7 @@ function LensTabs({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
 function DatePill({ value, min, max, label, onChange }: { value: string; min?: string; max?: string; label: string; onChange: (v: string) => void }) {
   return (
     <label className="relative flex-1">
-      <input type="date" value={value} min={min} max={max} onChange={(e) => e.target.value && onChange(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0 [color-scheme:dark]" aria-label={label} />
+      <input type="date" value={value} min={min} max={max} onChange={(e) => e.target.value && onChange(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" aria-label={label} />
       <div className="pointer-events-none flex items-center justify-center gap-1.5 rounded-full bg-secondary px-3 py-2 text-sm font-semibold [&_svg]:size-4"><Calendar className="text-muted-foreground" />{shortDate(value)}</div>
     </label>
   );
@@ -475,7 +475,7 @@ function MiniStat({ icon: Icon, tone, label, value, sub }: { icon: LucideIcon; t
     <div className="flex items-center gap-2.5">
       <Icon className="size-4 shrink-0" style={{ color: toneVar[tone] }} />
       <span className="flex-1 truncate text-xs text-muted-foreground">{label}</span>
-      <span className="numeral text-sm font-bold">{value}{sub && <span className="ml-0.5 text-[0.65rem] font-medium text-muted-foreground">{sub}</span>}</span>
+      <span className="numeral text-sm font-bold">{value}{sub && <span className="ml-0.5 text-xs font-medium text-muted-foreground">{sub}</span>}</span>
     </div>
   );
 }
@@ -502,8 +502,8 @@ export function RangeChip({ status, range, convert, unit }: { status: RangeStat 
 function MeasChip({ label, value, units }: { label: string; value: number | null; units: ReturnType<typeof useUnits> }) {
   return (
     <div className="rounded-xl bg-surface-2 px-3 py-2.5">
-      <div className="text-[0.65rem] font-medium text-muted-foreground">{label}</div>
-      <div className="numeral mt-0.5 text-sm font-bold">{value != null ? `${cmToLengthDisplay(value, units).toFixed(1)}` : "—"}<span className="ml-0.5 text-[0.6rem] font-medium text-muted-foreground">{value != null ? lengthLabel(units) : ""}</span></div>
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="numeral mt-0.5 text-sm font-bold">{value != null ? `${cmToLengthDisplay(value, units).toFixed(1)}` : "—"}<span className="ml-0.5 text-xs font-medium text-muted-foreground">{value != null ? lengthLabel(units) : ""}</span></div>
     </div>
   );
 }

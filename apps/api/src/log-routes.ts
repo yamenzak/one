@@ -1167,15 +1167,30 @@ export const logRoutes = new Hono<AppEnv>()
       return c.json({ ok: true, id: existing.id, updated: true });
     }
     const id = newId("chk");
-    await c.env.DB.prepare(
-      "INSERT INTO check_ins (id, tenant_id, client_id, date_local, weight_kg, mood, energy, stress, sleep_quality, sleep_hours, water_ml, steps_count, notes, photos_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    // Upsert on the unique (client_id, date_local) day index: a double-submit
+    // that races the SELECT above no longer collides into a 500 — the loser
+    // updates the row instead. RETURNING id tells us which happened.
+    const inserted = await c.env.DB.prepare(
+      `INSERT INTO check_ins (id, tenant_id, client_id, date_local, weight_kg, mood, energy, stress, sleep_quality, sleep_hours, water_ml, steps_count, notes, photos_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(client_id, date_local) DO UPDATE SET
+         weight_kg = excluded.weight_kg, mood = excluded.mood, energy = excluded.energy, stress = excluded.stress,
+         sleep_quality = excluded.sleep_quality, sleep_hours = excluded.sleep_hours, water_ml = excluded.water_ml,
+         steps_count = excluded.steps_count, notes = excluded.notes,
+         photos_json = COALESCE(excluded.photos_json, check_ins.photos_json), updated_at = excluded.updated_at
+       RETURNING id`,
     )
       .bind(
         id, access.client.tenant_id, access.client.id, d.date, d.weightKg ?? null, d.mood ?? null,
         d.energy ?? null, d.stress ?? null, d.sleepQuality ?? null, d.sleepHours ?? null,
         d.waterMl ?? null, d.stepsCount ?? null, d.notes ?? null, photosJson, nowIso(), nowIso(),
       )
-      .run();
+      .first<{ id: string }>();
+    const rowId = inserted?.id ?? id;
+    // A conflict (rowId !== id) means a concurrent submit already created the
+    // day's row — treat that as an update, skipping the mirror + trainer notify
+    // so a raced double-submit can't fire the "checked in" notification twice.
+    if (rowId !== id) return c.json({ ok: true, id: rowId, updated: true });
     // Mirror weight into measurements so progress prefers the dedicated table.
     if (d.weightKg) {
       await c.env.DB.prepare(

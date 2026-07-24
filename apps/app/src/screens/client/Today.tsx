@@ -9,11 +9,11 @@ import {
   Reveal, SkeletonHero, SkeletonList, SkeletonHeader,
   Page, Stagger, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
   Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Sparkles, Utensils, Croissant, Soup, Apple,
-  Store, Ticket, AlertTriangle, ShieldCheck, toneVar, ChevronLeft, ChevronRight, Target, ScanLine, Calendar, type Tone, type LucideIcon,
+  Store, Ticket, AlertTriangle, ShieldCheck, toneVar, ChevronLeft, ChevronRight, Target, ScanLine, Calendar, BookOpen, type Tone, type LucideIcon,
 } from "@mossa/ui";
 import type { WidgetItem } from "@mossa/protocol";
 import { useNavigate } from "react-router-dom";
-import { api, todayLocal } from "../../api.js";
+import { api, todayLocal, shiftDay } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
 import { usePasskey } from "../../PasskeyPrompt.js";
@@ -25,13 +25,6 @@ import { TodayAgenda, fetchAgenda, type AgendaData } from "./TodayAgenda.js";
 import { CoachNote } from "./CoachNote.js";
 
 export interface FeedEvent { id: string; kind: string; date: string; at: string; title: string; subtitle: string | null; ref?: string; actor?: string; metric?: { unit: "energy" | "volume" | "weight"; value: number } }
-
-/** N days back from a YYYY-MM-DD string. */
-const shiftDay = (date: string, delta: number): string => {
-  const d = new Date(`${date}T00:00:00`);
-  d.setDate(d.getDate() + delta);
-  return d.toISOString().slice(0, 10);
-};
 
 export interface TodayBundle {
   date: string;
@@ -186,7 +179,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
           <Stagger className="flex items-center gap-2">
             <button onClick={() => setDate((d) => shiftDay(d, -1))} aria-label="Previous day" className="grid size-9 shrink-0 place-items-center rounded-full bg-background/25 text-muted-foreground backdrop-blur-md transition-colors hover:bg-background/40 hover:text-foreground [&_svg]:size-4"><ChevronLeft /></button>
             <label className="relative flex-1">
-              <input type="date" max={today} value={date} onChange={(e) => e.target.value && setDate(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0 [color-scheme:dark]" aria-label="Pick a date" />
+              <input type="date" max={today} value={date} onChange={(e) => e.target.value && setDate(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" aria-label="Pick a date" />
               <div className="pointer-events-none flex items-center justify-center gap-1.5 rounded-xl bg-background/25 px-3 py-2 text-sm font-semibold backdrop-blur-md [&_svg]:size-4"><Calendar className="text-muted-foreground" />{dayLabel(date, today)}</div>
             </label>
             {isToday
@@ -309,6 +302,10 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
           </Stagger>
 
           {isToday && <Stagger><CoachNote clientId={clientId} surface="home" /></Stagger>}
+
+          {/* Content hub — an Explore rail of the coach's latest articles/recipes
+              (SPEC §8.10 surfacing). Self-fetches; renders nothing when empty. */}
+          {isToday && <ExploreRail clientId={clientId} onOpen={() => nav("/explore")} />}
         </>
         )}
       </Reveal>
@@ -361,6 +358,47 @@ function dayLabel(day: string, today: string): string {
   return new Date(`${day}T00:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
 }
 
+// ── Explore rail: the tenant's content hub, surfaced on Today ────────────────
+interface RailResource { id: string; type: string; title: string; summary: string | null; coverUrl: string | null; category?: string | null; durationMinutes: number | null }
+const railIcon = (t: string): LucideIcon => (t === "recipe" ? Utensils : t === "warmup" || t === "stretch" ? Dumbbell : BookOpen);
+
+/** A horizontal rail of article/recipe cover cards that opens the full Explore
+ *  hub. Self-fetching so the feed only shows it when the coach has published
+ *  content the client can see (audience-gated server-side). */
+function ExploreRail({ clientId, onOpen }: { clientId: string; onOpen: () => void }) {
+  const [items, setItems] = useState<RailResource[] | null>(null);
+  useEffect(() => {
+    void api.get<{ resources: RailResource[] }>(`/api/resources/feed?clientId=${clientId}`)
+      .then((r) => setItems(r.resources.slice(0, 8))).catch(() => setItems([]));
+  }, [clientId]);
+  if (!items || items.length === 0) return null;
+  return (
+    <Stagger className="space-y-2">
+      <button onClick={onOpen} className="flex w-full items-center justify-between px-1">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Explore</h3>
+        <span className="inline-flex items-center gap-0.5 text-sm font-medium text-primary [&_svg]:size-4">See all <ChevronRight /></span>
+      </button>
+      <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
+        {items.map((r) => {
+          const Icon = railIcon(r.type);
+          return (
+            <button key={r.id} onClick={onOpen} className="w-[62%] shrink-0 snap-start text-left sm:w-[45%]">
+              <div className="relative h-32 overflow-hidden rounded-2xl bg-card active:scale-[0.98]">
+                {r.coverUrl ? <img src={r.coverUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2 text-primary/60 [&_svg]:size-7"><Icon /></div>}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 p-3">
+                  {r.category && <div className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-white/80">{r.category}</div>}
+                  <div className="line-clamp-2 text-sm font-semibold leading-snug text-white">{r.title}</div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </Stagger>
+  );
+}
+
 function FeedRow({ ev, units, onOpen, onDetail }: { ev: FeedEvent; units: UnitPrefs; onOpen?: (route: string) => void; onDetail?: (kind: string, ref: string) => void }) {
   const meta = metaFor(ev.kind);
   // Coach-authored events carry the acting staff member's name ("by Jane").
@@ -378,7 +416,7 @@ function FeedRow({ ev, units, onOpen, onDetail }: { ev: FeedEvent; units: UnitPr
         <div className="truncate text-sm font-medium">{ev.title}</div>
         {sub && <div className="truncate text-xs text-muted-foreground">{sub}</div>}
       </div>
-      <span className="shrink-0 text-[0.7rem] tabular-nums text-muted-foreground">{time}</span>
+      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{time}</span>
       {clickable && <ChevronRight className="size-4 shrink-0 text-muted-foreground/40" />}
     </>
   );

@@ -180,6 +180,14 @@ export function remainingAddOnQuantity(balances: AddOnBalance[], addOnTypeId: st
 /**
  * Redemption-code top-up: extends the feature's runway by `days`, queued at the
  * current runway end (or starting now if nothing active).
+ *
+ * FOOTGUN: for `feature === "all"` this queues a SINGLE `all` budget behind the
+ * longest existing runway of ANY feature, which strands every shorter-runway
+ * feature (the exact pre-fix `all` behaviour that `buildBudgetsForPurchase`
+ * corrects by expanding `all` per feature). Redemption routes therefore build
+ * their budgets with `buildBudgetsForPurchase`, NOT this helper. Keep this only
+ * for a single explicit (non-`all`) feature; `days` is floored to a
+ * non-negative whole number so a bad caller can't mint a negative-length budget.
  */
 export function buildRedemptionBudget(
   existing: Budget[],
@@ -187,11 +195,12 @@ export function buildRedemptionBudget(
   days: number,
   nowIso: string,
 ): Budget {
+  const d = Math.max(0, Math.floor(days));
   const startedAt = computeBudgetStart(existing, feature, nowIso);
   return {
     feature,
-    daysTotal: days,
+    daysTotal: d,
     startedAt,
-    expiresAt: new Date(t(startedAt) + days * DAY_MS).toISOString(),
+    expiresAt: new Date(t(startedAt) + d * DAY_MS).toISOString(),
   };
 }

@@ -69,22 +69,28 @@ export function PaymentSheet({
   const pay = async () => {
     const stripe = stripeRef.current;
     const elements = elementsRef.current;
-    if (!stripe || !elements || !intent) return;
+    if (!stripe || !elements || !intent || busy) return;
     setBusy(true);
     setError(null);
-    const res = await stripe.confirmPayment({
-      elements,
-      clientSecret: intent.clientSecret,
-      confirmParams: { return_url: window.location.href },
-      redirect: "if_required",
-    });
-    if (res.error) {
-      setError(res.error.message ?? "Payment failed. Try another card.");
+    try {
+      const res = await stripe.confirmPayment({
+        elements,
+        clientSecret: intent.clientSecret,
+        confirmParams: { return_url: window.location.href },
+        redirect: "if_required",
+      });
+      if (res.error) {
+        setError(res.error.message ?? "Payment failed. Try another card.");
+        return;
+      }
+      onSuccess();
+    } catch {
+      // A thrown confirmPayment (network/JS error) must never strand the button
+      // on "Processing…" — surface a retryable error and fall through to finally.
+      setError("Payment couldn't be completed. Check your connection and try again.");
+    } finally {
       setBusy(false);
-      return;
     }
-    setBusy(false);
-    onSuccess();
   };
 
   return (

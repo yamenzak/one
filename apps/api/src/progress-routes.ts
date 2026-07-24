@@ -45,12 +45,16 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
   const access = await requireClientAccess(c, c.req.param("clientId"));
   if ("response" in access) return access.response;
   const range = (c.req.query("range") as "7d" | "30d" | "90d") ?? "30d";
-  const today = c.req.query("today") ?? new Date().toISOString().slice(0, 10);
+  // `today` reaches throwing domain date helpers (presetRange/addDays/
+  // currentStreak) — an unparseable value would 500 the whole endpoint, so
+  // validate the LocalDate shape and fall back to the server date.
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  const qToday = c.req.query("today");
+  const today = qToday && DATE_RE.test(qToday) ? qToday : new Date().toISOString().slice(0, 10);
   // Range is either a preset (7d/30d/90d) or an explicit custom window via
   // `start`/`end` (YYYY-MM-DD). A valid custom pair wins; anything malformed
   // falls back to the preset. The window is clamped to today and capped at
   // 366 days so a hand-crafted query can't scan an unbounded history.
-  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   const qStart = c.req.query("start"), qEnd = c.req.query("end");
   let start: string, end: string;
   if (qStart && qEnd && DATE_RE.test(qStart) && DATE_RE.test(qEnd) && qStart <= qEnd) {

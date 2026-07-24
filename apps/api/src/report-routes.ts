@@ -27,13 +27,21 @@ interface SessionEntry {
   sets: LoggedSetLike[];
 }
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const todayLocal = (): string => new Date().toISOString().slice(0, 10);
+/** Validate a caller-supplied LocalDate (YYYY-MM-DD), else fall back. These
+ *  values reach throwing domain date helpers (presetRange/addDays/daysInRange),
+ *  so an unparseable string would otherwise 500 the endpoint. */
+const safeDate = (v: string | undefined, fallback: string): string => (v && DATE_RE.test(v) ? v : fallback);
+
 export const reportRoutes = new Hono<AppEnv>()
   .get("/reports/client/:clientId", async (c) => {
     const access = await requireClientAccess(c, c.req.param("clientId"));
     if ("response" in access) return access.response;
     const range = (c.req.query("range") as "7d" | "30d" | "90d") ?? "30d";
-    // "today" comes from the caller's tz; fall back to server date.
-    const today = c.req.query("today") ?? new Date().toISOString().slice(0, 10);
+    // "today" comes from the caller's tz; validate the LocalDate shape (it feeds
+    // presetRange → addDays, which throws on an unparseable date) and fall back.
+    const today = safeDate(c.req.query("today"), todayLocal());
     const { start, end } = presetRange(range, today);
     const clientId = access.client.id;
     const db = c.env.DB;
@@ -155,8 +163,8 @@ export const reportRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const scope = await visibleClientIds(c);
     if (scope !== "all" && scope.length === 0) return c.json({ events: [] });
-    const from = c.req.query("from") ?? new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
-    const to = c.req.query("to") ?? new Date().toISOString().slice(0, 10);
+    const from = safeDate(c.req.query("from"), addDays(todayLocal(), -2));
+    const to = safeDate(c.req.query("to"), todayLocal());
     const db = c.env.DB;
 
     let ids: string[];
@@ -209,7 +217,7 @@ export const reportRoutes = new Hono<AppEnv>()
   .get("/reports/roster-analytics", async (c) => {
     const who = requireTenant(c)!;
     const scope = await visibleClientIds(c);
-    const today = c.req.query("today") ?? new Date().toISOString().slice(0, 10);
+    const today = safeDate(c.req.query("today"), todayLocal());
     const days = Math.min(30, Math.max(7, Number(c.req.query("days")) || 14));
     let ids: string[];
     if (scope === "all") {

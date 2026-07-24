@@ -26,7 +26,7 @@ interface PostureScan {
 }
 const POSTURE_TONE = POSTURE_SEVERITY_TONE;
 const capp = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-import { api, todayLocal, uploadMedia } from "../../api.js";
+import { api, todayLocal, shiftDay, uploadMedia } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { scanProfile, modelSilhouette } from "./bodyscan/model.js";
 import { PostureFigure } from "./bodyscan/PostureFigure.js";
@@ -41,9 +41,6 @@ interface Supplement { id: string; name: string; dose: string | null; kind: stri
 interface Fast { activeFast: { started_at: string; target_hours: number } | null; recentFasts: { duration_minutes: number; target_hours: number }[] }
 interface Session { id: string; scheduled_at: string; duration_minutes: number; status: string }
 interface Today { waterMl: number; goal: { targets: { targetWaterMl?: number } | null } | null; checkInDates: string[] }
-
-/** N days back from a YYYY-MM-DD string, as YYYY-MM-DD. */
-const shift = (date: string, delta: number): string => { const d = new Date(`${date}T00:00:00`); d.setDate(d.getDate() + delta); return d.toISOString().slice(0, 10); };
 
 type Zone = FastingZone;
 const ZONES = FASTING_ZONES; // SSOT — @mossa/ui
@@ -65,8 +62,8 @@ function ZoneTrack({ elapsedHours }: { elapsedHours: number }) {
         return (
           <div key={z.label} style={{ flexGrow: z.vis }} className="min-w-0">
             <div className="h-2 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${frac * 100}%`, backgroundColor: toneVar[z.tone] }} /></div>
-            <div className={cn("mt-1.5 truncate text-center text-[0.55rem] font-semibold leading-tight", current ? "text-foreground" : "text-muted-foreground/60")}>{z.label}</div>
-            <div className="numeral text-center text-[0.5rem] text-muted-foreground/50">{z.start}h</div>
+            <div className={cn("mt-1.5 truncate text-center text-[0.7rem] font-semibold leading-tight", current ? "text-foreground" : "text-muted-foreground/60")}>{z.label}</div>
+            <div className="numeral text-center text-[0.65rem] text-muted-foreground/50" aria-hidden="true">{z.start}h</div>
           </div>
         );
       })}
@@ -140,12 +137,12 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
 
   // ── This-week metrics ──
   const week = useMemo(() => {
-    const days = Array.from({ length: 7 }, (_, i) => shift(date, -(6 - i)));
+    const days = Array.from({ length: 7 }, (_, i) => shiftDay(date, -(6 - i)));
     const ciDates = new Set(checkIns.map((c) => c.date_local));
     const present = days.map((d) => ciDates.has(d));
     // streak: consecutive days with a check-in ending today (or yesterday).
     let streak = 0;
-    for (let i = 0; ; i++) { const d = shift(date, -i); if (ciDates.has(d)) streak++; else if (i === 0) continue; else break; }
+    for (let i = 0; ; i++) { const d = shiftDay(date, -i); if (ciDates.has(d)) streak++; else if (i === 0) continue; else break; }
     // Per-day series over the week window (chronological) → sparklines.
     const sleepByDay = new Map(checkIns.filter((c) => c.sleep_hours != null).map((c) => [c.date_local, c.sleep_hours!] as const));
     const moodByDay = new Map(checkIns.filter((c) => c.mood != null).map((c) => [c.date_local, c.mood!] as const));
@@ -241,7 +238,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
               <Button className="w-full" size="lg" onClick={() => void toggleFast()}><Timer /> Start fasting</Button>
               {(fast?.recentFasts.length ?? 0) > 0 && (
                 <div className="space-y-1.5 border-t border-border/50 pt-3">
-                  <div className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">Recent fasts</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent fasts</div>
                   {fast!.recentFasts.slice(0, 3).map((r, i) => (
                     <div key={i} className="flex items-center justify-between text-xs text-muted-foreground">
                       <span className="numeral">{Math.floor(r.duration_minutes / 60)}h {r.duration_minutes % 60}m</span>
@@ -278,9 +275,9 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
                     {latest.severity !== "good" && <AlertTriangle className="mr-1 inline size-3.5 -translate-y-px text-warning" />}
                     {POSTURE_GUIDANCE[latest.severity]}
                   </p>
-                  <p className="text-[0.7rem] text-muted-foreground">The line traces hip → shoulder → head; the dashed plumb is upright. A more forward head is a lower neck angle.</p>
+                  <p className="text-xs text-muted-foreground">The line traces hip → shoulder → head; the dashed plumb is upright. A more forward head is a lower neck angle.</p>
                   {trend.length >= 2 && (
-                    <div><div className="mb-1 text-[0.7rem] font-medium text-muted-foreground">Neck angle trend</div><Sparkline values={trend} tone="activity" /></div>
+                    <div><div className="mb-1 text-xs font-medium text-muted-foreground">Neck angle trend</div><Sparkline values={trend} tone="activity" /></div>
                   )}
                 </div>
               </div>

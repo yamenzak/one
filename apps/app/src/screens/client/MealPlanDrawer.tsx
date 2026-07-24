@@ -46,6 +46,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   const [targets, setTargets] = useState<Targets | null>(null);
   const [loggedIdx, setLoggedIdx] = useState<Set<number>>(new Set());
   const [logging, setLogging] = useState<number | null>(null);
+  const [logErr, setLogErr] = useState(false);
   const [view, setView] = useState<"plan" | "shop">("plan");
   const [counts, setCounts] = useState<Record<number, number>>({});
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -187,6 +188,9 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
       }
       setLoggedIdx((s) => new Set(s).add(index));
       onLogged();
+    } catch {
+      // Offline / failed save — surface it instead of dying as an unhandled rejection.
+      setLogErr(true); setTimeout(() => setLogErr(false), 3000);
     } finally { setLogging(null); }
   };
 
@@ -220,7 +224,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
 
   return (
     <motion.div ref={overlayRef} role="dialog" aria-modal="true" aria-label="Meal plan" tabIndex={-1} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-background outline-none">
-      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border/40 bg-background/85 px-4 py-3 backdrop-blur-xl">
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border/40 bg-background/85 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 backdrop-blur-xl">
         <button onClick={onClose} aria-label="Close" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><ArrowLeft /></button>
         <div className="min-w-0 flex-1"><div className="truncate text-base font-bold tracking-tight">{isPast ? "Past plan" : "Meal plan"}</div>{active && <div className="truncate text-xs text-muted-foreground">{active.name}</div>}</div>
         <button onClick={() => startTour("meal")} aria-label="Replay meal plan tour" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><LifeBuoy /></button>
@@ -350,7 +354,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                       const done = checked.has(g.id);
                       return (
                         <button key={g.id} data-tour={gi === 0 ? "mp-shop-item" : undefined} onClick={() => setChecked((s) => { const n = new Set(s); n.has(g.id) ? n.delete(g.id) : n.add(g.id); return n; })} className="flex w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-surface-2">
-                          <span className={cn("grid size-5 shrink-0 place-items-center rounded-full border transition-colors [&_svg]:size-3", done ? "border-nutrition bg-nutrition text-white" : "border-border")}>{done && <Check strokeWidth={3} />}</span>
+                          <span className={cn("grid size-5 shrink-0 place-items-center rounded-full border transition-colors [&_svg]:size-3", done ? "border-nutrition bg-nutrition text-[var(--tone-foreground)]" : "border-border")}>{done && <Check strokeWidth={3} />}</span>
                           <FoodThumb src={g.img} size={32} />
                           <span className={cn("min-w-0 flex-1 truncate text-sm transition-colors", done && "text-muted-foreground line-through")}>{g.name}</span>
                           <Badge tone="neutral">{Math.round(g.qty)} {g.unit}</Badge>
@@ -424,6 +428,12 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
         destructive
         onConfirm={resetShop}
       />
+
+      {logErr && (
+        <div role="alert" className="fixed inset-x-0 bottom-24 z-[60] mx-auto flex w-fit items-center gap-2 rounded-full bg-card px-5 py-3 text-sm font-semibold text-foreground shadow-lg ring-1 ring-border">
+          Couldn't log — check your connection
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -440,7 +450,7 @@ function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, on
         <button onClick={onOpen} className="relative block h-36 w-full text-left transition-opacity active:opacity-90">
           {image ? <img src={image} alt="" className="absolute inset-0 size-full object-cover" /> : <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-nutrition/20 to-surface-2 text-nutrition/50 [&_svg]:size-9"><Utensils /></div>}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-          {logged ? <span className="absolute right-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-nutrition px-2 py-0.5 text-[0.6rem] font-semibold text-white [&_svg]:size-2.5"><Check strokeWidth={3} /> Logged</span> : opt.isFree ? <span className="absolute right-2 top-2 rounded-full bg-white/20 px-2 py-0.5 text-[0.6rem] font-semibold text-white backdrop-blur-md">Free</span> : null}
+          {logged ? <span className="absolute right-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-nutrition px-2 py-0.5 text-[0.6rem] font-semibold text-[var(--tone-foreground)] [&_svg]:size-2.5"><Check strokeWidth={3} /> Logged</span> : opt.isFree ? <span className="absolute right-2 top-2 rounded-full bg-white/20 px-2 py-0.5 text-[0.6rem] font-semibold text-white backdrop-blur-md">Free</span> : null}
           <div className="absolute inset-x-0 bottom-0 p-3">
             <div className="truncate font-semibold text-white">{opt.mealName || (opt.isFree ? "Free meal" : `Option ${index + 1}`)}</div>
             {opt.isFree ? (

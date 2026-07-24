@@ -100,3 +100,16 @@ export function todayLocal(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+
+/**
+ * Shift a YYYY-MM-DD local date by `delta` days, formatting the result with the
+ * SAME local year/month/day padding as todayLocal() — never via toISOString(),
+ * which emits the UTC date and drifts a full day for every user east of UTC
+ * (local midnight of `date` is the previous day in UTC). The one shared copy;
+ * every screen imports this instead of hand-rolling its own.
+ */
+export function shiftDay(date: string, delta: number): string {
+  const d = new Date(`${date}T00:00:00`);
+  d.setDate(d.getDate() + delta);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}

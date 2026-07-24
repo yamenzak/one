@@ -11,8 +11,11 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { type AppEnv, type AppContext, requireTenant } from "./auth-context.js";
+import type { Env } from "./env.js";
 import { withinQuota } from "./billing-store.js";
-import { notify } from "./notify.js";
+import { notify, tenantBrandKit } from "./notify.js";
+import { sendTenantEmail } from "./email-provider.js";
+import { emailShell, emailButton, escapeHtml } from "./mailer.js";
 import { newId, nowIso } from "./ids.js";
 import { recordAudit } from "./audit.js";
 import { parseJson, j } from "./db.js";
@@ -231,6 +234,67 @@ async function clientMetrics(db: D1Database, row: ClientRow) {
   };
 }
 
+/** URL-safe base64 of bytes (no padding) — for the opaque invite token. */
+function b64url(bytes: Uint8Array): string {
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/**
+ * A tamper-evident, opaque invite token the app renders as a QR (SPEC §4). It
+ * carries the client + tenant + email so the branded login can prefill the
+ * address; it's HMAC-signed so the QR payload can't be forged. It is NOT a bearer
+ * credential — activation still requires the invitee to receive an OTP at that
+ * email (the /api/context auto-link binds the record only after an authenticated
+ * sign-in), so the token is a convenience hint, not an authorization.
+ */
+async function signInviteToken(env: Env, payload: { c: string; t: string; e: string }): Promise<string> {
+  const enc = new TextEncoder();
+  const body = b64url(enc.encode(JSON.stringify(payload)));
+  const secret = env.BETTER_AUTH_SECRET || "mossa-dev-insecure-secret-change-me";
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(body));
+  return `${body}.${b64url(new Uint8Array(sig))}`;
+}
+
+/** The tenant's canonical branded login URL: an active custom domain if one is
+ *  live (white-label, SPEC §14.1), else the platform host's `/t/<slug>` path. */
+async function tenantLoginUrl(env: Env, tenantId: string): Promise<string> {
+  const base = (env.BETTER_AUTH_URL || "https://mossa.4dl.app").replace(/\/$/, "");
+  const dom = await env.DB
+    .prepare("SELECT hostname FROM tenant_domains WHERE tenant_id = ? AND status = 'active' ORDER BY created_at LIMIT 1")
+    .bind(tenantId)
+    .first<{ hostname: string }>()
+    .catch(() => null);
+  if (dom?.hostname) return `https://${dom.hostname}`;
+  const org = await env.DB.prepare('SELECT slug FROM "organization" WHERE id = ?').bind(tenantId).first<{ slug: string }>().catch(() => null);
+  return org?.slug ? `${base}/t/${org.slug}` : base;
+}
+
+/** Build the invite deep-link + opaque token, and send the branded invite email
+ *  (SPEC §4, §8.1). Best-effort: a mail failure never fails client creation, and
+ *  the returned QR data still lets the coach show the in-gym invite. */
+async function buildClientInvite(env: Env, tenantId: string, clientId: string, email: string): Promise<{ url: string; token: string; email: string }> {
+  const loginUrl = await tenantLoginUrl(env, tenantId);
+  const token = await signInviteToken(env, { c: clientId, t: tenantId, e: email });
+  const url = `${loginUrl}${loginUrl.includes("?") ? "&" : "?"}invite=${encodeURIComponent(token)}`;
+  const brand = await tenantBrandKit(env.DB, tenantId).catch(() => null);
+  if (brand) {
+    const html = emailShell(
+      `Welcome to ${escapeHtml(brand.name)}`,
+      `<p style="margin:0 0 4px">Your coach set up your space on <strong>${escapeHtml(brand.name)}</strong>.</p>
+       <p style="margin:0">Open it and sign in with this email — a one-time code lands in your inbox, no password to create.</p>
+       ${emailButton(`Open ${brand.name}`, url, brand)}
+       <p style="margin:18px 0 0;color:#8b9099;font-size:13px;line-height:1.6">If this wasn't meant for you, you can safely ignore this email.</p>`,
+      { brand, preheader: `Your ${brand.name} space is ready`, eyebrow: "You're invited" },
+    );
+    const text = `Your coach set up your space on ${brand.name}. Open it and sign in with this email: ${url}`;
+    await sendTenantEmail(env, tenantId, { to: email, subject: `Your ${brand.name} space is ready`, html, text, brandName: brand.name }).catch(() => undefined);
+  }
+  return { url, token, email };
+}
+
 export const clientRoutes = new Hono<AppEnv>()
   // Roster — scoped by role.
   .get("/clients", async (c) => {
@@ -285,8 +349,15 @@ export const clientRoutes = new Hono<AppEnv>()
         .bind(id, who.userId, who.tenantId, nowIso())
         .run();
     }
+    // Send the branded invite + build the QR invite data (SPEC §4): the email is
+    // the activation channel, and `invite` carries the deep-link + opaque token
+    // the coach can show as an in-gym QR. Best-effort — never fails creation.
+    let invite: { url: string; token: string; email: string } | null = null;
+    if (body.data.email) {
+      invite = await buildClientInvite(c.env, who.tenantId, id, body.data.email).catch(() => null);
+    }
     const row = await getClient(c.env.DB, who.tenantId, id);
-    return c.json({ client: clientView(row!) }, 201);
+    return c.json({ client: clientView(row!), invite }, 201);
   })
 
   // "Create my client record" — the trainer-trains-themself tap (SPEC §2).

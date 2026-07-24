@@ -165,11 +165,16 @@ export function pickPlanForDate<T extends PlanLike>(plans: T[], dateIso?: string
   );
   if (eligible.length === 0) return null;
   if (dateIso) {
-    const endOfDay = Date.parse(dateIso) + 86_400_000 - 1;
+    // Compare on the same calendar basis: `dateIso` is a client-LOCAL day
+    // (YYYY-MM-DD), so a plan counts for it when its publish CALENDAR DAY is
+    // on-or-before that day. Parsing `dateIso` as a UTC instant (Date.parse)
+    // and comparing to the absolute `publishedAt` mixed a UTC-day window with
+    // an instant, drifting the resolution a day for off-UTC users near publish.
+    const viewDay = dateIso.slice(0, 10);
     let best: T | null = null;
     for (const p of eligible) {
-      const pub = Date.parse(p.publishedAt!);
-      if (pub <= endOfDay && (!best || pub > Date.parse(best.publishedAt!))) best = p;
+      const pubDay = p.publishedAt!.slice(0, 10);
+      if (pubDay <= viewDay && (!best || p.publishedAt! > best.publishedAt!)) best = p;
     }
     if (best) return best;
   }

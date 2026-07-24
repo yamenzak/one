@@ -11,29 +11,24 @@ import { motion } from "motion/react";
 import { prescribedSetsForDay, type WorkoutBody } from "@mossa/protocol";
 import { sessionTonnage, sessionLoad, epley1Rm, DEFAULT_WEEKLY_LOAD_TARGET, activityByKey, fmtEnergy, fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
 import {
-  Card, Badge, Button, Chip, Skeleton, Page, Stagger, EmptyState, StatCard, WeekDots, Sparkline, MiniBars, IconBadge,
+  Card, Badge, Button, Chip, Field, Skeleton, Page, Stagger, EmptyState, StatCard, WeekDots, Sparkline, MiniBars, IconBadge, Sheet,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
-  Dumbbell, Play, Moon, ChevronRight, Plus, Footprints, Flame, TrendingUp, Trophy, Activity, AlertTriangle,
+  Dumbbell, Play, Moon, ChevronRight, Plus, Footprints, Flame, TrendingUp, Trophy, Activity, AlertTriangle, Search,
 } from "@mossa/ui";
-import { api, todayLocal } from "../../api.js";
+import { api, todayLocal, shiftDay } from "../../api.js";
 import { activityIcon } from "./activityIcons.js";
 import { useUnits } from "../../units.js";
 import { LogSheet } from "./LogSheet.js";
-import { pretty } from "../exercise.js";
+import { pretty, splitList, metaText, type ExerciseInfo } from "../exercise.js";
 import { CoachNote } from "./CoachNote.js";
 import { LaneSwitcher, type Lane } from "./LaneSwitcher.js";
+import { Markdown } from "../../Markdown.js";
 
 interface Plan { id: string; name: string; status: string; variantId: string | null; body: WorkoutBody }
+interface Goal { status: string; targets: Record<string, number> | null }
 interface LoggedSet { reps?: number | null; weightKg?: number | null; durationSeconds?: number | null; effortLabel?: "easy" | "perfect" | "hard" | null; completed: boolean }
 interface Session { id: string; date_local: string; entries: { exerciseId: string; sets: LoggedSet[] }[] }
 interface ActivityLog { id: string; date_local: string; activity_key: string; label: string | null; duration_min: number | null; calories: number | null }
-
-/** N days back from a YYYY-MM-DD string, as YYYY-MM-DD. */
-const shift = (date: string, delta: number): string => {
-  const d = new Date(`${date}T00:00:00`);
-  d.setDate(d.getDate() + delta);
-  return d.toISOString().slice(0, 10);
-};
 
 export function Train({ clientId }: { clientId: string }) {
   const [plans, setPlans] = useState<Plan[] | null>(null);
@@ -42,6 +37,7 @@ export function Train({ clientId }: { clientId: string }) {
   const [defaultLabel, setDefaultLabel] = useState("Main");
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const nav = useNavigate();
   const units = useUnits();
   const [activityOpen, setActivityOpen] = useState(false);
@@ -55,13 +51,14 @@ export function Train({ clientId }: { clientId: string }) {
     const rid = ++reqRef.current;
     setError(false);
     try {
-      const [p, s, a] = await Promise.all([
+      const [p, s, a, g] = await Promise.all([
         api.get<{ plans: Plan[]; variants: Lane[]; currentVariantId: string | null; defaultLabel?: string }>(`/api/workout-plans?clientId=${clientId}`),
-        api.get<{ sessions: Session[] }>(`/api/logs/workout-sessions?clientId=${clientId}&from=${shift(today, -89)}&to=${today}`),
-        api.get<{ activities: ActivityLog[] }>(`/api/logs/activities?clientId=${clientId}&from=${shift(today, -29)}&to=${today}`),
+        api.get<{ sessions: Session[] }>(`/api/logs/workout-sessions?clientId=${clientId}&from=${shiftDay(today, -89)}&to=${today}`),
+        api.get<{ activities: ActivityLog[] }>(`/api/logs/activities?clientId=${clientId}&from=${shiftDay(today, -29)}&to=${today}`),
+        api.get<{ goals: Goal[] }>(`/api/goals?clientId=${clientId}`).catch(() => ({ goals: [] as Goal[] })),
       ]);
       if (rid !== reqRef.current) return;
-      setPlans(p.plans); setVariants(p.variants ?? []); setCurrentVariantId(p.currentVariantId ?? null); setDefaultLabel(p.defaultLabel || "Main"); setSessions(s.sessions); setActivities(a.activities);
+      setPlans(p.plans); setVariants(p.variants ?? []); setCurrentVariantId(p.currentVariantId ?? null); setDefaultLabel(p.defaultLabel || "Main"); setSessions(s.sessions); setActivities(a.activities); setGoals(g.goals);
     } catch {
       if (rid !== reqRef.current) return;
       setError(true);
@@ -69,8 +66,16 @@ export function Train({ clientId }: { clientId: string }) {
   }, [clientId, today]);
   useEffect(() => void load(), [load]);
 
+  // The weekly Training-Load target is trainer-set on the active goal
+  // (targets_json "weeklyTrainingLoad", SPEC §8.11) — fall back to the default
+  // when no goal carries one.
+  const loadTarget = useMemo(() => {
+    const t = goals.find((g) => g.status === "active")?.targets?.weeklyTrainingLoad;
+    return typeof t === "number" && t > 0 ? t : DEFAULT_WEEKLY_LOAD_TARGET;
+  }, [goals]);
+
   const week = useMemo(() => {
-    const days = Array.from({ length: 7 }, (_, i) => shift(today, -(6 - i)));
+    const days = Array.from({ length: 7 }, (_, i) => shiftDay(today, -(6 - i)));
     const inWeek = new Set(days);
     const dailyLoad = Array(7).fill(0) as number[];
     const dailyTonnage = Array(7).fill(0) as number[];
@@ -202,9 +207,9 @@ export function Train({ clientId }: { clientId: string }) {
         <section className="space-y-2">
           <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">This week</h3>
           <Stagger className="grid grid-cols-2 gap-3">
-            <StatCard stack label="Training load" value={week.weekLoad} unit={`/ ${DEFAULT_WEEKLY_LOAD_TARGET}`} icon={TrendingUp} tone="activity"
-              badge={<Badge tone={week.weekLoad >= DEFAULT_WEEKLY_LOAD_TARGET ? "success" : "neutral"}>{week.weekLoad >= DEFAULT_WEEKLY_LOAD_TARGET ? "On target" : "Building"}</Badge>}
-              chart={week.weekLoad > 0 ? <MiniBars values={week.dailyLoad} tone="activity" width={132} target={DEFAULT_WEEKLY_LOAD_TARGET / 7} /> : undefined} />
+            <StatCard stack label="Training load" value={week.weekLoad} unit={`/ ${loadTarget}`} icon={TrendingUp} tone="activity"
+              badge={<Badge tone={week.weekLoad >= loadTarget ? "success" : "neutral"}>{week.weekLoad >= loadTarget ? "On target" : "Building"}</Badge>}
+              chart={week.weekLoad > 0 ? <MiniBars values={week.dailyLoad} tone="activity" width={132} target={loadTarget / 7} /> : undefined} />
             <StatCard stack label="Tonnage" value={kgToDisplay(week.weekTonnage, units).toLocaleString()} unit={weightLabel(units)} icon={Dumbbell} tone="activity"
               chart={week.weekTonnage > 0 ? <Sparkline values={week.dailyTonnage.map((v) => kgToDisplay(v, units))} tone="activity" width={132} /> : undefined} />
             <StatCard stack label="Active days" value={week.activeCount} unit="of 7" icon={Flame} tone="cardio"
@@ -230,7 +235,7 @@ export function Train({ clientId }: { clientId: string }) {
                   <div className="truncate font-medium">{r.title}</div>
                   <div className="truncate text-xs text-muted-foreground">{new Date(`${r.date}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · {r.sub}</div>
                 </div>
-                {r.load > 0 && <div className="shrink-0 text-right"><div className="numeral font-semibold text-activity">{r.load}</div><div className="text-[0.6rem] uppercase tracking-wide text-muted-foreground">load</div></div>}
+                {r.load > 0 && <div className="shrink-0 text-right"><div className="numeral font-semibold text-activity">{r.load}</div><div className="text-xs uppercase tracking-wide text-muted-foreground">load</div></div>}
               </Card>
             ))}
           </Stagger>
@@ -251,7 +256,7 @@ export function Train({ clientId }: { clientId: string }) {
                     {day.imageUrl ? <img src={day.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className={`absolute inset-0 ${day.isRestDay ? "bg-gradient-to-br from-sleep/20 to-surface-2" : "bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2"}`} />}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
                     {!day.imageUrl && <div className="absolute inset-0 grid place-items-center text-white/35 [&_svg]:size-8">{day.isRestDay ? <Moon /> : <Dumbbell />}</div>}
-                    {day.isRestDay && <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-[0.6rem] font-semibold text-sleep">Rest</span>}
+                    {day.isRestDay && <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-xs font-semibold text-sleep">Rest</span>}
                     <div className="absolute inset-x-0 bottom-0 p-3">
                       <div className="truncate font-semibold text-white">{day.name || `Day ${i + 1}`}</div>
                       <div className="truncate text-xs text-white/75">{day.isRestDay ? "Rest day" : `${exercises} exercise${exercises === 1 ? "" : "s"} · ${sets} sets`}</div>
@@ -268,6 +273,10 @@ export function Train({ clientId }: { clientId: string }) {
         <EmptyState icon={Activity} title="Nothing here yet" description="Log an activity to get started." action={<Button onClick={() => setActivityOpen(true)}><Plus /> Log activity</Button>} />
       )}
 
+      {/* Browsable exercise library (SPEC §8.11) — freestyle content for no-plan
+          clients, category-filtered, tap a card for the illustrated how-to. */}
+      <LibraryGrid />
+
       <Stagger><CoachNote clientId={clientId} surface="train" /></Stagger>
         </>
         )}
@@ -276,5 +285,96 @@ export function Train({ clientId }: { clientId: string }) {
 
       {activityOpen && <LogSheet open initialKind="activity" clientId={clientId} onClose={() => setActivityOpen(false)} onLogged={() => void load()} />}
     </Page>
+  );
+}
+
+// ── Illustrated exercise library (SPEC §8.11) ────────────────────────────────
+/** The first muscle group of an exercise, humanised — the browse category. */
+const libCategory = (e: ExerciseInfo): string => { const c = splitList(e.category)[0] ?? splitList(e.muscle_groups)[0]; return c ? pretty(c) : "Other"; };
+
+/** A full-width illustrated cover for a library exercise (static first frame,
+ *  muscle-tinted glyph fallback). ExerciseThumb is fixed-size; this fills. */
+function LibCover({ ex, className = "" }: { ex: ExerciseInfo; className?: string }) {
+  const img = ex.thumb_url || ex.thumb2_url;
+  return (
+    <div className={`relative grid place-items-center overflow-hidden rounded-xl bg-activity-soft text-activity ${className}`}>
+      {img ? <img src={img} alt="" className="size-full object-contain" /> : <Dumbbell className="size-8" />}
+    </div>
+  );
+}
+
+/** A browsable grid of the platform + tenant exercise library: search + muscle
+ *  category chips over illustrated thumbnails; tap a card for the how-to. */
+function LibraryGrid() {
+  const [all, setAll] = useState<ExerciseInfo[] | null>(null);
+  const [q, setQ] = useState("");
+  const [cat, setCat] = useState<string | null>(null);
+  const [open, setOpen] = useState<ExerciseInfo | null>(null);
+  useEffect(() => {
+    void api.get<{ exercises: ExerciseInfo[] }>("/api/exercises").then((r) => setAll(r.exercises)).catch(() => setAll([]));
+  }, []);
+  const categories = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of all ?? []) { const c = libCategory(e); counts.set(c, (counts.get(c) ?? 0) + 1); }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c).slice(0, 8);
+  }, [all]);
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    return (all ?? []).filter((e) => (!cat || libCategory(e) === cat) && (!s || e.name.toLowerCase().includes(s))).slice(0, 60);
+  }, [all, q, cat]);
+
+  if (all && all.length === 0) return null;
+  return (
+    <section className="space-y-2">
+      <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Exercise library</h3>
+      <Reveal loading={!all} skeleton={<SkeletonList card rows={3} thumb={56} />}>
+        {all && (
+          <div className="space-y-3">
+            <Field label="Search exercises" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the library…" />
+            {categories.length > 0 && (
+              <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
+                <span className="shrink-0"><Chip selected={cat === null} onClick={() => setCat(null)}>All</Chip></span>
+                {categories.map((cName) => <span key={cName} className="shrink-0"><Chip selected={cat === cName} onClick={() => setCat(cName)}>{cName}</Chip></span>)}
+              </div>
+            )}
+            {filtered.length === 0 ? (
+              <Card className="text-center text-sm text-muted-foreground">No exercises match.</Card>
+            ) : (
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                {filtered.map((e) => (
+                  <button key={e.id} onClick={() => setOpen(e)} className="text-left">
+                    <Card interactive className="flex flex-col gap-2 p-2.5">
+                      <LibCover ex={e} className="aspect-square w-full" />
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium">{e.name}</div>
+                        <div className="truncate text-xs text-muted-foreground">{metaText(e) || "Exercise"}</div>
+                      </div>
+                    </Card>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </Reveal>
+      {open && <ExerciseLibrarySheet ex={open} onClose={() => setOpen(null)} />}
+    </section>
+  );
+}
+
+/** The illustrated how-to for a library exercise: animated frames + meta +
+ *  instructions. Read-only browse; freestyle logging still lives in LogSheet. */
+function ExerciseLibrarySheet({ ex, onClose }: { ex: ExerciseInfo; onClose: () => void }) {
+  const chips = [splitList(ex.muscle_groups)[0], splitList(ex.equipment)[0], ex.difficulty, ex.mechanic].filter(Boolean) as string[];
+  return (
+    <Sheet open onClose={onClose} title={ex.name}>
+      <div className="space-y-4">
+        <LibCover ex={ex} className="aspect-video w-full" />
+        {chips.length > 0 && <div className="flex flex-wrap gap-1.5">{chips.map((ch, i) => <Badge key={i} tone="activity">{pretty(ch)}</Badge>)}</div>}
+        {ex.instructions_md
+          ? <Markdown className="text-sm text-foreground/90">{ex.instructions_md}</Markdown>
+          : <p className="text-sm text-muted-foreground">No written instructions for this exercise yet.</p>}
+      </div>
+    </Sheet>
   );
 }

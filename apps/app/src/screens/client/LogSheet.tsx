@@ -35,9 +35,9 @@ function Rating({ label, value, onChange }: { label: string; value: number | nul
   return (
     <div>
       <div className="mb-2 text-sm text-muted-foreground">{label}</div>
-      <div className="flex gap-2">
+      <div className="flex gap-2" role="radiogroup" aria-label={label}>
         {MOOD_ICONS.map((Face, i) => (
-          <button key={i} onClick={() => onChange(i + 1)} className={`grid size-11 place-items-center rounded-full transition-all active:scale-90 [&_svg]:size-5 ${value === i + 1 ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+          <button key={i} role="radio" aria-label={`${label} ${i + 1} of 5`} aria-checked={value === i + 1} onClick={() => onChange(i + 1)} className={`grid size-11 place-items-center rounded-full transition-all active:scale-90 [&_svg]:size-5 ${value === i + 1 ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
             <Face />
           </button>
         ))}
@@ -207,7 +207,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
               </div>
               <div className="relative mb-2">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <input value={actSearch} onChange={(e) => setActSearch(e.target.value)} placeholder="Search sports & workouts…" className="h-9 w-full rounded-full bg-background pl-8 pr-3 text-sm outline-none" />
+                <input value={actSearch} onChange={(e) => setActSearch(e.target.value)} aria-label="Search sports & workouts" placeholder="Search sports & workouts…" className="h-9 w-full rounded-full bg-background pl-8 pr-3 text-sm outline-none" />
               </div>
               <div className="max-h-52 space-y-2 overflow-y-auto pr-0.5">
                 {activitiesByCategory().map((g) => {
@@ -216,13 +216,13 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
                   if (!items.length) return null;
                   return (
                     <div key={g.key}>
-                      <div className="px-1 pb-1 text-[0.62rem] font-semibold uppercase tracking-wide text-muted-foreground">{g.label}</div>
+                      <div className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{g.label}</div>
                       <div className="flex flex-wrap gap-1.5">
                         {items.map((a) => {
                           const Icon = activityIcon(a.key);
                           const on = activityKey === a.key;
                           return (
-                            <button key={a.key} onClick={() => setActivityKey(a.key)} style={on ? { background: toneVar.cardio, color: "#fff" } : undefined} className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors [&_svg]:size-3.5", !on && "bg-background hover:bg-surface-3")}>
+                            <button key={a.key} aria-pressed={on} onClick={() => setActivityKey(a.key)} style={on ? { background: toneVar.cardio, color: "var(--tone-foreground)" } : undefined} className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors [&_svg]:size-3.5", !on && "bg-background hover:bg-surface-3")}>
                               <Icon /> {a.label}
                             </button>
                           );

@@ -63,6 +63,19 @@ export async function consumePromoRedemption(db: D1Database, promoId: string): P
   return (r.meta?.changes ?? 0) > 0;
 }
 
+/** Compensate a slot consumed by `consumePromoRedemption` when the
+ *  value-producing grant that followed it FAILS. Releases the slot (guarded so
+ *  the count can never go negative) so the buyer can retry instead of being
+ *  permanently rejected with `promo_exhausted` against a one-use code — the same
+ *  compensation the redemption-code /redeem path uses. Best-effort. */
+export async function releasePromoRedemption(db: D1Database, promoId: string): Promise<void> {
+  await db
+    .prepare("UPDATE promo_codes SET redemption_count = redemption_count - 1 WHERE id = ? AND redemption_count > 0")
+    .bind(promoId)
+    .run()
+    .catch(() => undefined);
+}
+
 /** Fire-and-forget counter bump for the PAID path (called from a webhook AFTER
  *  the charge succeeded). Note: on the paid path the eligibility check runs at
  *  intent time and this bump lands at payment time, so under heavy concurrency a
