@@ -1434,6 +1434,68 @@ describe("activities feed (Train tab)", () => {
   });
 });
 
+describe("log detail (Today-item detail page)", () => {
+  interface Detail {
+    kind: string; date: string; title: string; tone: string;
+    hero: { value: number; unit: string; label: string } | null;
+    stats: { label: string; value: number | null; unit: string }[];
+    items: { title: string; sub?: string | null }[];
+    rows: { label: string; value: string }[];
+    series?: { title: string; unit: string; chart: string; points: { value: number }[] } | null;
+  }
+
+  it("returns normalized detail + analytics for a logged activity", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "DetailAct" }) })).json()) as { client: { id: string } };
+    // Weight first so the activity gets a MET-estimated calorie burn.
+    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-01", weightKg: 80 } }) });
+    const created = (await (await SELF.fetch("http://x/api/logs/activity", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-02", activityKey: "swimming", durationMin: 60, distanceM: 1500, notes: "pool laps" } }) })).json()) as { id: string; calories: number };
+    expect(created.calories).toBe(480);
+
+    const d = (await (await SELF.fetch(`http://x/api/logs/detail?clientId=${client.id}&kind=activity&ref=${created.id}`, { headers: auth(ownerCookie) })).json()) as Detail;
+    expect(d.kind).toBe("activity");
+    expect(d.tone).toBe("cardio");
+    expect(d.title).toBe("Swimming");
+    expect(d.date).toBe("2026-07-02");
+    expect(d.hero).toMatchObject({ value: 480, unit: "energy", label: "Calories" });
+    // duration + distance + "Times logged" are present; nulls (reps/HR) omitted.
+    expect(d.stats.find((s) => s.label === "Duration")).toMatchObject({ value: 60, unit: "minutes" });
+    expect(d.stats.find((s) => s.label === "Distance")).toMatchObject({ value: 1500, unit: "distance" });
+    expect(d.stats.find((s) => s.label === "Times logged")).toMatchObject({ value: 1, unit: "count" });
+    expect(d.stats.some((s) => s.label === "Reps")).toBe(false);
+    expect(d.series?.chart).toBe("bar");
+    expect(d.series?.unit).toBe("energy");
+    expect(d.series?.points.at(-1)?.value).toBe(480);
+
+    // Unknown ref → 404; another tenant → 404.
+    expect((await SELF.fetch(`http://x/api/logs/detail?clientId=${client.id}&kind=activity&ref=nope`, { headers: auth(ownerCookie) })).status).toBe(404);
+    expect((await SELF.fetch(`http://x/api/logs/detail?clientId=${client.id}&kind=activity&ref=${created.id}`, { headers: auth(otherCookie) })).status).toBe(404);
+  });
+
+  it("aggregates a food meal by date with a 7-day calorie series", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "DetailFood" }) })).json()) as { client: { id: string } };
+    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-10", mealType: "lunch", label: "Rice", calories: 300, proteinG: 8, carbsG: 60, fatG: 2, quantity: 100, unit: "g" } }) });
+    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-10", mealType: "lunch", label: "Chicken", calories: 250, proteinG: 40, carbsG: 0, fatG: 8, quantity: 150, unit: "g" } }) });
+
+    // Food kinds arrive with the `:` dot-encoded (food.lunch), ref = the date.
+    const d = (await (await SELF.fetch(`http://x/api/logs/detail?clientId=${client.id}&kind=food.lunch&ref=2026-07-10`, { headers: auth(ownerCookie) })).json()) as Detail;
+    expect(d.kind).toBe("food.lunch");
+    expect(d.tone).toBe("nutrition");
+    expect(d.title).toBe("Lunch");
+    expect(d.hero).toMatchObject({ value: 550, unit: "energy", label: "Calories" });
+    expect(d.stats.find((s) => s.label === "Protein g")).toMatchObject({ value: 48, unit: "raw" });
+    expect(d.items.length).toBe(2);
+    expect(d.items[0]).toMatchObject({ title: "Rice", sub: "100g · 300 kcal" });
+    expect(d.series?.chart).toBe("bar");
+    expect(d.series?.points.length).toBe(7);
+    expect(d.series?.points.at(-1)?.value).toBe(550);
+
+    // A meal with no entries that day → 404.
+    expect((await SELF.fetch(`http://x/api/logs/detail?clientId=${client.id}&kind=food.dinner&ref=2026-07-10`, { headers: auth(ownerCookie) })).status).toBe(404);
+  });
+});
+
 describe("weekly nutrition strip (Eat tab)", () => {
   it("buckets 7-day calories/protein/water per day and stays tenant-scoped", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
