@@ -9,12 +9,11 @@
  */
 
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "motion/react";
 import { fmtEnergy, fmtWeight, fmtVolume, lengthLabel, type UnitPrefs } from "@mossa/domain";
 import {
-  Page, Card, Badge, IconBadge, ChartCard, AreaChart, BarChart, MacroBar, GlanceStrip, ProgressRing, SectionHeader, Reveal, SkeletonHero, SkeletonChart, EmptyState, Stagger, stagger, METRICS, toneVar, cn,
-  ArrowLeft, Flame, Weight, Droplet, MapPin, Timer, HeartPulse, Gauge, Smile, Ruler, Activity, TrendingUp, TrendingDown,
+  Sheet, Card, Badge, IconBadge, ChartCard, AreaChart, BarChart, MacroBar, GlanceStrip, ProgressRing, SectionHeader, Reveal, SkeletonHero, SkeletonChart, EmptyState, Stagger, stagger, METRICS, toneVar, cn,
+  Flame, Weight, Droplet, MapPin, Timer, HeartPulse, Gauge, Smile, Ruler, Activity, TrendingUp, TrendingDown,
   Footprints, Dumbbell, ClipboardList, Moon, Pill, ScanLine, Target, Utensils, Croissant, Soup, Apple,
   type LucideIcon, type Tone,
 } from "@mossa/ui";
@@ -101,11 +100,13 @@ function MiniStat({ icon: Icon, tone, label, value, sub }: { icon: LucideIcon; t
   );
 }
 
-export function LogDetail() {
-  const { kind = "", ref = "" } = useParams();
+/** A logged item's detail as a full-height, swipe-to-dismiss drawer — opened
+ *  from the Today feed, so you keep your place in the feed. `kind` is the feed
+ *  kind (food kinds arrive dot-encoded, e.g. "food.lunch"); `ref` is the row id
+ *  or local date. */
+export function LogDetailSheet({ kind, ref, onClose }: { kind: string; ref: string; onClose: () => void }) {
   const clientId = useActiveClientId();
   const units = useUnits();
-  const nav = useNavigate();
   const [d, setD] = useState<LogDetail | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
@@ -122,17 +123,15 @@ export function LogDetail() {
   const Icon = iconFor(kind, ref);
 
   return (
-    <Page>
-      <button onClick={() => nav(-1)} className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-4"><ArrowLeft /> Back</button>
-
-      <Reveal loading={state === "loading"} className="space-y-4" skeleton={<><SkeletonHero height={150} /><SkeletonChart height={160} /></>}>
+    <Sheet open onClose={onClose}>
+      <Reveal loading={state === "loading"} className="space-y-4 pb-1" skeleton={<><SkeletonHero height={150} /><SkeletonChart height={160} /></>}>
         {state === "error" || !d ? (
-          <EmptyState icon={Activity} title="Couldn't load this" description="This log may have been removed. Go back and try another." />
+          <EmptyState icon={Activity} title="Couldn't load this" description="This log may have been removed. Close and try another." />
         ) : (
           <Detail d={d} Icon={Icon} units={units} />
         )}
       </Reveal>
-    </Page>
+    </Sheet>
   );
 }
 

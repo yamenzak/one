@@ -29,7 +29,6 @@ import { Settings } from "./screens/Settings.js";
 import { Inbox } from "./screens/Inbox.js";
 import { MediaLibrary } from "./screens/MediaLibrary.js";
 import { Wellness } from "./screens/client/Wellness.js";
-import { LogDetail } from "./screens/client/LogDetail.js";
 import { Onboarding } from "./screens/client/Onboarding.js";
 import { Shop } from "./screens/client/Shop.js";
 import { Explore } from "./screens/client/Explore.js";
@@ -108,7 +107,6 @@ export function Shell() {
         <Route path="eat" element={<ClientArea>{(cid) => <Eat clientId={cid} />}</ClientArea>} />
         <Route path="progress" element={<ClientArea>{(cid) => <Progress clientId={cid} />}</ClientArea>} />
         <Route path="wellness" element={<ClientArea>{(cid) => <Wellness clientId={cid} />}</ClientArea>} />
-        <Route path="log/:kind/:ref" element={<ClientArea>{() => <LogDetail />}</ClientArea>} />
         <Route path="clients" element={<CoachArea><Clients /></CoachArea>} />
         <Route path="clients/:clientId" element={<CoachArea><ClientDetail /></CoachArea>} />
         <Route path="clients/:clientId/:subtab" element={<CoachArea><ClientDetail /></CoachArea>} />
