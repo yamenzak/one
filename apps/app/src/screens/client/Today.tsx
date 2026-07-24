@@ -18,6 +18,7 @@ import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
 import { usePasskey } from "../../PasskeyPrompt.js";
 import { LogSheet } from "./LogSheet.js";
+import { LogDetailSheet } from "./LogDetail.js";
 import { WidgetCarousel, WidgetCustomizeSheet } from "../widget-kit.js";
 import { CLIENT_WIDGETS, DEFAULT_CLIENT_WIDGETS, type ClientWidgetData } from "./HomeWidgets.js";
 import { TodayAgenda, fetchAgenda, type AgendaData } from "./TodayAgenda.js";
@@ -84,18 +85,16 @@ const GAP_LABELS: Record<string, string> = {
   workoutLocation: "Where you train",
 };
 
-/** Loggable kinds that open their own detail page (`/log/:kind/:ref`). Coach /
- *  plan events keep routing to their existing surfaces (sheets / tabs). */
+/** Loggable kinds that open their own detail drawer (a swipe-to-dismiss sheet,
+ *  so you keep your place in the feed). Coach / plan events keep routing to
+ *  their existing surfaces (sheets / tabs). */
 const DETAIL_KINDS = new Set(["water", "workout", "activity", "measurement", "checkin", "sleep", "mood", "supplement", "fast", "bodyscan", "goal"]);
+const opensDetail = (ev: FeedEvent): boolean => !!ev.ref && (ev.kind.startsWith("food") || DETAIL_KINDS.has(ev.kind));
 
-/** The route a feed event opens. A logged thing → its dedicated detail page;
- *  coach feedback / labs → their Wellness sheet; plan events → the plan tab. */
+/** The route a NON-detail feed event opens: coach feedback / labs → their
+ *  Wellness sheet; plan events → the plan tab. */
 const routeForEvent = (ev: FeedEvent): string | null => {
-  const k = ev.kind;
-  // Food meals carry `food:<meal>`; the ":" is encoded as "." in the path.
-  if (k.startsWith("food") && ev.ref) return `/log/${k.replace(":", ".")}/${encodeURIComponent(ev.ref)}`;
-  if (DETAIL_KINDS.has(k) && ev.ref) return `/log/${k}/${encodeURIComponent(ev.ref)}`;
-  switch (k) {
+  switch (ev.kind) {
     case "feedback": return ev.ref ? `/wellness?checkin=${ev.ref}` : "/wellness";
     case "lab": return ev.ref ? `/wellness?lab=${ev.ref}` : "/wellness";
     case "session": return "/wellness";
@@ -111,6 +110,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   const [feed, setFeed] = useState<FeedEvent[] | null>(null);
   const [logOpen, setLogOpen] = useState(false);
   const [checkInOpen, setCheckInOpen] = useState(false);
+  const [detail, setDetail] = useState<{ kind: string; ref: string } | null>(null);
   const [widgetsOpen, setWidgetsOpen] = useState(false);
   // The home widget layout is CLIENT-scoped (stored on the client's dashboard
   // prefs, surfaced in the today bundle), so a coach viewing a client edits the
@@ -302,7 +302,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
                 <Card className="text-center text-sm text-muted-foreground">{isToday ? "Your day fills in here as you log — meals, workouts, check-ins and more." : "Nothing was logged on this day."}</Card>
               ) : (
                 <Card className="divide-y divide-border/40 py-0.5">
-                  {feed.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} onOpen={onOpen} />)}
+                  {feed.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} onOpen={onOpen} onDetail={(kind, ref) => setDetail({ kind, ref })} />)}
                 </Card>
               ))}
             </Reveal>
@@ -313,6 +313,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
         )}
       </Reveal>
 
+      {detail && <LogDetailSheet kind={detail.kind} ref={detail.ref} onClose={() => setDetail(null)} />}
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} clientId={clientId} onLogged={() => void load()} />
       {checkInOpen && <LogSheet open initialKind="checkin" onClose={() => setCheckInOpen(false)} clientId={clientId} onLogged={() => { setCheckInOpen(false); void load(); }} />}
       {widgetsOpen && <WidgetCustomizeSheet catalog={widgetCatalog} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
@@ -360,12 +361,16 @@ function dayLabel(day: string, today: string): string {
   return new Date(`${day}T00:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
 }
 
-function FeedRow({ ev, units, onOpen }: { ev: FeedEvent; units: UnitPrefs; onOpen?: (route: string) => void }) {
+function FeedRow({ ev, units, onOpen, onDetail }: { ev: FeedEvent; units: UnitPrefs; onOpen?: (route: string) => void; onDetail?: (kind: string, ref: string) => void }) {
   const meta = metaFor(ev.kind);
   // Coach-authored events carry the acting staff member's name ("by Jane").
   const sub = [ev.subtitle, ev.actor ? `by ${ev.actor}` : null, formatMetric(ev.metric, units)].filter(Boolean).join(" · ");
   const time = new Date(ev.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  const route = onOpen ? routeForEvent(ev) : null;
+  // A logged thing opens its detail drawer in place; coach/plan events route.
+  const detail = onDetail && opensDetail(ev);
+  const route = !detail && onOpen ? routeForEvent(ev) : null;
+  const clickable = detail || !!route;
+  const open = () => (detail ? onDetail!(ev.kind.replace(":", "."), ev.ref!) : onOpen!(route!));
   const body = (
     <>
       <IconBadge icon={meta.icon} tone={meta.tone} size="sm" />
@@ -374,11 +379,11 @@ function FeedRow({ ev, units, onOpen }: { ev: FeedEvent; units: UnitPrefs; onOpe
         {sub && <div className="truncate text-xs text-muted-foreground">{sub}</div>}
       </div>
       <span className="shrink-0 text-[0.7rem] tabular-nums text-muted-foreground">{time}</span>
-      {route && <ChevronRight className="size-4 shrink-0 text-muted-foreground/40" />}
+      {clickable && <ChevronRight className="size-4 shrink-0 text-muted-foreground/40" />}
     </>
   );
-  return route ? (
-    <button onClick={() => onOpen!(route)} className="flex w-full items-center gap-3 py-2.5 text-left transition-opacity active:opacity-60">{body}</button>
+  return clickable ? (
+    <button onClick={open} className="flex w-full items-center gap-3 py-2.5 text-left transition-opacity active:opacity-60">{body}</button>
   ) : (
     <div className="flex items-center gap-3 py-2.5">{body}</div>
   );
