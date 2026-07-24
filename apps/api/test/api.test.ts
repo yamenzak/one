@@ -1411,6 +1411,17 @@ describe("activities feed (Train tab)", () => {
     expect(list.activities.length).toBe(0);
   });
 
+  it("logs a rep-based move (push-ups) with a count and no duration", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "Reps" }) })).json()) as { client: { id: string } };
+    const r = await SELF.fetch("http://x/api/logs/activity", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-05", activityKey: "push_ups", reps: 50 } }) });
+    expect([200, 201]).toContain(r.status);
+    const list = (await (await SELF.fetch(`http://x/api/logs/activities?clientId=${client.id}&from=2026-07-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as { activities: { activity_key: string; reps: number; duration_min: number | null }[] };
+    expect(list.activities[0]!.activity_key).toBe("push_ups");
+    expect(list.activities[0]!.reps).toBe(50);
+    expect(list.activities[0]!.duration_min).toBeNull();
+  });
+
   it("estimates activity calories with AI, grounded on the client's body (mock)", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };

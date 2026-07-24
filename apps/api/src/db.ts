@@ -302,6 +302,9 @@ export function ensureSchema(db: D1Database): Promise<void> {
           // Apple Health / Fitbit) can carry its distance and any context.
           "ALTER TABLE activity_logs ADD COLUMN distance_m REAL",
           "ALTER TABLE activity_logs ADD COLUMN notes TEXT",
+          // Rep count for bodyweight moves logged as activities (push-ups →
+          // reps rather than distance/duration).
+          "ALTER TABLE activity_logs ADD COLUMN reps INTEGER",
         ];
         for (const sql of alters) await db.exec(sql).catch(() => undefined);
         // Backfill: older body scans mirrored only weight + body-fat into

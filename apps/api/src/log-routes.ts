@@ -239,7 +239,7 @@ export const logRoutes = new Hono<AppEnv>()
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
     const rows = await c.env.DB.prepare(
-      "SELECT id, date_local, activity_key, label, start_time, duration_min, avg_hr_bpm, distance_m, notes, calories, calories_locked FROM activity_logs WHERE client_id = ? AND date_local >= ? AND date_local <= ? ORDER BY date_local DESC, created_at DESC LIMIT 60",
+      "SELECT id, date_local, activity_key, label, start_time, duration_min, avg_hr_bpm, distance_m, reps, notes, calories, calories_locked FROM activity_logs WHERE client_id = ? AND date_local >= ? AND date_local <= ? ORDER BY date_local DESC, created_at DESC LIMIT 60",
     )
       .bind(clientId, from ?? "0000", to ?? "9999")
       .all();
@@ -271,7 +271,8 @@ export const logRoutes = new Hono<AppEnv>()
     const d = parsed.data.data;
     let calories = d.caloriesBurned ?? null;
     let locked = calories != null;
-    if (calories == null) {
+    // MET estimate needs a duration; rep-only logs (push-ups) leave it null.
+    if (calories == null && d.durationMin) {
       const weight = await c.env.DB.prepare(
         "SELECT weight_kg FROM measurements WHERE client_id = ? AND weight_kg IS NOT NULL ORDER BY date_local DESC LIMIT 1",
       )
@@ -289,7 +290,7 @@ export const logRoutes = new Hono<AppEnv>()
     }
     const id = newId("act");
     await c.env.DB.prepare(
-      "INSERT INTO activity_logs (id, tenant_id, client_id, date_local, activity_key, label, start_time, duration_min, avg_hr_bpm, distance_m, notes, calories, calories_locked, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO activity_logs (id, tenant_id, client_id, date_local, activity_key, label, start_time, duration_min, avg_hr_bpm, distance_m, reps, notes, calories, calories_locked, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
       .bind(
         id,
@@ -299,9 +300,10 @@ export const logRoutes = new Hono<AppEnv>()
         d.activityKey ?? null,
         d.label ?? null,
         d.startTime ?? null,
-        d.durationMin,
+        d.durationMin ?? null,
         d.avgHrBpm ?? null,
         d.distanceM ?? null,
+        d.reps ?? null,
         d.notes ?? null,
         calories,
         locked ? 1 : 0,
@@ -320,9 +322,10 @@ export const logRoutes = new Hono<AppEnv>()
         activityKey: z.string().max(40).nullish(),
         label: z.string().max(80).nullish(),
         startTime: z.string().max(8).nullish(),
-        durationMin: z.number().int().positive().optional(),
+        durationMin: z.number().int().positive().nullish(),
         avgHrBpm: z.number().int().positive().nullish(),
         distanceM: z.number().min(0).nullish(),
+        reps: z.number().int().positive().nullish(),
         notes: z.string().max(300).nullish(),
         caloriesBurned: z.number().int().min(0).nullish(),
       })
@@ -338,7 +341,7 @@ export const logRoutes = new Hono<AppEnv>()
 
     const map: Record<string, unknown> = {
       activity_key: d.activityKey, label: d.label, start_time: d.startTime,
-      duration_min: d.durationMin, avg_hr_bpm: d.avgHrBpm, distance_m: d.distanceM, notes: d.notes,
+      duration_min: d.durationMin, avg_hr_bpm: d.avgHrBpm, distance_m: d.distanceM, reps: d.reps, notes: d.notes,
     };
     // Calories: an explicit number locks; otherwise re-estimate when a driver
     // changed and the row isn't already a locked (user-supplied) value.
