@@ -35,6 +35,7 @@ const PackageBody = z.object({
     .array(z.object({ feature: z.enum(BUDGET_FEATURES), days: z.number().int().positive() }))
     .default([]),
   flags: z.record(z.string(), z.boolean()).nullish(),
+  addOns: z.array(z.object({ addOnTypeId: z.string(), quantity: z.number().int().positive() })).nullish(),
   visibility: z.enum(["private", "marketplace", "client_specific"]).default("private"),
   restrictedClientId: z.string().nullish(),
   oncePerCustomer: z.boolean().default(false),
@@ -105,8 +106,10 @@ export const commerceRoutes = new Hono<AppEnv>()
       packages: (rows.results ?? []).map((p) => ({
         ...p,
         budgets: parseJson(p.budgets_json as string | null, []),
+        addOns: parseJson(p.addons_json as string | null, []),
         flags: parseJson(p.flags_json as string | null, null),
         budgets_json: undefined,
+        addons_json: undefined,
         flags_json: undefined,
       })),
     });
@@ -120,14 +123,14 @@ export const commerceRoutes = new Hono<AppEnv>()
     const d = parsed.data;
     const id = newId("pkg");
     await c.env.DB.prepare(
-      `INSERT INTO packages (id, tenant_id, name, description, one_time_price_cents, monthly_price_cents, installment_months, budgets_json, flags_json, visibility, restricted_client_id, once_per_customer, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO packages (id, tenant_id, name, description, one_time_price_cents, monthly_price_cents, installment_months, budgets_json, addons_json, flags_json, visibility, restricted_client_id, once_per_customer, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         id, who.tenantId, d.name, d.description ?? null, d.oneTimePriceCents ?? null,
         d.monthlyPriceCents ?? null, d.installmentMonths ?? null, j(d.budgets),
-        d.flags ? j(d.flags) : null, d.visibility, d.restrictedClientId ?? null,
-        d.oncePerCustomer ? 1 : 0, nowIso(),
+        d.addOns ? j(d.addOns) : null, d.flags ? j(d.flags) : null, d.visibility,
+        d.restrictedClientId ?? null, d.oncePerCustomer ? 1 : 0, nowIso(),
       )
       .run();
     return c.json({ ok: true, id }, 201);
@@ -151,6 +154,7 @@ export const commerceRoutes = new Hono<AppEnv>()
     if (d.monthlyPriceCents !== undefined) put("monthly_price_cents", d.monthlyPriceCents);
     if (d.installmentMonths !== undefined) put("installment_months", d.installmentMonths);
     if (d.budgets !== undefined) put("budgets_json", j(d.budgets));
+    if (d.addOns !== undefined) put("addons_json", d.addOns ? j(d.addOns) : null);
     if (d.flags !== undefined) put("flags_json", d.flags ? j(d.flags) : null);
     if (d.visibility !== undefined) put("visibility", d.visibility);
     if (d.restrictedClientId !== undefined) put("restricted_client_id", d.restrictedClientId);

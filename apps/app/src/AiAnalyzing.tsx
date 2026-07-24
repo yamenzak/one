@@ -40,7 +40,7 @@ export function AiAnalyzing({ label, sub }: { label: string; sub?: string }) {
         </motion.div>
       </div>
 
-      <div className="text-center">
+      <div className="text-center" role="status" aria-live="polite">
         <div className="flex items-center justify-center gap-1 text-base font-semibold">
           {label}
           <span className="inline-flex">

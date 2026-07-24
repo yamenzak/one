@@ -71,6 +71,9 @@ export interface TenantAiConfig {
   tone?: AiTone | null;
   /** Prebuilt Gemini voice for the spoken body-scan cues (a TTS_VOICES id). */
   ttsVoice?: string | null;
+  /** Owner cap on AI credits a single client may spend per local day (SPEC §6);
+   *  null/absent = uncapped. Enforced server-side in ai.ts. */
+  perClientDailyCreditCap?: number | null;
   features?: Record<string, AiFeatureConfig>;
 }
 

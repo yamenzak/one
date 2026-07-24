@@ -35,10 +35,12 @@ export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activi
   // hue dominate (78% weight), so on a tinted-neutral theme the track drifted off
   // the tone (e.g. a cardio-blue ring with a green track).
   const track = softTrack ? `color-mix(in oklch, ${color} 24%, transparent)` : "var(--surface-3)";
+  // Summarize the ring's data for AT — colour + arc length alone convey nothing.
+  const ariaLabel = [label, `${Math.round(p * 100)}%`, sublabel].filter(Boolean).join(", ");
 
   return (
     <div className={cn("relative shrink-0", className)} style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90" role="img" aria-label={label}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90" role="img" aria-label={ariaLabel}>
         <defs>
           <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor={color} stopOpacity={0.65} />

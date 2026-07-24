@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Badge, Field, Sheet, Skeleton, Reveal, SkeletonLine, SegmentedControl, Switch, Chip, Page, Stagger, ConfirmDialog, ShieldCheck, Sparkles, ArrowLeft, KeyRound, Globe, Gift, Tag, Trash2, Plus, cn, LayoutGrid, AlertTriangle, Spinner } from "@mossa/ui";
 import { api } from "../../api.js";
+import { fmtPrice } from "../../money.js";
 
 interface Tenant { id: string; name: string; slug: string; plan_id: string | null; status: string | null; comp: number | null }
 const PLANS = ["free", "solo", "studio", "team"];
@@ -525,7 +526,7 @@ function PlatformPromos() {
               <Card key={p.id} className={cn("flex items-center justify-between", !p.active && "opacity-50")}>
                 <div className="flex items-center gap-2.5">
                   <div className="grid size-8 place-items-center rounded-full bg-primary/10 text-primary [&_svg]:size-4"><Tag /></div>
-                  <div><div className="font-mono font-semibold">{p.code}</div><div className="text-xs text-muted-foreground">{p.discount_type === "percent" ? `${p.percent_off}% off` : `$${((p.amount_off_cents ?? 0) / 100).toFixed(0)} off`} · used {p.redemption_count}{p.max_redemptions ? `/${p.max_redemptions}` : ""}</div></div>
+                  <div><div className="font-mono font-semibold">{p.code}</div><div className="text-xs text-muted-foreground">{p.discount_type === "percent" ? `${p.percent_off}% off` : `${fmtPrice(p.amount_off_cents ?? 0)} off`} · used {p.redemption_count}{p.max_redemptions ? `/${p.max_redemptions}` : ""}</div></div>
                 </div>
                 {p.active ? <button onClick={() => setToDelete(p)} aria-label="Delete promo code" className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button> : <Badge tone="neutral">inactive</Badge>}
               </Card>

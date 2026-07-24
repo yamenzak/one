@@ -10,7 +10,7 @@
  * `route` steps navigate as they go.
  */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
@@ -116,6 +116,18 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
   // thing, swapping the card to the "here's what just happened" explanation.
   const [done, setDone] = useState(false);
   useEffect(() => { setDone(false); }, [idx]);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Escape dismisses the tour, matching the close (✕) affordance.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") stop(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [stop]);
+
+  // Basic focus management: move focus onto the tour card as each step (and each
+  // action `after` beat) appears, so keyboard/AT users land on the live copy.
+  useEffect(() => { cardRef.current?.focus(); }, [idx, done]);
   const accent = toneVar[step.tone ?? "primary"];
   const last = idx === steps.length - 1;
   const next = () => (last ? stop() : setIdx(idx + 1));
@@ -217,9 +229,14 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
         <AnimatePresence mode="wait">
           <motion.div
             key={`${idx}:${done ? 1 : 0}`}
+            ref={cardRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={shown.title}
+            tabIndex={-1}
             initial={{ opacity: 0, y: below ? -8 : 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="pointer-events-auto mx-auto max-w-md rounded-3xl border border-border/50 bg-card p-5 shadow-[0_24px_60px_-20px_oklch(0_0_0/0.6)]"
+            className="pointer-events-auto mx-auto max-w-md rounded-3xl border border-border/50 bg-card p-5 shadow-[0_24px_60px_-20px_oklch(0_0_0/0.6)] outline-none"
           >
             <div className="flex items-start gap-3">
               <div className="grid size-9 shrink-0 place-items-center rounded-xl [&_svg]:size-[1.1rem]" style={{ backgroundColor: `color-mix(in oklch, ${accent} 16%, transparent)`, color: accent }}>{done ? <CircleCheck /> : step.action ? <Hand /> : <Sparkles />}</div>

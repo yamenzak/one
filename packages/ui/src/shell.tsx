@@ -37,7 +37,7 @@ export function AppBar({ leading, title, trailing, bare, scrolled }: { leading?:
     ? cn("flex items-center rounded-full px-3 py-1.5 transition-colors duration-300", showPills && "border border-border/40 bg-background/60 backdrop-blur-md")
     : "flex items-center";
   return (
-    <header className={cn("sticky top-0 z-30 flex h-16 items-center justify-between gap-3 px-4", !bare && "border-b border-border/40 bg-background/80 backdrop-blur-xl")}>
+    <header className={cn("sticky top-0 z-30 flex h-[calc(4rem+env(safe-area-inset-top))] items-center justify-between gap-3 px-4 pt-[env(safe-area-inset-top)]", !bare && "border-b border-border/40 bg-background/80 backdrop-blur-xl")}>
       <div className={cn(cluster, "min-w-0 gap-2")}>{leading}</div>
       {title && <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-base font-semibold">{title}</div>}
       <div className={cn(cluster, "gap-1.5")}>{trailing}</div>
@@ -64,6 +64,7 @@ export function BottomTabs({ tabs, active, onSelect, tinted }: { tabs: TabDef[];
               key={t.key}
               data-tour={`tab-${t.key}`}
               onClick={() => onSelect(t.key)}
+              aria-label={t.label}
               aria-current={on ? "page" : undefined}
               style={on ? { color: onFg } : undefined}
               className={cn(

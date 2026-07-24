@@ -6,9 +6,11 @@ import { CLIENT_FLAG_META, CLIENT_FLAG_CATEGORIES, CLIENT_FLAG_KEYS, DEFAULT_CLI
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { FeatureLock } from "../../FeatureLock.js";
+import { fmtPrice } from "../../money.js";
 
 interface Pkg { id: string; name: string; one_time_price_cents: number | null; monthly_price_cents?: number | null; installment_months?: number | null; budgets: { feature: string; days: number }[]; visibility: string }
 interface ClientOpt { id: string; displayName: string }
+interface AddOnType { id: string; label: string; duration_minutes: number }
 interface Code { id: string; code: string; days_to_add: number; target_feature: string; used_count: number; max_uses: number; restricted_package_id?: string | null; restricted_client_id?: string | null }
 interface Promo { id: string; code: string; discount_type: string; percent_off: number | null; amount_off_cents: number | null; redemption_count: number; max_redemptions: number | null; restricted_package_id?: string | null; restricted_client_id?: string | null; active: number }
 
@@ -54,7 +56,7 @@ export function Packages() {
           {packages.map((p) => (
             <Card key={p.id} className="flex items-center justify-between">
               <div><div className="font-semibold">{p.name}</div><div className="mt-1 flex flex-wrap gap-1">{p.budgets.map((b, i) => <Badge key={i} tone="activity">{b.days}d {b.feature}</Badge>)}</div></div>
-              <div className="text-right"><div className="numeral font-semibold">{p.monthly_price_cents ? `$${(p.monthly_price_cents / 100).toFixed(0)}/mo` : p.one_time_price_cents ? `$${(p.one_time_price_cents / 100).toFixed(0)}${p.installment_months && p.installment_months > 1 ? ` · ${p.installment_months}×` : ""}` : "Free"}</div><Badge tone="neutral">{p.visibility === "client_specific" ? "one client" : p.visibility}</Badge></div>
+              <div className="text-right"><div className="numeral font-semibold">{p.monthly_price_cents ? `${fmtPrice(p.monthly_price_cents)}/mo` : p.one_time_price_cents ? `${fmtPrice(p.one_time_price_cents)}${p.installment_months && p.installment_months > 1 ? ` · ${p.installment_months}×` : ""}` : "Free"}</div><Badge tone="neutral">{p.visibility === "client_specific" ? "one client" : p.visibility}</Badge></div>
             </Card>
           ))}
         </Stagger>
@@ -76,7 +78,7 @@ export function Packages() {
         <Stagger className="space-y-2">
           {promos.map((p) => (
             <Card key={p.id} className={`flex items-center justify-between ${p.active ? "" : "opacity-50"}`}>
-              <div className="flex items-center gap-2.5"><IconBadge icon={Tag} tone="nutrition" size="sm" /><div><div className="font-mono font-semibold">{p.code}</div><div className="text-xs text-muted-foreground">{p.discount_type === "percent" ? `${p.percent_off}% off` : `$${((p.amount_off_cents ?? 0) / 100).toFixed(0)} off`} · used {p.redemption_count}{p.max_redemptions ? `/${p.max_redemptions}` : ""}</div></div></div>
+              <div className="flex items-center gap-2.5"><IconBadge icon={Tag} tone="nutrition" size="sm" /><div><div className="font-mono font-semibold">{p.code}</div><div className="text-xs text-muted-foreground">{p.discount_type === "percent" ? `${p.percent_off}% off` : `${fmtPrice(p.amount_off_cents ?? 0)} off`} · used {p.redemption_count}{p.max_redemptions ? `/${p.max_redemptions}` : ""}</div></div></div>
               {p.active ? <button onClick={() => setPromoToDelete(p)} aria-label="Delete promo code" className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button> : <Badge tone="neutral">inactive</Badge>}
             </Card>
           ))}
@@ -110,6 +112,10 @@ function PackageSheet({ clients, onClose, onSaved }: { clients: ClientOpt[]; onC
   const [price, setPrice] = useState("");
   const [installmentMonths, setInstallmentMonths] = useState("3");
   const [budgets, setBudgets] = useState<{ feature: "all" | "workout" | "meal"; days: number }[]>([{ feature: "all", days: 30 }]);
+  // Included add-ons (SPEC §7): consultation units the package grants. Only shown
+  // when the tenant has defined add-on types (frontDesk). Keyed by type id → qty.
+  const [addOnTypes, setAddOnTypes] = useState<AddOnType[]>([]);
+  const [addOns, setAddOns] = useState<Record<string, number>>({});
   const [visibility, setVisibility] = useState<"private" | "marketplace" | "client_specific">("marketplace");
   const [restrictedClientId, setRestrictedClientId] = useState("");
   const [oncePerCustomer, setOncePerCustomer] = useState(false);
@@ -123,15 +129,23 @@ function PackageSheet({ clients, onClose, onSaved }: { clients: ClientOpt[]; onC
   const entFeatures = (ctx?.entitlements?.features ?? {}) as Record<string, boolean>;
   const cents = price ? Math.round(Number(price) * 100) : null;
   const setBudget = (i: number, p: Partial<{ feature: "all" | "workout" | "meal"; days: number }>) => setBudgets((b) => b.map((r, idx) => (idx === i ? { ...r, ...p } : r)));
+  // Add-on types exist only when the tenant holds `frontDesk`; a 403/empty list
+  // just hides the "included add-ons" section.
+  useEffect(() => {
+    if (!entFeatures.frontDesk) return;
+    void api.get<{ addOnTypes: AddOnType[] }>("/api/addon-types").then((r) => setAddOnTypes(r.addOnTypes)).catch(() => undefined);
+  }, [entFeatures.frontDesk]);
   const save = async () => {
     setBusy(true);
     try {
+      const includedAddOns = Object.entries(addOns).filter(([, q]) => q > 0).map(([addOnTypeId, quantity]) => ({ addOnTypeId, quantity }));
       await api.post("/api/packages", {
         name,
         oneTimePriceCents: priceMode === "one_time" || priceMode === "installment" ? cents : null,
         monthlyPriceCents: priceMode === "monthly" ? cents : null,
         installmentMonths: priceMode === "installment" ? Number(installmentMonths) : null,
         budgets,
+        addOns: includedAddOns.length ? includedAddOns : undefined,
         flags: Object.keys(flags).length ? flags : null,
         oncePerCustomer,
         visibility,
@@ -159,6 +173,21 @@ function PackageSheet({ clients, onClose, onSaved }: { clients: ClientOpt[]; onC
             </div>
           ))}
         </div>
+
+        {addOnTypes.length > 0 && (
+          <div className="space-y-2">
+            <div>
+              <span className="text-sm text-muted-foreground">Included add-ons</span>
+              <p className="text-xs text-muted-foreground/80">Consultation units this package grants — consumed when a session is completed.</p>
+            </div>
+            {addOnTypes.map((t) => (
+              <div key={t.id} className="flex items-center justify-between gap-2">
+                <div className="min-w-0"><div className="text-sm">{t.label}</div><div className="text-xs text-muted-foreground">{t.duration_minutes} min</div></div>
+                <input type="number" min={0} value={addOns[t.id] ?? 0} onChange={(e) => setAddOns((p) => ({ ...p, [t.id]: Math.max(0, Number(e.target.value)) }))} className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 text-sm outline-none" aria-label={`${t.label} units included`} />
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="space-y-3">
           <div>

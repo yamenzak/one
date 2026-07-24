@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Sheet, Avatar, SegmentedControl, Page, Stagger, EmptyState, Reveal, SkeletonList, toneVar, Users, Mail, User, ArrowLeft, Plus } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, SegmentedControl, Page, Stagger, EmptyState, Reveal, SkeletonList, toneVar, Users, Mail, User, ArrowLeft, Plus, Copy, Check, ExternalLink } from "@mossa/ui";
 import type { AttentionSeverity } from "@mossa/domain";
 import { api } from "../../api.js";
 import { SEVERITY_TONE } from "../../attention-ui.js";
@@ -18,6 +18,10 @@ import { ClientReport } from "./ClientReport.js";
 
 export interface ClientSummary { id: string; displayName: string; email: string | null; status: string; hasLogin: boolean; avatarUrl?: string | null; avatarSeed?: string | null }
 
+/** The invite payload POST /api/clients returns when an email is present — the
+ *  branded deep-link (also emailed) the coach can show in the gym. */
+interface Invite { url: string; token: string; email: string }
+
 export function Clients() {
   const nav = useNavigate();
   const [clients, setClients] = useState<ClientSummary[] | null>(null);
@@ -25,6 +29,9 @@ export function Clients() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
+  // After a client is created with an email, hold the invite so the coach can
+  // show / copy the in-gym deep-link before continuing into the client.
+  const [invite, setInvite] = useState<{ invite: Invite; clientId: string } | null>(null);
 
   // Per-client attention rollup — the worst item's label + how many, so a coach
   // spots a stale goal / quiet client / lab-to-review straight from the roster.
@@ -39,8 +46,14 @@ export function Clients() {
 
   const create = async () => {
     setBusy(true);
-    try { const r = await api.post<{ client: { id: string } }>("/api/clients", { email: email.trim(), displayName: name.trim() || undefined }); setCreateOpen(false); setName(""); setEmail(""); await load(); nav(`/clients/${r.client.id}/today`); }
-    finally { setBusy(false); }
+    try {
+      const r = await api.post<{ client: { id: string }; invite: Invite | null }>("/api/clients", { email: email.trim(), displayName: name.trim() || undefined });
+      setCreateOpen(false); setName(""); setEmail(""); await load();
+      // With an email the server emails a branded invite AND returns the deep-link
+      // so the coach can show it in the gym; otherwise go straight to the client.
+      if (r.invite) setInvite({ invite: r.invite, clientId: r.client.id });
+      else nav(`/clients/${r.client.id}/today`);
+    } finally { setBusy(false); }
   };
   const emailValid = /.+@.+\..+/.test(email.trim());
 
@@ -79,7 +92,47 @@ export function Clients() {
           <Button size="lg" className="w-full" disabled={!emailValid || busy} onClick={() => void create()}>{busy ? "Creating…" : "Add client"}</Button>
         </div>
       </Sheet>
+
+      {invite && (
+        <InviteSheet
+          invite={invite.invite}
+          onClose={() => { const id = invite.clientId; setInvite(null); nav(`/clients/${id}/today`); }}
+        />
+      )}
     </Page>
+  );
+}
+
+/** Post-create invite affordance (SPEC §4): the branded deep-link is emailed to
+ *  the client and shown here so the coach can also relay it in the gym — copy it,
+ *  open it, or read it aloud. A scannable QR needs a generator lib (see residual);
+ *  today the link is rendered prominently as the fallback. */
+function InviteSheet({ invite, onClose }: { invite: Invite; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(invite.url); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* clipboard blocked */ }
+  };
+  return (
+    <Sheet open onClose={onClose} title="Client invited">
+      <div className="space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="grid size-11 shrink-0 place-items-center rounded-2xl [&_svg]:size-[1.35rem]" style={{ background: `color-mix(in oklch, ${toneVar.success} 15%, transparent)`, color: toneVar.success }}><Check /></div>
+          <div className="min-w-0">
+            <p className="text-sm">We emailed a branded sign-in link to <span className="font-medium text-foreground">{invite.email}</span>.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Share this link in the gym too — they open it and sign in with a one-time code, no password.</p>
+          </div>
+        </div>
+        <div className="space-y-2 rounded-2xl bg-card p-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Invite link</div>
+          <div className="break-all rounded-xl bg-surface-3 px-3 py-2.5 font-mono text-xs">{invite.url}</div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="tonal" className="flex-1" onClick={() => void copy()}>{copied ? <><Check /> Copied</> : <><Copy /> Copy link</>}</Button>
+            <Button size="sm" variant="secondary" className="flex-1" onClick={() => window.open(invite.url, "_blank", "noopener")}><ExternalLink /> Open</Button>
+          </div>
+        </div>
+        <Button size="lg" className="w-full" onClick={onClose}>Go to client</Button>
+      </div>
+    </Sheet>
   );
 }
 

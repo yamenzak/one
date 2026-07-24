@@ -114,7 +114,16 @@ export function AreaChart({ values, tone = "activity", height = 180, target, tar
 
   return (
     <div ref={ref} className={cn("relative w-full select-none", className)}>
-      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} onPointerMove={onMove} onPointerLeave={() => setActive(null)} className="touch-none">
+      <svg
+        width="100%"
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        onPointerMove={onMove}
+        onPointerLeave={() => setActive(null)}
+        className="touch-none"
+        role="img"
+        aria-label={`Trend chart of ${pts.length} points, latest ${format(last.v)}, range ${format(lo)} to ${format(hi)}${target != null ? `, target ${format(target)}` : ""}`}
+      >
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity={0.28} />
@@ -173,7 +182,14 @@ export function BarChart({ values, labels, tone = "activity", height = 160, targ
 
   return (
     <div ref={ref} className={cn("relative w-full select-none", className)}>
-      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} className="touch-none">
+      <svg
+        width="100%"
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        className="touch-none"
+        role="img"
+        aria-label={`Bar chart of ${values.length} bars, latest ${format(values[values.length - 1] ?? 0)}, peak ${format(Math.max(...values, 0))}${target != null ? `, target ${format(target)}` : ""}`}
+      >
         {target != null && target <= max && <line x1={0} x2={width} y1={padTop + (1 - target / max) * (height - padTop - padBot)} y2={padTop + (1 - target / max) * (height - padTop - padBot)} stroke={color} strokeDasharray="2 5" strokeWidth={1.5} opacity={0.6} />}
         {values.map((v, i) => {
           const h = Math.max(v > 0 ? 3 : 0, barH(v));
@@ -270,10 +286,11 @@ export function CalendarHeatmap({ days, today, tone = "activity", weeks = 16, ma
     cols.push(col);
   }
   const gridW = weeks * (cell + gap);
+  const activeDays = cols.reduce((n, col) => n + col.filter((c) => !c.future && c.lv > 0).length, 0);
 
   return (
     <div className={cn("w-full overflow-x-auto", className)}>
-      <svg width={gridW} height={7 * (cell + gap) + 16} className="min-w-full">
+      <svg width={gridW} height={7 * (cell + gap) + 16} className="min-w-full" role="img" aria-label={`Activity heatmap over ${weeks} weeks, ${activeDays} active days`}>
         {monthTicks.map((m, k) => <text key={k} x={m.col * (cell + gap)} y={8} className="fill-muted-foreground" style={{ fontSize: 8.5 }}>{m.label}</text>)}
         {cols.map((col, w) => col.map((c, d) => (
           <motion.rect key={c.date} x={w * (cell + gap)} y={12 + d * (cell + gap)} width={cell} height={cell} rx={3}

@@ -118,17 +118,35 @@ Button.displayName = "Button";
 
 // ── Card ───────────────────────────────────────────────────────────────────
 export const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & { interactive?: boolean }>(
-  ({ className, interactive, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(
-        "rounded-2xl bg-card p-5 text-card-foreground",
-        interactive && "transition-all hover:bg-surface-2 active:scale-[0.99] cursor-pointer",
-        className,
-      )}
-      {...props}
-    />
-  ),
+  ({ className, interactive, onClick, onKeyDown, role, tabIndex, ...props }, ref) => {
+    // A clickable Card must be keyboard-reachable and named — otherwise the
+    // click-only div is invisible to keyboard/switch/AT users. Give it button
+    // semantics (role, focusability, Enter/Space activation) rather than nesting
+    // a real <button>, so it can still contain interactive children.
+    const clickable = !!onClick;
+    return (
+      <div
+        ref={ref}
+        onClick={onClick}
+        role={clickable ? role ?? "button" : role}
+        tabIndex={clickable ? tabIndex ?? 0 : tabIndex}
+        onKeyDown={(e) => {
+          onKeyDown?.(e);
+          if (clickable && !e.defaultPrevented && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            onClick?.(e as unknown as React.MouseEvent<HTMLDivElement>);
+          }
+        }}
+        className={cn(
+          "rounded-2xl bg-card p-5 text-card-foreground",
+          interactive && "transition-all hover:bg-surface-2 active:scale-[0.99] cursor-pointer",
+          clickable && "outline-none focus-visible:ring-2 focus-visible:ring-ring/70",
+          className,
+        )}
+        {...props}
+      />
+    );
+  },
 );
 Card.displayName = "Card";
 

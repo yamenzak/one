@@ -6,6 +6,16 @@
     <meta name="theme-color" content="#0b0c0e" />
     <title>Mossa</title>
     <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- Default install icons for the neutral platform host / any tenant without
+         an uploaded mark. iOS ignores manifest icons for Add-to-Home-Screen and
+         rejects SVG touch icons, so a raster apple-touch-icon is required; a
+         branded tenant overrides these at runtime (theme.tsx). -->
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Mossa" />
     <script>
       // Anti-flash: apply the stored theme before first paint (DESIGN.md).
       try {

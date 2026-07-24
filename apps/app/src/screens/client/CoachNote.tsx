@@ -10,11 +10,15 @@ import { motion } from "motion/react";
 import { api, todayLocal } from "../../api.js";
 import { AiAvatar, useAiIdentity } from "../../AiAvatar.js";
 import { Markdown } from "../../Markdown.js";
+import { InsightFeedback, isInsightMuted } from "./InsightFeedback.js";
 
 type Surface = "home" | "train" | "eat" | "wellness" | "progress";
 
+const INSIGHT_TYPE = "coach-note";
+
 export function CoachNote({ clientId, surface }: { clientId: string; surface: Surface }) {
   const [msg, setMsg] = useState<string | null>(null);
+  const [muted, setMuted] = useState(() => isInsightMuted(INSIGHT_TYPE));
   const ai = useAiIdentity();
 
   useEffect(() => {
@@ -28,13 +32,14 @@ export function CoachNote({ clientId, surface }: { clientId: string; surface: Su
     return () => { live = false; };
   }, [clientId, surface]);
 
-  if (!msg) return null;
+  if (!msg || muted) return null;
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} className="flex items-start gap-3 px-1">
       <AiAvatar className="mt-0.5 size-8 shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-primary">{ai.name}</div>
         <Markdown className="mt-1 text-[0.95rem] text-foreground/85">{msg}</Markdown>
+        <InsightFeedback className="mt-2" insightType={INSIGHT_TYPE} insightRef={`${surface}:${clientId}`} onMute={() => setMuted(true)} />
       </div>
     </motion.div>
   );

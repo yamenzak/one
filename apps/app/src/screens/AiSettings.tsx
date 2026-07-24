@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { AiSettingsPayload, AiFeatureMeta, AiModelMeta, TenantAiConfig, AiFeatureConfig, AiTone } from "@mossa/protocol";
-import { Card, Badge, Skeleton, Reveal, SkeletonLine, Switch, Button, Textarea, Chip, IconBadge, cn, Sparkles, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, Play, type Tone, type LucideIcon } from "@mossa/ui";
+import { Card, Badge, Skeleton, Reveal, SkeletonLine, Switch, Button, Textarea, Chip, Field, IconBadge, cn, Sparkles, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, Play, Wallet, type Tone, type LucideIcon } from "@mossa/ui";
 import { api } from "../api.js";
 
 const TONE_LABEL: Record<string, string> = {
@@ -56,6 +56,21 @@ export function AiConfigSection() {
   const saveTtsVoice = async (ttsVoice: string) => {
     setConfig((c) => ({ ...c, ttsVoice }));
     await api.patch("/api/settings/ai", { ttsVoice }).catch(() => undefined);
+  };
+  // Owner cap on AI credits a single client can spend per day (SPEC §6). Empty =
+  // uncapped. Edited as free text, committed on blur so partial input never saves.
+  const saveCreditCap = async (cap: number | null) => {
+    setConfig((c) => ({ ...c, perClientDailyCreditCap: cap }));
+    await api.patch("/api/settings/ai", { perClientDailyCreditCap: cap }).catch(() => undefined);
+  };
+  const [capDraft, setCapDraft] = useState("");
+  useEffect(() => { setCapDraft(config.perClientDailyCreditCap != null ? String(config.perClientDailyCreditCap) : ""); }, [config.perClientDailyCreditCap]);
+  const commitCreditCap = () => {
+    const t = capDraft.trim();
+    if (t === "") { void saveCreditCap(null); return; }
+    const n = Math.round(Number(t));
+    if (Number.isFinite(n) && n >= 0) void saveCreditCap(n);
+    else setCapDraft(config.perClientDailyCreditCap != null ? String(config.perClientDailyCreditCap) : "");
   };
   const [previewing, setPreviewing] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -202,6 +217,24 @@ export function AiConfigSection() {
                     {genNote ?? "Generated once and cached — you're billed in credits for the cue pack, not per scan."}
                   </div>
                 </div>
+              </Card>
+
+              <Card className="mt-2 space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <IconBadge icon={Wallet} tone="primary" size="sm" />
+                  <div><div className="font-medium">Per-client daily cap</div><div className="text-sm text-muted-foreground">The most AI credits any one client can spend in a day. Leave blank for no limit.</div></div>
+                </div>
+                <Field
+                  label="Daily credit cap"
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  placeholder="No limit"
+                  value={capDraft}
+                  onChange={(e) => setCapDraft(e.target.value)}
+                  onBlur={commitCreditCap}
+                  hint="Applies to AI features clients trigger themselves; your own coaching AI is never capped."
+                />
               </Card>
             </div>
 

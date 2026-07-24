@@ -15,8 +15,6 @@ export interface Env {
   MEDIA: R2Bucket;
   /** Workers AI. Optional in local dev → AI falls back to the mock. */
   AI?: Ai;
-  /** Product analytics sink. Optional in local dev. */
-  USAGE?: AnalyticsEngineDataset;
 
   /** Platform super-admin allowlist (comma-separated emails). */
   ADMIN_EMAILS?: string;

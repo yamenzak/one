@@ -114,9 +114,23 @@ token, accepting it only when the solved hostname matches the serving host —
 which is what makes it work on a tenant's own domain. Clear the secret (or hit
 **Turn off**) to disable.
 
+## Required before a production deploy
+- **`BETTER_AUTH_SECRET`** — a wrangler secret you set **manually, once** (step
+  2b above). It is not a repo secret and the deploy workflow never writes it;
+  without it Better Auth cannot sign session cookies. Set it before the first
+  real sign-in.
+- **A real email provider** — passwordless login is the *only* way in, so OTP
+  delivery is mandatory in production. Until a sender domain is onboarded in
+  Cloudflare Email Sending (and `email.provider = cloudflare` + `email.from` are
+  set in `app_config`), codes are only written to `wrangler tail`, which is fine
+  for your own admin bootstrap but means **no real user can sign in**. Onboard
+  the sender domain before inviting anyone.
+
 ## Notes
-- The Workers AI binding is commented out in `wrangler.jsonc` for
-  credential-free local dev; the Deploy workflow uncomments it automatically.
+- The Workers AI binding ships **enabled** in `wrangler.jsonc`
+  (`"ai": { "binding": "AI" }`) — it deploys as-is, no build-step edit. `env.AI`
+  is optional (the deterministic mock covers local dev); for a fully
+  credential-free `wrangler dev` you can re-comment that one line.
 - Stripe stays disabled until you set keys via the platform-admin console
   (Stripe tab) and run **Sync catalog**.
 - Rollback: `cd apps/api && pnpm exec wrangler rollback` (or redeploy an older

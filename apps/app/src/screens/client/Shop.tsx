@@ -82,8 +82,10 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
   };
   const cancelRenew = async () => {
     setBusy(true); setMsg(null);
+    // The route returns non-2xx (502) when the Stripe cancel actually fails —
+    // never assume success; surface a retryable error and keep auto-renew shown.
     try { await api.post("/api/connect/cancel-subscription", { clientId }); setMsg("Auto-renew canceled — your access continues until it runs out."); await load(); }
-    catch { setMsg("Couldn't cancel auto-renew."); }
+    catch { setMsg("Couldn't cancel — please try again."); }
     finally { setBusy(false); }
   };
 

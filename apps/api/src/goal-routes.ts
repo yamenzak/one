@@ -38,6 +38,9 @@ const GoalTargetsSchema = z
     targetFatG: z.number().min(0).max(2000).optional(),
     targetFiberG: z.number().min(0).max(500).optional(),
     targetWaterMl: z.number().min(0).max(30000).optional(),
+    // Weekly training-load target (SPEC §8.11) — the coach GoalManager writes it
+    // into targets_json alongside the nutrition targets.
+    weeklyTrainingLoad: z.number().int().min(0).max(2000).nullish(),
   })
   .strict();
 

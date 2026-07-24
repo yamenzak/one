@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNod
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
-  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, Palette, Bell, KeyRound, ImageIcon, toneVar, type TabDef, type Tone,
+  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, Palette, Bell, KeyRound, ImageIcon, toneVar, type TabDef, type Tone,
 } from "@mossa/ui";
 import { useSession, useActiveClientId } from "./session.js";
 import { useTheme } from "./theme.js";
@@ -24,6 +24,7 @@ import { WorkoutBuilder } from "./screens/coach/WorkoutBuilder.js";
 import { MealBuilder } from "./screens/coach/MealBuilder.js";
 import { WorkoutPlayer } from "./screens/client/WorkoutPlayer.js";
 import { Business } from "./screens/coach/Business.js";
+import { Sessions } from "./screens/coach/Sessions.js";
 import { Library } from "./screens/coach/Library.js";
 import { Settings } from "./screens/Settings.js";
 import { Inbox } from "./screens/Inbox.js";
@@ -33,6 +34,7 @@ import { Onboarding } from "./screens/client/Onboarding.js";
 import { Shop } from "./screens/client/Shop.js";
 import { Explore } from "./screens/client/Explore.js";
 import { AdminConsole } from "./screens/admin/AdminConsole.js";
+import { AcceptInvite } from "./screens/AcceptInvite.js";
 import { NotificationBell } from "./NotificationBell.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { TourProvider, useTour, type TourId } from "./tour.js";
@@ -100,6 +102,11 @@ export function Shell() {
       <Route path="/shop" element={<OverlayWithClient render={(cid, back) => <Shop clientId={cid} onBack={back} />} />} />
       <Route path="/explore" element={<OverlayWithClient render={(cid, back) => <Explore clientId={cid} onBack={back} />} />} />
       <Route path="/admin" element={<AdminRoute />} />
+      {/* Staff invitation deep-link (SPEC §4). Full-screen; the screen drives its
+          own OTP flow, so a signed-in staffer accepts a seat on another tenant
+          in place. (For a not-yet-signed-in invitee the pre-session router in
+          main.tsx must render this before the login gate — see residual.) */}
+      <Route path="/accept-invitation/:invitationId" element={<AcceptInvite />} />
       {/* Plan builder — full-screen editor, its own bottom action bar. */}
       <Route path="/clients/:clientId/plans/:planKind/:planId" element={<CoachArea><PlanBuilderRoute /></CoachArea>} />
 
@@ -118,6 +125,7 @@ export function Shell() {
         <Route path="clients/:clientId/:subtab" element={<CoachArea><ClientDetail /></CoachArea>} />
         <Route path="library" element={<CoachArea><Library /></CoachArea>} />
         <Route path="library/:tab" element={<CoachArea><Library /></CoachArea>} />
+        <Route path="sessions" element={<CoachArea><Sessions /></CoachArea>} />
         <Route path="business" element={<CoachArea><Business /></CoachArea>} />
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Route>
@@ -152,6 +160,7 @@ function TabLayout() {
         { key: "today", label: "Today", icon: Home, tone: "primary" },
         { key: "clients", label: "Clients", icon: Users, tone: "cardio" },
         { key: "library", label: "Library", icon: LayoutGrid, tone: "activity" },
+        ...(ctx!.entitlements?.features?.frontDesk ? [{ key: "sessions", label: "Sessions", icon: Calendar, tone: "sleep" } as TabDef] : []),
         ...(active.role === "owner" ? [{ key: "business", label: "Business", icon: Wallet, tone: "warning" } as TabDef] : []),
       ];
   const seg = loc.pathname.split("/")[1] || "today";

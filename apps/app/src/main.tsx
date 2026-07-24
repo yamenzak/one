@@ -1,13 +1,14 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import { AnimatePresence, motion } from "motion/react";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
 import { ThemeProvider } from "./theme.js";
 import { Login } from "./screens/Login.js";
 import { Start } from "./screens/Start.js";
 import { Shell } from "./Shell.js";
+import { AcceptInvite } from "./screens/AcceptInvite.js";
 import { PasskeyProvider } from "./PasskeyPrompt.js";
 
 /**
@@ -52,6 +53,17 @@ function BootSplash() {
 
 function App() {
   const { loading, ctx } = useSession();
+  const location = useLocation();
+  // The staff-invite deep-link renders BEFORE the session gate: a brand-new
+  // invitee isn't signed in yet, so it must not be short-circuited to Login.
+  // Rendered inside a matching Route so AcceptInvite's useParams resolves.
+  if (location.pathname.startsWith("/accept-invitation/")) {
+    return (
+      <Routes>
+        <Route path="/accept-invitation/:invitationId" element={<AcceptInvite />} />
+      </Routes>
+    );
+  }
   const screen = loading ? "boot" : !ctx ? "login" : !ctx.active ? "start" : "shell";
   return (
     <AnimatePresence mode="wait">
@@ -67,12 +79,14 @@ function App() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter>
-      <SessionProvider>
-        <ThemeProvider>
-          <App />
-        </ThemeProvider>
-      </SessionProvider>
-    </BrowserRouter>
+    <MotionConfig reducedMotion="user">
+      <BrowserRouter>
+        <SessionProvider>
+          <ThemeProvider>
+            <App />
+          </ThemeProvider>
+        </SessionProvider>
+      </BrowserRouter>
+    </MotionConfig>
   </StrictMode>,
 );

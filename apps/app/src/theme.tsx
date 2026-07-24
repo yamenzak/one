@@ -56,10 +56,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [branding?.defaultMode]);
 
   // White-label the browser chrome from branding: favicon + apple-touch-icon
-  // (the square app icon, falling back to the wordmark) and the theme-color meta
-  // (the brand primary) that tints the mobile toolbar / installed title bar. The
-  // PWA manifest is themed server-side per host; this covers the live tab + any
-  // origin (incl. the platform host and /t/<slug>).
+  // (the square app icon, falling back to the wordmark). The PWA manifest is
+  // themed server-side per host; this covers the live tab + any origin (incl.
+  // the platform host and /t/<slug>).
   useEffect(() => {
     if (typeof document === "undefined") return;
     const undo: (() => void)[] = [];
@@ -74,14 +73,23 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         undo.push(() => (prev ? el.setAttribute("href", prev) : el.remove()));
       }
     }
-    const rawPrimary = branding?.primary || branding?.tokens?.dark?.["--primary"];
-    const hex = rawPrimary ? (rawPrimary.startsWith("#") ? rawPrimary : oklchStringToHex(rawPrimary)) : null;
-    if (hex) {
-      const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-      if (meta) { const prev = meta.getAttribute("content"); meta.setAttribute("content", hex); undo.push(() => prev && meta.setAttribute("content", prev)); }
-    }
     return () => undo.forEach((f) => f());
   }, [branding]);
+
+  // The theme-color meta (the brand primary) tints the mobile toolbar / installed
+  // title bar — it must track the active MODE, since a brand's primary token can
+  // differ between light and dark, so re-apply it whenever branding or mode change.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const rawPrimary = branding?.primary || branding?.tokens?.[mode]?.["--primary"] || branding?.tokens?.dark?.["--primary"];
+    const hex = rawPrimary ? (rawPrimary.startsWith("#") ? rawPrimary : oklchStringToHex(rawPrimary)) : null;
+    if (!hex) return;
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!meta) return;
+    const prev = meta.getAttribute("content");
+    meta.setAttribute("content", hex);
+    return () => { if (prev) meta.setAttribute("content", prev); };
+  }, [branding, mode]);
 
   // Apply mode.
   useEffect(() => {

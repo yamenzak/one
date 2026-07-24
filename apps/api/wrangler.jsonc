@@ -70,11 +70,6 @@
     { "binding": "MEDIA", "bucket_name": "mossa-media" }
   ],
 
-  "analytics_engine_datasets": [
-    // Product analytics (logs written, AI calls, active clients).
-    { "binding": "USAGE", "dataset": "mossa_usage" }
-  ],
-
   // Cloudflare Email Sending (transactional: OTP codes, invites, notices).
   // Until the sender domain is onboarded the mailer falls back to a dev mock.
   "send_email": [{ "name": "EMAIL" }]

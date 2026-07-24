@@ -53,19 +53,28 @@ function iconType(url: string): string {
 export function buildManifest(ht: HostTenant | null): string {
   const name = (ht?.name || "Mossa").slice(0, 45);
   const b = ht?.branding;
-  const icon = b?.iconUrl || b?.logoUrl || "/icon.svg";
-  const type = iconType(icon);
+  const icon = b?.iconUrl || b?.logoUrl || null;
+  const type = icon ? iconType(icon) : "image/svg+xml";
   const theme = oklchToHex(b?.tokens?.dark?.["--primary"]) || oklchToHex(b?.primary) || DEFAULT_BG;
   const background = oklchToHex(b?.tokens?.dark?.["--background"]) || DEFAULT_BG;
 
-  // SVG scales to any size; a raster mark is declared at the two install sizes.
-  const icons =
-    type === "image/svg+xml"
-      ? [{ src: icon, sizes: "any", type, purpose: "any" }]
-      : [
-          { src: icon, sizes: "192x192", type, purpose: "any" },
-          { src: icon, sizes: "512x512", type, purpose: "any" },
-        ];
+  // No tenant mark → advertise the platform PNG icons (iOS/Android need a real
+  // raster; SVG alone leaves the low-fidelity screenshot tile) plus a maskable
+  // entry for Android adaptive launchers. A tenant mark is a square upload:
+  // declare it at the two install sizes (192/512) so iOS/Android get a real
+  // raster tile, plus a maskable 512 for Android adaptive launchers.
+  const icons = !icon
+    ? [
+        { src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
+        { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+        { src: "/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      ]
+    : [
+        { src: icon, sizes: "192x192", type, purpose: "any" },
+        { src: icon, sizes: "512x512", type, purpose: "any" },
+        { src: icon, sizes: "512x512", type, purpose: "maskable" },
+      ];
 
   return JSON.stringify({
     name,
