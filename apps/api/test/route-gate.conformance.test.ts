@@ -70,8 +70,8 @@ describe("route gate — roster and studio management stay staff-only", () => {
   const staffOnly: [string, string, string][] = [
     ["create a client", "POST", "/api/clients"],
     ["archive a client", "POST", `${CLI}/archive`],
-    ["assign a trainer", "POST", `${CLI}/trainers`],
-    ["unassign a trainer", "DELETE", `${CLI}/trainers/u_1`],
+    ["assign a coach", "POST", `${CLI}/trainers`],
+    ["unassign a coach", "DELETE", `${CLI}/trainers/u_1`],
     ["set a client's default lane", "PATCH", `${CLI}/default-lane`],
     ["create a plan variant", "POST", `${CLI}/variants`],
     ["publish a workout plan", "POST", "/api/workout-plans/wp_1/publish"],
@@ -85,6 +85,20 @@ describe("route gate — roster and studio management stay staff-only", () => {
       expect(passes("client", method, path)).toBe(false);
     });
   }
+
+  it("staffing a client is owner-only, but any coaching role can see who is assigned", () => {
+    // A trainer holds client:["update"], so gating the assign/unassign routes on
+    // that let an assigned coach staff other coaches onto their own client and
+    // move the is_primary flag that routes notifications. Reads stay open.
+    expect(passes("owner", "POST", `${CLI}/trainers`)).toBe(true);
+    expect(passes("owner", "DELETE", `${CLI}/trainers/u_1`)).toBe(true);
+    for (const role of ["trainer", "assistant", "client"]) {
+      expect(passes(role, "POST", `${CLI}/trainers`), `${role} assigns a coach`).toBe(false);
+      expect(passes(role, "DELETE", `${CLI}/trainers/u_1`), `${role} unassigns a coach`).toBe(false);
+    }
+    expect(passes("trainer", "GET", `${CLI}/trainers`)).toBe(true);
+    expect(passes("assistant", "GET", `${CLI}/trainers`)).toBe(true);
+  });
 
   it("only the owner reaches billing, settings and staff management", () => {
     for (const path of ["/api/billing", "/api/settings", "/api/members"]) {

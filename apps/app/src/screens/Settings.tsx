@@ -919,11 +919,27 @@ function UnitsSection() {
   );
 }
 
-interface MarketplaceCfg { enabled?: boolean; selfRegister?: boolean; requireActiveAccess?: boolean }
+/**
+ * Storefront settings. Only two of these do anything, so only two are offered:
+ * `selfRegister` drives `allowSignup` on the studio's sign-in page
+ * (`host-context.ts`) and `requireActiveAccess` drives `clientAccess.required`
+ * (`context-routes.ts`), which pins an uncovered client to the Shop.
+ *
+ * There used to be an "Enable storefront" toggle for `marketplace.enabled`. It
+ * had no reader anywhere: the only endpoint that ever returned it is
+ * `GET /api/marketplace/:slug`, which no app or site calls, and `/t/<slug>` is a
+ * branded sign-in page — it renders no packages and no articles. An owner could
+ * switch it on, mark packages for the storefront, publish public posts, and
+ * nothing existed to show any of it. The toggle is gone; the card below says
+ * where packages actually sell today.
+ */
+interface MarketplaceCfg { selfRegister?: boolean; requireActiveAccess?: boolean }
 function MarketplaceSection() {
   const [marketplace, setMarketplace] = useState<MarketplaceCfg>({});
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
   const load = useCallback(async () => {
     setError(false);
     try {
@@ -933,13 +949,22 @@ function MarketplaceSection() {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const setMarket = async (patch: MarketplaceCfg) => { setMarketplace((m) => ({ ...m, ...patch })); await api.patch("/api/settings", { marketplace: patch }); };
+  // Optimistic, but a failed PATCH rolls the switch back and says so — otherwise
+  // the toggle sits in a position the server never accepted.
+  const setMarket = async (patch: MarketplaceCfg) => {
+    if (busy) return;
+    const prev = marketplace;
+    setBusy(true); setSaveErr(null); setMarketplace((m) => ({ ...m, ...patch }));
+    try { await api.patch("/api/settings", { marketplace: patch }); }
+    catch (e) { setMarketplace(prev); setSaveErr(errorText(e, "Couldn't save that setting.")); }
+    finally { setBusy(false); }
+  };
 
   return (
     <section>
       <SectionHead title="Marketplace" scope="tenant" />
       {error && !loaded ? <LoadError label="your storefront settings" onRetry={() => void load()} /> : (
-      <Reveal loading={!loaded} skeleton={
+      <Reveal loading={!loaded} className="space-y-3" skeleton={
         <Card className="space-y-3">
           <div className="flex items-center gap-2.5"><Skeleton className="size-9 rounded-xl" /><div className="flex-1 space-y-1.5"><SkeletonLine w="45%" h="text" /><SkeletonLine w="70%" h="xs" /></div></div>
           {Array.from({ length: 2 }).map((_, i) => (
@@ -948,15 +973,28 @@ function MarketplaceSection() {
         </Card>
       }>
         {loaded && (
+        <>
         <Card className="space-y-3">
-          <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Store /></div><div><div className="font-medium">Public storefront</div><div className="text-sm text-muted-foreground">A shareable page with your packages and blog.</div></div></div>
-          <div className="flex items-center justify-between"><span className="text-sm">Enable storefront</span><Switch checked={!!marketplace.enabled} onCheckedChange={(v) => void setMarket({ enabled: v })} /></div>
-          <div className="flex items-center justify-between"><span className="text-sm">Allow self sign-up</span><Switch checked={!!marketplace.selfRegister} onCheckedChange={(v) => void setMarket({ selfRegister: v })} /></div>
-          <div className="flex items-start justify-between gap-3 border-t border-border/50 pt-3">
-            <div className="min-w-0"><div className="text-sm">Require an active plan</div><div className="text-xs text-muted-foreground">Clients with no live package are locked to the Plans screen until they have one.</div></div>
-            <Switch checked={!!marketplace.requireActiveAccess} onCheckedChange={(v) => void setMarket({ requireActiveAccess: v })} />
+          <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Store /></div><div><div className="font-medium">Your Shop</div><div className="text-sm text-muted-foreground">Packages you mark for the Shop are listed in every client&rsquo;s Shop tab, where they can buy them.</div></div></div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0"><div className="text-sm">Allow self sign-up</div><div className="text-xs text-muted-foreground">A new email can create their own client account from your studio&rsquo;s sign-in page.</div></div>
+            <Switch checked={!!marketplace.selfRegister} disabled={busy} onCheckedChange={(v) => void setMarket({ selfRegister: v })} />
           </div>
+          <div className="flex items-start justify-between gap-3 border-t border-border/50 pt-3">
+            <div className="min-w-0"><div className="text-sm">Require an active plan</div><div className="text-xs text-muted-foreground">Clients with no live package are locked to the Shop screen until they have one.</div></div>
+            <Switch checked={!!marketplace.requireActiveAccess} disabled={busy} onCheckedChange={(v) => void setMarket({ requireActiveAccess: v })} />
+          </div>
+          {saveErr && <p role="status" aria-live="polite" className="text-sm text-danger">{saveErr}</p>}
         </Card>
+        <Card className="space-y-2">
+          <div className="flex items-center gap-2.5">
+            <div className="grid size-9 place-items-center rounded-xl bg-secondary text-muted-foreground [&_svg]:size-4"><Globe /></div>
+            <div className="min-w-0 flex-1"><div className="font-medium">Public storefront</div></div>
+            <Badge tone="neutral">Coming later</Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">A shareable public page listing your packages and public articles. Not built yet — your studio&rsquo;s address is a branded sign-in page for now, and packages sell inside the app on each client&rsquo;s Shop tab.</p>
+        </Card>
+        </>
         )}
       </Reveal>
       )}

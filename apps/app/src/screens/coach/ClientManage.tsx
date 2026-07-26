@@ -1,13 +1,13 @@
 /**
- * Coach client management — access grants, swap approvals, check-in review with
- * AI summarizer, supplement prescriptions, lab requests + value entry, and a
- * per-client report.
+ * Coach client management — access grants, coach assignment, swap approvals,
+ * check-in review with AI summarizer, supplement prescriptions, lab requests +
+ * value entry, a per-client report, and archive/offboard.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, PhotoGrid, ConfirmDialog, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon, User, AlertTriangle } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon, User, Star, Archive, AlertTriangle, personaLabel, personaTone } from "@mossa/ui";
 import { api, errorText, todayLocal } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
@@ -37,9 +37,17 @@ function focusRow(id: string): boolean {
   return true;
 }
 
-export function ClientManage({ clientId }: { clientId: string }) {
+export function ClientManage({ clientId, clientName }: { clientId: string; clientName?: string | null }) {
   const { ctx } = useSession();
   const canSuppLabs = !!ctx?.entitlements?.features?.supplementsLabs;
+  // Coach assignment and archive are presented as OWNER powers: a coach must not
+  // be able to hand a client to someone else or retire a record out of the
+  // roster. Archive is owner-only in the API too (route-guard demands
+  // client:["archive"], which only the owner preset carries); the /trainers
+  // routes ask for client:["update"], which the trainer preset DOES hold, so
+  // this gate is the product decision, not the security boundary — the boundary
+  // is requireClientAccess, which still scopes every call to one client row.
+  const isOwner = ctx?.active?.role === "owner";
   const [subs, setSubs] = useState<Sub[] | null>(null);
   const [packages, setPackages] = useState<Pkg[]>([]);
   const [swaps, setSwaps] = useState<Swap[]>([]);
@@ -227,7 +235,14 @@ export function ClientManage({ clientId }: { clientId: string }) {
       </Reveal>
       )}
 
+      {/* Coaches + Archive read their own endpoints and sit OUTSIDE the Reveal
+          above, so a failed `subscriptions` read can't hide the only screen in
+          the product that can hand a client to another coach. */}
+      {isOwner && <CoachesSection clientId={clientId} />}
+
       <ActivityLog clientId={clientId} />
+
+      {isOwner && <ArchiveClientSection clientId={clientId} clientName={clientName} />}
 
       <Sheet open={grantOpen} onClose={() => setGrantOpen(false)} title="Grant a package">
         <div className="space-y-2">
@@ -252,6 +267,198 @@ export function ClientManage({ clientId }: { clientId: string }) {
         onConfirm={() => { if (suppToDiscontinue) void discontinueSupp(suppToDiscontinue.id); }}
       />
     </Page>
+  );
+}
+
+// ── Coaches (client_trainers) ───────────────────────────────────────────────
+// `client_trainers` is what `visibleClientIds` scopes a coach's roster to, and
+// until this section existed the ONLY writer was the creator auto-assign in
+// POST /clients. So every owner-created client stayed owner-only: an owner could
+// invite four coaches and then had no way to hand any client over, a departing
+// coach's book couldn't be reassigned, and `is_primary` (which routes body-scan /
+// PR / check-in notifications) was unreachable. This is that screen.
+
+interface AssignedCoach { userId: string; isPrimary: boolean; name: string | null; email: string | null }
+interface StaffMember { userId: string; role: string; name: string | null; email: string | null }
+const coachName = (c: { name: string | null; email: string | null }): string => c.name || c.email || "Coach";
+
+function CoachesSection({ clientId }: { clientId: string }) {
+  const { ctx } = useSession();
+  const myUserId = ctx?.user.id ?? null;
+  const [coaches, setCoaches] = useState<AssignedCoach[] | null>(null);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [staffErr, setStaffErr] = useState(false);
+  const [loadErr, setLoadErr] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  // The userId whose write is in flight — several rows are actionable at once, so
+  // a single boolean would disable the wrong control.
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [toRemove, setToRemove] = useState<AssignedCoach | null>(null);
+
+  // Two independent reads: the assignment list gates this section, the staff list
+  // only gates the "Assign" affordance. `allSettled` so a dead /members doesn't
+  // blank a list of coaches we successfully read.
+  const load = useCallback(async () => {
+    setLoadErr(false);
+    const [t, m] = await Promise.allSettled([
+      api.get<{ trainers: AssignedCoach[] }>(`/api/clients/${clientId}/trainers`),
+      api.get<{ members: StaffMember[] }>("/api/members"),
+    ]);
+    if (m.status === "fulfilled") { setStaff(m.value.members.filter((x) => x.role !== "client")); setStaffErr(false); }
+    else setStaffErr(true);
+    if (t.status === "fulfilled") setCoaches(t.value.trainers);
+    else setLoadErr(true);
+  }, [clientId]);
+  useEffect(() => void load(), [load]);
+
+  const assign = async (userId: string, isPrimary: boolean) => {
+    if (busy) return;
+    setBusy(userId); setErr(null);
+    try {
+      await api.post(`/api/clients/${clientId}/trainers`, { trainerUserId: userId, isPrimary });
+      setAddOpen(false);
+      await load();
+    } catch (e) { setErr(errorText(e, "Couldn't update this client's coaches. Please try again.")); }
+    finally { setBusy(null); }
+  };
+  const unassign = async (userId: string) => {
+    if (busy) return;
+    setBusy(userId); setErr(null);
+    try { await api.del(`/api/clients/${clientId}/trainers/${userId}`); await load(); }
+    catch (e) { setErr(errorText(e, "Couldn't remove that coach. Please try again.")); }
+    finally { setBusy(null); }
+  };
+
+  const assigned = new Set((coaches ?? []).map((c) => c.userId));
+  const addable = staff.filter((m) => !assigned.has(m.userId));
+  const roleOf = (userId: string): string => staff.find((m) => m.userId === userId)?.role ?? "trainer";
+
+  return (
+    <section className="space-y-2">
+      <Eyebrow action={
+        <Button size="sm" disabled={!coaches || staffErr} onClick={() => { setErr(null); setAddOpen(true); }}><Plus /> Assign</Button>
+      }>Coaches</Eyebrow>
+      <Stagger>
+      {loadErr && !coaches ? (
+        <Card className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
+          <div className="min-w-0 flex-1"><div className="text-sm font-semibold">Couldn't load coaches</div><p className="text-sm text-muted-foreground">We couldn't reach the server for this client's coach assignments.</p></div>
+          <Button size="sm" variant="secondary" onClick={() => void load()}>Retry</Button>
+        </Card>
+      ) : (
+      <Reveal loading={!coaches} skeleton={<Card><SkeletonRow thumb={40} /></Card>}>
+        {coaches && (
+        <Card className="space-y-3">
+          <p className="text-sm text-muted-foreground">Only assigned coaches see this client on their roster. The primary coach receives their notifications.</p>
+          {coaches.length === 0 ? (
+            <p className="text-sm text-warning" role="status">No coach is assigned — nobody but an owner can see this client.</p>
+          ) : coaches.map((co) => (
+            <SubCard key={co.userId} className="flex items-center gap-3 py-3">
+              <Avatar name={coachName(co)} seed={co.email ?? co.userId} className="size-10 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="truncate font-medium">{coachName(co)}</span>
+                  <Badge tone={personaTone(roleOf(co.userId), { self: co.userId === myUserId })}>{personaLabel(roleOf(co.userId), { self: co.userId === myUserId })}</Badge>
+                  {co.isPrimary && <Badge tone="primary"><Star /> Primary</Badge>}
+                </div>
+                {co.email && <div className="truncate text-sm text-muted-foreground">{co.email}</div>}
+              </div>
+              {!co.isPrimary && (
+                <Button size="sm" variant="secondary" className="shrink-0" disabled={busy !== null} onClick={() => void assign(co.userId, true)}>
+                  {busy === co.userId ? "…" : "Make primary"}
+                </Button>
+              )}
+              <Button size="icon" variant="ghost" className="size-12 shrink-0 text-muted-foreground" aria-label={`Remove ${coachName(co)} from this client`} disabled={busy !== null} onClick={() => { setErr(null); setToRemove(co); }}><X /></Button>
+            </SubCard>
+          ))}
+          {staffErr && <p className="text-sm text-muted-foreground">Your staff list didn't load, so assigning is unavailable right now. <button onClick={() => void load()} className="font-medium text-primary underline">Retry</button></p>}
+          {err && <p className="text-sm text-warning" role="alert">{err}</p>}
+        </Card>
+        )}
+      </Reveal>
+      )}
+      </Stagger>
+
+      <Sheet open={addOpen} onClose={() => setAddOpen(false)} title="Assign a coach">
+        <div className="space-y-2">
+          {addable.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{staff.length === 0 ? "No staff yet — invite a coach from the Staff screen first." : "Every staff member is already assigned to this client."}</p>
+          ) : addable.map((m) => (
+            <button
+              key={m.userId}
+              onClick={() => void assign(m.userId, false)}
+              disabled={busy !== null}
+              className="flex min-h-12 w-full items-center gap-3 rounded-xl bg-secondary px-4 py-3 text-left transition-colors hover:bg-surface-3 disabled:opacity-45"
+            >
+              <Avatar name={coachName(m)} seed={m.email ?? m.userId} className="size-9 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{coachName(m)}</div>
+                <div className="truncate text-sm text-muted-foreground">{personaLabel(m.role)}{m.email ? ` · ${m.email}` : ""}</div>
+              </div>
+              <span className="shrink-0 text-sm font-medium text-primary">{busy === m.userId ? "Assigning…" : "Assign"}</span>
+            </button>
+          ))}
+          {err && <p className="text-sm text-warning" role="alert">{err}</p>}
+        </div>
+      </Sheet>
+
+      <ConfirmDialog
+        open={!!toRemove}
+        onOpenChange={(o) => !o && setToRemove(null)}
+        title={toRemove ? `Remove ${coachName(toRemove)}?` : "Remove coach?"}
+        description="They lose this client from their roster and can no longer open the record. Nothing the client has logged is deleted, and you can assign them again later."
+        confirmLabel="Remove coach"
+        destructive
+        onConfirm={() => { if (toRemove) void unassign(toRemove.userId); }}
+      />
+    </section>
+  );
+}
+
+// ── Archive / offboard (SPEC §8.1) ─────────────────────────────────────────
+// `POST /clients/:id/archive` is the only writer of `status = 'archived'`, and
+// the activeClients quota counts `status != 'archived'`. With no UI the quota was
+// a one-way ratchet: churn 20 clients on Solo and you still can't add a 21st.
+
+function ArchiveClientSection({ clientId, clientName }: { clientId: string; clientName?: string | null }) {
+  const nav = useNavigate();
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const who = clientName?.trim() || "this client";
+  const archive = async () => {
+    if (busy) return;
+    setBusy(true); setErr(null);
+    try { await api.post(`/api/clients/${clientId}/archive`); nav("/clients"); }
+    catch (e) { setErr(errorText(e, "Couldn't archive this client. Please try again.")); setBusy(false); }
+  };
+  return (
+    <section className="space-y-2">
+      <Eyebrow>Offboard</Eyebrow>
+      <Stagger>
+      <Card className="space-y-2.5">
+        <div className="flex items-center gap-2 font-medium"><Archive className="size-4 text-muted-foreground" /> Archive this client</div>
+        <p className="text-sm text-muted-foreground">
+          They come off your roster and stop counting against your plan's active-client limit, which frees the seat for someone new. Everything on the record — logs, plans, check-ins, labs, files — is kept.
+        </p>
+        <p className="text-sm text-muted-foreground">
+          If they have a login, they lose access to their space. There's no un-archive in the app yet, so treat this as one-way.
+        </p>
+        <Button variant="outline" className="w-full" disabled={busy} onClick={() => { setErr(null); setConfirm(true); }}><Archive /> {busy ? "Archiving…" : "Archive client…"}</Button>
+        {err && <p className="text-sm text-warning" role="alert">{err}</p>}
+      </Card>
+      </Stagger>
+      <ConfirmDialog
+        open={confirm}
+        onOpenChange={setConfirm}
+        title={`Archive ${who}?`}
+        description={`${who} comes off your roster and frees a seat against your plan's active-client limit. Their data is kept, but they lose access to their space and this can't be undone from the app.`}
+        confirmLabel="Archive client"
+        destructive
+        onConfirm={() => void archive()}
+      />
+    </section>
   );
 }
 

@@ -192,7 +192,7 @@ export function ClientDetail() {
             <Avatar name={client?.displayName ?? ""} src={client?.avatarUrl} seed={client?.avatarSeed ?? clientId} className="size-8 shrink-0" />
             <div className="min-w-0 leading-tight">
               <div className="truncate text-sm font-semibold">{client?.displayName ?? "…"}</div>
-              <div className="text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground">Coach view</div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Coach view</div>
             </div>
           </div>
         </div>
@@ -205,7 +205,9 @@ export function ClientDetail() {
       {tab === "goals" && <GoalManager key={clientId} clientId={clientId} />}
       {tab === "progress" && <Progress key={clientId} clientId={clientId} />}
       {tab === "report" && <ClientReport key={clientId} clientId={clientId} />}
-      {tab === "manage" && <ClientManage key={clientId} clientId={clientId} />}
+      {/* clientName is only for copy in the archive confirmation — Manage names the
+          client it's about to take off the roster rather than saying "this client". */}
+      {tab === "manage" && <ClientManage key={clientId} clientId={clientId} clientName={client?.displayName} />}
     </div>
   );
 }

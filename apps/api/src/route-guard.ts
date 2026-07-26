@@ -49,7 +49,15 @@ export function permissionFor(method: string, path: string): Record<string, stri
   // clients themselves; the handlers scope rows via requireClientAccess.
   if (path === "/api/clients" && !isGet) return { client: ["create"] };
   if (/^\/api\/clients\/[^/]+\/archive$/.test(path)) return { client: ["archive"] };
-  if (/^\/api\/clients\/[^/]+\/trainers/.test(path)) return { client: ["update"] };
+  // Who staffs a client is studio management, not coaching. Reads stay open to
+  // any coaching role (an assigned coach should see who else is on the client),
+  // but assigning and unassigning ride `member:["update"]` — a resource only the
+  // owner preset carries — so a trainer cannot staff other coaches onto their own
+  // clients or move the `is_primary` flag that routes notifications. Previously
+  // this was `client:["update"]`, which the trainer preset holds.
+  if (/^\/api\/clients\/[^/]+\/trainers/.test(path)) {
+    return isGet ? { client: ["read"] } : { member: ["update"] };
+  }
   // Self-service writes on a client's OWN record: onboarding, profile, unit
   // prefs, dashboard layout, avatar, and the lane they're currently training.
   // The `client` role deliberately carries no `client` resource (roster
