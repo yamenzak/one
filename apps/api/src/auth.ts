@@ -11,11 +11,12 @@
  * prompts passkey enrollment; passkey becomes the one-tap default, OTP stays
  * as fallback + new-device bootstrap.
  */
-import { betterAuth } from "better-auth";
+import { betterAuth, APIError } from "better-auth";
 import { organization, emailOTP } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import type { Env } from "./env.js";
 import { ac, roles } from "./access.js";
+import { withinQuota } from "./billing-store.js";
 import { sendEmail, emailShell, emailButton, escapeHtml, MOSSA_BRAND } from "./mailer.js";
 import { sendTenantEmail } from "./email-provider.js";
 import { tenantBrandKit } from "./notify.js";
@@ -52,6 +53,85 @@ export async function recentAuthEvents(
 }
 
 const OTP_MAX_PER_HOUR = 6;
+
+// ── Staff seats (the `staffSeats` quota) ─────────────────────────────────────
+//
+// A staff seat is a `member` row whose role is not `client` — **the owner
+// included**, because the quota's own label is "Owner + trainers + assistants"
+// (`@mossa/domain` entitlements.ts) and `checkDowngrade` counts it the same way.
+// So Free/Solo (`staffSeats: 1`) is a one-coach studio by design: the owner fills
+// it and cannot add staff without upgrading. That is the ceiling, not a lockout —
+// nothing here runs when a workspace is CREATED, when a client links, or when a
+// staffer moves sideways between staff roles; the check fires only where a NEW
+// staff seat is actually claimed.
+//
+// There were three ways past the one check that existed (in `/api/context`):
+// Better Auth's `accept-invitation` (the deep link), our own role-promotion
+// route, and invitation creation. The hooks below close the first and third for
+// BOTH accept paths at once; `member-routes.ts` closes the second.
+
+/** Seats consumed right now: every non-client membership. */
+export async function staffSeatsUsed(db: D1Database, tenantId: string): Promise<number> {
+  const row = await db
+    .prepare('SELECT COUNT(*) AS n FROM "member" WHERE organizationId = ? AND role != \'client\'')
+    .bind(tenantId)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+/** Seats already promised: pending, unexpired, non-client invitations. */
+export async function pendingStaffSeats(db: D1Database, tenantId: string): Promise<number> {
+  const rows = await db
+    .prepare("SELECT expiresAt FROM \"invitation\" WHERE organizationId = ? AND status = 'pending' AND role != 'client'")
+    .bind(tenantId)
+    .all<{ expiresAt: string | number | null }>();
+  const now = Date.now();
+  return (rows.results ?? []).filter((r) => {
+    const exp = r.expiresAt != null ? new Date(r.expiresAt as string).getTime() : NaN;
+    return !Number.isFinite(exp) || exp >= now; // an unparseable expiry counts (fail closed)
+  }).length;
+}
+
+export interface SeatVerdict {
+  ok: boolean;
+  used: number;
+  max: number;
+  /** Actionable copy: what the owner must do to make room. */
+  message: string;
+}
+
+/**
+ * Is there room for one more staff seat? `countPending` includes pending
+ * invitations, which is right when RESERVING a seat (creating an invitation) and
+ * wrong when CLAIMING one (accepting an invitation — the invite being accepted
+ * would count itself).
+ */
+export async function checkStaffSeat(
+  db: D1Database,
+  tenantId: string,
+  opts: { countPending?: boolean } = {},
+): Promise<SeatVerdict> {
+  const members = await staffSeatsUsed(db, tenantId);
+  const pending = opts.countPending ? await pendingStaffSeats(db, tenantId) : 0;
+  const used = members + pending;
+  const { ok, max } = await withinQuota(db, tenantId, "staffSeats", used);
+  const seats = `${max} staff seat${max === 1 ? "" : "s"}`;
+  const held = pending > 0 ? `${used} of them ${used === 1 ? "is" : "are"} in use or invited` : `${used} ${used === 1 ? "is" : "are"} in use`;
+  const free = pending > 0 ? "Remove a staff member, cancel a pending invitation," : "Remove a staff member";
+  return {
+    ok,
+    used,
+    max,
+    message: ok
+      ? `${used} of ${seats} in use.`
+      : `Your plan includes ${seats} and ${held}. ${free}${pending > 0 ? "" : ","} or upgrade your plan to add another.`,
+  };
+}
+
+/** The seat rejection, as the error Better Auth will serialise to the client. */
+function seatError(verdict: SeatVerdict): APIError {
+  return new APIError("FORBIDDEN", { code: "STAFF_SEATS_EXCEEDED", message: verdict.message, quota: "staffSeats", used: verdict.used, limit: verdict.max });
+}
 
 export function createAuth(env: Env, origin?: string) {
   // Local dev always wins: a localhost origin overrides the prod var so
@@ -140,6 +220,44 @@ export function createAuth(env: Env, origin?: string) {
         ac,
         roles,
         creatorRole: "owner",
+        // Seat ceiling, enforced inside the plugin so BOTH accept paths share one
+        // check: the /accept-invitation deep link (which posts straight to
+        // `accept-invitation` in the public lane and skipped every check) and the
+        // email-matched auto-accept in `/api/context`. Verified against the
+        // vendored 1.6.23 source: both hooks are `await`ed directly in the
+        // endpoint body (routes/crud-invites.mjs), `beforeAcceptInvitation` before
+        // the invitation is marked accepted and the member row is created, so a
+        // thrown APIError refuses the accept and leaves the invite pending.
+        organizationHooks: {
+          // Don't let an owner promise more seats than they hold — a pending
+          // invitation is a reserved seat, so it counts toward the ceiling.
+          beforeCreateInvitation: async ({ invitation, organization: org }) => {
+            if (invitation.role === "client") return; // client invites aren't staff seats
+            const seat = await checkStaffSeat(env.DB, org.id, { countPending: true });
+            if (!seat.ok) throw seatError(seat);
+          },
+          beforeAcceptInvitation: async ({ invitation, user, organization: org }) => {
+            if (invitation.role === "client") return;
+            // Already a member ⇒ they already occupy their seat (or a client seat
+            // being re-invited as staff, which the promotion path governs).
+            // Counting them again would refuse a legitimate re-accept — e.g. the
+            // deep link firing after `/api/context` already minted the membership.
+            const already = await env.DB.prepare('SELECT 1 AS x FROM "member" WHERE organizationId = ? AND userId = ?')
+              .bind(org.id, user.id)
+              .first<{ x: number }>();
+            if (already) return;
+            const seat = await checkStaffSeat(env.DB, org.id);
+            if (!seat.ok) throw seatError(seat);
+          },
+          // `/api/auth/organization/update-member-role` is HTTP-reachable and is a
+          // second promotion path alongside our own `/api/members/:id/role`; gate
+          // it the same way. Only client → staff claims a NEW seat.
+          beforeUpdateMemberRole: async ({ member, newRole, organization: org }) => {
+            if (newRole === "client" || member.role !== "client") return;
+            const seat = await checkStaffSeat(env.DB, org.id);
+            if (!seat.ok) throw seatError(seat);
+          },
+        },
         // Staff invite delivery (SPEC §4): the owner invites a trainer/assistant
         // by email → a branded email with an /accept-invitation/<id> deep link.
         // Acceptance is belt-and-suspenders: the accept screen calls Better

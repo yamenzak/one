@@ -14,7 +14,8 @@ import { resolveUnits, overallDaysRemaining, NOTIF_TYPES, notifVisibleInSurface,
 import { type AppEnv, isPlatformAdmin, requireTenant } from "./auth-context.js";
 import { clientForUser } from "./clients.js";
 import { resolveClientFlagsFor, loadClientAccessRows, accessBudgetsOf } from "./client-flags.js";
-import { tenantEntitlements, seedBilling, withinQuota } from "./billing-store.js";
+import { tenantEntitlements, seedBilling } from "./billing-store.js";
+import { checkStaffSeat } from "./auth.js";
 import { parseJson, j } from "./db.js";
 import { nowIso } from "./ids.js";
 
@@ -80,12 +81,11 @@ export const contextRoutes = new Hono<AppEnv>()
         .bind(inv.organizationId, user.id)
         .first<{ x: number }>();
       if (!already) {
-        const staff = await c.env.DB.prepare(
-          "SELECT COUNT(*) AS n FROM \"member\" WHERE organizationId = ? AND role != 'client'",
-        )
-          .bind(inv.organizationId)
-          .first<{ n: number }>();
-        const seat = await withinQuota(c.env.DB, inv.organizationId, "staffSeats", staff?.n ?? 0);
+        // The SAME seat check Better Auth's `beforeAcceptInvitation` hook runs
+        // (`checkStaffSeat`, auth.ts) — one definition, so this lane and the deep
+        // link can never disagree about who fits. Pending invitations are NOT
+        // counted here: the invite being claimed would count itself out.
+        const seat = await checkStaffSeat(c.env.DB, inv.organizationId);
         if (!seat.ok) continue; // over the seat ceiling — keep the invite pending
         const role = inv.role && inv.role !== "client" ? inv.role : "trainer";
         await c.env.DB.prepare(

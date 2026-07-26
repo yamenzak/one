@@ -1,9 +1,16 @@
-/** Staff management — roster, role changes, custom permission grants, invite. */
+/**
+ * Staff management — roster, role changes, custom permission grants, invite.
+ *
+ * Both mutating paths here can be refused by the plan's `staffSeats` ceiling —
+ * inviting reserves a seat, promoting a client-role member to staff claims one —
+ * and the server's message names the fix ("free a seat or upgrade"). Show it
+ * verbatim: a bare "Invite failed" hides a billing decision behind a shrug.
+ */
 
 import { useCallback, useEffect, useState } from "react";
 import { PERMISSION_CATALOG } from "@mossa/domain";
 import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, Plus, personaLabel, personaTone } from "@mossa/ui";
-import { api } from "../../api.js";
+import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
 
 interface Member { userId: string; role: string; name: string | null; email: string | null; customGrant?: Record<string, string[]> | null }
@@ -22,21 +29,31 @@ export function Staff() {
   const load = useCallback(async () => setMembers((await api.get<{ members: Member[] }>("/api/members")).members), []);
   useEffect(() => void load(), [load]);
 
+  const [busy, setBusy] = useState(false);
   const changeRole = async (userId: string, newRole: string) => {
+    setBusy(true);
+    setMsg(null);
     try { await api.patch(`/api/members/${userId}/role`, { role: newRole }); await load(); }
-    catch (e) { setMsg(e instanceof Error && e.message.includes("last owner") ? "Can't demote the last owner." : "Couldn't change role."); }
+    catch (e) {
+      // The seat-ceiling 403 and the last-owner 409 both carry usable copy.
+      setMsg(e instanceof Error && e.message.includes("last owner") ? "Can't demote the last owner." : errorText(e, "Couldn't change role."));
+    }
+    finally { setBusy(false); }
   };
   const ROLE_LABEL = (r: string) => personaLabel(r);
   const myUserId = useSession().ctx?.user.id ?? null;
   const invite = async () => {
+    setBusy(true);
+    setMsg(null);
     try { await api.post("/api/auth/organization/invite-member", { email, role }); setMsg(`Invite sent to ${email}.`); setInviteOpen(false); setEmail(""); }
-    catch { setMsg("Invite failed — check the email and try again."); }
+    catch (e) { setMsg(errorText(e, "Invite failed — check the email and try again.")); }
+    finally { setBusy(false); }
   };
 
   return (
     <Page className="mx-auto max-w-xl space-y-3 p-4 pb-28">
       <SectionHeader icon={Users} tone="cardio" title="Staff" action={<Button size="sm" onClick={() => setInviteOpen(true)}><Plus /> Invite</Button>} />
-      {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+      {msg && <p role="status" aria-live="polite" className="text-sm text-muted-foreground">{msg}</p>}
       <Reveal loading={!members} className="space-y-3" skeleton={
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -59,7 +76,10 @@ export function Staff() {
                   <div className="truncate text-xs text-muted-foreground">{m.email}</div>
                 </div>
                 {m.role !== "owner" && <Button size="icon" variant="secondary" aria-label="Permissions" onClick={() => setPermMember(m)}><ShieldCheck /></Button>}
-                <div className="w-28"><Select aria-label="Role" value={m.role} onChange={(v) => v !== m.role && setPendingRole({ member: m, role: v })} options={ROLES} /></div>
+                {/* `Select` has no disabled prop, so gate the mutation itself on
+                    `busy` — a second role change mid-flight would race the roster
+                    reload and show a stale role. */}
+                <div className="w-28"><Select aria-label="Role" value={m.role} onChange={(v) => v !== m.role && !busy && setPendingRole({ member: m, role: v })} options={ROLES} /></div>
               </Card>
             ))}
           </Stagger>
@@ -72,7 +92,7 @@ export function Staff() {
         <div className="space-y-4">
           <Field label="Email" icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <div className="flex gap-2"><Chip selected={role === "trainer"} onClick={() => setRole("trainer")}>{personaLabel("trainer")}</Chip><Chip selected={role === "assistant"} onClick={() => setRole("assistant")}>{personaLabel("assistant")}</Chip></div>
-          <Button size="lg" className="w-full" disabled={!email.includes("@")} onClick={() => void invite()}>Send invite</Button>
+          <Button size="lg" className="w-full" disabled={!email.includes("@") || busy} onClick={() => void invite()}>{busy ? "Sending…" : "Send invite"}</Button>
           <p className="text-xs text-muted-foreground">They sign in with a code — no password to set.</p>
         </div>
       </Sheet>

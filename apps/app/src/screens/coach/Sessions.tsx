@@ -1,14 +1,20 @@
 /**
  * Coach: sessions & front desk (SPEC §8.9, `frontDesk` entitlement). Owners
  * define add-on types (consultations) and any staff member schedules sessions
- * against a client's add-on balance — completing consumes a unit, cancelling /
- * no-showing refunds it (the ledger math lives server-side). This is the staff
- * operator surface for the read-only "Sessions" card the client sees in Wellness.
+ * against a client's add-on balance.
+ *
+ * The balance ledger lives server-side (`session-routes.ts`) and this screen must
+ * describe it truthfully: **completing OR no-showing spends a unit; cancelling a
+ * session that already spent one hands it back; cancelling a still-scheduled
+ * session spends and refunds nothing.** Booking without an unspent unit is
+ * refused, so the schedule sheet has to surface the server's message rather than
+ * failing silently. Resolved sessions stay on screen as history (the API returns
+ * a 30-day tail) — that is where a consumed unit can be handed back by reopening.
  */
 
-import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Sheet, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonList, Avatar, Calendar, Clock, CheckCheck, X, User, Plus, Ticket, CreditCard } from "@mossa/ui";
-import { api } from "../../api.js";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button, Card, Badge, Field, Sheet, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonList, Avatar, Calendar, Clock, CheckCheck, X, User, Plus, Ticket, CreditCard, History, RotateCcw } from "@mossa/ui";
+import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
 import { FeatureLock } from "../../FeatureLock.js";
 import { fmtPrice } from "../../money.js";
@@ -29,6 +35,7 @@ export function Sessions() {
   const [typeOpen, setTypeOpen] = useState(false);
   const [cancelling, setCancelling] = useState<SessionRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [t, s, cl] = await Promise.all([
@@ -43,9 +50,20 @@ export function Sessions() {
   const clientName = (id: string) => clients.find((c) => c.id === id)?.displayName ?? "Client";
   const typeLabel = (id: string) => types?.find((t) => t.id === id)?.label ?? "Session";
 
-  const transition = async (id: string, status: "completed" | "no_show" | "cancelled") => {
+  // The API returns upcoming bookings AND a recent resolved tail in one list;
+  // split them so history reads newest-first without hiding what's coming up.
+  const upcoming = useMemo(() => (sessions ?? []).filter((s) => s.status === "scheduled"), [sessions]);
+  const history = useMemo(
+    () => (sessions ?? []).filter((s) => s.status !== "scheduled").sort((a, b) => b.scheduled_at.localeCompare(a.scheduled_at)),
+    [sessions],
+  );
+
+  const transition = async (id: string, status: "scheduled" | "completed" | "no_show" | "cancelled") => {
     setBusyId(id);
-    try { await api.patch(`/api/sessions/${id}`, { status }); await load(); } finally { setBusyId(null); }
+    setMsg(null);
+    try { await api.patch(`/api/sessions/${id}`, { status }); await load(); }
+    catch (e) { setMsg(errorText(e, "Couldn't update that session.")); }
+    finally { setBusyId(null); }
   };
 
   return (
@@ -55,11 +73,12 @@ export function Sessions() {
           {sessions && types && (
           <>
             <SectionHeader icon={Calendar} tone="cardio" title="Upcoming sessions" action={<Button size="sm" disabled={types.length === 0 || clients.length === 0} onClick={() => setScheduleOpen(true)}><Plus /> Schedule</Button>} />
-            {sessions.length === 0 ? (
-              <EmptyState icon={Calendar} title="No sessions scheduled" description={types.length === 0 ? "Add a consultation type below, then schedule a session against a client's add-on balance." : "Schedule a session against a client's add-on balance — completing it consumes a unit, cancelling refunds it."} />
+            {msg && <p role="status" aria-live="polite" className="text-sm text-danger">{msg}</p>}
+            {upcoming.length === 0 ? (
+              <EmptyState icon={Calendar} title="No sessions scheduled" description={types.length === 0 ? "Add a consultation type below, then schedule a session against a client's add-on balance." : "Schedule a session against a client's add-on balance — completing it or marking a no-show spends a unit."} />
             ) : (
               <Stagger className="space-y-2">
-                {sessions.map((s) => (
+                {upcoming.map((s) => (
                   <Card key={s.id} className="space-y-3">
                     <div className="flex items-center gap-3">
                       <Avatar name={clientName(s.client_id)} seed={s.client_id} className="size-10" />
@@ -74,16 +93,42 @@ export function Sessions() {
                       <span className="inline-flex items-center gap-1 [&_svg]:size-3.5"><Clock />{s.duration_minutes} min</span>
                     </div>
                     {s.notes && <p className="text-sm text-muted-foreground">{s.notes}</p>}
-                    {s.status === "scheduled" && (
-                      <div className="flex flex-wrap gap-2 border-t border-border/40 pt-3">
-                        <Button size="sm" variant="tonal" disabled={busyId === s.id} onClick={() => void transition(s.id, "completed")}><CheckCheck /> Complete</Button>
-                        <Button size="sm" variant="secondary" disabled={busyId === s.id} onClick={() => void transition(s.id, "no_show")}><X /> No-show</Button>
-                        <Button size="sm" variant="ghost" disabled={busyId === s.id} onClick={() => setCancelling(s)}>Cancel</Button>
-                      </div>
-                    )}
+                    <div className="flex flex-wrap gap-2 border-t border-border/40 pt-3">
+                      <Button size="sm" variant="tonal" disabled={busyId === s.id} onClick={() => void transition(s.id, "completed")}><CheckCheck /> Complete</Button>
+                      <Button size="sm" variant="secondary" disabled={busyId === s.id} onClick={() => void transition(s.id, "no_show")}><X /> No-show</Button>
+                      <Button size="sm" variant="ghost" disabled={busyId === s.id} onClick={() => setCancelling(s)}>Cancel</Button>
+                    </div>
                   </Card>
                 ))}
               </Stagger>
+            )}
+
+            {history.length > 0 && (
+              <>
+                <SectionHeader className="pt-2" icon={History} tone="neutral" title="Recent history" />
+                <Stagger className="space-y-2">
+                  {history.map((s) => (
+                    <Card key={s.id} className="space-y-2.5">
+                      <div className="flex items-center gap-3">
+                        <Avatar name={clientName(s.client_id)} seed={s.client_id} className="size-9 opacity-70" />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-medium">{clientName(s.client_id)}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {typeLabel(s.addon_type_id)} · {new Date(s.scheduled_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                          </div>
+                        </div>
+                        <Badge tone={STATUS_TONE[s.status] ?? "neutral"}>{s.status.replace("_", " ")}</Badge>
+                      </div>
+                      {(s.status === "completed" || s.status === "no_show") && (
+                        <div className="flex flex-wrap items-center gap-2 border-t border-border/40 pt-2.5">
+                          <Button size="sm" variant="ghost" disabled={busyId === s.id} onClick={() => void transition(s.id, "scheduled")}><RotateCcw /> Reopen</Button>
+                          <span className="text-xs text-muted-foreground">Returns the add-on unit to their balance.</span>
+                        </div>
+                      )}
+                    </Card>
+                  ))}
+                </Stagger>
+              </>
             )}
 
             <SectionHeader className="pt-2" icon={Ticket} tone="primary" title="Add-on types" action={isOwner ? <Button size="sm" onClick={() => setTypeOpen(true)}><Plus /> Type</Button> : undefined} />
@@ -109,7 +154,11 @@ export function Sessions() {
           open={!!cancelling}
           onOpenChange={(o) => !o && setCancelling(null)}
           title="Cancel this session?"
-          description="Cancelling refunds the add-on unit to the client's balance and notifies them."
+          // Honest copy: a scheduled session has spent nothing yet, so there is no
+          // unit to refund — the booking is simply released. (The old text promised
+          // a refund that never happened.) A unit only comes back by reopening a
+          // completed / no-showed session.
+          description="Cancelling releases the booking and notifies the client. Their add-on unit was never spent, so nothing is refunded."
           confirmLabel="Cancel session"
           destructive
           onConfirm={() => { if (cancelling) void transition(cancelling.id, "cancelled"); }}
@@ -126,13 +175,19 @@ function ScheduleSheet({ clients, types, onClose, onSaved }: { clients: ClientSu
   const [when, setWhen] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const duration = types.find((t) => t.id === addOnTypeId)?.duration_minutes ?? 30;
   const save = async () => {
     setBusy(true);
+    setErr(null);
     try {
       await api.post("/api/sessions", { clientId, addOnTypeId, scheduledAt: new Date(when).toISOString(), durationMinutes: duration, notes: notes.trim() || undefined });
       onSaved();
-    } finally { setBusy(false); }
+    }
+    // The server refuses a booking with no unspent add-on unit (409) and its
+    // message says how to fix it — show that, don't swallow it.
+    catch (e) { setErr(errorText(e, "Couldn't schedule that session.")); }
+    finally { setBusy(false); }
   };
   return (
     <Sheet open onClose={onClose} title="Schedule a session">
@@ -144,6 +199,7 @@ function ScheduleSheet({ clients, types, onClose, onSaved }: { clients: ClientSu
           <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className="w-full rounded-xl bg-surface-3 px-3 py-2.5 text-sm outline-none ring-ring focus-visible:ring-2" />
         </label>
         <Field label="Notes (optional)" icon={User} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        {err && <p role="status" aria-live="polite" className="text-sm text-danger">{err}</p>}
         <Button size="lg" className="w-full" disabled={!clientId || !addOnTypeId || !when || busy} onClick={() => void save()}>{busy ? "Scheduling…" : "Schedule session"}</Button>
       </div>
     </Sheet>
@@ -156,19 +212,24 @@ function AddOnTypeSheet({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   const [duration, setDuration] = useState("30");
   const [price, setPrice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const save = async () => {
     setBusy(true);
+    setErr(null);
     try {
       await api.post("/api/addon-types", { label: label.trim(), durationMinutes: Number(duration) || 30, standalonePriceCents: price ? Math.round(Number(price) * 100) : undefined });
       onSaved();
-    } finally { setBusy(false); }
+    }
+    catch (e) { setErr(errorText(e, "Couldn't create that add-on type.")); }
+    finally { setBusy(false); }
   };
   return (
     <Sheet open onClose={onClose} title="New add-on type">
       <div className="space-y-4">
         <Field label="Label" icon={Ticket} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nutrition consultation" />
         <Field label="Duration (minutes)" icon={Clock} value={duration} inputMode="numeric" onChange={(e) => setDuration(e.target.value.replace(/\D/g, ""))} />
-        <Field label="Standalone price (USD, optional)" icon={CreditCard} value={price} inputMode="decimal" onChange={(e) => setPrice(e.target.value)} hint="What one session costs on its own, when not included in a package." />
+        <Field label="Standalone price (USD, optional)" icon={CreditCard} value={price} inputMode="decimal" onChange={(e) => setPrice(e.target.value)} hint="What one session costs on its own. Setting it also lets staff book this type when a client has no included units left." />
+        {err && <p role="status" aria-live="polite" className="text-sm text-danger">{err}</p>}
         <Button size="lg" className="w-full" disabled={label.trim().length < 2 || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create type"}</Button>
       </div>
     </Sheet>

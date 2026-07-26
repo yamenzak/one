@@ -1,20 +1,60 @@
 /**
  * Trainer sessions + add-on types (SPEC §8.9) — consultations consumed from a
- * client subscription's add-on balances. Scheduling a session against a balance
- * decrements it on completion and refunds on cancel (ByShujaa parity).
+ * client subscription's add-on balances.
+ *
+ * **The balance semantics, in one place** (BILLING-PLAN: a package's add-ons are
+ * a paid, finite quantity):
+ *
+ * - **Booking** requires an unspent unit. "Unspent" nets off the units already
+ *   promised to sessions still sitting in `scheduled` — otherwise a package that
+ *   included 2 consultations books 20, because nothing is consumed until each one
+ *   resolves. A booking with no unit left is REFUSED (409), unless the add-on
+ *   type carries a `standalone_price_cents`, which is the sanctioned pay-per-
+ *   session path: that session is booked unattached (`subscription_id = NULL`)
+ *   and consumes nothing when it resolves.
+ * - **`completed` and `no_show` both CONSUME** one unit. A no-show is a burnt
+ *   slot for the studio — the client held the coach's hour — so refunding it (or,
+ *   as before, consuming nothing at all) hands back a session they didn't attend.
+ * - **`cancelled` (and re-opening to `scheduled`) REFUNDS** a unit, but only when
+ *   the session had actually consumed one. Cancelling a still-`scheduled` session
+ *   refunds nothing, because nothing was ever spent.
+ * - A consuming transition on a session attached to a subscription with **no
+ *   matching balance entry fails loudly** rather than completing for free.
+ *
+ * Every write to `addons_json` goes through `updateSubscriptionRunway`
+ * (AGENTS.md §5) — four uncoordinated writers share that column, so a bare
+ * read-modify-write here silently destroys paid budget days.
  */
 
 import { Hono } from "hono";
 import { z } from "zod";
 import { remainingAddOnQuantity, type AddOnBalance } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
-import { gateFeature } from "./client-flags.js";
+import { gateFeature, LIVE_ACCESS_STATUSES } from "./client-flags.js";
 import { requireClientAccess, visibleClientIds } from "./clients.js";
+import { updateSubscriptionRunway } from "./subscription-runway.js";
 import { notify } from "./notify.js";
 import { newId, nowIso } from "./ids.js";
-import { parseJson, j } from "./db.js";
+import { parseJson } from "./db.js";
 
 const staff = (c: { get: (k: "role") => string | null }) => c.get("role") === "owner" || c.get("role") === "trainer" || c.get("role") === "assistant";
+
+/** The statuses that have SPENT a unit of the client's add-on balance. */
+const CONSUMED_STATUSES = ["completed", "no_show"] as const;
+const consumesUnit = (status: string): boolean => (CONSUMED_STATUSES as readonly string[]).includes(status);
+/** The same set as a SQL predicate — the guard on the spend boundary. */
+const CONSUMED_SQL = `status IN (${CONSUMED_STATUSES.map((s) => `'${s}'`).join(",")})`;
+
+/** Units of `addOnTypeId` already promised to sessions that haven't resolved yet.
+ *  Netting these off the remaining balance is what stops over-booking: nothing is
+ *  consumed until a session completes, so without it the same unit books twice. */
+async function outstandingBookings(db: D1Database, subscriptionId: string, addOnTypeId: string): Promise<number> {
+  const row = await db
+    .prepare("SELECT COUNT(*) AS n FROM trainer_sessions WHERE subscription_id = ? AND addon_type_id = ? AND status = 'scheduled'")
+    .bind(subscriptionId, addOnTypeId)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
 
 export const sessionRoutes = new Hono<AppEnv>()
   // ── Add-on types (catalog) ─────────────────────────────────────────────────
@@ -53,13 +93,23 @@ export const sessionRoutes = new Hono<AppEnv>()
     // them — which the client_trainers invariant is there to prevent.
     const scope = await visibleClientIds(c);
     if (scope !== "all" && scope.length === 0) return c.json({ sessions: [] });
-    const where =
-      scope === "all"
-        ? "tenant_id = ? AND status = 'scheduled'"
-        : `tenant_id = ? AND status = 'scheduled' AND client_id IN (${scope.map(() => "?").join(",")})`;
-    const binds = scope === "all" ? [who.tenantId] : [who.tenantId, ...scope];
-    const rows = await c.env.DB.prepare(`SELECT * FROM trainer_sessions WHERE ${where} ORDER BY scheduled_at LIMIT 500`).bind(...binds).all();
-    return c.json({ sessions: rows.results ?? [] });
+    // Upcoming AND recent history. Filtering to `status = 'scheduled'` made every
+    // completed / cancelled / no-showed session VANISH the moment it resolved, so
+    // the front desk had no record of what actually ran (and no way to see, or
+    // undo, a consumed unit). Resolved sessions come back bounded by a window —
+    // `?historyDays=` (default 30, clamped 0..365) — so the schedule stays a page
+    // rather than growing into an unbounded archive.
+    const rawDays = Number(c.req.query("historyDays"));
+    const historyDays = Number.isFinite(rawDays) ? Math.min(365, Math.max(0, rawDays)) : 30;
+    const since = new Date(Date.now() - historyDays * 86_400_000).toISOString();
+    const clauses = ["tenant_id = ?", "(status = 'scheduled' OR scheduled_at >= ?)"];
+    const binds: unknown[] = [who.tenantId, since];
+    if (scope !== "all") {
+      clauses.push(`client_id IN (${scope.map(() => "?").join(",")})`);
+      binds.push(...scope);
+    }
+    const rows = await c.env.DB.prepare(`SELECT * FROM trainer_sessions WHERE ${clauses.join(" AND ")} ORDER BY scheduled_at LIMIT 500`).bind(...binds).all();
+    return c.json({ sessions: rows.results ?? [], historyDays });
   })
 
   .post("/sessions", async (c) => {
@@ -70,14 +120,45 @@ export const sessionRoutes = new Hono<AppEnv>()
     if (!b.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, b.data.clientId);
     if ("response" in access) return access.response;
-    // Check the client has an add-on balance.
-    const sub = await c.env.DB.prepare("SELECT id, addons_json FROM client_subscriptions WHERE client_id = ? AND status = 'active' ORDER BY started_at DESC LIMIT 1").bind(access.client.id).first<{ id: string; addons_json: string | null }>();
-    if (sub && remainingAddOnQuantity(parseJson<AddOnBalance[]>(sub.addons_json, []), b.data.addOnTypeId) <= 0) {
-      // Allowed to schedule anyway (coach discretion); balance only consumed on complete.
+
+    // The add-on type must belong to THIS tenant — it also decides whether the
+    // standalone (pay-per-session) path is open when no balance is left.
+    const type = await c.env.DB.prepare("SELECT id, label, standalone_price_cents FROM addon_types WHERE id = ? AND tenant_id = ?")
+      .bind(b.data.addOnTypeId, who.tenantId)
+      .first<{ id: string; label: string; standalone_price_cents: number | null }>();
+    if (!type) return c.json({ error: "unknown add-on type" }, 404);
+
+    // Find a live subscription that still has an unspent unit of this add-on,
+    // netting off the units already promised to sessions awaiting resolution.
+    // A client may legitimately hold several live rows (BILLING-PLAN §7 stacks
+    // packages), so scan them newest-first rather than trusting LIMIT 1.
+    const ph = LIVE_ACCESS_STATUSES.map(() => "?").join(",");
+    const subs = await c.env.DB.prepare(`SELECT id, addons_json FROM client_subscriptions WHERE client_id = ? AND tenant_id = ? AND status IN (${ph}) ORDER BY started_at DESC`)
+      .bind(access.client.id, who.tenantId, ...LIVE_ACCESS_STATUSES)
+      .all<{ id: string; addons_json: string | null }>();
+    let subscriptionId: string | null = null;
+    for (const s of subs.results ?? []) {
+      const remaining = remainingAddOnQuantity(parseJson<AddOnBalance[]>(s.addons_json, []), type.id);
+      if (!(remaining > 0)) continue;
+      if (remaining - (await outstandingBookings(c.env.DB, s.id, type.id)) <= 0) continue;
+      subscriptionId = s.id;
+      break;
     }
+    if (!subscriptionId && !((type.standalone_price_cents ?? 0) > 0)) {
+      // No included unit and no standalone price to sell one at — refuse, and say
+      // what would fix it, rather than booking a session nobody can complete.
+      return c.json(
+        {
+          error: `${access.client.display_name ?? "This client"} has no ${type.label} left. Sell or grant a package that includes one, or give this add-on type a standalone price to book it as a paid extra.`,
+          addOnTypeId: type.id,
+        },
+        409,
+      );
+    }
+
     const id = newId("sess");
     await c.env.DB.prepare("INSERT INTO trainer_sessions (id, tenant_id, client_id, trainer_user_id, subscription_id, addon_type_id, scheduled_at, duration_minutes, status, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?)")
-      .bind(id, who.tenantId, access.client.id, who.userId, sub?.id ?? null, b.data.addOnTypeId, b.data.scheduledAt, b.data.durationMinutes, b.data.notes ?? null, nowIso())
+      .bind(id, who.tenantId, access.client.id, who.userId, subscriptionId, b.data.addOnTypeId, b.data.scheduledAt, b.data.durationMinutes, b.data.notes ?? null, nowIso())
       .run();
     if (access.client.user_id) {
       await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "session_booked", message: new Date(b.data.scheduledAt).toLocaleString(), vars: { sessionTime: new Date(b.data.scheduledAt).toLocaleString() } });
@@ -85,14 +166,19 @@ export const sessionRoutes = new Hono<AppEnv>()
     return c.json({ ok: true, id }, 201);
   })
 
-  // Transition status; completing consumes one add-on unit, cancelling refunds.
+  // Transition status. `completed`/`no_show` consume one add-on unit; going back
+  // to `cancelled`/`scheduled` refunds one — see the module header.
   .patch("/sessions/:id", async (c) => {
     const who = requireTenant(c)!;
     if (!staff(c)) return c.json({ error: "forbidden" }, 403);
+    // The POST paths gate on `sessions` (= the `frontDesk` entitlement) but this
+    // one didn't, so a tenant downgraded off frontDesk could still complete
+    // sessions — burning paid add-on units through a feature they no longer have.
+    { const g = await gateFeature(c, "sessions"); if (g) return g; }
     const b = z.object({ status: z.enum(["scheduled", "completed", "cancelled", "no_show"]) }).safeParse(await c.req.json().catch(() => null));
     if (!b.success) return c.json({ error: "invalid body" }, 400);
     const sessionId = c.req.param("id");
-    const row = await c.env.DB.prepare("SELECT * FROM trainer_sessions WHERE id = ? AND tenant_id = ?").bind(sessionId, who.tenantId).first<{ status: string; subscription_id: string | null; addon_type_id: string; client_id: string; scheduled_at: string }>();
+    const row = await c.env.DB.prepare("SELECT * FROM trainer_sessions WHERE id = ? AND tenant_id = ?").bind(sessionId, who.tenantId).first<{ status: string; completed_at: string | null; subscription_id: string | null; addon_type_id: string; client_id: string; scheduled_at: string }>();
     if (!row) return c.json({ error: "not found" }, 404);
     // Row-level scope on the session's client, BEFORE any write. This transition is
     // money-affecting: completing it decrements `quantityUsed` on the client's
@@ -103,36 +189,60 @@ export const sessionRoutes = new Hono<AppEnv>()
     const access = await requireClientAccess(c, row.client_id);
     if ("response" in access) return access.response;
     const target = b.data.status;
+    const now = nowIso();
+    const wasConsumed = consumesUnit(row.status);
+    const willConsume = consumesUnit(target);
 
-    // Atomic status transition. The completed<->not-completed boundary is guarded
-    // so two concurrent requests can't both flip the same session and each burn
-    // an add-on unit — only the request that ACTUALLY transitions consumes/refunds.
+    // A consuming transition must have a unit to consume. Before the fix a
+    // completion whose subscription carried no matching balance silently no-op'd:
+    // the session read "completed" and the studio's paid quantity never moved, so
+    // an included consultation could be delivered for free, forever. Checked
+    // BEFORE the status flip so there is nothing to compensate.
+    if (willConsume && !wasConsumed && row.subscription_id) {
+      const sub = await c.env.DB.prepare("SELECT addons_json FROM client_subscriptions WHERE id = ? AND tenant_id = ?").bind(row.subscription_id, who.tenantId).first<{ addons_json: string | null }>();
+      const balances = parseJson<AddOnBalance[]>(sub?.addons_json ?? null, []);
+      if (!balances.some((x) => x.addOnTypeId === row.addon_type_id)) {
+        return c.json({ error: "this session isn't attached to an add-on balance any more — re-book it against a package that includes this add-on", addOnTypeId: row.addon_type_id }, 409);
+      }
+    }
+
+    // Atomic status transition. The spent<->unspent boundary is guarded so two
+    // concurrent requests can't both cross it and each burn (or refund) a unit —
+    // only the request that ACTUALLY transitions consumes/refunds.
     let changed: boolean;
-    if (target === "completed" && row.status !== "completed") {
-      const r = await c.env.DB.prepare("UPDATE trainer_sessions SET status = 'completed', completed_at = ? WHERE id = ? AND tenant_id = ? AND status != 'completed'").bind(nowIso(), sessionId, who.tenantId).run();
-      changed = (r.meta?.changes ?? 0) > 0;
-    } else if (target !== "completed" && row.status === "completed") {
-      const r = await c.env.DB.prepare("UPDATE trainer_sessions SET status = ?, completed_at = NULL WHERE id = ? AND tenant_id = ? AND status = 'completed'").bind(target, sessionId, who.tenantId).run();
+    if (willConsume !== wasConsumed) {
+      const guard = wasConsumed ? CONSUMED_SQL : `NOT (${CONSUMED_SQL})`;
+      const r = await c.env.DB.prepare(`UPDATE trainer_sessions SET status = ?, completed_at = ? WHERE id = ? AND tenant_id = ? AND ${guard}`).bind(target, target === "completed" ? now : null, sessionId, who.tenantId).run();
       changed = (r.meta?.changes ?? 0) > 0;
     } else {
-      const r = await c.env.DB.prepare("UPDATE trainer_sessions SET status = ?, completed_at = ? WHERE id = ? AND tenant_id = ?").bind(target, target === "completed" ? nowIso() : null, sessionId, who.tenantId).run();
+      const r = await c.env.DB.prepare("UPDATE trainer_sessions SET status = ?, completed_at = ? WHERE id = ? AND tenant_id = ?").bind(target, target === "completed" ? now : null, sessionId, who.tenantId).run();
       changed = (r.meta?.changes ?? 0) > 0;
     }
 
-    const consume = changed && target === "completed" && row.status !== "completed";
-    const refund = changed && target !== "completed" && row.status === "completed";
+    const consume = changed && willConsume && !wasConsumed;
+    const refund = changed && !willConsume && wasConsumed;
     if ((consume || refund) && row.subscription_id) {
-      // CAS retry on addons_json so two different sessions completing concurrently
-      // on the same subscription can't lose one decrement (last-writer-wins).
-      for (let attempt = 1; attempt <= 5; attempt++) {
-        const sub = await c.env.DB.prepare("SELECT addons_json FROM client_subscriptions WHERE id = ?").bind(row.subscription_id).first<{ addons_json: string | null }>();
-        const prev = sub?.addons_json ?? null;
-        const balances = parseJson<AddOnBalance[]>(prev, []);
-        const bal = balances.find((x) => x.addOnTypeId === row.addon_type_id);
-        if (!bal) break;
-        bal.quantityUsed = Math.max(0, bal.quantityUsed + (consume ? 1 : -1));
-        const w = await c.env.DB.prepare("UPDATE client_subscriptions SET addons_json = ? WHERE id = ? AND addons_json IS ?").bind(j(balances), row.subscription_id, prev).run();
-        if ((w.meta?.changes ?? 0) > 0) break;
+      // `addons_json` shares its row with `budgets_json` and has four
+      // uncoordinated writers, so the decrement goes through the ONE sanctioned
+      // CAS writer (AGENTS.md §5) — a bare read-modify-write here would clobber a
+      // concurrent renewal's budget days. Refunds clamp at zero: a unit can never
+      // be handed back twice, because the status guard above only lets one request
+      // cross the boundary.
+      const ok = await updateSubscriptionRunway(c.env.DB, row.subscription_id, (budgets, addOns) => ({
+        budgets,
+        addOns: addOns.map((x) =>
+          x.addOnTypeId === row.addon_type_id ? { ...x, quantityUsed: Math.max(0, x.quantityUsed + (consume ? 1 : -1)) } : x,
+        ),
+        extra: { sql: "updated_at = ?", binds: [now] },
+      }));
+      if (!ok) {
+        // The balance did not move, so the status must not either — otherwise a
+        // lost CAS silently gifts (or reclaims) a paid consultation. Put the
+        // session back and tell the caller to retry.
+        await c.env.DB.prepare("UPDATE trainer_sessions SET status = ?, completed_at = ? WHERE id = ? AND tenant_id = ?")
+          .bind(row.status, row.completed_at, sessionId, who.tenantId)
+          .run();
+        return c.json({ error: "couldn't update the client's add-on balance — please try again" }, 409);
       }
     }
     if (changed && (target === "cancelled" || target === "no_show")) {
