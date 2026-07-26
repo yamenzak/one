@@ -88,9 +88,15 @@ export function PaymentSheet({
     setBusy(true);
     setError(null);
     try {
+      // Do NOT pass `clientSecret` here. The Elements instance above was created
+      // WITH the client secret, and Stripe.js treats "client secret on Elements"
+      // and "client secret at confirm time" (the deferred-intent flow) as two
+      // different integrations — supplying both is an integration error, which
+      // Stripe.js *throws* rather than returning as `{ error }`. That landed in the
+      // catch below and reported itself as a connection problem, so a trial signup
+      // failed with "check your connection" on a perfectly good connection.
       const args = {
         elements,
-        clientSecret: intent.clientSecret,
         confirmParams: { return_url: window.location.href },
         redirect: "if_required" as const,
       };
@@ -101,14 +107,22 @@ export function PaymentSheet({
         return;
       }
       onSuccess();
-    } catch {
-      // A thrown confirmPayment (network/JS error) must never strand the button
-      // on "Processing…" — surface a retryable error and fall through to finally.
+    } catch (e) {
+      // A throw here is a Stripe.js integration or transport failure, never a card
+      // decline (declines come back as `res.error`). Surface what it actually said:
+      // blaming the connection for a misconfiguration sends people to reset their
+      // wifi while the real cause is a key or an intent mismatch. Only fall back to
+      // the connectivity wording when the browser really is offline.
+      const detail = e instanceof Error && e.message ? e.message : null;
+      const offline = typeof navigator !== "undefined" && navigator.onLine === false;
       setError(
-        intent.mode === "setup"
-          ? "Couldn't save your card. Check your connection and try again."
-          : "Payment couldn't be completed. Check your connection and try again.",
+        offline || !detail
+          ? intent.mode === "setup"
+            ? "Couldn't save your card. Check your connection and try again."
+            : "Payment couldn't be completed. Check your connection and try again."
+          : detail,
       );
+      console.error("[PaymentSheet] confirm failed", e);
     } finally {
       setBusy(false);
     }
