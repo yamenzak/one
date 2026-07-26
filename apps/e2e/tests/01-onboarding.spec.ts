@@ -1,8 +1,13 @@
 /**
  * GOLDEN PATH 1 — the front door.
  *
- *   owner signs up → creates a studio → invites a client by email
- *     → the client signs in with their own emailed code
+ *   an unauthenticated visitor at the platform host `/` gets the GATE, not a
+ *   signup form → clicks through to Mossa's own deep sign-in
+ *     → owner signs in → names their studio → picks a plan (mandatory)
+ *     → billing degrades cleanly (no Stripe in this stack) → studio is live
+ *     → invites a client by email
+ *     → the client opens the studio's own branded door (`/t/<slug>`, straight out
+ *       of the invite link the server built) and signs in with their emailed code
  *     → auto-links to the invited record
  *     → completes the 5-step intake wizard
  *     → lands in the client app
@@ -24,28 +29,62 @@
  *
  * So the assertions to care about are: the wizard's Finish actually persists, and
  * the client lands on the CLIENT surface (Train/Eat tabs) rather than the
- * first-run "Start your business" screen.
+ * first-run studio wizard.
+ *
+ * The front half now also guards the entry rework, and both halves of it matter:
+ *  • `/` on the platform host must NOT offer a signup form (that is how clients
+ *    ended up as orphan accounts under Mossa instead of under their coach), and
+ *  • it must still let staff through, because the installed PWA's `start_url` is
+ *    `/` and a signed-out owner opening their app lands exactly there.
+ * Plus: the mandatory plan step must DEGRADE when Stripe is unconfigured. If it
+ * hard-blocked, nobody could create a studio on a fresh deploy — the same class of
+ * bootstrap deadlock as the OTP one.
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import { newParty, prepare, sheet, signInWithOtp, signUpOwner, tab, uniqueEmail } from "../src/app.js";
+import { createStudio, newParty, prepare, sheet, signInWithOtp, tab, throughPlatformGate, uniqueEmail } from "../src/app.js";
 
 test("owner onboards, invites a client, and the client signs in and completes intake", async ({ browser }) => {
   const ownerEmail = uniqueEmail("owner");
   const clientEmail = uniqueEmail("client");
   const studio = `E2E Studio ${Date.now().toString(36)}`;
   const clientName = "Dana Test";
+  /** The studio's own branded door, lifted out of the invite link the server built
+   *  — that is the path a real invited client arrives on, and it is deliberately
+   *  NOT the platform host's `/`, which is now a gate. */
+  let invitePath = "";
 
   const coachCtx = await newParty(browser);
   const coach = await coachCtx.newPage();
 
-  await test.step("owner signs up and creates the studio", async () => {
-    await signUpOwner(coach, ownerEmail, studio);
+  await test.step("the platform host's front door is a gate, not a signup form", async () => {
+    await prepare(coach);
+    // Asserts both halves: no OTP form / no email field, the end-user redirect
+    // copy is present, and the low-emphasis staff link still reaches sign-in.
+    await throughPlatformGate(coach);
+  });
+
+  await test.step("owner signs in and completes the three-step studio onboarding", async () => {
+    await signInWithOtp(coach, ownerEmail);
+    // Names the studio, picks Light off the LIVE plan catalog, and asserts the
+    // Stripe-unconfigured degrade path lets them through with billing pending.
+    await createStudio(coach, studio);
     // The coach surface, not the client one: the owner's own dashboard, under
     // the studio they just named.
     await expect(coach.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
     await expect(coach.getByText(studio)).toBeVisible();
     await expect(tab(coach, "Clients")).toBeVisible();
+  });
+
+  await test.step("the chosen plan is recorded as pending, not granted", async () => {
+    // The safety property behind the degrade path: an owner who never entered a
+    // card must NOT be holding the plan they picked. `GET /api/billing` is the
+    // authority — the studio sits on the free baseline with Light pending.
+    const billing = await coach.request.get("/api/billing", { headers: { origin: new URL(coach.url()).origin } });
+    expect(billing.ok()).toBe(true);
+    const body = (await billing.json()) as { subscription: { planId: string; pendingPlanId: string | null } };
+    expect(body.subscription.pendingPlanId).toBe("light");
+    expect(body.subscription.planId).toBe("free");
   });
 
   await test.step("owner invites a client by email", async () => {
@@ -66,7 +105,13 @@ test("owner onboards, invites a client, and the client signs in and completes in
     const invited = sheet(coach, "Client invited");
     await expect(invited).toBeVisible();
     await expect(invited.getByText(clientEmail)).toBeVisible();
-    await expect(invited.getByText(/\?invite=/)).toBeVisible();
+    const link = invited.getByText(/\?invite=/);
+    await expect(link).toBeVisible();
+    // The link is absolute against the deployed host; drive its path locally. It
+    // must be the tenant's own `/t/<slug>` surface — the branded end-user door.
+    const url = new URL((await link.textContent())!.trim());
+    expect(url.pathname).toMatch(/^\/t\/[^/]+$/);
+    invitePath = `${url.pathname}${url.search}`;
     await invited.getByRole("button", { name: "Go to client" }).click();
 
     // Coach view of the new client.
@@ -86,16 +131,21 @@ test("owner onboards, invites a client, and the client signs in and completes in
   const clientCtx = await newParty(browser);
   const client = await clientCtx.newPage();
 
-  await test.step("the invited client signs in with their own code", async () => {
+  await test.step("the invited client opens their studio's branded door and signs in", async () => {
     await prepare(client);
-    await client.goto("/");
+    // Straight from the invite link. Tenant surfaces are untouched by the platform
+    // gate — `/t/<slug>` still renders the studio's own login, which is the end-user
+    // door the gate redirects people to.
+    await client.goto(invitePath);
+    await expect(client.getByRole("heading", { name: studio, exact: true })).toBeVisible();
     await signInWithOtp(client, clientEmail);
   });
 
   await test.step("the client is auto-linked and gets the intake wizard, not 'create a studio'", async () => {
-    // The regression that mattered: an unlinked invitee saw "Start your business".
+    // The regression that mattered: an unlinked invitee saw the business wizard.
     await expect(client.getByRole("heading", { name: /^Hi / })).toBeVisible({ timeout: 30_000 });
-    await expect(client.getByRole("heading", { name: "Start your business" })).toHaveCount(0);
+    await expect(client.getByRole("heading", { name: "Name your studio" })).toHaveCount(0);
+    await expect(client.getByRole("heading", { name: "Your studio", exact: true })).toHaveCount(0);
   });
 
   await test.step("the client completes all five intake steps", async () => {

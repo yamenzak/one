@@ -105,22 +105,76 @@ async function pollForOtp(email: string): Promise<string> {
   return code!;
 }
 
-/** Create the studio from the first-run screen (owner path). */
-export async function createStudio(page: Page, name: string): Promise<void> {
-  await expect(page.getByRole("heading", { name: "Start your business" })).toBeVisible();
+/**
+ * Mossa's own sign-in. It is NOT `/` any more: on the platform host `/` is an
+ * explanatory gate (see `PlatformGate.tsx`), because a client of a studio who
+ * landed there used to sign up under Mossa instead of under their coach. Keep this
+ * in lockstep with `SIGN_IN_PATH` in the app and `APP_SIGNIN_URL` in `apps/www`.
+ */
+export const SIGN_IN_PATH = "/studio/sign-in";
+
+/**
+ * Enter through the platform host's front door and click through to sign-in.
+ *
+ * This is the gate's regression guard, and it guards two opposite failures at
+ * once: the gate must NOT offer a signup form (the whole reason it exists), and it
+ * must still let staff in (the installed PWA's `start_url` is `/`, so a signed-out
+ * owner lands here — no visible way through would be a launch-blocking lockout).
+ */
+export async function throughPlatformGate(page: Page): Promise<void> {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /platform coaches run their business on/i })).toBeVisible();
+  // No signup surface: no OTP card, no email field.
+  await expect(page.getByRole("heading", { name: "Continue with email" })).toHaveCount(0);
+  await expect(page.getByLabel("Email")).toHaveCount(0);
+  // The end-user redirect — the point of the whole screen.
+  await expect(page.getByText(/Use the link your coach sent you/i)).toBeVisible();
+  // …and the staff escape hatch.
+  await page.getByRole("link", { name: /^Sign in/ }).click();
+  await expect(page).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
+  await expect(page.getByRole("heading", { name: "Continue with email" })).toBeVisible();
+}
+
+/**
+ * The three-step first-run onboarding: name the studio → choose a plan → start it.
+ *
+ * The plan step is mandatory (the free tier is retired), and step 3 in this stack
+ * takes the **degrade path**: no Stripe keys are configured, so no client secret
+ * can exist. That is asserted rather than tolerated — if a mandatory paid step ever
+ * hard-blocks there, nobody can create a studio on a fresh deploy, which is the
+ * same class of bootstrap deadlock as the OTP one.
+ */
+export async function createStudio(page: Page, name: string, plan = "Light"): Promise<void> {
+  await expect(page.getByRole("heading", { name: "Your studio", exact: true })).toBeVisible({ timeout: 30_000 });
   await page.getByLabel("Business name").fill(name);
-  await page.getByRole("button", { name: "Create workspace" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  // Step 2 — the live catalog, not a hardcoded list: the plan is addressed by the
+  // accessible name the API's own name + price produce.
+  await expect(page.getByRole("heading", { name: "Choose a plan", exact: true })).toBeVisible();
+  const option = page.getByRole("radio", { name: new RegExp(`^${plan},`) });
+  await expect(option).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
+  await option.click();
+  await expect(option).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  // Step 3 — Stripe is unconfigured here, so the owner is let through with the
+  // plan recorded and billing pending. Nothing is charged and nothing paid is
+  // granted; the studio runs on the free baseline until billing completes.
+  await expect(page.getByRole("heading", { name: "Start your plan", exact: true })).toBeVisible();
+  await expect(page.getByText(/Billing isn.t ready yet/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/Nothing has been charged/i)).toBeVisible();
+  await page.getByRole("button", { name: /Go to my studio/ }).click();
+
   // The studio name lands in the app bar once the context refreshes.
   await expect(page.getByRole("button", { name: "Account" })).toBeVisible({ timeout: 30_000 });
 }
 
-/** Sign in a brand-new owner through the UI and give them a studio. */
-export async function signUpOwner(page: Page, email: string, studio: string): Promise<void> {
-  await prepare(page);
-  await page.goto("/");
-  await signInWithOtp(page, email);
-  await createStudio(page, studio);
-}
+// (There is deliberately no `signUpOwner` wrapper any more. The owner path is now
+// three distinct things worth seeing separately in a failure report — the platform
+// gate, the OTP sign-in, and the three-step onboarding — so spec 01 composes
+// `throughPlatformGate` + `signInWithOtp` + `createStudio` as its own test.steps.)
 
 /**
  * A bottom-tab-bar button.

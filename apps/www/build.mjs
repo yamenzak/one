@@ -17,6 +17,19 @@ const dist = join(__dirname, "dist");
 mkdirSync(dist, { recursive: true });
 
 const APP_URL = "https://mossa.4dl.app";
+/**
+ * Mossa's OWN sign-in, and the ONLY link this site points a human at.
+ *
+ * `APP_URL` itself (`/`) is no longer a signup surface: on the platform host an
+ * unauthenticated visitor there gets an explanatory gate, because a client of a
+ * studio who landed on it used to sign up under *Mossa* instead of under their
+ * coach. The gate deliberately makes the coach/studio door a deep route, and this
+ * site is where you come from to reach it — so every CTA below uses this constant.
+ *
+ * It must stay in lockstep with `SIGN_IN_PATH` in
+ * `apps/app/src/screens/onboarding/paths.ts`.
+ */
+const APP_SIGNIN_URL = `${APP_URL}/studio/sign-in`;
 
 const FEATURES = [
   ["🗂️", "One roster, real scope", "Owners see everything; trainers see only their assigned clients. Multi-trainer, multi-tenant, and secure by construction."],
@@ -111,11 +124,11 @@ footer .sep{opacity:.4;padding:0 4px}
 
 const feature = ([ico, h, p]) => `<div class="card"><div class="ico">${ico}</div><h3>${h}</h3><p>${p}</p></div>`;
 const plan = ([name, price, items, trial], feat) =>
-  `<div class="plan${feat ? " feat" : ""}"><h3>${name}</h3><div class="price">${price}</div>${trial ? `<div class="trial">${trial}</div>` : ""}<ul>${items.map((i) => `<li>${i}</li>`).join("")}</ul><a class="btn${feat ? "" : " ghost"}" href="${APP_URL}">${trial ? "Start free trial" : "Get started"}</a></div>`;
+  `<div class="plan${feat ? " feat" : ""}"><h3>${name}</h3><div class="price">${price}</div>${trial ? `<div class="trial">${trial}</div>` : ""}<ul>${items.map((i) => `<li>${i}</li>`).join("")}</ul><a class="btn${feat ? "" : " ghost"}" href="${APP_SIGNIN_URL}">${trial ? "Start free trial" : "Get started"}</a></div>`;
 
 // Mossa collects email, body measurements, progress photos and lab/medical
 // files, so the legal pages are not optional furniture — every page links them.
-const footer = `<footer><div class="wrap">Mossa · Built on Cloudflare<span class="sep">·</span><a href="${APP_URL}">app</a><span class="sep">·</span><a href="/privacy">Privacy</a><span class="sep">·</span><a href="/terms">Terms</a></div></footer>`;
+const footer = `<footer><div class="wrap">Mossa · Built on Cloudflare<span class="sep">·</span><a href="${APP_SIGNIN_URL}">app</a><span class="sep">·</span><a href="/privacy">Privacy</a><span class="sep">·</span><a href="/terms">Terms</a></div></footer>`;
 
 /** The shared document shell — one head, one header, one footer, every page. */
 const page = ({ title, description, body, ogTitle, ogDescription }) => `<!doctype html>
@@ -131,7 +144,7 @@ const page = ({ title, description, body, ogTitle, ogDescription }) => `<!doctyp
 </head><body>
 <header><div class="wrap">
   <div class="logo"><a href="/" style="display:flex;align-items:center;gap:10px"><span class="m">M</span> Mossa</a></div>
-  <div><a class="btn ghost" href="${APP_URL}">Sign in</a></div>
+  <div><a class="btn ghost" href="${APP_SIGNIN_URL}">Sign in</a></div>
 </div></header>
 ${body}
 ${footer}
@@ -148,7 +161,7 @@ const html = page({
 <div class="hero wrap">
   <h1>Coaching, <span class="grad">organized</span>.</h1>
   <p>The all-in-one platform for personal trainers and studios. Build plans, track clients, sell packages on your own Stripe, and let AI do the busywork — in an app a 70-year-old can use.</p>
-  <a class="btn" href="${APP_URL}">Start free for 30 days</a>
+  <a class="btn" href="${APP_SIGNIN_URL}">Start free for 30 days</a>
 </div>
 
 <section class="wrap">
@@ -166,7 +179,7 @@ const html = page({
 <div class="cta wrap">
   <h2>Your clients deserve better than a PDF.</h2>
   <p class="sub">Set up your studio in minutes. Passwordless sign-in, mobile-first, offline-ready.</p>
-  <a class="btn" href="${APP_URL}">Start your free trial</a>
+  <a class="btn" href="${APP_SIGNIN_URL}">Start your free trial</a>
 </div>
 </main>`,
 });

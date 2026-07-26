@@ -43,6 +43,7 @@ import { nuclearRoutes } from "./nuclear-routes.js";
 import { purgeTenant } from "./purge.js";
 import { sessionRoutes, promoRoutes } from "./session-routes.js";
 import { domainRoutes, domainAdminRoutes } from "./domain-routes.js";
+import { onboardingRoutes } from "./onboarding-routes.js";
 import { otpSendGuard } from "./otp-guard.js";
 import { buildManifest } from "./manifest.js";
 import type { Env } from "./env.js";
@@ -134,6 +135,10 @@ app.route("/api", sessionRoutes);
 app.route("/api", promoRoutes);
 app.route("/api", domainRoutes);
 app.route("/api", domainAdminRoutes);
+// First-run studio wizard. Mounted under `/api/me/...` on purpose — that is the
+// one authenticated route-guard lane that does not demand a tenant, which is
+// exactly the caller (signed in, no studio yet). See onboarding-routes.ts.
+app.route("/api", onboardingRoutes);
 
 // Per-tenant PWA manifest (white-label). Served by the worker (run_worker_first
 // lists this path) so the installed app wears the host tenant's name/icon/colors.

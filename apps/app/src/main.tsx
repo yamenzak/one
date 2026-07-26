@@ -9,6 +9,8 @@ import { Login } from "./screens/Login.js";
 import { Start } from "./screens/Start.js";
 import { Shell } from "./Shell.js";
 import { AcceptInvite } from "./screens/AcceptInvite.js";
+import { PlatformGate } from "./screens/onboarding/PlatformGate.js";
+import { ONBOARDING_PATH, SIGN_IN_PATH } from "./screens/onboarding/paths.js";
 import { PasskeyProvider } from "./PasskeyPrompt.js";
 import { PwaUpdatePrompt, UnhandledErrorToast } from "./notices.js";
 import { stripReloadParam } from "./hard-refresh.js";
@@ -53,8 +55,59 @@ function BootSplash() {
   );
 }
 
+/**
+ * Which top-level screen this request gets.
+ *
+ * ── The platform host is no longer an end-user signup surface ────────────────
+ *
+ * `mossa.4dl.app/` used to render the same OTP form to everybody, so a client of
+ * a studio who landed there signed up under *Mossa* instead of under their coach —
+ * an orphan account in the wrong tenant, with nothing to tell them so. An
+ * unauthenticated visitor at `/` on the platform host now gets `PlatformGate`,
+ * which explains what Mossa is, points at the marketing site, and — the actual
+ * point — tells an end user to use the link their coach sent them.
+ *
+ * The four rules that keep that from locking anyone out:
+ *
+ *  1. **Tenant surfaces are untouched.** `host.tenant` is set by a custom domain
+ *     or a `/t/<slug>` entry, and there the branded `Login` still renders at `/`.
+ *     That IS the end-user door; the gate must never appear on it.
+ *  2. **Mossa's own sign-in moved to `/studio/sign-in`** (`SIGN_IN_PATH`), linked
+ *     from `apps/www` and from the gate's low-emphasis "Already have a Mossa
+ *     account? Sign in" — so an installed PWA (whose `start_url` is `/`) opening
+ *     signed-out still has a one-tap way in.
+ *  3. **Deep links still sign in.** Only `/` is gated; any other unauthenticated
+ *     platform path keeps rendering `Login`, so an emailed link like
+ *     `/labs?lab=…` doesn't lose its destination behind an interstitial.
+ *  4. **A signed-in user is unaffected** — `ctx` short-circuits everything above
+ *     and the Shell renders exactly as before.
+ *
+ * `/studio/setup` renders the onboarding wizard even when a tenant already
+ * exists: step 1 creates the studio mid-flow, so the path (not session state) is
+ * what keeps the wizard mounted and makes a reload resume rather than restart.
+ */
+function pickScreen(
+  loading: boolean,
+  ctx: unknown,
+  hostResolved: boolean,
+  hostIsTenant: boolean,
+  path: string,
+): "boot" | "login" | "gate" | "start" | "shell" {
+  if (loading) return "boot";
+  if (!ctx) {
+    // The host probe decides gate-vs-login; without it we'd flash the wrong one.
+    if (!hostResolved) return "boot";
+    if (hostIsTenant) return "login";
+    if (path === SIGN_IN_PATH) return "login";
+    return path === "/" ? "gate" : "login";
+  }
+  const active = (ctx as { active: unknown }).active;
+  if (!active) return "start";
+  return path.startsWith(ONBOARDING_PATH) ? "start" : "shell";
+}
+
 function App() {
-  const { loading, ctx } = useSession();
+  const { loading, ctx, host } = useSession();
   const location = useLocation();
   // The staff-invite deep-link renders BEFORE the session gate: a brand-new
   // invitee isn't signed in yet, so it must not be short-circuited to Login.
@@ -66,12 +119,13 @@ function App() {
       </Routes>
     );
   }
-  const screen = loading ? "boot" : !ctx ? "login" : !ctx.active ? "start" : "shell";
+  const screen = pickScreen(loading, ctx, host !== null, Boolean(host?.tenant), location.pathname);
   return (
     <>
       <AnimatePresence mode="wait">
         <motion.div key={screen} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
           {screen === "boot" && <BootSplash />}
+          {screen === "gate" && <PlatformGate />}
           {screen === "login" && <Login />}
           {screen === "start" && <Start />}
           {screen === "shell" && <PasskeyProvider><Shell /></PasskeyProvider>}
