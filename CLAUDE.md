@@ -156,7 +156,10 @@ in `pnpm dev`. Production is same-origin and unaffected. Not fixed here (it is
 **NOT built** (do not describe any of these as shipped):
 - **Wearable import** (Health Connect).
 - **Trainer ↔ client chat** — `chat` is `reserved: true` in
-  `@mossa/domain/entitlements.ts`, yet the Studio/Team seed plans set it `true`.
+  `@mossa/domain/entitlements.ts`. No plan in the current catalog (Solo/Light/Pro/
+  Max) enables it; the retired `studio`/`team` rows still carry `chat: true` in
+  their stored D1 JSON, left untouched so a grandfathered tenant keeps exactly what
+  it was sold. Inert either way — reserved features are unenforced by construction.
 - **Tenant API / webhooks / data exports** — the `integrations` entitlement is
   also `reserved: true`: no export route, no CSV serializer, no download UI, no
   tenant API-key issuance, no webhook dispatcher. SPEC §11 promises data export;
