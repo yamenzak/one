@@ -3393,6 +3393,16 @@ describe("row-level scope on client-owned rows (round-4 audit)", () => {
 
   it("PATCH /sessions/:id — unassigned trainer cannot consume another client's paid consultation", async () => {
     const { db, tenantId, assigned, victim, trainerCookie } = await studio("r4sess");
+    // Sessions are the `frontDesk` entitlement, and PATCH /sessions/:id now gates
+    // on it (it previously didn't, so a tenant downgraded off frontDesk could
+    // still complete sessions through the API). A fresh studio starts on `free`,
+    // so entitle it — otherwise the assigned-trainer leg below 403s on the
+    // entitlement and stops testing what it's here to test: row-level scope.
+    await SELF.fetch(`${B}/api/admin/tenants/${tenantId}/plan`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ planId: "studio" }),
+    });
     const addons = JSON.stringify([{ addOnTypeId: "aot_consult", quantity: 4, quantityUsed: 0 }]);
     const seed = async (id: string, clientId: string, subId: string) => {
       await db.prepare("INSERT INTO client_subscriptions (id, tenant_id, client_id, status, addons_json, started_at) VALUES (?, ?, ?, 'active', ?, ?)")

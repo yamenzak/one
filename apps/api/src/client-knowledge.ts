@@ -34,6 +34,7 @@ import {
   classifyBMI,
   ageFromDob,
   goalStaleness,
+  resolveWeeklyLoadTarget,
   wellnessScore,
   fmtWeight,
   kgToDisplay,
@@ -325,7 +326,12 @@ export async function loadClientKnowledge(
     hasGoal: goalTimeline.hasGoal,
     targets: { calories: t.targetCalories ?? null, proteinG: t.targetProteinG ?? null, carbsG: t.targetCarbsG ?? null, fatG: t.targetFatG ?? null, fiberG: t.targetFiberG ?? null, waterMl: t.targetWaterMl ?? null },
     ranges: goalTimeline.ranges,
-    weeklyLoadTarget: goalTimeline.weeklyLoadTarget ?? 300,
+    // ONE resolver, shared with the wellness score and /today: the coach's
+    // targets_json value wins, the column is only a mirror, the default lives in
+    // @mossa/domain. Reading the column's hardcoded 300 here is what told the
+    // model "training load 620/300" and had it congratulate a client who was
+    // actually short of the 900 their coach set.
+    weeklyLoadTarget: resolveWeeklyLoadTarget(t, goalTimeline.weeklyLoadTarget),
     tdee: deriv.tdee ?? null,
     bmrFromGoal: deriv.bmr ?? null,
     macroSplitNote: macroSplit ? `${macroSplit.proteinPct ?? "?"}% P / ${macroSplit.carbsPct ?? "?"}% C / ${macroSplit.fatPct ?? "?"}% F` : null,

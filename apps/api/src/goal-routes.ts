@@ -9,7 +9,7 @@ import { z } from "zod";
 import {
   calculateNutritionTargets,
   validateCalculatorInputs,
-  DEFAULT_WEEKLY_LOAD_TARGET,
+  resolveWeeklyLoadTarget,
   type ActivityLevel,
   type DietaryApproach,
   type Gender,
@@ -49,7 +49,11 @@ const CreateGoal = z.object({
   label: z.string().min(1).max(120),
   startDate: LocalDate.nullish(),
   endDate: LocalDate.nullish(),
-  weeklyLoadTarget: z.number().int().min(0).max(2000).default(DEFAULT_WEEKLY_LOAD_TARGET),
+  /** Legacy body-level alias for `targets.weeklyTrainingLoad`. NO default: it
+   *  used to default to 300, which is how the `weekly_load_target` column ended
+   *  up pinned at 300 for every goal (no client has ever sent this field) while
+   *  the coach's real value lived in targets_json. Absent now means absent. */
+  weeklyLoadTarget: z.number().int().min(0).max(2000).optional(),
   /** Explicit targets, or `calculator` inputs to derive them server-side. */
   targets: GoalTargetsSchema.nullish(),
   calculator: z
@@ -83,15 +87,23 @@ export const goalRoutes = new Hono<AppEnv>()
       .bind(clientId)
       .all();
     return c.json({
-      goals: (rows.results ?? []).map((r) => ({
-        ...r,
-        targets: parseJson(r.targets_json as string | null, null),
-        ranges: parseJson(r.ranges_json as string | null, null),
-        derivation: parseJson(r.derivation_json as string | null, null),
-        targets_json: undefined,
-        ranges_json: undefined,
-        derivation_json: undefined,
-      })),
+      goals: (rows.results ?? []).map((r) => {
+        const targets = parseJson(r.targets_json as string | null, null);
+        return {
+          ...r,
+          targets,
+          ranges: parseJson(r.ranges_json as string | null, null),
+          derivation: parseJson(r.derivation_json as string | null, null),
+          // The resolved, single-source-of-truth weekly load target. Callers read
+          // THIS, not `targets.weeklyTrainingLoad` and not the raw column — so
+          // every surface (Train tab, wellness score, /today, AI prompt) grades
+          // against the same number and the default is expressed in one place.
+          weeklyLoadTarget: resolveWeeklyLoadTarget(targets, r.weekly_load_target as number | null),
+          targets_json: undefined,
+          ranges_json: undefined,
+          derivation_json: undefined,
+        };
+      }),
     });
   })
 
@@ -135,6 +147,21 @@ export const goalRoutes = new Hono<AppEnv>()
       };
     }
 
+    // ── ONE authoritative weekly training-load target ────────────────────────
+    // `targets_json.weeklyTrainingLoad` is the source of truth (it is what the
+    // coach's GoalManager writes and what the client's Train tab reads). The
+    // `weekly_load_target` COLUMN is kept only as a mirror of it, because three
+    // consumers (wellness score, /today, the AI coach-note prompt) read the
+    // column — and used to read a hardcoded 300 while the coach saw their own
+    // number. Both stores are written from the same value here, so they can
+    // never disagree again. The default lives in @mossa/domain, not here.
+    const weeklyLoadTarget = resolveWeeklyLoadTarget(targets, d.weeklyLoadTarget);
+    // Fold a body-level `weeklyLoadTarget` into the authoritative store so the
+    // JSON is complete even for callers using the legacy field.
+    if (d.weeklyLoadTarget != null && (targets == null || targets.weeklyTrainingLoad == null)) {
+      targets = { ...(targets ?? {}), weeklyTrainingLoad: weeklyLoadTarget };
+    }
+
     const id = newId("goal");
     const now = nowIso();
     await c.env.DB.batch([
@@ -154,7 +181,7 @@ export const goalRoutes = new Hono<AppEnv>()
         targets ? j(targets) : null,
         d.ranges ? j(d.ranges) : null,
         derivation ? j(derivation) : null,
-        d.weeklyLoadTarget,
+        weeklyLoadTarget, // mirror of targets_json.weeklyTrainingLoad — never a separate value
         d.notes ?? null,
         who.userId,
         now,

@@ -19,3 +19,4 @@ export * from "./audit.js";
 export * from "./coaching.js";
 export * from "./settings.js";
 export * from "./attention.js";
+export * from "./ai-mock.js";

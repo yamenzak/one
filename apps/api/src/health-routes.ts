@@ -9,7 +9,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import {
   wellnessScore, sessionLoad, epley1Rm, activityByKey, presetRange, addDays,
-  DEFAULT_WEEKLY_LOAD_TARGET, type LoggedSetLike, type WellnessInput,
+  resolveWeeklyLoadTarget, type LoggedSetLike, type WellnessInput,
 } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { gateFeature } from "./client-flags.js";
@@ -418,7 +418,11 @@ export const healthRoutes = new Hono<AppEnv>()
     const input: WellnessInput = {
       activeDays: activeDaySet.size,
       weeklyLoad,
-      weeklyLoadTarget: timeline.weeklyLoadTarget ?? DEFAULT_WEEKLY_LOAD_TARGET,
+      // The coach's target from targets_json wins; the column is only a mirror
+      // (older rows have it pinned at 300). Reading the column alone is what
+      // graded a client with a 900 target against 300 and pinned the load
+      // component of this score at 1.0.
+      weeklyLoadTarget: resolveWeeklyLoadTarget(timeline.active, timeline.weeklyLoadTarget),
       prsThisWeek,
       calorieAdherence: calParts.length ? calParts.reduce((a, b) => a + b, 0) / calParts.length : null,
       proteinAdherence: proParts.length ? proParts.reduce((a, b) => a + b, 0) / proParts.length : null,

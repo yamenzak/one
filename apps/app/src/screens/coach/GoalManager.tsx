@@ -17,7 +17,7 @@ import { api, errorText } from "../../api.js";
 import { useUnits } from "../../units.js";
 
 type TargetKey = "targetCalories" | "targetProteinG" | "targetCarbsG" | "targetFatG" | "targetFiberG" | "targetWaterMl";
-interface Goal { id: string; label: string; status: string; targets: Record<string, number> | null; notes?: string | null; start_date?: string | null; end_date?: string | null; created_at: string; created_by_name?: string | null }
+interface Goal { id: string; label: string; status: string; targets: Record<string, number> | null; weeklyLoadTarget?: number | null; notes?: string | null; start_date?: string | null; end_date?: string | null; created_at: string; created_by_name?: string | null }
 interface ClientData { gender: string | null; heightCm: number | null; dateOfBirth: string | null; preferences: ClientPreferences }
 type RangeStat = "in_range" | "below" | "above";
 interface Metrics {
@@ -191,9 +191,12 @@ export function GoalManager({ clientId }: { clientId: string }) {
 
   const active = goals?.find((g) => g.status === "active");
   // Seed the weekly-load input from the active goal so the coach edits the live
-  // value rather than a blank (falls back to the domain default when unset).
+  // value rather than a blank. Prefer the RESOLVED `weeklyLoadTarget` the route
+  // returns (targets_json → mirrored column → domain default) so the coach sees
+  // the exact number every consumer grades against — including on legacy rows
+  // whose value only ever reached the column.
   useEffect(() => {
-    const v = active?.targets?.weeklyTrainingLoad;
+    const v = active?.targets?.weeklyTrainingLoad ?? active?.weeklyLoadTarget;
     if (typeof v === "number" && v > 0) setWeeklyLoad(String(v));
   }, [active]);
   const history = goals?.filter((g) => g.status !== "active") ?? [];

@@ -19,6 +19,7 @@ import { api, uploadMedia } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
+import { MockedNotice } from "../../AiError.js";
 import { AiImageField } from "../../AiImageField.js";
 import { ModeRow, StepFade } from "../../composer.js";
 import { BarcodeScanner } from "./BarcodeScanner.js";
@@ -88,6 +89,10 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
   const [scanning, setScanning] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Whether the currently shown values were auto-filled from the AI MOCK lane
+  // (label-reader / food-meta `mocked: true`). Nothing rendered this flag before,
+  // so simulated macros looked exactly like a real label read (AGENTS §6).
+  const [aiMocked, setAiMocked] = useState(false);
   const [showMicros, setShowMicros] = useState(false);
   const labelInputRef = useRef<HTMLInputElement>(null);
   const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }));
@@ -117,10 +122,11 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
 
   // Label Reader — photograph the nutrition panel → auto-fill.
   const scanLabel = async (file: File) => {
-    setScanning(true); setErr(null);
+    setScanning(true); setErr(null); setAiMocked(false);
     try {
       const key = await uploadMedia(file, "label");
-      const r = await api.post<{ food: Record<string, unknown> }>("/api/ai/label-reader", { imageKey: key });
+      const r = await api.post<{ food: Record<string, unknown>; mocked?: boolean }>("/api/ai/label-reader", { imageKey: key });
+      setAiMocked(!!r.mocked);
       const g = r.food;
       const str = (v: unknown) => (v == null ? "" : String(v));
       setF((p) => ({
@@ -141,9 +147,10 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
   // With AI — estimate the macros from the name.
   const estimateFromName = async () => {
     if (f.name.trim().length < 2) return;
-    setAiBusy(true); setErr(null);
+    setAiBusy(true); setErr(null); setAiMocked(false);
     try {
-      const r = await api.post<{ food: Record<string, number | string> }>("/api/ai/food-meta", { name: f.name.trim() });
+      const r = await api.post<{ food: Record<string, number | string>; mocked?: boolean }>("/api/ai/food-meta", { name: f.name.trim() });
+      setAiMocked(!!r.mocked);
       const g = r.food;
       setF((p) => ({
         ...p, serving: String(g.servingSize ?? 100), unit: String(g.servingUnit ?? "g"),
@@ -272,6 +279,9 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
             ) : (
               <div className="space-y-6">
                 {!foodId && <button onClick={() => setStep("choose")} className="-mb-1 inline-flex items-center gap-1 text-sm text-muted-foreground [&_svg]:size-4"><ArrowLeft /> Back</button>}
+
+                {/* Simulated output must never read as a real label read. */}
+                <MockedNotice mocked={aiMocked} what="These macros" />
 
                 {/* ── Basics ─────────────────────────────────────────────── */}
                 <div className="space-y-3">

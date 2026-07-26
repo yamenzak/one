@@ -19,7 +19,7 @@ import { FoodRow, normFood } from "../food.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { Markdown } from "../../Markdown.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
-import { AiErrorBox } from "../../AiError.js";
+import { AiErrorBox, MockedNotice } from "../../AiError.js";
 import { BarcodeScanner } from "./BarcodeScanner.js";
 import { FoodEditor, type EditableFood } from "./FoodEditor.js";
 
@@ -119,7 +119,7 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   const [logQueued, setLogQueued] = useState(false);
   // Snap-a-meal review: the AI's detected foods + its note + the photo, held
   // for the user to confirm/trim BEFORE anything is logged (no fire-and-forget).
-  const [snap, setSnap] = useState<{ entries: SnapEntry[]; note: string | null; imageKey: string } | null>(null);
+  const [snap, setSnap] = useState<{ entries: SnapEntry[]; note: string | null; imageKey: string; mocked: boolean } | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   // Manual add / barcode-miss editor. `null` = closed; an object opens it,
   // optionally prefilled (e.g. with a scanned-but-unmatched barcode).
@@ -252,10 +252,10 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
       // Client-owned media — route through uploadMedia so the 401 hook + error
       // surfacing fire (instead of a bare fetch that silently no-ops).
       const key = await uploadMedia(photo, "meal-snap", photo.name, clientId);
-      const r = await api.post<{ entries: SnapEntry[]; note: string | null }>("/api/ai/snap-meal", { clientId, imageKey: key, hint: q });
+      const r = await api.post<{ entries: SnapEntry[]; note: string | null; mocked?: boolean }>("/api/ai/snap-meal", { clientId, imageKey: key, hint: q });
       if (!r.entries?.length) throw new Error("No foods detected in that photo — try another angle or search instead.");
       // Show the AI's read for review — logging happens only on confirm.
-      setSnap({ entries: r.entries, note: r.note ?? null, imageKey: key });
+      setSnap({ entries: r.entries, note: r.note ?? null, imageKey: key, mocked: r.mocked ?? false });
     } catch (e) { setSnapErr(e); } finally { setAiBusy(false); }
   };
 
@@ -284,6 +284,7 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
       <SnapReview
         entries={snap.entries}
         note={snap.note}
+        mocked={snap.mocked}
         defaultMeal={snap.entries[0]?.mealType && MEALS.includes(snap.entries[0].mealType as (typeof MEALS)[number]) ? snap.entries[0].mealType! : meal}
         units={units}
         onCancel={() => setSnap(null)}
@@ -498,8 +499,8 @@ function FoodResult({ food, onPick }: { food: Food; onPick: () => void }) {
  * the AI's read (foods + macros) and a one-line assessment, lets the user pick
  * the meal and trim any mis-detected item, then logs everything on confirm.
  */
-function SnapReview({ entries, note, defaultMeal, units, onCancel, onRetake, onConfirm }: {
-  entries: SnapEntry[]; note: string | null; defaultMeal: string; units: UnitPrefs;
+function SnapReview({ entries, note, mocked, defaultMeal, units, onCancel, onRetake, onConfirm }: {
+  entries: SnapEntry[]; note: string | null; mocked?: boolean; defaultMeal: string; units: UnitPrefs;
   onCancel: () => void; onRetake: () => void; onConfirm: (items: SnapEntry[], mealType: string) => Promise<void>;
 }) {
   // Each row carries a stable `_key` so removing one doesn't rekey the rest.
@@ -512,6 +513,8 @@ function SnapReview({ entries, note, defaultMeal, units, onCancel, onRetake, onC
   return (
     <Sheet open onClose={onCancel} title="Review meal">
       <div className="space-y-4">
+        {/* Simulated output must never read as a real model answer (AGENTS §6). */}
+        <MockedNotice mocked={mocked} what="These foods and macros" />
         {note && (
           <div className="flex items-start gap-3 rounded-2xl bg-primary/10 p-3">
             <AiAvatar className="size-8 shrink-0" />

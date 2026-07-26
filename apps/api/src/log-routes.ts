@@ -19,7 +19,7 @@ import {
   SubmitCheckIn,
   type LoggedSet,
 } from "@mossa/protocol";
-import { activityByKey, estimateBurnedCalories, sessionTonnage, bodyComposition, calculateBMI, calculateBMR, ageFromDob, profileGaps, overallDaysRemaining, isFullyExpired, hasActiveBudget, epley1Rm, SUSPENDED_STATUSES, type ClientPreferences, type Budget } from "@mossa/domain";
+import { activityByKey, estimateBurnedCalories, resolveWeeklyLoadTarget, sessionTonnage, bodyComposition, calculateBMI, calculateBMR, ageFromDob, profileGaps, overallDaysRemaining, isFullyExpired, hasActiveBudget, epley1Rm, SUSPENDED_STATUSES, type ClientPreferences, type Budget } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess, type ClientRow } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
@@ -1453,7 +1453,14 @@ export const logRoutes = new Hono<AppEnv>()
       burnedKcal: sessionOverride > 0 ? sessionOverride : Math.round(activities?.burned ?? 0),
       workout: { loggedSets: workoutSets, sessions: workout.results ?? [] },
       checkedIn: Boolean(checkIn),
-      goal: goal ? { targets: parseJson(goal.targets_json, null), weeklyLoadTarget: goal.weekly_load_target } : null,
+      // weeklyLoadTarget resolves through @mossa/domain — targets_json (what the
+      // coach set) wins over the mirrored column, default in exactly one place.
+      goal: goal
+        ? (() => {
+            const targets = parseJson<{ weeklyTrainingLoad?: number } | null>(goal.targets_json, null);
+            return { targets, weeklyLoadTarget: resolveWeeklyLoadTarget(targets, goal.weekly_load_target) };
+          })()
+        : null,
       publishedWorkoutPlan: (plans.results ?? [])[0]
         ? {
             id: plans.results![0]!.id,

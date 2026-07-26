@@ -100,6 +100,28 @@ export function sessionLoad(input: {
 
 export const DEFAULT_WEEKLY_LOAD_TARGET = 300;
 
+/**
+ * THE single resolver for a client's weekly training-load target (SPEC §8.11).
+ *
+ * There are two stores and historically they disagreed: `client_goals.
+ * targets_json.weeklyTrainingLoad` (what the coach's GoalManager actually
+ * writes) and the `client_goals.weekly_load_target` column (which no client
+ * ever sends, so it sat at a hardcoded 300 while three consumers graded the
+ * client against it). The coach-written JSON value is authoritative; the column
+ * is only a mirror, so it is a fallback for rows written before the mirror
+ * existed. The default lives here and nowhere else — never re-hardcode 300.
+ *
+ * `targets` is deliberately `unknown`: callers hand us a parsed JSON blob whose
+ * static type (api `GoalTargets`) doesn't declare the field.
+ */
+export function resolveWeeklyLoadTarget(targets: unknown, mirrorColumn?: number | null): number {
+  const fromTargets = (targets as { weeklyTrainingLoad?: unknown } | null | undefined)?.weeklyTrainingLoad;
+  const n = typeof fromTargets === "number" ? fromTargets : Number.NaN;
+  if (Number.isFinite(n) && n > 0) return Math.round(n);
+  if (typeof mirrorColumn === "number" && Number.isFinite(mirrorColumn) && mirrorColumn > 0) return Math.round(mirrorColumn);
+  return DEFAULT_WEEKLY_LOAD_TARGET;
+}
+
 /** Minimal shape of a plan day for scheduling. */
 export interface PlanDayLike {
   isRestDay?: boolean | null;
