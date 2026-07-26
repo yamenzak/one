@@ -1,4 +1,5 @@
-/** Platform admin console — tenants (comp/topup/seed), Stripe config. */
+/** Platform admin console — tenants (comp/top-up/gift), plans, AI, Stripe,
+ *  promos, custom domains, security. */
 
 import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Badge, Field, Sheet, Skeleton, Reveal, SkeletonLine, SegmentedControl, Switch, Chip, Page, Stagger, ConfirmDialog, ShieldCheck, Sparkles, ArrowLeft, KeyRound, Globe, Gift, Tag, Trash2, Plus, cn, LayoutGrid, AlertTriangle, Spinner } from "@mossa/ui";
@@ -425,13 +426,11 @@ function Tenants() {
   const [credits, setCredits] = useState("");
   const [gift, setGift] = useState<{ id: string; name: string } | null>(null);
   const [compTarget, setCompTarget] = useState<{ id: string; name: string; planId: string } | null>(null);
-  const [confirmDemo, setConfirmDemo] = useState(false);
   const load = useCallback(async () => setTenants((await api.get<{ tenants: Tenant[] }>("/api/admin/tenants")).tenants), []);
   useEffect(() => void load(), [load]);
 
   const comp = async (id: string, planId: string) => { setBusy(id); try { await api.post(`/api/admin/tenants/${id}/plan`, { planId, comp: true }); await load(); } finally { setBusy(null); } };
   const topUp = async () => { const c = Number(credits); if (topUpId && c) await api.post(`/api/admin/tenants/${topUpId}/topup`, { credits: c }); setTopUpId(null); setCredits(""); setMsg(c ? `Added ${c} credits.` : null); };
-  const seedDemo = async () => { setBusy("demo"); setMsg(null); try { const r = await api.post<{ seeded?: number; skipped?: string }>("/api/admin/seed-demo"); setMsg(r.skipped ? `Skipped: ${r.skipped}` : `Seeded ${r.seeded} sample clients.`); } finally { setBusy(null); } };
 
   return (
     <Reveal loading={!tenants} className="space-y-3" skeleton={
@@ -447,28 +446,7 @@ function Tenants() {
     }>
       {tenants && (
     <Stagger className="space-y-3">
-      {/* This writes into the admin's OWN studio, not a sandbox, and there is no
-          un-seed route — so say so before it's clicked rather than after. */}
-      <Card className="space-y-2">
-        <div>
-          <div className="text-sm font-semibold">Demo data</div>
-          <p className="text-xs text-muted-foreground">
-            Adds 3 sample clients (named “(demo)”) with goals and a published plan, plus one grant-only sample package, to
-            <span className="font-medium text-foreground"> your own studio</span>. For screenshots and sales demos — not needed for a real studio.
-            It's skipped entirely if you already have clients, there's no undo, and the samples count against your client limit. Remove them by archiving.
-          </p>
-        </div>
-        <Button variant="tonal" className="w-full" disabled={busy === "demo"} onClick={() => setConfirmDemo(true)}><Sparkles /> {busy === "demo" ? "Seeding…" : "Seed demo data into my studio"}</Button>
-      </Card>
       {msg && <p className="text-center text-sm text-muted-foreground" role="status">{msg}</p>}
-      <ConfirmDialog
-        open={confirmDemo}
-        onOpenChange={(o) => !o && setConfirmDemo(false)}
-        title="Add demo data to your studio?"
-        description="3 sample clients and a grant-only sample package will be added to this studio. There's no undo — you'd remove them by archiving each one. Skipped if you already have clients."
-        confirmLabel="Add demo data"
-        onConfirm={() => { setConfirmDemo(false); void seedDemo(); }}
-      />
 
       {tenants.map((t) => (
         <Card key={t.id} className="space-y-2.5">

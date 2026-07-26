@@ -614,9 +614,11 @@ referenced entities; `source`/`source_id` on imported library rows.
   domains, offline, desktop widths.
 - Observability on (workers logs), Analytics Engine product metrics, `ai_generations` as
   the AI audit trail, ledger mirrors for billing forensics.
-- Local dev: `wrangler dev` + mock AI + mock mailer + Stripe test mode; seed script
-  creates a demo tenant (comped Studio) with sample clients/plans (Scena's demo-tenant
-  pattern).
+- Local dev: `wrangler dev` + mock AI + mock mailer + Stripe test mode. (The
+  demo-tenant seeder was **removed**: it wrote sample clients and a purchasable
+  package into the caller's own — i.e. a real — studio, with no undo. Create a
+  throwaway studio for demos instead. The platform exercise library seeds itself
+  on first use, so nothing depends on the seeder.)
 
 ## 13. Build Phases
 

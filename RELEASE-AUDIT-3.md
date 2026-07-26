@@ -242,8 +242,9 @@ Real, verified, and left with reasons rather than silently dropped.
   features and the marketing page no longer lists them — so this is an internal
   inconsistency, not a false public claim.
 - **`goals.ts` still exposes the raw `weekly_load_target` column**, with resolution
-  applied at each of its two call sites rather than inside it; `demo-routes.ts`
-  is the last writer that bypasses the mirror. Both resolve correctly today.
+  applied at each of its two call sites rather than inside it. Both resolve
+  correctly today, and the one writer that bypassed the mirror
+  (`demo-routes.ts`) has since been deleted.
 - **No `MockedNotice` on the lab review sheet.** Mitigated at the source — the mock
   markers are self-labelling ("SIMULATED — not real data"), and the prefix travels
   into the sheet, the saved chart row and the prompt — but the banner is the

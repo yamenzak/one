@@ -330,7 +330,7 @@ describe("weekly training-load target — one authoritative value", () => {
   });
 
   it("a legacy row whose value only ever reached the column still resolves to it", async () => {
-    // Pre-mirror rows (and demo-routes' direct INSERT) carry the number in the
+    // Pre-mirror rows carry the number in the
     // column only. The resolver must fall through to it rather than the default.
     const other = (await (
       await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H(), body: JSON.stringify({ displayName: "Legacy Row" }) })
