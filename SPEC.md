@@ -599,8 +599,19 @@ referenced entities; `source`/`source_id` on imported library rows.
   where ByShujaa had literally nothing.
 - API integration tests on workers-pool vitest (miniflare): auth lanes, tenant isolation,
   reserve/settle, webhook flows (Stripe fixture events), flag resolution.
-- E2E (Playwright): the three golden paths — owner onboards → creates package → client
-  buys → logs a workout; trainer builds + publishes plan; AI draft → approve.
+- **E2E (Playwright): the three golden paths — BUILT** (`apps/e2e`, `pnpm e2e`). Two
+  personas in two browser contexts, driving the real worker with the real SPA:
+  (1) owner onboards → invites a client → the client signs in with an emailed OTP,
+  auto-links and completes intake → the coach sees the profile; (2) coach builds +
+  publishes a workout plan → the client logs a set → the coach sees it; (3) client
+  logs a meal → the coach sees it. Each spec provisions its own studio/users, so the
+  suite is hermetic and re-runnable; the sign-in code is read from the local D1
+  `verification` table, never a log. The shipped set deliberately drops the *client
+  buys a package* leg (Stripe) and the *AI draft → approve* leg (needs a live model
+  or the mock lane, whose output a launch gate shouldn't assert on) — both belong in
+  the integration suite, where they already are. Not covered: commerce, the AI suite,
+  camera/vision paths, external search, notifications, staff invitations, custom
+  domains, offline, desktop widths.
 - Observability on (workers logs), Analytics Engine product metrics, `ai_generations` as
   the AI audit trail, ledger mirrors for billing forensics.
 - Local dev: `wrangler dev` + mock AI + mock mailer + Stripe test mode; seed script

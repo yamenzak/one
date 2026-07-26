@@ -37,3 +37,45 @@ jobs:
       - run: pnpm --filter @mossa/app build
 
       - run: pnpm turbo run typecheck test
+
+  # The three golden paths (SPEC §12), in a real browser against the real worker.
+  #
+  # A separate job on purpose: it needs a Chromium download the unit lanes don't,
+  # and keeping it apart means "E2E is red" and "unit tests are red" are distinct
+  # signals rather than one long log to bisect.
+  #
+  # Credential-free and network-free, like `validate`: Playwright boots
+  # `wrangler dev --local` (D1/KV/R2 simulated by Miniflare), the suite creates its
+  # own tenants and users through the app's own sign-in, and nothing calls Workers
+  # AI, Stripe, or an external food/exercise provider.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Chromium only — the suite runs one project, and --with-deps pulls the
+      # system libraries headless Chromium needs on a bare ubuntu runner.
+      - run: pnpm --filter @mossa/e2e exec playwright install --with-deps chromium
+
+      # Boots the worker itself (webServer) after turbo builds the SPA it serves.
+      - run: pnpm e2e
+
+      # Traces + screenshots for the paths that failed. Nothing is attached on a
+      # green run, so this stays cheap.
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            apps/e2e/playwright-report/
+            apps/e2e/test-results/
+          retention-days: 7

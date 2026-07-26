@@ -23,6 +23,7 @@ apps/
   api/   # THE worker — Hono router + TenantBillingDO; serves the app SPA
   app/   # ONE role-adaptive PWA (client / trainer / owner / platform admin)
   www/   # marketing site (dependency-free static generator)
+  e2e/   # Playwright — the golden paths, in a browser against the real worker
 packages/
   domain/    # pure logic (no I/O): credits, entitlements, perms, budgets,
              # nutrition/TDEE, body-fat, activity/workout math, progress. Tested.
@@ -40,6 +41,12 @@ packages/
   `apps/app/dist`, and Miniflare aborts (reporting "no tests") without it. The
   root `pnpm test` handles this automatically (turbo builds the app first).
 - `pnpm --filter @mossa/app build` — build the SPA (the api worker serves `apps/app/dist`)
+- `pnpm e2e` — the Playwright golden paths (`apps/e2e`). One command from a clean
+  checkout: turbo builds the SPA, Playwright boots `wrangler dev --local` on :8787
+  and drives **that** origin (not vite :5173 — see the config header for why), and
+  each spec creates its own studio + users, so runs never collide. Stop any
+  `wrangler dev` you started with `pnpm dev` first — it shares `.wrangler` state.
+  `E2E_SERVER_LOGS=1 pnpm e2e` un-mutes the worker's request log.
 
 **Local dev needs no Cloudflare account** — but it needs one file. Copy
 `apps/api/.dev.vars.example` → `apps/api/.dev.vars` before your first `pnpm dev`.
@@ -59,7 +66,8 @@ including clinical lab values from `lab-extract`, **and still bills the tenant
 credits for it**. See DEPLOY.md §8.
 
 The `ai` binding is enabled in `wrangler.jsonc`; for a fully credential-free
-`wrangler dev` you can re-comment it.
+`wrangler dev` you can re-comment it — or just pass `--local`, which disables
+remote bindings without editing the config (this is what the E2E suite does).
 
 ## Architecture notes (read before changing these)
 
@@ -101,7 +109,8 @@ an over-claim costs more than an under-claim. Verify before editing it.
 moves. Measured most recently: **188 domain + ~208 API + 7 protocol + a small
 app suite**, four vitest projects total. The pricing and normalizer suites live
 in `apps/api/test` and are already *inside* the API count — the older
-"protocol/pricing/normalizer" phrasing double-counted them.
+"protocol/pricing/normalizer" phrasing double-counted them. **E2E is separate**
+(`pnpm e2e`, not part of `pnpm test`): 3 Playwright specs, ~35 s all in.
 
 **Built and tested:** foundation, auth (OTP + passkeys, incl. autofill /
 conditional UI), tenancy + row-level scope, the AI suite (credits reserve →
@@ -114,6 +123,36 @@ round-logging), the workout UI parity pass, the rebuilt Train tab, and the
 offline-first PWA (app-shell precache + Background-Sync replay of failed
 log-write POSTs).
 
+**E2E (Playwright) — three golden paths, `apps/e2e`, run with `pnpm e2e`.** What
+they cover, precisely:
+1. owner sign-up → studio create → invite a client by email → the client signs in
+   with their own OTP, auto-links, and completes the 5-step intake wizard → the
+   coach sees the entered profile. (The path that 403'd on the client persona's
+   first write; the integration suite structurally cannot see that class of bug —
+   AGENTS.md §4.)
+2. coach builds + publishes a workout plan → the client sees it as their active
+   plan, opens the player and logs a set → the coach sees the set on the client's
+   day.
+3. client creates a food by hand and logs a portion as a snack → their diary and
+   day totals move and survive a reload → the coach sees the meal.
+
+Each spec provisions its own studio and users (unique emails), so the suite is
+re-runnable with no reset. The sign-in OTP is read out of the local Miniflare D1
+`verification` table, never from a log. **NOT covered by E2E:** commerce/Stripe,
+the AI suite, the camera paths (Snap-a-Meal, barcode, label, body scan), external
+food/exercise search, notifications/inbox, staff invitations, custom domains, the
+offline lane (the config blocks the service worker on purpose), and anything
+desktop-width — the projects list is Chromium at a phone viewport only.
+
+⚠️ The E2E suite drives **:8787** (the worker serving the built SPA), not vite's
+:5173. That is not a preference: with the vite proxy the browser Origin is
+`localhost:5173` while the worker's is `localhost:8787`, and Better Auth 1.6.23
+ignores the `trustedOrigins` array `auth.ts` passes it — so every *cookie-bearing*
+Better Auth POST 403s `INVALID_ORIGIN`. Sign-in itself is cookieless and works,
+then **"Create workspace" fails on :5173**, i.e. an owner cannot create a studio
+in `pnpm dev`. Production is same-origin and unaffected. Not fixed here (it is
+`auth.ts`'s to fix); the suite avoids it by testing the shape that ships.
+
 **NOT built** (do not describe any of these as shipped):
 - **Wearable import** (Health Connect).
 - **Trainer ↔ client chat** — `chat` is `reserved: true` in
@@ -124,7 +163,6 @@ log-write POSTs).
   it does not exist. (The www pricing page no longer advertises it.)
 - **Tenant marketplace storefront** and the **public blog renderer**.
 - **Analytics Engine `USAGE`** — binding referenced, not wired.
-- **Playwright E2E golden paths.**
 - **Six catalogued AI features**: voice logging, meal swap, menu scout,
   periodization assistant, the retention-radar per-client LLM line, and the
   business-digest narrative. The retention *report endpoint* exists but has no
