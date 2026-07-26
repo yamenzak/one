@@ -9,9 +9,17 @@
  * "on"), a deterministic mock answers and reports synthetic usage, so the
  * whole reserve/settle/ledger loop runs in local dev. Gemini routing joins
  * with the model-catalog phase; the credit math is provider-agnostic already.
+ *
+ * The mock lane is DEVELOPMENT-ONLY, in every mode. `shouldUseMockLane`
+ * (`@mossa/domain`) puts `env.ENVIRONMENT === "development"` on the outside, so
+ * a stored `ai.mock = "on"` — from the admin console, a hand-edited app_config
+ * row, or a restored backup — cannot fabricate output in production. Fabricated
+ * `lab-extract` markers would otherwise pre-fill a real client's chart, flow
+ * into their `LABS:` prompt block and the supplement recommender, and bill the
+ * tenant credits for the privilege. See AGENTS §6.
  */
 
-import { creditsForUsage, type ModelRate, type Usage } from "@mossa/domain";
+import { creditsForUsage, shouldUseMockLane, type ModelRate, type Usage } from "@mossa/domain";
 import type { TenantAiConfig, AiTone } from "@mossa/protocol";
 import type { Env } from "./env.js";
 import { newId, nowMs } from "./ids.js";
@@ -430,16 +438,16 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   const isGoogle = model.provider === "google";
   // Real run needs the matching credential: Workers AI binding, or a Gemini key.
   const canRunReal = isGoogle ? !!geminiKey : !!env.AI;
-  // The `auto` mock fallback is a DEV convenience ONLY — in production a missing
-  // credential must fail closed, never silently bill for fabricated output (the
-  // same hardening the mailer got). `ai.mock = "on"` stays an explicit admin
-  // override in any environment.
-  const useMock = mockMode === "on" || (mockMode !== "off" && !canRunReal && env.ENVIRONMENT === "development");
+  // Mock is dev-only in EVERY mode, including an explicit `ai.mock = "on"`:
+  // outside development a missing credential must fail closed, never silently
+  // bill for fabricated output (the same hardening the mailer got).
+  const useMock = shouldUseMockLane({ mockMode, canRunReal, isDevelopment: env.ENVIRONMENT === "development" });
   if (!useMock && !canRunReal) return { ok: false, error: "unavailable", detail: "AI provider not configured" };
   // Vision safety: the Workers AI branch below never attaches input.image, so a
   // non-Google model asked to read a photo would fabricate output that parses as
   // valid JSON and gets billed. Refuse before reserving — never bill hallucinated
-  // vision output as real.
+  // vision output as real. `useMock` can only be true in development, so a
+  // stored "on" no longer buys a production bypass of this refusal.
   if (input.image && !isGoogle && !useMock) return { ok: false, error: "unavailable", detail: "model cannot read images" };
 
   // Worst-case estimate for the hold: prompt tokens (~chars/4) in, cap out, plus
@@ -578,9 +586,9 @@ export async function generateImage(env: Env, input: GenerateImageInput): Promis
   const cfg = await getConfig(env.DB);
   const geminiKey = cfg["google.gemini_key"];
   const mockMode = cfg["ai.mock"] ?? "auto";
-  // Auto mock is dev-only; production fails closed on a missing key (never bills
-  // for a fabricated image). `ai.mock = "on"` stays an explicit admin override.
-  const useMock = mockMode === "on" || (mockMode !== "off" && !geminiKey && env.ENVIRONMENT === "development");
+  // Dev-only in every mode (incl. an explicit `ai.mock = "on"`); production
+  // fails closed on a missing key and never bills for a fabricated image.
+  const useMock = shouldUseMockLane({ mockMode, canRunReal: !!geminiKey, isDevelopment: env.ENVIRONMENT === "development" });
   if (!useMock && !geminiKey) return { ok: false, error: "unavailable", detail: "AI provider not configured" };
 
   // Storage gate up front — refuse to spend credits generating an image the
@@ -707,10 +715,10 @@ export async function generateSpeech(env: Env, input: { tenantId: string; featur
   const cfg = await getConfig(env.DB);
   const geminiKey = cfg["google.gemini_key"];
   const mockMode = cfg["ai.mock"] ?? "auto";
-  // Auto mock (silent WAV) is dev-only; production fails closed on a missing key
-  // so a client's scan never bills the owner for silent cues that then cache
-  // permanently. `ai.mock = "on"` stays an explicit admin override.
-  const useMock = mockMode === "on" || (mockMode !== "off" && !geminiKey && env.ENVIRONMENT === "development");
+  // Mock (silent WAV) is dev-only in every mode; production fails closed on a
+  // missing key so a client's scan never bills the owner for silent cues that
+  // then cache permanently.
+  const useMock = shouldUseMockLane({ mockMode, canRunReal: !!geminiKey, isDevelopment: env.ENVIRONMENT === "development" });
   if (!useMock && !geminiKey) return { ok: false, error: "unavailable", detail: "AI provider not configured" };
 
   const model = await modelForTask(env.DB, "speech");

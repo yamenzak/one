@@ -11,19 +11,44 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { kcalToDisplay, scaleFood, servingsToQuantity, SERVING_PRESETS, type UnitPrefs } from "@mossa/domain";
 import { Button, Field, Sheet, Chip, SegmentedControl, IconBadge, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, ChevronRight, Plus, X } from "@mossa/ui";
-import { api, todayLocal, uploadMedia } from "../../api.js";
+import { api, errorText, isQueued, todayLocal, uploadMedia } from "../../api.js";
+import { QueuedNotice } from "../../notices.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { FoodRow, normFood } from "../food.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { Markdown } from "../../Markdown.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
-import { AiErrorBox } from "../../AiError.js";
+import { AiErrorBox, MockedNotice } from "../../AiError.js";
 import { BarcodeScanner } from "./BarcodeScanner.js";
 import { FoodEditor, type EditableFood } from "./FoodEditor.js";
 
 /** A food the vision model detected in a snapped meal (pre-log, reviewable). */
 interface SnapEntry { label: string; mealType?: string; calories: number; proteinG: number; carbsG: number; fatG: number; quantity?: number | null; unit?: string | null }
+/** A reviewable snap row, carrying the stable key its list is rendered with. */
+type SnapItem = SnapEntry & { _key: string };
+
+/**
+ * Outcome of confirming a snap. There is no batch food-log endpoint (the API
+ * exposes one POST /api/logs/food per entry — see apps/api/src/log-routes.ts), so
+ * a 4-item meal is 4 writes and a failure on #3 leaves #1 and #2 already in the
+ * diary. Re-sending the whole list would write those two a SECOND time and the
+ * day would double-count — wrong ring for the client, wrong compliance for the
+ * coach. So the loop reports exactly which rows are still unwritten and the
+ * review sheet keeps only those, making a retry send only what's left.
+ */
+interface SnapLogResult {
+  /** How many rows the confirm started with (for "3 of 5 saved"). */
+  total: number;
+  /** Rows that reached the server or the offline queue — durable either way. */
+  saved: number;
+  /** Rows still unwritten; a retry must send ONLY these. */
+  remaining: SnapItem[];
+  /** Why we stopped, or null when everything landed. */
+  error: string | null;
+  /** At least one row is parked in the Background-Sync queue, not yet on the server. */
+  queued: boolean;
+}
 
 /** A previously-logged food, ready to re-log at its last portion in one tap. */
 interface Recent {
@@ -83,9 +108,18 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   const [logging, setLogging] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [snapErr, setSnapErr] = useState<unknown>(null);
+  // Search failures used to be invisible: the list silently kept the previous
+  // query's rows and the only trace was an unhandled rejection.
+  const [searchErr, setSearchErr] = useState<string | null>(null);
+  // Write feedback for the log / re-log / barcode paths. `logQueued` is a SUCCESS
+  // state (the POST is parked in the service worker's Background-Sync queue and
+  // will replay) — the sheet stays open to say so, because closing it silently
+  // would leave the diary unchanged and get the button tapped again → double log.
+  const [logErr, setLogErr] = useState<string | null>(null);
+  const [logQueued, setLogQueued] = useState(false);
   // Snap-a-meal review: the AI's detected foods + its note + the photo, held
   // for the user to confirm/trim BEFORE anything is logged (no fire-and-forget).
-  const [snap, setSnap] = useState<{ entries: SnapEntry[]; note: string | null; imageKey: string } | null>(null);
+  const [snap, setSnap] = useState<{ entries: SnapEntry[]; note: string | null; imageKey: string; mocked: boolean } | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   // Manual add / barcode-miss editor. `null` = closed; an object opens it,
   // optionally prefilled (e.g. with a scanned-but-unmatched barcode).
@@ -114,17 +148,32 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
       });
       setExtPage(page);
       setExtMore(res.length >= 10);
+    } catch (e) {
+      if (seq !== searchSeq.current) return; // a newer query owns the list now
+      // Clear `extMore` or the IntersectionObserver sentinel re-fires the same
+      // failing page every time it scrolls into view.
+      setExtMore(false);
+      setSearchErr(errorText(e, "Couldn't load web results — check your connection."));
     } finally { if (seq === searchSeq.current) setSearching(false); }
   }, [q]);
 
   const search = useCallback(async () => {
-    if (q.trim().length < 2) { searchSeq.current++; setLocal([]); setExternal([]); setExtPage(0); return; }
+    if (q.trim().length < 2) { searchSeq.current++; setLocal([]); setExternal([]); setExtPage(0); setSearchErr(null); return; }
     const seq = ++searchSeq.current;
-    const foods = (await api.get<{ foods: Food[] }>(`/api/foods?q=${encodeURIComponent(q)}`)).foods;
-    if (seq !== searchSeq.current) return; // a newer query started while this was in flight
-    setLocal(foods);
-    setExternal([]); setExtPage(0); setExtMore(false);
-    if (webEnabled) void searchExternal(1);
+    setSearchErr(null);
+    try {
+      const foods = (await api.get<{ foods: Food[] }>(`/api/foods?q=${encodeURIComponent(q)}`)).foods;
+      if (seq !== searchSeq.current) return; // a newer query started while this was in flight
+      setLocal(foods);
+      setExternal([]); setExtPage(0); setExtMore(false);
+      if (webEnabled) void searchExternal(1);
+    } catch (e) {
+      if (seq !== searchSeq.current) return;
+      // Drop the stale rows: leaving the previous query's matches on screen under
+      // the new text is worse than an empty list with a reason and a retry.
+      setLocal([]); setExternal([]); setExtPage(0); setExtMore(false);
+      setSearchErr(errorText(e, "Couldn't search foods — check your connection."));
+    }
   }, [q, webEnabled, searchExternal]);
   useEffect(() => { const t = setTimeout(() => void search(), 300); return () => clearTimeout(t); }, [search]);
   // Infinite scroll: when the sentinel at the bottom of the results list scrolls
@@ -203,10 +252,10 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
       // Client-owned media — route through uploadMedia so the 401 hook + error
       // surfacing fire (instead of a bare fetch that silently no-ops).
       const key = await uploadMedia(photo, "meal-snap", photo.name, clientId);
-      const r = await api.post<{ entries: SnapEntry[]; note: string | null }>("/api/ai/snap-meal", { clientId, imageKey: key, hint: q });
+      const r = await api.post<{ entries: SnapEntry[]; note: string | null; mocked?: boolean }>("/api/ai/snap-meal", { clientId, imageKey: key, hint: q });
       if (!r.entries?.length) throw new Error("No foods detected in that photo — try another angle or search instead.");
       // Show the AI's read for review — logging happens only on confirm.
-      setSnap({ entries: r.entries, note: r.note ?? null, imageKey: key });
+      setSnap({ entries: r.entries, note: r.note ?? null, imageKey: key, mocked: r.mocked ?? false });
     } catch (e) { setSnapErr(e); } finally { setAiBusy(false); }
   };
 
@@ -235,6 +284,7 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
       <SnapReview
         entries={snap.entries}
         note={snap.note}
+        mocked={snap.mocked}
         defaultMeal={snap.entries[0]?.mealType && MEALS.includes(snap.entries[0].mealType as (typeof MEALS)[number]) ? snap.entries[0].mealType! : meal}
         units={units}
         onCancel={() => setSnap(null)}
@@ -449,8 +499,8 @@ function FoodResult({ food, onPick }: { food: Food; onPick: () => void }) {
  * the AI's read (foods + macros) and a one-line assessment, lets the user pick
  * the meal and trim any mis-detected item, then logs everything on confirm.
  */
-function SnapReview({ entries, note, defaultMeal, units, onCancel, onRetake, onConfirm }: {
-  entries: SnapEntry[]; note: string | null; defaultMeal: string; units: UnitPrefs;
+function SnapReview({ entries, note, mocked, defaultMeal, units, onCancel, onRetake, onConfirm }: {
+  entries: SnapEntry[]; note: string | null; mocked?: boolean; defaultMeal: string; units: UnitPrefs;
   onCancel: () => void; onRetake: () => void; onConfirm: (items: SnapEntry[], mealType: string) => Promise<void>;
 }) {
   // Each row carries a stable `_key` so removing one doesn't rekey the rest.
@@ -463,6 +513,8 @@ function SnapReview({ entries, note, defaultMeal, units, onCancel, onRetake, onC
   return (
     <Sheet open onClose={onCancel} title="Review meal">
       <div className="space-y-4">
+        {/* Simulated output must never read as a real model answer (AGENTS §6). */}
+        <MockedNotice mocked={mocked} what="These foods and macros" />
         {note && (
           <div className="flex items-start gap-3 rounded-2xl bg-primary/10 p-3">
             <AiAvatar className="size-8 shrink-0" />

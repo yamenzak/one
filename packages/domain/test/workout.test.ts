@@ -8,7 +8,9 @@ import {
   recommendNextDay,
   sessionLoad,
   sessionTonnage,
+  resolveWeeklyLoadTarget,
   DEFAULT_BARBELL_KG,
+  DEFAULT_WEEKLY_LOAD_TARGET,
   type ExerciseBests,
 } from "../src/workout.js";
 
@@ -157,5 +159,43 @@ describe("activity burn", () => {
     )!;
     expect(r.setCount).toBe(2);
     expect(r.kcal).toBeGreaterThan(0);
+  });
+});
+
+// The weekly training-load target used to live in two stores that disagreed:
+// `targets_json.weeklyTrainingLoad` (coach-written, has a UI) and the
+// `weekly_load_target` column (pinned at a hardcoded 300, nobody wrote it).
+// This resolver is the single source of truth for every consumer.
+describe("resolveWeeklyLoadTarget", () => {
+  it("prefers the coach-written targets_json value over the mirrored column", () => {
+    expect(resolveWeeklyLoadTarget({ weeklyTrainingLoad: 900 }, 300)).toBe(900);
+    // The specific split-brain from the audit: coach set 900, column says 300.
+    expect(resolveWeeklyLoadTarget({ weeklyTrainingLoad: 900 }, 300)).not.toBe(300);
+  });
+
+  it("falls back to the mirrored column when targets carry no value", () => {
+    expect(resolveWeeklyLoadTarget({ targetCalories: 2200 }, 620)).toBe(620);
+    expect(resolveWeeklyLoadTarget(null, 620)).toBe(620);
+  });
+
+  it("falls back to the ONE domain default when neither store has a value", () => {
+    expect(resolveWeeklyLoadTarget(null, null)).toBe(DEFAULT_WEEKLY_LOAD_TARGET);
+    expect(resolveWeeklyLoadTarget(undefined)).toBe(DEFAULT_WEEKLY_LOAD_TARGET);
+    expect(resolveWeeklyLoadTarget({}, 0)).toBe(DEFAULT_WEEKLY_LOAD_TARGET);
+  });
+
+  it("ignores junk in either store rather than poisoning downstream ratios", () => {
+    // A non-number, NaN, negative or zero target would make load/target Infinity
+    // or NaN inside wellnessScore.
+    expect(resolveWeeklyLoadTarget({ weeklyTrainingLoad: "900" }, 620)).toBe(620);
+    expect(resolveWeeklyLoadTarget({ weeklyTrainingLoad: Number.NaN }, 620)).toBe(620);
+    expect(resolveWeeklyLoadTarget({ weeklyTrainingLoad: -5 }, null)).toBe(DEFAULT_WEEKLY_LOAD_TARGET);
+    expect(resolveWeeklyLoadTarget({ weeklyTrainingLoad: 0 }, null)).toBe(DEFAULT_WEEKLY_LOAD_TARGET);
+    expect(resolveWeeklyLoadTarget("nonsense", Number.NaN)).toBe(DEFAULT_WEEKLY_LOAD_TARGET);
+  });
+
+  it("rounds a fractional target to a whole number", () => {
+    expect(resolveWeeklyLoadTarget({ weeklyTrainingLoad: 899.6 })).toBe(900);
+    expect(resolveWeeklyLoadTarget(null, 619.4)).toBe(619);
   });
 });

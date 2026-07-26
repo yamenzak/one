@@ -16,6 +16,8 @@ build/
 .wrangler/
 .dev.vars
 .dev.vars.*
+# …but the template IS committed (it documents ENVIRONMENT=development).
+!.dev.vars.example
 
 # Env / secrets
 .env

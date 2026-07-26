@@ -63,7 +63,12 @@ export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activi
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        {label && <div className="text-xs font-medium text-muted-foreground" style={{ fontSize: size * 0.065 }}>{label}</div>}
+        {/* Floor the ring's caption text at 12px (DESIGN.md §2.2). The pure
+            proportional size rendered the label at 7.5px on the hero ring most
+            screens use (size 116) — the inline style silently beat the `text-xs`
+            class it sits next to, so the smallest, most-read text in the app was
+            barely legible. */}
+        {label && <div className="text-xs font-medium text-muted-foreground" style={{ fontSize: Math.max(12, size * 0.065) }}>{label}</div>}
         <motion.div
           className="numeral font-semibold leading-none"
           style={{ fontSize: size * 0.2, color: tintValue ? color : undefined }}
@@ -73,7 +78,7 @@ export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activi
         >
           {value}
         </motion.div>
-        {sublabel && <div className="mt-1 text-muted-foreground" style={{ fontSize: size * 0.062 }}>{sublabel}</div>}
+        {sublabel && <div className="mt-1 text-muted-foreground" style={{ fontSize: Math.max(12, size * 0.062) }}>{sublabel}</div>}
       </div>
     </div>
   );

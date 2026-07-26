@@ -88,6 +88,11 @@ export function Login() {
         setError("This studio isn't taking new members right now.");
       } else if (e instanceof ApiError && e.body?.error === "human_check_failed") {
         setError("Couldn't verify you're human — please try again.");
+      } else if (e instanceof ApiError && e.body?.error === "email_not_configured") {
+        // Never advance to the code screen here: the server has told us it cannot
+        // deliver, so a code is definitely not coming. Say so plainly rather than
+        // leaving someone waiting on a message that will never arrive.
+        setError("Sign-in email isn't set up for this studio yet, so we couldn't send your code. Please contact support — this needs fixing on our side, not yours.");
       } else {
         setError(e instanceof Error ? e.message : "Could not send the code");
       }

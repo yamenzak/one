@@ -102,7 +102,7 @@ function FeaturedCard({ r, onOpen }: { r: Resource; onOpen: () => void }) {
     <motion.button initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} whileTap={{ scale: 0.985 }} onClick={onOpen} className="relative block w-full overflow-hidden rounded-3xl text-left shadow-lg">
       {r.coverUrl ? <img src={r.coverUrl} alt="" className="h-56 w-full object-cover" /> : <div className="grid h-56 w-full place-items-center bg-gradient-to-br from-primary/30 via-primary/10 to-surface-2 text-primary/60 [&_svg]:size-12"><Icon /></div>}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
-      <div className="absolute left-4 top-4"><span className="rounded-full bg-white/15 px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-white backdrop-blur-md">Featured</span></div>
+      <div className="absolute left-4 top-4"><span className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white backdrop-blur-md">Featured</span></div>
       <div className="absolute inset-x-0 bottom-0 p-5">
         <div className="mb-2 flex items-center gap-2 text-xs font-medium text-white/85">
           {r.category && <span className="rounded-full bg-primary px-2 py-0.5 font-semibold text-primary-foreground">{r.category}</span>}
@@ -132,7 +132,7 @@ function ArticleCard({ r, onOpen }: { r: Resource; onOpen: () => void }) {
           <h3 className="line-clamp-2 font-semibold leading-snug">{r.title}</h3>
           {r.summary && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{r.summary}</p>}
           {(r.topics ?? []).length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1">{(r.topics ?? []).slice(0, 3).map((t) => <span key={t} className="rounded-full bg-surface-2 px-2 py-0.5 text-[0.7rem] text-muted-foreground">#{t}</span>)}</div>
+            <div className="mt-1.5 flex flex-wrap gap-1">{(r.topics ?? []).slice(0, 3).map((t) => <span key={t} className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-muted-foreground">#{t}</span>)}</div>
           )}
         </div>
       </Card>

@@ -66,6 +66,19 @@ export const ROLE_PRESETS: Record<string, Grant> = {
     tracking: ["read", "create", "update"], // own record only (row-level in routes)
     plan: ["read"],
     content: ["read"],
+    // Read-only views of things staff prescribe or sell TO the client. Without
+    // these the client's own screens 403: Wellness (their supplements + lab
+    // requests) and Plans & access (the studio's packages) both fan out reads
+    // that the action gate demands `supplement`/`lab`/`package` for, and a
+    // tenant requiring active access pins the client to that very screen — so a
+    // missing read here bricks the whole app for them. No write actions:
+    // prescribing, ordering labs, booking and selling stay staff-only, and each
+    // read is narrowed to the client's own rows by requireClientAccess.
+    goal: ["read"],
+    supplement: ["read"],
+    lab: ["read"],
+    session: ["read"],
+    package: ["read"],
     ai: ["use"],
   },
 };

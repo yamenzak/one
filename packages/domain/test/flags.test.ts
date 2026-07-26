@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FREE_ENTITLEMENTS, mergeOverrides, resolveEntitlements, checkDowngrade, RESERVED_FEATURES, FEATURE_KEYS } from "../src/entitlements.js";
-import { DEFAULT_CLIENT_FLAGS, resolveClientFlags, CLIENT_FLAG_META, CLIENT_FLAG_KEYS } from "../src/clientFlags.js";
+import { DEFAULT_CLIENT_FLAGS, resolveClientFlags, unionClientFlags, CLIENT_FLAG_META, CLIENT_FLAG_KEYS } from "../src/clientFlags.js";
 import { grantSatisfies, resolvePermissions, sanitizePermissions, ROLE_PRESETS } from "../src/perms.js";
 import type { Budget } from "../src/budgets.js";
 
@@ -121,6 +121,41 @@ describe("client flags resolver", () => {
     // Master kill cascades to the groups even if a group was set true.
     const masterOff = resolveClientFlags({ packageFlags: { canUseAi: false, aiMealTools: true }, entitlements: paidEnt, nowIso: NOW });
     expect(masterOff.aiMealTools).toBe(false);
+  });
+});
+
+describe("client flags union (stacked packages)", () => {
+  const live: Budget[] = [{ feature: "all", daysTotal: 30, startedAt: days(-5), expiresAt: days(25) }];
+  const workoutOnly: Budget[] = [{ feature: "workout", daysTotal: 30, startedAt: days(-1), expiresAt: days(29) }];
+
+  it("a capability from ANY live package survives (the newest row can't revoke it)", () => {
+    // Membership: sells the fasting timer (default-off, so it can only come from
+    // a package) on a full-access budget.
+    const membership = resolveClientFlags({ packageFlags: { canTrackFasting: true }, budgets: live, entitlements: paidEnt, nowIso: NOW });
+    // A one-time workout package bought later: no fasting, no meal budget.
+    const oneTime = resolveClientFlags({ packageFlags: { canTrackFasting: false }, budgets: workoutOnly, entitlements: paidEnt, nowIso: NOW });
+    expect(oneTime.canTrackFasting).toBe(false);
+    expect(oneTime.canAccessMealPlan).toBe(false);
+
+    const both = [membership, oneTime].reduce(unionClientFlags);
+    expect(both.canTrackFasting).toBe(true); // union, not "newest row wins"
+    expect(both.canAccessMealPlan).toBe(true); // the membership's meal coverage holds
+    expect(both.canAccessWorkoutPlan).toBe(true);
+  });
+
+  it("is order-independent and never widens the entitlement bound", () => {
+    // Free plan → no aiSuite; a package that claims AI still can't grant it, and
+    // the union of two such rows can't either.
+    const a = resolveClientFlags({ packageFlags: { canUseAi: true, aiMealTools: true }, budgets: live, entitlements: FREE_ENTITLEMENTS, nowIso: NOW });
+    const b = resolveClientFlags({ packageFlags: { aiCoachInsights: true }, budgets: live, entitlements: FREE_ENTITLEMENTS, nowIso: NOW });
+    expect(unionClientFlags(a, b)).toEqual(unionClientFlags(b, a));
+    const u = unionClientFlags(a, b);
+    expect([u.canUseAi, u.aiMealTools, u.aiCoachInsights]).toEqual([false, false, false]);
+  });
+
+  it("unioning one set with itself is a no-op (idempotent)", () => {
+    const one = resolveClientFlags({ packageFlags: { showMacroBreakdown: false }, budgets: workoutOnly, entitlements: paidEnt, nowIso: NOW });
+    expect(unionClientFlags(one, one)).toEqual(one);
   });
 });
 

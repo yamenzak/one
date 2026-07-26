@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@mossa/protocol";
 import { Button, Card, Badge, Field, Input, Select, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, Eyebrow, GlanceStrip, IconBadge, ConfirmDialog, toneVar, type Tone, cn, colorToHex, Reveal, SkeletonLine, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, CheckCheck, Save, History, LayoutGrid, X, BarChart3, AlertTriangle } from "@mossa/ui";
-import { api, ApiError } from "../../api.js";
+import { api, ApiError, errorText } from "../../api.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { ClientPrefsStrip } from "./ClientPrefsStrip.js";
 import { AiErrorBox } from "../../AiError.js";
@@ -264,6 +264,11 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   const [dayIdx, setDayIdx] = useState(0);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  // One in-flight name for the footer's three lifecycle actions — they share the
+  // bar, and only one can sensibly run at a time.
+  const [action, setAction] = useState<"publish" | "activate" | "rollback" | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
   const [library, setLibrary] = useState<ExerciseLite[]>([]);
   const [picker, setPicker] = useState<{ blockIdx: number } | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
@@ -276,9 +281,17 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   // A pending destructive replace, held until the coach confirms.
   const [seedConfirm, setSeedConfirm] = useState<{ source: string; apply: () => void } | null>(null);
 
+  // Two independent reads, so `allSettled`: the plan is required (nothing renders
+  // without it) but the exercise library only resolves names/thumbs/muscle
+  // volume, and with `all` a library outage rejected the pair and left the whole
+  // builder a permanent skeleton — the coach couldn't see the days they'd already
+  // written. Losing the library alone degrades rows to "Exercise".
   const load = useCallback(async () => {
-    const [p, ex] = await Promise.all([api.get<{ plan: Plan }>(`/api/workout-plans/${planId}`), api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all")]);
-    setPlan(p.plan); setDays(p.plan.body.days ?? []); setLibrary(ex.exercises);
+    setLoadError(false);
+    const [p, ex] = await Promise.allSettled([api.get<{ plan: Plan }>(`/api/workout-plans/${planId}`), api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all")]);
+    if (ex.status === "fulfilled") setLibrary(ex.value.exercises);
+    if (p.status === "rejected") { setLoadError(true); return; }
+    setPlan(p.value.plan); setDays(p.value.plan.body.days ?? []);
   }, [planId]);
   useEffect(() => void load(), [load]);
 
@@ -286,7 +299,11 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   // row resolves its name/thumb WITHOUT reloading the plan (which would reset
   // `days` from the server and discard the just-added slot + unsaved edits).
   const reloadLibrary = useCallback(async () => {
-    setLibrary((await api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all")).exercises);
+    // Cosmetic: on failure keep the library we have (rows fall back to
+    // "Exercise") rather than rejecting into an unhandled promise — the coach's
+    // unsaved day edits are intact either way.
+    try { setLibrary((await api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all")).exercises); }
+    catch { /* keep the current library */ }
   }, []);
 
   // Fetch the client's plans (created_at DESC) to offer "Latest plan" as a
@@ -320,12 +337,31 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   };
 
   const mutate = (fn: (d: WorkoutDay[]) => void) => { const next = structuredClone(days); fn(next); setDays(next); setDirty(true); };
-  const save = async () => { setSaving(true); try { await api.patch(`/api/workout-plans/${planId}`, { body: { days } }); setDirty(false); } finally { setSaving(false); } };
-  const publish = async () => { await save(); await api.post(`/api/workout-plans/${planId}/publish`); await load(); };
+  // The raw body write — publish composes it, so it must throw rather than
+  // swallow (publishing an unsaved body would hand the client the wrong days).
+  const saveBody = async () => { await api.patch(`/api/workout-plans/${planId}`, { body: { days } }); setDirty(false); };
+  const save = async () => {
+    if (saving || action) return;
+    setSaving(true); setActionErr(null);
+    try { await saveBody(); }
+    catch (e) { setActionErr(errorText(e, "Couldn't save the draft. Please try again.")); }
+    finally { setSaving(false); }
+  };
+  /** Run one footer action with an in-flight guard + a visible failure. Without
+   *  this a flaky POST changed nothing on screen: the coach walked away believing
+   *  the client had the plan, and a double-tap fired the write twice. */
+  const runAction = async (name: "publish" | "activate" | "rollback", fn: () => Promise<void>, fallback: string) => {
+    if (action || saving) return;
+    setAction(name); setActionErr(null);
+    try { await fn(); }
+    catch (e) { setActionErr(errorText(e, fallback)); }
+    finally { setAction(null); }
+  };
+  const publish = () => runAction("publish", async () => { await saveBody(); await api.post(`/api/workout-plans/${planId}/publish`); await load(); }, "Couldn't publish this plan — the client hasn't received it. Please try again.");
   // Superseded/archived plans are read-only (PATCH 409s). "Make active" re-publishes
   // WITHOUT a save first (which would 409); rollback returns it to an editable draft.
-  const makeActive = async () => { await api.post(`/api/workout-plans/${planId}/publish`); await load(); };
-  const rollback = async () => { await api.post(`/api/workout-plans/${planId}/status`, { status: "draft" }); await load(); };
+  const makeActive = () => runAction("activate", async () => { await api.post(`/api/workout-plans/${planId}/publish`); await load(); }, "Couldn't make this plan active. Please try again.");
+  const rollback = () => runAction("rollback", async () => { await api.post(`/api/workout-plans/${planId}/status`, { status: "draft" }); await load(); }, "Couldn't roll this plan back to a draft. Please try again.");
   const runAi = async (instructions: string): Promise<string[]> => { if (!plan) return []; const res = await api.post<{ draft: WorkoutBody; dropped?: string[] }>("/api/ai/draft-plan", { clientId: plan.clientId, instructions }); setDays(res.draft.days); setDirty(true); const dropped = res.dropped ?? []; if (!dropped.length) setAiOpen(false); return dropped; };
 
   // Copy week: duplicate every current day as a new mesocycle week, with an
@@ -363,6 +399,9 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-32">
+      {loadError && !plan ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load this plan" description="Something went wrong reaching the server. Check your connection and try again." action={<div className="flex gap-2"><Button variant="secondary" onClick={onBack}>Back</Button><Button onClick={() => void load()}>Try again</Button></div>} />
+      ) : (
       <Reveal loading={!plan} className="space-y-4" skeleton={
         <>
           <div className="flex items-center gap-3">
@@ -420,7 +459,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                 {d.isRestDay && <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-[0.6rem] font-semibold text-sleep">Rest</span>}
                 <div className="absolute inset-x-0 bottom-0 p-2.5">
                   <div className="truncate text-sm font-semibold text-white">{d.name || `Day ${i + 1}`}</div>
-                  <div className="truncate text-[0.68rem] text-white/70">{sub}</div>
+                  <div className="truncate text-xs text-[var(--tone-foreground)]/70">{sub}</div>
                 </div>
               </button>
             );
@@ -509,16 +548,17 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
           {readOnly && (
             <div className="flex items-center gap-2 rounded-xl bg-warning-soft px-3 py-2 text-xs text-warning [&_svg]:size-3.5"><History /> This plan is {plan.status} — read-only. Roll it back to a draft to edit, or make it active again.</div>
           )}
+          {actionErr && <p className="px-1 text-xs text-warning" role="alert">{actionErr}</p>}
           <div className="flex gap-3">
             {readOnly ? (
               <>
-                <Button variant="outline" className="flex-1" onClick={() => void rollback()}>Roll back to draft</Button>
-                <Button className="flex-1" onClick={() => void makeActive()}>Make active</Button>
+                <Button variant="outline" className="flex-1" disabled={action !== null} onClick={() => void rollback()}>{action === "rollback" ? "Rolling back…" : "Roll back to draft"}</Button>
+                <Button className="flex-1" disabled={action !== null} onClick={() => void makeActive()}>{action === "activate" ? "Activating…" : "Make active"}</Button>
               </>
             ) : (
               <>
-                <Button variant="outline" className="flex-1" disabled={!dirty || saving} onClick={() => void save()}>{saving ? "Saving…" : dirty ? "Save draft" : "Saved"}</Button>
-                <Button className="flex-1" onClick={() => void publish()}>{plan.status === "published" ? "Re-publish" : "Publish"}</Button>
+                <Button variant="outline" className="flex-1" disabled={!dirty || saving || action !== null} onClick={() => void save()}>{saving ? "Saving…" : dirty ? "Save draft" : "Saved"}</Button>
+                <Button className="flex-1" disabled={saving || action !== null} onClick={() => void publish()}>{action === "publish" ? "Publishing…" : plan.status === "published" ? "Re-publish" : "Publish"}</Button>
               </>
             )}
           </div>
@@ -527,6 +567,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
         </>
         )}
       </Reveal>
+      )}
 
       {picker && <ExercisePicker library={library} reloadLibrary={reloadLibrary} onClose={() => setPicker(null)} onPick={(id) => { mutate((d) => d[dayIdx]!.blocks[picker.blockIdx]!.slots.push(emptySlot(id))); setPicker(null); }} />}
       {aiOpen && <AiDraftSheet onClose={() => setAiOpen(false)} onRun={runAi} />}

@@ -411,6 +411,12 @@ export const clientRoutes = new Hono<AppEnv>()
     if (!body.success) return c.json({ error: "invalid body" }, 400);
     const d = body.data;
     const cur = access.client;
+    // `email` is the identity field the sign-in auto-link matches on
+    // (context-routes links an unlinked clients row to the user with that
+    // address), so it stays staff-managed — a client editing their own profile
+    // may change their name, phone and preferences but not the address their
+    // record is keyed to.
+    const email = c.get("role") === "client" ? cur.email : d.email !== undefined ? d.email : cur.email;
     // Preferences merge (partial): updating one field never wipes the others.
     const prefsJson =
       d.preferences !== undefined
@@ -424,7 +430,7 @@ export const clientRoutes = new Hono<AppEnv>()
     )
       .bind(
         d.displayName ?? cur.display_name,
-        d.email !== undefined ? d.email : cur.email,
+        email,
         d.gender !== undefined ? d.gender : cur.gender,
         d.dateOfBirth !== undefined ? d.dateOfBirth : cur.date_of_birth,
         d.heightCm !== undefined ? d.heightCm : cur.height_cm,

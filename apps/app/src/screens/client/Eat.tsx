@@ -8,7 +8,8 @@ import {
   Plus, Utensils, Croissant, Soup, Apple, Dumbbell, Trash2, AlertTriangle, type LucideIcon,
 } from "@mossa/ui";
 import type { UnitPrefs } from "@mossa/domain";
-import { api, todayLocal } from "../../api.js";
+import { api, errorText, isQueued, todayLocal } from "../../api.js";
+import { QueuedNotice } from "../../notices.js";
 import { useUnits } from "../../units.js";
 import { FoodRow, FoodThumb, normFood } from "../food.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
@@ -53,35 +54,46 @@ export function Eat({ clientId }: { clientId: string }) {
   const [defaultLabel, setDefaultLabel] = useState("Main");
   const [edit, setEdit] = useState<Entry | null>(null);
   const [error, setError] = useState(false);
+  // Feedback for the one-tap write paths (quick-add re-log, water): a failure the
+  // user can read, and a "saved offline" confirmation so nothing gets re-tapped.
+  const [logErr, setLogErr] = useState<string | null>(null);
+  const [queuedMsg, setQueuedMsg] = useState(false);
   const reqRef = useRef(0);
   const units = useUnits();
   const date = todayLocal();
 
   // Guards stale writes (fast client swap in coach view) and surfaces a load
   // failure instead of stranding the screen on the skeleton forever.
+  //
+  // These five reads are INDEPENDENT sections, so they settle independently: with
+  // Promise.all a flaky /week (or /today) rejected the whole batch and blanked
+  // the diary the client had already logged. Only the diary itself is required —
+  // everything else degrades to its own section going quiet.
   const load = useCallback(async () => {
     const rid = ++reqRef.current;
     setError(false);
-    try {
-      const [e, today, wk, mp, rc] = await Promise.all([
-        api.get<{ entries: Entry[] }>(`/api/logs/food?clientId=${clientId}&date=${date}`),
-        api.get<{ goal: { targets: Targets | null } | null }>(`/api/today?clientId=${clientId}&date=${date}`),
-        api.get<Week>(`/api/logs/nutrition/week?clientId=${clientId}&date=${date}`),
-        api.get<{ plans: { status: string; name: string; variantId: string | null; body?: { mealOptions?: { mealType: string }[] } }[]; variants: Lane[]; currentVariantId: string | null; defaultLabel?: string }>(`/api/meal-plans?clientId=${clientId}`).catch(() => ({ plans: [], variants: [], currentVariantId: null, defaultLabel: "Main" })),
-        api.get<{ recents: Recent[] }>(`/api/foods/recent?clientId=${clientId}&limit=8`).catch(() => ({ recents: [] as Recent[] })),
-      ]);
-      if (rid !== reqRef.current) return;
-      setEntries(e.entries); setTargets(today.goal?.targets ?? null);
-      setRecents(rc.recents ?? []);
-      setWeek(wk); setWaterMl(wk.days[wk.days.length - 1]?.waterMl ?? 0);
+    const [eR, todayR, wkR, mpR, rcR] = await Promise.allSettled([
+      api.get<{ entries: Entry[] }>(`/api/logs/food?clientId=${clientId}&date=${date}`),
+      api.get<{ goal: { targets: Targets | null } | null }>(`/api/today?clientId=${clientId}&date=${date}`),
+      api.get<Week>(`/api/logs/nutrition/week?clientId=${clientId}&date=${date}`),
+      api.get<{ plans: { status: string; name: string; variantId: string | null; body?: { mealOptions?: { mealType: string }[] } }[]; variants: Lane[]; currentVariantId: string | null; defaultLabel?: string }>(`/api/meal-plans?clientId=${clientId}`),
+      api.get<{ recents: Recent[] }>(`/api/foods/recent?clientId=${clientId}&limit=8`),
+    ]);
+    if (rid !== reqRef.current) return;
+    // The diary is the screen — without it there's nothing to show, so that one
+    // failure is the only one that becomes the full-screen retry.
+    if (eR.status !== "fulfilled") { setError(true); return; }
+    setEntries(eR.value.entries);
+    if (todayR.status === "fulfilled") setTargets(todayR.value.goal?.targets ?? null);
+    if (rcR.status === "fulfilled") setRecents(rcR.value.recents ?? []);
+    if (wkR.status === "fulfilled") { setWeek(wkR.value); setWaterMl(wkR.value.days[wkR.value.days.length - 1]?.waterMl ?? 0); }
+    if (mpR.status === "fulfilled") {
+      const mp = mpR.value;
       setVariants(mp.variants ?? []); setCurrentVariantId(mp.currentVariantId ?? null); setDefaultLabel(mp.defaultLabel || "Main");
       const cur = mp.currentVariantId ?? null;
       const published = mp.plans.find((p) => p.status === "published" && (p.variantId ?? null) === cur);
       const opts = published?.body?.mealOptions ?? [];
       setMealPlan(published ? { name: published.name, meals: new Set(opts.map((o) => o.mealType)).size, options: opts.length } : null);
-    } catch {
-      if (rid !== reqRef.current) return;
-      setError(true);
     }
   }, [clientId, date]);
   useEffect(() => void load(), [load]);
@@ -91,9 +103,12 @@ export function Eat({ clientId }: { clientId: string }) {
   const addWater = async (displayAmount: number) => {
     const ml = Math.round(volumeDisplayToMl(displayAmount, units));
     setWaterMl((w) => w + ml);
-    // Roll the optimistic bump back if the write fails, so no phantom water sticks.
+    // Roll the optimistic bump back if the write fails, so no phantom water sticks
+    // — but NOT when it's queued: that write is parked in the service worker and
+    // will land, so un-bumping it reads as "nothing happened" and the user taps
+    // again, queuing a second glass that also replays.
     try { await api.post("/api/logs/water", { clientId, data: { date, amountMl: ml } }); }
-    catch { setWaterMl((w) => w - ml); }
+    catch (e) { if (isQueued(e)) setQueuedMsg(true); else setWaterMl((w) => w - ml); }
   };
 
   const openLog = (meal?: string) => { setLogMeal(meal); setLogOpen(true); };
@@ -103,10 +118,15 @@ export function Eat({ clientId }: { clientId: string }) {
   const relog = async (r: Recent) => {
     if (relogging) return;
     const key = r.food_id ?? r.label;
-    setRelogging(key);
+    setRelogging(key); setLogErr(null); setQueuedMsg(false);
     try {
       await api.post("/api/logs/food", { clientId, data: { date, mealType: mealBucket(), foodId: r.food_id ?? null, label: r.label, quantity: r.quantity, unit: r.unit, calories: r.calories, proteinG: r.protein_g, carbsG: r.carbs_g, fatG: r.fat_g } });
       await load();
+    } catch (e) {
+      // Queued = durably saved for replay, so it must read as done. Reporting it
+      // as a failure got the tile re-tapped and the food logged twice.
+      if (isQueued(e)) setQueuedMsg(true);
+      else setLogErr(errorText(e, "Couldn't log that — try again."));
     } finally { setRelogging(null); }
   };
 
@@ -173,6 +193,10 @@ export function Eat({ clientId }: { clientId: string }) {
         <Button className="min-w-0 flex-1" onClick={() => openLog()}><Plus /> Log food</Button>
         {mealPlan && <Button variant="secondary" onClick={() => setPlanOpen(true)}><Utensils /> View plan</Button>}
       </Stagger>
+      {/* One-tap write feedback (quick-add / water) — sits above both so a queued
+          or failed tap is never a silent no-op the user retries blindly. */}
+      {queuedMsg && <QueuedNotice />}
+      {logErr && <p role="alert" className="text-sm text-warning">{logErr}</p>}
 
       {/* Today — intake, hydration + protein at a glance */}
       <section className="space-y-2">
@@ -363,19 +387,19 @@ function WeekStrip({ week }: { week: Week }) {
         </div>
         <div className="mt-1.5 flex gap-1.5">
           {days.map((d, i) => (
-            <span key={d.date} className={`flex-1 text-center text-[0.65rem] ${i === days.length - 1 ? "font-bold text-foreground" : "text-muted-foreground"}`}>{DOW[new Date(`${d.date}T00:00:00Z`).getUTCDay()]}</span>
+            <span key={d.date} className={`flex-1 text-center text-xs ${i === days.length - 1 ? "font-bold text-foreground" : "text-muted-foreground"}`}>{DOW[new Date(`${d.date}T00:00:00Z`).getUTCDay()]}</span>
           ))}
         </div>
       </div>
       <div className="flex items-center justify-around border-t border-border/50 pt-3 text-center">
         <div>
           <div className="numeral text-lg font-bold leading-none">{onTarget}<span className="text-sm font-medium text-muted-foreground">/7</span></div>
-          <div className="mt-1 text-[0.7rem] text-muted-foreground">{ct ? "on target" : "days logged"}</div>
+          <div className="mt-1 text-xs text-muted-foreground">{ct ? "on target" : "days logged"}</div>
         </div>
         <div className="h-8 w-px bg-border/50" />
         <div>
           <div className="numeral text-lg font-bold leading-none text-protein">{avgProtein}<span className="text-sm font-medium text-muted-foreground"> g</span></div>
-          <div className="mt-1 text-[0.7rem] text-muted-foreground">avg protein{pt ? ` / ${pt}` : ""}</div>
+          <div className="mt-1 text-xs text-muted-foreground">avg protein{pt ? ` / ${pt}` : ""}</div>
         </div>
       </div>
     </Card>
@@ -388,6 +412,7 @@ function EditEntrySheet({ entry, clientId, units, onClose, onSaved }: { entry: E
   const [qty, setQty] = useState(entry.quantity != null ? String(entry.quantity) : "");
   const [meal, setMeal] = useState(entry.meal_type);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const scalable = entry.quantity != null && entry.quantity > 0;
   const qtyNum = Number(qty);
@@ -395,18 +420,28 @@ function EditEntrySheet({ entry, clientId, units, onClose, onSaved }: { entry: E
   const factor = scalable && qtyValid ? qtyNum / entry.quantity! : 1;
   const s = (v: number) => Math.round(v * factor);
 
+  // Neither of these is in the Background-Sync queue — it only replays POSTs — so
+  // there is no "queued" outcome here: an edit or a delete that doesn't reach the
+  // server didn't happen, and the sheet must stay open saying so rather than
+  // closing as if it had (the entry would silently snap back on the next reload).
   const save = async () => {
     // A malformed quantity (e.g. "1.2.3" → NaN) must never reach the API.
     if (scalable && qty && !qtyValid) return;
-    setBusy(true);
+    setBusy(true); setErr(null);
     try {
       const body: Record<string, unknown> = { clientId, mealType: meal };
       if (scalable && qtyValid) { body.quantity = qtyNum; body.calories = s(entry.calories); body.proteinG = s(entry.protein_g); body.carbsG = s(entry.carbs_g); body.fatG = s(entry.fat_g); }
       await api.patch(`/api/logs/food/${entry.id}`, body);
       onSaved(); onClose();
-    } finally { setBusy(false); }
+    } catch (e) { setErr(errorText(e, "Couldn't save that change — try again.")); }
+    finally { setBusy(false); }
   };
-  const remove = async () => { setBusy(true); try { await api.del(`/api/logs/food/${entry.id}?clientId=${clientId}`); onSaved(); onClose(); } finally { setBusy(false); } };
+  const remove = async () => {
+    setBusy(true); setErr(null);
+    try { await api.del(`/api/logs/food/${entry.id}?clientId=${clientId}`); onSaved(); onClose(); }
+    catch (e) { setErr(errorText(e, "Couldn't delete that entry — try again.")); }
+    finally { setBusy(false); }
+  };
 
   return (
     <Sheet open onClose={onClose} title={entry.label ?? "Edit food"}>
@@ -429,6 +464,8 @@ function EditEntrySheet({ entry, clientId, units, onClose, onSaved }: { entry: E
           <div className="mb-1.5 text-sm text-muted-foreground">Meal</div>
           <div className="flex flex-wrap gap-2">{EDIT_MEALS.map((m) => <Chip key={m} selected={meal === m} onClick={() => setMeal(m)}>{metaFor(m).label}</Chip>)}</div>
         </div>
+
+        {err && <p role="alert" className="text-sm text-warning">{err}</p>}
 
         <div className="flex gap-3">
           <Button variant="ghost" className="text-danger" disabled={busy} onClick={() => setConfirmDelete(true)}><Trash2 /> Delete</Button>

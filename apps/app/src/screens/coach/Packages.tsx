@@ -1,41 +1,114 @@
 /** Package editor + redemption codes + promo codes. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Switch, Sheet, Chip, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonHeader, SkeletonList, CreditCard, Ticket, Tag, Trash2, Plus, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Switch, Sheet, Chip, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonHeader, SkeletonList, CreditCard, Ticket, Tag, Trash2, Plus, X, PencilLine, Archive, RotateCcw, AlertTriangle } from "@mossa/ui";
 import { CLIENT_FLAG_META, CLIENT_FLAG_CATEGORIES, CLIENT_FLAG_KEYS, DEFAULT_CLIENT_FLAGS, type ClientFlags } from "@mossa/domain";
-import { api } from "../../api.js";
+import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
 import { FeatureLock } from "../../FeatureLock.js";
 import { fmtPrice } from "../../money.js";
 
-interface Pkg { id: string; name: string; one_time_price_cents: number | null; monthly_price_cents?: number | null; installment_months?: number | null; budgets: { feature: string; days: number }[]; visibility: string }
+type BudgetFeature = "all" | "workout" | "meal";
+const BUDGET_FEATURES: readonly BudgetFeature[] = ["all", "workout", "meal"];
+type PkgFlags = Partial<Record<keyof ClientFlags, boolean>>;
+
+interface Pkg {
+  id: string;
+  name: string;
+  description?: string | null;
+  one_time_price_cents: number | null;
+  monthly_price_cents?: number | null;
+  installment_months?: number | null;
+  budgets: { feature: string; days: number }[];
+  addOns?: { addOnTypeId: string; quantity: number }[] | null;
+  flags?: PkgFlags | null;
+  visibility: string;
+  restricted_client_id?: string | null;
+  once_per_customer?: number | null;
+}
 interface ClientOpt { id: string; displayName: string }
 interface AddOnType { id: string; label: string; duration_minutes: number }
 interface Code { id: string; code: string; days_to_add: number; target_feature: string; used_count: number; max_uses: number; restricted_package_id?: string | null; restricted_client_id?: string | null }
 interface Promo { id: string; code: string; discount_type: string; percent_off: number | null; amount_off_cents: number | null; redemption_count: number; max_redemptions: number | null; restricted_package_id?: string | null; restricted_client_id?: string | null; active: number }
 
+/** `marketplace` is what puts a package in every client's in-app Shop, where it
+ *  can actually be bought — so it's labelled for that, not "Public" (there is no
+ *  public web storefront that renders these). */
+const VISIBILITY_LABEL: Record<string, string> = { marketplace: "In client Shop", private: "Grant only", client_specific: "One client" };
+
+const priceLabel = (p: Pkg): string =>
+  p.monthly_price_cents ? `${fmtPrice(p.monthly_price_cents)}/mo`
+  : p.one_time_price_cents ? `${fmtPrice(p.one_time_price_cents)}${p.installment_months && p.installment_months > 1 ? ` · ${p.installment_months}×` : ""}`
+  : "Free";
+
 export function Packages() {
   const { ctx } = useSession();
   const hasCommerce = ctx?.entitlements?.features?.commerce ?? false;
   const [packages, setPackages] = useState<Pkg[] | null>(null);
+  const [archived, setArchived] = useState<Pkg[]>([]);
   const [clients, setClients] = useState<ClientOpt[]>([]);
   const [codes, setCodes] = useState<Code[]>([]);
   const [promos, setPromos] = useState<Promo[]>([]);
+  const [loadError, setLoadError] = useState(false);
   const [pkgOpen, setPkgOpen] = useState(false);
+  const [editing, setEditing] = useState<Pkg | null>(null);
+  const [toArchive, setToArchive] = useState<Pkg | null>(null);
   const [codeOpen, setCodeOpen] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
   const [promoToDelete, setPromoToDelete] = useState<Promo | null>(null);
+  // One row action at a time; its id disables that row's buttons while in flight.
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
 
+  // allSettled: a dead promo/roster/archive endpoint degrades one section rather
+  // than leaving the whole screen shimmering. Only the live package list is
+  // load-critical — if it fails we show a retry instead of a permanent skeleton.
   const load = useCallback(async () => {
-    const [p, c, pr, cl] = await Promise.all([api.get<{ packages: Pkg[] }>("/api/packages"), api.get<{ codes: Code[] }>("/api/redemption-codes"), api.get<{ codes: Promo[] }>("/api/promo-codes").catch(() => ({ codes: [] })), api.get<{ clients: ClientOpt[] }>("/api/clients").catch(() => ({ clients: [] }))]);
-    setPackages(p.packages); setCodes(c.codes); setPromos(pr.codes); setClients(cl.clients);
+    setLoadError(false);
+    const [p, arch, c, pr, cl] = await Promise.allSettled([
+      api.get<{ packages: Pkg[] }>("/api/packages"),
+      api.get<{ packages: Pkg[] }>("/api/packages?archived=1"),
+      api.get<{ codes: Code[] }>("/api/redemption-codes"),
+      api.get<{ codes: Promo[] }>("/api/promo-codes"),
+      api.get<{ clients: ClientOpt[] }>("/api/clients"),
+    ]);
+    if (p.status === "rejected") { setLoadError(true); return; }
+    setPackages(p.value.packages);
+    setArchived(arch.status === "fulfilled" ? arch.value.packages : []);
+    if (c.status === "fulfilled") setCodes(c.value.codes);
+    if (pr.status === "fulfilled") setPromos(pr.value.codes);
+    if (cl.status === "fulfilled") setClients(cl.value.clients);
   }, []);
   useEffect(() => { if (hasCommerce) void load(); }, [load, hasCommerce]);
-  const deletePromo = async (id: string) => { await api.del(`/api/promo-codes/${id}`); await load(); };
+
+  const deletePromo = async (id: string) => {
+    setRowBusy(id); setActionErr(null);
+    try { await api.del(`/api/promo-codes/${id}`); await load(); }
+    catch (e) { setActionErr(errorText(e, "Couldn't deactivate that promo code.")); }
+    finally { setRowBusy(null); }
+  };
+  // DELETE /packages/:id is an archive, not an erase: it flips `active = 0`, which
+  // removes the package from the Shop and both checkout lanes but leaves every
+  // client_subscriptions row alone.
+  const archivePkg = async (p: Pkg) => {
+    setRowBusy(p.id); setActionErr(null);
+    try { await api.del(`/api/packages/${p.id}`); await load(); }
+    catch (e) { setActionErr(errorText(e, `Couldn't archive ${p.name}.`)); }
+    finally { setRowBusy(null); }
+  };
+  const restorePkg = async (p: Pkg) => {
+    setRowBusy(p.id); setActionErr(null);
+    try { await api.patch(`/api/packages/${p.id}`, { active: true }); await load(); }
+    catch (e) { setActionErr(errorText(e, `Couldn't put ${p.name} back on sale.`)); }
+    finally { setRowBusy(null); }
+  };
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
     <FeatureLock feature="commerce">
+      {loadError && !packages ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load your packages" description="Something went wrong reaching the server. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
+      ) : (
       <Reveal loading={!packages} className="space-y-4" skeleton={
         <>
           <SkeletonHeader action />
@@ -48,18 +121,54 @@ export function Packages() {
       }>
         {packages && (
         <>
+      {actionErr && <p role="status" aria-live="polite" className="rounded-xl bg-danger-soft px-3 py-2 text-sm text-danger">{actionErr}</p>}
+
       <SectionHeader icon={CreditCard} tone="primary" title="Packages" action={<Button size="sm" onClick={() => setPkgOpen(true)}><Plus /> New</Button>} />
       {packages.length === 0 ? (
         <EmptyState icon={CreditCard} title="No packages yet" description="Build a package — feature budgets (workout/meal/all) sold once or as installments. $0 packages are comps you grant directly." />
       ) : (
         <Stagger className="space-y-2">
           {packages.map((p) => (
-            <Card key={p.id} className="flex items-center justify-between">
-              <div><div className="font-semibold">{p.name}</div><div className="mt-1 flex flex-wrap gap-1">{p.budgets.map((b, i) => <Badge key={i} tone="activity">{b.days}d {b.feature}</Badge>)}</div></div>
-              <div className="text-right"><div className="numeral font-semibold">{p.monthly_price_cents ? `${fmtPrice(p.monthly_price_cents)}/mo` : p.one_time_price_cents ? `${fmtPrice(p.one_time_price_cents)}${p.installment_months && p.installment_months > 1 ? ` · ${p.installment_months}×` : ""}` : "Free"}</div><Badge tone="neutral">{p.visibility === "client_specific" ? "one client" : p.visibility}</Badge></div>
+            <Card key={p.id} className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-semibold">{p.name}</div>
+                  {p.description && <p className="mt-0.5 text-sm text-muted-foreground">{p.description}</p>}
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {p.budgets.map((b, i) => <Badge key={i} tone="activity">{b.days}d {b.feature}</Badge>)}
+                    {p.once_per_customer ? <Badge tone="neutral">once per customer</Badge> : null}
+                  </div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className="numeral font-semibold">{priceLabel(p)}</div>
+                  <Badge tone="neutral">{VISIBILITY_LABEL[p.visibility] ?? p.visibility}</Badge>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-1 border-t border-border/50 pt-1">
+                <button type="button" onClick={() => setEditing(p)} disabled={rowBusy === p.id} aria-label={`Edit ${p.name}`} className="grid size-12 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50 [&_svg]:size-[1.15rem]"><PencilLine /></button>
+                <button type="button" onClick={() => setToArchive(p)} disabled={rowBusy === p.id} aria-label={`Archive ${p.name}`} className="grid size-12 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-50 [&_svg]:size-[1.15rem]"><Archive /></button>
+              </div>
             </Card>
           ))}
         </Stagger>
+      )}
+
+      {archived.length > 0 && (
+        <>
+          <SectionHeader className="pt-2" icon={Archive} tone="neutral" title="Archived" count={archived.length} />
+          <p className="px-1 text-xs text-muted-foreground">Off sale and hidden from every client&rsquo;s Shop. Clients who already bought one keep the days they paid for.</p>
+          <Stagger className="space-y-2">
+            {archived.map((p) => (
+              <Card key={p.id} className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate font-semibold text-muted-foreground">{p.name}</div>
+                  <div className="numeral text-xs text-muted-foreground">{priceLabel(p)}</div>
+                </div>
+                <Button size="sm" variant="secondary" disabled={rowBusy === p.id} onClick={() => void restorePkg(p)}><RotateCcw /> {rowBusy === p.id ? "Restoring…" : "Put back on sale"}</Button>
+              </Card>
+            ))}
+          </Stagger>
+        </>
       )}
 
       <SectionHeader className="pt-2" icon={Ticket} tone="primary" title="Redemption codes" action={<Button size="sm" onClick={() => setCodeOpen(true)}><Plus /> Code</Button>} />
@@ -79,7 +188,7 @@ export function Packages() {
           {promos.map((p) => (
             <Card key={p.id} className={`flex items-center justify-between ${p.active ? "" : "opacity-50"}`}>
               <div className="flex items-center gap-2.5"><IconBadge icon={Tag} tone="nutrition" size="sm" /><div><div className="font-mono font-semibold">{p.code}</div><div className="text-xs text-muted-foreground">{p.discount_type === "percent" ? `${p.percent_off}% off` : `${fmtPrice(p.amount_off_cents ?? 0)} off`} · used {p.redemption_count}{p.max_redemptions ? `/${p.max_redemptions}` : ""}</div></div></div>
-              {p.active ? <button onClick={() => setPromoToDelete(p)} aria-label="Delete promo code" className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button> : <Badge tone="neutral">inactive</Badge>}
+              {p.active ? <button type="button" onClick={() => setPromoToDelete(p)} disabled={rowBusy === p.id} aria-label={`Delete promo code ${p.code}`} className="grid size-12 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-50 [&_svg]:size-4"><Trash2 /></button> : <Badge tone="neutral">inactive</Badge>}
             </Card>
           ))}
         </Stagger>
@@ -87,10 +196,23 @@ export function Packages() {
         </>
         )}
       </Reveal>
+      )}
 
       {pkgOpen && <PackageSheet clients={clients} onClose={() => setPkgOpen(false)} onSaved={() => { setPkgOpen(false); void load(); }} />}
+      {editing && <PackageSheet pkg={editing} clients={clients} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void load(); }} />}
       {codeOpen && <CodeSheet packages={packages ?? []} clients={clients} onClose={() => setCodeOpen(false)} onSaved={() => { setCodeOpen(false); void load(); }} />}
       {promoOpen && <PromoSheet packages={packages ?? []} clients={clients} onClose={() => setPromoOpen(false)} onSaved={() => { setPromoOpen(false); void load(); }} />}
+
+      <ConfirmDialog
+        open={!!toArchive}
+        onOpenChange={(o) => !o && setToArchive(null)}
+        title={toArchive ? `Archive ${toArchive.name}?` : "Archive package?"}
+        description="It comes off sale straight away: it disappears from every client's Shop and can no longer be bought or granted. Clients who already bought it keep every day they paid for — nothing is taken back. You can put it back on sale from Archived at any time."
+        confirmLabel="Archive"
+        cancelLabel="Keep selling"
+        destructive
+        onConfirm={() => { if (toArchive) void archivePkg(toArchive); }}
+      />
 
       <ConfirmDialog
         open={!!promoToDelete}
@@ -106,72 +228,148 @@ export function Packages() {
   );
 }
 
-function PackageSheet({ clients, onClose, onSaved }: { clients: ClientOpt[]; onClose: () => void; onSaved: () => void }) {
-  const [name, setName] = useState("");
-  const [priceMode, setPriceMode] = useState<"one_time" | "monthly" | "installment">("one_time");
-  const [price, setPrice] = useState("");
-  const [installmentMonths, setInstallmentMonths] = useState("3");
-  const [budgets, setBudgets] = useState<{ feature: "all" | "workout" | "meal"; days: number }[]>([{ feature: "all", days: 30 }]);
+/** Stripe's per-charge ceiling ($999,999.99) — anything above it is a typo. */
+const MAX_PRICE_CENTS = 99_999_999;
+
+/**
+ * Blank = a free comp, which is legitimate. Anything else must be plain digits:
+ * `Number("$99")` / `Number("99 USD")` is NaN, `JSON.stringify` writes NaN as
+ * `null`, and the package used to publish as "Free" — after which every client
+ * hit a 400 at checkout and was told to ask their coach to finish Stripe setup,
+ * pointing the owner at entirely the wrong problem. So an unparseable or absurd
+ * price now blocks the save with the real reason.
+ */
+function parsePrice(raw: string): { cents: number | null; error: string | null } {
+  const s = raw.trim();
+  if (!s) return { cents: null, error: null };
+  if (!/^\d+(\.\d{1,2})?$/.test(s)) return { cents: null, error: "Digits only — 99 or 99.50. Leave out the $ and any currency code." };
+  const cents = Math.round(Number(s) * 100);
+  if (!Number.isFinite(cents)) return { cents: null, error: "That isn't a number." };
+  if (cents > MAX_PRICE_CENTS) return { cents: null, error: `Keep it under ${fmtPrice(MAX_PRICE_CENTS)}.` };
+  return { cents, error: null };
+}
+
+/** Cents → the text the price field shows, without a stray ".00" tail. */
+const centsToInput = (cents: number | null | undefined): string =>
+  cents == null ? "" : cents % 100 === 0 ? String(Math.round(cents / 100)) : (cents / 100).toFixed(2);
+
+/**
+ * One sheet for both create and edit. With `pkg` it PATCHes that package
+ * (a true partial update server-side — but we send every field so switching
+ * price mode clears the column it left behind, and an emptied add-on list
+ * actually clears `addons_json`). Without it, POSTs a new one.
+ */
+function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; clients: ClientOpt[]; onClose: () => void; onSaved: () => void }) {
+  const editing = !!pkg;
+  const [name, setName] = useState(pkg?.name ?? "");
+  const [description, setDescription] = useState(pkg?.description ?? "");
+  const [priceMode, setPriceMode] = useState<"one_time" | "monthly" | "installment">(
+    pkg?.monthly_price_cents ? "monthly" : pkg?.installment_months && pkg.installment_months > 1 ? "installment" : "one_time",
+  );
+  const [price, setPrice] = useState(centsToInput(pkg?.monthly_price_cents ?? pkg?.one_time_price_cents ?? null));
+  const [installmentMonths, setInstallmentMonths] = useState(String(pkg?.installment_months && pkg.installment_months > 1 ? pkg.installment_months : 3));
+  const [budgets, setBudgets] = useState<{ feature: BudgetFeature; days: number }[]>(() => {
+    const initial = (pkg?.budgets ?? [])
+      .filter((b): b is { feature: BudgetFeature; days: number } => BUDGET_FEATURES.includes(b.feature as BudgetFeature));
+    return initial.length ? initial : [{ feature: "all", days: 30 }];
+  });
   // Included add-ons (SPEC §7): consultation units the package grants. Only shown
   // when the tenant has defined add-on types (frontDesk). Keyed by type id → qty.
   const [addOnTypes, setAddOnTypes] = useState<AddOnType[]>([]);
-  const [addOns, setAddOns] = useState<Record<string, number>>({});
-  const [visibility, setVisibility] = useState<"private" | "marketplace" | "client_specific">("marketplace");
-  const [restrictedClientId, setRestrictedClientId] = useState("");
-  const [oncePerCustomer, setOncePerCustomer] = useState(false);
+  const [addOns, setAddOns] = useState<Record<string, number>>(() => Object.fromEntries((pkg?.addOns ?? []).map((a) => [a.addOnTypeId, a.quantity])));
+  const [visibility, setVisibility] = useState<"private" | "marketplace" | "client_specific">(
+    pkg?.visibility === "private" || pkg?.visibility === "client_specific" ? pkg.visibility : "marketplace",
+  );
+  const [restrictedClientId, setRestrictedClientId] = useState(pkg?.restricted_client_id ?? "");
+  const [oncePerCustomer, setOncePerCustomer] = useState(!!pkg?.once_per_customer);
   // Only keys the tenant explicitly toggled land here — untouched flags fall
   // back to the client defaults at resolve time (so a package needn't restate
   // everything). Explicit `false` IS persisted, which is how a tenant carves
   // out a bespoke bundle (e.g. turn AI insights off).
-  const [flags, setFlags] = useState<Partial<Record<keyof ClientFlags, boolean>>>({});
+  const [flags, setFlags] = useState<PkgFlags>(pkg?.flags ?? {});
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { ctx } = useSession();
   const entFeatures = (ctx?.entitlements?.features ?? {}) as Record<string, boolean>;
-  const cents = price ? Math.round(Number(price) * 100) : null;
-  const setBudget = (i: number, p: Partial<{ feature: "all" | "workout" | "meal"; days: number }>) => setBudgets((b) => b.map((r, idx) => (idx === i ? { ...r, ...p } : r)));
+  const setBudget = (i: number, p: Partial<{ feature: BudgetFeature; days: number }>) => setBudgets((b) => b.map((r, idx) => (idx === i ? { ...r, ...p } : r)));
   // Add-on types exist only when the tenant holds `frontDesk`; a 403/empty list
   // just hides the "included add-ons" section.
   useEffect(() => {
     if (!entFeatures.frontDesk) return;
     void api.get<{ addOnTypes: AddOnType[] }>("/api/addon-types").then((r) => setAddOnTypes(r.addOnTypes)).catch(() => undefined);
   }, [entFeatures.frontDesk]);
+
+  const parsed = parsePrice(price);
+  const months = Number(installmentMonths);
+  const monthsError = priceMode === "installment" && !(Number.isInteger(months) && months >= 2 && months <= 24) ? "Between 2 and 24 months." : null;
+  // A recurring or installment package with no real amount is nonsense — and the
+  // one-time lane is the only place "blank = free comp" is meaningful.
+  const priceError = parsed.error
+    ?? (priceMode === "monthly" && !parsed.cents ? "A monthly package needs a price."
+      : priceMode === "installment" && !parsed.cents ? "An installment plan needs a total price." : null);
+  const badDays = budgets.some((b) => !Number.isInteger(b.days) || b.days < 1);
+  const canSave = name.trim().length >= 2 && budgets.length > 0 && !badDays && !priceError && !monthsError
+    && !(visibility === "client_specific" && !restrictedClientId);
+
   const save = async () => {
-    setBusy(true);
+    if (busy || !canSave) return;
+    setBusy(true); setError(null);
     try {
       const includedAddOns = Object.entries(addOns).filter(([, q]) => q > 0).map(([addOnTypeId, quantity]) => ({ addOnTypeId, quantity }));
-      await api.post("/api/packages", {
-        name,
-        oneTimePriceCents: priceMode === "one_time" || priceMode === "installment" ? cents : null,
-        monthlyPriceCents: priceMode === "monthly" ? cents : null,
-        installmentMonths: priceMode === "installment" ? Number(installmentMonths) : null,
+      const body = {
+        name: name.trim(),
+        description: description.trim() || null,
+        oneTimePriceCents: priceMode === "monthly" ? null : parsed.cents,
+        monthlyPriceCents: priceMode === "monthly" ? parsed.cents : null,
+        installmentMonths: priceMode === "installment" ? months : null,
         budgets,
-        addOns: includedAddOns.length ? includedAddOns : undefined,
+        // On an edit always send the array — PATCH leaves omitted keys alone, so
+        // `undefined` here would make "I removed every add-on" a silent no-op.
+        addOns: editing ? includedAddOns : includedAddOns.length ? includedAddOns : undefined,
         flags: Object.keys(flags).length ? flags : null,
         oncePerCustomer,
         visibility,
         restrictedClientId: visibility === "client_specific" && restrictedClientId ? restrictedClientId : null,
-      });
+      };
+      if (pkg) await api.patch(`/api/packages/${pkg.id}`, body);
+      else await api.post("/api/packages", body);
       onSaved();
+    } catch (e) {
+      setError(errorText(e, editing ? "Couldn't save those changes." : "Couldn't create that package."));
     } finally { setBusy(false); }
   };
+
   return (
-    <Sheet open onClose={onClose} title="New package">
+    <Sheet open onClose={onClose} title={editing ? "Edit package" : "New package"}>
       <div className="space-y-4">
+        {editing && <p className="text-sm text-muted-foreground">Changes apply to the Shop right away. Clients who already bought this package keep the access they paid for — editing never touches a live subscription.</p>}
         <Field label="Name" icon={CreditCard} value={name} onChange={(e) => setName(e.target.value)} />
+        <div>
+          <span className="mb-1.5 block text-sm font-medium text-muted-foreground">Description</span>
+          <Textarea rows={2} maxLength={2000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="One line clients see on the Shop card." />
+        </div>
         <div className="flex gap-2">{(["one_time", "monthly", "installment"] as const).map((m) => <Chip key={m} selected={priceMode === m} onClick={() => setPriceMode(m)}>{m.replace("_", " ")}</Chip>)}</div>
-        <Field label={priceMode === "monthly" ? "Price per month (USD)" : "Price (USD, blank = free comp)"} value={price} inputMode="decimal" onChange={(e) => setPrice(e.target.value)} />
-        {priceMode === "installment" && <Field label="Installment months" value={installmentMonths} inputMode="numeric" onChange={(e) => setInstallmentMonths(e.target.value.replace(/\D/g, ""))} />}
+        <Field
+          label={priceMode === "monthly" ? "Price per month (USD)" : priceMode === "installment" ? "Total price (USD)" : "Price (USD, blank = free comp)"}
+          value={price}
+          inputMode="decimal"
+          onChange={(e) => setPrice(e.target.value)}
+          error={priceError ?? undefined}
+          hint={priceError ? undefined : parsed.cents != null ? `Clients see ${fmtPrice(parsed.cents)}${priceMode === "monthly" ? " per month" : ""}.` : undefined}
+        />
+        {priceMode === "installment" && <Field label="Installment months" value={installmentMonths} inputMode="numeric" onChange={(e) => setInstallmentMonths(e.target.value.replace(/\D/g, ""))} error={monthsError ?? undefined} />}
 
         <div className="space-y-2">
-          <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">Feature budgets</span><button onClick={() => setBudgets((b) => [...b, { feature: "workout", days: 30 }])} className="text-xs font-medium text-primary">+ Budget</button></div>
+          <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">Feature budgets</span><button type="button" onClick={() => setBudgets((b) => [...b, { feature: "workout", days: 30 }])} className="text-xs font-medium text-primary">+ Budget</button></div>
           {budgets.map((b, i) => (
             <div key={i} className="flex items-center gap-2">
-              <div className="flex gap-1">{(["all", "workout", "meal"] as const).map((f) => <Chip key={f} selected={b.feature === f} onClick={() => setBudget(i, { feature: f })}>{f}</Chip>)}</div>
-              <input type="number" value={b.days} onChange={(e) => setBudget(i, { days: Number(e.target.value) })} className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 text-sm outline-none" />
+              <div className="flex gap-1">{BUDGET_FEATURES.map((f) => <Chip key={f} selected={b.feature === f} onClick={() => setBudget(i, { feature: f })}>{f}</Chip>)}</div>
+              <input type="number" min={1} value={b.days} onChange={(e) => setBudget(i, { days: Number(e.target.value) })} aria-label="Budget days" className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 text-sm outline-none" />
               <span className="text-xs text-muted-foreground">days</span>
-              {budgets.length > 1 && <button onClick={() => setBudgets((x) => x.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-danger [&_svg]:size-3.5"><X /></button>}
+              {budgets.length > 1 && <button type="button" onClick={() => setBudgets((x) => x.filter((_, idx) => idx !== i))} aria-label="Remove budget" className="text-muted-foreground hover:text-danger [&_svg]:size-3.5"><X /></button>}
             </div>
           ))}
+          {badDays && <p className="text-xs text-danger">Every budget needs at least 1 day.</p>}
         </div>
 
         {addOnTypes.length > 0 && (
@@ -220,12 +418,20 @@ function PackageSheet({ clients, onClose, onSaved }: { clients: ClientOpt[]; onC
         <div className="flex items-center justify-between"><span className="text-sm">Once per customer</span><Switch checked={oncePerCustomer} onCheckedChange={setOncePerCustomer} /></div>
         <div className="space-y-2">
           <span className="text-sm text-muted-foreground">Visibility</span>
-          <div className="flex flex-wrap gap-2">{([["marketplace", "Public"], ["private", "Private (grant only)"], ["client_specific", "One client"]] as const).map(([v, label]) => <Chip key={v} selected={visibility === v} onClick={() => setVisibility(v)}>{label}</Chip>)}</div>
+          <div className="flex flex-wrap gap-2">{([["marketplace", "Client Shop"], ["private", "Grant only"], ["client_specific", "One client"]] as const).map(([v, label]) => <Chip key={v} selected={visibility === v} onClick={() => setVisibility(v)}>{label}</Chip>)}</div>
+          <p className="text-xs text-muted-foreground/80">
+            {visibility === "marketplace" ? "Listed in every client's Shop tab, where they can buy it themselves."
+              : visibility === "private" ? "Never listed. You assign it from a client's Plans & access."
+              : "Listed in one client's Shop only, and only they can buy it."}
+          </p>
           {visibility === "client_specific" && (
             <Select aria-label="Client" value={restrictedClientId} onChange={setRestrictedClientId} options={[{ value: "", label: "Choose a client…" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} />
           )}
         </div>
-        <Button size="lg" className="w-full" disabled={name.trim().length < 2 || budgets.length === 0 || (visibility === "client_specific" && !restrictedClientId) || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create package"}</Button>
+        {error && <p role="status" aria-live="polite" className="text-sm text-danger">{error}</p>}
+        <Button size="lg" className="w-full" disabled={!canSave || busy} onClick={() => void save()}>
+          {busy ? (editing ? "Saving…" : "Creating…") : editing ? "Save changes" : "Create package"}
+        </Button>
       </div>
     </Sheet>
   );
@@ -240,32 +446,41 @@ function PromoSheet({ packages, clients, onClose, onSaved }: { packages: Pkg[]; 
   const [restrictedClientId, setRestrictedClientId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Same NaN trap as the package price: "20%" or "$20" used to serialise to null
+  // and create a discount that discounts nothing.
+  const amount = parsePrice(value);
+  const percent = Number(value.trim());
+  const valueError = discountType === "amount"
+    ? (amount.error ?? (amount.cents ? null : "Enter an amount, e.g. 20."))
+    : (!/^\d+$/.test(value.trim()) ? "Whole percent only, 1–100." : percent < 1 || percent > 100 ? "Between 1 and 100." : null);
+  const canSave = code.trim().length >= 3 && !valueError;
   const save = async () => {
+    if (busy || !canSave) return;
     setBusy(true); setError(null);
     try {
       await api.post("/api/promo-codes", {
-        code,
+        code: code.trim(),
         discountType,
-        percentOff: discountType === "percent" ? Number(value) : undefined,
-        amountOffCents: discountType === "amount" ? Math.round(Number(value) * 100) : undefined,
+        percentOff: discountType === "percent" ? percent : undefined,
+        amountOffCents: discountType === "amount" ? amount.cents : undefined,
         maxRedemptions: maxRedemptions ? Number(maxRedemptions) : undefined,
         restrictedPackageId: restrictedPackageId || undefined,
         restrictedClientId: restrictedClientId || undefined,
       });
       onSaved();
-    } catch { setError("That code already exists."); } finally { setBusy(false); }
+    } catch (e) { setError(errorText(e, "That code already exists.")); } finally { setBusy(false); }
   };
   return (
     <Sheet open onClose={onClose} title="New promo code">
       <div className="space-y-4">
         <Field label="Code" icon={Tag} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="SUMMER20" />
         <div className="flex gap-2">{(["percent", "amount"] as const).map((t) => <Chip key={t} selected={discountType === t} onClick={() => setDiscountType(t)}>{t === "percent" ? "% off" : "$ off"}</Chip>)}</div>
-        <Field label={discountType === "percent" ? "Percent off" : "Amount off (USD)"} value={value} inputMode="decimal" onChange={(e) => setValue(e.target.value)} />
+        <Field label={discountType === "percent" ? "Percent off" : "Amount off (USD)"} value={value} inputMode="decimal" onChange={(e) => setValue(e.target.value)} error={valueError ?? undefined} />
         <Field label="Max redemptions (blank = unlimited)" value={maxRedemptions} inputMode="numeric" onChange={(e) => setMaxRedemptions(e.target.value.replace(/\D/g, ""))} />
         <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Limit to a package (optional)</span><Select aria-label="Package" value={restrictedPackageId} onChange={setRestrictedPackageId} options={[{ value: "", label: "Any package" }, ...packages.map((p) => ({ value: p.id, label: p.name }))]} /></div>
         <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Limit to a client (optional)</span><Select aria-label="Client" value={restrictedClientId} onChange={setRestrictedClientId} options={[{ value: "", label: "Any client" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} /></div>
-        {error && <p className="text-sm text-danger">{error}</p>}
-        <Button size="lg" className="w-full" disabled={code.length < 3 || !value || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create promo"}</Button>
+        {error && <p role="status" aria-live="polite" className="text-sm text-danger">{error}</p>}
+        <Button size="lg" className="w-full" disabled={!canSave || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create promo"}</Button>
       </div>
     </Sheet>
   );
@@ -274,21 +489,34 @@ function PromoSheet({ packages, clients, onClose, onSaved }: { packages: Pkg[]; 
 function CodeSheet({ packages, clients, onClose, onSaved }: { packages: Pkg[]; clients: ClientOpt[]; onClose: () => void; onSaved: () => void }) {
   const [code, setCode] = useState("");
   const [days, setDays] = useState("7");
-  const [feature, setFeature] = useState<"all" | "workout" | "meal">("all");
+  const [feature, setFeature] = useState<BudgetFeature>("all");
   const [maxUses, setMaxUses] = useState("1");
   const [restrictedPackageId, setRestrictedPackageId] = useState("");
   const [restrictedClientId, setRestrictedClientId] = useState("");
-  const save = async () => { await api.post("/api/redemption-codes", { code, daysToAdd: Number(days), targetFeature: feature, maxUses: Number(maxUses), restrictedPackageId: restrictedPackageId || undefined, restrictedClientId: restrictedClientId || undefined }); onSaved(); };
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const dayCount = Number(days);
+  const daysError = !(Number.isInteger(dayCount) && dayCount >= 1 && dayCount <= 730) ? "Between 1 and 730 days." : null;
+  const canSave = code.trim().length >= 4 && !daysError && Number(maxUses) >= 1;
+  const save = async () => {
+    if (busy || !canSave) return;
+    setBusy(true); setError(null);
+    try {
+      await api.post("/api/redemption-codes", { code: code.trim(), daysToAdd: dayCount, targetFeature: feature, maxUses: Number(maxUses), restrictedPackageId: restrictedPackageId || undefined, restrictedClientId: restrictedClientId || undefined });
+      onSaved();
+    } catch (e) { setError(errorText(e, "Couldn't create that code — it may already exist.")); } finally { setBusy(false); }
+  };
   return (
     <Sheet open onClose={onClose} title="New redemption code">
       <div className="space-y-4">
         <Field label="Code" icon={Ticket} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="WELCOME7" />
-        <Field label="Days to add" value={days} inputMode="numeric" onChange={(e) => setDays(e.target.value.replace(/\D/g, ""))} />
-        <div className="flex gap-2">{(["all", "workout", "meal"] as const).map((f) => <Chip key={f} selected={feature === f} onClick={() => setFeature(f)}>{f}</Chip>)}</div>
+        <Field label="Days to add" value={days} inputMode="numeric" onChange={(e) => setDays(e.target.value.replace(/\D/g, ""))} error={daysError ?? undefined} />
+        <div className="flex gap-2">{BUDGET_FEATURES.map((f) => <Chip key={f} selected={feature === f} onClick={() => setFeature(f)}>{f}</Chip>)}</div>
         <Field label="Max uses" value={maxUses} inputMode="numeric" onChange={(e) => setMaxUses(e.target.value.replace(/\D/g, ""))} />
         <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Only for holders of a package (optional)</span><Select aria-label="Package" value={restrictedPackageId} onChange={setRestrictedPackageId} options={[{ value: "", label: "Any package" }, ...packages.map((p) => ({ value: p.id, label: p.name }))]} /></div>
         <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Only for one client (optional)</span><Select aria-label="Client" value={restrictedClientId} onChange={setRestrictedClientId} options={[{ value: "", label: "Any client" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} /></div>
-        <Button size="lg" className="w-full" disabled={code.length < 4 || !days} onClick={() => void save()}>Create code</Button>
+        {error && <p role="status" aria-live="polite" className="text-sm text-danger">{error}</p>}
+        <Button size="lg" className="w-full" disabled={!canSave || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create code"}</Button>
       </div>
     </Sheet>
   );

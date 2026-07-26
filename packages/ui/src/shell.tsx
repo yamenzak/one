@@ -116,7 +116,7 @@ export function NavRail({ tabs, active, onSelect, footer, brand, tinted }: { tab
                 className={cn("relative size-[1.35rem] transition-colors", !on && "text-muted-foreground group-hover:text-foreground")}
                 strokeWidth={on ? 2.4 : 2}
               />
-              <span style={on ? { color } : undefined} className={cn("relative text-[0.66rem] font-medium transition-colors", !on && "text-muted-foreground group-hover:text-foreground")}>{t.label}</span>
+              <span style={on ? { color } : undefined} className={cn("relative text-xs font-medium transition-colors", !on && "text-muted-foreground group-hover:text-foreground")}>{t.label}</span>
             </button>
           );
         })}

@@ -10,31 +10,102 @@
  * by what a client bought (AI still meters against the tenant's own credits).
  */
 
-import { resolveClientFlags, parseFlagsJson, gateSpecOf, type Budget, type ClientFlags, type Entitlements, type FeatureKey } from "@mossa/domain";
+import { resolveClientFlags, unionClientFlags, parseFlagsJson, gateSpecOf, type Budget, type ClientFlags, type Entitlements, type FeatureKey } from "@mossa/domain";
 import type { Context } from "hono";
 import type { AppEnv } from "./auth-context.js";
 import { tenantEntitlements, hasFeature } from "./billing-store.js";
 import { parseJson } from "./db.js";
 
-/** Resolve a client's effective flags from their current subscription (if any). */
+/**
+ * The statuses that count as a LIVE access row — what the enforcing gate honours.
+ * `paused` still holds capability (the budget clock is what expires access).
+ */
+export const LIVE_ACCESS_STATUSES = ["active", "paused"] as const;
+/**
+ * Live + `expired` — for the read-only access SUMMARIES (the client's Today
+ * banner, the coach's attention queue) which must still describe a lapsed
+ * subscriber ("expired", "0 days left") rather than look like a client who never
+ * bought anything.
+ */
+export const REPORTED_ACCESS_STATUSES = ["active", "paused", "expired"] as const;
+
+export interface ClientAccessRow {
+  status: string;
+  package_id: string | null;
+  budgets_json: string | null;
+  flags_json: string | null;
+}
+
+/**
+ * Load EVERY access row a client holds (not just the newest).
+ *
+ * This is the single read behind all three access surfaces. A client can hold
+ * more than one row at a time by design — `grantClientPackage` gives every
+ * Stripe subscription its OWN row while one-time purchases fold into the active
+ * non-recurring row — so a client on a monthly membership who also buys a
+ * one-time package legitimately has TWO. `ORDER BY started_at DESC LIMIT 1`
+ * (what every caller used to do) honoured only one of them: the other row's
+ * flags AND its paid-for budget days went dark, while /context summed days
+ * across all rows — so the banner promised access the routes then 403'd.
+ *
+ * Tenant-scoped on purpose: a mis-tenanted row (a stale/foreign write) must
+ * never be able to grant access inside this tenant.
+ */
+export async function loadClientAccessRows(
+  db: D1Database,
+  tenantId: string,
+  clientId: string,
+  statuses: readonly string[] = LIVE_ACCESS_STATUSES,
+): Promise<ClientAccessRow[]> {
+  const ph = statuses.map(() => "?").join(",");
+  const r = await db
+    .prepare(`SELECT status, package_id, budgets_json, flags_json FROM client_subscriptions WHERE client_id = ? AND tenant_id = ? AND status IN (${ph}) ORDER BY started_at DESC`)
+    .bind(clientId, tenantId, ...statuses)
+    .all<ClientAccessRow>();
+  return r.results ?? [];
+}
+
+/** The runway a client actually holds: every row's budgets concatenated. Days
+ *  STACK across packages (BILLING-PLAN §7), and the budget engine derives
+ *  remaining days / expiry from each entry's own `expiresAt`, so concatenating
+ *  is exactly right — no row's paid days are hidden behind another's. */
+export function accessBudgetsOf(rows: ClientAccessRow[]): Budget[] {
+  return rows.flatMap((r) => parseJson<Budget[]>(r.budgets_json, []));
+}
+
+/** Resolve a client's effective flags across EVERY live subscription row. */
 export async function resolveClientFlagsFor(db: D1Database, tenantId: string, clientId: string): Promise<ClientFlags> {
   const entitlements = await tenantEntitlements(db, tenantId);
-  const sub = await db
-    .prepare("SELECT budgets_json, flags_json, package_id FROM client_subscriptions WHERE client_id = ? AND status IN ('active','paused') ORDER BY started_at DESC LIMIT 1")
-    .bind(clientId)
-    .first<{ budgets_json: string | null; flags_json: string | null; package_id: string | null }>();
-  let packageFlags = null;
-  if (sub?.package_id) {
-    const pkg = await db.prepare("SELECT flags_json FROM packages WHERE id = ?").bind(sub.package_id).first<{ flags_json: string | null }>();
-    packageFlags = parseFlagsJson(pkg?.flags_json);
+  const rows = await loadClientAccessRows(db, tenantId, clientId);
+  const nowIso = new Date().toISOString();
+  // No row at all ⇒ `budgets: null`, the resolver's documented "no subscription
+  // context" signal, which SKIPS budget gating (a generous tenancy that never
+  // sells packages). This is deliberately NOT `[]` — that means "a subscriber
+  // whose budgets all lapsed" and correctly revokes plan access.
+  if (rows.length === 0) {
+    return resolveClientFlags({ packageFlags: null, subscriptionFlags: null, budgets: null, entitlements, nowIso });
   }
-  return resolveClientFlags({
-    packageFlags,
-    subscriptionFlags: parseFlagsJson(sub?.flags_json),
-    budgets: sub ? parseJson<Budget[]>(sub.budgets_json, []) : null,
-    entitlements,
-    nowIso: new Date().toISOString(),
-  });
+  // Resolve each row on its OWN package flags + overrides + budgets, then union:
+  // the client keeps a capability for as long as ANY live package grants it.
+  const resolved: ClientFlags[] = [];
+  for (const row of rows) {
+    let packageFlags = null;
+    if (row.package_id) {
+      // Tenant-scoped: never inherit another tenant's package flags.
+      const pkg = await db.prepare("SELECT flags_json FROM packages WHERE id = ? AND tenant_id = ?").bind(row.package_id, tenantId).first<{ flags_json: string | null }>();
+      packageFlags = parseFlagsJson(pkg?.flags_json);
+    }
+    resolved.push(
+      resolveClientFlags({
+        packageFlags,
+        subscriptionFlags: parseFlagsJson(row.flags_json),
+        budgets: parseJson<Budget[]>(row.budgets_json, []),
+        entitlements,
+        nowIso,
+      }),
+    );
+  }
+  return resolved.reduce(unionClientFlags);
 }
 
 /**

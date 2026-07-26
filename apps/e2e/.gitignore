@@ -1,0 +1,6 @@
+# Playwright run artefacts. The root .gitignore predates this package and does
+# not know about them; scoping them here keeps that file untouched.
+test-results/
+playwright-report/
+blob-report/
+.playwright/

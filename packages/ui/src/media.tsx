@@ -78,7 +78,7 @@ export function PhotoGrid({ photos, className, cols = 3 }: { photos: Photo[]; cl
             className="group relative aspect-square overflow-hidden rounded-2xl bg-surface-2 ring-1 ring-border/60"
           >
             <img src={p.url} alt={p.label ?? `Photo ${i + 1}`} loading="lazy" className="size-full object-cover transition-transform duration-300 group-hover:scale-105" />
-            {p.label && <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5 text-[0.65rem] font-medium text-white">{p.label}</span>}
+            {p.label && <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5 text-xs font-medium text-white">{p.label}</span>}
           </motion.button>
         ))}
       </div>

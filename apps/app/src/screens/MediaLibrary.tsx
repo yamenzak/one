@@ -119,16 +119,16 @@ export function MediaLibrary({ onBack }: { onBack: () => void }) {
                   <img src={it.url} alt={PURPOSE_LABEL[it.purpose] ?? it.purpose} loading="lazy" className="aspect-square w-full object-cover" />
                 ) : (
                   <div className="grid aspect-square w-full place-items-center bg-surface-2 text-center text-xs text-muted-foreground">
-                    <div className="space-y-1 px-2"><div className="font-mono text-[0.6rem] uppercase">{it.contentType.split("/").pop()}</div><div>{PURPOSE_LABEL[it.purpose] ?? it.purpose}</div></div>
+                    <div className="space-y-1 px-2"><div className="font-mono text-xs uppercase">{it.contentType.split("/").pop()}</div><div>{PURPOSE_LABEL[it.purpose] ?? it.purpose}</div></div>
                   </div>
                 )}
                 <div className="space-y-1 p-2.5">
                   <div className="flex items-center gap-1.5">
                     <Badge tone="neutral">{PURPOSE_LABEL[it.purpose] ?? it.purpose}</Badge>
-                    {it.mine && <span className="text-[0.6rem] font-medium text-muted-foreground">yours</span>}
+                    {it.mine && <span className="text-xs font-medium text-muted-foreground">yours</span>}
                   </div>
                   {it.clientName && <div className="truncate text-xs font-medium">{it.clientName}</div>}
-                  <div className="numeral flex items-center justify-between text-[0.65rem] text-muted-foreground">
+                  <div className="numeral flex items-center justify-between text-xs text-muted-foreground">
                     <span>{fmtBytes(it.sizeBytes)}</span><span>{fmtDate(it.createdAt)}</span>
                   </div>
                 </div>

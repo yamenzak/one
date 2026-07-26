@@ -249,7 +249,7 @@ function Foods() {
   const macros = (f: FoodRow) => (
     <>
       <span className="numeral font-semibold text-calories">{fmtEnergy(f.calories, units)}</span>
-      {f.protein_g != null && <MacroInline proteinG={f.protein_g} carbsG={f.carbs_g ?? 0} fatG={f.fat_g ?? 0} className="text-[0.7rem]" />}
+      {f.protein_g != null && <MacroInline proteinG={f.protein_g} carbsG={f.carbs_g ?? 0} fatG={f.fat_g ?? 0} className="text-xs" />}
     </>
   );
   const actions = (f: FoodRow) => (

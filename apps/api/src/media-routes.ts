@@ -22,6 +22,18 @@ const MAX_BYTES = 15 * 1024 * 1024; // 15 MB
 const ALLOWED = /^(image\/(png|jpe?g|webp|gif)|application\/pdf|video\/(mp4|webm))$/;
 const INLINE_SAFE = /^image\/(png|jpe?g|webp|gif)$/;
 
+// `purpose` is spliced straight into the R2 key, so it is a path segment the
+// caller controls — it MUST be a closed set, not free text. Two things went wrong
+// while it was unvalidated: `purpose=brand` put a client's arbitrary upload under
+// t/<tenant>/brand/… , which route-guard + the read proxy both serve PUBLICLY and
+// unauthenticated with `cache-control: public` (free hosting of any image/pdf/mp4
+// on the studio's white-label domain), and `purpose=c/<victim>/progress` forged a
+// path into another client's key namespace on the tenant's storage quota.
+const PURPOSES = new Set(["progress", "lab", "avatar", "food", "exercise", "label", "meal-snap", "misc"]);
+// `brand` is the one publicly-readable prefix, so it is not in the general set:
+// only the owner (the white-label/branding surface, settings:manage) may write it.
+const BRAND_PURPOSE = "brand";
+
 export const mediaRoutes = new Hono<AppEnv>()
   // Upload a private asset. Returns the storage key. Pass `clientId` for
   // client-owned media (progress photos, lab files) so reads are assignment-
@@ -30,7 +42,12 @@ export const mediaRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const form = await c.req.formData().catch(() => null);
     const raw = form?.get("file");
-    const purpose = String(form?.get("purpose") ?? "misc"); // progress | lab | avatar | misc
+    const purpose = String(form?.get("purpose") ?? "misc");
+    if (purpose === BRAND_PURPOSE) {
+      if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
+    } else if (!PURPOSES.has(purpose)) {
+      return c.json({ error: "invalid purpose" }, 400);
+    }
     // Duck-typed File (workers-types doesn't expose the File constructor).
     const file = raw as { size?: number; type?: string; name?: string; arrayBuffer?: () => Promise<ArrayBuffer> } | null;
     if (!file || typeof file.arrayBuffer !== "function") return c.json({ error: "file required" }, 400);

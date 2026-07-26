@@ -173,7 +173,10 @@ export function LabDetailSheet({ lab, onClose }: { lab: LabFull; onClose: () => 
           </SubCard>
         )}
         {lab.due_by && lab.status !== "reviewed" && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground [&_svg]:size-4"><Calendar /> Due {new Date(lab.due_by).toLocaleDateString()}</div>
+          /* `due_by` is a date-only column, so a bare `new Date(d)` parses as UTC
+             midnight and every timezone west of UTC renders the day BEFORE the
+             one the coach set. Pin it to local midnight, like prettyDate above. */
+          <div className="flex items-center gap-2 text-sm text-muted-foreground [&_svg]:size-4"><Calendar /> Due {new Date(`${lab.due_by}T00:00:00`).toLocaleDateString()}</div>
         )}
 
         {fileUrl && (

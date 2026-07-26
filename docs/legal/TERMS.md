@@ -1,23 +1,16 @@
 # Mossa — Terms of Service
 
-> **DRAFT for legal review.** This document was prepared as a working draft to be
-> reviewed and finalised by qualified legal counsel admitted in the United Arab
-> Emirates before publication. It is not legal advice. Bracketed items `[ ]` are
-> remaining placeholders you must confirm (commercial licence number, registered
-> address, and — if you prefer arbitration to the Abu Dhabi courts — the dispute
-> clause in §19). Four Degree Labs is confirmed as a mainland Abu Dhabi LLC, so
-> UAE Federal law and the Abu Dhabi courts govern.
 
-**Effective date:** `[DATE]`
-**Last updated:** `[DATE]`
+**Effective date:** 26 July 2026
+**Last updated:** 26 July 2026
 
 ## 1. Who we are and what this covers
 
 Mossa (the "**Platform**", "**Service**", "**we**", "**us**", "**our**") is a
 software-as-a-service platform for personal-training and coaching businesses,
 operated by **Four Degree Labs LLC**, a limited liability company licensed in
-mainland Abu Dhabi, United Arab Emirates, under commercial licence number
-`[NUMBER]`, with its registered office at `[ADDRESS]`.
+mainland Abu Dhabi, United Arab Emirates. Our commercial licence number and
+registered office address are available on request at `info@fourdegreelabs.com`.
 
 These Terms of Service (the "**Terms**") are a binding agreement between Four
 Degree Labs and the person or entity that registers for, accesses, or uses the

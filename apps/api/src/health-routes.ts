@@ -9,11 +9,11 @@ import { Hono } from "hono";
 import { z } from "zod";
 import {
   wellnessScore, sessionLoad, epley1Rm, activityByKey, presetRange, addDays,
-  DEFAULT_WEEKLY_LOAD_TARGET, type LoggedSetLike, type WellnessInput,
+  resolveWeeklyLoadTarget, type LoggedSetLike, type WellnessInput,
 } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { gateFeature } from "./client-flags.js";
-import { requireClientAccess } from "./clients.js";
+import { requireClientAccess, visibleClientIds } from "./clients.js";
 import { loadGoalTimeline } from "./goals.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
@@ -102,14 +102,24 @@ export const healthRoutes = new Hono<AppEnv>()
     if (d.dose !== undefined) (sets.push("dose = ?"), binds.push(d.dose));
     if (d.notes !== undefined) (sets.push("notes = ?"), binds.push(d.notes));
     if (!sets.length) return c.json({ ok: true });
+    // Resolve the row's owning client BEFORE writing, and enforce row-level scope
+    // on it. `WHERE id = ? AND tenant_id = ?` alone is NOT sufficient for a
+    // client-owned row: a trainer who is a member of the studio but absent from
+    // client_trainers for this client could otherwise change the dose or flip the
+    // status to discontinued on someone else's prescription — a clinical change,
+    // pushed to that client as a notification, from a coach with no relationship
+    // to them. Same defect class as the swap-decide check below.
+    const sup = await c.env.DB.prepare("SELECT s.client_id, s.name, cl.user_id FROM supplements s JOIN clients cl ON cl.id = s.client_id WHERE s.id = ? AND s.tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ client_id: string; name: string; user_id: string | null }>();
+    if (!sup) return c.json({ error: "not found" }, 404);
+    const access = await requireClientAccess(c, sup.client_id);
+    if ("response" in access) return access.response;
     await c.env.DB.prepare(`UPDATE supplements SET ${sets.join(", ")} WHERE id = ? AND tenant_id = ?`)
       .bind(...binds, c.req.param("id"), who.tenantId)
       .run();
-    const sup = await c.env.DB.prepare("SELECT s.client_id, s.name, cl.user_id FROM supplements s JOIN clients cl ON cl.id = s.client_id WHERE s.id = ? AND s.tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ client_id: string; name: string; user_id: string | null }>();
-    if (sup) await recordAudit(c.env, { tenantId: who.tenantId, clientId: sup.client_id, actorUserId: who.userId, action: "supplement.update", summary: `${sup.name}${d.status ? ` · ${d.status}` : ""}`, ref: c.req.param("id") });
+    await recordAudit(c.env, { tenantId: who.tenantId, clientId: sup.client_id, actorUserId: who.userId, action: "supplement.update", summary: `${sup.name}${d.status ? ` · ${d.status}` : ""}`, ref: c.req.param("id") });
     // Tell the client when the change is one they'd act on — a status flip
     // (paused/resumed/stopped) or a dose change. A notes-only tweak is silent.
-    if (sup?.user_id && (d.status || d.dose !== undefined)) {
+    if (sup.user_id && (d.status || d.dose !== undefined)) {
       const change = d.status ? `marked ${d.status}` : "dose updated";
       await notify(c.env, {
         tenantId: who.tenantId,
@@ -266,13 +276,21 @@ export const healthRoutes = new Hono<AppEnv>()
     if (d.values !== undefined) (sets.push("values_json = ?"), binds.push(d.values ? j(d.values) : null));
     if (d.trainerFeedback !== undefined) (sets.push("trainer_feedback = ?"), binds.push(d.trainerFeedback));
     if (!sets.length) return c.json({ ok: true });
+    // Resolve the lab's owning client BEFORE writing, and enforce row-level scope.
+    // Tenant match alone let an UNASSIGNED trainer overwrite any same-tenant
+    // client's values_json + trainer_feedback and flip the status to 'reviewed' —
+    // forged clinical data that the client and their real coach then read as
+    // authoritative. The row-level guard is the only thing that stops it.
+    const lab = await c.env.DB.prepare("SELECT c.user_id AS user_id, c.id AS client_id, l.display_name AS name FROM lab_tests l JOIN clients c ON c.id = l.client_id WHERE l.id = ? AND l.tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ user_id: string | null; client_id: string; name: string | null }>();
+    if (!lab) return c.json({ error: "not found" }, 404);
+    const access = await requireClientAccess(c, lab.client_id);
+    if ("response" in access) return access.response;
     await c.env.DB.prepare(`UPDATE lab_tests SET ${sets.join(", ")} WHERE id = ? AND tenant_id = ?`)
       .bind(...binds, c.req.param("id"), who.tenantId)
       .run();
     if (d.status === "reviewed") {
-      const lab = await c.env.DB.prepare("SELECT c.user_id AS user_id, c.id AS client_id, l.display_name AS name FROM lab_tests l JOIN clients c ON c.id = l.client_id WHERE l.id = ? AND l.tenant_id = ?").bind(c.req.param("id"), who.tenantId).first<{ user_id: string | null; client_id: string; name: string | null }>();
-      if (lab?.user_id) await notify(c.env, { tenantId: who.tenantId, userId: lab.user_id, type: "lab_reviewed", message: lab.name ?? "", link: `/wellness?lab=${c.req.param("id")}` });
-      if (lab?.client_id) await recordAudit(c.env, { tenantId: who.tenantId, clientId: lab.client_id, actorUserId: who.userId, action: "lab.review", summary: lab.name ?? "", ref: c.req.param("id") });
+      if (lab.user_id) await notify(c.env, { tenantId: who.tenantId, userId: lab.user_id, type: "lab_reviewed", message: lab.name ?? "", link: `/wellness?lab=${c.req.param("id")}` });
+      await recordAudit(c.env, { tenantId: who.tenantId, clientId: lab.client_id, actorUserId: who.userId, action: "lab.review", summary: lab.name ?? "", ref: c.req.param("id") });
     }
     return c.json({ ok: true });
   })
@@ -400,7 +418,11 @@ export const healthRoutes = new Hono<AppEnv>()
     const input: WellnessInput = {
       activeDays: activeDaySet.size,
       weeklyLoad,
-      weeklyLoadTarget: timeline.weeklyLoadTarget ?? DEFAULT_WEEKLY_LOAD_TARGET,
+      // The coach's target from targets_json wins; the column is only a mirror
+      // (older rows have it pinned at 300). Reading the column alone is what
+      // graded a client with a 900 target against 300 and pinned the load
+      // component of this score at 1.0.
+      weeklyLoadTarget: resolveWeeklyLoadTarget(timeline.active, timeline.weeklyLoadTarget),
       prsThisWeek,
       calorieAdherence: calParts.length ? calParts.reduce((a, b) => a + b, 0) / calParts.length : null,
       proteinAdherence: proParts.length ? proParts.reduce((a, b) => a + b, 0) / proParts.length : null,
@@ -432,11 +454,28 @@ export const healthRoutes = new Hono<AppEnv>()
         .all();
       return c.json({ swaps: rows.results ?? [] });
     }
-    // Trainer view: all pending swaps in the tenant (roster-scoped in UI).
-    const rows = await c.env.DB.prepare(
-      "SELECT * FROM swap_requests WHERE tenant_id = ? AND status = 'pending' ORDER BY created_at DESC",
-    )
-      .bind(who.tenantId)
+    // No clientId = the COACH's pending-swaps queue. Two things have to hold here.
+    //
+    // 1. This route rides `tracking:["read"]`, a permission the CLIENT role holds,
+    //    so without an explicit reject any signed-in client could call it with no
+    //    query params and read every other client's pending swap: their client_id,
+    //    workout_plan_id, the client-authored `reason` free text (typically injury
+    //    or pain detail), the coach's trainer_note and resolved_by. A client must
+    //    always ask for their own id, which then goes through requireClientAccess.
+    if (c.get("role") === "client") return c.json({ error: "clientId required" }, 400);
+    // 2. "Roster-scoped in the UI" is not scope. Tenant match alone handed an
+    //    UNASSIGNED trainer a tenant-wide queue, breaking the client_trainers
+    //    invariant; scope the query to the ids they may actually see (owners and
+    //    assistants legitimately see the whole roster → "all").
+    const scope = await visibleClientIds(c);
+    if (scope !== "all" && scope.length === 0) return c.json({ swaps: [] });
+    const where =
+      scope === "all"
+        ? "tenant_id = ? AND status = 'pending'"
+        : `tenant_id = ? AND status = 'pending' AND client_id IN (${scope.map(() => "?").join(",")})`;
+    const binds = scope === "all" ? [who.tenantId] : [who.tenantId, ...scope];
+    const rows = await c.env.DB.prepare(`SELECT * FROM swap_requests WHERE ${where} ORDER BY created_at DESC`)
+      .bind(...binds)
       .all();
     return c.json({ swaps: rows.results ?? [] });
   })

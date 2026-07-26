@@ -12,7 +12,7 @@ import { notifCoding } from "./notif-ui.js";
 interface Notification { id: string; type: NotifType; tenant_id: string | null; title: string; message: string | null; link: string | null; read: number; created_at: string }
 
 export function NotificationBell() {
-  const { ctx, mode, setMode, switchTenant } = useSession();
+  const { ctx, mode, setMode, switchTenant, online } = useSession();
   const nav = useNavigate();
   const [items, setItems] = useState<Notification[]>([]);
   const [failed, setFailed] = useState(false);
@@ -28,7 +28,14 @@ export function NotificationBell() {
 
   // Real-time via the per-user InboxDO WebSocket; a slow poll stays as a
   // backstop for missed pushes / dropped sockets (SPEC §8.10).
+  //
+  // Gated on connectivity: while offline the socket can only fail, so the
+  // backoff reconnect + the 90s poll used to grind against a dead radio for the
+  // whole session — draining battery in exactly the gym scenario the offline
+  // support exists for. Going back online re-runs this effect (the `online` dep),
+  // which reconnects and reloads immediately.
   useEffect(() => {
+    if (!online) return;
     void load();
     const poll = setInterval(() => void load(), 90000);
     let ws: WebSocket | null = null;
@@ -53,7 +60,7 @@ export function NotificationBell() {
     };
     connect();
     return () => { closed = true; clearInterval(poll); if (timer) clearTimeout(timer); try { ws?.close(); } catch { /* noop */ } };
-  }, [load]);
+  }, [load, online]);
 
   // Only the current surface's notifications (train vs coach mode).
   const shown = items.filter((n) => notifVisibleInSurface(n.type, surface));
@@ -82,7 +89,7 @@ export function NotificationBell() {
       <DropdownMenuTrigger asChild>
         <button className="relative grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" aria-label="Notifications">
           <Bell className="size-[1.15rem]" />
-          {unread > 0 && <span className="absolute right-1.5 top-1.5 grid size-4 place-items-center rounded-full bg-primary text-[0.6rem] font-bold text-primary-foreground">{unread > 9 ? "9+" : unread}</span>}
+          {unread > 0 && <span className="absolute right-1.5 top-1.5 grid size-4 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{unread > 9 ? "9+" : unread}</span>}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="max-h-[28rem] w-80 overflow-y-auto">
@@ -91,7 +98,9 @@ export function NotificationBell() {
           {unread > 0 && <button onClick={() => void markAll()} className="text-xs font-medium text-primary hover:underline">Mark all read</button>}
         </div>
         <DropdownMenuSeparator />
-        {failed && shown.length === 0 ? (
+        {!online && shown.length === 0 ? (
+          <div className="px-3 py-6 text-center text-sm text-muted-foreground">You're offline — notifications will update when you reconnect.</div>
+        ) : failed && shown.length === 0 ? (
           <div className="px-3 py-6 text-center text-sm text-warning">Couldn't load notifications. We'll keep trying.</div>
         ) : shown.length === 0 ? (
           <div className="px-3 py-6 text-center text-sm text-muted-foreground">You're all caught up.</div>
@@ -104,7 +113,7 @@ export function NotificationBell() {
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">{n.title}</div>
                   {n.message && <div className="truncate text-xs text-muted-foreground">{n.message}</div>}
-                  <div className="mt-0.5 text-[0.65rem] text-muted-foreground">{new Date(n.created_at).toLocaleString()}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">{new Date(n.created_at).toLocaleString()}</div>
                 </div>
                 {!n.read && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />}
               </button>

@@ -55,7 +55,25 @@ export { InboxDO } from "./inbox-do.js";
 
 const app = new Hono<AppEnv>();
 
+// Liveness: the worker is up. Deliberately trivial and dependency-free.
 app.get("/health", (c) => c.json({ ok: true, service: "mossa-api" }));
+
+// Readiness: point an external uptime monitor HERE, not at /health. A worker that
+// boots while D1 is unreachable answers /health with 200 and 500s every real
+// request, so liveness alone cannot detect a broken deploy. This touches the
+// bindings a request actually depends on and returns 503 when one is down.
+app.get("/ready", async (c) => {
+  const checks: Record<string, boolean> = {};
+  await Promise.all([
+    c.env.DB.prepare("SELECT 1 AS x").first<{ x: number }>().then(
+      (r) => { checks.d1 = r?.x === 1; },
+      () => { checks.d1 = false; },
+    ),
+    c.env.CACHE.get("__ready_probe").then(() => { checks.kv = true; }, () => { checks.kv = false; }),
+  ]);
+  const ok = Object.values(checks).every(Boolean);
+  return c.json({ ok, checks, service: "mossa-api" }, ok ? 200 : 503);
+});
 
 app.use("*", sessionMiddleware);
 app.use("*", routeGuard);
@@ -64,6 +82,16 @@ app.use("*", routeGuard);
 // eligibility), then forwards to Better Auth. Registered before the catch-all
 // so this exact path lands here, not on the generic handler.
 app.post("/api/auth/email-otp/send-verification-otp", otpSendGuard);
+
+// Close the two sibling endpoints the emailOTP plugin registers unconditionally.
+// Both call the same sendVerificationOTP callback directly, so they are a way
+// around otpSendGuard entirely — no Turnstile, no 30s cooldown, no per-IP hourly
+// ceiling — which would let an attacker keep emailing codes after an operator
+// turned Turnstile on. There is no password provider here at all
+// (`emailAndPassword: { enabled: false }`), so password-reset OTP is pure attack
+// surface with no legitimate caller. 404 rather than 403: don't confirm it exists.
+app.post("/api/auth/email-otp/request-password-reset", (c) => c.json({ error: "not_found" }, 404));
+app.post("/api/auth/forget-password/email-otp", (c) => c.json({ error: "not_found" }, 404));
 
 // Better Auth: sign-in (OTP), passkey ceremonies, org management, sessions.
 app.on(["GET", "POST"], "/api/auth/*", (c) => c.get("auth").handler(c.req.raw));
@@ -124,28 +152,47 @@ const DELETE_DAYS = 30; // suspended → data wipe
  * Comped tenants are exempt.
  */
 async function dailySweep(env: Env): Promise<void> {
-  await ensureSchema(env.DB);
-  await seedBilling(env.DB);
+  // Every phase below is independent, so each is isolated: this sweep is the only
+  // thing that grants monthly credits, advances the dunning lifecycle, executes
+  // scheduled closures and bounds table growth, and it runs once a day. A single
+  // transient D1 error used to abort the whole run from the very first statement —
+  // meaning paying tenants silently received zero credits for that month, with
+  // nothing surfaced. Isolate per phase so one failure costs one phase, not the day.
+  const step = async (name: string, fn: () => Promise<void>): Promise<void> => {
+    try {
+      await fn();
+    } catch (e) {
+      console.error(`[dailySweep] phase "${name}" failed:`, e);
+    }
+  };
+
+  await step("schema+seed", async () => {
+    await ensureSchema(env.DB);
+    await seedBilling(env.DB);
+  });
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();
 
   // 1) Monthly grants.
-  const plans = await listPlans(env.DB);
-  const grants = new Map(plans.map((p) => [p.id, resolveEntitlements(p.entitlements_json).aiCredits.monthlyGrant]));
-  const active = await env.DB.prepare("SELECT tenant_id, plan_id FROM subscriptions WHERE status IN ('active','trialing')").all<{ tenant_id: string; plan_id: string }>();
-  const key = periodKey();
-  for (const sub of active.results ?? []) {
-    const grant = grants.get(sub.plan_id) ?? 0;
-    if (grant <= 0) continue;
-    const dobj = env.BILLING.get(env.BILLING.idFromName(sub.tenant_id));
-    await dobj.bind(sub.tenant_id);
-    // Money path: a swallowed grant failure means a paid tenant silently never
-    // receives its monthly credits — surface it so it's observable.
-    await dobj.grantMonthly(grant, key).catch((e) => console.error(`[dailySweep] grantMonthly failed for ${sub.tenant_id}:`, e));
-  }
+  await step("monthly-grants", async () => {
+    const plans = await listPlans(env.DB);
+    const grants = new Map(plans.map((p) => [p.id, resolveEntitlements(p.entitlements_json).aiCredits.monthlyGrant]));
+    const active = await env.DB.prepare("SELECT tenant_id, plan_id FROM subscriptions WHERE status IN ('active','trialing')").all<{ tenant_id: string; plan_id: string }>();
+    const key = periodKey();
+    for (const sub of active.results ?? []) {
+      const grant = grants.get(sub.plan_id) ?? 0;
+      if (grant <= 0) continue;
+      const dobj = env.BILLING.get(env.BILLING.idFromName(sub.tenant_id));
+      await dobj.bind(sub.tenant_id);
+      // Money path: a swallowed grant failure means a paid tenant silently never
+      // receives its monthly credits — surface it so it's observable.
+      await dobj.grantMonthly(grant, key).catch((e) => console.error(`[dailySweep] grantMonthly failed for ${sub.tenant_id}:`, e));
+    }
+  });
 
   // 2) Dunning: past_due older than the grace window → suspended. Select first
   //    so we can notify each owner that their studio just went dark.
+  await step("dunning-suspend", async () => {
   const graceCutoff = new Date(nowMs - GRACE_DAYS * 86_400_000).toISOString();
   const toSuspend = await env.DB.prepare(
     "SELECT tenant_id FROM subscriptions WHERE status = 'past_due' AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?",
@@ -163,9 +210,11 @@ async function dailySweep(env: Env): Promise<void> {
       dedupeKey: `susp_${s.tenant_id}`,
     });
   }
+  });
 
   // 3) Suspended past the delete window → drop to free (data-wipe hook lives
   //    here; v1 resets the plan, retaining coaching data until wired).
+  await step("dunning-cancel", async () => {
   const toCancel = await env.DB.prepare(
     "SELECT tenant_id FROM subscriptions WHERE status = 'suspended' AND comp = 0 AND delete_at IS NOT NULL AND delete_at < ?",
   ).bind(nowIso).all<{ tenant_id: string }>().catch(() => ({ results: [] as { tenant_id: string }[] }));
@@ -182,16 +231,19 @@ async function dailySweep(env: Env): Promise<void> {
       dedupeKey: `cancel_${s.tenant_id}`,
     });
   }
+  });
 
   // 4) Owner-initiated studio closures past their 7-day hold → full hard purge
   //    (R2 + D1 + billing DO + member identities). Distinct from the dunning
   //    lifecycle above (which merely resets a delinquent tenant to free).
-  const toPurge = await env.DB.prepare(
-    "SELECT tenant_id FROM subscriptions WHERE status = 'closing' AND delete_at IS NOT NULL AND delete_at < ?",
-  ).bind(nowIso).all<{ tenant_id: string }>().catch(() => ({ results: [] as { tenant_id: string }[] }));
-  for (const s of toPurge.results ?? []) {
-    await purgeTenant(env, s.tenant_id).catch((e) => console.error(`[dailySweep] purgeTenant failed for ${s.tenant_id}:`, e));
-  }
+  await step("scheduled-closures", async () => {
+    const toPurge = await env.DB.prepare(
+      "SELECT tenant_id FROM subscriptions WHERE status = 'closing' AND delete_at IS NOT NULL AND delete_at < ?",
+    ).bind(nowIso).all<{ tenant_id: string }>().catch(() => ({ results: [] as { tenant_id: string }[] }));
+    for (const s of toPurge.results ?? []) {
+      await purgeTenant(env, s.tenant_id).catch((e) => console.error(`[dailySweep] purgeTenant failed for ${s.tenant_id}:`, e));
+    }
+  });
 
   // 5) Housekeeping: bound the growth of the append-only dedup/cache/ledger
   //    tables. Webhook dedup only needs a window wider than Stripe's retry
@@ -228,13 +280,28 @@ async function reminderSweep(env: Env): Promise<void> {
         // Title + link (/shop) come from the type's record; `studioName` is auto.
         await notify(env, { tenantId: sub.tenant_id, userId: client.user_id, type, message, dedupeKey: `${marker}_${sub.id}`, vars });
       }
-      await env.DB.prepare("UPDATE client_subscriptions SET notes = ? WHERE id = ?").bind(`${notes} ${marker}`.trim(), sub.id).run().catch(() => undefined);
+      // CAS on the notes we read: two overlapping sweeps (or a coach saving a
+      // note) must not clobber each other's marker and re-nudge the client.
+      await env.DB.prepare("UPDATE client_subscriptions SET notes = ? WHERE id = ? AND notes IS ?").bind(`${notes} ${marker}`.trim(), sub.id, sub.notes ?? null).run().catch(() => undefined);
     };
     // Fully lapsed → one "expired" nudge, and reconcile the status.
     if (latest > 0 && latest <= now) {
       if (!notes.includes("expired-notified")) {
         await nudge("sub_expired", "Renew to pick your plan back up where you left off.", "expired-notified");
-        await env.DB.prepare("UPDATE client_subscriptions SET status = 'expired' WHERE id = ?").bind(sub.id).run().catch(() => undefined);
+        // Guard on the exact status + budgets this iteration read — the same
+        // guard reconcile() uses (commerce-routes.ts). The row set was snapshotted
+        // by one SELECT at the top of the sweep and each iteration then does D1
+        // reads plus a notify() network call, so on a large roster the snapshot is
+        // minutes stale by the time we get here. Without the guard, a renewal that
+        // landed in that window (invoice.paid appending fresh days and setting the
+        // row active) gets stamped 'expired' on top — and since NO read path ever
+        // flips expired→active, the client has paid and is locked out of every
+        // budget-gated capability until their next invoice.
+        await env.DB
+          .prepare("UPDATE client_subscriptions SET status = 'expired' WHERE id = ? AND status = 'active' AND budgets_json IS ?")
+          .bind(sub.id, sub.budgets_json ?? null)
+          .run()
+          .catch(() => undefined);
       }
       continue;
     }

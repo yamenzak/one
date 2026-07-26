@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { MealBody, MealOption, MealFood } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy, scaleFood, servingsToQuantity, SERVING_PRESETS } from "@mossa/domain";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, MacroBar, ProgressRing, Eyebrow, Chip, IconBadge, ConfirmDialog, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, ArrowLeft, Plus, Sparkles, Utensils, Flame, History, LayoutGrid, ChevronRight, Trash2, X } from "@mossa/ui";
-import { api, ApiError } from "../../api.js";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, MacroBar, ProgressRing, Eyebrow, Chip, IconBadge, ConfirmDialog, EmptyState, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, AlertTriangle, ArrowLeft, Plus, Sparkles, Utensils, Flame, History, LayoutGrid, ChevronRight, Trash2, X } from "@mossa/ui";
+import { api, ApiError, errorText } from "../../api.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { ClientPrefsStrip } from "./ClientPrefsStrip.js";
 import { AiErrorBox } from "../../AiError.js";
@@ -37,6 +37,11 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const [targets, setTargets] = useState<Targets | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  // One in-flight name for the footer's three lifecycle actions — they share the
+  // bar, and only one can sensibly run at a time.
+  const [action, setAction] = useState<"publish" | "activate" | "rollback" | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
   const [foodPicker, setFoodPicker] = useState<{ optIdx: number } | null>(null);
   const units = useUnits();
   const [aiOpen, setAiOpen] = useState(false);
@@ -52,11 +57,20 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const foodsFromRows = (rows: FoodRow[]): Map<string, FoodLike> =>
     new Map(rows.map((x) => [x.id, { id: x.id, servingSize: x.serving_size, caloriesPerServing: x.calories, proteinG: x.protein_g, carbsG: x.carbs_g, fatG: x.fat_g }]));
 
+  // Two independent reads, so `allSettled`: the plan is required (nothing renders
+  // without it) but the food library only powers the macro read-outs, and with
+  // `all` a foods outage rejected the pair and left the whole builder a permanent
+  // skeleton — the coach couldn't even see the meals they'd already written.
+  // Losing foods alone just falls back to "Macros update after saving".
   const load = useCallback(async () => {
-    const [p, f] = await Promise.all([api.get<{ plan: Plan }>(`/api/meal-plans/${planId}`), api.get<{ foods: FoodRow[] }>("/api/foods?scope=all")]);
-    setPlan(p.plan); setOptions(p.plan.body.mealOptions ?? []); setCustomTypes(p.plan.body.customMealTypes ?? []); setHiddenTypes(p.plan.body.hiddenMealTypes ?? []);
-    setFoods(foodsFromRows(f.foods));
-    setNames(new Map(f.foods.map((x) => [x.id, x.name])));
+    setLoadError(false);
+    const [p, f] = await Promise.allSettled([api.get<{ plan: Plan }>(`/api/meal-plans/${planId}`), api.get<{ foods: FoodRow[] }>("/api/foods?scope=all")]);
+    if (f.status === "fulfilled") {
+      setFoods(foodsFromRows(f.value.foods));
+      setNames(new Map(f.value.foods.map((x) => [x.id, x.name])));
+    }
+    if (p.status === "rejected") { setLoadError(true); return; }
+    setPlan(p.value.plan); setOptions(p.value.plan.body.mealOptions ?? []); setCustomTypes(p.value.plan.body.customMealTypes ?? []); setHiddenTypes(p.value.plan.body.hiddenMealTypes ?? []);
   }, [planId]);
   useEffect(() => void load(), [load]);
 
@@ -119,7 +133,26 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   };
 
   const mutate = (fn: (d: MealOption[]) => void) => { const next = structuredClone(options); fn(next); setOptions(next); setDirty(true); };
-  const save = async () => { setSaving(true); try { await api.patch(`/api/meal-plans/${planId}`, { body: { customMealTypes: customTypes, hiddenMealTypes: hiddenTypes, mealOptions: options } }); setDirty(false); } finally { setSaving(false); } };
+  // The raw body write — publish composes it, so it must throw rather than
+  // swallow (publishing an unsaved body would hand the client the wrong meals).
+  const saveBody = async () => { await api.patch(`/api/meal-plans/${planId}`, { body: { customMealTypes: customTypes, hiddenMealTypes: hiddenTypes, mealOptions: options } }); setDirty(false); };
+  const save = async () => {
+    if (saving || action) return;
+    setSaving(true); setActionErr(null);
+    try { await saveBody(); }
+    catch (e) { setActionErr(errorText(e, "Couldn't save the draft. Please try again.")); }
+    finally { setSaving(false); }
+  };
+  /** Run one footer action with an in-flight guard + a visible failure. Without
+   *  this a flaky POST changed nothing on screen: the coach walked away believing
+   *  the client had the plan, and a double-tap fired the write twice. */
+  const runAction = async (name: "publish" | "activate" | "rollback", fn: () => Promise<void>, fallback: string) => {
+    if (action || saving) return;
+    setAction(name); setActionErr(null);
+    try { await fn(); }
+    catch (e) { setActionErr(errorText(e, fallback)); }
+    finally { setAction(null); }
+  };
   // Remove a meal type from THIS plan: built-ins are hidden (restorable via
   // "+ Meal type"); custom types are dropped outright. Either way its options go.
   const removeType = (type: string) => {
@@ -128,11 +161,11 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
     else setCustomTypes((p) => p.filter((t) => t.label !== type));
     setDirty(true);
   };
-  const publish = async () => { await save(); await api.post(`/api/meal-plans/${planId}/publish`); await load(); };
+  const publish = () => runAction("publish", async () => { await saveBody(); await api.post(`/api/meal-plans/${planId}/publish`); await load(); }, "Couldn't publish this plan — the client hasn't received it. Please try again.");
   // Superseded/archived plans are read-only (PATCH 409s). "Make active" re-publishes
   // WITHOUT a save first (which would 409); rollback returns it to an editable draft.
-  const makeActive = async () => { await api.post(`/api/meal-plans/${planId}/publish`); await load(); };
-  const rollback = async () => { await api.post(`/api/meal-plans/${planId}/status`, { status: "draft" }); await load(); };
+  const makeActive = () => runAction("activate", async () => { await api.post(`/api/meal-plans/${planId}/publish`); await load(); }, "Couldn't make this plan active. Please try again.");
+  const rollback = () => runAction("rollback", async () => { await api.post(`/api/meal-plans/${planId}/status`, { status: "draft" }); await load(); }, "Couldn't roll this plan back to a draft. Please try again.");
   const addCustomType = () => { const label = newType.trim(); if (label && !customTypes.some((t) => t.label === label)) { setCustomTypes((p) => [...p, { label }]); setDirty(true); } setNewType(""); setTypeOpen(false); };
   const runAi = async (instructions: string): Promise<string[]> => {
     if (!plan) return [];
@@ -152,6 +185,9 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-32">
+      {loadError && !plan ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load this plan" description="Something went wrong reaching the server. Check your connection and try again." action={<div className="flex gap-2"><Button variant="secondary" onClick={onBack}>Back</Button><Button onClick={() => void load()}>Try again</Button></div>} />
+      ) : (
       <Reveal loading={!plan} className="space-y-4" skeleton={
         <>
           <div className="flex items-center gap-3">
@@ -277,16 +313,17 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
           {readOnly && (
             <div className="flex items-center gap-2 rounded-xl bg-warning-soft px-3 py-2 text-xs text-warning [&_svg]:size-3.5"><History /> This plan is {plan.status} — read-only. Roll it back to a draft to edit, or make it active again.</div>
           )}
+          {actionErr && <p className="px-1 text-xs text-warning" role="alert">{actionErr}</p>}
           <div className="flex gap-3">
             {readOnly ? (
               <>
-                <Button variant="outline" className="flex-1" onClick={() => void rollback()}>Roll back to draft</Button>
-                <Button className="flex-1" onClick={() => void makeActive()}>Make active</Button>
+                <Button variant="outline" className="flex-1" disabled={action !== null} onClick={() => void rollback()}>{action === "rollback" ? "Rolling back…" : "Roll back to draft"}</Button>
+                <Button className="flex-1" disabled={action !== null} onClick={() => void makeActive()}>{action === "activate" ? "Activating…" : "Make active"}</Button>
               </>
             ) : (
               <>
-                <Button variant="outline" className="flex-1" disabled={!dirty || saving} onClick={() => void save()}>{saving ? "Saving…" : dirty ? "Save draft" : "Saved"}</Button>
-                <Button className="flex-1" onClick={() => void publish()}>{plan.status === "published" ? "Re-publish" : "Publish"}</Button>
+                <Button variant="outline" className="flex-1" disabled={!dirty || saving || action !== null} onClick={() => void save()}>{saving ? "Saving…" : dirty ? "Save draft" : "Saved"}</Button>
+                <Button className="flex-1" disabled={saving || action !== null} onClick={() => void publish()}>{action === "publish" ? "Publishing…" : plan.status === "published" ? "Re-publish" : "Publish"}</Button>
               </>
             )}
           </div>
@@ -295,6 +332,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
         </>
         )}
       </Reveal>
+      )}
 
       {foodPicker && <FoodSearchSheet onClose={() => setFoodPicker(null)} onPick={(id, name) => { mutate((d) => d[foodPicker.optIdx]!.foods.push({ foodId: id, quantity: 100, unit: "g" })); setNames((p) => new Map(p).set(id, name)); setFoodPicker(null); void refreshFoods(); }} />}
       {aiOpen && <AiMealSheet onClose={() => setAiOpen(false)} onRun={runAi} />}
@@ -385,7 +423,7 @@ function PlanHealth({ allTypes, byType, foods, targets }: {
           <div className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-2xl bg-surface-2 px-5 py-4 text-center">
             <Flame className="size-5" style={{ color: toneVar.calories }} />
             <span className="numeral text-2xl font-bold leading-none">{fmtEnergy(total.calories, units, false)}</span>
-            <span className="text-[0.65rem] font-medium text-muted-foreground">Sample day</span>
+            <span className="text-xs font-medium text-muted-foreground">Sample day</span>
           </div>
         )}
         <div className="min-w-0 flex-1 space-y-2">

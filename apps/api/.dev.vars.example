@@ -1,0 +1,41 @@
+# Local-only worker vars for `wrangler dev`. Copy this file to `.dev.vars`
+# (gitignored) before your first `pnpm dev`:
+#
+#     cp apps/api/.dev.vars.example apps/api/.dev.vars
+#
+# Wrangler loads `.dev.vars` automatically for `wrangler dev` ONLY. It is never
+# uploaded by `wrangler deploy`.
+
+# ── The dev lane switch ──────────────────────────────────────────────────────
+# `ENVIRONMENT=development` is the single explicit signal that this worker is a
+# throwaway local one. Four separate fail-closed guards read it:
+#
+#   1. mailer.ts       — the `mock` email provider logs the OTP to the
+#                        `wrangler dev` console instead of failing closed.
+#                        Without it, invites/notifications/action-confirm codes
+#                        are silently dropped locally. (Sign-in OTP also has a
+#                        localhost-Origin fallback, so it can work without this
+#                        — the rest of the email surface cannot.)
+#   2. ai.ts           — the deterministic AI mock lane (`ai.mock` = auto).
+#                        Without it, every AI call with no real credential
+#                        returns "AI provider not configured" / "unavailable".
+#   3. auth.ts         — the BETTER_AUTH_SECRET dev fallback (also satisfied by
+#                        a localhost serving origin).
+#   4. auth-context.ts — `isPlatformAdmin` dev convenience, so a signed-in local
+#                        user can reach the platform-admin console.
+ENVIRONMENT=development
+
+# ── DANGER: never move this into wrangler.jsonc ──────────────────────────────
+# `wrangler.jsonc`'s top-level `vars` block IS the deployed configuration. If
+# `ENVIRONMENT: "development"` is added there it ships to production and
+# re-opens all four guards above on the live worker. The worst of the four is
+# the AI mock lane: with no `google.gemini_key` set, Snap-a-Meal, Label Reader,
+# body-scan voice and **lab-extract** would silently return FABRICATED output —
+# including invented clinical lab values that a coach can save into a real
+# client's chart — and the tenant is metered and billed credits for it. There is
+# no UI that surfaces `mocked: true`. Keep this variable in `.dev.vars` only.
+
+# ── Optional local overrides ─────────────────────────────────────────────────
+# Uncomment to test the real Better Auth signing path locally (otherwise the
+# dev fallback key is used):
+# BETTER_AUTH_SECRET=run-openssl-rand-base64-32-and-paste-here

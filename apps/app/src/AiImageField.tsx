@@ -70,7 +70,7 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
       {creating ? (
         <div className="flex flex-col items-center gap-1 text-primary">
           <AiAvatar className="size-6 animate-pulse" />
-          <span className="text-[0.6rem] font-medium">Creating…</span>
+          <span className="text-xs font-medium">Creating…</span>
         </div>
       ) : uploading ? (
         <span className="size-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -108,7 +108,7 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
         {canAi && (
           <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
             {genButton()}
-            <p className="text-[0.7rem] leading-snug text-muted-foreground">Original, license-free {feature === "food-image" ? "food render" : "exercise illustration"}. Style is set in AI settings.</p>
+            <p className="text-xs leading-snug text-muted-foreground">Original, license-free {feature === "food-image" ? "food render" : "exercise illustration"}. Style is set in AI settings.</p>
           </div>
         )}
       </div>

@@ -1,14 +1,14 @@
 /**
- * Coach client management — access grants, swap approvals, check-in review with
- * AI summarizer, supplement prescriptions, lab requests + value entry, and a
- * per-client report.
+ * Coach client management — access grants, coach assignment, swap approvals,
+ * check-in review with AI summarizer, supplement prescriptions, lab requests +
+ * value entry, a per-client report, and archive/offboard.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, PhotoGrid, ConfirmDialog, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon, User } from "@mossa/ui";
-import { api, todayLocal } from "../../api.js";
+import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon, User, Star, Archive, AlertTriangle, personaLabel, personaTone } from "@mossa/ui";
+import { api, errorText, todayLocal } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
@@ -37,9 +37,17 @@ function focusRow(id: string): boolean {
   return true;
 }
 
-export function ClientManage({ clientId }: { clientId: string }) {
+export function ClientManage({ clientId, clientName }: { clientId: string; clientName?: string | null }) {
   const { ctx } = useSession();
   const canSuppLabs = !!ctx?.entitlements?.features?.supplementsLabs;
+  // Coach assignment and archive are presented as OWNER powers: a coach must not
+  // be able to hand a client to someone else or retire a record out of the
+  // roster. Archive is owner-only in the API too (route-guard demands
+  // client:["archive"], which only the owner preset carries); the /trainers
+  // routes ask for client:["update"], which the trainer preset DOES hold, so
+  // this gate is the product decision, not the security boundary — the boundary
+  // is requireClientAccess, which still scopes every call to one client row.
+  const isOwner = ctx?.active?.role === "owner";
   const [subs, setSubs] = useState<Sub[] | null>(null);
   const [packages, setPackages] = useState<Pkg[]>([]);
   const [swaps, setSwaps] = useState<Swap[]>([]);
@@ -54,9 +62,19 @@ export function ClientManage({ clientId }: { clientId: string }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [exercises, setExercises] = useState<ExerciseInfo[]>([]);
   const [suppToDiscontinue, setSuppToDiscontinue] = useState<Supp | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [partial, setPartial] = useState(false);
 
+  // Seven INDEPENDENT reads, one per section — so `allSettled`, not `all`: with
+  // `all` a single dead endpoint (labs 500ing, say) rejected the lot and left the
+  // whole management screen a permanent skeleton. Now each section fills in from
+  // its own read and the ones that failed are named in a banner.
+  //
+  // `subscriptions` is the exception: it gates the entire render below, so its
+  // failure is the screen's error and gets the retry.
   const load = useCallback(async () => {
-    const [s, p, sw, l, su, ci, ex] = await Promise.all([
+    setLoadError(false);
+    const [s, p, sw, l, su, ci, ex] = await Promise.allSettled([
       api.get<{ subscriptions: Sub[] }>(`/api/subscriptions?clientId=${clientId}`),
       api.get<{ packages: Pkg[] }>("/api/packages"),
       api.get<{ swaps: Swap[] }>(`/api/swaps?clientId=${clientId}`),
@@ -65,7 +83,15 @@ export function ClientManage({ clientId }: { clientId: string }) {
       api.get<{ checkIns: CheckIn[] }>(`/api/check-ins?clientId=${clientId}`),
       api.get<{ exercises: ExerciseInfo[] }>("/api/exercises"),
     ]);
-    setSubs(s.subscriptions); setPackages(p.packages); setSwaps(sw.swaps); setLabs(l.labs); setSupps(su.supplements); setCheckIns(ci.checkIns); setExercises(ex.exercises);
+    if (p.status === "fulfilled") setPackages(p.value.packages);
+    if (sw.status === "fulfilled") setSwaps(sw.value.swaps);
+    if (l.status === "fulfilled") setLabs(l.value.labs);
+    if (su.status === "fulfilled") setSupps(su.value.supplements);
+    if (ci.status === "fulfilled") setCheckIns(ci.value.checkIns);
+    if (ex.status === "fulfilled") setExercises(ex.value.exercises);
+    setPartial([p, sw, l, su, ci, ex].some((r) => r.status === "rejected"));
+    if (s.status === "fulfilled") setSubs(s.value.subscriptions);
+    else setLoadError(true);
   }, [clientId]);
   useEffect(() => void load(), [load]);
 
@@ -102,6 +128,9 @@ export function ClientManage({ clientId }: { clientId: string }) {
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+      {loadError && !subs ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load this client" description="Something went wrong reaching the server. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
+      ) : (
       <Reveal loading={!subs} className="space-y-4" skeleton={
         <>
           <SkeletonList card rows={1} />
@@ -110,6 +139,15 @@ export function ClientManage({ clientId }: { clientId: string }) {
         </>
       }>
       {subs && (<>
+      {/* One of the section reads failed — say so rather than letting an empty
+          Supplements / Labs / Check-ins card read as "this client has none". */}
+      {partial && (
+        <Card className="flex items-start gap-3 border border-warning/25 bg-warning-soft/50">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
+          <div className="min-w-0 flex-1"><div className="text-sm font-semibold">Some sections didn't load</div><p className="text-sm text-muted-foreground">Part of this client's record couldn't be reached, so what's below may be incomplete.</p></div>
+          <Button size="sm" variant="secondary" onClick={() => void load()}>Retry</Button>
+        </Card>
+      )}
       <section className="space-y-2">
         <Eyebrow action={
           <div className="flex gap-2">
@@ -195,8 +233,16 @@ export function ClientManage({ clientId }: { clientId: string }) {
       )}
       </>)}
       </Reveal>
+      )}
+
+      {/* Coaches + Archive read their own endpoints and sit OUTSIDE the Reveal
+          above, so a failed `subscriptions` read can't hide the only screen in
+          the product that can hand a client to another coach. */}
+      {isOwner && <CoachesSection clientId={clientId} />}
 
       <ActivityLog clientId={clientId} />
+
+      {isOwner && <ArchiveClientSection clientId={clientId} clientName={clientName} />}
 
       <Sheet open={grantOpen} onClose={() => setGrantOpen(false)} title="Grant a package">
         <div className="space-y-2">
@@ -221,6 +267,198 @@ export function ClientManage({ clientId }: { clientId: string }) {
         onConfirm={() => { if (suppToDiscontinue) void discontinueSupp(suppToDiscontinue.id); }}
       />
     </Page>
+  );
+}
+
+// ── Coaches (client_trainers) ───────────────────────────────────────────────
+// `client_trainers` is what `visibleClientIds` scopes a coach's roster to, and
+// until this section existed the ONLY writer was the creator auto-assign in
+// POST /clients. So every owner-created client stayed owner-only: an owner could
+// invite four coaches and then had no way to hand any client over, a departing
+// coach's book couldn't be reassigned, and `is_primary` (which routes body-scan /
+// PR / check-in notifications) was unreachable. This is that screen.
+
+interface AssignedCoach { userId: string; isPrimary: boolean; name: string | null; email: string | null }
+interface StaffMember { userId: string; role: string; name: string | null; email: string | null }
+const coachName = (c: { name: string | null; email: string | null }): string => c.name || c.email || "Coach";
+
+function CoachesSection({ clientId }: { clientId: string }) {
+  const { ctx } = useSession();
+  const myUserId = ctx?.user.id ?? null;
+  const [coaches, setCoaches] = useState<AssignedCoach[] | null>(null);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [staffErr, setStaffErr] = useState(false);
+  const [loadErr, setLoadErr] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  // The userId whose write is in flight — several rows are actionable at once, so
+  // a single boolean would disable the wrong control.
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [toRemove, setToRemove] = useState<AssignedCoach | null>(null);
+
+  // Two independent reads: the assignment list gates this section, the staff list
+  // only gates the "Assign" affordance. `allSettled` so a dead /members doesn't
+  // blank a list of coaches we successfully read.
+  const load = useCallback(async () => {
+    setLoadErr(false);
+    const [t, m] = await Promise.allSettled([
+      api.get<{ trainers: AssignedCoach[] }>(`/api/clients/${clientId}/trainers`),
+      api.get<{ members: StaffMember[] }>("/api/members"),
+    ]);
+    if (m.status === "fulfilled") { setStaff(m.value.members.filter((x) => x.role !== "client")); setStaffErr(false); }
+    else setStaffErr(true);
+    if (t.status === "fulfilled") setCoaches(t.value.trainers);
+    else setLoadErr(true);
+  }, [clientId]);
+  useEffect(() => void load(), [load]);
+
+  const assign = async (userId: string, isPrimary: boolean) => {
+    if (busy) return;
+    setBusy(userId); setErr(null);
+    try {
+      await api.post(`/api/clients/${clientId}/trainers`, { trainerUserId: userId, isPrimary });
+      setAddOpen(false);
+      await load();
+    } catch (e) { setErr(errorText(e, "Couldn't update this client's coaches. Please try again.")); }
+    finally { setBusy(null); }
+  };
+  const unassign = async (userId: string) => {
+    if (busy) return;
+    setBusy(userId); setErr(null);
+    try { await api.del(`/api/clients/${clientId}/trainers/${userId}`); await load(); }
+    catch (e) { setErr(errorText(e, "Couldn't remove that coach. Please try again.")); }
+    finally { setBusy(null); }
+  };
+
+  const assigned = new Set((coaches ?? []).map((c) => c.userId));
+  const addable = staff.filter((m) => !assigned.has(m.userId));
+  const roleOf = (userId: string): string => staff.find((m) => m.userId === userId)?.role ?? "trainer";
+
+  return (
+    <section className="space-y-2">
+      <Eyebrow action={
+        <Button size="sm" disabled={!coaches || staffErr} onClick={() => { setErr(null); setAddOpen(true); }}><Plus /> Assign</Button>
+      }>Coaches</Eyebrow>
+      <Stagger>
+      {loadErr && !coaches ? (
+        <Card className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
+          <div className="min-w-0 flex-1"><div className="text-sm font-semibold">Couldn't load coaches</div><p className="text-sm text-muted-foreground">We couldn't reach the server for this client's coach assignments.</p></div>
+          <Button size="sm" variant="secondary" onClick={() => void load()}>Retry</Button>
+        </Card>
+      ) : (
+      <Reveal loading={!coaches} skeleton={<Card><SkeletonRow thumb={40} /></Card>}>
+        {coaches && (
+        <Card className="space-y-3">
+          <p className="text-sm text-muted-foreground">Only assigned coaches see this client on their roster. The primary coach receives their notifications.</p>
+          {coaches.length === 0 ? (
+            <p className="text-sm text-warning" role="status">No coach is assigned — nobody but an owner can see this client.</p>
+          ) : coaches.map((co) => (
+            <SubCard key={co.userId} className="flex items-center gap-3 py-3">
+              <Avatar name={coachName(co)} seed={co.email ?? co.userId} className="size-10 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="truncate font-medium">{coachName(co)}</span>
+                  <Badge tone={personaTone(roleOf(co.userId), { self: co.userId === myUserId })}>{personaLabel(roleOf(co.userId), { self: co.userId === myUserId })}</Badge>
+                  {co.isPrimary && <Badge tone="primary"><Star /> Primary</Badge>}
+                </div>
+                {co.email && <div className="truncate text-sm text-muted-foreground">{co.email}</div>}
+              </div>
+              {!co.isPrimary && (
+                <Button size="sm" variant="secondary" className="shrink-0" disabled={busy !== null} onClick={() => void assign(co.userId, true)}>
+                  {busy === co.userId ? "…" : "Make primary"}
+                </Button>
+              )}
+              <Button size="icon" variant="ghost" className="size-12 shrink-0 text-muted-foreground" aria-label={`Remove ${coachName(co)} from this client`} disabled={busy !== null} onClick={() => { setErr(null); setToRemove(co); }}><X /></Button>
+            </SubCard>
+          ))}
+          {staffErr && <p className="text-sm text-muted-foreground">Your staff list didn't load, so assigning is unavailable right now. <button onClick={() => void load()} className="font-medium text-primary underline">Retry</button></p>}
+          {err && <p className="text-sm text-warning" role="alert">{err}</p>}
+        </Card>
+        )}
+      </Reveal>
+      )}
+      </Stagger>
+
+      <Sheet open={addOpen} onClose={() => setAddOpen(false)} title="Assign a coach">
+        <div className="space-y-2">
+          {addable.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{staff.length === 0 ? "No staff yet — invite a coach from the Staff screen first." : "Every staff member is already assigned to this client."}</p>
+          ) : addable.map((m) => (
+            <button
+              key={m.userId}
+              onClick={() => void assign(m.userId, false)}
+              disabled={busy !== null}
+              className="flex min-h-12 w-full items-center gap-3 rounded-xl bg-secondary px-4 py-3 text-left transition-colors hover:bg-surface-3 disabled:opacity-45"
+            >
+              <Avatar name={coachName(m)} seed={m.email ?? m.userId} className="size-9 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{coachName(m)}</div>
+                <div className="truncate text-sm text-muted-foreground">{personaLabel(m.role)}{m.email ? ` · ${m.email}` : ""}</div>
+              </div>
+              <span className="shrink-0 text-sm font-medium text-primary">{busy === m.userId ? "Assigning…" : "Assign"}</span>
+            </button>
+          ))}
+          {err && <p className="text-sm text-warning" role="alert">{err}</p>}
+        </div>
+      </Sheet>
+
+      <ConfirmDialog
+        open={!!toRemove}
+        onOpenChange={(o) => !o && setToRemove(null)}
+        title={toRemove ? `Remove ${coachName(toRemove)}?` : "Remove coach?"}
+        description="They lose this client from their roster and can no longer open the record. Nothing the client has logged is deleted, and you can assign them again later."
+        confirmLabel="Remove coach"
+        destructive
+        onConfirm={() => { if (toRemove) void unassign(toRemove.userId); }}
+      />
+    </section>
+  );
+}
+
+// ── Archive / offboard (SPEC §8.1) ─────────────────────────────────────────
+// `POST /clients/:id/archive` is the only writer of `status = 'archived'`, and
+// the activeClients quota counts `status != 'archived'`. With no UI the quota was
+// a one-way ratchet: churn 20 clients on Solo and you still can't add a 21st.
+
+function ArchiveClientSection({ clientId, clientName }: { clientId: string; clientName?: string | null }) {
+  const nav = useNavigate();
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const who = clientName?.trim() || "this client";
+  const archive = async () => {
+    if (busy) return;
+    setBusy(true); setErr(null);
+    try { await api.post(`/api/clients/${clientId}/archive`); nav("/clients"); }
+    catch (e) { setErr(errorText(e, "Couldn't archive this client. Please try again.")); setBusy(false); }
+  };
+  return (
+    <section className="space-y-2">
+      <Eyebrow>Offboard</Eyebrow>
+      <Stagger>
+      <Card className="space-y-2.5">
+        <div className="flex items-center gap-2 font-medium"><Archive className="size-4 text-muted-foreground" /> Archive this client</div>
+        <p className="text-sm text-muted-foreground">
+          They come off your roster and stop counting against your plan's active-client limit, which frees the seat for someone new. Everything on the record — logs, plans, check-ins, labs, files — is kept.
+        </p>
+        <p className="text-sm text-muted-foreground">
+          If they have a login, they lose access to their space. There's no un-archive in the app yet, so treat this as one-way.
+        </p>
+        <Button variant="outline" className="w-full" disabled={busy} onClick={() => { setErr(null); setConfirm(true); }}><Archive /> {busy ? "Archiving…" : "Archive client…"}</Button>
+        {err && <p className="text-sm text-warning" role="alert">{err}</p>}
+      </Card>
+      </Stagger>
+      <ConfirmDialog
+        open={confirm}
+        onOpenChange={setConfirm}
+        title={`Archive ${who}?`}
+        description={`${who} comes off your roster and frees a seat against your plan's active-client limit. Their data is kept, but they lose access to their space and this can't be undone from the app.`}
+        confirmLabel="Archive client"
+        destructive
+        onConfirm={() => void archive()}
+      />
+    </section>
   );
 }
 
@@ -330,6 +568,10 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<unknown>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  // The check-in id whose reply is in flight, plus per-row failures — a coach can
+  // have several rows open, so a single boolean would disable the wrong Send.
+  const [sending, setSending] = useState<string | null>(null);
+  const [sendErr, setSendErr] = useState<Record<string, string>>({});
   const units = useUnits();
   const summarize = async () => {
     setBusy(true); setErr(null); setSummary(null);
@@ -340,7 +582,20 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
     } catch (e) { setErr(e); }
     finally { setBusy(false); }
   };
-  const send = async (id: string) => { const fb = draft[id]?.trim(); if (!fb) return; await api.post(`/api/check-ins/${id}/feedback`, { clientId, feedback: fb }); setDraft((d) => ({ ...d, [id]: "" })); await onFeedback(); };
+  // Sending notifies the client, so a double-tap used to send the reply twice —
+  // and a failed POST cleared nothing and said nothing, leaving the coach to
+  // believe the client had been answered when they hadn't.
+  const send = async (id: string) => {
+    const fb = draft[id]?.trim();
+    if (!fb || sending) return;
+    setSending(id); setSendErr((m) => ({ ...m, [id]: "" }));
+    try {
+      await api.post(`/api/check-ins/${id}/feedback`, { clientId, feedback: fb });
+      setDraft((d) => ({ ...d, [id]: "" }));
+      await onFeedback();
+    } catch (e) { setSendErr((m) => ({ ...m, [id]: errorText(e, "Couldn't send that reply. Please try again.") })); }
+    finally { setSending(null); }
+  };
   return (
     <section className="space-y-2">
       <Eyebrow action={<Button size="sm" variant="tonal" disabled={busy || checkIns.length === 0} onClick={() => void summarize()}><AiAvatar className="size-5" /> {busy ? "…" : "Summarize"}</Button>}>Check-ins</Eyebrow>
@@ -361,9 +616,12 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
             {photos.length > 0 && <PhotoGrid photos={photos} cols={4} />}
             {c.notes && <p className="text-sm text-muted-foreground">“{c.notes}”</p>}
             {c.trainer_feedback ? <div className="flex items-start gap-1.5 rounded-lg bg-primary/10 px-3 py-2 text-xs text-primary"><Check className="mt-0.5 size-3.5 shrink-0" /><span>You replied: {c.trainer_feedback}</span></div> : (
-              <div className="flex items-center gap-2">
-                <input value={draft[c.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [c.id]: e.target.value }))} placeholder="Reply…" className="flex-1 rounded-lg bg-surface-3 px-3 py-2 text-sm outline-none" />
-                <Button size="sm" disabled={!draft[c.id]?.trim()} onClick={() => void send(c.id)}>Send</Button>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <input value={draft[c.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [c.id]: e.target.value }))} placeholder="Reply…" className="flex-1 rounded-lg bg-surface-3 px-3 py-2 text-sm outline-none" />
+                  <Button size="sm" disabled={!draft[c.id]?.trim() || sending === c.id} onClick={() => void send(c.id)}>{sending === c.id ? "Sending…" : "Send"}</Button>
+                </div>
+                {sendErr[c.id] && <p className="text-sm text-warning" role="alert">{sendErr[c.id]}</p>}
               </div>
             )}
           </SubCard>
@@ -406,15 +664,25 @@ function SuggestSuppSheet({ clientId, onClose, onPrescribed }: { clientId: strin
   const [note, setNote] = useState("");
   const [error, setError] = useState<unknown>(null);
   const [added, setAdded] = useState<Set<string>>(new Set());
+  // The reco whose POST is in flight, and the one that failed — a double-tap used
+  // to prescribe the same supplement twice, and a rejection left the row's
+  // "Prescribe" button unchanged, so it looked like a no-op rather than an error.
+  const [prescribing, setPrescribing] = useState<string | null>(null);
+  const [prescribeErr, setPrescribeErr] = useState<{ name: string; text: string } | null>(null);
   useEffect(() => {
     void api.post<{ recommendations: SuppReco[]; note: string }>("/api/ai/supplement-reco", { clientId })
       .then((r) => { setRecos(r.recommendations); setNote(r.note); })
       .catch((e) => setError(e));
   }, [clientId]);
   const prescribe = async (r: SuppReco) => {
-    await api.post("/api/supplements", { clientId, name: r.name, dose: r.dose || undefined, kind: "other", schedule: [{ slot: "daily" }] });
-    setAdded((a) => new Set(a).add(r.name));
-    await onPrescribed();
+    if (prescribing) return;
+    setPrescribing(r.name); setPrescribeErr(null);
+    try {
+      await api.post("/api/supplements", { clientId, name: r.name, dose: r.dose || undefined, kind: "other", schedule: [{ slot: "daily" }] });
+      setAdded((a) => new Set(a).add(r.name));
+      await onPrescribed();
+    } catch (e) { setPrescribeErr({ name: r.name, text: errorText(e, "Couldn't prescribe that. Please try again.") }); }
+    finally { setPrescribing(null); }
   };
   return (
     <Sheet open onClose={onClose} title="Suggested supplements">
@@ -426,9 +694,10 @@ function SuggestSuppSheet({ clientId, onClose, onPrescribed }: { clientId: strin
               <SubCard key={i} className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0"><span className="font-medium">{r.name}</span>{r.dose && <span className="ml-2 text-xs text-muted-foreground">{r.dose}</span>}</div>
-                  {added.has(r.name) ? <Badge tone="success">Added</Badge> : <Button size="sm" onClick={() => void prescribe(r)}>Prescribe</Button>}
+                  {added.has(r.name) ? <Badge tone="success">Added</Badge> : <Button size="sm" disabled={prescribing !== null} onClick={() => void prescribe(r)}>{prescribing === r.name ? "Adding…" : "Prescribe"}</Button>}
                 </div>
                 <p className="text-xs text-muted-foreground">{r.rationale}</p>
+                {prescribeErr && prescribeErr.name === r.name && <p className="text-sm text-warning" role="alert">{prescribeErr.text}</p>}
                 {r.linkedMarker && <Badge tone="cardio">{r.linkedMarker}</Badge>}
               </SubCard>
             )))}
@@ -537,15 +806,21 @@ interface Report {
 function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => void }) {
   const [range, setRange] = useState<"7d" | "30d" | "90d">("30d");
   const [report, setReport] = useState<Report | null>(null);
+  const [reportErr, setReportErr] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [exNames, setExNames] = useState<Map<string, string>>(new Map());
   const units = useUnits();
+  // Same dead end as the screen loader: a failed read left this sheet a
+  // permanent skeleton (the range chips still switching, nothing ever arriving).
   useEffect(() => {
     let alive = true;
-    setReport(null);
+    setReport(null); setReportErr(false);
     const today = todayLocal();
-    void api.get<Report>(`/api/reports/client/${clientId}?range=${range}&today=${today}`).then((r) => { if (alive) setReport(r); });
+    api.get<Report>(`/api/reports/client/${clientId}?range=${range}&today=${today}`)
+      .then((r) => { if (alive) setReport(r); })
+      .catch(() => { if (alive) setReportErr(true); });
     return () => { alive = false; };
-  }, [clientId, range]);
+  }, [clientId, range, reloadKey]);
   useEffect(() => { void api.get<{ exercises: { id: string; name: string }[] }>("/api/exercises?scope=all").then((r) => setExNames(new Map(r.exercises.map((e) => [e.id, e.name])))).catch(() => undefined); }, []);
   const weight = report?.weightSeries ?? [];
   const wDelta = weight.length >= 2 ? Math.round((kgToDisplay(weight.at(-1)!.kg, units) - kgToDisplay(weight[0]!.kg, units)) * 10) / 10 : null;
@@ -554,6 +829,9 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
   return (
     <Sheet open onClose={onClose} title="Client report">
       <div className="mb-3 flex gap-2">{(["7d", "30d", "90d"] as const).map((r) => <Chip key={r} selected={range === r} onClick={() => setRange(r)}>{r}</Chip>)}</div>
+      {reportErr ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load the report" description="Something went wrong reaching the server. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />
+      ) : (
       <Reveal loading={!report} skeleton={<><SkeletonStatGrid count={9} cols={3} /><SkeletonList card rows={5} thumb={0} /></>}>
         {report && (
         <div className="space-y-3">
@@ -578,6 +856,7 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
         </div>
         )}
       </Reveal>
+      )}
     </Sheet>
   );
 }

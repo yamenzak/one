@@ -25,18 +25,19 @@ import { notify } from "./notify.js";
 import { parseJson, j } from "./db.js";
 import { updateSubscriptionRunway } from "./subscription-runway.js";
 
+const BudgetSpecs = z.array(z.object({ feature: z.enum(BUDGET_FEATURES), days: z.number().int().positive() }));
+const Visibility = z.enum(["private", "marketplace", "client_specific"]);
+
 const PackageBody = z.object({
   name: z.string().min(1).max(120),
   description: z.string().max(2000).nullish(),
   oneTimePriceCents: z.number().int().min(0).nullish(),
   monthlyPriceCents: z.number().int().min(0).nullish(),
   installmentMonths: z.number().int().min(2).max(24).nullish(),
-  budgets: z
-    .array(z.object({ feature: z.enum(BUDGET_FEATURES), days: z.number().int().positive() }))
-    .default([]),
+  budgets: BudgetSpecs.default([]),
   flags: z.record(z.string(), z.boolean()).nullish(),
   addOns: z.array(z.object({ addOnTypeId: z.string(), quantity: z.number().int().positive() })).nullish(),
-  visibility: z.enum(["private", "marketplace", "client_specific"]).default("private"),
+  visibility: Visibility.default("private"),
   restrictedClientId: z.string().nullish(),
   oncePerCustomer: z.boolean().default(false),
 });
@@ -93,14 +94,38 @@ async function reconcile(db: D1Database, row: SubRow, now: string): Promise<SubR
   return row;
 }
 
+/**
+ * PATCH body — a true partial update: an omitted key leaves its column alone.
+ *
+ * `PackageBody.partial()` on its own does NOT give you that. `.partial()` wraps
+ * each field in `.optional()` but leaves any `.default()` underneath it intact,
+ * so `budgets` / `visibility` / `oncePerCustomer` still materialised their
+ * defaults on every request: a PATCH that only renamed a package also wiped its
+ * budgets, forced it back to `private`, and cleared once-per-customer. Those
+ * three are re-declared here without defaults.
+ *
+ * `active` is the extra: DELETE /packages/:id only flips `active = 0`, and
+ * nothing else in the codebase ever sets it back to 1 — without this, archiving
+ * would be permanent.
+ */
+const PackagePatchBody = PackageBody.partial().extend({
+  budgets: BudgetSpecs.optional(),
+  visibility: Visibility.optional(),
+  oncePerCustomer: z.boolean().optional(),
+  active: z.boolean().optional(),
+});
+
 export const commerceRoutes = new Hono<AppEnv>()
   // ── Packages ───────────────────────────────────────────────────────────────
   .get("/packages", async (c) => {
     const who = requireTenant(c)!;
+    // Default = the live catalogue (what the client Shop sells). `?archived=1`
+    // returns the archived ones so an owner can see and restore them.
+    const archived = c.req.query("archived") === "1";
     const rows = await c.env.DB.prepare(
-      "SELECT * FROM packages WHERE tenant_id = ? AND active = 1 ORDER BY created_at DESC",
+      "SELECT * FROM packages WHERE tenant_id = ? AND active = ? ORDER BY created_at DESC",
     )
-      .bind(who.tenantId)
+      .bind(who.tenantId, archived ? 0 : 1)
       .all();
     return c.json({
       packages: (rows.results ?? []).map((p) => ({
@@ -142,7 +167,7 @@ export const commerceRoutes = new Hono<AppEnv>()
       .bind(c.req.param("id"), who.tenantId)
       .first();
     if (!row) return c.json({ error: "not found" }, 404);
-    const parsed = PackageBody.partial().safeParse(await c.req.json().catch(() => null));
+    const parsed = PackagePatchBody.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const d = parsed.data;
     const sets: string[] = [];
@@ -159,6 +184,7 @@ export const commerceRoutes = new Hono<AppEnv>()
     if (d.visibility !== undefined) put("visibility", d.visibility);
     if (d.restrictedClientId !== undefined) put("restricted_client_id", d.restrictedClientId);
     if (d.oncePerCustomer !== undefined) put("once_per_customer", d.oncePerCustomer ? 1 : 0);
+    if (d.active !== undefined) put("active", d.active ? 1 : 0);
     if (sets.length === 0) return c.json({ ok: true });
     await c.env.DB.prepare(`UPDATE packages SET ${sets.join(", ")} WHERE id = ?`)
       .bind(...binds, c.req.param("id"))
@@ -166,11 +192,19 @@ export const commerceRoutes = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
 
+  /**
+   * Archive, not erase. `active = 0` drops the package out of GET /packages, the
+   * client Shop, the public marketplace payload and both Stripe checkout lanes
+   * (all of which require `active = 1`) — but `client_subscriptions` rows are
+   * untouched, so anyone who already bought it keeps the exact budget days they
+   * paid for. PATCH `{ active: true }` puts it back on sale.
+   */
   .delete("/packages/:id", async (c) => {
     const who = requireTenant(c)!;
-    await c.env.DB.prepare("UPDATE packages SET active = 0 WHERE id = ? AND tenant_id = ?")
+    const r = await c.env.DB.prepare("UPDATE packages SET active = 0 WHERE id = ? AND tenant_id = ?")
       .bind(c.req.param("id"), who.tenantId)
       .run();
+    if ((r.meta?.changes ?? 0) === 0) return c.json({ error: "not found" }, 404);
     return c.json({ ok: true });
   })
 

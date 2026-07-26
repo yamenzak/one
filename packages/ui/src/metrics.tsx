@@ -42,7 +42,7 @@ export function GlanceStrip({ items, className }: { items: { icon: LucideIcon; t
         <div key={i} className="flex flex-1 flex-col items-center gap-1.5 px-2 text-center">
           <it.icon className="size-4 shrink-0" style={{ color: toneVar[it.tone] }} />
           <span className="numeral text-2xl font-bold leading-none">{it.value}</span>
-          <span className="text-[0.65rem] font-medium leading-tight text-muted-foreground">{it.label}</span>
+          <span className="text-xs font-medium leading-tight text-muted-foreground">{it.label}</span>
         </div>
       ))}
     </div>
@@ -162,8 +162,8 @@ export function MacroBar({ proteinG, carbsG, fatG, targets, className }: { prote
             {t ? <span aria-hidden className="absolute inset-y-0 left-0 bg-current opacity-[0.12]" style={{ width: `${Math.min(100, (grams[k] / t) * 100)}%` }} /> : null}
             <m.icon className="relative size-4 shrink-0" style={{ color: toneVar[m.tone] }} />
             <span className="relative min-w-0">
-              <span className="numeral block text-sm font-bold leading-none">{Math.round(grams[k])}<span className="text-[0.6rem] font-medium opacity-70"> g</span></span>
-              <span className="block text-[0.6rem] font-medium opacity-70">{m.label}{t ? ` / ${t}` : ""}</span>
+              <span className="numeral block text-sm font-bold leading-none">{Math.round(grams[k])}<span className="text-xs font-medium opacity-70"> g</span></span>
+              <span className="block text-xs font-medium opacity-70">{m.label}{t ? ` / ${t}` : ""}</span>
             </span>
           </div>
         );
@@ -220,20 +220,29 @@ export function MiniBars({ values, width = 130, height = 52, tone = "activity", 
 
 // ── WeekDots ─────────────────────────────────────────────────────────────────
 const DAY_LETTERS = ["M", "T", "W", "T", "F", "S", "S"];
+const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
 export function WeekDots({ days, todayIndex, tone = "activity", className, fill }: { days: boolean[]; todayIndex?: number; tone?: Tone; className?: string; fill?: boolean }) {
+  // Seven duplicated single letters ("M T W T F S S") read out one by one are
+  // noise, and the tick/blank dots convey nothing at all to a screen reader — so
+  // the group speaks the week as one sentence and the glyphs are hidden. The
+  // letters themselves now sit at the 12px floor (DESIGN.md §2.2); they were
+  // 8.8–10.4px, the smallest text in the app.
+  const doneNames = DAY_NAMES.filter((_, i) => days[i]);
+  const groupLabel = `Week: ${doneNames.length ? `${doneNames.join(", ")} complete` : "no days complete yet"}${todayIndex != null && DAY_NAMES[todayIndex] ? `. Today is ${DAY_NAMES[todayIndex]}` : ""}`;
   return (
-    <div className={cn(fill ? "flex w-full items-center justify-between" : "flex items-center gap-1.5", className)}>
+    <div role="img" aria-label={groupLabel} className={cn(fill ? "flex w-full items-center justify-between" : "flex items-center gap-1.5", className)}>
       {DAY_LETTERS.map((letter, i) => (
-        <div key={i} className="flex flex-col items-center gap-1">
+        <div key={i} aria-hidden className="flex flex-col items-center gap-1">
           <motion.span
             initial={{ scale: 0.6, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: i * 0.03, type: "spring", stiffness: 400, damping: 22 }}
-            className={cn("grid place-items-center rounded-full [&_svg]:size-3", fill ? "size-[1.15rem] text-[0.6rem]" : "size-7 text-[0.7rem]", days[i] ? toneSoft[tone] : "bg-surface-2 text-muted-foreground/40")}
+            className={cn("grid place-items-center rounded-full [&_svg]:size-3", fill ? "size-[1.15rem]" : "size-7", days[i] ? toneSoft[tone] : "bg-surface-2 text-muted-foreground/40")}
           >
             {days[i] ? <Check strokeWidth={3} /> : ""}
           </motion.span>
-          <span className={cn(fill ? "text-[0.55rem]" : "text-[0.65rem]", i === todayIndex ? "font-bold text-foreground" : "text-muted-foreground")}>{letter}</span>
+          <span className={cn("text-xs leading-none", i === todayIndex ? "font-bold text-foreground" : "text-muted-foreground")}>{letter}</span>
         </div>
       ))}
     </div>

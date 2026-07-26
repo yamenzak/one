@@ -116,7 +116,7 @@ export function FoodRow({
       {(energy || macros) && (calories != null || proteinG != null) && (
         <div className="shrink-0 text-right leading-tight">
           {energy && <div className="numeral text-sm font-semibold text-calories">{fmtEnergy(calories ?? 0, units)}</div>}
-          {macros && <MacroInline proteinG={proteinG ?? 0} carbsG={carbsG ?? 0} fatG={fatG ?? 0} className="mt-0.5 justify-end text-[0.7rem]" />}
+          {macros && <MacroInline proteinG={proteinG ?? 0} carbsG={carbsG ?? 0} fatG={fatG ?? 0} className="mt-0.5 justify-end text-xs" />}
         </div>
       )}
       {trailing}

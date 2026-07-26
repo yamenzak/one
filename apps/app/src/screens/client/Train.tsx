@@ -25,7 +25,7 @@ import { LaneSwitcher, type Lane } from "./LaneSwitcher.js";
 import { Markdown } from "../../Markdown.js";
 
 interface Plan { id: string; name: string; status: string; variantId: string | null; body: WorkoutBody }
-interface Goal { status: string; targets: Record<string, number> | null }
+interface Goal { status: string; targets: Record<string, number> | null; weeklyLoadTarget?: number | null }
 interface LoggedSet { reps?: number | null; weightKg?: number | null; durationSeconds?: number | null; effortLabel?: "easy" | "perfect" | "hard" | null; completed: boolean }
 interface Session { id: string; date_local: string; entries: { exerciseId: string; sets: LoggedSet[] }[] }
 interface ActivityLog { id: string; date_local: string; activity_key: string; label: string | null; duration_min: number | null; calories: number | null }
@@ -66,11 +66,17 @@ export function Train({ clientId }: { clientId: string }) {
   }, [clientId, today]);
   useEffect(() => void load(), [load]);
 
-  // The weekly Training-Load target is trainer-set on the active goal
-  // (targets_json "weeklyTrainingLoad", SPEC §8.11) — fall back to the default
-  // when no goal carries one.
+  // The weekly Training-Load target is trainer-set on the active goal (SPEC
+  // §8.11). `GET /api/goals` now returns it already RESOLVED (`weeklyLoadTarget`
+  // = targets_json.weeklyTrainingLoad, else the mirrored column, else the domain
+  // default) so this tab, the wellness/recovery score and the AI coach note all
+  // grade against the identical number. `targets.weeklyTrainingLoad` stays as a
+  // fallback for a cached/offline response predating that field.
   const loadTarget = useMemo(() => {
-    const t = goals.find((g) => g.status === "active")?.targets?.weeklyTrainingLoad;
+    const active = goals.find((g) => g.status === "active");
+    const resolved = active?.weeklyLoadTarget;
+    if (typeof resolved === "number" && resolved > 0) return resolved;
+    const t = active?.targets?.weeklyTrainingLoad;
     return typeof t === "number" && t > 0 ? t : DEFAULT_WEEKLY_LOAD_TARGET;
   }, [goals]);
 

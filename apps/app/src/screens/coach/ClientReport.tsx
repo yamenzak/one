@@ -134,7 +134,7 @@ export function ClientReport({ clientId }: { clientId: string }) {
 
           {report.prs.length > 0 && (
             <section className="space-y-2">
-              <Eyebrow action={<span className="text-[0.65rem] font-medium text-muted-foreground">est. 1RM</span>}>Personal records</Eyebrow>
+              <Eyebrow action={<span className="text-xs font-medium text-muted-foreground">est. 1RM</span>}>Personal records</Eyebrow>
               <Stagger>
               <Card className="space-y-3">
                 <div className="space-y-3">

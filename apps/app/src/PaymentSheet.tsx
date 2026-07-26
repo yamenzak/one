@@ -52,7 +52,13 @@ export function PaymentSheet({
         return;
       }
       stripeRef.current = stripe;
-      const dark = document.documentElement.classList.contains("dark") || document.documentElement.dataset.theme === "dark";
+      // Mossa is dark by DEFAULT and light is the opt-in: applyMode() sets
+      // data-theme="light" for light and DELETES the attribute for dark (there is
+      // no `dark` class anywhere). Testing for "dark" therefore never matched, so
+      // Stripe always got its light `stripe` theme — a white card form flashing
+      // into a near-black sheet at the exact moment of payment. Invert the test:
+      // anything that isn't explicitly light is dark.
+      const dark = document.documentElement.dataset.theme !== "light";
       const elements = stripe.elements({ clientSecret: intent.clientSecret, appearance: { theme: dark ? "night" : "stripe" } });
       elementsRef.current = elements;
       const el = elements.create("payment");

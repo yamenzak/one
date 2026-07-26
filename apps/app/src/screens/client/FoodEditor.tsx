@@ -19,6 +19,7 @@ import { api, uploadMedia } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
+import { MockedNotice } from "../../AiError.js";
 import { AiImageField } from "../../AiImageField.js";
 import { ModeRow, StepFade } from "../../composer.js";
 import { BarcodeScanner } from "./BarcodeScanner.js";
@@ -88,6 +89,10 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
   const [scanning, setScanning] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Whether the currently shown values were auto-filled from the AI MOCK lane
+  // (label-reader / food-meta `mocked: true`). Nothing rendered this flag before,
+  // so simulated macros looked exactly like a real label read (AGENTS §6).
+  const [aiMocked, setAiMocked] = useState(false);
   const [showMicros, setShowMicros] = useState(false);
   const labelInputRef = useRef<HTMLInputElement>(null);
   const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }));
@@ -117,10 +122,11 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
 
   // Label Reader — photograph the nutrition panel → auto-fill.
   const scanLabel = async (file: File) => {
-    setScanning(true); setErr(null);
+    setScanning(true); setErr(null); setAiMocked(false);
     try {
       const key = await uploadMedia(file, "label");
-      const r = await api.post<{ food: Record<string, unknown> }>("/api/ai/label-reader", { imageKey: key });
+      const r = await api.post<{ food: Record<string, unknown>; mocked?: boolean }>("/api/ai/label-reader", { imageKey: key });
+      setAiMocked(!!r.mocked);
       const g = r.food;
       const str = (v: unknown) => (v == null ? "" : String(v));
       setF((p) => ({
@@ -141,9 +147,10 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
   // With AI — estimate the macros from the name.
   const estimateFromName = async () => {
     if (f.name.trim().length < 2) return;
-    setAiBusy(true); setErr(null);
+    setAiBusy(true); setErr(null); setAiMocked(false);
     try {
-      const r = await api.post<{ food: Record<string, number | string> }>("/api/ai/food-meta", { name: f.name.trim() });
+      const r = await api.post<{ food: Record<string, number | string>; mocked?: boolean }>("/api/ai/food-meta", { name: f.name.trim() });
+      setAiMocked(!!r.mocked);
       const g = r.food;
       setF((p) => ({
         ...p, serving: String(g.servingSize ?? 100), unit: String(g.servingUnit ?? "g"),
@@ -273,6 +280,9 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
               <div className="space-y-6">
                 {!foodId && <button onClick={() => setStep("choose")} className="-mb-1 inline-flex items-center gap-1 text-sm text-muted-foreground [&_svg]:size-4"><ArrowLeft /> Back</button>}
 
+                {/* Simulated output must never read as a real label read. */}
+                <MockedNotice mocked={aiMocked} what="These macros" />
+
                 {/* ── Basics ─────────────────────────────────────────────── */}
                 <div className="space-y-3">
                   <Field label="Name" icon={Utensils} value={f.name} onChange={(e) => set("name", e.target.value)} />
@@ -294,7 +304,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
 
                 {/* ── Nutrition (per serving) ────────────────────────────── */}
                 <div className="space-y-3">
-                  <div className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">Nutrition per serving</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nutrition per serving</div>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Serving size" inputMode="decimal" value={f.serving} onChange={(e) => set("serving", dec(e.target.value))} />
                     <Field label="Unit" value={f.unit} onChange={(e) => set("unit", e.target.value)} placeholder="g / ml / piece" />
@@ -305,10 +315,16 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                       const M = METRICS[metric];
                       return (
                         <label key={k} className={cn("flex flex-col gap-1.5 rounded-2xl p-2.5", toneSoft[M.tone])}>
-                          <span className="flex items-center gap-1 text-[0.64rem] font-semibold leading-none [&_svg]:size-3"><M.icon /> <span className="truncate">{label}</span></span>
+                          <span className="flex items-center gap-1 text-xs font-semibold leading-none [&_svg]:size-3"><M.icon /> <span className="truncate">{label}</span></span>
                           <span className="flex items-baseline gap-0.5 rounded-lg bg-background/70 px-1.5 py-1.5">
-                            <input inputMode="decimal" value={f[k]} onChange={(e) => set(k, dec(e.target.value))} placeholder="0" className="w-full min-w-0 bg-transparent text-center text-[0.95rem] font-bold text-foreground outline-none placeholder:font-medium placeholder:text-muted-foreground/50" />
-                            <span className="shrink-0 text-[0.58rem] font-medium text-muted-foreground">{unit}</span>
+                            {/* Named explicitly: without this the accessible name is
+                                the whole wrapping label's concatenated text
+                                (icon + abbreviation + unit), so a screen reader
+                                announces "Cal kcal" for the field and "Fat g" for
+                                another — abbreviations that don't read as words.
+                                The unit belongs in the name, not just beside it. */}
+                            <input aria-label={`${metric.charAt(0).toUpperCase()}${metric.slice(1)} (${unit})`} inputMode="decimal" value={f[k]} onChange={(e) => set(k, dec(e.target.value))} placeholder="0" className="w-full min-w-0 bg-transparent text-center text-[0.95rem] font-bold text-foreground outline-none placeholder:font-medium placeholder:text-muted-foreground/50" />
+                            <span className="shrink-0 text-xs font-medium text-muted-foreground">{unit}</span>
                           </span>
                         </label>
                       );
@@ -330,7 +346,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                 {/* ── Sharing (staff only) ───────────────────────────────── */}
                 {isStaff && (
                   <div className="space-y-2">
-                    <div className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">Who can use this food</div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Who can use this food</div>
                     <div className="flex gap-2">
                       <Chip selected={f.visibility === "tenant"} onClick={() => set("visibility", "tenant")}>Shared with team</Chip>
                       <Chip selected={f.visibility === "private"} onClick={() => set("visibility", "private")}>Only me</Chip>

@@ -235,8 +235,14 @@ export const stripeRoutes = new Hono<AppEnv>()
     if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
     // The account must actually be able to accept charges (onboarding done).
     if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
-    const pkg = await c.env.DB.prepare("SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_client_id: string | null }>();
+    const pkg = await c.env.DB.prepare("SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_client_id: string | null; once_per_customer: number | null }>();
     if (!pkg || purchaseBlocked(pkg, access.client.id)) return c.json({ error: "package not found" }, 404);
+    // The Packages editor offers a `once_per_customer` toggle, so it must actually
+    // bind on the PAID paths too — until now only the free staff grant checked it,
+    // and a client could re-buy a "first month intro" package unlimited times.
+    if (pkg.once_per_customer && (await hasPriorPurchase(c.env.DB, access.client.id, pkg.id))) {
+      return c.json({ error: "package is once per customer" }, 409);
+    }
     // Three pricing modes. A monthly price = an open-ended subscription. An
     // installment plan (installment_months N on a one-time package) = a
     // LIMITED-term subscription: monthly = one_time/N, billed N times then
@@ -308,8 +314,13 @@ export const stripeRoutes = new Hono<AppEnv>()
     const settings = await c.env.DB.prepare("SELECT stripe_account_id, charges_enabled FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null }>();
     if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
     if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
-    const pkg = await c.env.DB.prepare("SELECT id, name, one_time_price_cents, monthly_price_cents, installment_months, currency, visibility, restricted_client_id FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_client_id: string | null }>();
+    const pkg = await c.env.DB.prepare("SELECT id, name, one_time_price_cents, monthly_price_cents, installment_months, currency, visibility, restricted_client_id, once_per_customer FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_client_id: string | null; once_per_customer: number | null }>();
     if (!pkg || purchaseBlocked(pkg, access.client.id)) return c.json({ error: "package not found" }, 404);
+    // Same once-per-customer rule as the hosted path (and re-checked in
+    // grantClientPackage, the last gate before days are written).
+    if (pkg.once_per_customer && (await hasPriorPurchase(c.env.DB, access.client.id, pkg.id))) {
+      return c.json({ error: "package is once per customer" }, 409);
+    }
     // Subscriptions and installment plans go through hosted checkout (Stripe
     // provisions the connected-account customer + recurring price); inline is
     // one-time only.
@@ -360,7 +371,11 @@ export const stripeRoutes = new Hono<AppEnv>()
         },
         { connectedAccount: settings.stripe_account_id },
       );
-      return c.json({ clientSecret: pi.client_secret, publishableKey: cfg.publishableKey, stripeAccount: settings.stripe_account_id, discountCents });
+      // Return the amount we ACTUALLY created the PaymentIntent for (mirroring
+      // /billing/pack-intent). The app labels its Pay button from this: labelling
+      // it from the package's list price showed "Pay $250.00" on a sheet that
+      // charges $200 once a promo applied.
+      return c.json({ clientSecret: pi.client_secret, publishableKey: cfg.publishableKey, stripeAccount: settings.stripe_account_id, amountCents: amount, discountCents });
     } catch {
       return c.json({ error: "checkout_failed" }, 402);
     }
@@ -463,16 +478,24 @@ export const stripeRoutes = new Hono<AppEnv>()
       // is skipped — checkout.session.completed already granted period one. Scope
       // the renewal to the account's tenant so a foreign account can't top up a
       // row it doesn't own.
-      const inv = event.data.object as { subscription?: string; billing_reason?: string };
-      if (inv.subscription && inv.billing_reason === "subscription_cycle" && accountTenantId) {
-        await renewClientSubscription(c.env.DB, inv.subscription, accountTenantId);
+      const inv = event.data.object;
+      // Resolve the sub id across API-version shapes (Basil moved it off the
+      // invoice root) — see invoiceSubscriptionId. A cycle invoice we can't map to
+      // a subscription means a charged client with no top-up, so make it LOUD:
+      // there is no other signal (we answer Stripe 200 either way).
+      const invSubId = invoiceSubscriptionId(inv);
+      if (inv.billing_reason === "subscription_cycle" && !invSubId) {
+        console.error("connect invoice.paid: subscription_cycle with no resolvable subscription id", event.id);
+      }
+      if (invSubId && inv.billing_reason === "subscription_cycle" && accountTenantId) {
+        await renewClientSubscription(c.env.DB, invSubId, accountTenantId);
       }
     } else if (event.type === "invoice.payment_failed") {
       // Auto-renew charge failed — mark past_due + nudge the client to fix their
       // card. Access still runs until the current budget lapses (grace by design).
-      const inv = event.data.object as { subscription?: string };
-      if (inv.subscription) {
-        const row = await c.env.DB.prepare("SELECT id, tenant_id, client_id FROM client_subscriptions WHERE stripe_sub_id = ? LIMIT 1").bind(inv.subscription).first<{ id: string; tenant_id: string; client_id: string }>();
+      const failedSubId = invoiceSubscriptionId(event.data.object);
+      if (failedSubId) {
+        const row = await c.env.DB.prepare("SELECT id, tenant_id, client_id FROM client_subscriptions WHERE stripe_sub_id = ? LIMIT 1").bind(failedSubId).first<{ id: string; tenant_id: string; client_id: string }>();
         if (row) {
           await c.env.DB.prepare("UPDATE client_subscriptions SET payment_status = 'past_due', updated_at = ? WHERE id = ?").bind(nowIso(), row.id).run();
           const cl = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null }>();
@@ -629,12 +652,16 @@ async function handlePlatformEvent(
       break;
     }
     case "invoice.paid": {
-      const tenantId = meta.mossa_tenant ?? (await tenantByCustomer(db, obj.customer as string));
+      const tenantId = meta.mossa_tenant ?? (await tenantByCustomer(db, obj.customer));
       const planId = await planForTenant(db, tenantId);
       if (tenantId && planId) await activatePlan(db, billing, tenantId, planId);
       // Capture the Stripe subscription id + the renewal date this invoice covers.
       if (tenantId) {
-        const subId = typeof obj.subscription === "string" ? obj.subscription : null;
+        // Same version-shape defence as the Connect rail: on a Basil-shaped
+        // payload the sub id lives under `parent.subscription_details`, so the
+        // legacy read left the tenant's stored sub id (and every guard keyed off
+        // it) permanently unstamped.
+        const subId = invoiceSubscriptionId(obj);
         const cpe = typeof obj.period_end === "number" ? new Date(obj.period_end * 1000).toISOString() : null;
         // Only (re)stamp the sub id if it's the tenant's current one (or none is
         // stored yet) — an invoice for a stale/old sub must not regress the
@@ -647,34 +674,11 @@ async function handlePlatformEvent(
     }
     case "charge.refunded":
     case "charge.dispute.created": {
-      // Money-safe reversal on the PLATFORM rail (mirrors the Connect rail's
-      // refund/dispute surfacing). A refunded/disputed credit-pack purchase must
-      // not leave the granted credits sitting in the tenant's `purchased`
-      // bucket. When the charge identifies the pack (a clean credit count — exact
-      // and safe to reverse, unlike Connect budget days) we debit them back, and
-      // we ALWAYS notify the tenant so a human can reconcile anything we can't
-      // auto-reverse (e.g. a plan-level refund).
-      const tenantId = meta.mossa_tenant ?? (await tenantByCustomer(db, obj.customer as string));
-      if (tenantId) {
-        const credits = Number(meta.mossa_credits ?? 0);
-        if (Number.isFinite(credits) && credits > 0) {
-          const dobj = billing.get(billing.idFromName(tenantId));
-          await dobj.bind(tenantId);
-          await dobj.revokePurchased(credits, event.type === "charge.dispute.created" ? "pack.dispute" : "pack.refund", meta.mossa_pack);
-        }
-        const disputed = event.type === "charge.dispute.created";
-        await notifyOwners(env, tenantId, {
-          type: disputed ? "payment_disputed" : "payment_refunded",
-          message: disputed
-            ? "A payment on your Mossa account was disputed. Any credits it granted may be reversed — review your balance."
-            : "A payment on your Mossa account was refunded. Credits from a refunded pack were reversed from your balance.",
-          dedupeKey: typeof obj.id === "string" ? `${event.type}_${obj.id}` : event.id,
-        });
-      }
+      await reverseChargedCredits(env, event, secretKey);
       break;
     }
     case "invoice.payment_failed": {
-      const tenantId = meta.mossa_tenant ?? (await tenantByCustomer(db, obj.customer as string));
+      const tenantId = meta.mossa_tenant ?? (await tenantByCustomer(db, obj.customer));
       // Seed the grace window; never clobber a later suspend/cancel.
       if (tenantId) {
         await db.prepare("UPDATE subscriptions SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?) WHERE tenant_id = ? AND status NOT IN ('suspended','canceled')").bind(nowIso(), tenantId).run();
@@ -717,7 +721,7 @@ async function handlePlatformEvent(
       break;
     }
     case "customer.subscription.deleted": {
-      const tenantId = await tenantByCustomer(db, obj.customer as string);
+      const tenantId = await tenantByCustomer(db, obj.customer);
       if (!tenantId) break;
       // Only downgrade to free if the DELETED sub is the tenant's CURRENT one. A
       // stale sub being cleaned up (e.g. the old sub replaced on an upgrade) must
@@ -756,7 +760,7 @@ async function supersedePlatformSub(db: D1Database, secretKey: string, tenantId:
  * or clear those markers — never fight the cron's windows.
  */
 async function syncStripeSubscription(db: D1Database, obj: Record<string, unknown>): Promise<void> {
-  const tenantId = await tenantByCustomer(db, obj.customer as string);
+  const tenantId = await tenantByCustomer(db, obj.customer);
   if (!tenantId) return;
   const subId = typeof obj.id === "string" ? obj.id : null;
   // Reconcile ONLY the tenant's CURRENT subscription. A stale sub (an old one
@@ -800,8 +804,171 @@ async function activatePlan(db: D1Database, billing: AppEnv["Bindings"]["BILLING
   }
 }
 
-async function tenantByCustomer(db: D1Database, customerId: string): Promise<string | null> {
-  const row = await db.prepare("SELECT tenant_id FROM subscriptions WHERE stripe_customer_id = ?").bind(customerId).first<{ tenant_id: string }>();
+/** A Stripe id that may arrive as a bare string or an expanded object. */
+function stripeId(v: unknown): string | null {
+  if (typeof v === "string") return v;
+  if (v && typeof v === "object" && typeof (v as { id?: unknown }).id === "string") return (v as { id: string }).id;
+  return null;
+}
+
+/**
+ * Resolve the Stripe SUBSCRIPTION id off an Invoice across API-version shapes.
+ *
+ * `stripe.ts` pins the version of requests WE make, but a webhook payload's
+ * shape follows the version stored on the Stripe *endpoint* — which nothing in
+ * this repo can set. On an account defaulting to 2025-03-31 ("Basil") or later,
+ * `invoice.subscription` is GONE: it moved to
+ * `invoice.parent.subscription_details.subscription` (and per-line under
+ * `lines.data[].subscription`). Reading only the legacy field meant every
+ * renewal invoice resolved to "no subscription", so `renewClientSubscription`
+ * was never called — the client's card was charged monthly and their budget was
+ * never topped up, with a 200 back to Stripe and no signal anywhere.
+ */
+function invoiceSubscriptionId(inv: Record<string, unknown>): string | null {
+  const direct = stripeId(inv.subscription);
+  if (direct) return direct;
+  const parent = inv.parent as { subscription_details?: { subscription?: unknown } } | undefined;
+  const fromParent = stripeId(parent?.subscription_details?.subscription);
+  if (fromParent) return fromParent;
+  const lines = (inv.lines as { data?: Record<string, unknown>[] } | undefined)?.data ?? [];
+  for (const line of lines) {
+    const fromLine =
+      stripeId(line.subscription) ??
+      stripeId((line.parent as { subscription_item_details?: { subscription?: unknown } } | undefined)?.subscription_item_details?.subscription);
+    if (fromLine) return fromLine;
+  }
+  return null;
+}
+
+/**
+ * The charge behind a refund/dispute event, plus how much of it has been
+ * reversed so far (in cents).
+ *
+ * `charge.refunded` delivers the Charge itself. `charge.dispute.created`
+ * delivers a **Dispute**: it carries `charge` / `payment_intent`, its own
+ * `amount` (the disputed portion), an EMPTY `metadata` and **no `customer`** —
+ * so reading `metadata.mossa_tenant` / `obj.customer` off it (what this handler
+ * used to do) always came up empty. The dispute branch was therefore dead code:
+ * a tenant could charge back a credit pack, we'd lose the money, the credits
+ * stayed spendable and nobody was told. Resolve the underlying charge first.
+ */
+async function resolveReversal(
+  obj: Record<string, unknown>,
+  eventType: string,
+  secretKey: string,
+): Promise<{ chargeId: string | null; amountCents: number; reversedCents: number; meta: Record<string, string>; customer: unknown }> {
+  const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  if (eventType !== "charge.dispute.created") {
+    // Charge object: `amount_refunded` is CUMULATIVE across every refund so far.
+    return {
+      chargeId: typeof obj.id === "string" ? obj.id : null,
+      amountCents: num(obj.amount),
+      reversedCents: num(obj.amount_refunded),
+      meta: (obj.metadata as Record<string, string> | undefined) ?? {},
+      customer: obj.customer,
+    };
+  }
+  const disputed = num(obj.amount);
+  const chargeId = stripeId(obj.charge);
+  const piId = stripeId(obj.payment_intent);
+  // A failure here THROWS on purpose: the webhook's catch releases the event-id
+  // claim and 500s, so Stripe redelivers the dispute instead of us dropping a
+  // chargeback we couldn't attribute.
+  const src = chargeId
+    ? await stripeCall<Record<string, unknown>>(secretKey, `charges/${chargeId}`)
+    : piId
+      ? await stripeCall<Record<string, unknown>>(secretKey, `payment_intents/${piId}`)
+      : null;
+  if (!src) throw new Error("dispute carries neither charge nor payment_intent");
+  return {
+    // Key the reversal ledger off the CHARGE id either way, so a dispute and a
+    // partial refund on the same charge share one cumulative total.
+    chargeId: chargeId ?? stripeId(src.latest_charge) ?? piId,
+    amountCents: num(src.amount),
+    // A dispute can follow partial refunds; money reversed = both.
+    reversedCents: Math.min(num(src.amount), disputed + num(src.amount_refunded)),
+    meta: (src.metadata as Record<string, string> | undefined) ?? {},
+    customer: src.customer,
+  };
+}
+
+/**
+ * Credits already clawed back for a charge, read off the append-only
+ * `credit_ledger` by `ref` (= the charge id). This is what makes repeat
+ * refund/dispute events INCREMENTAL: Stripe fires `charge.refunded` for every
+ * partial refund and each event carries the CUMULATIVE `amount_refunded`, so
+ * without this a second $5 refund on a $100 pack would reverse the whole
+ * proportional total a second time. The ledger is the existing record of every
+ * credit movement, so no new table is needed — a reversal that never landed
+ * (the `purchased` bucket was already drained, so `revokePurchased` clamped to a
+ * no-op) also leaves no row, which is correct: nothing was taken, so the next
+ * event may still take up to the amount owed and never more.
+ */
+async function creditsAlreadyReversed(db: D1Database, tenantId: string, chargeId: string | null): Promise<number> {
+  if (!chargeId) return 0;
+  const row = await db
+    .prepare("SELECT COALESCE(SUM(-delta), 0) AS reversed FROM credit_ledger WHERE tenant_id = ? AND ref = ? AND reason IN ('pack.refund','pack.dispute')")
+    .bind(tenantId, chargeId)
+    .first<{ reversed: number }>();
+  return Math.max(0, Math.floor(row?.reversed ?? 0));
+}
+
+/**
+ * Money-safe reversal on the PLATFORM rail (the Connect rail only surfaces
+ * refunds — budget days are not safely clawable). A refunded or disputed
+ * credit-pack purchase must not leave the granted credits spendable, but it must
+ * be reversed PROPORTIONALLY: `charge.refunded` fires for PARTIAL refunds too,
+ * so a $5 goodwill refund on a $100 / 130,000-credit pack used to revoke all
+ * 130,000 — and two partial refunds revoked that twice. We reverse
+ * `round(credits × amount_refunded / amount)` minus whatever this charge has
+ * already had reversed, and always notify so a human can reconcile what we
+ * can't auto-reverse (e.g. a plan-level refund with no credit count).
+ */
+async function reverseChargedCredits(
+  env: AppEnv["Bindings"],
+  event: { type: string; id?: string; data: { object: Record<string, unknown> } },
+  secretKey: string,
+): Promise<void> {
+  const db = env.DB;
+  const obj = event.data.object;
+  const disputed = event.type === "charge.dispute.created";
+  const r = await resolveReversal(obj, event.type, secretKey);
+  const tenantId = r.meta.mossa_tenant ?? (await tenantByCustomer(db, r.customer));
+  if (!tenantId) return;
+
+  const packCredits = Number(r.meta.mossa_credits ?? 0);
+  if (Number.isFinite(packCredits) && packCredits > 0 && r.amountCents > 0) {
+    // Proportional, clamped to the pack. A FULL refund (reversed === amount)
+    // reverses exactly `packCredits`.
+    const share = Math.min(1, Math.max(0, r.reversedCents / r.amountCents));
+    const owed = Math.min(packCredits, Math.round(packCredits * share));
+    const already = await creditsAlreadyReversed(db, tenantId, r.chargeId);
+    const take = owed - already;
+    if (take > 0) {
+      const dobj = env.BILLING.get(env.BILLING.idFromName(tenantId));
+      await dobj.bind(tenantId);
+      // `ref` = the charge id (not the pack id) so the ledger doubles as the
+      // per-charge reversal total read back above.
+      await dobj.revokePurchased(take, disputed ? "pack.dispute" : "pack.refund", r.chargeId ?? undefined);
+    }
+  }
+  await notifyOwners(env, tenantId, {
+    type: disputed ? "payment_disputed" : "payment_refunded",
+    message: disputed
+      ? "A payment on your Mossa account was disputed. Any credits it granted may be reversed — review your balance."
+      : "A payment on your Mossa account was refunded. Credits from a refunded pack were reversed from your balance.",
+    dedupeKey: typeof obj.id === "string" ? `${event.type}_${obj.id}` : event.id,
+  });
+}
+
+/** Tenant behind a Stripe customer. Takes `unknown` on purpose: webhook objects
+ *  that carry no customer (a Dispute) must read as "no tenant", never bind
+ *  `undefined` into D1 (which throws and puts the handler into Stripe's retry
+ *  loop forever). */
+async function tenantByCustomer(db: D1Database, customerId: unknown): Promise<string | null> {
+  const id = stripeId(customerId);
+  if (!id) return null;
+  const row = await db.prepare("SELECT tenant_id FROM subscriptions WHERE stripe_customer_id = ?").bind(id).first<{ tenant_id: string }>();
   return row?.tenant_id ?? null;
 }
 async function planForTenant(db: D1Database, tenantId: string | null): Promise<string | null> {
@@ -834,6 +1001,23 @@ async function cancelInstallmentSub(db: D1Database, tenantId: string, stripeSubI
   if (canceled) await db.prepare("UPDATE client_subscriptions SET stripe_sub_id = NULL WHERE id = ?").bind(rowId).run();
 }
 
+/**
+ * Has this client EVER held this package before? The `once_per_customer` test,
+ * shared by both paid checkout paths and the webhook grant, with the same
+ * semantics as the staff-grant check in `commerce-routes.ts` (any row, whatever
+ * its status — an intro offer is once, not once-at-a-time).
+ *
+ * `excludeSubId` skips the row belonging to a Stripe subscription we're already
+ * processing, so a webhook redelivery / renewal of that same subscription is not
+ * mistaken for a second purchase.
+ */
+async function hasPriorPurchase(db: D1Database, clientId: string, packageId: string, excludeSubId: string | null = null): Promise<boolean> {
+  const row = excludeSubId
+    ? await db.prepare("SELECT 1 AS x FROM client_subscriptions WHERE client_id = ? AND package_id = ? AND (stripe_sub_id IS NULL OR stripe_sub_id <> ?) LIMIT 1").bind(clientId, packageId, excludeSubId).first()
+    : await db.prepare("SELECT 1 AS x FROM client_subscriptions WHERE client_id = ? AND package_id = ? LIMIT 1").bind(clientId, packageId).first();
+  return !!row;
+}
+
 /** Shared with commerce: create/extend a client subscription from a package.
  *  `checkoutId`/`subId` are the Stripe Checkout Session / Subscription ids;
  *  event-level idempotency (firstSeen) already prevents a redelivery twice.
@@ -844,8 +1028,17 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
   // (verified) event carrying another tenant's package id grant that package's
   // budgets/add-ons/flags into this tenant's row. Paired with the webhook's
   // account→tenant check, the package must belong to the account's tenant.
-  const pkg = await db.prepare("SELECT budgets_json, addons_json, flags_json FROM packages WHERE id = ? AND tenant_id = ?").bind(packageId, tenantId).first<{ budgets_json: string | null; addons_json: string | null; flags_json: string | null }>();
+  const pkg = await db.prepare("SELECT budgets_json, addons_json, flags_json, once_per_customer FROM packages WHERE id = ? AND tenant_id = ?").bind(packageId, tenantId).first<{ budgets_json: string | null; addons_json: string | null; flags_json: string | null; once_per_customer: number | null }>();
   if (!pkg) return;
+  // `once_per_customer` is a real selling rule (an intro offer), so it has to hold
+  // at the LAST gate too, not just at checkout: a stale tab, a second browser, or
+  // a charge created straight from the tenant's Stripe dashboard all land here.
+  // Rows carrying THIS sub id are excluded so a redelivered checkout for the same
+  // subscription still tops its own runway up (that's not a repeat purchase).
+  if (pkg.once_per_customer && (await hasPriorPurchase(db, clientId, packageId, subId))) {
+    console.error("grantClientPackage: blocked repeat purchase of a once-per-customer package", { clientId, packageId });
+    return;
+  }
   const now = nowIso();
   const n = installmentsTotal && installmentsTotal > 1 ? installmentsTotal : 1;
   const specs = scaleSpecs(parseJson<{ feature: Budget["feature"]; days: number }[]>(pkg.budgets_json, []), n);
@@ -861,11 +1054,15 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
       // A redelivered checkout for this same sub (before firstSeen dedup) — top
       // up its own runway rather than create a duplicate. CAS so a concurrent
       // renewal on the same row can't lose this write (last-writer-wins).
-      await updateSubscriptionRunway(db, bySub.id, (existing, balancesPrev) => ({
+      const ok = await updateSubscriptionRunway(db, bySub.id, (existing, balancesPrev) => ({
         budgets: [...existing, ...buildBudgetsForPurchase(existing, specs, now)],
         addOns: mergeAddOnBalances(balancesPrev, addOns),
         extra: { sql: "payment_status = 'paid', stripe_checkout_id = COALESCE(?, stripe_checkout_id), updated_at = ?", binds: [checkoutId, now] },
       }));
+      // A raced-out CAS on a PAID grant is money captured with zero days granted.
+      // Throw so the webhook releases the event-id claim and 500s → Stripe
+      // redelivers and the grant lands (same contract as /redeem's compensation).
+      if (!ok) throw new Error(`grantClientPackage: runway CAS failed for ${bySub.id}`);
     } else {
       await db.prepare(
         "INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, installments_total, installments_paid, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, 'stripe', ?, ?, ?, ?, ?, ?)",
@@ -882,11 +1079,12 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
   if (current) {
     // CAS so a concurrent staff grant / redeem on the same row can't clobber
     // these paid-for days.
-    await updateSubscriptionRunway(db, current.id, (existing, balancesPrev) => ({
+    const ok = await updateSubscriptionRunway(db, current.id, (existing, balancesPrev) => ({
       budgets: [...existing, ...buildBudgetsForPurchase(existing, specs, now)],
       addOns: mergeAddOnBalances(balancesPrev, addOns),
       extra: { sql: "payment_status = 'paid', stripe_checkout_id = COALESCE(?, stripe_checkout_id), updated_at = ?", binds: [checkoutId, now] },
     }));
+    if (!ok) throw new Error(`grantClientPackage: runway CAS failed for ${current.id}`);
   } else {
     await db.prepare(
       "INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, ?, 'stripe', ?, ?, ?, ?)",
@@ -953,4 +1151,8 @@ async function renewClientSubscription(db: D1Database, stripeSubId: string, expe
     const w = await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, status = 'active', payment_status = 'paid', updated_at = ? WHERE id = ? AND budgets_json IS ? AND addons_json IS ?").bind(j(nextBudgets), j(nextAddons), now, base.id, prevB, prevA).run();
     if ((w.meta?.changes ?? 0) > 0) return;
   }
+  // Every attempt raced out on a PAID renewal cycle: the client was charged and
+  // got no days. Throw so the webhook releases the event-id claim and 500s —
+  // Stripe redelivers and the top-up lands, instead of vanishing silently.
+  throw new Error(`renewClientSubscription: runway CAS failed for ${base.id}`);
 }

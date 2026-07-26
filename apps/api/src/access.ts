@@ -79,11 +79,23 @@ export const assistant = ac.newRole({
   content: ["read"],
 });
 
-/** Client: the client surfaces only; own-record scope enforced row-level. */
+/** Client: the client surfaces only; own-record scope enforced row-level.
+ *  The `read` grants below are what the client's OWN screens need — their
+ *  prescribed supplements and lab requests (Wellness), the studio's packages
+ *  (Plans & access), their booked sessions, and their goal targets. They carry
+ *  no write action: prescribing, ordering labs, selling packages and booking are
+ *  staff powers, and every read is still narrowed to the client's own rows by
+ *  requireClientAccess in the handler. Must stay in lockstep with
+ *  ROLE_PRESETS.client in @mossa/domain perms.ts (rbac-conformance enforces it). */
 export const client = ac.newRole({
   tracking: ["create", "read", "update"],
   plan: ["read"],
   content: ["read"],
+  goal: ["read"],
+  supplement: ["read"],
+  lab: ["read"],
+  session: ["read"],
+  package: ["read"],
   ai: ["use"],
 });
 

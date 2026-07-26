@@ -7,12 +7,13 @@
  * day's logs and tap through to where you complete them.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Card, IconBadge, cn, Check, ClipboardList, Dumbbell, Utensils, Pill, ChevronRight, ChevronDown, type LucideIcon, type Tone,
 } from "@mossa/ui";
-import { api } from "../../api.js";
+import { api, isQueued, errorText } from "../../api.js";
+import { QueuedNotice } from "../../notices.js";
 import type { TodayBundle } from "./Today.js";
 
 interface Supp { id: string; name: string; dose: string | null; schedule: { slot: string }[] }
@@ -88,12 +89,37 @@ export function TodayAgenda({ clientId, date, bundle, agenda, onChanged, onNavig
   const [taken, setTaken] = useState<Set<string>>(() => new Set(agenda.taken));
   useEffect(() => { setTaken(new Set(agenda.taken)); }, [agenda.taken]);
   const [expanded, setExpanded] = useState(false);
+  const [suppErr, setSuppErr] = useState<string | null>(null);
+  const [suppQueued, setSuppQueued] = useState(false);
 
+  /**
+   * Per-slot in-flight guard. `/api/supplements/:id/log` is a TOGGLE: two fast
+   * taps insert then delete, and if the first response resolves last the checkbox
+   * settles ticked while the server holds no log. Supplement adherence feeds the
+   * coach's report, so that desync shows the coach a missed dose the client is
+   * certain they logged. So: one tap per slot at a time, the server's answer wins,
+   * and a failure puts the tick back instead of leaving a comforting lie.
+   */
+  const inFlight = useRef<Set<string>>(new Set());
   const toggleSupp = async (id: string, slot: string) => {
     const key = `${id}:${slot}`;
-    const r = await api.post<{ taken: boolean }>(`/api/supplements/${id}/log`, { clientId, date, slot });
-    setTaken((p) => { const n = new Set(p); r.taken ? n.add(key) : n.delete(key); return n; });
-    onChanged();
+    if (inFlight.current.has(key)) return;
+    inFlight.current.add(key);
+    const wasTaken = taken.has(key);
+    setSuppErr(null); setSuppQueued(false);
+    setTaken((p) => { const n = new Set(p); wasTaken ? n.delete(key) : n.add(key); return n; });
+    try {
+      const r = await api.post<{ taken: boolean }>(`/api/supplements/${id}/log`, { clientId, date, slot });
+      setTaken((p) => { const n = new Set(p); r.taken ? n.add(key) : n.delete(key); return n; });
+      onChanged();
+    } catch (e) {
+      // Queued: the toggle replays on reconnect, so keep the optimistic tick and
+      // deliberately DON'T call onChanged() — re-reading now would pull down the
+      // server's pre-queue truth and un-tick a dose that is going to land.
+      if (isQueued(e)) { setSuppQueued(true); return; }
+      setTaken((p) => { const n = new Set(p); wasTaken ? n.add(key) : n.delete(key); return n; });
+      setSuppErr(errorText(e, "Couldn't log that dose — it wasn't saved."));
+    } finally { inFlight.current.delete(key); }
   };
 
   interface Item { key: string; icon: LucideIcon; tone: Tone; label: string; sub?: string; done: boolean; actionable: boolean; onClick: () => void }
@@ -146,6 +172,8 @@ export function TodayAgenda({ clientId, date, bundle, agenda, onChanged, onNavig
           </motion.div>
         )}
       </AnimatePresence>
+      {suppQueued && <QueuedNotice className="px-1" />}
+      {suppErr && <p role="alert" className="px-1 text-sm text-warning">{suppErr}</p>}
     </section>
   );
 }

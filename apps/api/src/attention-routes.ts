@@ -12,6 +12,7 @@ import {
   overallDaysRemaining, isFullyExpired, addDays, type AttentionType, type AttentionSeverity, type Budget, type ClientPreferences,
 } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
+import { REPORTED_ACCESS_STATUSES } from "./client-flags.js";
 import { visibleClientIds } from "./clients.js";
 import { parseJson } from "./db.js";
 
@@ -48,9 +49,18 @@ export async function rollupAttention(db: D1Database, clients: AttentionClientRo
     db.prepare(`SELECT client_id, COUNT(*) AS n FROM check_ins WHERE client_id IN (${ph}) AND trainer_feedback IS NULL AND date_local >= ? GROUP BY client_id`).bind(...ids, since14).all<{ client_id: string; n: number }>(),
     db.prepare(`SELECT client_id, COUNT(*) AS n FROM lab_tests WHERE client_id IN (${ph}) AND status = 'uploaded' GROUP BY client_id`).bind(...ids).all<{ client_id: string; n: number }>(),
     db.prepare(`SELECT client_id, COUNT(*) AS n FROM swap_requests WHERE client_id IN (${ph}) AND status = 'pending' GROUP BY client_id`).bind(...ids).all<{ client_id: string; n: number }>(),
-    db.prepare(`SELECT s.client_id, s.budgets_json FROM client_subscriptions s JOIN (
-        SELECT client_id, MAX(started_at) AS st FROM client_subscriptions WHERE client_id IN (${ph}) AND status IN ('active','paused','expired') GROUP BY client_id
-      ) x ON s.client_id = x.client_id AND s.started_at = x.st`).bind(...ids).all<{ client_id: string; budgets_json: string | null }>(),
+    // EVERY access row per client, not just the newest one. Days STACK across
+    // packages (BILLING-PLAN §7) and a client legitimately holds several rows (a
+    // membership row per Stripe subscription + the non-recurring row one-time
+    // purchases fold into), so "newest row wins" flagged access as
+    // expiring/expired while another live package still covered them — and
+    // disagreed with the enforcing gate in `client-flags.ts`. The join on
+    // `clients` also pins each row to its client's OWN tenant, so a mis-tenanted
+    // row can't feed this rollup (the batched read is per-roster, hence SQL here
+    // rather than the per-client `loadClientAccessRows` helper).
+    db.prepare(`SELECT s.client_id, s.budgets_json FROM client_subscriptions s
+        JOIN clients c ON c.id = s.client_id AND c.tenant_id = s.tenant_id
+        WHERE s.client_id IN (${ph}) AND s.status IN (${REPORTED_ACCESS_STATUSES.map(() => "?").join(",")})`).bind(...ids, ...REPORTED_ACCESS_STATUSES).all<{ client_id: string; budgets_json: string | null }>(),
     db.prepare(`SELECT client_id, date_local, SUM(calories) AS cal, MAX(target_calories) AS tcal FROM food_entries WHERE client_id IN (${ph}) AND date_local >= ? GROUP BY client_id, date_local`).bind(...ids, since14).all<{ client_id: string; date_local: string; cal: number; tcal: number | null }>(),
     db.prepare(`SELECT DISTINCT client_id FROM workout_plans WHERE client_id IN (${ph}) AND status = 'published'`).bind(...ids).all<{ client_id: string }>(),
     db.prepare(`SELECT DISTINCT client_id FROM meal_plans WHERE client_id IN (${ph}) AND status = 'published'`).bind(...ids).all<{ client_id: string }>(),
@@ -68,7 +78,12 @@ export async function rollupAttention(db: D1Database, clients: AttentionClientRo
   const checkBy = countBy(checkRows.results ?? []);
   const labBy = countBy(labRows.results ?? []);
   const swapBy = countBy(swapRows.results ?? []);
-  const subBy = new Map((subRows.results ?? []).map((r) => [r.client_id, parseJson<Budget[]>(r.budgets_json, [])]));
+  // Concatenate every row's budgets per client (queue-not-sum: each entry carries
+  // its own expiry, so the engine derives remaining days from the whole set).
+  const subBy = new Map<string, Budget[]>();
+  for (const r of subRows.results ?? []) {
+    subBy.set(r.client_id, [...(subBy.get(r.client_id) ?? []), ...parseJson<Budget[]>(r.budgets_json, [])]);
+  }
   const hasWorkout = new Set((wPlanRows.results ?? []).map((r) => r.client_id));
   const hasMeal = new Set((mPlanRows.results ?? []).map((r) => r.client_id));
   const flaggedBy = new Set<string>();

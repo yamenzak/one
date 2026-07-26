@@ -23,7 +23,27 @@ export function Onboarding({ clientId, displayName, onDone }: { clientId: string
   const finish = async () => {
     setSaving(true);
     try {
-      await api.patch(`/api/clients/${clientId}`, { gender: f.gender, dateOfBirth: f.dateOfBirth || null, heightCm, intake: { primaryGoal: f.primaryGoal, workoutLocation: f.workoutLocation, experienceLevel: f.experienceLevel, activityLevel: f.activityLevel, dietaryApproach: f.dietaryApproach, availableDays: f.availableDays }, onboardingComplete: true });
+      // These four answers must land in `preferences`, not only in `intake`.
+      // `intake_json` is free-form context for the AI; `preferences_json` is the
+      // typed store the rest of the product reads — including profileGaps, which
+      // drives the coach's "finish this profile" card and the goal-setting
+      // prompts. Sending them only as intake meant a client answered goal,
+      // activity level and where they train, and their coach was still told all
+      // three were missing. The option values here are deliberately the same
+      // enums ClientPrefs validates, so they map across unchanged.
+      await api.patch(`/api/clients/${clientId}`, {
+        gender: f.gender,
+        dateOfBirth: f.dateOfBirth || null,
+        heightCm,
+        preferences: {
+          primaryGoal: f.primaryGoal,
+          workoutLocation: f.workoutLocation,
+          activityLevel: f.activityLevel,
+          dietaryApproach: f.dietaryApproach,
+        },
+        intake: { primaryGoal: f.primaryGoal, workoutLocation: f.workoutLocation, experienceLevel: f.experienceLevel, activityLevel: f.activityLevel, dietaryApproach: f.dietaryApproach, availableDays: f.availableDays },
+        onboardingComplete: true,
+      });
       onDone();
     } finally { setSaving(false); }
   };

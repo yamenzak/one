@@ -695,13 +695,13 @@ function ResultStep({ clientId, result, profile, units, onSaved, onRetry }: {
             <div className="grid grid-cols-2 gap-2">
               {soma && (
                 <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-center">
-                  <div className="text-[0.65rem] font-medium text-muted-foreground">Body type</div>
+                  <div className="text-xs font-medium text-muted-foreground">Body type</div>
                   <div className="mt-0.5 text-sm font-bold">{soma.label}</div>
                 </div>
               )}
               {post && (
                 <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-center">
-                  <div className="text-[0.65rem] font-medium text-muted-foreground">Posture</div>
+                  <div className="text-xs font-medium text-muted-foreground">Posture</div>
                   <div className="mt-0.5 flex items-center justify-center gap-1.5">
                     <Badge tone={postTone}>{post.severity[0]!.toUpperCase() + post.severity.slice(1)}</Badge>
                     <span className="numeral text-xs text-muted-foreground">{post.craniovertebralAngleDeg.toFixed(0)}°</span>
@@ -763,8 +763,8 @@ function BandBar({ low, value, high }: { low: number; value: number; high: numbe
 function MeasBox({ label, cm, units }: { label: string; cm: number | null | undefined; units: UnitPrefs }) {
   return (
     <div className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
-      <div className="text-[0.65rem] font-medium text-muted-foreground">{label}</div>
-      <div className="numeral mt-0.5 text-sm font-bold">{cm != null ? Math.round(cmToLengthDisplay(cm, units)) : "—"}<span className="ml-0.5 text-[0.55rem] text-muted-foreground">{cm != null ? lengthLabel(units) : ""}</span></div>
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="numeral mt-0.5 text-sm font-bold">{cm != null ? Math.round(cmToLengthDisplay(cm, units)) : "—"}<span className="ml-0.5 text-xs text-muted-foreground">{cm != null ? lengthLabel(units) : ""}</span></div>
     </div>
   );
 }
@@ -772,8 +772,8 @@ function MeasBox({ label, cm, units }: { label: string; cm: number | null | unde
 function CompBox({ label, value, unit }: { label: string; value: number; unit: string }) {
   return (
     <motion.div variants={popIn} className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
-      <div className="text-[0.65rem] font-medium text-muted-foreground">{label}</div>
-      <div className="numeral mt-0.5 text-sm font-bold"><CountUp value={value} decimals={1} /><span className="ml-0.5 text-[0.55rem] text-muted-foreground">{unit}</span></div>
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="numeral mt-0.5 text-sm font-bold"><CountUp value={value} decimals={1} /><span className="ml-0.5 text-xs text-muted-foreground">{unit}</span></div>
     </motion.div>
   );
 }

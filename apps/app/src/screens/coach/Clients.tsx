@@ -5,9 +5,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Sheet, Avatar, SegmentedControl, Page, Stagger, EmptyState, Reveal, SkeletonList, toneVar, Users, Mail, User, ArrowLeft, Plus, Copy, Check, ExternalLink } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, SegmentedControl, Page, Stagger, EmptyState, Reveal, SkeletonList, toneVar, Users, Mail, User, ArrowLeft, Plus, Copy, Check, ExternalLink, AlertTriangle } from "@mossa/ui";
 import type { AttentionSeverity } from "@mossa/domain";
-import { api } from "../../api.js";
+import { api, errorText } from "../../api.js";
 import { SEVERITY_TONE } from "../../attention-ui.js";
 import { Today } from "../client/Today.js";
 import { Progress } from "../client/Progress.js";
@@ -29,6 +29,8 @@ export function Clients() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
+  const [createErr, setCreateErr] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
   // After a client is created with an email, hold the invite so the coach can
   // show / copy the in-gym deep-link before continuing into the client.
   const [invite, setInvite] = useState<{ invite: Invite; clientId: string } | null>(null);
@@ -36,7 +38,14 @@ export function Clients() {
   // Per-client attention rollup — the worst item's label + how many, so a coach
   // spots a stale goal / quiet client / lab-to-review straight from the roster.
   const [att, setAtt] = useState<Map<string, { label: string; count: number; severity: AttentionSeverity }>>(new Map());
-  const load = useCallback(async () => { setClients((await api.get<{ clients: ClientSummary[] }>("/api/clients")).clients); }, []);
+  // Uncaught, this left the roster skeleton up forever with nothing said and no
+  // way back — the coach's entire book of business looking like a slow load.
+  // A failure keeps whatever roster we already had and offers a retry.
+  const load = useCallback(async () => {
+    setLoadError(false);
+    try { setClients((await api.get<{ clients: ClientSummary[] }>("/api/clients")).clients); }
+    catch { setLoadError(true); }
+  }, []);
   useEffect(() => void load(), [load]);
   useEffect(() => {
     void api.get<{ clients: { clientId: string; items: { label: string; severity: AttentionSeverity }[] }[] }>("/api/coach/attention")
@@ -45,7 +54,8 @@ export function Clients() {
   }, []);
 
   const create = async () => {
-    setBusy(true);
+    if (busy) return;
+    setBusy(true); setCreateErr(null);
     try {
       const r = await api.post<{ client: { id: string }; invite: Invite | null }>("/api/clients", { email: email.trim(), displayName: name.trim() || undefined });
       setCreateOpen(false); setName(""); setEmail(""); await load();
@@ -53,6 +63,11 @@ export function Clients() {
       // so the coach can show it in the gym; otherwise go straight to the client.
       if (r.invite) setInvite({ invite: r.invite, clientId: r.client.id });
       else nav(`/clients/${r.client.id}/today`);
+    } catch (e) {
+      // The common failure here is a 400 for an email already on the roster.
+      // Uncaught it read as "nothing happened", so the coach retyped the same
+      // address; the server's own message names the real reason.
+      setCreateErr(errorText(e, "Couldn't add that client. Check the email and try again."));
     } finally { setBusy(false); }
   };
   const emailValid = /.+@.+\..+/.test(email.trim());
@@ -64,6 +79,9 @@ export function Clients() {
         <Button onClick={() => setCreateOpen(true)}><Plus /> New</Button>
       </div>
 
+      {loadError && !clients ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load your clients" description="Something went wrong reaching the server. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
+      ) : (
       <Reveal loading={!clients} skeleton={<SkeletonList card rows={6} thumb={44} />}>
         {clients && (clients.length === 0 ? (
           <EmptyState icon={Users} title="No clients yet" description="Add your first client. With an email set, they sign in the moment you do — no codes, no passwords." action={<Button onClick={() => setCreateOpen(true)}><Plus /> Add client</Button>} />
@@ -84,12 +102,14 @@ export function Clients() {
           </Stagger>
         ))}
       </Reveal>
+      )}
 
-      <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title="New client">
+      <Sheet open={createOpen} onClose={() => { setCreateOpen(false); setCreateErr(null); }} title="New client">
         <div className="space-y-4">
           <Field label="Email" icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} hint="This is the invite — they sign in with a code and their space links automatically." />
           <Field label="Name (optional)" icon={User} value={name} onChange={(e) => setName(e.target.value)} hint="Leave blank and they'll add it on their profile." />
           <Button size="lg" className="w-full" disabled={!emailValid || busy} onClick={() => void create()}>{busy ? "Creating…" : "Add client"}</Button>
+          {createErr && <p className="text-sm text-warning" role="alert">{createErr}</p>}
         </div>
       </Sheet>
 
@@ -172,7 +192,7 @@ export function ClientDetail() {
             <Avatar name={client?.displayName ?? ""} src={client?.avatarUrl} seed={client?.avatarSeed ?? clientId} className="size-8 shrink-0" />
             <div className="min-w-0 leading-tight">
               <div className="truncate text-sm font-semibold">{client?.displayName ?? "…"}</div>
-              <div className="text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground">Coach view</div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Coach view</div>
             </div>
           </div>
         </div>
@@ -185,7 +205,9 @@ export function ClientDetail() {
       {tab === "goals" && <GoalManager key={clientId} clientId={clientId} />}
       {tab === "progress" && <Progress key={clientId} clientId={clientId} />}
       {tab === "report" && <ClientReport key={clientId} clientId={clientId} />}
-      {tab === "manage" && <ClientManage key={clientId} clientId={clientId} />}
+      {/* clientName is only for copy in the archive confirmation — Manage names the
+          client it's about to take off the roster rather than saying "this client". */}
+      {tab === "manage" && <ClientManage key={clientId} clientId={clientId} clientName={client?.displayName} />}
     </div>
   );
 }

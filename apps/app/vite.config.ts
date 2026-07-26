@@ -62,14 +62,25 @@ export default defineConfig({
     mediapipeWasm(),
     // Offline-first PWA (SPEC §3 "gym-basement logging"): precache the built app
     // shell so it opens with no signal, and queue failed log-write POSTs in an
-    // IndexedDB Background-Sync queue that replays on reconnect. `injectRegister:
-    // "auto"` injects the SW registration into index.html at build — no main.tsx
-    // edit. `manifest: false` because the worker serves /manifest.webmanifest
+    // IndexedDB Background-Sync queue that replays on reconnect.
+    // `manifest: false` because the worker serves /manifest.webmanifest
     // white-labeled per tenant (manifest.ts); we don't want the plugin to emit a
     // second, un-branded manifest.
+    //
+    // `registerType: "prompt"` (was "autoUpdate" + skipWaiting): with skipWaiting,
+    // a deploy activated the new worker inside ALREADY-OPEN tabs and
+    // cleanupOutdatedCaches purged the old precache under them — so a client mid-
+    // workout hit a 404 on the next lazy chunk import and fell into the
+    // ErrorBoundary, losing the session they were logging. Waiting means the new
+    // worker sits idle until the tabs on the old one are gone. The tradeoff is that
+    // an update lands one reload later, which we make explicit with a dismissible
+    // "New version — reload" prompt instead of leaving it invisible.
+    // `injectRegister: null` because we register /sw.js ourselves (notices.tsx
+    // PwaUpdatePrompt) — the plugin's injected registerSW.js only registers and has
+    // no way to tell anyone an update is waiting.
     VitePWA({
-      registerType: "autoUpdate",
-      injectRegister: "auto",
+      registerType: "prompt",
+      injectRegister: null,
       manifest: false,
       includeAssets: ["icon.svg", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"],
       workbox: {
@@ -79,8 +90,14 @@ export default defineConfig({
         globIgnores: ["**/models/**", "**/mediapipe/**"],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         cleanupOutdatedCaches: true,
+        // `clientsClaim` WITHOUT `skipWaiting` is the combination we want. Claiming
+        // only happens when a worker activates: on a FIRST install there's no old
+        // worker, so it activates at once and takes over the page — offline works
+        // from the very first visit. On an UPDATE, skipWaiting:false leaves the new
+        // worker parked until every tab on the old one closes, so it can never
+        // purge the precache under a live session (the mid-workout chunk 404).
         clientsClaim: true,
-        skipWaiting: true,
+        skipWaiting: false,
         // Serve the cached shell for client-side routes when offline; never for
         // the API, health, or the (worker-served) manifest.
         navigateFallback: "/index.html",
@@ -88,11 +105,20 @@ export default defineConfig({
         runtimeCaching: [
           {
             // Log-write POSTs (food/water/sets/activity/sleep/mood, check-ins,
-            // supplement + fasting toggles): try the network, and on failure
-            // (offline) enqueue for replay when connectivity returns.
+            // measurements, body scans, supplement + fasting toggles): try the
+            // network, and on failure (offline) enqueue for replay when
+            // connectivity returns.
+            //
+            // `measurements` + `body-scans` were missing, so a weigh-in or a body
+            // scan taken in a no-signal gym was lost permanently — the two forms
+            // most likely to be filled in exactly there. Both server handlers are
+            // `INSERT … ON CONFLICT(client_id, date_local) DO UPDATE`
+            // (log-routes.ts /measurements, body-scan-routes.ts /body-scans), i.e.
+            // idempotent per client-day, so a duplicate replay upserts rather than
+            // double-counting. Keep this in lockstep with QUEUED_POST in src/api.ts.
             urlPattern: ({ url, request }: { url: URL; request: Request }) =>
               request.method === "POST" &&
-              /^\/api\/(logs\/|check-ins|supplements\/[^/]+\/log|fasting)/.test(url.pathname),
+              /^\/api\/(logs\/|check-ins|measurements|body-scans|supplements\/[^/]+\/log|fasting)/.test(url.pathname),
             handler: "NetworkOnly",
             method: "POST",
             options: {
@@ -110,12 +136,30 @@ export default defineConfig({
     port: 5173,
     proxy: {
       // Same-origin in prod (the api worker serves this app); proxied in dev.
-      "/api": "http://localhost:8787",
-      "/health": "http://localhost:8787",
+      //
+      // The Origin rewrite is load-bearing, not hygiene. Better Auth 1.6.23
+      // ignores the `trustedOrigins` array auth.ts passes it and trusts only the
+      // request's own origin, so a proxied POST arriving with
+      // `Origin: http://localhost:5173` against a worker on :8787 is rejected
+      // `INVALID_ORIGIN`. Cookieless calls (OTP send/verify) pass, which is why
+      // sign-in appeared to work while "Create workspace", set-active-org and
+      // sign-out all failed — the confusing symptom of being able to log in and
+      // then do nothing. Presenting the target's own origin makes the dev proxy
+      // look same-origin, which is exactly what production is.
+      "/api": {
+        target: "http://localhost:8787",
+        changeOrigin: true,
+        headers: { origin: "http://localhost:8787" },
+      },
+      "/health": { target: "http://localhost:8787", changeOrigin: true },
     },
   },
   build: {
-    sourcemap: true,
+    // The api worker's assets binding serves everything in dist/ publicly, so
+    // `true` shipped ~8.5 MB of .map files — the app's full source, readable by
+    // anyone who asked for them. Flip to "hidden" if a build ever needs maps for
+    // local debugging without the `//# sourceMappingURL` pointer.
+    sourcemap: false,
     chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {

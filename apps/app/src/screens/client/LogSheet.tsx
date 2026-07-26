@@ -11,7 +11,8 @@ import {
   Utensils, Footprints, Droplet, Weight, Ruler, Moon, Smile, ClipboardList, Camera, Angry, Frown, Meh, Laugh, Search, Timer, HeartPulse, MapPin, Flame, Dumbbell,
   cn, toneVar, type LucideIcon, type Tone,
 } from "@mossa/ui";
-import { api, todayLocal, uploadMedia } from "../../api.js";
+import { api, errorText, isQueued, todayLocal, uploadMedia } from "../../api.js";
+import { QueuedNotice } from "../../notices.js";
 import { useUnits } from "../../units.js";
 import { AiAvatar, useAiIdentity } from "../../AiAvatar.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
@@ -58,6 +59,8 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
   const [aiNote, setAiNote] = useState<string | null>(null);
   const [photos, setPhotos] = useState<{ key: string; consentToFeature: boolean }[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  // The write is parked in the service-worker queue — reassure, don't alarm.
+  const [queued, setQueued] = useState(false);
   const [photoErr, setPhotoErr] = useState<string | null>(null);
   const date = todayLocal();
   const units = useUnits();
@@ -99,7 +102,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
     } finally { setAiBusy(false); }
   };
 
-  const close = () => { setKind(null); setFoodMode(false); setF({}); setRatings({ mood: null, energy: null, stress: null, sleepQ: null }); setActSearch(""); setAiNote(null); setPhotos([]); setErr(null); setPhotoErr(null); onClose(); };
+  const close = () => { setKind(null); setFoodMode(false); setF({}); setRatings({ mood: null, energy: null, stress: null, sleepQ: null }); setActSearch(""); setAiNote(null); setPhotos([]); setErr(null); setQueued(false); setPhotoErr(null); onClose(); };
 
   const uploadPhoto = async (file: File) => {
     setPhotoErr(null);
@@ -132,6 +135,19 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
       if (track === "reps" && !num("reps")) { setErr("Enter a count."); return; }
       if (track !== "reps" && !num("duration")) { setErr("Enter a duration."); return; }
     }
+    // Water and Sleep post a REQUIRED positive number (LogWater.amountMl and
+    // LogSleep.durationMinutes are both `int().positive()` in @mossa/protocol).
+    // A blank amount sent `undefined`, and 0 hours sent durationMinutes: 0 —
+    // both 400 at the route, which with no catch below read as a Save button
+    // that does nothing, forever. Catch it here where we can say why.
+    if (kind === "water" && !num("amount")) { setErr("Enter how much you drank."); return; }
+    if (kind === "sleep" && !((num("hours") ?? 0) > 0)) { setErr("Enter how many hours you slept."); return; }
+    // Weight / Body / Check-in are all-optional forms, but an entirely empty one
+    // posts nothing and looks like it saved. Require at least one value.
+    if (kind === "weight" && !num("amount")) { setErr("Enter your weight."); return; }
+    if (kind === "body" && !["weight", "bf", "neck", "waist", "hips", "chest"].some((k) => num(k) != null)) {
+      setErr("Enter at least one measurement."); return;
+    }
     setErr(null);
     setBusy(true);
     try {
@@ -144,6 +160,14 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
       else if (kind === "checkin") await api.post("/api/check-ins", { clientId, data: { date, weightKg: kg("weight"), mood: ratings.mood ?? undefined, energy: ratings.energy ?? undefined, stress: ratings.stress ?? undefined, sleepHours: num("sleepHours"), stepsCount: num("steps"), notes: f.notes || undefined, progressPhotos: photos.length ? photos : undefined } });
       onLogged();
       close();
+    } catch (e) {
+      // Without this every one of the eight kinds failed in total silence: an
+      // unhandled rejection, "Saving…" flipping back to "Save", the sheet still
+      // open, and nothing said. A queued offline write is the opposite case — it
+      // WILL land, so treat it as a success and say so rather than inviting a
+      // retry that would double-count the day.
+      if (isQueued(e)) { setQueued(true); onLogged(); return; }
+      setErr(errorText(e, "Couldn't save that. Check your connection and try again."));
     } finally { setBusy(false); }
   };
 
@@ -285,10 +309,11 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
               {photos.length > 0 && <p className="mt-1.5 text-xs text-muted-foreground">Photos are private. Toggle to allow featuring as a before/after.</p>}
             </div>
           </>)}
-          {err && <p className="text-sm text-warning">{err}</p>}
+          {err && <p className="text-sm text-warning" role="alert">{err}</p>}
+          {queued && <QueuedNotice />}
           <div className="flex gap-3 pt-1">
-            <Button variant="ghost" onClick={() => { setErr(null); setKind(null); }}>Back</Button>
-            <Button size="lg" className="flex-1" disabled={busy} onClick={() => void submit()}>{busy ? "Saving…" : "Save"}</Button>
+            <Button variant="ghost" onClick={() => { setErr(null); setQueued(false); setKind(null); }}>Back</Button>
+            <Button size="lg" className="flex-1" disabled={busy} onClick={() => void submit()}>{busy ? "Saving…" : queued ? "Done" : "Save"}</Button>
           </div>
         </div>
       )}

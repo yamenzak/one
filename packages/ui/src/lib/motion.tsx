@@ -67,10 +67,25 @@ export function Stagger({ children, className, ...props }: HTMLMotionProps<"div"
   );
 }
 
-/** Tap/press feedback wrapper — subtle scale on press. */
-export function Pressable({ children, className, onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {
+/**
+ * Tap/press feedback wrapper — subtle scale on press.
+ *
+ * Renders a real <button> as soon as it's interactive. A `motion.div` with an
+ * `onClick` is a clickable div: no role, not focusable, and dead to Enter/Space,
+ * so it's invisible to keyboard and screen-reader users — the exact trap the
+ * accessibility pass just removed from the app, sitting exported from the design
+ * system waiting to be reintroduced. Mirrors MetricPill/StatCard in metrics.tsx.
+ */
+export function Pressable({ children, className, onClick, "aria-label": ariaLabel }: { children: ReactNode; className?: string; onClick?: () => void; "aria-label"?: string }) {
+  if (onClick) {
+    return (
+      <motion.button type="button" onClick={onClick} aria-label={ariaLabel} whileTap={{ scale: 0.97 }} className={className}>
+        {children}
+      </motion.button>
+    );
+  }
   return (
-    <motion.div whileTap={{ scale: 0.97 }} className={className} onClick={onClick}>
+    <motion.div aria-label={ariaLabel} whileTap={{ scale: 0.97 }} className={className}>
       {children}
     </motion.div>
   );

@@ -4,14 +4,14 @@
  * surfaces so clients can look back at what a past phase prescribed.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkoutBody, MealBody, MealOption } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy } from "@mossa/domain";
 import {
-  Sheet, Card, Badge, EmptyState, MacroInline, cn,
+  Sheet, Card, Badge, Button, EmptyState, MacroInline, cn,
   Reveal, SkeletonList,
-  Dumbbell, Utensils, Moon, ChevronDown, History, type LucideIcon,
+  AlertTriangle, Dumbbell, Utensils, Moon, ChevronDown, History, type LucideIcon,
 } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
@@ -30,21 +30,37 @@ export function PlanHistorySheet({ clientId, kind, onClose }: { clientId: string
   const [exMap, setExMap] = useState<Map<string, ExerciseLite>>(new Map());
   const [foods, setFoods] = useState<Map<string, FoodRow>>(new Map());
   const [openId, setOpenId] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
+  // Only the newest load may commit — `kind` can flip while a request is in
+  // flight (Train → Eat history from the same sheet host).
+  const reqRef = useRef(0);
   const load = useCallback(async () => {
+    const rid = ++reqRef.current;
+    setError(false);
     const endpoint = kind === "workout" ? "workout-plans" : "meal-plans";
-    const [pl, lib] = await Promise.all([
+    // allSettled, not all: the name library is independent of the plan list. Under
+    // Promise.all a failing library read discarded the plans too, and `plans` stays
+    // null until a success — so the sheet showed its skeleton forever.
+    const [pl, lib] = await Promise.allSettled([
       api.get<{ plans: PlanRow[] }>(`/api/${endpoint}?clientId=${clientId}`),
       kind === "workout"
         ? api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all")
         : api.get<{ foods: FoodRow[] }>("/api/foods?scope=all"),
     ]);
+    if (rid !== reqRef.current) return;
+    if (pl.status !== "fulfilled") { setError(true); return; }
     // Previous = superseded (the active plan is the published one, shown on the page).
-    setPlans(pl.plans.filter((p) => p.status === "superseded"));
-    if (kind === "workout") setExMap(new Map((lib as { exercises: ExerciseLite[] }).exercises.map((e) => [e.id, e])));
-    else setFoods(new Map((lib as { foods: FoodRow[] }).foods.map((f) => [f.id, f])));
+    setPlans(pl.value.plans.filter((p) => p.status === "superseded"));
+    // Without the library, exercise/food names fall back to their placeholders —
+    // the plan's structure (days, sets, macros) still reads correctly.
+    if (lib.status === "fulfilled") {
+      if (kind === "workout") setExMap(new Map((lib.value as { exercises: ExerciseLite[] }).exercises.map((e) => [e.id, e])));
+      else setFoods(new Map((lib.value as { foods: FoodRow[] }).foods.map((f) => [f.id, f])));
+    }
   }, [clientId, kind]);
-  useEffect(() => void load(), [load]);
+  useEffect(() => void load(), [load, reloadKey]);
 
   const foodMap = useMemo(
     () => new Map([...foods.entries()].map(([id, f]) => [id, { id: f.id, servingSize: f.serving_size, caloriesPerServing: f.calories, proteinG: f.protein_g, carbsG: f.carbs_g, fatG: f.fat_g } as FoodLike])),
@@ -53,6 +69,9 @@ export function PlanHistorySheet({ clientId, kind, onClose }: { clientId: string
 
   return (
     <Sheet open onClose={onClose} title={kind === "workout" ? "Previous workout plans" : "Previous meal plans"}>
+      {error && !plans ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load past plans" description="Something went wrong fetching your plan history. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />
+      ) : (
       <Reveal loading={!plans} skeleton={
         <div className="space-y-2.5">
           <SkeletonList card rows={1} thumb={36} />
@@ -84,6 +103,7 @@ export function PlanHistorySheet({ clientId, kind, onClose }: { clientId: string
         </div>
         ))}
       </Reveal>
+      )}
     </Sheet>
   );
 }
@@ -145,7 +165,7 @@ function MealDetail({ body, foodMap, nameOf, units }: { body: MealBody; foodMap:
                   </div>
                   {!opt.isFree && (
                     <>
-                      <MacroInline proteinG={t.proteinG} carbsG={t.carbsG} fatG={t.fatG} className="mt-1 text-[0.7rem]" />
+                      <MacroInline proteinG={t.proteinG} carbsG={t.carbsG} fatG={t.fatG} className="mt-1 text-xs" />
                       {opt.foods.length > 0 && <div className="mt-1 truncate text-xs text-muted-foreground">{opt.foods.map((f) => nameOf(f.foodId)).join(", ")}</div>}
                     </>
                   )}

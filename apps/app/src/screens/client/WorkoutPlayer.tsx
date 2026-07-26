@@ -10,9 +10,9 @@ import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmt
 import {
   Button, Card, Badge, Field, Input, Label, Sheet, SubCard, ProgressRing, EmptyState,
   Reveal, Skeleton, SkeletonLine, SkeletonList, useModalOverlay,
-  ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, LifeBuoy, Plus, Minus, RotateCcw, cn,
+  AlertTriangle, ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, LifeBuoy, Plus, Minus, RotateCcw, cn,
 } from "@mossa/ui";
-import { api, todayLocal } from "../../api.js";
+import { api, todayLocal, errorText } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { useTour } from "../../tour.js";
 import { Markdown } from "../../Markdown.js";
@@ -44,6 +44,11 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   // Nonce-per-step: bumped when a set is logged so that step's rest timer
   // auto-starts (see RestTimer's `autoStart`). Single = "b:s", group = "g:b".
   const [restSignals, setRestSignals] = useState<Map<string, number>>(new Map());
+  // A failed PLAN read is fatal to the player (there's nothing to train); a failed
+  // library / today's-sessions read only degrades it, and says so inline.
+  const [loadError, setLoadError] = useState(false);
+  const [loadWarning, setLoadWarning] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const pingRest = (key: string) => setRestSignals((m) => new Map(m).set(key, (m.get(key) ?? 0) + 1));
   const units = useUnits();
   // Capture the session date ONCE (lazy initializer) — re-deriving todayLocal()
@@ -88,20 +93,33 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   const reqRef = useRef(0);
   const load = useCallback(async () => {
     const rid = ++reqRef.current;
-    const [plansRes, exRes, sessRes] = await Promise.all([
+    setLoadError(false); setLoadWarning(null);
+    // allSettled, not all: only the plan read is load-bearing. Under Promise.all a
+    // failing exercise-library or today's-sessions read threw the plan away too,
+    // and since `plan` stays `undefined` until a success the player sat on its
+    // skeleton forever — no error, no retry, no way out but a reload.
+    const [plansRes, exRes, sessRes] = await Promise.allSettled([
       api.get<{ plans: PlanRow[] }>(`/api/workout-plans?clientId=${clientId}`),
       api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all"),
       api.get<{ sessions: { entries: SessionEntry[] }[] }>(`/api/logs/workout-sessions?clientId=${clientId}&from=${date}&to=${date}`),
     ]);
     if (rid !== reqRef.current) return;
-    setPlan(plansRes.plans.find((p) => p.status === "published") ?? null);
-    setAllPlans(plansRes.plans);
-    setExercises(new Map(exRes.exercises.map((e) => [e.id, e])));
+    if (plansRes.status !== "fulfilled") { setLoadError(true); return; }
+    setPlan(plansRes.value.plans.find((p) => p.status === "published") ?? null);
+    setAllPlans(plansRes.value.plans);
+    if (exRes.status === "fulfilled") setExercises(new Map(exRes.value.exercises.map((e) => [e.id, e])));
     const sess = new Map<string, LoggedSet[]>();
-    for (const s of sessRes.sessions) for (const e of s.entries) sess.set(`${e.blockIndex}:${e.slotIndex}`, e.sets);
+    if (sessRes.status === "fulfilled") for (const s of sessRes.value.sessions) for (const e of s.entries) sess.set(`${e.blockIndex}:${e.slotIndex}`, e.sets);
     setSession(sess);
+    // Name the degradation rather than quietly showing an unnamed exercise or a
+    // 0/12 progress ring over sets the client already logged today.
+    const missing = [
+      exRes.status === "rejected" ? "exercise details" : null,
+      sessRes.status === "rejected" ? "today's logged sets" : null,
+    ].filter(Boolean);
+    if (missing.length) setLoadWarning(`Couldn't load ${missing.join(" or ")}. Logging still works.`);
   }, [clientId, date]);
-  useEffect(() => void load(), [load, tourActive]); // reload through the api interceptor when a tour toggles
+  useEffect(() => void load(), [load, tourActive, reloadKey]); // reload through the api interceptor when a tour toggles
 
   // On a client switch, clear the previous client's plan/session/bests so their
   // data can't linger under the new client while the reload is in flight.
@@ -120,7 +138,10 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
         map.set(e.exerciseId, b);
       }
       if (alive) setBests(map);
-    });
+      // PR history is a nice-to-have: without it a genuine PR just doesn't get
+      // celebrated. Swallow it here so it can't reach the global unhandled-
+      // rejection toast and read as "the workout didn't load".
+    }).catch(() => undefined);
     return () => { alive = false; };
   }, [clientId, date]);
 
@@ -138,6 +159,19 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   const isPast = !!active && !!plan && active.id !== plan.id;
   const pastPlans = allPlans.filter((p) => p.status === "superseded");
   const pickPlan = (id: string | null) => { setViewId(id); setHistOpen(false); };
+
+  // The plan read failed. This has to be said out loud: the skeleton below is
+  // keyed on `plan === undefined`, so without this branch a failed read is an
+  // infinite shimmer inside a full-screen overlay the client can only escape.
+  if (loadError && plan === undefined) return (
+    <PlanShell onEscape={onExit}>
+      <HeaderBar title="Workout plan" onBack={onExit} />
+      <div className="mx-auto max-w-xl p-4">
+        <EmptyState icon={AlertTriangle} title="Couldn't load your plan" description="Something went wrong reaching your workout plan. Check your connection and try again."
+          action={<Button onClick={() => { setLoadError(false); setReloadKey((k) => k + 1); }}>Try again</Button>} />
+      </div>
+    </PlanShell>
+  );
 
   // Still loading — show a skeleton rather than flashing "No published plan"
   // (which is indistinguishable from an empty result before the fetch resolves).
@@ -204,7 +238,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                   {day.imageUrl ? <img src={day.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className={`absolute inset-0 ${day.isRestDay ? "bg-gradient-to-br from-sleep/20 to-surface-2" : "bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2"}`} />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
                   {!day.imageUrl && <div className="absolute inset-0 grid place-items-center text-white/35 [&_svg]:size-9">{day.isRestDay ? <Moon /> : <Dumbbell />}</div>}
-                  {day.isRestDay ? <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-[0.6rem] font-semibold text-sleep">Rest</span> : rec ? <span className="absolute right-2 top-2 rounded-full bg-activity px-2 py-0.5 text-[0.6rem] font-semibold text-[var(--tone-foreground)]">Recommended</span> : null}
+                  {day.isRestDay ? <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-xs font-semibold text-sleep">Rest</span> : rec ? <span className="absolute right-2 top-2 rounded-full bg-activity px-2 py-0.5 text-xs font-semibold text-[var(--tone-foreground)]">Recommended</span> : null}
                   <div className="absolute inset-x-0 bottom-0 p-3">
                     <div className="truncate font-semibold text-white">{day.name || `Day ${i + 1}`}</div>
                     <div className="truncate text-xs text-white/75">{day.isRestDay ? "Rest day" : `${exercises} exercise${exercises === 1 ? "" : "s"} · ${sets} sets`}</div>
@@ -317,6 +351,13 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
       <HeaderBar title={day.name || `Day ${dayIndex + 1}`} subtitle={`${loggedSets} of ${totalSets} set${totalSets === 1 ? "" : "s"} logged`} onBack={() => setDayIndex(null)}
         right={<span data-tour="wp-progress"><ProgressRing progress={totalSets ? loggedSets / totalSets : 0} size={40} strokeWidth={5} tone="activity" value={<span className="text-xs font-semibold">{loggedSets}</span>} /></span>} />
 
+      {loadWarning && (
+        <div role="status" className="mx-auto flex max-w-xl items-center justify-between gap-3 px-4 pt-3">
+          <p className="min-w-0 text-sm text-warning">{loadWarning}</p>
+          <Button size="sm" variant="secondary" className="shrink-0" onClick={() => setReloadKey((k) => k + 1)}>Retry</Button>
+        </div>
+      )}
+
       <ol className="mx-auto max-w-xl p-4 pb-28">
         {steps.map((step, i) => {
           const last = i === steps.length - 1;
@@ -358,14 +399,14 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                           <Fragment key={k}>
                             <div className="flex flex-col items-center gap-1">
                               <span className={cn("size-2.5 rounded-full transition-colors", setDotClass(set, k < logged))} />
-                              <span className="text-[0.62rem] font-semibold leading-none tabular-nums text-muted-foreground">{setMeasureShort(set, mode)}</span>
+                              <span className="text-xs font-semibold leading-none tabular-nums text-muted-foreground">{setMeasureShort(set, mode)}</span>
                             </div>
                             {k < step.slot.sets.length - 1 && <RestTimer seconds={set.restAfterSec ?? 60} />}
                           </Fragment>
                         ))}
                       </div>
-                      {mods.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{mods.map((m) => <span key={m} className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.65rem] font-medium text-muted-foreground">{m}</span>)}</div>}
-                      {step.slot.slotNotes && <p className="mt-2 text-[0.72rem] italic leading-snug text-muted-foreground">“{step.slot.slotNotes}”</p>}
+                      {mods.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{mods.map((m) => <span key={m} className="rounded bg-surface-2 px-1.5 py-0.5 text-xs font-medium text-muted-foreground">{m}</span>)}</div>}
+                      {step.slot.slotNotes && <p className="mt-2 text-xs italic leading-snug text-muted-foreground">“{step.slot.slotNotes}”</p>}
                     </div>
                     <div className="mt-2 flex items-center gap-2 border-t border-border/50 p-2">
                       <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex: step.blockIndex, slotIndex: step.slotIndex, exerciseId: step.slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
@@ -376,7 +417,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                   // Grouped block — superset/circuit/HIIT, logged one round at a time.
                   <div className="overflow-hidden rounded-2xl bg-card ring-1 ring-inset ring-border/50">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 pt-3"><Badge tone="activity">{blockLabel(step.block.type)}</Badge><span className="text-xs text-muted-foreground">{roundsDone}/{rounds} rounds</span>{step.block.restBetweenRoundsSec ? <span className="text-xs text-muted-foreground">· {fmtClock(step.block.restBetweenRoundsSec)} between</span> : null}</div>
-                    {step.block.blockNotes && <p className="px-3 pt-1 text-[0.72rem] italic leading-snug text-muted-foreground">“{step.block.blockNotes}”</p>}
+                    {step.block.blockNotes && <p className="px-3 pt-1 text-xs italic leading-snug text-muted-foreground">“{step.block.blockNotes}”</p>}
                     <div className="space-y-1.5 p-3">
                       {step.block.slots.map((slot, slotIndex) => (
                         <div key={slotIndex} className="rounded-xl bg-surface-2 p-2">
@@ -395,7 +436,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                     <span className="h-px w-4 bg-border/60" />
                     <RestTimer seconds={single ? stepRestSeconds(step.block, step.slot) : stepRestSeconds(step.block)} label
                       autoStart={restSignals.get(single ? `${step.blockIndex}:${step.slotIndex}` : `g:${step.blockIndex}`)} />
-                    <span className="text-[0.65rem] text-muted-foreground">before next</span>
+                    <span className="text-xs text-muted-foreground">before next</span>
                   </div>
                 )}
               </motion.div>
@@ -518,7 +559,7 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
             {([["Start", ex?.thumb_url], ["End", ex?.thumb2_url]] as const).filter(([, src]) => src).map(([label, src]) => (
               <div key={label} className="relative min-w-0 flex-1 overflow-hidden rounded-2xl bg-surface-2">
                 <img src={src!} alt="" className="h-40 w-full object-contain" />
-                {ex?.thumb_url && ex?.thumb2_url && <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[0.65rem] font-semibold text-white">{label}</span>}
+                {ex?.thumb_url && ex?.thumb2_url && <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-xs font-semibold text-white">{label}</span>}
               </div>
             ))}
           </div>
@@ -659,7 +700,7 @@ function SetLogDrawer({ slot, exerciseId, exerciseName, logged, fetchLast, onClo
         </div>
         {last && (
           <div className="rounded-xl bg-surface-2 px-3 py-2">
-            <div className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">Last time · {relativeDate(last.date)}</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Last time · {relativeDate(last.date)}</div>
             <div className="truncate text-sm font-medium tabular-nums">{summarizeLast(last.sets, units)}</div>
           </div>
         )}
@@ -790,6 +831,7 @@ function RoundLogDrawer({ block, roundIndex, exercises, fetchLast, onClose, onSa
  */
 function SwapDrawer({ clientId, planId, dayIndex, coords, currentName, onClose, onDone }: { clientId: string; planId: string; dayIndex: number; coords: { blockIndex: number; slotIndex: number; exerciseId: string }; currentName: string; onClose: () => void; onDone: (m: string) => void }) {
   const [alts, setAlts] = useState<ExerciseInfo[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -799,13 +841,19 @@ function SwapDrawer({ clientId, planId, dayIndex, coords, currentName, onClose, 
 
   const post = (body: Record<string, unknown>) => api.post<{ autoApproved: boolean }>("/api/swaps", { clientId, workoutPlanId: planId, dayIndex, blockIndex: coords.blockIndex, slotIndex: coords.slotIndex, currentExerciseId: coords.exerciseId, ...body });
 
+  // A swap that fails must not close the sheet on a lie — `onDone` is what tells
+  // the client (and the toast) the exercise changed. Report it and stay open.
   const swapTo = async (alt: ExerciseInfo) => {
-    setBusy(true);
-    try { await post({ suggestedExerciseId: alt.id }); onDone(`Swapped to ${alt.name}`); } finally { setBusy(false); }
+    setBusy(true); setErr(null);
+    try { await post({ suggestedExerciseId: alt.id }); onDone(`Swapped to ${alt.name}`); }
+    catch (e) { setErr(errorText(e, "Couldn't swap that exercise — try again.")); }
+    finally { setBusy(false); }
   };
   const request = async () => {
-    setBusy(true);
-    try { await post({ reason: reason || null }); onDone("Swap request sent to your coach"); } finally { setBusy(false); }
+    setBusy(true); setErr(null);
+    try { await post({ reason: reason || null }); onDone("Swap request sent to your coach"); }
+    catch (e) { setErr(errorText(e, "Couldn't send that request — try again.")); }
+    finally { setBusy(false); }
   };
 
   return (
@@ -838,6 +886,7 @@ function SwapDrawer({ clientId, planId, dayIndex, coords, currentName, onClose, 
           <Field label="Why swap? (optional)" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. shoulder pain, no cable machine" />
           <Button variant="outline" className="mt-3 w-full" disabled={busy} onClick={() => void request()}>Request a swap — coach will choose</Button>
         </div>
+        {err && <p role="alert" className="text-sm text-warning">{err}</p>}
       </div>
     </Sheet>
   );
@@ -1052,12 +1101,23 @@ function RestTimer({ seconds, label, className, autoStart }: { seconds: number; 
   }, []);
   const running = left !== null && left > 0;
   const done = left === 0;
+  const counting = running || done;
   return (
     <button type="button" onClick={(e) => { e.stopPropagation(); if (left === null) begin(seconds); else stop(); }}
       aria-label={running ? "Reset rest timer" : "Start rest timer"}
-      className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-semibold tabular-nums transition-colors [&_svg]:size-3",
+      className={cn("inline-flex shrink-0 items-center font-semibold tabular-nums transition-colors",
+        // Idle this is a chip you tap. The moment it's counting it becomes a
+        // primary in-workout readout — the number a client reads mid-set with the
+        // phone on the floor and a bar in their hands — so it grows in place
+        // rather than staying a 10px pill. Only the running step expands, and it
+        // collapses again a beat after "Go!", so the timeline layout is unchanged
+        // except for the one row that's actively resting.
+        counting ? "gap-2 rounded-2xl px-3.5 py-2 [&_svg]:size-5" : "gap-1 rounded-full px-2 py-0.5 text-xs [&_svg]:size-3",
         done ? "bg-activity text-[var(--tone-foreground)]" : running ? "bg-cardio text-[var(--tone-foreground)]" : "bg-surface-3 text-muted-foreground hover:bg-surface-2", className)}>
-      <Timer />{done ? "Go!" : `${label ? "Rest " : ""}${fmtClock(running ? left! : seconds)}`}
+      <Timer />
+      {counting
+        ? <span className="numeral text-4xl font-bold leading-none tracking-tight">{done ? "Go!" : fmtClock(left!)}</span>
+        : `${label ? "Rest " : ""}${fmtClock(seconds)}`}
     </button>
   );
 }

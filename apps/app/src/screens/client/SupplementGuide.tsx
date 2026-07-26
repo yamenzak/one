@@ -49,9 +49,9 @@ export function SupplementGuide({ clientId }: { clientId: string }) {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} className="flex items-start gap-3">
           <AiAvatar className="mt-0.5 size-8 shrink-0" />
           <div className="min-w-0 flex-1">
-            <div className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-primary">Supplement tips</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">Supplement tips</div>
             <Markdown className="mt-1 text-[0.95rem] text-foreground/85">{guide}</Markdown>
-            <p className="mt-1.5 text-[0.7rem] text-muted-foreground">General info — ask your coach before starting, stopping, or changing anything.</p>
+            <p className="mt-1.5 text-xs text-muted-foreground">General info — ask your coach before starting, stopping, or changing anything.</p>
           </div>
         </motion.div>
       )}
