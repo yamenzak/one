@@ -45,7 +45,7 @@ function ChipStrip({ options, selected, onChange }: { options: readonly string[]
 
 /** A quiet uppercase section eyebrow that groups the review fields. */
 function SectionLabel({ children }: { children: ReactNode }) {
-  return <div className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground/70">{children}</div>;
+  return <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">{children}</div>;
 }
 
 /**
@@ -81,7 +81,7 @@ function HeroChoice({ icon: Icon, tone, title, subtitle, badge, active, busy, di
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
           <span className="text-[0.95rem] font-semibold leading-tight text-foreground">{title}</span>
-          {badge && <span className="rounded-full bg-primary/15 px-1.5 py-px text-[0.6rem] font-bold uppercase leading-none tracking-wide text-primary">{badge}</span>}
+          {badge && <span className="rounded-full bg-primary/15 px-1.5 py-px text-xs font-bold uppercase leading-none tracking-wide text-primary">{badge}</span>}
         </span>
         <span className="mt-1 block text-xs leading-snug text-muted-foreground">{subtitle}</span>
       </span>

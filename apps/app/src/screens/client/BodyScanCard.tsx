@@ -230,8 +230,8 @@ function ShapeOverTime({ scans, onOpenDetails }: { scans: Scan[]; onOpenDetails:
           nearProfile ? <Body3D profile={nearProfile} width={200} height={220} /> : <span className="text-xs text-muted-foreground">No model for this scan</span>
         ) : (
           <div className="flex items-end justify-center gap-6">
-            {frontPoly && <figure className="m-0"><Silhouette points={frontPoly} tone={toneVar.sleep} width={104} height={200} /><figcaption className="mt-1 text-center text-[0.65rem] text-muted-foreground">Front</figcaption></figure>}
-            {hasSide && sidePoly && <figure className="m-0"><Silhouette points={sidePoly} tone={toneVar.sleep} width={88} height={200} /><figcaption className="mt-1 text-center text-[0.65rem] text-muted-foreground">Side</figcaption></figure>}
+            {frontPoly && <figure className="m-0"><Silhouette points={frontPoly} tone={toneVar.sleep} width={104} height={200} /><figcaption className="mt-1 text-center text-xs text-muted-foreground">Front</figcaption></figure>}
+            {hasSide && sidePoly && <figure className="m-0"><Silhouette points={sidePoly} tone={toneVar.sleep} width={88} height={200} /><figcaption className="mt-1 text-center text-xs text-muted-foreground">Side</figcaption></figure>}
           </div>
         )}
       </div>

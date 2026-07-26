@@ -11,7 +11,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { kcalToDisplay, scaleFood, servingsToQuantity, SERVING_PRESETS, type UnitPrefs } from "@mossa/domain";
 import { Button, Field, Sheet, Chip, SegmentedControl, IconBadge, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, ChevronRight, Plus, X } from "@mossa/ui";
-import { api, todayLocal, uploadMedia } from "../../api.js";
+import { api, errorText, isQueued, todayLocal, uploadMedia } from "../../api.js";
+import { QueuedNotice } from "../../notices.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { FoodRow, normFood } from "../food.js";
@@ -24,6 +25,30 @@ import { FoodEditor, type EditableFood } from "./FoodEditor.js";
 
 /** A food the vision model detected in a snapped meal (pre-log, reviewable). */
 interface SnapEntry { label: string; mealType?: string; calories: number; proteinG: number; carbsG: number; fatG: number; quantity?: number | null; unit?: string | null }
+/** A reviewable snap row, carrying the stable key its list is rendered with. */
+type SnapItem = SnapEntry & { _key: string };
+
+/**
+ * Outcome of confirming a snap. There is no batch food-log endpoint (the API
+ * exposes one POST /api/logs/food per entry — see apps/api/src/log-routes.ts), so
+ * a 4-item meal is 4 writes and a failure on #3 leaves #1 and #2 already in the
+ * diary. Re-sending the whole list would write those two a SECOND time and the
+ * day would double-count — wrong ring for the client, wrong compliance for the
+ * coach. So the loop reports exactly which rows are still unwritten and the
+ * review sheet keeps only those, making a retry send only what's left.
+ */
+interface SnapLogResult {
+  /** How many rows the confirm started with (for "3 of 5 saved"). */
+  total: number;
+  /** Rows that reached the server or the offline queue — durable either way. */
+  saved: number;
+  /** Rows still unwritten; a retry must send ONLY these. */
+  remaining: SnapItem[];
+  /** Why we stopped, or null when everything landed. */
+  error: string | null;
+  /** At least one row is parked in the Background-Sync queue, not yet on the server. */
+  queued: boolean;
+}
 
 /** A previously-logged food, ready to re-log at its last portion in one tap. */
 interface Recent {
@@ -83,6 +108,15 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
   const [logging, setLogging] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [snapErr, setSnapErr] = useState<unknown>(null);
+  // Search failures used to be invisible: the list silently kept the previous
+  // query's rows and the only trace was an unhandled rejection.
+  const [searchErr, setSearchErr] = useState<string | null>(null);
+  // Write feedback for the log / re-log / barcode paths. `logQueued` is a SUCCESS
+  // state (the POST is parked in the service worker's Background-Sync queue and
+  // will replay) — the sheet stays open to say so, because closing it silently
+  // would leave the diary unchanged and get the button tapped again → double log.
+  const [logErr, setLogErr] = useState<string | null>(null);
+  const [logQueued, setLogQueued] = useState(false);
   // Snap-a-meal review: the AI's detected foods + its note + the photo, held
   // for the user to confirm/trim BEFORE anything is logged (no fire-and-forget).
   const [snap, setSnap] = useState<{ entries: SnapEntry[]; note: string | null; imageKey: string } | null>(null);
@@ -114,17 +148,32 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
       });
       setExtPage(page);
       setExtMore(res.length >= 10);
+    } catch (e) {
+      if (seq !== searchSeq.current) return; // a newer query owns the list now
+      // Clear `extMore` or the IntersectionObserver sentinel re-fires the same
+      // failing page every time it scrolls into view.
+      setExtMore(false);
+      setSearchErr(errorText(e, "Couldn't load web results — check your connection."));
     } finally { if (seq === searchSeq.current) setSearching(false); }
   }, [q]);
 
   const search = useCallback(async () => {
-    if (q.trim().length < 2) { searchSeq.current++; setLocal([]); setExternal([]); setExtPage(0); return; }
+    if (q.trim().length < 2) { searchSeq.current++; setLocal([]); setExternal([]); setExtPage(0); setSearchErr(null); return; }
     const seq = ++searchSeq.current;
-    const foods = (await api.get<{ foods: Food[] }>(`/api/foods?q=${encodeURIComponent(q)}`)).foods;
-    if (seq !== searchSeq.current) return; // a newer query started while this was in flight
-    setLocal(foods);
-    setExternal([]); setExtPage(0); setExtMore(false);
-    if (webEnabled) void searchExternal(1);
+    setSearchErr(null);
+    try {
+      const foods = (await api.get<{ foods: Food[] }>(`/api/foods?q=${encodeURIComponent(q)}`)).foods;
+      if (seq !== searchSeq.current) return; // a newer query started while this was in flight
+      setLocal(foods);
+      setExternal([]); setExtPage(0); setExtMore(false);
+      if (webEnabled) void searchExternal(1);
+    } catch (e) {
+      if (seq !== searchSeq.current) return;
+      // Drop the stale rows: leaving the previous query's matches on screen under
+      // the new text is worse than an empty list with a reason and a retry.
+      setLocal([]); setExternal([]); setExtPage(0); setExtMore(false);
+      setSearchErr(errorText(e, "Couldn't search foods — check your connection."));
+    }
   }, [q, webEnabled, searchExternal]);
   useEffect(() => { const t = setTimeout(() => void search(), 300); return () => clearTimeout(t); }, [search]);
   // Infinite scroll: when the sentinel at the bottom of the results list scrolls

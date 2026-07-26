@@ -7,8 +7,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, PhotoGrid, ConfirmDialog, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon, User } from "@mossa/ui";
-import { api, todayLocal } from "../../api.js";
+import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, PhotoGrid, ConfirmDialog, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon, User, AlertTriangle } from "@mossa/ui";
+import { api, errorText, todayLocal } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
@@ -54,9 +54,19 @@ export function ClientManage({ clientId }: { clientId: string }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [exercises, setExercises] = useState<ExerciseInfo[]>([]);
   const [suppToDiscontinue, setSuppToDiscontinue] = useState<Supp | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [partial, setPartial] = useState(false);
 
+  // Seven INDEPENDENT reads, one per section — so `allSettled`, not `all`: with
+  // `all` a single dead endpoint (labs 500ing, say) rejected the lot and left the
+  // whole management screen a permanent skeleton. Now each section fills in from
+  // its own read and the ones that failed are named in a banner.
+  //
+  // `subscriptions` is the exception: it gates the entire render below, so its
+  // failure is the screen's error and gets the retry.
   const load = useCallback(async () => {
-    const [s, p, sw, l, su, ci, ex] = await Promise.all([
+    setLoadError(false);
+    const [s, p, sw, l, su, ci, ex] = await Promise.allSettled([
       api.get<{ subscriptions: Sub[] }>(`/api/subscriptions?clientId=${clientId}`),
       api.get<{ packages: Pkg[] }>("/api/packages"),
       api.get<{ swaps: Swap[] }>(`/api/swaps?clientId=${clientId}`),
@@ -65,7 +75,15 @@ export function ClientManage({ clientId }: { clientId: string }) {
       api.get<{ checkIns: CheckIn[] }>(`/api/check-ins?clientId=${clientId}`),
       api.get<{ exercises: ExerciseInfo[] }>("/api/exercises"),
     ]);
-    setSubs(s.subscriptions); setPackages(p.packages); setSwaps(sw.swaps); setLabs(l.labs); setSupps(su.supplements); setCheckIns(ci.checkIns); setExercises(ex.exercises);
+    if (p.status === "fulfilled") setPackages(p.value.packages);
+    if (sw.status === "fulfilled") setSwaps(sw.value.swaps);
+    if (l.status === "fulfilled") setLabs(l.value.labs);
+    if (su.status === "fulfilled") setSupps(su.value.supplements);
+    if (ci.status === "fulfilled") setCheckIns(ci.value.checkIns);
+    if (ex.status === "fulfilled") setExercises(ex.value.exercises);
+    setPartial([p, sw, l, su, ci, ex].some((r) => r.status === "rejected"));
+    if (s.status === "fulfilled") setSubs(s.value.subscriptions);
+    else setLoadError(true);
   }, [clientId]);
   useEffect(() => void load(), [load]);
 
@@ -102,6 +120,9 @@ export function ClientManage({ clientId }: { clientId: string }) {
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+      {loadError && !subs ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load this client" description="Something went wrong reaching the server. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
+      ) : (
       <Reveal loading={!subs} className="space-y-4" skeleton={
         <>
           <SkeletonList card rows={1} />
@@ -110,6 +131,15 @@ export function ClientManage({ clientId }: { clientId: string }) {
         </>
       }>
       {subs && (<>
+      {/* One of the section reads failed — say so rather than letting an empty
+          Supplements / Labs / Check-ins card read as "this client has none". */}
+      {partial && (
+        <Card className="flex items-start gap-3 border border-warning/25 bg-warning-soft/50">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
+          <div className="min-w-0 flex-1"><div className="text-sm font-semibold">Some sections didn't load</div><p className="text-sm text-muted-foreground">Part of this client's record couldn't be reached, so what's below may be incomplete.</p></div>
+          <Button size="sm" variant="secondary" onClick={() => void load()}>Retry</Button>
+        </Card>
+      )}
       <section className="space-y-2">
         <Eyebrow action={
           <div className="flex gap-2">
@@ -195,6 +225,7 @@ export function ClientManage({ clientId }: { clientId: string }) {
       )}
       </>)}
       </Reveal>
+      )}
 
       <ActivityLog clientId={clientId} />
 
@@ -330,6 +361,10 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<unknown>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  // The check-in id whose reply is in flight, plus per-row failures — a coach can
+  // have several rows open, so a single boolean would disable the wrong Send.
+  const [sending, setSending] = useState<string | null>(null);
+  const [sendErr, setSendErr] = useState<Record<string, string>>({});
   const units = useUnits();
   const summarize = async () => {
     setBusy(true); setErr(null); setSummary(null);
@@ -340,7 +375,20 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
     } catch (e) { setErr(e); }
     finally { setBusy(false); }
   };
-  const send = async (id: string) => { const fb = draft[id]?.trim(); if (!fb) return; await api.post(`/api/check-ins/${id}/feedback`, { clientId, feedback: fb }); setDraft((d) => ({ ...d, [id]: "" })); await onFeedback(); };
+  // Sending notifies the client, so a double-tap used to send the reply twice —
+  // and a failed POST cleared nothing and said nothing, leaving the coach to
+  // believe the client had been answered when they hadn't.
+  const send = async (id: string) => {
+    const fb = draft[id]?.trim();
+    if (!fb || sending) return;
+    setSending(id); setSendErr((m) => ({ ...m, [id]: "" }));
+    try {
+      await api.post(`/api/check-ins/${id}/feedback`, { clientId, feedback: fb });
+      setDraft((d) => ({ ...d, [id]: "" }));
+      await onFeedback();
+    } catch (e) { setSendErr((m) => ({ ...m, [id]: errorText(e, "Couldn't send that reply. Please try again.") })); }
+    finally { setSending(null); }
+  };
   return (
     <section className="space-y-2">
       <Eyebrow action={<Button size="sm" variant="tonal" disabled={busy || checkIns.length === 0} onClick={() => void summarize()}><AiAvatar className="size-5" /> {busy ? "…" : "Summarize"}</Button>}>Check-ins</Eyebrow>
@@ -361,9 +409,12 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
             {photos.length > 0 && <PhotoGrid photos={photos} cols={4} />}
             {c.notes && <p className="text-sm text-muted-foreground">“{c.notes}”</p>}
             {c.trainer_feedback ? <div className="flex items-start gap-1.5 rounded-lg bg-primary/10 px-3 py-2 text-xs text-primary"><Check className="mt-0.5 size-3.5 shrink-0" /><span>You replied: {c.trainer_feedback}</span></div> : (
-              <div className="flex items-center gap-2">
-                <input value={draft[c.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [c.id]: e.target.value }))} placeholder="Reply…" className="flex-1 rounded-lg bg-surface-3 px-3 py-2 text-sm outline-none" />
-                <Button size="sm" disabled={!draft[c.id]?.trim()} onClick={() => void send(c.id)}>Send</Button>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <input value={draft[c.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [c.id]: e.target.value }))} placeholder="Reply…" className="flex-1 rounded-lg bg-surface-3 px-3 py-2 text-sm outline-none" />
+                  <Button size="sm" disabled={!draft[c.id]?.trim() || sending === c.id} onClick={() => void send(c.id)}>{sending === c.id ? "Sending…" : "Send"}</Button>
+                </div>
+                {sendErr[c.id] && <p className="text-sm text-warning" role="alert">{sendErr[c.id]}</p>}
               </div>
             )}
           </SubCard>
@@ -406,15 +457,25 @@ function SuggestSuppSheet({ clientId, onClose, onPrescribed }: { clientId: strin
   const [note, setNote] = useState("");
   const [error, setError] = useState<unknown>(null);
   const [added, setAdded] = useState<Set<string>>(new Set());
+  // The reco whose POST is in flight, and the one that failed — a double-tap used
+  // to prescribe the same supplement twice, and a rejection left the row's
+  // "Prescribe" button unchanged, so it looked like a no-op rather than an error.
+  const [prescribing, setPrescribing] = useState<string | null>(null);
+  const [prescribeErr, setPrescribeErr] = useState<{ name: string; text: string } | null>(null);
   useEffect(() => {
     void api.post<{ recommendations: SuppReco[]; note: string }>("/api/ai/supplement-reco", { clientId })
       .then((r) => { setRecos(r.recommendations); setNote(r.note); })
       .catch((e) => setError(e));
   }, [clientId]);
   const prescribe = async (r: SuppReco) => {
-    await api.post("/api/supplements", { clientId, name: r.name, dose: r.dose || undefined, kind: "other", schedule: [{ slot: "daily" }] });
-    setAdded((a) => new Set(a).add(r.name));
-    await onPrescribed();
+    if (prescribing) return;
+    setPrescribing(r.name); setPrescribeErr(null);
+    try {
+      await api.post("/api/supplements", { clientId, name: r.name, dose: r.dose || undefined, kind: "other", schedule: [{ slot: "daily" }] });
+      setAdded((a) => new Set(a).add(r.name));
+      await onPrescribed();
+    } catch (e) { setPrescribeErr({ name: r.name, text: errorText(e, "Couldn't prescribe that. Please try again.") }); }
+    finally { setPrescribing(null); }
   };
   return (
     <Sheet open onClose={onClose} title="Suggested supplements">
@@ -426,9 +487,10 @@ function SuggestSuppSheet({ clientId, onClose, onPrescribed }: { clientId: strin
               <SubCard key={i} className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0"><span className="font-medium">{r.name}</span>{r.dose && <span className="ml-2 text-xs text-muted-foreground">{r.dose}</span>}</div>
-                  {added.has(r.name) ? <Badge tone="success">Added</Badge> : <Button size="sm" onClick={() => void prescribe(r)}>Prescribe</Button>}
+                  {added.has(r.name) ? <Badge tone="success">Added</Badge> : <Button size="sm" disabled={prescribing !== null} onClick={() => void prescribe(r)}>{prescribing === r.name ? "Adding…" : "Prescribe"}</Button>}
                 </div>
                 <p className="text-xs text-muted-foreground">{r.rationale}</p>
+                {prescribeErr && prescribeErr.name === r.name && <p className="text-sm text-warning" role="alert">{prescribeErr.text}</p>}
                 {r.linkedMarker && <Badge tone="cardio">{r.linkedMarker}</Badge>}
               </SubCard>
             )))}
@@ -537,15 +599,21 @@ interface Report {
 function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => void }) {
   const [range, setRange] = useState<"7d" | "30d" | "90d">("30d");
   const [report, setReport] = useState<Report | null>(null);
+  const [reportErr, setReportErr] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [exNames, setExNames] = useState<Map<string, string>>(new Map());
   const units = useUnits();
+  // Same dead end as the screen loader: a failed read left this sheet a
+  // permanent skeleton (the range chips still switching, nothing ever arriving).
   useEffect(() => {
     let alive = true;
-    setReport(null);
+    setReport(null); setReportErr(false);
     const today = todayLocal();
-    void api.get<Report>(`/api/reports/client/${clientId}?range=${range}&today=${today}`).then((r) => { if (alive) setReport(r); });
+    api.get<Report>(`/api/reports/client/${clientId}?range=${range}&today=${today}`)
+      .then((r) => { if (alive) setReport(r); })
+      .catch(() => { if (alive) setReportErr(true); });
     return () => { alive = false; };
-  }, [clientId, range]);
+  }, [clientId, range, reloadKey]);
   useEffect(() => { void api.get<{ exercises: { id: string; name: string }[] }>("/api/exercises?scope=all").then((r) => setExNames(new Map(r.exercises.map((e) => [e.id, e.name])))).catch(() => undefined); }, []);
   const weight = report?.weightSeries ?? [];
   const wDelta = weight.length >= 2 ? Math.round((kgToDisplay(weight.at(-1)!.kg, units) - kgToDisplay(weight[0]!.kg, units)) * 10) / 10 : null;
@@ -554,6 +622,9 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
   return (
     <Sheet open onClose={onClose} title="Client report">
       <div className="mb-3 flex gap-2">{(["7d", "30d", "90d"] as const).map((r) => <Chip key={r} selected={range === r} onClick={() => setRange(r)}>{r}</Chip>)}</div>
+      {reportErr ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load the report" description="Something went wrong reaching the server. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />
+      ) : (
       <Reveal loading={!report} skeleton={<><SkeletonStatGrid count={9} cols={3} /><SkeletonList card rows={5} thumb={0} /></>}>
         {report && (
         <div className="space-y-3">
@@ -578,6 +649,7 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
         </div>
         )}
       </Reveal>
+      )}
     </Sheet>
   );
 }

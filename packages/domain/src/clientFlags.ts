@@ -177,6 +177,37 @@ export interface ResolveFlagsInput {
   nowIso: string;
 }
 
+/**
+ * OR-merge two already-resolved flag sets (a binary fold — use with
+ * `sets.reduce(unionClientFlags)`).
+ *
+ * A client can legitimately hold SEVERAL live access rows at once: a monthly
+ * membership owns its own row (keyed by its Stripe subscription) while a
+ * one-time package bought on top folds into the non-recurring row. BILLING-PLAN
+ * §7 locks the semantics — "days stack + flags UNION across every active
+ * package" — so effective capability is the SUPERSET of every live row's
+ * resolved flags: a capability stays on for as long as ANY granting package is
+ * live. Honouring only the newest row silently revokes capabilities the client
+ * paid for in the other one.
+ *
+ * Each input must ALREADY be a `resolveClientFlags` result (its own package
+ * flags, its own subscription overrides, gated by its OWN budgets and
+ * intersected with the tenant's entitlements) — the union is a pure OR on top,
+ * so the entitlement bound and the budget gate can never be widened by it.
+ */
+export function unionClientFlags(a: ClientFlags, b: ClientFlags): ClientFlags {
+  const out = { ...a };
+  for (const key of CLIENT_FLAG_KEYS) if (b[key]) out[key] = true;
+  // The AI master stays a kill switch. Each input already cascaded master→groups,
+  // so a group can only be true here if its own row had the master on — but
+  // re-assert it so the invariant can't drift if that cascade ever changes.
+  if (!out.canUseAi) {
+    out.aiMealTools = false;
+    out.aiCoachInsights = false;
+  }
+  return out;
+}
+
 /** THE resolver. Everything client-capability flows through here. */
 export function resolveClientFlags(input: ResolveFlagsInput): ClientFlags {
   let flags = applyPartial(DEFAULT_CLIENT_FLAGS, input.packageFlags);

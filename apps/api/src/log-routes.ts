@@ -26,6 +26,7 @@ import { newId, nowIso } from "./ids.js";
 import { notify } from "./notify.js";
 import { recordAudit } from "./audit.js";
 import { parseJson, j } from "./db.js";
+import { loadClientAccessRows, accessBudgetsOf, REPORTED_ACCESS_STATUSES } from "./client-flags.js";
 
 /** Every log payload arrives wrapped with the target clientId. */
 const withClient = <T extends z.ZodTypeAny>(schema: T) =>
@@ -201,7 +202,11 @@ export const logRoutes = new Hono<AppEnv>()
               const actorId = requireTenant(c)?.userId;
               const primary = await db.prepare("SELECT trainer_user_id FROM client_trainers WHERE client_id = ? ORDER BY is_primary DESC LIMIT 1").bind(access.client.id).first<{ trainer_user_id: string }>();
               if (primary?.trainer_user_id && primary.trainer_user_id !== actorId) {
-                const ex = await db.prepare("SELECT name FROM exercises WHERE id = ?").bind(d.exerciseId).first<{ name: string }>();
+                // Tenant-scoped (own library or the global one): the id comes from
+                // a client-supplied log payload, so an unscoped lookup would echo
+                // ANOTHER tenant's private exercise name into this coach's
+                // notification.
+                const ex = await db.prepare("SELECT name FROM exercises WHERE id = ? AND (tenant_id = ? OR tenant_id IS NULL)").bind(d.exerciseId, access.client.tenant_id).first<{ name: string }>();
                 const lift = ex?.name ?? "an exercise";
                 await notify(c.env, {
                   tenantId: access.client.tenant_id,
@@ -787,11 +792,12 @@ export const logRoutes = new Hono<AppEnv>()
         const allSets = entries.flatMap((e) => e.sets ?? []);
         const completedSets = allSets.filter((s) => s.completed !== false).length;
         const tonnage = sessionTonnage(allSets);
-        // Exercise names for the item rows.
+        // Exercise names for the item rows. Tenant-scoped for the same reason as
+        // the PR notification above: the ids ride on client-written log entries.
         const ids = [...new Set(entries.map((e) => e.exerciseId).filter(Boolean))];
         const nameById = new Map<string, string>();
         if (ids.length) {
-          const ex = await db.prepare(`SELECT id, name FROM exercises WHERE id IN (${ids.map(() => "?").join(",")})`).bind(...ids).all<{ id: string; name: string }>();
+          const ex = await db.prepare(`SELECT id, name FROM exercises WHERE id IN (${ids.map(() => "?").join(",")}) AND (tenant_id = ? OR tenant_id IS NULL)`).bind(...ids, access.client.tenant_id).all<{ id: string; name: string }>();
           for (const e of ex.results ?? []) nameById.set(e.id, e.name);
         }
         // Tonnage per session over the last ~10 sessions.
@@ -1402,18 +1408,23 @@ export const logRoutes = new Hono<AppEnv>()
     // coach-account notices. Only surfaces a "buy" prompt in tenancies that
     // actually sell packages (`sellsPackages`); generous tenancies stay silent.
     const nowInstant = new Date().toISOString();
-    const [accessSub, sells, tenantSub] = await Promise.all([
-      db.prepare("SELECT status, budgets_json FROM client_subscriptions WHERE client_id = ? AND status IN ('active','paused','expired') ORDER BY started_at DESC LIMIT 1").bind(clientId).first<{ status: string; budgets_json: string | null }>(),
+    const [accessRows, sells, tenantSub] = await Promise.all([
+      // EVERY access row, not just the newest: a client on a membership who also
+      // bought a one-time package holds two, and the enforcing gate
+      // (`resolveClientFlagsFor`) unions both. Reading one row here made this
+      // banner disagree with what the routes actually allow.
+      loadClientAccessRows(db, access.client.tenant_id, clientId, REPORTED_ACCESS_STATUSES),
       db.prepare("SELECT COUNT(*) AS n FROM packages WHERE tenant_id = ? AND active = 1 AND visibility = 'marketplace'").bind(access.client.tenant_id).first<{ n: number }>(),
       db.prepare("SELECT status FROM subscriptions WHERE tenant_id = ?").bind(access.client.tenant_id).first<{ status: string }>(),
     ]);
-    const accessBudgets = parseJson<Budget[]>(accessSub?.budgets_json, []);
+    const hasAccessSub = accessRows.length > 0;
+    const accessBudgets = accessBudgetsOf(accessRows);
     const accessSummary = {
-      hasSubscription: Boolean(accessSub),
-      daysRemaining: accessSub ? overallDaysRemaining(accessBudgets, nowInstant) : null,
-      expired: Boolean(accessSub) && isFullyExpired(accessBudgets, nowInstant),
-      workoutActive: !accessSub || hasActiveBudget(accessBudgets, "workout", nowInstant),
-      mealActive: !accessSub || hasActiveBudget(accessBudgets, "meal", nowInstant),
+      hasSubscription: hasAccessSub,
+      daysRemaining: hasAccessSub ? overallDaysRemaining(accessBudgets, nowInstant) : null,
+      expired: hasAccessSub && isFullyExpired(accessBudgets, nowInstant),
+      workoutActive: !hasAccessSub || hasActiveBudget(accessBudgets, "workout", nowInstant),
+      mealActive: !hasAccessSub || hasActiveBudget(accessBudgets, "meal", nowInstant),
       sellsPackages: (sells?.n ?? 0) > 0,
       // Passthrough: when the tenant is suspended for non-payment to Mossa, the
       // client's tenant-derived paid features are already clamped off upstream —

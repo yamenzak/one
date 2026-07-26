@@ -46,9 +46,9 @@ function EntitlementFields({ ent, meta, onChange }: { ent: Ent; meta: EntMeta; o
             return (
               <div key={k} className="flex items-center gap-2">
                 <div className="min-w-0 flex-1"><div className="text-sm font-medium">{m.label}</div><div className="truncate text-xs text-muted-foreground">{m.hint}</div></div>
-                <button onClick={() => setQuota(k, unlimited ? 0 : -1)} className={cn("shrink-0 rounded-full px-2 py-1 text-[0.65rem] font-medium transition-colors", unlimited ? "bg-primary/15 text-primary" : "bg-surface-3 text-muted-foreground")}>∞</button>
+                <button onClick={() => setQuota(k, unlimited ? 0 : -1)} className={cn("shrink-0 rounded-full px-2 py-1 text-xs font-medium transition-colors", unlimited ? "bg-primary/15 text-primary" : "bg-surface-3 text-muted-foreground")}>∞</button>
                 <input type="number" min={0} disabled={unlimited} value={unlimited ? "" : v} onChange={(e) => setQuota(k, Math.max(0, Number(e.target.value) || 0))} className="w-20 rounded-lg bg-surface-2 px-2 py-1.5 text-right text-sm outline-none disabled:opacity-40" placeholder={unlimited ? "∞" : ""} />
-                <span className="w-8 shrink-0 text-[0.65rem] text-muted-foreground">{unlimited ? "" : m.unit ?? ""}</span>
+                <span className="w-8 shrink-0 text-xs text-muted-foreground">{unlimited ? "" : m.unit ?? ""}</span>
               </div>
             );
           })}
@@ -264,7 +264,7 @@ function AiConfig() {
                   </button>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{m.label}</div>
-                    <div className="numeral truncate text-[0.65rem] text-muted-foreground">{m.task} · {rate(m)} · {m.markup ?? "?"}×</div>
+                    <div className="numeral truncate text-xs text-muted-foreground">{m.task} · {rate(m)} · {m.markup ?? "?"}×</div>
                   </div>
                   <Switch checked={m.enabled === 1} onCheckedChange={(v) => void patchModel(m.id, { enabled: v })} />
                 </div>

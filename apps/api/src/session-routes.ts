@@ -9,7 +9,7 @@ import { z } from "zod";
 import { remainingAddOnQuantity, type AddOnBalance } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { gateFeature } from "./client-flags.js";
-import { requireClientAccess } from "./clients.js";
+import { requireClientAccess, visibleClientIds } from "./clients.js";
 import { notify } from "./notify.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
@@ -46,7 +46,19 @@ export const sessionRoutes = new Hono<AppEnv>()
       const rows = await c.env.DB.prepare("SELECT * FROM trainer_sessions WHERE client_id = ? ORDER BY scheduled_at DESC LIMIT 500").bind(clientId).all();
       return c.json({ sessions: rows.results ?? [] });
     }
-    const rows = await c.env.DB.prepare("SELECT * FROM trainer_sessions WHERE tenant_id = ? AND status = 'scheduled' ORDER BY scheduled_at LIMIT 500").bind(who.tenantId).all();
+    // No clientId = the front-desk schedule. Scope it to the roster the caller may
+    // see: an owner/assistant runs the desk and legitimately sees everyone ("all"),
+    // but a plain tenant match handed an UNASSIGNED trainer the whole studio's
+    // schedule — every client's booking times plus the coach-authored `notes` on
+    // them — which the client_trainers invariant is there to prevent.
+    const scope = await visibleClientIds(c);
+    if (scope !== "all" && scope.length === 0) return c.json({ sessions: [] });
+    const where =
+      scope === "all"
+        ? "tenant_id = ? AND status = 'scheduled'"
+        : `tenant_id = ? AND status = 'scheduled' AND client_id IN (${scope.map(() => "?").join(",")})`;
+    const binds = scope === "all" ? [who.tenantId] : [who.tenantId, ...scope];
+    const rows = await c.env.DB.prepare(`SELECT * FROM trainer_sessions WHERE ${where} ORDER BY scheduled_at LIMIT 500`).bind(...binds).all();
     return c.json({ sessions: rows.results ?? [] });
   })
 
@@ -82,6 +94,14 @@ export const sessionRoutes = new Hono<AppEnv>()
     const sessionId = c.req.param("id");
     const row = await c.env.DB.prepare("SELECT * FROM trainer_sessions WHERE id = ? AND tenant_id = ?").bind(sessionId, who.tenantId).first<{ status: string; subscription_id: string | null; addon_type_id: string; client_id: string; scheduled_at: string }>();
     if (!row) return c.json({ error: "not found" }, 404);
+    // Row-level scope on the session's client, BEFORE any write. This transition is
+    // money-affecting: completing it decrements `quantityUsed` on the client's
+    // subscription add-on balance (burning a consultation they paid for) and
+    // cancelling it refunds one and fires a cancellation notification at them. With
+    // only the tenant match in the WHERE above, a trainer with no client_trainers
+    // assignment could consume or refund any same-tenant client's consultations.
+    const access = await requireClientAccess(c, row.client_id);
+    if ("response" in access) return access.response;
     const target = b.data.status;
 
     // Atomic status transition. The completed<->not-completed boundary is guarded

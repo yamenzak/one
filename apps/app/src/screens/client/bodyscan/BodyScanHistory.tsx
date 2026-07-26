@@ -148,13 +148,13 @@ export function BodyScanHistory({ scans, units, initialId, onClose }: { scans: H
             <div className="grid grid-cols-2 gap-2">
               {scan.somatotype && (
                 <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-center">
-                  <div className="text-[0.65rem] font-medium text-muted-foreground">Body type</div>
+                  <div className="text-xs font-medium text-muted-foreground">Body type</div>
                   <div className="mt-0.5 text-sm font-bold">{scan.somatotype}</div>
                 </div>
               )}
               {scan.posture && (
                 <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-center">
-                  <div className="text-[0.65rem] font-medium text-muted-foreground">Posture</div>
+                  <div className="text-xs font-medium text-muted-foreground">Posture</div>
                   <div className="mt-0.5 flex items-center justify-center gap-1.5">
                     <Badge tone={POSTURE_TONE[scan.posture.severity]}>{cap(scan.posture.severity)}</Badge>
                     {scan.posture.cvaDeg != null && <span className="numeral text-xs text-muted-foreground">{scan.posture.cvaDeg.toFixed(0)}°</span>}
@@ -221,8 +221,8 @@ export function BodyScanHistory({ scans, units, initialId, onClose }: { scans: H
 function Meas({ label, cm, units }: { label: string; cm: number | null; units: UnitPrefs }) {
   return (
     <div className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
-      <div className="text-[0.65rem] font-medium text-muted-foreground">{label}</div>
-      <div className="numeral mt-0.5 text-sm font-bold">{cm != null ? Math.round(cmToLengthDisplay(cm, units)) : "—"}<span className="ml-0.5 text-[0.55rem] text-muted-foreground">{cm != null ? lengthLabel(units) : ""}</span></div>
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="numeral mt-0.5 text-sm font-bold">{cm != null ? Math.round(cmToLengthDisplay(cm, units)) : "—"}<span className="ml-0.5 text-xs text-muted-foreground">{cm != null ? lengthLabel(units) : ""}</span></div>
     </div>
   );
 }
@@ -230,8 +230,8 @@ function Meas({ label, cm, units }: { label: string; cm: number | null; units: U
 function Stat({ label, value, unit }: { label: string; value: number; unit: string }) {
   return (
     <motion.div variants={popIn} className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
-      <div className="text-[0.65rem] font-medium text-muted-foreground">{label}</div>
-      <div className="numeral mt-0.5 text-sm font-bold"><CountUp value={value} decimals={1} /><span className="ml-0.5 text-[0.55rem] text-muted-foreground">{unit}</span></div>
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="numeral mt-0.5 text-sm font-bold"><CountUp value={value} decimals={1} /><span className="ml-0.5 text-xs text-muted-foreground">{unit}</span></div>
     </motion.div>
   );
 }

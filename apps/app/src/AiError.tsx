@@ -26,7 +26,7 @@ export function AiErrorBox({ error, className }: { error: unknown; className?: s
         <CircleAlert className="mt-0.5 shrink-0" />
         <span className="min-w-0 flex-1 break-words">{message}</span>
       </div>
-      {raw && <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-black/15 p-2 text-[0.65rem] leading-snug">{raw}</pre>}
+      {raw && <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-black/15 p-2 text-xs leading-snug">{raw}</pre>}
       <Button size="sm" variant="secondary" onClick={() => void copy()}>{copied ? <Check /> : <Copy />} {copied ? "Copied" : "Copy error"}</Button>
     </div>
   );

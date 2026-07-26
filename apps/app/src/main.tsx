@@ -10,6 +10,7 @@ import { Start } from "./screens/Start.js";
 import { Shell } from "./Shell.js";
 import { AcceptInvite } from "./screens/AcceptInvite.js";
 import { PasskeyProvider } from "./PasskeyPrompt.js";
+import { PwaUpdatePrompt, UnhandledErrorToast } from "./notices.js";
 
 /**
  * Branded boot screen — the studio's logo on a soft brand glow with a gentle
@@ -66,14 +67,22 @@ function App() {
   }
   const screen = loading ? "boot" : !ctx ? "login" : !ctx.active ? "start" : "shell";
   return (
-    <AnimatePresence mode="wait">
-      <motion.div key={screen} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-        {screen === "boot" && <BootSplash />}
-        {screen === "login" && <Login />}
-        {screen === "start" && <Start />}
-        {screen === "shell" && <PasskeyProvider><Shell /></PasskeyProvider>}
-      </motion.div>
-    </AnimatePresence>
+    <>
+      <AnimatePresence mode="wait">
+        <motion.div key={screen} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+          {screen === "boot" && <BootSplash />}
+          {screen === "login" && <Login />}
+          {screen === "start" && <Start />}
+          {screen === "shell" && <PasskeyProvider><Shell /></PasskeyProvider>}
+        </motion.div>
+      </AnimatePresence>
+      {/* App-level, screen-independent: a promise nobody caught must at least be
+          visible, and a waiting service-worker update must be announced rather
+          than silently applied mid-session. Outside AnimatePresence so neither
+          is torn down by a screen transition. */}
+      <UnhandledErrorToast />
+      <PwaUpdatePrompt />
+    </>
   );
 }
 

@@ -10,10 +10,10 @@ import {
   type PersonaRefRole,
 } from "./context-helpers.js";
 import type { PersonaRef, SessionContext } from "@mossa/protocol";
-import { resolveUnits, overallDaysRemaining, NOTIF_TYPES, notifVisibleInSurface, type UnitPrefs, type Budget, type NotifType } from "@mossa/domain";
+import { resolveUnits, overallDaysRemaining, NOTIF_TYPES, notifVisibleInSurface, type UnitPrefs, type NotifType } from "@mossa/domain";
 import { type AppEnv, isPlatformAdmin, requireTenant } from "./auth-context.js";
 import { clientForUser } from "./clients.js";
-import { resolveClientFlagsFor } from "./client-flags.js";
+import { resolveClientFlagsFor, loadClientAccessRows, accessBudgetsOf } from "./client-flags.js";
 import { tenantEntitlements, seedBilling, withinQuota } from "./billing-store.js";
 import { parseJson, j } from "./db.js";
 import { nowIso } from "./ids.js";
@@ -149,13 +149,11 @@ export const contextRoutes = new Hono<AppEnv>()
     if (active?.clientId) {
       const now = new Date().toISOString();
       const required = Boolean(parseJson<{ requireActiveAccess?: boolean }>(marketplaceJson, {}).requireActiveAccess);
-      const subs = await c.env.DB
-        .prepare("SELECT budgets_json FROM client_subscriptions WHERE client_id = ? AND status IN ('active','paused')")
-        .bind(active.clientId)
-        .all<{ budgets_json: string | null }>();
-      const rows = subs.results ?? [];
-      let days = 0;
-      for (const s of rows) days = Math.max(days, overallDaysRemaining(parseJson<Budget[]>(s.budgets_json, []), now));
+      // Same read as the enforcing gate (`client-flags.ts`) and the Today banner:
+      // every live row, tenant-scoped, budgets concatenated. Days stack across
+      // packages, so this banner and the routes can never disagree.
+      const rows = await loadClientAccessRows(c.env.DB, active.tenantId, active.clientId);
+      const days = overallDaysRemaining(accessBudgetsOf(rows), now);
       clientAccess = { active: days > 0, required, daysRemaining: rows.length ? days : null };
     }
 

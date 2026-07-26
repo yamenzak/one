@@ -109,6 +109,11 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   // prefs, surfaced in the today bundle), so a coach viewing a client edits the
   // client's own hero — not their own — and both see the same arrangement.
   const [widgetItems, setWidgetItems] = useState<WidgetItem[] | null>(null);
+  // The today bundle is the only read the page can't render without; the feed is
+  // its own section and fails on its own. `reloadKey` drives the retry buttons.
+  const [error, setError] = useState(false);
+  const [feedError, setFeedError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const units = useUnits();
   const nav = useNavigate();
   const { ctx } = useSession();
@@ -139,24 +144,40 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   const reqRef = useRef(0);
   const load = useCallback(async () => {
     const rid = ++reqRef.current;
-    const [bundle, hist, ag] = await Promise.all([
+    setError(false); setFeedError(false);
+    // allSettled, not all: the bundle, the day's history and the agenda are three
+    // INDEPENDENT reads. Under Promise.all one failing sibling discarded the other
+    // two, and since the loading flag is `!data || !agenda` the page sat on its
+    // skeleton forever with nothing said and nothing to tap.
+    const [bundleR, histR, agR] = await Promise.allSettled([
       api.get<TodayBundle>(`/api/today?clientId=${clientId}&date=${date}`),
       api.get<{ events: FeedEvent[] }>(`/api/activity-history?clientId=${clientId}&from=${date}&to=${date}`),
       fetchAgenda(clientId, date),
     ]);
     if (rid !== reqRef.current) return;
-    setData(bundle); setWidgetItems(bundle.widgets ?? null); setFeed(hist.events); setAgenda(ag);
+    // Everything on the page hangs off the bundle (rings, macros, access, agenda
+    // rows), so this is the one failure that owns the whole screen.
+    if (bundleR.status !== "fulfilled") { setError(true); return; }
+    setData(bundleR.value); setWidgetItems(bundleR.value.widgets ?? null);
+    if (histR.status === "fulfilled") setFeed(histR.value.events);
+    else { setFeed([]); setFeedError(true); }
+    // A dead agenda read degrades to the rows derivable from the bundle alone
+    // (check-in + today's workout) instead of holding the whole day hostage.
+    setAgenda(agR.status === "fulfilled" ? agR.value : { supps: [], taken: [], mealTypes: [], loggedMeals: [] });
   }, [clientId, date]);
   // Reset to the skeleton when the scoped client changes so the previous
   // client's data doesn't linger; then (re)load. Manual refreshes reuse `load`
   // without resetting, so they don't flash the skeleton.
-  useEffect(() => { setData(null); setAgenda(null); setFeed(null); void load(); }, [load]);
+  useEffect(() => { setData(null); setAgenda(null); setFeed(null); void load(); }, [load, reloadKey]);
 
   const targets = data?.goal?.targets ?? null;
   const widgetData: ClientWidgetData | null = data ? { clientId, units, bundle: data } : null;
 
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+      {error && !data ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load your day" description="Something went wrong loading today. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />
+      ) : (
       <Reveal loading={!data || !agenda} className="space-y-5" skeleton={
         <>
           <SkeletonHero height={208} />
@@ -291,7 +312,14 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
           <Stagger className="space-y-2">
             <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{isToday ? "Today's activity" : `${dayLabel(date, today)} · activity`}</h3>
             <Reveal loading={!feed} skeleton={<SkeletonList card rows={3} />}>
-              {feed && (feed.length === 0 ? (
+              {feed && (feedError ? (
+                /* The feed alone failed — an empty timeline would read as "you
+                   logged nothing today", which is a different and wrong claim. */
+                <Card className="flex items-center justify-between gap-3 py-3 text-sm text-muted-foreground">
+                  <span className="min-w-0">Couldn't load this day's activity.</span>
+                  <Button size="sm" variant="secondary" className="shrink-0" onClick={() => setReloadKey((k) => k + 1)}>Retry</Button>
+                </Card>
+              ) : feed.length === 0 ? (
                 <Card className="text-center text-sm text-muted-foreground">{isToday ? "Your day fills in here as you log — meals, workouts, check-ins and more." : "Nothing was logged on this day."}</Card>
               ) : (
                 <Card className="divide-y divide-border/40 py-0.5">
@@ -309,6 +337,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
         </>
         )}
       </Reveal>
+      )}
 
       {detail && <LogDetailSheet kind={detail.kind} ref={detail.ref} onClose={() => setDetail(null)} />}
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} clientId={clientId} onLogged={() => void load()} />

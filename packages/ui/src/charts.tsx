@@ -133,7 +133,7 @@ export function AreaChart({ values, tone = "activity", height = 180, target, tar
         {gridYs.map((gv, k) => (
           <g key={k}>
             <line x1={padX} x2={width - padX} y1={y(gv)} y2={y(gv)} stroke="var(--border)" strokeWidth={1} opacity={k === 0 ? 0 : 0.5} />
-            <text x={0} y={y(gv) - 3} className="fill-muted-foreground" style={{ fontSize: 9 }}>{format(gv)}</text>
+            <text x={0} y={y(gv) - 3} className="fill-muted-foreground" style={{ fontSize: 11 }}>{format(gv)}</text>
           </g>
         ))}
         {stepPath ? (
@@ -151,7 +151,7 @@ export function AreaChart({ values, tone = "activity", height = 180, target, tar
       {/* readout — only while the user is scrubbing (header shows the value at rest) */}
       <div className="pointer-events-none absolute left-0 top-0 flex items-center gap-1.5 rounded-lg bg-card/90 px-2 py-1 text-xs shadow-sm backdrop-blur-sm transition-opacity duration-150" style={{ opacity: active != null ? 1 : 0, transform: `translateX(${Math.min(Math.max(0, x(activePt.i) - 30), Math.max(0, width - 92))}px)` }}>
         <span className="numeral font-bold" style={{ color }}>{format(activePt.v)}</span>
-        {label && <span className="text-[0.65rem] text-muted-foreground">{label(activePt.i)}</span>}
+        {label && <span className="text-xs text-muted-foreground">{label(activePt.i)}</span>}
       </div>
     </div>
   );
@@ -203,13 +203,13 @@ export function BarChart({ values, labels, tone = "activity", height = 160, targ
           );
         })}
         {labels && labels.map((l, i) => ((values.length <= 8 || i % Math.ceil(values.length / 6) === 0) ? (
-          <text key={i} x={i * (bw + gap) + bw / 2} y={height - 5} textAnchor="middle" className="fill-muted-foreground" style={{ fontSize: 9 }}>{l}</text>
+          <text key={i} x={i * (bw + gap) + bw / 2} y={height - 5} textAnchor="middle" className="fill-muted-foreground" style={{ fontSize: 11 }}>{l}</text>
         ) : null))}
       </svg>
       {values.length > 0 && (
         <div className="pointer-events-none absolute right-0 top-0 flex items-baseline gap-1 rounded-lg bg-card/90 px-2 py-1 shadow-sm backdrop-blur-sm transition-opacity duration-150" style={{ opacity: active != null ? 1 : 0 }}>
           <span className="numeral text-xs font-bold" style={{ color }}>{format(values[shown]!)}</span>
-          {labels?.[shown] && <span className="text-[0.65rem] text-muted-foreground">{labels[shown]}</span>}
+          {labels?.[shown] && <span className="text-xs text-muted-foreground">{labels[shown]}</span>}
         </div>
       )}
     </div>
@@ -229,8 +229,12 @@ export function RadarChart({ axes, tone = "cardio", size = 220, rings = 3, class
   const pt = (i: number, rad: number) => ({ x: cx + Math.cos(angle(i)) * rad, y: cy + Math.sin(angle(i)) * rad });
   const poly = axes.map((a, i) => { const p = pt(i, Math.max(0.04, Math.min(1, a.value)) * r); return `${p.x.toFixed(1)},${p.y.toFixed(1)}`; }).join(" ");
 
+  // role="img" + a spoken summary: the axis labels inside are 11px SVG text that
+  // can't grow without spilling past the chart box, so the accessible reading of
+  // the chart has to come from here rather than from the glyphs.
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className={cn("mx-auto", className)}>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className={cn("mx-auto", className)}
+      role="img" aria-label={`Radar chart: ${axes.map((a) => `${a.label} ${Math.round(Math.max(0, Math.min(1, a.value)) * 100)}%`).join(", ")}`}>
       {Array.from({ length: rings }, (_, k) => {
         const rr = (r * (k + 1)) / rings;
         const ringPoly = axes.map((_, i) => { const p = pt(i, rr); return `${p.x.toFixed(1)},${p.y.toFixed(1)}`; }).join(" ");
@@ -245,7 +249,7 @@ export function RadarChart({ axes, tone = "cardio", size = 220, rings = 3, class
         return (
           <g key={i}>
             <circle cx={dot.x} cy={dot.y} r={3} fill={color} />
-            <text x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle" className="fill-muted-foreground" style={{ fontSize: 9.5, fontWeight: 600 }}>{a.label}</text>
+            <text x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle" className="fill-muted-foreground" style={{ fontSize: 11, fontWeight: 600 }}>{a.label}</text>
           </g>
         );
       })}
@@ -256,6 +260,10 @@ export function RadarChart({ axes, tone = "cardio", size = 220, rings = 3, class
 // ── CalendarHeatmap ──────────────────────────────────────────────────────────
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** A Date's LOCAL calendar day as YYYY-MM-DD. */
+const localDay = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 /** GitHub-style contribution grid. `days` maps YYYY-MM-DD → intensity (0..max);
  *  renders the trailing `weeks` columns ending on `today`. */
@@ -278,7 +286,13 @@ export function CalendarHeatmap({ days, today, tone = "activity", weeks = 16, ma
   for (let w = 0; w < weeks; w++) {
     const col: { date: string; lv: number; future: boolean }[] = [];
     for (let d = 0; d < 7; d++) {
-      const iso = cur.toISOString().slice(0, 10);
+      // Local calendar day, NOT toISOString(): the cursor is local-parsed from
+      // `today` (local midnight), which in UTC+3 is 21:00 the PREVIOUS day in
+      // UTC — so every cell keyed off the ISO string showed the previous day's
+      // count, the tooltip named the wrong date, the "today" ring outlined
+      // tomorrow, and tomorrow rendered as a real (non-future) day. Same padding
+      // idiom as the app's shiftDay/todayLocal. Never toISOString() for a day key.
+      const iso = localDay(cur);
       if (cur.getDate() <= 7 && d === 0) monthTicks.push({ col: w, label: MONTHS[cur.getMonth()]! });
       col.push({ date: iso, lv: level(days[iso] ?? 0), future: iso > today });
       cur.setDate(cur.getDate() + 1);
@@ -290,10 +304,10 @@ export function CalendarHeatmap({ days, today, tone = "activity", weeks = 16, ma
 
   return (
     <div className={cn("w-full overflow-x-auto", className)}>
-      <svg width={gridW} height={7 * (cell + gap) + 16} className="min-w-full" role="img" aria-label={`Activity heatmap over ${weeks} weeks, ${activeDays} active days`}>
-        {monthTicks.map((m, k) => <text key={k} x={m.col * (cell + gap)} y={8} className="fill-muted-foreground" style={{ fontSize: 8.5 }}>{m.label}</text>)}
+      <svg width={gridW} height={7 * (cell + gap) + 18} className="min-w-full" role="img" aria-label={`Activity heatmap over ${weeks} weeks, ${activeDays} active days`}>
+        {monthTicks.map((m, k) => <text key={k} x={m.col * (cell + gap)} y={9} className="fill-muted-foreground" style={{ fontSize: 10 }}>{m.label}</text>)}
         {cols.map((col, w) => col.map((c, d) => (
-          <motion.rect key={c.date} x={w * (cell + gap)} y={12 + d * (cell + gap)} width={cell} height={cell} rx={3}
+          <motion.rect key={c.date} x={w * (cell + gap)} y={14 + d * (cell + gap)} width={cell} height={cell} rx={3}
             fill={c.future ? "transparent" : fill(c.lv)} stroke={c.date === today ? color : "transparent"} strokeWidth={1.5}
             initial={{ opacity: 0 }} animate={{ opacity: c.future ? 0 : 1 }} transition={{ delay: Math.min(w * 0.01, 0.4), duration: 0.3 }}>
             <title>{`${c.date}`}</title>
@@ -301,7 +315,7 @@ export function CalendarHeatmap({ days, today, tone = "activity", weeks = 16, ma
         )))}
       </svg>
       {legend && (
-        <div className="mt-1 flex items-center justify-end gap-1 text-[0.6rem] text-muted-foreground">
+        <div className="mt-1 flex items-center justify-end gap-1 text-xs text-muted-foreground">
           Less
           {[0, 1, 2, 3, 4].map((lv) => <span key={lv} className="inline-block size-2.5 rounded-[3px]" style={{ background: fill(lv) }} />)}
           More

@@ -294,7 +294,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
 
                 {/* ── Nutrition (per serving) ────────────────────────────── */}
                 <div className="space-y-3">
-                  <div className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">Nutrition per serving</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nutrition per serving</div>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Serving size" inputMode="decimal" value={f.serving} onChange={(e) => set("serving", dec(e.target.value))} />
                     <Field label="Unit" value={f.unit} onChange={(e) => set("unit", e.target.value)} placeholder="g / ml / piece" />
@@ -305,10 +305,10 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                       const M = METRICS[metric];
                       return (
                         <label key={k} className={cn("flex flex-col gap-1.5 rounded-2xl p-2.5", toneSoft[M.tone])}>
-                          <span className="flex items-center gap-1 text-[0.64rem] font-semibold leading-none [&_svg]:size-3"><M.icon /> <span className="truncate">{label}</span></span>
+                          <span className="flex items-center gap-1 text-xs font-semibold leading-none [&_svg]:size-3"><M.icon /> <span className="truncate">{label}</span></span>
                           <span className="flex items-baseline gap-0.5 rounded-lg bg-background/70 px-1.5 py-1.5">
                             <input inputMode="decimal" value={f[k]} onChange={(e) => set(k, dec(e.target.value))} placeholder="0" className="w-full min-w-0 bg-transparent text-center text-[0.95rem] font-bold text-foreground outline-none placeholder:font-medium placeholder:text-muted-foreground/50" />
-                            <span className="shrink-0 text-[0.58rem] font-medium text-muted-foreground">{unit}</span>
+                            <span className="shrink-0 text-xs font-medium text-muted-foreground">{unit}</span>
                           </span>
                         </label>
                       );
@@ -330,7 +330,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                 {/* ── Sharing (staff only) ───────────────────────────────── */}
                 {isStaff && (
                   <div className="space-y-2">
-                    <div className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">Who can use this food</div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Who can use this food</div>
                     <div className="flex gap-2">
                       <Chip selected={f.visibility === "tenant"} onClick={() => set("visibility", "tenant")}>Shared with team</Chip>
                       <Chip selected={f.visibility === "private"} onClick={() => set("visibility", "private")}>Only me</Chip>

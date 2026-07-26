@@ -67,9 +67,11 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
     if (buying) return;
     setBuying(true); setMsg(null);
     try {
-      const r = await api.post<{ clientSecret?: string; publishableKey?: string; stripeAccount?: string; granted?: boolean }>("/api/connect/pay-intent", { clientId, packageId: p.id, promoCode: buyPromo || undefined });
+      const r = await api.post<{ clientSecret?: string; publishableKey?: string; stripeAccount?: string; granted?: boolean; amountCents?: number }>("/api/connect/pay-intent", { clientId, packageId: p.id, promoCode: buyPromo || undefined });
       if (r.granted) { setMsg("Access unlocked!"); await load(); await refresh(); return; } // promo covered it fully
-      if (r.clientSecret && r.publishableKey) setCheckout({ intent: { clientSecret: r.clientSecret, publishableKey: r.publishableKey, stripeAccount: r.stripeAccount }, name: p.name, price: fmtPrice(p.one_time_price_cents ?? 0) });
+      // Label the button from the amount the SERVER created the PaymentIntent for
+      // — with a promo applied the list price is not what Stripe will charge.
+      if (r.clientSecret && r.publishableKey) setCheckout({ intent: { clientSecret: r.clientSecret, publishableKey: r.publishableKey, stripeAccount: r.stripeAccount }, name: p.name, price: fmtPrice(r.amountCents ?? p.one_time_price_cents ?? 0) });
       else setMsg("Checkout isn't available yet — ask your coach to finish Stripe setup.");
     } catch (e) { setMsg(e instanceof Error && e.message.startsWith("promo_") ? promoMsg(e.message) : "Checkout isn't available yet — ask your coach to finish Stripe setup."); }
     finally { setBuying(false); }

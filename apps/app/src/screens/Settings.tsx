@@ -17,7 +17,7 @@ import { useUnits } from "../units.js";
 import { useSession } from "../session.js";
 import { PreferencesEditorCard } from "./PreferencesEditor.js";
 import { useTheme } from "../theme.js";
-import { api, uploadMedia } from "../api.js";
+import { api, errorText, uploadMedia } from "../api.js";
 import { enrollPasskey, listPasskeys, removePasskey, passkeySupported, passkeyErrorMessage, deviceLabel } from "../passkey.js";
 import { usePasskey } from "../PasskeyPrompt.js";
 import { AiConfigSection } from "./AiSettings.js";
@@ -35,6 +35,25 @@ function SectionHead({ title, scope }: { title: string; scope?: Scope }) {
       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
       {scope && <ScopeTag />}
     </div>
+  );
+}
+
+/**
+ * A section whose read failed. Every settings section loads independently, and a
+ * loader with no catch left its skeleton shimmering forever — a silent dead end
+ * with nothing to retry (or, for EmailSection, no section at all). This is the
+ * one shared "it broke, here's the way out" card, so one dead endpoint costs the
+ * owner one section instead of the whole screen.
+ */
+function LoadError({ label, onRetry }: { label: string; onRetry: () => void }) {
+  return (
+    <Card className="flex items-center justify-between gap-3">
+      <div className="flex min-w-0 items-start gap-2.5">
+        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+        <p className="text-sm text-muted-foreground">Couldn't load {label}. Check your connection and try again.</p>
+      </div>
+      <Button size="sm" variant="secondary" className="shrink-0" onClick={onRetry}>Try again</Button>
+    </Card>
   );
 }
 
@@ -346,13 +365,13 @@ function LoginPreview({ brandName, logoUrl, tagline, headline, subtext, bgImageU
         <div>
           <div className="text-lg font-bold tracking-tight">{brandName}</div>
           <div className="mt-0.5 text-xs text-muted-foreground">{head}</div>
-          {sub && <div className="text-[0.7rem] text-muted-foreground/80">{sub}</div>}
+          {sub && <div className="text-xs text-muted-foreground/80">{sub}</div>}
         </div>
         <div className="space-y-2.5 rounded-2xl border border-border/60 bg-card p-3.5 text-left shadow-sm">
-          <div className="text-[0.7rem] font-medium text-primary">{tag}</div>
-          <div className="flex items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-2 text-[0.7rem] text-muted-foreground"><Mail className="size-3.5" /> you@example.com</div>
-          <div className="flex items-center justify-center gap-1.5 rounded-full bg-primary py-2 text-[0.7rem] font-semibold text-primary-foreground">Email me a code <ArrowRight className="size-3" /></div>
-          {showPasskey && <div className="flex items-center justify-center gap-1.5 text-[0.7rem] font-medium text-muted-foreground"><KeyRound className="size-3" /> Sign in with a passkey</div>}
+          <div className="text-xs font-medium text-primary">{tag}</div>
+          <div className="flex items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-2 text-xs text-muted-foreground"><Mail className="size-3.5" /> you@example.com</div>
+          <div className="flex items-center justify-center gap-1.5 rounded-full bg-primary py-2 text-xs font-semibold text-primary-foreground">Email me a code <ArrowRight className="size-3" /></div>
+          {showPasskey && <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground"><KeyRound className="size-3" /> Sign in with a passkey</div>}
         </div>
       </div>
     </div>
@@ -448,7 +467,12 @@ function ToggleRow({ icon: Icon, title, desc, checked, onChange }: { icon: Lucid
 /** Per-user notification channels — inbox + email, per category, role-scoped. */
 function NotificationsSection() {
   const [data, setData] = useState<{ categories: { key: string; label: string; blurb: string }[]; prefs: Record<string, { inbox: boolean; email: boolean }> } | null>(null);
-  const load = useCallback(async () => setData(await api.get("/api/notification-prefs")), []);
+  const [error, setError] = useState(false);
+  const load = useCallback(async () => {
+    setError(false);
+    try { setData(await api.get("/api/notification-prefs")); }
+    catch { setError(true); }
+  }, []);
   useEffect(() => { void load(); }, [load]);
   const toggle = async (cat: string, channel: "inbox" | "email", v: boolean) => {
     setData((d) => (d ? { ...d, prefs: { ...d.prefs, [cat]: { ...d.prefs[cat]!, [channel]: v } } } : d));
@@ -457,6 +481,7 @@ function NotificationsSection() {
   return (
     <section>
       <SectionHead title="Notifications" />
+      {error && !data ? <LoadError label="your notification settings" onRetry={() => void load()} /> : (
       <Card className="divide-y divide-border/50 p-0">
         <div className="flex items-center justify-end gap-6 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <span className="inline-flex items-center gap-1"><Bell className="size-3.5" /> App</span>
@@ -474,6 +499,7 @@ function NotificationsSection() {
               </div>
             ))}
       </Card>
+      )}
     </section>
   );
 }
@@ -490,12 +516,23 @@ function EmailTemplatesSection() {
   const [signature, setSignature] = useState("");
   const [sigSaved, setSigSaved] = useState(false);
   const [openType, setOpenType] = useState<string | null>(null);
+  const [error, setError] = useState(false);
   const load = useCallback(async () => {
-    const r = await api.get<{ templates: EmailTemplate[]; signature: string }>("/api/email-templates");
-    setTemplates(r.templates); setSignature(r.signature);
+    setError(false);
+    try {
+      const r = await api.get<{ templates: EmailTemplate[]; signature: string }>("/api/email-templates");
+      setTemplates(r.templates); setSignature(r.signature);
+    } catch { setError(true); }
   }, []);
   useEffect(() => { void load(); }, [load]);
-  const saveSig = async () => { await api.put("/api/email-signature", { signature }).catch(() => undefined); setSigSaved(true); setTimeout(() => setSigSaved(false), 1500); };
+  const [sigErr, setSigErr] = useState<string | null>(null);
+  const saveSig = async () => {
+    setSigErr(null);
+    // The signature save used to swallow its error and still flash "Saved" — the
+    // owner walked away believing a footer was stored that never was.
+    try { await api.put("/api/email-signature", { signature }); setSigSaved(true); setTimeout(() => setSigSaved(false), 1500); }
+    catch (e) { setSigErr(errorText(e, "Couldn't save your signature — try again.")); }
+  };
 
   return (
     <section className="space-y-3">
@@ -504,10 +541,13 @@ function EmailTemplatesSection() {
         <div className="text-sm font-medium">Signature</div>
         <p className="text-xs text-muted-foreground">Appended to the footer of every email your studio sends.</p>
         <Textarea rows={2} value={signature} onChange={(e) => setSignature(e.target.value)} placeholder="Team YourStudio · reply to this email anytime" />
+        {sigErr && <p className="text-sm text-warning">{sigErr}</p>}
         <div className="flex justify-end"><Button size="sm" onClick={() => void saveSig()}>{sigSaved ? "Saved" : "Save signature"}</Button></div>
       </Card>
 
-      {!templates ? (
+      {error && !templates ? (
+        <LoadError label="your email templates" onRetry={() => void load()} />
+      ) : !templates ? (
         <SkeletonLine w="10rem" h="text" />
       ) : (
         <div className="space-y-2">
@@ -563,9 +603,13 @@ type AudiencePolicy = { client: Record<string, boolean>; staff: Record<string, b
 
 function NotificationPolicySection() {
   const [data, setData] = useState<{ notifCategories: NotifCat[]; notifPolicy: AudiencePolicy } | null>(null);
+  const [error, setError] = useState(false);
   const load = useCallback(async () => {
-    const r = await api.get<{ notifCategories: NotifCat[]; notifPolicy: AudiencePolicy }>("/api/settings");
-    setData({ notifCategories: r.notifCategories, notifPolicy: r.notifPolicy });
+    setError(false);
+    try {
+      const r = await api.get<{ notifCategories: NotifCat[]; notifPolicy: AudiencePolicy }>("/api/settings");
+      setData({ notifCategories: r.notifCategories, notifPolicy: r.notifPolicy });
+    } catch { setError(true); }
   }, []);
   useEffect(() => { void load(); }, [load]);
   const toggle = async (audience: "client" | "staff", cat: string, v: boolean) => {
@@ -576,9 +620,10 @@ function NotificationPolicySection() {
   return (
     <section>
       <SectionHead title="Email notifications policy" scope="tenant" />
+      {error && !data ? <LoadError label="your email policy" onRetry={() => void load()} /> : (
       <Card className="p-0">
         <p className="px-4 pt-4 text-sm text-muted-foreground">Choose which notifications may be emailed — separately for your clients and your staff. Turning one off keeps it in the in-app inbox but never emails it; people still tune their own preferences within what you allow here.</p>
-        <div className="mt-2 flex items-center justify-end gap-6 px-4 pb-1 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="mt-2 flex items-center justify-end gap-6 px-4 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <span className="w-10 text-center">Clients</span><span className="w-10 text-center">Staff</span>
         </div>
         <div className="divide-y divide-border/50">
@@ -595,6 +640,7 @@ function NotificationPolicySection() {
               ))}
         </div>
       </Card>
+      )}
     </section>
   );
 }
@@ -606,11 +652,24 @@ function EmailSection() {
   const [senderEmail, setSenderEmail] = useState("");
   const [senderName, setSenderName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
   const load = useCallback(async () => {
-    const r = await api.get<{ email: { provider: string; senderEmail: string; senderName: string; brevoKeySet: boolean; ready: boolean }; emailPlatformFrom: string }>("/api/settings");
-    setCfg(r); setSenderEmail(r.email.senderEmail); setSenderName(r.email.senderName);
+    setError(false);
+    try {
+      const r = await api.get<{ email: { provider: string; senderEmail: string; senderName: string; brevoKeySet: boolean; ready: boolean }; emailPlatformFrom: string }>("/api/settings");
+      setCfg(r); setSenderEmail(r.email.senderEmail); setSenderName(r.email.senderName);
+    } catch { setError(true); }
   }, []);
   useEffect(() => { void load(); }, [load]);
+  // A failed read used to render NOTHING (`if (!cfg) return null`) — the whole
+  // "Email delivery" section just wasn't there, so the owner had no way to tell
+  // a broken load from a section they'd never been given.
+  if (error && !cfg) return (
+    <section>
+      <SectionHead title="Email delivery" scope="tenant" />
+      <LoadError label="your email delivery settings" onRetry={() => void load()} />
+    </section>
+  );
   if (!cfg) return null;
   const provider = cfg.email.provider;
   const setProvider = async (p: string) => { setCfg((c) => (c ? { ...c, email: { ...c.email, provider: p } } : c)); await api.patch("/api/settings", { email: { provider: p } }).catch(() => void load()); };
@@ -729,8 +788,21 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
   const [p, setP] = useState<ClientProfile | null>(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const units = useUnits();
-  useEffect(() => { void api.get<{ client: ClientProfile }>(`/api/clients/${clientId}`).then((r) => setP(r.client)).catch(() => undefined); }, [clientId]);
+  // The old `.catch(() => undefined)` swallowed the failure and left the profile
+  // skeleton shimmering forever. `alive` also drops a response for a clientId the
+  // user has already switched away from (coach view), which would show the wrong
+  // person's profile in the form.
+  useEffect(() => {
+    let alive = true;
+    setError(false);
+    api.get<{ client: ClientProfile }>(`/api/clients/${clientId}`)
+      .then((r) => { if (alive) setP(r.client); })
+      .catch(() => { if (alive) setError(true); });
+    return () => { alive = false; };
+  }, [clientId, reloadKey]);
   const set = (patch: Partial<ClientProfile>) => setP((c) => (c ? { ...c, ...patch } : c));
   const hFt = p?.heightCm != null ? cmToFeetInches(p.heightCm) : null;
   const uploadAvatar = async (file: File) => {
@@ -753,6 +825,7 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
   return (
     <section>
       <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Profile</h3>
+      {error && !p ? <LoadError label="your profile" onRetry={() => setReloadKey((k) => k + 1)} /> : (
       <Reveal loading={!p} skeleton={
         <Card className="space-y-4">
           <div className="flex items-center gap-3"><SkeletonCircle size={64} /><Skeleton className="h-9 w-32 rounded-full" /></div>
@@ -800,6 +873,7 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
       </Card>
         )}
       </Reveal>
+      )}
     </section>
   );
 }
@@ -849,16 +923,22 @@ interface MarketplaceCfg { enabled?: boolean; selfRegister?: boolean; requireAct
 function MarketplaceSection() {
   const [marketplace, setMarketplace] = useState<MarketplaceCfg>({});
   const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    void api.get<{ marketplace: MarketplaceCfg }>("/api/settings").then((r) => { setMarketplace(r.marketplace ?? {}); setLoaded(true); });
+  const [error, setError] = useState(false);
+  const load = useCallback(async () => {
+    setError(false);
+    try {
+      const r = await api.get<{ marketplace: MarketplaceCfg }>("/api/settings");
+      setMarketplace(r.marketplace ?? {}); setLoaded(true);
+    } catch { setError(true); }
   }, []);
+  useEffect(() => { void load(); }, [load]);
 
   const setMarket = async (patch: MarketplaceCfg) => { setMarketplace((m) => ({ ...m, ...patch })); await api.patch("/api/settings", { marketplace: patch }); };
 
   return (
     <section>
       <SectionHead title="Marketplace" scope="tenant" />
+      {error && !loaded ? <LoadError label="your storefront settings" onRetry={() => void load()} /> : (
       <Reveal loading={!loaded} skeleton={
         <Card className="space-y-3">
           <div className="flex items-center gap-2.5"><Skeleton className="size-9 rounded-xl" /><div className="flex-1 space-y-1.5"><SkeletonLine w="45%" h="text" /><SkeletonLine w="70%" h="xs" /></div></div>
@@ -879,6 +959,7 @@ function MarketplaceSection() {
         </Card>
         )}
       </Reveal>
+      )}
     </section>
   );
 }
@@ -898,7 +979,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
   const copy = () => void navigator.clipboard?.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); });
   return (
     <div className="min-w-0">
-      <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</div>
       <button onClick={copy} className="flex w-full items-center gap-1.5 text-left" title="Copy">
         <code className="min-w-0 flex-1 truncate font-mono text-xs">{value}</code>
         {copied ? <Check className="size-3 shrink-0 text-success" /> : <Copy className="size-3 shrink-0 text-muted-foreground" />}
@@ -912,7 +993,7 @@ function DnsRecord({ type, name, value, hint }: { type: string; name: string; va
   return (
     <div className="rounded-xl bg-surface-3 p-3">
       <div className="mb-2 flex items-center gap-2">
-        <span className="rounded-md bg-primary/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">{type}</span>
+        <span className="rounded-md bg-primary/15 px-1.5 py-0.5 font-mono text-xs font-bold text-primary">{type}</span>
         <span className="text-xs text-muted-foreground">{hint}</span>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -930,12 +1011,16 @@ function DomainSection() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [domainToRemove, setDomainToRemove] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  const load = async () => {
-    const r = await api.get<{ domains: DomainInfo[]; configured: boolean }>("/api/domains");
-    setDomains(r.domains); setConfigured(r.configured);
-  };
-  useEffect(() => { void load(); }, []);
+  const load = useCallback(async () => {
+    setLoadFailed(false);
+    try {
+      const r = await api.get<{ domains: DomainInfo[]; configured: boolean }>("/api/domains");
+      setDomains(r.domains); setConfigured(r.configured);
+    } catch { setLoadFailed(true); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
 
   const add = async () => {
     setBusy(true); setErr(null);
@@ -955,6 +1040,7 @@ function DomainSection() {
   return (
     <section>
       <SectionHead title="Custom domain" scope="tenant" />
+      {loadFailed && !domains ? <LoadError label="your custom domains" onRetry={() => void load()} /> : (
       <Reveal loading={!domains} skeleton={
         <Card className="space-y-4">
           <div className="flex items-center gap-2.5"><Skeleton className="size-9 rounded-xl" /><div className="flex-1 space-y-1.5"><SkeletonLine w="45%" h="text" /><SkeletonLine w="70%" h="xs" /></div></div>
@@ -977,7 +1063,7 @@ function DomainSection() {
               <div className="space-y-3">
                 {/* Step 1 — add the records. */}
                 <div className="flex gap-2.5">
-                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">1</span>
+                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary">1</span>
                   <div className="min-w-0 space-y-2">
                     <p className="text-sm">In your domain's DNS settings (GoDaddy, Namecheap, Cloudflare…), add {d.txt ? "these records" : "this record"}:</p>
                     {d.cname.target && <DnsRecord type="CNAME" name={d.cname.name} value={d.cname.target} hint="Routes your domain to the app" />}
@@ -987,7 +1073,7 @@ function DomainSection() {
                 </div>
                 {/* Step 2 — verify. */}
                 <div className="flex gap-2.5">
-                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">2</span>
+                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary">2</span>
                   <p className="text-sm">Save at your provider, then tap <span className="font-medium">Check now</span>. DNS can take a few minutes (up to an hour); the SSL certificate then issues automatically.</p>
                 </div>
               </div>
@@ -1017,6 +1103,7 @@ function DomainSection() {
       </Card>
         )}
       </Reveal>
+      )}
 
       <ConfirmDialog
         open={!!domainToRemove}
@@ -1051,12 +1138,16 @@ function IntegrationsSection() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState(false);
 
-  const load = async () => {
-    const r = await api.get<{ integrationProviders: ProviderMeta[]; integrations: Record<string, MaskedProvider> }>("/api/settings");
-    setProviders(r.integrationProviders); setState(r.integrations);
-  };
-  useEffect(() => { void load(); }, []);
+  const load = useCallback(async () => {
+    setError(false);
+    try {
+      const r = await api.get<{ integrationProviders: ProviderMeta[]; integrations: Record<string, MaskedProvider> }>("/api/settings");
+      setProviders(r.integrationProviders); setState(r.integrations);
+    } catch { setError(true); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
 
   const patch = async (id: string, patchObj: Record<string, string | boolean>) => { await api.patch("/api/settings", { integrations: { [id]: patchObj } }); await load(); };
   const saveKeys = async (p: ProviderMeta) => {
@@ -1072,6 +1163,7 @@ function IntegrationsSection() {
   return (
     <section>
       <SectionHead title="Integrations" scope="tenant" />
+      {error && !providers ? <LoadError label="your data providers" onRetry={() => void load()} /> : (
       <Reveal loading={!providers} skeleton={
         <Card className="space-y-4">
           <div className="flex items-center gap-2.5"><Skeleton className="size-9 rounded-xl" /><div className="flex-1 space-y-1.5"><SkeletonLine w="40%" h="text" /><SkeletonLine w="70%" h="xs" /></div></div>
@@ -1095,7 +1187,7 @@ function IntegrationsSection() {
         <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Plug /></div><div><div className="font-medium">Data providers</div><div className="text-sm text-muted-foreground">Turn on sources so builders pull ready-made foods & exercises.</div></div></div>
         {groups.map((g) => (
           <div key={g.key} className="space-y-2">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{g.label}</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{g.label}</div>
             {providers.filter((p) => p.category === g.key).map((p) => {
               const s = state[p.id];
               const needsKeys = !p.keyless && s?.enabled && !s?.ready;
@@ -1132,6 +1224,7 @@ function IntegrationsSection() {
       </Card>
         )}
       </Reveal>
+      )}
     </section>
   );
 }
@@ -1329,16 +1422,16 @@ function TokenGrid({ tokens, onSet }: { tokens: BrandTokens; onSet: (mode: "ligh
     <div className="space-y-4">
       {THEME_TOKEN_GROUPS.map((g) => (
         <div key={g.label}>
-          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{g.label}</div>
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{g.label}</div>
           <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1">
             <span />
-            <span className="w-[5.5rem] text-center text-[10px] uppercase tracking-wider text-muted-foreground">Light</span>
-            <span className="w-[5.5rem] text-center text-[10px] uppercase tracking-wider text-muted-foreground">Dark</span>
+            <span className="w-[5.5rem] text-center text-xs uppercase tracking-wider text-muted-foreground">Light</span>
+            <span className="w-[5.5rem] text-center text-xs uppercase tracking-wider text-muted-foreground">Dark</span>
             {g.tokens.map((name) => {
               const key = `--${name}`;
               return (
                 <Fragment key={name}>
-                  <code className="truncate text-[11px] text-muted-foreground">{name}</code>
+                  <code className="truncate text-xs text-muted-foreground">{name}</code>
                   <TokenCell mode="light" tokenKey={key} value={tokens.light?.[key] ?? ""} def={DEFAULT_TOKENS.light?.[key] ?? ""} onSet={onSet} />
                   <TokenCell mode="dark" tokenKey={key} value={tokens.dark?.[key] ?? ""} def={DEFAULT_TOKENS.dark?.[key] ?? ""} onSet={onSet} />
                 </Fragment>
@@ -1366,7 +1459,7 @@ function TokenCell({ mode, tokenKey, value, def, onSet }: { mode: "light" | "dar
         value={value}
         placeholder={def.replace(/oklch\(|\)/g, "")}
         onChange={(e) => onSet(mode, tokenKey, e.target.value)}
-        className="w-full bg-transparent font-mono text-[10px] outline-none placeholder:text-muted-foreground/40"
+        className="w-full bg-transparent font-mono text-xs outline-none placeholder:text-muted-foreground/40"
       />
     </div>
   );

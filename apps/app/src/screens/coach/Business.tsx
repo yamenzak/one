@@ -5,6 +5,7 @@ import { Button, Card, Badge, SegmentedControl, Field, Page, Stagger, ChartCard,
 import { FEATURE_KEYS, FEATURE_META, QUOTA_KEYS, QUOTA_META, type Entitlements } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
+import { fmtPrice } from "../../money.js";
 import { PaymentSheet, type CheckoutIntent } from "../../PaymentSheet.js";
 import { Staff } from "./Staff.js";
 import { Packages } from "./Packages.js";
@@ -32,6 +33,11 @@ interface AiUsage { usage: { feature: string; calls: number; credits: number }[]
 type Tab = "overview" | "packages" | "staff";
 
 const featLabel = (f: string) => f.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+
+/** Platform-rail catalog prices are stored in DOLLARS (`price_usd`,
+ *  `priceUsdMonth`); everything display-side goes through `fmtPrice`, which takes
+ *  cents — so a $24.50 pack renders "$24.50" instead of the raw "$24.5". */
+const usdToCents = (usd: number) => Math.round((usd ?? 0) * 100);
 
 /** Friendly copy for a `promo_<reason>` checkout error. */
 function promoError(code: string): string {
@@ -95,12 +101,16 @@ function Overview() {
   const [checkout, setCheckout] = useState<{ intent: CheckoutIntent; title: string; label: string } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [packPromo, setPackPromo] = useState("");
-  const startInline = async (path: string, body: Record<string, unknown>, title: string, label: string, key: string) => {
+  // `label` is a builder, not a string: the server may charge LESS than the list
+  // price (a promo code is applied server-side before the PaymentIntent is
+  // created), so the submit button has to be labelled from the amount the API
+  // returns — never from the catalog price.
+  const startInline = async (path: string, body: Record<string, unknown>, title: string, label: (amountCents: number | null) => string, key: string) => {
     setBusy(key);
     try {
-      const r = await api.post<{ clientSecret?: string; publishableKey?: string; granted?: boolean }>(path, body);
+      const r = await api.post<{ clientSecret?: string; publishableKey?: string; granted?: boolean; amountCents?: number }>(path, body);
       if (r.granted) { onPaid(); return; } // promo covered it fully — nothing to charge
-      if (r.clientSecret && r.publishableKey) setCheckout({ intent: { clientSecret: r.clientSecret, publishableKey: r.publishableKey }, title, label });
+      if (r.clientSecret && r.publishableKey) setCheckout({ intent: { clientSecret: r.clientSecret, publishableKey: r.publishableKey }, title, label: label(typeof r.amountCents === "number" ? r.amountCents : null) });
       else setFlash("Couldn't start checkout — Stripe isn't fully configured yet.");
     } catch (e) {
       const msg = e instanceof Error && e.message.startsWith("promo_") ? promoError(e.message) : "Couldn't start checkout. Please try again.";
@@ -243,11 +253,11 @@ function Overview() {
                   <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5">
                     <div><div className="text-sm font-medium">{p.name}</div><div className="numeral text-xs text-muted-foreground">{p.credits.toLocaleString()} credits</div></div>
                     {isOwner && billing.stripeEnabled ? (
-                      <Button size="sm" variant="tonal" disabled={busy === `pack_${p.id}`} onClick={() => void startInline("/api/billing/pack-intent", { packId: p.id, promoCode: packPromo || undefined }, `Buy ${p.name}`, `Pay $${p.price_usd}`, `pack_${p.id}`)}>
-                        {busy === `pack_${p.id}` ? "…" : `$${p.price_usd}`}
+                      <Button size="sm" variant="tonal" disabled={busy === `pack_${p.id}`} onClick={() => void startInline("/api/billing/pack-intent", { packId: p.id, promoCode: packPromo || undefined }, `Buy ${p.name}`, (cents) => `Pay ${fmtPrice(cents ?? usdToCents(p.price_usd))}`, `pack_${p.id}`)}>
+                        {busy === `pack_${p.id}` ? "…" : fmtPrice(usdToCents(p.price_usd))}
                       </Button>
                     ) : (
-                      <Badge tone="primary">${p.price_usd}</Badge>
+                      <Badge tone="primary">{fmtPrice(usdToCents(p.price_usd))}</Badge>
                     )}
                   </div>
                 ))}
@@ -266,8 +276,8 @@ function Overview() {
                 <div className="space-y-1.5">
                   {billing.plans.filter((p) => p.priceUsdMonth > 0 && p.id !== billing.subscription.planId).map((p) => (
                     <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5">
-                      <div><div className="text-sm font-medium">{p.name}</div><div className="numeral text-xs text-muted-foreground">${p.priceUsdMonth}/mo</div></div>
-                      <Button size="sm" variant="tonal" disabled={busy === `plan_${p.id}`} onClick={() => void startInline("/api/billing/plan-intent", { planId: p.id }, `Subscribe to ${p.name}`, `Subscribe · $${p.priceUsdMonth}/mo`, `plan_${p.id}`)}>
+                      <div><div className="text-sm font-medium">{p.name}</div><div className="numeral text-xs text-muted-foreground">{fmtPrice(usdToCents(p.priceUsdMonth))}/mo</div></div>
+                      <Button size="sm" variant="tonal" disabled={busy === `plan_${p.id}`} onClick={() => void startInline("/api/billing/plan-intent", { planId: p.id }, `Subscribe to ${p.name}`, () => `Subscribe · ${fmtPrice(usdToCents(p.priceUsdMonth))}/mo`, `plan_${p.id}`)}>
                         {busy === `plan_${p.id}` ? "…" : "Select"}
                       </Button>
                     </div>

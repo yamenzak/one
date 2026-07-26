@@ -1,9 +1,9 @@
 /** Notifications inbox — the full, grouped-by-day list behind the bell's
  *  "See all". Surface-aware (client vs coach mode), click-through, mark-all. */
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Page, Stagger, SectionHeader, IconBadge, EmptyState, Reveal, SkeletonList, Bell, CheckCheck, ArrowLeft } from "@mossa/ui";
+import { Button, Card, Page, Stagger, SectionHeader, IconBadge, EmptyState, Reveal, SkeletonList, AlertTriangle, Bell, CheckCheck, ArrowLeft } from "@mossa/ui";
 import { notifVisibleInSurface, unreadInSurface, type NotifType, type NotifSurface } from "@mossa/domain";
 import { api } from "../api.js";
 import { useSession } from "../session.js";
@@ -26,13 +26,24 @@ export function Inbox({ onBack }: { onBack: () => void }) {
   const { ctx, mode, setMode, switchTenant } = useSession();
   const nav = useNavigate();
   const [items, setItems] = useState<Notification[] | null>(null);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const surface: NotifSurface = ctx?.active?.role === "client" || mode === "train" ? "client" : "staff";
   const activeTenantId = ctx?.active?.tenantId ?? null;
 
-  const load = useCallback(async () => {
-    setItems((await api.get<{ notifications: Notification[] }>("/api/notifications")).notifications);
-  }, []);
-  useEffect(() => void load().catch(() => setItems([])), [load]);
+  // A failed read used to fall back to an empty list, which rendered the
+  // "You're all caught up" empty state — indistinguishable from actually having
+  // no notifications, so a user could miss real messages and never know. Now it
+  // surfaces as an error with a retry; `alive` drops a response that lands after
+  // a remount/retry has superseded it.
+  useEffect(() => {
+    let alive = true;
+    setError(false);
+    api.get<{ notifications: Notification[] }>("/api/notifications")
+      .then((r) => { if (alive) setItems(r.notifications); })
+      .catch(() => { if (alive) setError(true); });
+    return () => { alive = false; };
+  }, [reloadKey]);
 
   const shown = (items ?? []).filter((n) => notifVisibleInSurface(n.type, surface));
   const unread = unreadInSurface(items ?? [], surface);
@@ -65,6 +76,9 @@ export function Inbox({ onBack }: { onBack: () => void }) {
         {unread > 0 && <Button size="sm" variant="ghost" onClick={() => void markAll()}><CheckCheck /> Mark all read</Button>}
       </div>
 
+      {error && items === null ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load notifications" description="Something went wrong fetching your inbox. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />
+      ) : (
       <Reveal loading={items === null} className="space-y-5" skeleton={<SkeletonList card rows={6} thumb={36} />}>
         {items !== null && (shown.length === 0 ? (
           <EmptyState icon={Bell} title="You're all caught up" description="New notifications for this view will show up here." />
@@ -92,6 +106,7 @@ export function Inbox({ onBack }: { onBack: () => void }) {
           ))
         ))}
       </Reveal>
+      )}
     </Page>
   );
 }

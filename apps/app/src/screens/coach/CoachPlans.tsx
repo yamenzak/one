@@ -3,10 +3,10 @@
  *  A client can run one published plan per lane in parallel; the lane chips here
  *  filter the list and set which lane a new plan is created in. */
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Badge, Chip, Field, Sheet, Reveal, SkeletonList, SegmentedControl, Page, Stagger, EmptyState, SectionHeader, cn, Dumbbell, Utensils, Plus, Ellipsis, Trash2, Archive, History, Zap, PencilLine } from "@mossa/ui";
-import { api } from "../../api.js";
+import { Button, Card, Badge, Chip, Field, Sheet, Reveal, SkeletonList, SegmentedControl, Page, Stagger, EmptyState, SectionHeader, cn, AlertTriangle, Dumbbell, Utensils, Plus, Ellipsis, Trash2, Archive, History, Zap, PencilLine } from "@mossa/ui";
+import { api, errorText } from "../../api.js";
 
 interface Plan { id: string; name: string; status: string; publishedAt: string | null; variantId: string | null }
 interface Lane { id: string; label: string; archived: boolean }
@@ -23,20 +23,42 @@ export function CoachPlans({ clientId }: { clientId: string }) {
   const [name, setName] = useState("");
   const [lanesOpen, setLanesOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<Plan | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createErr, setCreateErr] = useState<string | null>(null);
   const endpoint = kind === "workout" ? "workout-plans" : "meal-plans";
   const open = (planId: string) => nav(`/clients/${clientId}/plans/${kind}/${planId}`);
 
   // Lanes are client-level, so the workout + meal lists share the same lane set;
   // we take it from whichever list loads. Both endpoints return it.
+  //
+  // The Workout/Meal toggle re-creates `load`, so two reads can be in flight at
+  // once — a request token drops a stale one instead of letting the slower
+  // endpoint's plans land under the other tab. A failure surfaces a retry;
+  // uncaught it left the list skeleton shimmering forever.
+  const reqId = useRef(0);
   const load = useCallback(async () => {
-    const r = await api.get<{ plans: Plan[]; variants: Lane[]; defaultLabel?: string }>(`/api/${endpoint}?clientId=${clientId}`);
-    setPlans(r.plans);
-    setVariants(r.variants ?? []);
-    setDefaultLabel(r.defaultLabel || "Main");
+    const id = ++reqId.current;
+    setLoadError(false);
+    try {
+      const r = await api.get<{ plans: Plan[]; variants: Lane[]; defaultLabel?: string }>(`/api/${endpoint}?clientId=${clientId}`);
+      if (id !== reqId.current) return;
+      setPlans(r.plans);
+      setVariants(r.variants ?? []);
+      setDefaultLabel(r.defaultLabel || "Main");
+    } catch { if (id === reqId.current) setLoadError(true); }
   }, [clientId, endpoint]);
   useEffect(() => { setPlans(null); void load(); }, [load]);
 
-  const create = async () => { const r = await api.post<{ plan: Plan }>(`/api/${endpoint}`, { clientId, name, variantId: laneId }); setCreateOpen(false); setName(""); open(r.plan.id); };
+  const create = async () => {
+    if (creating) return; // a double-tap used to create two identical plans
+    setCreating(true); setCreateErr(null);
+    try {
+      const r = await api.post<{ plan: Plan }>(`/api/${endpoint}`, { clientId, name, variantId: laneId });
+      setCreateOpen(false); setName(""); open(r.plan.id);
+    } catch (e) { setCreateErr(errorText(e, "Couldn't create that plan. Please try again.")); }
+    finally { setCreating(false); }
+  };
 
   const liveLanes = variants.filter((v) => !v.archived);
   // If the selected lane got archived out from under us, fall back to Main.
@@ -66,6 +88,9 @@ export function CoachPlans({ clientId }: { clientId: string }) {
         title={liveLanes.length > 0 ? `${laneName} · ${kind === "workout" ? "Workout" : "Meal"}` : `${kind === "workout" ? "Workout" : "Meal"} plans`}
         action={<Button size="sm" onClick={() => setCreateOpen(true)}><Plus /> New</Button>}
       />
+      {loadError && !plans ? (
+        <EmptyState icon={AlertTriangle} title={`Couldn't load ${kind} plans`} description="Something went wrong reaching the server. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
+      ) : (
       <Reveal loading={!plans} skeleton={<SkeletonList card rows={5} thumb={0} />}>
         {plans && (shown.length === 0 ? (
           <EmptyState icon={kind === "workout" ? Dumbbell : Utensils} title={`No ${kind} plans${liveLanes.length > 0 ? ` in ${laneName}` : ""}`} description={liveLanes.length > 0 ? "New plans you create land in this lane." : (kind === "workout" ? "Create one and build it — or use the AI draft inside the builder." : "Create one and build the options bank.")} action={liveLanes.length === 0 ? undefined : <Button variant="secondary" size="sm" onClick={() => setLanesOpen(true)}>Manage lanes</Button>} />
@@ -83,6 +108,7 @@ export function CoachPlans({ clientId }: { clientId: string }) {
           </Stagger>
         ))}
       </Reveal>
+      )}
 
       {/* A quiet "add a schedule" entry when the client has no lanes yet. */}
       {liveLanes.length === 0 && plans && (
@@ -91,11 +117,12 @@ export function CoachPlans({ clientId }: { clientId: string }) {
         </button>
       )}
 
-      <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title={`New ${kind} plan${liveLanes.length > 0 ? ` · ${laneName}` : ""}`}>
+      <Sheet open={createOpen} onClose={() => { setCreateOpen(false); setCreateErr(null); }} title={`New ${kind} plan${liveLanes.length > 0 ? ` · ${laneName}` : ""}`}>
         <div className="space-y-4">
           <Field label="Plan name" icon={kind === "workout" ? Dumbbell : Utensils} value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "workout" ? "Push Pull Legs" : "Cutting Plan"} />
           {liveLanes.length > 0 && <p className="text-xs text-muted-foreground">Lands in the <span className="font-medium text-foreground">{laneName}</span> schedule.</p>}
-          <Button size="lg" className="w-full" disabled={name.trim().length < 2} onClick={() => void create()}>Create &amp; build</Button>
+          <Button size="lg" className="w-full" disabled={name.trim().length < 2 || creating} onClick={() => void create()}>{creating ? "Creating…" : <>Create &amp; build</>}</Button>
+          {createErr && <p className="text-sm text-warning" role="alert">{createErr}</p>}
         </div>
       </Sheet>
 

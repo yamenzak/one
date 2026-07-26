@@ -331,11 +331,11 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
 
                 {weekTotals.days > 0 && (
                   <Card className="flex items-center justify-around py-3 text-center">
-                    <div><div className="numeral text-lg font-bold leading-none">{weekTotals.days}</div><div className="mt-1 text-[0.7rem] text-muted-foreground">meals</div></div>
+                    <div><div className="numeral text-lg font-bold leading-none">{weekTotals.days}</div><div className="mt-1 text-xs text-muted-foreground">meals</div></div>
                     <div className="h-8 w-px bg-border/50" />
-                    <div><div className="numeral text-lg font-bold leading-none text-calories">{fmtEnergy(Math.round(weekTotals.cal), units)}</div><div className="mt-1 text-[0.7rem] text-muted-foreground">total</div></div>
+                    <div><div className="numeral text-lg font-bold leading-none text-calories">{fmtEnergy(Math.round(weekTotals.cal), units)}</div><div className="mt-1 text-xs text-muted-foreground">total</div></div>
                     <div className="h-8 w-px bg-border/50" />
-                    <div><div className="numeral text-lg font-bold leading-none text-protein">{Math.round(weekTotals.pro)} g</div><div className="mt-1 text-[0.7rem] text-muted-foreground">protein</div></div>
+                    <div><div className="numeral text-lg font-bold leading-none text-protein">{Math.round(weekTotals.pro)} g</div><div className="mt-1 text-xs text-muted-foreground">protein</div></div>
                   </Card>
                 )}
 
@@ -409,7 +409,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
               <div className="flex items-center gap-3">
                 <AiAvatar className="size-9" />
                 <div className="min-w-0">
-                  <div className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">Chef's suggestion</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-primary">Chef's suggestion</div>
                   <div className="truncate text-base font-bold tracking-tight">{recipe.title}</div>
                 </div>
               </div>
@@ -450,7 +450,7 @@ function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, on
         <button onClick={onOpen} className="relative block h-36 w-full text-left transition-opacity active:opacity-90">
           {image ? <img src={image} alt="" className="absolute inset-0 size-full object-cover" /> : <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-nutrition/20 to-surface-2 text-nutrition/50 [&_svg]:size-9"><Utensils /></div>}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-          {logged ? <span className="absolute right-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-nutrition px-2 py-0.5 text-[0.6rem] font-semibold text-[var(--tone-foreground)] [&_svg]:size-2.5"><Check strokeWidth={3} /> Logged</span> : opt.isFree ? <span className="absolute right-2 top-2 rounded-full bg-white/20 px-2 py-0.5 text-[0.6rem] font-semibold text-white backdrop-blur-md">Free</span> : null}
+          {logged ? <span className="absolute right-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-nutrition px-2 py-0.5 text-xs font-semibold text-[var(--tone-foreground)] [&_svg]:size-2.5"><Check strokeWidth={3} /> Logged</span> : opt.isFree ? <span className="absolute right-2 top-2 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur-md">Free</span> : null}
           <div className="absolute inset-x-0 bottom-0 p-3">
             <div className="truncate font-semibold text-white">{opt.mealName || (opt.isFree ? "Free meal" : `Option ${index + 1}`)}</div>
             {opt.isFree ? (
@@ -458,7 +458,7 @@ function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, on
             ) : (
               <div className="mt-0.5 flex items-center gap-2">
                 <span className="numeral shrink-0 text-xs font-semibold text-white">{fmtEnergy(totals.calories, units)}</span>
-                <MacroInline proteinG={totals.proteinG} carbsG={totals.carbsG} fatG={totals.fatG} className="shrink-0 text-[0.7rem] drop-shadow" />
+                <MacroInline proteinG={totals.proteinG} carbsG={totals.carbsG} fatG={totals.fatG} className="shrink-0 text-xs drop-shadow" />
               </div>
             )}
           </div>

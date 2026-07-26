@@ -45,17 +45,85 @@ function onUnauthorized(status: number, path: string): void {
   if (status === 401 && unauthorizedHandler && !isAuthPath(path)) unauthorizedHandler();
 }
 
+/**
+ * The log-write POSTs the service worker parks in its Background-Sync queue when
+ * the network is unreachable (mirror of the `urlPattern` in vite.config.ts — keep
+ * the two in lockstep).
+ *
+ * Why this exists: Workbox's BackgroundSyncPlugin enqueues the request in
+ * `fetchDidFail` and then RE-THROWS the original error, so `fetch` rejects even
+ * though the write is durably queued and WILL replay on reconnect. Reporting that
+ * as a failure is worse than saying nothing: the user taps "Log it" again, a
+ * second copy queues, both replay, and the day double-counts — inflating their
+ * ring and the coach's compliance report. So a rejected fetch on one of these
+ * paths is a DEFERRED SUCCESS, not an error.
+ */
+const QUEUED_POST = /^\/api\/(logs\/|check-ins|measurements|body-scans|supplements\/[^/]+\/log|fasting)/;
+
+/** Only a service worker that is actually CONTROLLING this page can have queued
+ *  anything. Without it (dev server, first load before activation, SW disabled)
+ *  a failed write is simply lost, and telling the user "saved" would be a lie. */
+const swQueueActive = (): boolean =>
+  typeof navigator !== "undefined" && !!navigator.serviceWorker?.controller;
+
+/**
+ * A write that never reached the server but is queued in the service worker for
+ * replay. Call sites should treat this as a success with a caveat ("Saved — will
+ * sync when you're back online"), never as a failure to retry.
+ */
+export class QueuedError extends Error {
+  readonly queued = true;
+  constructor(message = "Saved — will sync when you're back online.") {
+    super(message);
+  }
+}
+
+/** A request that never left the device (offline, DNS, dropped connection) and
+ *  is NOT queued — nothing was written, so retrying is the right advice. */
+export class OfflineError extends Error {
+  readonly offline = true;
+  constructor(message = "You're offline — that didn't reach the server.") {
+    super(message);
+  }
+}
+
+/** The write is safely queued: show a reassuring notice, close the sheet. */
+export const isQueued = (e: unknown): e is QueuedError => e instanceof QueuedError;
+/** The request never left the device and nothing was written. */
+export const isOffline = (e: unknown): e is OfflineError => e instanceof OfflineError;
+
+/**
+ * One place that turns any thrown value into text a user can act on, so every
+ * `catch` in the app is a one-liner instead of an ad-hoc message. Real HTTP
+ * errors keep the server's own message (4xx/5xx must never be dressed up as an
+ * offline queue).
+ */
+export function errorText(e: unknown, fallback = "Something went wrong — please try again."): string {
+  if (isQueued(e) || isOffline(e)) return e.message;
+  if (e instanceof ApiError) return e.message || fallback;
+  return fallback;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   if (interceptor) {
     const mocked = interceptor(method, path, body);
     if (mocked !== undefined) return mocked as T;
   }
-  const res = await fetch(path, {
-    method,
-    credentials: "include",
-    headers: body !== undefined ? { "content-type": "application/json" } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      method,
+      credentials: "include",
+      headers: body !== undefined ? { "content-type": "application/json" } : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    // `fetch` only rejects on a network-level failure — a 4xx/5xx resolves
+    // normally and falls through below. Distinguish the two offline outcomes so
+    // the UI can say "saved, will sync" instead of "failed" (see QUEUED_POST).
+    if (method === "POST" && QUEUED_POST.test(path) && swQueueActive()) throw new QueuedError();
+    throw new OfflineError();
+  }
   const data = (await res.json().catch(() => ({}))) as T & { error?: string; message?: string; detail?: string };
   if (!res.ok) {
     onUnauthorized(res.status, path);
@@ -78,7 +146,14 @@ export async function uploadMedia(file: Blob, purpose: string, filename = "uploa
   // so the server scopes the key per client and gates reads on assignment — a
   // client / non-assigned trainer can't read another client's file by key.
   if (clientId) fd.append("clientId", clientId);
-  const res = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
+  // Uploads are NOT in the Background-Sync queue (a multipart body with a Blob
+  // can't be replayed reliably), so an offline upload is a plain failure.
+  let res: Response;
+  try {
+    res = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
+  } catch {
+    throw new OfflineError("You're offline — the upload didn't go through.");
+  }
   const data = (await res.json().catch(() => ({}))) as { key?: string; error?: string; message?: string };
   if (!res.ok || !data.key) {
     onUnauthorized(res.status, "/api/media/upload");

@@ -12,8 +12,8 @@ import {
   PRIMARY_GOAL_LABELS, ACTIVITY_LEVEL_LABELS, DIETARY_APPROACH_LABELS, WORKOUT_LOCATION_LABELS, BMI_CATEGORY_LABELS,
   type ClientPreferences, type BmiCategory, type CalculatorInputs, type Gender, type ActivityLevel, type PrimaryGoal, type DietaryApproach, type UnitPrefs,
 } from "@mossa/domain";
-import { Button, Card, Badge, Field, Select, Reveal, SkeletonStatGrid, SkeletonList, Page, Stagger, Eyebrow, GlanceStrip, METRICS, toneVar, Target, Activity, Scale, Flame, AlertTriangle, Calculator, ArrowRight, Calendar, type MetricKey } from "@mossa/ui";
-import { api } from "../../api.js";
+import { Button, Card, Badge, Field, Select, Reveal, SkeletonStatGrid, SkeletonList, Page, Stagger, Eyebrow, EmptyState, GlanceStrip, METRICS, toneVar, Target, Activity, Scale, Flame, AlertTriangle, Calculator, ArrowRight, Calendar, type MetricKey } from "@mossa/ui";
+import { api, errorText } from "../../api.js";
 import { useUnits } from "../../units.js";
 
 type TargetKey = "targetCalories" | "targetProteinG" | "targetCarbsG" | "targetFatG" | "targetFiberG" | "targetWaterMl";
@@ -66,11 +66,20 @@ export function GoalManager({ clientId }: { clientId: string }) {
   const [targets, setTargets] = useState<Record<TargetKey, string>>(emptyTargets);
   const [edited, setEdited] = useState(false); // coach hand-tweaked → don't auto-overwrite
   const [busy, setBusy] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [derivation, setDerivation] = useState<Record<string, unknown> | null>(null);
   const units = useUnits();
   const prefilled = useRef(false);
 
-  const load = useCallback(async () => { setGoals((await api.get<{ goals: Goal[] }>(`/api/goals?clientId=${clientId}`)).goals); }, [clientId]);
+  // `goals` gates the whole screen, so an uncaught read left a permanent
+  // skeleton — the coach couldn't see the active goal OR set a new one, with
+  // nothing on screen saying why. Keep any goals we already had; offer a retry.
+  const load = useCallback(async () => {
+    setLoadError(false);
+    try { setGoals((await api.get<{ goals: Goal[] }>(`/api/goals?clientId=${clientId}`)).goals); }
+    catch { setLoadError(true); }
+  }, [clientId]);
   useEffect(() => void load(), [load]);
   useEffect(() => {
     void api.get<{ client: ClientData; metrics: Metrics }>(`/api/clients/${clientId}`).then((r) => { setClient(r.client); setMetrics(r.metrics); }).catch(() => undefined);
@@ -145,7 +154,8 @@ export function GoalManager({ clientId }: { clientId: string }) {
   };
 
   const create = async () => {
-    setBusy(true);
+    if (busy) return;
+    setBusy(true); setSaveErr(null);
     try {
       const targetsObj: Record<string, number> = {};
       for (const { key } of TARGET_FIELDS) if (targets[key] !== "" && Number.isFinite(Number(targets[key]))) targetsObj[key] = toMetricVal(key, Number(targets[key]), units);
@@ -171,7 +181,12 @@ export function GoalManager({ clientId }: { clientId: string }) {
       setEdited(false);
       await load();
       void api.get<{ client: ClientData; metrics: Metrics }>(`/api/clients/${clientId}`).then((r) => { setMetrics(r.metrics); }).catch(() => undefined);
-    } catch { /* validation surfaces via disabled */ } finally { setBusy(false); }
+    } catch (e) {
+      // The disabled state only covers a missing calorie target — a rejected POST
+      // (409 on a superseding goal, 5xx, offline) used to be swallowed here, so
+      // "Replace goal" simply did nothing and the client kept the old targets.
+      setSaveErr(errorText(e, "Couldn't save this goal. Please try again."));
+    } finally { setBusy(false); }
   };
 
   const active = goals?.find((g) => g.status === "active");
@@ -207,6 +222,9 @@ export function GoalManager({ clientId }: { clientId: string }) {
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+      {loadError && !goals ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load goals" description="Something went wrong reaching the server. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
+      ) : (
       <Reveal loading={!goals} className="space-y-4" skeleton={
         <>
           <SkeletonStatGrid count={6} cols={3} />
@@ -355,6 +373,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
           </div>
           <Field label="Notes (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Context for this phase" />
           <Button size="lg" className="w-full" disabled={!canSave || busy} onClick={() => void create()}>{busy ? "Saving…" : active ? "Replace goal" : "Set goal"}</Button>
+          {saveErr && <p className="text-sm text-warning" role="alert">{saveErr}</p>}
           {!canSave && <p className="text-center text-xs text-muted-foreground">Calculate or type a calorie target to save.</p>}
         </Card>
         </Stagger>
@@ -387,6 +406,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
       )}
       </>)}
       </Reveal>
+      )}
     </Page>
   );
 }

@@ -36,6 +36,7 @@ import { Explore } from "./screens/client/Explore.js";
 import { AdminConsole } from "./screens/admin/AdminConsole.js";
 import { AcceptInvite } from "./screens/AcceptInvite.js";
 import { NotificationBell } from "./NotificationBell.js";
+import { OfflinePill } from "./notices.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { TourProvider, useTour, type TourId } from "./tour.js";
 
@@ -230,7 +231,7 @@ function TabLayout() {
               <span className="truncate text-base font-semibold tracking-tight">{active.tenantName}</span>
             )}
             {isStaff && (
-              <span className="hidden rounded-full bg-secondary px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground sm:inline">
+              <span className="hidden rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:inline">
                 {clientSurface ? "Train" : "Coach"}
               </span>
             )}
@@ -238,6 +239,10 @@ function TabLayout() {
         }
         trailing={
           <>
+            {/* Connectivity first in the trailing row: when the radio is dead it's
+                the single most load-bearing thing on the bar — it's what explains
+                why a log said "will sync" and why a screen is showing stale data. */}
+            <OfflinePill />
             {clientSurface && clientId && (
               <button onClick={() => nav("/explore")} className="grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" aria-label="Explore resources">
                 <BookOpen className="size-[1.15rem]" />

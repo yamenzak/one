@@ -7,16 +7,52 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { SessionContext, TenantBranding } from "@mossa/protocol";
-import { api, setUnauthorizedHandler } from "./api.js";
+import { api, isOffline, setUnauthorizedHandler } from "./api.js";
 
-/** Remove the app's own localStorage keys (mode, ambient/nav prefs, per-plan
+/**
+ * Display preferences that are NOT identifying and carry no account data —
+ * chosen theme, tinted nav, ambient background. Sign-out used to wipe every
+ * `mossa`-prefixed key, so a light-theme user signed back in to a dark app and
+ * had to re-set their preferences every time. Anything that could leak between
+ * accounts (session cache, mode, per-plan shopping lists) must stay OUT of here.
+ */
+const KEEP_ON_SIGN_OUT = new Set(["mossa-theme", "mossa:tintedNav", "mossa:ambient"]);
+
+/** Remove the app's own localStorage keys (mode, cached session, per-plan
  *  shopping lists) — all `mossa`-prefixed — so nothing leaks across accounts. */
 function clearAppStorage(): void {
   try {
     for (const k of Object.keys(localStorage)) {
-      if (k.startsWith("mossa")) localStorage.removeItem(k);
+      if (k.startsWith("mossa") && !KEEP_ON_SIGN_OUT.has(k)) localStorage.removeItem(k);
     }
   } catch { /* private mode */ }
+}
+
+/**
+ * Last successful /api/context payload. The PWA precaches the app shell so it
+ * opens with no signal, but /api/context is never cached (and can't be: it's
+ * per-session) — so a cold offline start used to throw, null the session, and
+ * render the OTP login screen. That made the entire offline-first capability
+ * unreachable in its primary use case: install the app, lock the phone, walk
+ * into a basement gym, tap the icon. Persisting the payload lets a cold start
+ * with no network render the real app (degraded) instead of logging the user out.
+ *
+ * This is a UI convenience only — never an authorization decision. The session
+ * cookie is HttpOnly and every read/write is still authorized server-side, so a
+ * restored payload cannot grant access to anything. A real 401 clears it.
+ */
+const CTX_CACHE_KEY = "mossa:ctx-cache";
+function readCachedCtx(): SessionContext | null {
+  try {
+    const raw = localStorage.getItem(CTX_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as SessionContext) : null;
+  } catch { return null; }
+}
+function writeCachedCtx(data: SessionContext | null): void {
+  try {
+    if (data) localStorage.setItem(CTX_CACHE_KEY, JSON.stringify(data));
+    else localStorage.removeItem(CTX_CACHE_KEY);
+  } catch { /* private mode / quota */ }
 }
 
 type Mode = "coach" | "train";
@@ -35,6 +71,11 @@ interface Session {
   ctx: SessionContext | null;
   /** Custom-domain tenant, resolved pre-auth. Null on the platform host. */
   host: HostInfo | null;
+  /** Live connectivity. Drives the offline banner and pauses retry loops. */
+  online: boolean;
+  /** True when `ctx` came from the localStorage cache because the network was
+   *  unreachable — the app is usable but reads may be stale and writes queue. */
+  degraded: boolean;
   mode: Mode;
   setMode: (m: Mode) => void;
   refresh: () => Promise<void>;
@@ -48,6 +89,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [ctx, setCtx] = useState<SessionContext | null>(null);
   const [host, setHost] = useState<HostInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [degraded, setDegraded] = useState(false);
+  // `navigator.onLine === false` is trustworthy (no interface / airplane mode);
+  // `true` only means "there is a link", so a fetch can still fail. We treat a
+  // failed context read as offline too (below).
+  const [online, setOnline] = useState(() => navigator.onLine !== false);
   const [mode, setModeState] = useState<Mode>(() =>
     localStorage.getItem("mossa-mode") === "train" ? "train" : "coach",
   );
@@ -56,8 +102,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     try {
       const data = await api.get<SessionContext>("/api/context");
       setCtx(data);
-    } catch {
-      setCtx(null);
+      writeCachedCtx(data);
+      setDegraded(false);
+    } catch (e) {
+      // A NETWORK failure is not a sign-out. Restore the last known session so a
+      // cold start in a no-signal gym renders the app (degraded) instead of the
+      // OTP login screen — which is where the write queue becomes unreachable.
+      // An actual 401 goes through setUnauthorizedHandler below, which clears
+      // both the state and the cache so a signed-out user never looks signed in.
+      const cached = isOffline(e) ? readCachedCtx() : null;
+      if (cached) {
+        setCtx(cached);
+        setDegraded(true);
+      } else {
+        setCtx(null);
+        setDegraded(false);
+      }
     } finally {
       setLoading(false);
     }
@@ -79,10 +139,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // An expired cookie surfaces as a 401 on any data route. Clear the session so
   // the app drops back to Login instead of showing blank screens / failing
   // saves silently. Auth endpoints are excluded in the api layer (no loop).
+  // The cached context payload goes with it — otherwise the next cold start would
+  // restore it and show a signed-out user a signed-in shell.
   useEffect(() => {
-    setUnauthorizedHandler(() => { setCtx(null); setLoading(false); });
+    setUnauthorizedHandler(() => { writeCachedCtx(null); setCtx(null); setDegraded(false); setLoading(false); });
     return () => setUnauthorizedHandler(null);
   }, []);
+
+  // Connectivity: drives the offline banner, the "will sync" copy, and pausing
+  // the notification WS/poll retry loops (which otherwise hammer a dead radio
+  // for a whole gym session). Reconnecting re-reads the context, which clears
+  // the degraded flag and picks up anything that changed while we were dark.
+  useEffect(() => {
+    const goOnline = () => { setOnline(true); void refresh(); };
+    const goOffline = () => setOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, [refresh]);
 
   const setMode = useCallback((m: Mode) => {
     setModeState(m);
@@ -134,8 +211,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ loading, ctx, host, mode, setMode, refresh, switchTenant, signOut }),
-    [loading, ctx, host, mode, setMode, refresh, switchTenant, signOut],
+    () => ({ loading, ctx, host, online, degraded, mode, setMode, refresh, switchTenant, signOut }),
+    [loading, ctx, host, online, degraded, mode, setMode, refresh, switchTenant, signOut],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
@@ -144,6 +221,11 @@ export function useSession(): Session {
   const s = useContext(Ctx);
   if (!s) throw new Error("useSession outside provider");
   return s;
+}
+
+/** Live connectivity — for anything that should stop retrying while offline. */
+export function useOnline(): boolean {
+  return useSession().online;
 }
 
 /** The client record the current surface should scope to (train mode / client role). */

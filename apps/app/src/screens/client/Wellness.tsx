@@ -26,7 +26,8 @@ interface PostureScan {
 }
 const POSTURE_TONE = POSTURE_SEVERITY_TONE;
 const capp = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-import { api, todayLocal, shiftDay, uploadMedia } from "../../api.js";
+import { api, todayLocal, shiftDay, uploadMedia, isQueued, errorText } from "../../api.js";
+import { QueuedNotice } from "../../notices.js";
 import { useUnits } from "../../units.js";
 import { scanProfile, modelSilhouette } from "./bodyscan/model.js";
 import { PostureFigure } from "./bodyscan/PostureFigure.js";
@@ -62,8 +63,8 @@ function ZoneTrack({ elapsedHours }: { elapsedHours: number }) {
         return (
           <div key={z.label} style={{ flexGrow: z.vis }} className="min-w-0">
             <div className="h-2 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${frac * 100}%`, backgroundColor: toneVar[z.tone] }} /></div>
-            <div className={cn("mt-1.5 truncate text-center text-[0.7rem] font-semibold leading-tight", current ? "text-foreground" : "text-muted-foreground/60")}>{z.label}</div>
-            <div className="numeral text-center text-[0.65rem] text-muted-foreground/50" aria-hidden="true">{z.start}h</div>
+            <div className={cn("mt-1.5 truncate text-center text-xs font-semibold leading-tight", current ? "text-foreground" : "text-muted-foreground/60")}>{z.label}</div>
+            <div className="numeral text-center text-xs leading-tight text-muted-foreground/50" aria-hidden="true">{z.start}h</div>
           </div>
         );
       })}
@@ -82,6 +83,16 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
   const [score, setScore] = useState<WellnessScoreResult | null>(null);
   const [scans, setScans] = useState<PostureScan[]>([]);
   const [loading, setLoading] = useState(true);
+  // The today bundle is the only read this tab genuinely can't render without;
+  // `loadError` is that failure, and `failed` names the INDEPENDENT sections whose
+  // own read fell over (see load()). `reloadKey` is the retry.
+  const [loadError, setLoadError] = useState(false);
+  const [failed, setFailed] = useState<Set<string>>(new Set());
+  const [reloadKey, setReloadKey] = useState(0);
+  // Write feedback for the hot logging controls (water / fast / supplement tap):
+  // a queued write is a deferred success, anything else didn't save at all.
+  const [logErr, setLogErr] = useState<string | null>(null);
+  const [logQueued, setLogQueued] = useState(false);
   const [logKind, setLogKind] = useState<"checkin" | "water" | "sleep" | "mood" | null>(null);
   const [detailCheckIn, setDetailCheckIn] = useState<CheckInFull | null>(null);
   const [detailLab, setDetailLab] = useState<LabFull | null>(null);
@@ -92,7 +103,14 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
   const waterPresets = units.volume === "oz" ? [8, 12, 16] : [250, 500, 750];
 
   const load = useCallback(async () => {
-    const [s, sl, l, f, sess, ci, td, sc, bs] = await Promise.all([
+    setLoadError(false);
+    // allSettled, NOT all: these nine reads are independent surfaces of the same
+    // tab. With Promise.all a single rejection discarded every sibling result and
+    // — because `loading` only cleared on success — left the entire Wellness tab
+    // on its skeleton forever, with no error and no retry. (Supplements/labs 403'd
+    // for the client persona for a while, so that was the everyday outcome.) Now a
+    // failed read degrades its own section and the rest of the tab still renders.
+    const [s, sl, l, f, sess, ci, td, sc, bs] = await Promise.allSettled([
       api.get<{ supplements: Supplement[] }>(`/api/supplements?clientId=${clientId}`),
       api.get<{ taken: { supplement_id: string; slot: string }[] }>(`/api/supplements/logs?clientId=${clientId}&date=${date}`),
       api.get<{ labs: LabFull[] }>(`/api/labs?clientId=${clientId}`),
@@ -103,10 +121,23 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
       api.get<WellnessScoreResult>(`/api/wellness/score?clientId=${clientId}&today=${date}`).catch(() => null),
       api.get<{ scans: PostureScan[] }>(`/api/body-scans?clientId=${clientId}`).catch(() => ({ scans: [] })),
     ]);
-    setSupps(s.supplements); setTaken(new Set(sl.taken.map((t) => `${t.supplement_id}:${t.slot}`)));
-    setLabs(l.labs); setFast(f); setSessions(sess.sessions); setCheckIns(ci.checkIns); setToday(td); setScore(sc); setScans(bs.scans); setLoading(false);
+    const bad = new Set<string>();
+    if (s.status === "fulfilled") setSupps(s.value.supplements); else bad.add("supps");
+    if (sl.status === "fulfilled") setTaken(new Set(sl.value.taken.map((t) => `${t.supplement_id}:${t.slot}`))); else bad.add("supps");
+    if (l.status === "fulfilled") setLabs(l.value.labs); else bad.add("labs");
+    if (f.status === "fulfilled") setFast(f.value); else bad.add("fast");
+    if (ci.status === "fulfilled") setCheckIns(ci.value.checkIns); else bad.add("checkins");
+    if (sess.status === "fulfilled") setSessions(sess.value.sessions);
+    if (sc.status === "fulfilled") setScore(sc.value);
+    if (bs.status === "fulfilled") setScans(bs.value.scans);
+    setFailed(bad);
+    // Hydration hero + water target come from the today bundle, so this one
+    // failure blocks the screen (with an error + retry, never a silent skeleton).
+    if (td.status === "fulfilled") setToday(td.value); else setLoadError(true);
+    setLoading(false);
   }, [clientId, date]);
-  useEffect(() => void load(), [load]);
+  useEffect(() => void load(), [load, reloadKey]);
+  const retry = () => { setLoading(true); setReloadKey((k) => k + 1); };
 
   // Live tick while a fast is running.
   useEffect(() => {
@@ -127,13 +158,62 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, params]);
 
-  const addWater = async (displayAmount: number) => { const ml = Math.round(volumeDisplayToMl(displayAmount, units)); await api.post("/api/logs/water", { clientId, data: { date, amountMl: ml } }); setToday((t) => (t ? { ...t, waterMl: t.waterMl + ml } : t)); };
+  const addWater = async (displayAmount: number) => {
+    const ml = Math.round(volumeDisplayToMl(displayAmount, units));
+    setLogErr(null); setLogQueued(false);
+    try {
+      await api.post("/api/logs/water", { clientId, data: { date, amountMl: ml } });
+    } catch (e) {
+      // A queued write is durably parked and WILL replay, so the ring must still
+      // move and the copy must reassure; anything else never wrote, so don't move
+      // the ring or the client tops up twice to "make it count".
+      if (!isQueued(e)) { setLogErr(errorText(e, "Couldn't log that water — try again.")); return; }
+      setLogQueued(true);
+    }
+    setToday((t) => (t ? { ...t, waterMl: t.waterMl + ml } : t));
+  };
+
+  /**
+   * Per-slot in-flight guard. `/api/supplements/:id/log` is a TOGGLE: two fast
+   * taps insert then delete, and if the first response resolves last the row
+   * settles on a green tick while the server holds no log at all. Supplement
+   * adherence feeds the coach's report, so that desync shows the coach a missed
+   * dose the client believes they logged. One tap per slot at a time, then let
+   * the server's answer be the truth — and revert (loudly) if it never came.
+   */
+  const suppInFlight = useRef<Set<string>>(new Set());
   const toggleSupp = async (id: string, slot: string) => {
     const key = `${id}:${slot}`;
-    const r = await api.post<{ taken: boolean }>(`/api/supplements/${id}/log`, { clientId, date, slot });
-    setTaken((p) => { const n = new Set(p); r.taken ? n.add(key) : n.delete(key); return n; });
+    if (suppInFlight.current.has(key)) return;
+    suppInFlight.current.add(key);
+    const wasTaken = taken.has(key);
+    setLogErr(null); setLogQueued(false);
+    setTaken((p) => { const n = new Set(p); wasTaken ? n.delete(key) : n.add(key); return n; });
+    try {
+      const r = await api.post<{ taken: boolean }>(`/api/supplements/${id}/log`, { clientId, date, slot });
+      setTaken((p) => { const n = new Set(p); r.taken ? n.add(key) : n.delete(key); return n; });
+    } catch (e) {
+      // Queued: the toggle lands on reconnect, so the optimistic tick is correct.
+      if (isQueued(e)) { setLogQueued(true); return; }
+      setTaken((p) => { const n = new Set(p); wasTaken ? n.add(key) : n.delete(key); return n; });
+      setLogErr(errorText(e, "Couldn't log that dose — it wasn't saved."));
+    } finally { suppInFlight.current.delete(key); }
   };
-  const toggleFast = async () => { await api.post("/api/fasting", { clientId, data: { action: fast?.activeFast ? "end" : "start", targetHours: 16 } }); await load(); };
+
+  const toggleFast = async () => {
+    const ending = !!fast?.activeFast;
+    setLogErr(null); setLogQueued(false);
+    try {
+      await api.post("/api/fasting", { clientId, data: { action: ending ? "end" : "start", targetHours: 16 } });
+    } catch (e) {
+      // Queued: the start/stop will replay, but re-reading now would only show
+      // the stale server state — so confirm and leave the card as it is.
+      if (isQueued(e)) { setLogQueued(true); return; }
+      setLogErr(errorText(e, ending ? "Couldn't end your fast — try again." : "Couldn't start your fast — try again."));
+      return;
+    }
+    await load();
+  };
 
   // ── This-week metrics ──
   const week = useMemo(() => {
@@ -174,6 +254,13 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         <h1 className={onBack ? "text-xl font-bold tracking-tight" : "text-2xl font-bold tracking-tight"}>Wellness</h1>
       </div>
 
+      {/* Write feedback for the tap-logging controls — one spot, always visible. */}
+      {logQueued && <QueuedNotice />}
+      {logErr && <p role="alert" className="text-sm text-warning">{logErr}</p>}
+
+      {loadError && !today ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't load your wellness" description="Something went wrong loading your day. Check your connection and try again." action={<Button onClick={retry}>Try again</Button>} />
+      ) : (
       <Reveal loading={loading || !today} className="space-y-5" skeleton={
         <>
           <SkeletonHero height={150} />
@@ -222,6 +309,8 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
             <div className="flex items-center gap-2.5"><IconBadge icon={Timer} tone={fast?.activeFast ? zone.tone : "sleep"} size="sm" /><h2 className="font-semibold">Fasting</h2></div>
             {fast?.activeFast ? <Badge tone={zone.tone}>{zone.label}</Badge> : <Badge tone="neutral">Not fasting</Badge>}
           </div>
+          {/* Don't let a failed read pass "Not fasting" off as the truth. */}
+          {failed.has("fast") && <p className="relative text-sm text-warning">Couldn't load your fasting status — this may not be up to date.</p>}
 
           {fast?.activeFast ? (
             <>
@@ -309,7 +398,9 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Check-ins</h3>
           <button onClick={() => setLogKind("checkin")} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><Plus /> Check in</button>
         </div>
-        {checkIns.length === 0 ? (
+        {failed.has("checkins") ? (
+          <SectionNote text="Couldn't load your check-in history." onRetry={retry} />
+        ) : checkIns.length === 0 ? (
           <EmptyState icon={ClipboardList} title="No check-ins yet" description="Check in to track your progress and get your coach's feedback." action={<Button onClick={() => setLogKind("checkin")}><Plus /> Check in</Button>} />
         ) : (
           <Stagger className="space-y-1.5">
@@ -334,8 +425,14 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         )}
       </section>
 
-      {/* Supplements — a clear tap-to-log checklist */}
-      {supps.length > 0 && (
+      {/* Supplements — a clear tap-to-log checklist. An empty list and a failed
+          read look identical to the client, so name the difference. */}
+      {failed.has("supps") ? (
+        <section className="space-y-2">
+          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Supplements</h3>
+          <SectionNote text="Couldn't load your supplements or today's doses." onRetry={retry} />
+        </section>
+      ) : supps.length > 0 && (
         <section className="space-y-2">
           <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Supplements · tap to log</h3>
           <Stagger>
@@ -350,7 +447,12 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
       )}
 
       {/* Labs */}
-      {labs.length > 0 && (
+      {failed.has("labs") ? (
+        <section className="space-y-2">
+          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lab tests</h3>
+          <SectionNote text="Couldn't load your lab tests." onRetry={retry} />
+        </section>
+      ) : labs.length > 0 && (
         <section className="space-y-2">
           <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lab tests</h3>
           <Stagger className="space-y-1.5">
@@ -383,11 +485,24 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         </>
         )}
       </Reveal>
+      )}
 
       {logKind && <LogSheet open initialKind={logKind} clientId={clientId} onClose={() => setLogKind(null)} onLogged={() => { setLogKind(null); void load(); }} />}
       {detailCheckIn && <CheckInDetailSheet checkIn={detailCheckIn} onClose={() => setDetailCheckIn(null)} />}
       {detailLab && <LabDetailSheet lab={detailLab} onClose={() => setDetailLab(null)} />}
     </Page>
+  );
+}
+
+/** One section's own read failed while its siblings succeeded (the tab fans out
+ *  with allSettled). Say so in place, with a retry, rather than rendering an
+ *  empty section that reads to the client as "you have none". */
+function SectionNote({ text, onRetry }: { text: string; onRetry: () => void }) {
+  return (
+    <Card className="flex items-center justify-between gap-3 py-3 text-sm text-muted-foreground">
+      <span className="min-w-0">{text}</span>
+      <Button size="sm" variant="secondary" className="shrink-0" onClick={onRetry}>Retry</Button>
+    </Card>
   );
 }
 
@@ -404,7 +519,10 @@ function LabRow({ lab, clientId, onOpen, onUploaded }: { lab: LabFull; clientId:
   const markers = lab.values?.length ?? 0;
   const flagged = lab.values?.filter((v) => v.flag && v.flag !== "normal").length ?? 0;
   const sub = canUpload
-    ? (lab.due_by ? `Due ${new Date(lab.due_by).toLocaleDateString()}` : "Tap to upload your result")
+    // `due_by` is a date-only column: a bare `new Date("2026-08-01")` parses as
+    // UTC midnight, so every timezone west of UTC renders the day BEFORE the one
+    // the coach set. Pin it to local midnight (same idiom as coach/ClientManage).
+    ? (lab.due_by ? `Due ${new Date(`${lab.due_by}T00:00:00`).toLocaleDateString()}` : "Tap to upload your result")
     : lab.status === "uploaded" ? "Awaiting coach review"
     : lab.status === "reviewed" ? (markers ? `${markers} marker${markers === 1 ? "" : "s"}${flagged ? ` · ${flagged} flagged` : " · all in range"}` : "Result ready — tap to view")
     : lab.status === "cancelled" ? "Cancelled by your coach"

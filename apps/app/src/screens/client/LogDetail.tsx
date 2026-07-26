@@ -93,7 +93,7 @@ function MiniStat({ icon: Icon, tone, label, value, sub }: { icon: LucideIcon; t
     <div className="flex items-center gap-2.5">
       <span className="grid size-8 shrink-0 place-items-center rounded-lg [&_svg]:size-4" style={{ background: `color-mix(in oklch, ${toneVar[tone]} 15%, transparent)`, color: toneVar[tone] }}><Icon /></span>
       <div className="min-w-0 flex-1">
-        <div className="text-[0.7rem] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
         <div className="truncate text-sm font-semibold tabular-nums">{value}{sub ? <span className="ml-0.5 text-xs font-normal text-muted-foreground">{sub}</span> : null}</div>
       </div>
     </div>
