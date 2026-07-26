@@ -144,11 +144,23 @@ export function createAuth(env: Env, origin?: string) {
   // origin equals BETTER_AUTH_URL, so nothing changes there.
   const baseURL = origin || env.BETTER_AUTH_URL || "http://localhost:8787";
 
-  // CSRF: Better Auth (esp. the org plugin) rejects POSTs whose Origin isn't
-  // trusted. In local dev the app runs on the Vite server (:5173) and proxies
-  // /api to this worker (:8787), so the browser Origin (:5173) differs from the
-  // worker origin — trust the common localhost dev origins. In production the
-  // app is served by the worker at one origin, so trusting that origin is right.
+  // CSRF: Better Auth rejects POSTs whose Origin isn't trusted.
+  //
+  // ⚠️ Better Auth 1.6.23 does NOT honour this list — it trusts only the
+  // request's own origin. Verified by probe against the running worker: a POST
+  // with `Origin: http://localhost:8787` to the worker on :8787 → 200, while
+  // `http://localhost:5173` and `http://127.0.0.1:8787` → 403 INVALID_ORIGIN,
+  // despite all four being listed here. The list is kept because it is the
+  // documented option and a future version may respect it, but do NOT rely on
+  // it: adding an origin here does not make it work.
+  //
+  // The dev consequence was subtle and cost real time. Cookieless calls (OTP
+  // send/verify) have no Origin check, so sign-in on the Vite server at :5173
+  // succeeded — and then every cookie-bearing POST failed, which looks like
+  // "I can log in but Create workspace does nothing". The actual fix lives in
+  // apps/app/vite.config.ts, where the dev proxy now presents the worker's own
+  // origin so the proxied request is same-origin. Production is genuinely
+  // same-origin (the worker serves the SPA), so it was never affected.
   const trustedOrigins = isLocal
     ? ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8787", "http://127.0.0.1:8787"]
     : origin

@@ -136,8 +136,22 @@ export default defineConfig({
     port: 5173,
     proxy: {
       // Same-origin in prod (the api worker serves this app); proxied in dev.
-      "/api": "http://localhost:8787",
-      "/health": "http://localhost:8787",
+      //
+      // The Origin rewrite is load-bearing, not hygiene. Better Auth 1.6.23
+      // ignores the `trustedOrigins` array auth.ts passes it and trusts only the
+      // request's own origin, so a proxied POST arriving with
+      // `Origin: http://localhost:5173` against a worker on :8787 is rejected
+      // `INVALID_ORIGIN`. Cookieless calls (OTP send/verify) pass, which is why
+      // sign-in appeared to work while "Create workspace", set-active-org and
+      // sign-out all failed — the confusing symptom of being able to log in and
+      // then do nothing. Presenting the target's own origin makes the dev proxy
+      // look same-origin, which is exactly what production is.
+      "/api": {
+        target: "http://localhost:8787",
+        changeOrigin: true,
+        headers: { origin: "http://localhost:8787" },
+      },
+      "/health": { target: "http://localhost:8787", changeOrigin: true },
     },
   },
   build: {

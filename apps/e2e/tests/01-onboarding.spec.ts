@@ -156,6 +156,15 @@ test("owner onboards, invites a client, and the client signs in and completes in
     await expect(profileCard).not.toContainText("Date of birth");
     await expect(profileCard).not.toContainText("Height");
     await expect(profileCard).not.toContainText("Gender");
+
+    // The wizard's other three answers must count too. These were sent only as
+    // `intake` — free-form AI context — while profileGaps reads the typed
+    // `preferences` store, so a client answered their goal, their activity level
+    // and where they train, and their coach was still told all three were
+    // missing. Onboarding now writes both.
+    await expect(profileCard).not.toContainText("Primary goal");
+    await expect(profileCard).not.toContainText("Activity level");
+    await expect(profileCard).not.toContainText("Where you train");
   });
 
   await closeAll(coach, client);

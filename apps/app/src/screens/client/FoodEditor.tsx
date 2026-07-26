@@ -317,7 +317,13 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                         <label key={k} className={cn("flex flex-col gap-1.5 rounded-2xl p-2.5", toneSoft[M.tone])}>
                           <span className="flex items-center gap-1 text-xs font-semibold leading-none [&_svg]:size-3"><M.icon /> <span className="truncate">{label}</span></span>
                           <span className="flex items-baseline gap-0.5 rounded-lg bg-background/70 px-1.5 py-1.5">
-                            <input inputMode="decimal" value={f[k]} onChange={(e) => set(k, dec(e.target.value))} placeholder="0" className="w-full min-w-0 bg-transparent text-center text-[0.95rem] font-bold text-foreground outline-none placeholder:font-medium placeholder:text-muted-foreground/50" />
+                            {/* Named explicitly: without this the accessible name is
+                                the whole wrapping label's concatenated text
+                                (icon + abbreviation + unit), so a screen reader
+                                announces "Cal kcal" for the field and "Fat g" for
+                                another — abbreviations that don't read as words.
+                                The unit belongs in the name, not just beside it. */}
+                            <input aria-label={`${metric.charAt(0).toUpperCase()}${metric.slice(1)} (${unit})`} inputMode="decimal" value={f[k]} onChange={(e) => set(k, dec(e.target.value))} placeholder="0" className="w-full min-w-0 bg-transparent text-center text-[0.95rem] font-bold text-foreground outline-none placeholder:font-medium placeholder:text-muted-foreground/50" />
                             <span className="shrink-0 text-xs font-medium text-muted-foreground">{unit}</span>
                           </span>
                         </label>
