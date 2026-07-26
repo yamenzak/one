@@ -32,7 +32,7 @@ when a code couldn't be sent, so if the screen said it was sent, it was.
 ## 2. Finding your way
 
 One app, and the tabs change with your role. Every staff member sees **Today**,
-**Clients** and **Library**. On Studio and Team you also get **Sessions**. Owners
+**Clients** and **Library**. On Pro and Max you also get **Sessions**. Owners
 get **Business**. Your avatar menu holds personal settings, the media library,
 appearance and units, notifications, and — for owners — **Studio settings**.
 
@@ -191,7 +191,7 @@ Today screen in an Explore rail and in a full Explore list.
 
 ## 11. Packages and payments
 
-Owners on Solo and above: **Business → Packages**. First connect Stripe from
+Owners on Light and above: **Business → Packages**. First connect Stripe from
 **Business → Overview** — checkouts are created on **your** Stripe account, with
 your statement descriptor, your payouts and your tax. Mossa takes no cut. Until
 Stripe onboarding is complete, clients see "checkout isn't available yet."
@@ -242,7 +242,7 @@ lapse — a deliberate grace period.
 
 ## 12. Sessions and the front desk
 
-Studio and Team. **Sessions** lets an owner define add-on types (a consultation,
+Pro and Max. **Sessions** lets an owner define add-on types (a consultation,
 with a duration and optional standalone price), and any staff member schedule one
 for a client, then mark it completed, no-show or cancelled. The client is notified
 when you book.
@@ -281,15 +281,17 @@ You can also narrow an individual member's permissions below their role default.
 Each client has an activity history showing which staff member changed what and
 when — visible to staff, never to the client.
 
-**Client assignment caveat:** there is currently **no screen for assigning an
-existing client to a coach**. A coach sees clients they created themselves. Until
-that ships, either have coaches create their own clients, or work as the owner.
+**Assigning clients to a coach.** Open a client → **Manage** → **Coaches** to add
+or remove a coach and set which one is primary (the primary coach is who
+notifications route to). A coach only sees the clients assigned to them, so this is
+what hands a client over — and if nobody is assigned, only owners can see them.
+Owners only.
 
 ---
 
 ## 15. Branding and your own domain
 
-Studio and Team. **Studio settings → Brand** sets your logo, app icon and accent
+Pro and Max. **Studio settings → Brand** sets your logo, app icon and accent
 colour, applied throughout the app including the boot screen. **Sign-in**
 customises your login page — tagline, headline, body copy, background image — with
 a live preview, and gives you your `/t/your-slug` link. **Marketplace** is where
@@ -308,13 +310,39 @@ policy, and editable email templates.
 
 ## 16. Your plan and credits
 
+**The plans.** Four tiers, and you can move between them whenever you like:
+
+| | Coaches | Clients | Media | AI credits / mo | |
+|---|---|---|---|---|---|
+| **Solo** $4.99 | 1 | 1 | 250 MB | 500 | 30 days free |
+| **Light** $24.99 | 1 | 30 | 1 GB | 3,000 | 30 days free |
+| **Pro** $49.99 | 5 | 100 | 10 GB | 6,000 | |
+| **Max** $119.99 | unlimited | unlimited | 100 GB | 15,000 | |
+
+Solo and Light start with a **30-day free trial**. A trial does collect a card, but
+nothing is charged until it ends, and we email you three days before that happens.
+Cancel any time before then and you pay nothing. The coach count includes you.
+
 **Business → Overview** shows your plan and status, AI credit balance,
 client-billing health (lapsed, expiring within seven days), what your plan
 includes and each quota. From here you change plan and buy credit packs, paid
 inline with no redirect.
 
+**Moving up is instant. Moving down asks you to fit first** — if you're over the
+smaller plan's limits, you'll get a checklist of exactly what to clear (clients,
+coaches, plan templates) with a link straight to each. Storage is only a warning,
+not a blocker: we won't make you delete a client's progress photos to pay less,
+though new uploads stop once you're over. Nothing you're already using breaks when
+you downgrade — you simply can't add more until you're inside the new limits.
+
+**Freeing a client slot.** Two ways, and they're different on purpose. **Archive**
+keeps everything — their logs, photos and history stay, they just leave your roster
+and stop counting against your limit. **Delete** erases them permanently: logs,
+measurements, check-ins, photos, uploaded files, all of it, and reclaims the
+storage. Delete asks you to type the client's name, because it cannot be undone.
+
 **Credits come in two kinds.** *Monthly credits* come with your plan, refresh each
-month and **do not roll over*. *Purchased credits* from credit packs **never
+month and **do not roll over**. *Purchased credits* from credit packs **never
 expire**. AI always spends monthly credits first, so you never lose what you paid
 for. Credits refresh at the start of each calendar month, which may not be your
 billing date. When you run out, AI stops with a clear message — nothing else is
@@ -360,12 +388,13 @@ undone. Irreversible actions ask for a code emailed to you.
 
 Deliberately listed so you don't plan around them: a public storefront or blog
 page for your studio · client self-booking · exporting your data · any API or
-webhooks (including on Team) · trainer↔client chat · natural-language and voice
-food logging for clients · periodization assistant, meal swap, menu scout,
-business-digest narrative · wearable and health-app import · QR-code client
-invites · resending a client invite · assigning existing clients to a coach ·
-editing or deleting a package after creation · archiving a client · saving a
-meal-plan template · the client weekly meal-arrangement grid and grocery list.
+webhooks · trainer↔client chat · natural-language and voice food logging for
+clients · periodization assistant, meal swap, menu scout, business-digest
+narrative · wearable and health-app import · QR-code client invites · resending a
+client invite · un-archiving a client (archiving is one-way for now) · hard-deleting
+a package (you can archive it, which takes it off sale while existing buyers keep
+what they paid for) · saving a meal-plan template · the client weekly
+meal-arrangement grid and grocery list.
 
 Exercise thumbnails are sparse in the shipped library, and the client-facing
 exercise browser currently shows two categories with no favourites.

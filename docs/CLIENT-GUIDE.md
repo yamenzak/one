@@ -276,6 +276,12 @@ client. You'll confirm with a code sent to your email, because it can't be undon
 Save anything you want to keep first. If you'd rather just stop using the app,
 tell your coach instead of deleting; that leaves your history intact.
 
+**Your coach can also remove you**, in one of two ways. If they *archive* you, you
+come off their active roster but everything you logged is kept. If they *delete*
+you, your record and all of it — logs, measurements, check-ins, photos, uploaded
+files — is erased permanently and cannot be recovered. If you want a copy of
+anything, ask before you stop training with them.
+
 **One account, several studios.** If you train with more than one, it's the same
 login, and each studio only ever sees its own record for you.
 
