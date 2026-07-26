@@ -423,7 +423,7 @@ function PlanHealth({ allTypes, byType, foods, targets }: {
           <div className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-2xl bg-surface-2 px-5 py-4 text-center">
             <Flame className="size-5" style={{ color: toneVar.calories }} />
             <span className="numeral text-2xl font-bold leading-none">{fmtEnergy(total.calories, units, false)}</span>
-            <span className="text-[0.65rem] font-medium text-muted-foreground">Sample day</span>
+            <span className="text-xs font-medium text-muted-foreground">Sample day</span>
           </div>
         )}
         <div className="min-w-0 flex-1 space-y-2">

@@ -459,7 +459,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                 {d.isRestDay && <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-[0.6rem] font-semibold text-sleep">Rest</span>}
                 <div className="absolute inset-x-0 bottom-0 p-2.5">
                   <div className="truncate text-sm font-semibold text-white">{d.name || `Day ${i + 1}`}</div>
-                  <div className="truncate text-[0.68rem] text-white/70">{sub}</div>
+                  <div className="truncate text-xs text-[var(--tone-foreground)]/70">{sub}</div>
                 </div>
               </button>
             );
