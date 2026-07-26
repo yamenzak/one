@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Badge, Field, Sheet, Skeleton, Reveal, SkeletonLine, SegmentedControl, Switch, Chip, Page, Stagger, ConfirmDialog, ShieldCheck, Sparkles, ArrowLeft, KeyRound, Globe, Gift, Tag, Trash2, Plus, cn, LayoutGrid, AlertTriangle, Spinner } from "@mossa/ui";
-import { api } from "../../api.js";
+import { api, errorText } from "../../api.js";
 import { fmtPrice } from "../../money.js";
 
 interface Tenant { id: string; name: string; slug: string; plan_id: string | null; status: string | null; comp: number | null }
@@ -479,22 +479,146 @@ function Tenants() {
   );
 }
 
+/**
+ * Stripe configuration — BOTH rails.
+ *
+ * This form used to send only `{ mode: "test", secretKey, webhookSecret }`, with
+ * the mode hardcoded, while /api/admin/stripe/config has always accepted six
+ * fields. Three of them were unreachable, each with a silent consequence:
+ *  • no publishable key → every inline payment breaks on both rails, because the
+ *    Payment Element cannot initialise without it (pack-intent, plan-intent and
+ *    connect/pay-intent all return it to the browser);
+ *  • no Connect webhook secret → client→tenant events fail signature verification,
+ *    so a client pays their coach and no access is ever granted;
+ *  • mode pinned to "test" → live keys could never be activated from the product.
+ */
 function StripeConfig() {
-  const [status, setStatus] = useState<{ mode: string; enabled: boolean } | null>(null);
+  const [status, setStatus] = useState<{ mode: string; enabled: boolean; platformFeeBps?: number } | null>(null);
+  const [mode, setMode] = useState<"test" | "live" | "disabled">("test");
   const [secretKey, setSecretKey] = useState("");
+  const [publishableKey, setPublishableKey] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
+  const [connectWebhookSecret, setConnectWebhookSecret] = useState("");
+  const [feeBps, setFeeBps] = useState("");
+  const [busy, setBusy] = useState<"save" | "sync" | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
-  useEffect(() => { void api.get<{ mode: string; enabled: boolean }>("/api/admin/stripe/status").then(setStatus).catch(() => undefined); }, []);
-  const save = async () => { await api.post("/api/admin/stripe/config", { mode: "test", secretKey, webhookSecret }); setMsg("Saved. Run catalog sync to push plans + packs."); setStatus({ mode: "test", enabled: secretKey.startsWith("sk_") }); };
-  const sync = async () => { const r = await api.post<{ plans: number; packs: number }>("/api/admin/stripe/sync"); setMsg(`Synced ${r.plans} plans + ${r.packs} packs.`); };
+  const [err, setErr] = useState<string | null>(null);
+
+  const loadStatus = useCallback(async () => {
+    const s = await api.get<{ mode: string; enabled: boolean; platformFeeBps?: number }>("/api/admin/stripe/status");
+    setStatus(s);
+    if (s.mode === "test" || s.mode === "live" || s.mode === "disabled") setMode(s.mode);
+    if (typeof s.platformFeeBps === "number") setFeeBps(String(s.platformFeeBps));
+  }, []);
+  useEffect(() => { void loadStatus().catch(() => undefined); }, [loadStatus]);
+
+  // Keys are write-only (never read back), so only send what was actually typed —
+  // otherwise saving the fee would blank a key that is already stored.
+  const save = async () => {
+    setBusy("save");
+    setErr(null);
+    setMsg(null);
+    try {
+      const fee = feeBps.trim() === "" ? undefined : Number(feeBps);
+      if (fee !== undefined && (!Number.isInteger(fee) || fee < 0 || fee > 10000)) {
+        setErr("Platform fee must be a whole number of basis points between 0 and 10000.");
+        return;
+      }
+      await api.post("/api/admin/stripe/config", {
+        mode,
+        ...(secretKey ? { secretKey } : {}),
+        ...(publishableKey ? { publishableKey } : {}),
+        ...(webhookSecret ? { webhookSecret } : {}),
+        ...(connectWebhookSecret ? { connectWebhookSecret } : {}),
+        ...(fee !== undefined ? { platformFeeBps: fee } : {}),
+      });
+      setSecretKey("");
+      setPublishableKey("");
+      setWebhookSecret("");
+      setConnectWebhookSecret("");
+      await loadStatus();
+      setMsg("Saved. Run Sync catalog to push plans + credit packs to Stripe.");
+    } catch (e) {
+      setErr(errorText(e, "Could not save the Stripe configuration"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const sync = async () => {
+    setBusy("sync");
+    setErr(null);
+    setMsg(null);
+    try {
+      const r = await api.post<{ plans: number; packs: number }>("/api/admin/stripe/sync");
+      setMsg(`Synced ${r.plans} plans + ${r.packs} credit packs.`);
+    } catch (e) {
+      setErr(errorText(e, "Catalog sync failed"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const keyMismatch =
+    (mode === "live" && (secretKey.startsWith("sk_test_") || publishableKey.startsWith("pk_test_"))) ||
+    (mode === "test" && (secretKey.startsWith("sk_live_") || publishableKey.startsWith("pk_live_")));
+
   return (
-    <Stagger>
+    <Stagger className="space-y-3">
       <Card className="space-y-4">
-        <div className="flex items-center justify-between"><h2 className="font-semibold">Stripe (platform rail)</h2><Badge tone={status?.enabled ? "success" : "neutral"}>{status?.mode ?? "…"}</Badge></div>
-        <Field label="Secret key (sk_test_…)" icon={KeyRound} value={secretKey} onChange={(e) => setSecretKey(e.target.value)} />
-        <Field label="Webhook secret (whsec_…)" icon={KeyRound} value={webhookSecret} onChange={(e) => setWebhookSecret(e.target.value)} />
-        <div className="flex gap-3"><Button className="flex-1" disabled={!secretKey.startsWith("sk_")} onClick={() => void save()}>Save</Button><Button variant="outline" className="flex-1" disabled={!status?.enabled} onClick={() => void sync()}>Sync catalog</Button></div>
-        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Stripe</h2>
+          <Badge tone={status?.enabled ? "success" : "neutral"}>{status?.mode ?? "…"}</Badge>
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mode</div>
+          <div className="flex gap-2" role="radiogroup" aria-label="Stripe mode">
+            {(["test", "live", "disabled"] as const).map((m) => (
+              <button
+                key={m}
+                role="radio"
+                aria-checked={mode === m}
+                onClick={() => setMode(m)}
+                className={cn("min-h-12 flex-1 rounded-xl px-3 text-sm font-medium capitalize transition-colors", mode === m ? "bg-primary text-primary-foreground" : "bg-secondary")}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">Keys are stored write-only — leave a field blank to keep what's already saved.</p>
+        </div>
+
+        <Field label="Secret key (sk_…)" icon={KeyRound} value={secretKey} onChange={(e) => setSecretKey(e.target.value)} placeholder="leave blank to keep current" />
+        <Field label="Publishable key (pk_…)" icon={KeyRound} value={publishableKey} onChange={(e) => setPublishableKey(e.target.value)} placeholder="required for in-app payments" />
+        {keyMismatch && <p className="text-sm text-warning" role="alert">These keys don't match the selected mode — check you haven't pasted test keys into live, or the reverse.</p>}
+
+        <div className="space-y-1.5 rounded-2xl bg-surface-2 p-3">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Webhook signing secrets</div>
+          <p className="text-xs text-muted-foreground">
+            Two separate endpoints, two separate secrets. <span className="font-medium text-foreground">Platform</span> is <code>/api/stripe/webhook</code> (studios paying Mossa).
+            {" "}<span className="font-medium text-foreground">Connect</span> is <code>/api/connect/webhook</code> (clients paying their coach) and needs “Listen to events on connected accounts” enabled.
+            Without the Connect secret, a client's payment succeeds and no access is granted.
+          </p>
+          <Field label="Platform webhook secret (whsec_…)" icon={KeyRound} value={webhookSecret} onChange={(e) => setWebhookSecret(e.target.value)} placeholder="leave blank to keep current" />
+          <Field label="Connect webhook secret (whsec_…)" icon={KeyRound} value={connectWebhookSecret} onChange={(e) => setConnectWebhookSecret(e.target.value)} placeholder="leave blank to keep current" />
+        </div>
+
+        <Field
+          label="Platform fee on client payments (basis points, 0 = studios keep 100%)"
+          icon={KeyRound}
+          inputMode="numeric"
+          value={feeBps}
+          onChange={(e) => setFeeBps(e.target.value.replace(/[^\d]/g, ""))}
+          placeholder="0"
+        />
+
+        <div className="flex gap-3">
+          <Button className="flex-1" disabled={busy !== null} onClick={() => void save()}>{busy === "save" ? "Saving…" : "Save"}</Button>
+          <Button variant="outline" className="flex-1" disabled={busy !== null || !status?.enabled} onClick={() => void sync()}>{busy === "sync" ? "Syncing…" : "Sync catalog"}</Button>
+        </div>
+        {err && <p className="text-sm text-warning" role="alert">{err}</p>}
+        {msg && <p className="text-sm text-muted-foreground" role="status">{msg}</p>}
       </Card>
     </Stagger>
   );
