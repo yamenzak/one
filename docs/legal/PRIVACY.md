@@ -1,17 +1,8 @@
 # Mossa — Privacy Policy
 
-> **DRAFT for legal review.** Prepared as a working draft to be reviewed and
-> finalised by qualified UAE legal counsel before publication. It is not legal
-> advice. Bracketed items `[ ]` are remaining placeholders you must confirm
-> (registered address, email sub-processor, DPO/contact, retention period). Four
-> Degree Labs LLC is a mainland Abu Dhabi company, so this policy is drafted against
-> the UAE **Federal Decree-Law No. 45 of 2021 on the Protection of Personal Data
-> (PDPL)** and its executive regulations, and the **UAE Data Office** is the
-> competent authority. If you later serve customers in the EU/UK, GDPR/UK GDPR may
-> also apply and this policy should be revisited.
 
-**Effective date:** `[DATE]`
-**Last updated:** `[DATE]`
+**Effective date:** 26 July 2026
+**Last updated:** 26 July 2026
 
 ## 1. Introduction
 

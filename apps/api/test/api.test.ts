@@ -3744,3 +3744,64 @@ describe("once_per_customer is enforced on paid checkout", () => {
     }
   });
 });
+
+/**
+ * An invited member must land INSIDE the studio on first sign-in.
+ *
+ * Round-3 audit: auth.ts stamps `activeOrganizationId` at session CREATE, which
+ * is before /api/context does the client auto-link and the invitation
+ * auto-accept — so the membership existed but `active` resolved to null on that
+ * request and on every later one, because nothing wrote activeOrganizationId
+ * afterwards. The app early-returns on a null active and renders Start ("Create
+ * workspace"), so an invited trainer's only escape was to sign out and back in.
+ * Note every pre-existing test in this file works around it by POSTing
+ * /api/context/switch explicitly — these deliberately do NOT.
+ */
+describe("invited members land in the studio without an explicit switch", () => {
+  const B = "http://localhost:8787";
+  const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
+  const signIn = async (email: string): Promise<string> => {
+    const db = env.DB as D1Database;
+    await SELF.fetch(`${B}/api/auth/email-otp/send-verification-otp`, { method: "POST", headers: { "content-type": "application/json", origin: B }, body: JSON.stringify({ email, type: "sign-in" }) });
+    const row = await db.prepare("SELECT value FROM verification ORDER BY createdAt DESC LIMIT 1").first<{ value: string }>();
+    const otp = ((row?.value ?? "").match(/\d{6}/) ?? [])[0];
+    return grabCookies(await SELF.fetch(`${B}/api/auth/sign-in/email-otp`, { method: "POST", headers: { "content-type": "application/json", origin: B }, body: JSON.stringify({ email, otp }) }));
+  };
+
+  it("an invited client's very first /api/context resolves an active persona", async () => {
+    const tenantId = ((await (await SELF.fetch(`${B}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } }).active.tenantId;
+    const client = (await (await SELF.fetch(`${B}/api/clients`, { method: "POST", headers: H(), body: JSON.stringify({ email: "adopt-client@test.dev", displayName: "Adopt Client" }) })).json() as { client: { id: string } }).client;
+
+    const cookie = await signIn("adopt-client@test.dev");
+    const ctx = (await (await SELF.fetch(`${B}/api/context`, { headers: { origin: B, Cookie: cookie } })).json()) as {
+      active: { tenantId: string; role: string; clientId: string | null } | null;
+      personas: { tenantId: string }[];
+    };
+    expect(ctx.personas.length).toBe(1);
+    expect(ctx.active).not.toBeNull();
+    expect(ctx.active!.tenantId).toBe(tenantId);
+    expect(ctx.active!.role).toBe("client");
+    expect(ctx.active!.clientId).toBe(client.id);
+  }, 30_000);
+
+  it("an invited trainer's first /api/context resolves too, and the adoption sticks", async () => {
+    const tenantId = ((await (await SELF.fetch(`${B}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } }).active.tenantId;
+    const db = env.DB as D1Database;
+    await db
+      .prepare('INSERT INTO "invitation" (id, organizationId, email, role, status, expiresAt, inviterId) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .bind("inv_adopt_1", tenantId, "adopt-coach@test.dev", "trainer", "pending", new Date(Date.now() + 7 * 86_400_000).toISOString(), "u_owner")
+      .run();
+
+    const cookie = await signIn("adopt-coach@test.dev");
+    const first = (await (await SELF.fetch(`${B}/api/context`, { headers: { origin: B, Cookie: cookie } })).json()) as { active: { tenantId: string; role: string } | null };
+    expect(first.active).not.toBeNull();
+    expect(first.active!.tenantId).toBe(tenantId);
+    expect(first.active!.role).toBe("trainer");
+
+    // Persisted, not just computed for that one response.
+    const again = (await (await SELF.fetch(`${B}/api/context`, { headers: { origin: B, Cookie: cookie } })).json()) as { active: { role: string } | null };
+    expect(again.active?.role).toBe("trainer");
+    const inv = await db.prepare('SELECT status FROM "invitation" WHERE id = ?').bind("inv_adopt_1").first<{ status: string }>();
+    expect(inv?.status).toBe("accepted");
+  }, 30_000);
+});

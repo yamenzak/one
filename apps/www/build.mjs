@@ -293,6 +293,27 @@ for (const [slug, file, title, description] of legal) {
   const md = readFileSync(src, "utf8")
     .replace(/`docs\/legal\/PRIVACY\.md`/g, "[/privacy](/privacy)")
     .replace(/`docs\/legal\/TERMS\.md`/g, "[/terms](/terms)");
+
+  // Refuse to publish a legal page that still carries fill-in-the-blank markers.
+  // These pages are the public, binding statement of how a health-data product
+  // handles body measurements, progress photos and lab files — shipping one that
+  // reads `[ADDRESS]` is worse than shipping none, and it is the exact kind of
+  // thing that slips out under launch-day pressure. Failing the build is
+  // deliberate: the fix is to fill the value in docs/legal/, which takes seconds.
+  const unresolved = [...new Set(md.match(/\[(?:DATE|NUMBER|ADDRESS)\]/g) ?? [])];
+  const stillDraft = /DRAFT for legal review/i.test(md);
+  if (unresolved.length || stillDraft) {
+    const why = [
+      unresolved.length ? `unfilled placeholder(s): ${unresolved.join(", ")}` : null,
+      stillDraft ? 'it still carries the "DRAFT for legal review" banner' : null,
+    ].filter(Boolean).join("; ");
+    throw new Error(
+      `www: refusing to publish /${slug} — ${why}.\n` +
+      `  Fix docs/legal/${file}, then rebuild. Do not delete this check to get a green build:\n` +
+      `  it exists so an incomplete privacy policy or terms page cannot reach production.`,
+    );
+  }
+
   const body = `<main class="doc">${renderMarkdown(md)}</main>`;
   // Directory-style URLs (/privacy) so the footer links need no .html suffix.
   mkdirSync(join(dist, slug), { recursive: true });

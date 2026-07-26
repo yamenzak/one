@@ -120,7 +120,37 @@ export const contextRoutes = new Hono<AppEnv>()
       });
     }
 
-    const tenantId = c.get("tenantId");
+    // Adopt a tenant when the session has none. `tenantId` comes from the
+    // session's activeOrganizationId, which auth.ts stamps at session CREATE —
+    // i.e. before the client auto-link and the invitation auto-accept above have
+    // minted anything. So an invited client or staffer gets a membership here and
+    // still resolves `active: null` on this request AND every later one, because
+    // nothing ever writes activeOrganizationId afterwards. The app early-returns
+    // on a null active and renders Start ("Create workspace"), so an invited
+    // trainer's only escape was to sign out and back in. Persist the adoption so
+    // the whole session agrees, and only when there is exactly one candidate —
+    // with several memberships, picking one for the user would be a guess, and
+    // the studio switcher is the right answer.
+    let tenantId = c.get("tenantId");
+    // NEVER adopt on a tenant's custom domain. There the Host pins the tenant
+    // (auth-context.ts), and a non-member must keep resolving to null — that is
+    // the §14.1 isolation invariant, and adopting the user's own unrelated studio
+    // here would hand them an active persona on someone else's branded domain.
+    const hostPinned = Boolean(c.get("hostTenant"));
+    if (!tenantId && !hostPinned && personas.length === 1) {
+      const adopted = personas[0]!.tenantId;
+      await c.env.DB
+        .prepare('UPDATE "session" SET activeOrganizationId = ? WHERE userId = ? AND activeOrganizationId IS NULL')
+        .bind(adopted, user.id)
+        .run()
+        .catch(() => undefined);
+      // Serve this request as adopted regardless of whether the write landed —
+      // the persona is real either way, and a failed stamp would only mean the
+      // next request re-adopts. Guarded on `IS NULL`, so an explicit tenant
+      // choice made elsewhere (the switcher) is never overwritten.
+      tenantId = adopted;
+      c.set("tenantId", adopted);
+    }
     const active = personas.find((p) => p.tenantId === tenantId) ?? null;
 
     let entitlements = null;
