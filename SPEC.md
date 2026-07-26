@@ -231,30 +231,56 @@ stored as `entitlements_json` per plan row (admin-editable at runtime), deep-mer
 FREE baseline, per-tenant `overrides_json` for comps/gifts, `checkDowngrade()` compliance
 gate on downgrades.
 
-**Mossa ships 3 paid plans** + a free evaluation tier:
+**Mossa ships 4 paid plans.** Tier names are generic on purpose — "Studio" is
+business-side vocabulary for a tenant, never a plan name. There is no free tier; the two
+30-day trials replaced it.
 
-| | **Free** | **Solo** $29/mo | **Studio** $79/mo | **Team** $199/mo |
+| | **Solo** $4.99/mo | **Light** $24.99/mo | **Pro** $49.99/mo | **Max** $119.99/mo |
 |---|---|---|---|---|
-| Staff seats (owner+trainers) | 1 | 1 | 4 | 15 |
-| Active clients | 3 | 25 | 100 | 400 |
-| AI monthly credit grant | 0 | 500 | 2,500 | 10,000 |
-| Workout/meal templates | 5 | 50 | unlimited | unlimited |
-| Media storage | 250 MB | 5 GB | 25 GB | 100 GB |
+| Free trial | 30 days | 30 days | — | — |
+| Coaches (`staffSeats`, incl. owner) | 1 | 1 | 5 | unlimited |
+| Active clients | 1 | 30 | 100 | unlimited |
+| AI monthly credit grant | 500 | 3,000 | 6,000 | 15,000 |
+| Workout/meal templates | 25 | 200 | unlimited | unlimited |
+| Media storage | 250 MB | 1 GB | 10 GB | 100 GB |
 | **Features** | | | | |
 | Core coaching (plans, diary, check-ins, progress) | ✅ | ✅ | ✅ | ✅ |
-| Stripe Connect packages | — | ✅ | ✅ | ✅ |
-| AI suite (`aiSuite`) | — | ✅ | ✅ | ✅ |
+| External food/exercise search (`externalSearch`) | ✅ | ✅ | ✅ | ✅ |
+| AI suite (`aiSuite`) | ✅ | ✅ | ✅ | ✅ |
+| Stripe Connect packages (`commerce`) | — | ✅ | ✅ | ✅ |
 | Body-fat camera (`bfCamera`) | — | ✅ | ✅ | ✅ |
-| External food/exercise search (`externalSearch`) | ✅ (OFF/wger only) | ✅ | ✅ | ✅ |
 | Supplements & labs (`supplementsLabs`) | — | — | ✅ | ✅ |
 | Assistant role, sessions/booking (`frontDesk`) | — | — | ✅ | ✅ |
 | Custom branding/themes (`branding`) | — | — | ✅ | ✅ |
-| API/webhooks + exports (`integrations`) | — | — | — | ✅ |
-| Client chat (`chat`, phase 2) | — | — | ✅ | ✅ |
 
-(Numbers are seed defaults in `billing-seed.ts` — admin-tunable in production, same as
-Scena.) Quotas enforce at write time; feature gates checked inline in routes
-(`if (!ent.features.aiSuite) 403`) and mirrored to the UI via `GET /api/billing`.
+No plan enables a `reserved: true` feature — `integrations` (API/webhooks + exports) and
+`chat` (trainer ↔ client messaging) do not exist, so no tier may advertise them. Pro and
+Max carry every feature that *does* exist; Max's difference is capacity, not capability.
+
+**Credit grants are derived, not chosen.** 1 credit = $0.001 and markup is 3×, so
+1 credit ≈ 30.3 neurons; a workout-plan draft costs ~18 credits, a meal-plan draft ~11, a
+meal photo 1 (2 held), an NL food log or check-in summary 1, and a generated library image
+118. One standard coached client-month ≈ 91 credits ≈ $0.09. Each grant is that bundle
+times the roster the tier is sized for, held to **10–12.5% of the subscription price** so
+AI is a feature of the plan and not its substance. The full derivation, with per-action
+token counts, is the comment above `DEFAULT_PLANS` in `apps/api/src/billing-store.ts` —
+re-derive it there when a provider reprices.
+
+**Retired tiers are grandfathered, never migrated.** `free`, `studio` and `team` remain as
+plan rows with `active = 0`: they still resolve for tenants already on them
+(`tenantEntitlements` looks up by id) but are never offered to anyone new (`listPlans`
+filters `active = 1`, which backs the picker, `check-downgrade` and both checkout paths).
+Nobody is moved automatically — `studio` → `pro` would cut storage 25 GB → 10 GB and could
+put a live tenant over quota, so a human decides per tenant. `free` also stays the implicit
+unsubscribed baseline for a brand-new tenant and the fallback on subscription cancellation.
+`quotas` ceilings are only consulted on CREATE, so a tenant left above a lowered ceiling
+keeps everything they have and simply cannot add more.
+
+(Numbers are seed defaults in `billing-store.ts`, versioned by `PLAN_CATALOG_VERSION` and
+admin-tunable in production.) Quotas enforce at write time; feature gates checked inline in
+routes (`if (!ent.features.aiSuite) 403`) and mirrored to the UI via `GET /api/billing`.
+`trialDays` rides in `entitlements_json` (no schema change) and is consumed once, at
+subscription creation, as Stripe's `trial_period_days`.
 
 **Two flag systems, deliberately distinct (don't merge them):**
 1. **Platform entitlements** — what the *tenant* bought from Mossa (above).

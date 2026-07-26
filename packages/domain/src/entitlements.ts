@@ -52,6 +52,18 @@ export interface Entitlements {
   quotas: Quotas;
   features: Features;
   aiCredits: { monthlyGrant: number };
+  /**
+   * Free-trial length in days for a NEW subscription to this plan (0 = none).
+   *
+   * This lives in `entitlements_json` rather than in a `plans` column on
+   * purpose: a column means a `db.ts` DDL + `SCHEMA_VERSION` bump (AGENTS.md §7
+   * calls the forgotten bump the most dangerous omission in the repo), while the
+   * JSON blob is already read on every plan resolution, already deep-merged over
+   * this baseline, and already admin-editable through the plan builder. It is
+   * not a capability — nothing gates on it; it is a parameter of subscription
+   * *creation*, consumed once by `trialPeriodDays()` at Stripe checkout.
+   */
+  trialDays: number;
 }
 
 /** The most restrictive baseline — an unknown/free tenant resolves to this. */
@@ -74,6 +86,7 @@ export const FREE_ENTITLEMENTS: Entitlements = {
     chat: false,
   },
   aiCredits: { monthlyGrant: 0 },
+  trialDays: 0,
 };
 
 /** The full key sets, derived from the baseline — new keys auto-appear in the
@@ -149,6 +162,7 @@ export function resolveEntitlements(json: string | null | undefined): Entitlemen
     if (typeof v === "number" && Number.isFinite(v)) quotas[k] = v;
   }
   const grant = (raw.aiCredits as { monthlyGrant?: unknown } | undefined)?.monthlyGrant;
+  const trial = (raw as { trialDays?: unknown }).trialDays;
   return {
     quotas,
     features,
@@ -156,7 +170,22 @@ export function resolveEntitlements(json: string | null | undefined): Entitlemen
       ...FREE_ENTITLEMENTS.aiCredits,
       monthlyGrant: typeof grant === "number" && Number.isFinite(grant) ? grant : FREE_ENTITLEMENTS.aiCredits.monthlyGrant,
     },
+    // Coerced like a quota (finite number only) and floored non-negative, so a
+    // typo in admin JSON can't hand out an unbounded free trial.
+    trialDays: typeof trial === "number" && Number.isFinite(trial) && trial > 0 ? Math.floor(trial) : 0,
   };
+}
+
+/**
+ * Stripe `trial_period_days` for a NEW subscription to `ent` — `null` when the
+ * plan has no trial (the caller then omits the parameter entirely rather than
+ * sending 0, which Stripe rejects). Clamped to Stripe's accepted 1..730 range so
+ * an admin typo can't produce a request Stripe 400s on.
+ */
+export function trialPeriodDays(ent: Pick<Entitlements, "trialDays">): number | null {
+  const d = Math.floor(ent.trialDays);
+  if (!Number.isFinite(d) || d <= 0) return null;
+  return Math.min(d, 730);
 }
 
 /** A grant/override blob — a deep-partial of Entitlements (raise/enable only). */
@@ -195,7 +224,10 @@ export function mergeOverrides(base: Entitlements, json: string | null | undefin
   const features = { ...base.features };
   for (const k of FEATURE_KEYS) if (o.features?.[k] === true) features[k] = true; // enable-only
   const aiCredits = { monthlyGrant: Math.max(base.aiCredits.monthlyGrant, o.aiCredits?.monthlyGrant ?? 0) };
-  return { quotas, features, aiCredits };
+  // `trialDays` is deliberately NOT overridable: it is consumed once, at
+  // subscription creation, so gifting it to a tenant who already subscribed
+  // would be inert — and a per-tenant trial belongs in Stripe, not here.
+  return { quotas, features, aiCredits, trialDays: base.trialDays };
 }
 
 /**

@@ -13,13 +13,24 @@
  */
 
 import type { Env } from "./env.js";
-import { purgePrefix } from "./storage.js";
+import { purgePrefix, deleteMedia } from "./storage.js";
+import { nowIso } from "./ids.js";
 import { stripeConfig, stripeEnabled, stripeCall } from "./stripe.js";
 import { notifyUser } from "./inbox-do.js";
 import { saasConfig, deleteCustomHostname } from "./cloudflare.js";
 import { invalidateHostCache } from "./host-context.js";
 
-/** Tables that carry a `client_id` — everything a single client's record owns. */
+/** Tables that carry a `client_id` — everything a single client's record owns.
+ *
+ *  Verified against db.ts: this is EVERY table with a literal `client_id` column.
+ *  Deliberately absent (they reference a client by a *different* column and are
+ *  tenant-owned assets, so deleting the row would destroy the studio's property):
+ *  `packages.restricted_client_id`, `redemption_codes.restricted_client_id` +
+ *  `used_by_json`, `promo_codes.restricted_client_id`, `resources.assigned_json`,
+ *  and `notifications.link` (`/clients/<id>` deep-links). Those keep a dangling
+ *  reference after a purge; each one reads as "no longer applies" rather than
+ *  leaking data (an offer restricted to a deleted client is unreachable), so they
+ *  are left in place on purpose. */
 const CLIENT_TABLES = [
   "client_goals", "client_trainers", "workout_plans", "swap_requests", "meal_plans",
   "meal_arrangements", "exercise_logs", "exercise_prs", "activity_logs", "food_entries",
@@ -47,15 +58,110 @@ async function run(db: D1Database, sql: string, ...binds: unknown[]): Promise<vo
   await db.prepare(sql).bind(...binds).run().catch(() => undefined);
 }
 
+/** What a client purge reclaimed — reported back so the caller can say what was
+ *  freed. `bytesFreed` is measured off LIVE ledger rows (the same
+ *  `SUM(size_bytes) WHERE deleted_at IS NULL` the storage meter reads), so it is
+ *  exactly the amount `/api/storage-usage` drops by. */
+export interface ClientPurgeResult {
+  /** R2 objects removed (prefix sweep + the strays below). */
+  objects: number;
+  /** Live ledger bytes reclaimed. */
+  bytesFreed: number;
+}
+
+/**
+ * Prefix-match a `r2_key` WITHOUT `LIKE`. Measured against D1: its
+ * `SQLITE_LIMIT_LIKE_PATTERN_LENGTH` is **50 characters** — a 51-char pattern
+ * raises `D1_ERROR: LIKE or GLOB pattern too complex`, and only once a row is
+ * actually tested (an empty table never invokes the function, which is why this
+ * hid for so long). A per-client prefix is
+ * `t/<32-char tenant>/c/<20-char client>/%` = 59 chars, so it ALWAYS trips.
+ *
+ * `substr(col,1,?) = ?` has no length ceiling and no wildcard semantics, so it
+ * also stops a `_` in an id (every id has one) silently matching as a wildcard.
+ */
+const PREFIX_MATCH = "substr(r2_key, 1, ?) = ?";
+
+/** The R2 key behind a stored media URL (`/api/media/t/<tenant>/…`), or null if
+ *  the URL isn't one of ours (a DiceBear avatar, an external image). */
+function mediaKeyFromUrl(url: string | null | undefined, tenantId: string): string | null {
+  if (!url) return null;
+  const marker = "/api/media/";
+  const i = url.indexOf(marker);
+  const key = (i >= 0 ? url.slice(i + marker.length) : url).split("?")[0] ?? "";
+  return key.startsWith(`t/${tenantId}/`) ? key : null;
+}
+
 /**
  * Hard-delete ONE client: their R2 objects and every client-scoped row. Does NOT
  * touch the linked user identity (a user may still be a member elsewhere) — call
  * `purgeUser` for account-level erasure.
+ *
+ * The R2 sweep is deliberately NOT just the `t/<tenant>/c/<client>/` prefix.
+ * Two classes of the client's objects land outside it and survived erasure:
+ *
+ *   • **their avatar** — uploaded as `purpose=avatar` with NO clientId, so it
+ *     stores at `t/<tenant>/avatar/…` and its ledger row carries
+ *     `client_id = NULL`. Both the prefix sweep AND the
+ *     `DELETE … WHERE client_id = ?` missed it, so the object *and* its billed
+ *     bytes outlived the client. Resolved from `clients.avatar_url` below.
+ *   • **AI images generated for them** — `ai.ts` stores at `t/<tenant>/ai/…`
+ *     while stamping `media_assets.client_id`. The row was hard-deleted (so the
+ *     meter dropped) but the R2 object was orphaned with nothing left pointing
+ *     at it. Now swept via the ledger, by key, wherever it lives.
  */
-export async function purgeClient(env: Env, tenantId: string, clientId: string): Promise<void> {
-  await purgePrefix(env, `t/${tenantId}/c/${clientId}/`);
+export async function purgeClient(env: Env, tenantId: string, clientId: string): Promise<ClientPurgeResult> {
+  const prefix = `t/${tenantId}/c/${clientId}/`;
+  const row = await env.DB
+    .prepare("SELECT user_id, avatar_url FROM clients WHERE id = ? AND tenant_id = ?")
+    .bind(clientId, tenantId)
+    .first<{ user_id: string | null; avatar_url: string | null }>()
+    .catch(() => null);
+  const avatarKey = mediaKeyFromUrl(row?.avatar_url, tenantId);
+
+  // Measure BEFORE deleting — afterwards there is nothing left to sum.
+  const live = (
+    await env.DB
+      .prepare(
+        `SELECT r2_key, size_bytes FROM media_assets WHERE deleted_at IS NULL AND (client_id = ? OR ${PREFIX_MATCH} OR r2_key = ?)`,
+      )
+      .bind(clientId, prefix.length, prefix, avatarKey ?? "")
+      .all<{ r2_key: string; size_bytes: number | null }>()
+      .catch(() => ({ results: [] as { r2_key: string; size_bytes: number | null }[] }))
+  ).results ?? [];
+  const bytesFreed = live.reduce((n, r) => n + (r.size_bytes ?? 0), 0);
+
+  let objects = await purgePrefix(env, prefix);
+  // `purgePrefix` deletes the R2 objects (a bucket listing, so unaffected) but
+  // its own ledger tombstone is a `LIKE` on this same over-long prefix, so it
+  // throws and is swallowed — see PREFIX_MATCH. Tombstone the prefix rows here
+  // instead, which covers any whose `client_id` is NULL and would otherwise keep
+  // billing the tenant for bytes that no longer exist.
+  await run(
+    env.DB,
+    `UPDATE media_assets SET deleted_at = ? WHERE deleted_at IS NULL AND ${PREFIX_MATCH}`,
+    nowIso(),
+    prefix.length,
+    prefix,
+  );
+  // Everything of theirs that lives outside their own prefix.
+  const strays = new Set(live.map((r) => r.r2_key).filter((k) => !k.startsWith(prefix)));
+  if (avatarKey && !avatarKey.startsWith(prefix)) strays.add(avatarKey);
+  for (const key of strays) await deleteMedia(env, key);
+  objects += strays.size;
+
   for (const table of CLIENT_TABLES) await run(env.DB, `DELETE FROM ${table} WHERE client_id = ?`, clientId);
   await run(env.DB, "DELETE FROM clients WHERE id = ?", clientId);
+
+  // A deleted client must also lose their way in: without this the `member` row
+  // survives and they still sign in to the studio as a client with no record.
+  // Scoped to `role = 'client'` so deleting a coach's OWN training record
+  // (POST /clients/self) never strips their staff seat.
+  if (row?.user_id) {
+    await run(env.DB, 'DELETE FROM "member" WHERE organizationId = ? AND userId = ? AND role = \'client\'', tenantId, row.user_id);
+  }
+
+  return { objects, bytesFreed };
 }
 
 /** Deregister a tenant's custom domains (Cloudflare for SaaS) and drop their

@@ -13,6 +13,7 @@ import { z } from "zod";
 import { type AppEnv, type AppContext, requireTenant } from "./auth-context.js";
 import type { Env } from "./env.js";
 import { withinQuota } from "./billing-store.js";
+import { purgeClient } from "./purge.js";
 import { notify, tenantBrandKit } from "./notify.js";
 import { sendTenantEmail } from "./email-provider.js";
 import { emailShell, emailButton, escapeHtml } from "./mailer.js";
@@ -461,6 +462,64 @@ export const clientRoutes = new Hono<AppEnv>()
       .run();
     await recordAudit(c.env, { tenantId: access.client.tenant_id, clientId: access.client.id, actorUserId: c.get("user")?.id, action: "client.archive", summary: access.client.display_name });
     return c.json({ ok: true });
+  })
+
+  /**
+   * PERMANENT erasure of one client (SPEC §8.1) — the hard-delete counterpart to
+   * `/archive`. Both free an `activeClients` slot (the quota counts
+   * `status != 'archived'`); only this one reclaims the database rows and the R2
+   * bytes, and it cannot be undone.
+   *
+   * Reuses `purgeClient` (purge.ts) — the SAME cascade the GDPR self-delete
+   * (`purgeUser`) and the studio teardown run. There is deliberately no second
+   * deletion path.
+   *
+   * Two gates beyond `requireClientAccess`:
+   *  • OWNER only. The action-level wall for `/api/clients` writes is
+   *    `client:["update"]`, which the *trainer* preset also carries
+   *    (`route-guard.ts` owns that map and is not this file's to change), so the
+   *    owner restriction is asserted in-handler — the same idiom as
+   *    `POST /billing/portal` and the studio-close routes.
+   *  • A typed confirmation. `confirm` must match the client's display name, so
+   *    an accidental (or scripted) single call cannot erase a record — the UI's
+   *    two-step sheet is backed by a real server check, not just a dialog.
+   *
+   * POST, not DELETE, for the same reason `/archive` and `/tenant/close` are: the
+   * confirmation travels in a JSON body rather than a query string that lands in
+   * request logs (and the app's `api.del` sends no body).
+   */
+  .post("/clients/:id/delete", async (c) => {
+    const access = await requireClientAccess(c, c.req.param("id"));
+    if ("response" in access) return access.response;
+    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
+    const body = z
+      .object({ confirm: z.string().max(120) })
+      .safeParse(await c.req.json().catch(() => null));
+    const typed = body.success ? body.data.confirm.trim().toLowerCase() : null;
+    // `?? ""` guards a legacy row with a NULL name: `expected` is then empty, no
+    // typed string can equal it, and the delete fails closed rather than throwing.
+    const expected = (access.client.display_name ?? "").trim().toLowerCase();
+    if (!expected || typed !== expected) {
+      return c.json({ error: "confirm_mismatch", message: "Type the client's name exactly to confirm." }, 400);
+    }
+    const { id, tenant_id: tenantId, display_name: displayName } = access.client;
+    const freed = await purgeClient(c.env, tenantId, id);
+    // Post-delete capacity, so the UI can say the seat is actually back.
+    const active = await c.env.DB
+      .prepare("SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ? AND status != 'archived'")
+      .bind(tenantId)
+      .first<{ n: number }>();
+    const cap = await withinQuota(c.env.DB, tenantId, "activeClients", active?.n ?? 0);
+    return c.json({
+      ok: true,
+      deleted: { id, displayName },
+      storage: {
+        objectsRemoved: freed.objects,
+        bytesFreed: freed.bytesFreed,
+        mbFreed: Math.round((freed.bytesFreed / (1024 * 1024)) * 10) / 10,
+      },
+      activeClients: { used: active?.n ?? 0, max: cap.max },
+    });
   })
 
   // Trainer assignment (many-to-many, is_primary flag).

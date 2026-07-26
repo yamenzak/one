@@ -16,6 +16,7 @@ import { resolveEntitlements, type NotifType } from "@mossa/domain";
 import { periodKey } from "./ids.js";
 import { contextRoutes } from "./context-routes.js";
 import { billingRoutes, adminRoutes } from "./billing-routes.js";
+import { downgradeRoutes } from "./downgrade-routes.js";
 import { clientRoutes } from "./clients.js";
 import { memberRoutes } from "./member-routes.js";
 import { planRoutes } from "./plan-routes.js";
@@ -97,6 +98,11 @@ app.on(["GET", "POST"], "/api/auth/*", (c) => c.get("auth").handler(c.req.raw));
 
 app.route("/api", contextRoutes);
 app.route("/api", billingRoutes);
+// MUST stay ahead of `stripeRoutes`: downgradeRoutes registers pass-through
+// guards on POST /billing/plan-intent + /billing/checkout-plan that refuse an
+// ineligible downgrade and otherwise `next()` into the real Stripe handlers.
+// Mounted later, the Stripe handler would answer first and the gate would be dead.
+app.route("/api", downgradeRoutes);
 app.route("/api", adminRoutes);
 app.route("/api", clientRoutes);
 app.route("/api", memberRoutes);

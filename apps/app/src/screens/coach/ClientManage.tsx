@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon, User, Star, Archive, AlertTriangle, personaLabel, personaTone } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, personaLabel, personaTone } from "@mossa/ui";
 import { api, errorText, todayLocal } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
@@ -242,7 +242,7 @@ export function ClientManage({ clientId, clientName }: { clientId: string; clien
 
       <ActivityLog clientId={clientId} />
 
-      {isOwner && <ArchiveClientSection clientId={clientId} clientName={clientName} />}
+      {isOwner && <OffboardSection clientId={clientId} clientName={clientName} />}
 
       <Sheet open={grantOpen} onClose={() => setGrantOpen(false)} title="Grant a package">
         <div className="space-y-2">
@@ -416,16 +416,34 @@ function CoachesSection({ clientId }: { clientId: string }) {
   );
 }
 
-// ── Archive / offboard (SPEC §8.1) ─────────────────────────────────────────
-// `POST /clients/:id/archive` is the only writer of `status = 'archived'`, and
-// the activeClients quota counts `status != 'archived'`. With no UI the quota was
-// a one-way ratchet: churn 20 clients on Solo and you still can't add a 21st.
+// ── Offboard: archive vs delete (SPEC §8.1) ────────────────────────────────
+// Two OUTCOMES that must never be confused, so they are two separate cards with
+// different weight, different icons and a comparison line between them:
+//
+//   Archive — `POST /clients/:id/archive`. Flips `status = 'archived'`. Frees an
+//     activeClients slot (the quota counts `status != 'archived'`) and KEEPS
+//     everything. Reversible in principle (the row is intact), just not from the
+//     app yet.
+//   Delete  — `POST /clients/:id/delete`. Runs `purgeClient`: every client-scoped
+//     D1 row plus their R2 objects. Frees the same slot AND reclaims the storage.
+//     Irreversible, so it demands the client's name typed out (the server checks
+//     it too) and reports what it freed rather than silently vanishing.
+//
+// Both are owner-only. Archive is the default-looking action; delete lives behind
+// a danger-toned card so the destructive one is never the easy tap.
 
-function ArchiveClientSection({ clientId, clientName }: { clientId: string; clientName?: string | null }) {
+interface DeleteResult {
+  deleted: { id: string; displayName: string };
+  storage: { objectsRemoved: number; bytesFreed: number; mbFreed: number };
+  activeClients: { used: number; max: number };
+}
+
+function OffboardSection({ clientId, clientName }: { clientId: string; clientName?: string | null }) {
   const nav = useNavigate();
-  const [confirm, setConfirm] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const who = clientName?.trim() || "this client";
   const archive = async () => {
     if (busy) return;
@@ -436,7 +454,7 @@ function ArchiveClientSection({ clientId, clientName }: { clientId: string; clie
   return (
     <section className="space-y-2">
       <Eyebrow>Offboard</Eyebrow>
-      <Stagger>
+      <Stagger className="space-y-3">
       <Card className="space-y-2.5">
         <div className="flex items-center gap-2 font-medium"><Archive className="size-4 text-muted-foreground" /> Archive this client</div>
         <p className="text-sm text-muted-foreground">
@@ -445,20 +463,107 @@ function ArchiveClientSection({ clientId, clientName }: { clientId: string; clie
         <p className="text-sm text-muted-foreground">
           If they have a login, they lose access to their space. There's no un-archive in the app yet, so treat this as one-way.
         </p>
-        <Button variant="outline" className="w-full" disabled={busy} onClick={() => { setErr(null); setConfirm(true); }}><Archive /> {busy ? "Archiving…" : "Archive client…"}</Button>
+        <Button variant="outline" className="w-full" disabled={busy} onClick={() => { setErr(null); setConfirmArchive(true); }}><Archive /> {busy ? "Archiving…" : "Archive client…"}</Button>
         {err && <p className="text-sm text-warning" role="alert">{err}</p>}
       </Card>
+
+      <Card className="space-y-2.5 border border-danger/30">
+        <div className="flex items-center gap-2 font-medium text-danger"><Trash2 className="size-4" /> Delete this client permanently</div>
+        <p className="text-sm text-muted-foreground">
+          Erases the record and everything on it — logs, measurements, check-ins, progress photos, uploaded lab files and their whole history. It frees the same plan seat as archiving <span className="font-medium text-foreground">and</span> reclaims the storage those files were using.
+        </p>
+        <p className="text-sm text-danger">
+          There is no backup and no undo. Archive instead if there's any chance you'll want their history back.
+        </p>
+        <Button variant="outline" className="w-full border-danger/40 text-danger" onClick={() => setDeleteOpen(true)}><Trash2 /> Delete client…</Button>
+      </Card>
       </Stagger>
+
       <ConfirmDialog
-        open={confirm}
-        onOpenChange={setConfirm}
+        open={confirmArchive}
+        onOpenChange={setConfirmArchive}
         title={`Archive ${who}?`}
         description={`${who} comes off your roster and frees a seat against your plan's active-client limit. Their data is kept, but they lose access to their space and this can't be undone from the app.`}
         confirmLabel="Archive client"
         destructive
         onConfirm={() => void archive()}
       />
+
+      {deleteOpen && (
+        <DeleteClientSheet
+          clientId={clientId}
+          clientName={clientName ?? null}
+          onClose={() => setDeleteOpen(false)}
+          onDone={() => nav("/clients")}
+        />
+      )}
     </section>
+  );
+}
+
+/** The irreversible one. Two stages so it can never be a single tap: read what
+ *  goes, then type the client's name (the server re-checks the typed string, so
+ *  this is a real gate rather than a dialog you can bypass with a scripted POST).
+ *  On success it stays open to report what was actually freed. */
+function DeleteClientSheet({ clientId, clientName, onClose, onDone }: { clientId: string; clientName: string | null; onClose: () => void; onDone: () => void }) {
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [done, setDone] = useState<DeleteResult | null>(null);
+  const name = clientName?.trim() || "";
+  const matches = name.length > 0 && typed.trim().toLowerCase() === name.toLowerCase();
+  const del = async () => {
+    if (busy || !matches) return;
+    setBusy(true); setErr(null);
+    try { setDone(await api.post<DeleteResult>(`/api/clients/${clientId}/delete`, { confirm: typed.trim() })); }
+    catch (e) { setErr(errorText(e, "Couldn't delete this client. Nothing was removed — please try again.")); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Sheet open onClose={done ? onDone : onClose} title={done ? "Client deleted" : `Delete ${name || "client"}`}>
+      {done ? (
+        <div className="space-y-4" role="status" aria-live="polite">
+          <div className="flex items-start gap-3">
+            <IconBadge icon={Check} tone="success" />
+            <div className="min-w-0">
+              <p className="text-sm"><span className="font-medium">{done.deleted.displayName}</span> and everything on their record have been erased.</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {done.storage.objectsRemoved > 0
+                  ? `${done.storage.objectsRemoved} file${done.storage.objectsRemoved === 1 ? "" : "s"} removed, ${done.storage.mbFreed} MB of storage reclaimed.`
+                  : "No stored files were attached, so storage is unchanged."}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {done.activeClients.max < 0
+                  ? `Your roster is now ${done.activeClients.used}. Your plan has no client limit.`
+                  : `Your roster is now ${done.activeClients.used} of ${done.activeClients.max} — that seat is free.`}
+              </p>
+            </div>
+          </div>
+          <Button size="lg" className="w-full" onClick={onDone}>Back to roster</Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            This erases their logs, measurements, check-ins, progress photos, uploaded lab files, plans and history. It cannot be recovered by you or by us.
+          </p>
+          <Field
+            label={`Type “${name}” to confirm`}
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            autoFocus
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            hint="Case doesn't matter."
+          />
+          {err && <p className="text-sm text-danger" role="alert">{err}</p>}
+          <Button variant="outline" size="lg" className="w-full border-danger/40 text-danger" disabled={busy || !matches} onClick={() => void del()}>
+            {busy ? <><Spinner /> Deleting…</> : <><Trash2 /> Delete permanently</>}
+          </Button>
+          <Button variant="ghost" size="lg" className="w-full" onClick={onClose}>Keep this client</Button>
+        </div>
+      )}
+    </Sheet>
   );
 }
 

@@ -30,15 +30,24 @@ const FEATURES = [
   ["📈", "Progress that tells a story", "Streaks, adherence, tonnage, and body-fat trends — with an at-risk count on your dashboard when a client's activity drops off."],
 ];
 
-// Plan line items are contractual. "API + exports" was removed from Team: there
-// is no export route, no CSV serializer, no tenant API-key issuance and no
-// webhook dispatcher — the backing `integrations` entitlement is flagged
-// `reserved: true` in @mossa/domain. Do not re-add it until it ships.
+// Plan line items are contractual. Mirror `DEFAULT_PLANS` in
+// apps/api/src/billing-store.ts EXACTLY — names, prices, headline limits, credit
+// grants and trials. `plan-catalog.test.ts` pins the API side; if you change one
+// of these numbers, change both.
+//
+// "API + exports" is deliberately absent: there is no export route, no CSV
+// serializer, no tenant API-key issuance and no webhook dispatcher — the backing
+// `integrations` entitlement is flagged `reserved: true` in @mossa/domain. Same
+// for client chat (`chat`, also reserved). Do not advertise either until it ships.
+//
+// The free tier is retired; the two 30-day trials replaced it. Note that a trial
+// DOES collect a card (Stripe `trial_period_days` on a Checkout subscription), so
+// no copy on this page may promise "no card".
 const PLANS = [
-  ["Free", "$0", ["1 seat", "3 clients", "Core coaching"]],
-  ["Solo", "$29/mo", ["1 seat", "25 clients", "AI suite + Stripe", "500 AI credits"]],
-  ["Studio", "$79/mo", ["4 seats", "100 clients", "Supplements + labs", "Branding + front desk", "2,500 AI credits"]],
-  ["Team", "$199/mo", ["15 seats", "400 clients", "100 GB media", "10,000 AI credits"]],
+  ["Solo", "$4.99/mo", ["1 coach", "1 client", "Core coaching + AI suite", "500 AI credits / month", "250 MB media"], "30 days free"],
+  ["Light", "$24.99/mo", ["1 coach", "30 clients", "Sell packages on your Stripe", "3,000 AI credits / month", "1 GB media"], "30 days free"],
+  ["Pro", "$49.99/mo", ["5 coaches", "100 clients", "Supplements + labs", "Branding + front desk", "6,000 AI credits / month", "10 GB media"]],
+  ["Max", "$119.99/mo", ["Unlimited coaches", "Unlimited clients", "Everything in Pro", "15,000 AI credits / month", "100 GB media"]],
 ];
 
 const css = `
@@ -71,7 +80,9 @@ section .sub{color:var(--mut);text-align:center;max-width:560px;margin:0 auto 40
 .plan{background:var(--s1);border-radius:24px;padding:24px;display:flex;flex-direction:column}
 .plan.feat{outline:2px solid var(--acc)}
 .plan h3{font-size:18px}
-.plan .price{font-size:32px;font-weight:800;margin:8px 0 16px;font-variant-numeric:tabular-nums}
+.plan .price{font-size:32px;font-weight:800;margin:8px 0 4px;font-variant-numeric:tabular-nums}
+.plan .trial{color:var(--acc);font-size:13px;font-weight:700;margin-bottom:12px}
+.plan .price+ul{margin-top:12px}
 .plan ul{list-style:none;flex:1;margin-bottom:16px}
 .plan li{color:var(--mut);font-size:14px;padding:6px 0;border-bottom:1px solid var(--s2)}
 .cta{text-align:center;background:var(--s1);border-radius:32px;padding:64px 24px;margin:40px 0}
@@ -99,8 +110,8 @@ footer .sep{opacity:.4;padding:0 4px}
 `;
 
 const feature = ([ico, h, p]) => `<div class="card"><div class="ico">${ico}</div><h3>${h}</h3><p>${p}</p></div>`;
-const plan = ([name, price, items], feat) =>
-  `<div class="plan${feat ? " feat" : ""}"><h3>${name}</h3><div class="price">${price}</div><ul>${items.map((i) => `<li>${i}</li>`).join("")}</ul><a class="btn${feat ? "" : " ghost"}" href="${APP_URL}">Get started</a></div>`;
+const plan = ([name, price, items, trial], feat) =>
+  `<div class="plan${feat ? " feat" : ""}"><h3>${name}</h3><div class="price">${price}</div>${trial ? `<div class="trial">${trial}</div>` : ""}<ul>${items.map((i) => `<li>${i}</li>`).join("")}</ul><a class="btn${feat ? "" : " ghost"}" href="${APP_URL}">${trial ? "Start free trial" : "Get started"}</a></div>`;
 
 // Mossa collects email, body measurements, progress photos and lab/medical
 // files, so the legal pages are not optional furniture — every page links them.
@@ -137,7 +148,7 @@ const html = page({
 <div class="hero wrap">
   <h1>Coaching, <span class="grad">organized</span>.</h1>
   <p>The all-in-one platform for personal trainers and studios. Build plans, track clients, sell packages on your own Stripe, and let AI do the busywork — in an app a 70-year-old can use.</p>
-  <a class="btn" href="${APP_URL}">Start free — no card</a>
+  <a class="btn" href="${APP_URL}">Start free for 30 days</a>
 </div>
 
 <section class="wrap">
@@ -148,14 +159,14 @@ const html = page({
 
 <section class="wrap">
   <h2>Simple, honest pricing</h2>
-  <p class="sub">Pay for seats and clients. AI is metered at cost-plus against credits — never a surprise. Zero markup on what your clients pay you.</p>
+  <p class="sub">Pay for coaches and clients. Solo and Light start with 30 days free. AI is metered at cost-plus against credits — never a surprise. Zero markup on what your clients pay you.</p>
   <div class="plans">${PLANS.map((p, i) => plan(p, i === 2)).join("")}</div>
 </section>
 
 <div class="cta wrap">
   <h2>Your clients deserve better than a PDF.</h2>
   <p class="sub">Set up your studio in minutes. Passwordless sign-in, mobile-first, offline-ready.</p>
-  <a class="btn" href="${APP_URL}">Get started free</a>
+  <a class="btn" href="${APP_URL}">Start your free trial</a>
 </div>
 </main>`,
 });

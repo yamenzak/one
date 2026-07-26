@@ -4,10 +4,11 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Sheet, Avatar, SegmentedControl, Page, Stagger, EmptyState, Reveal, SkeletonList, toneVar, Users, Mail, User, ArrowLeft, Plus, Copy, Check, ExternalLink, AlertTriangle } from "@mossa/ui";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Button, Card, Badge, Field, Sheet, Avatar, SegmentedControl, Page, Stagger, EmptyState, Reveal, SkeletonList, ConfirmDialog, toneVar, Users, Mail, User, ArrowLeft, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle } from "@mossa/ui";
 import type { AttentionSeverity } from "@mossa/domain";
 import { api, errorText } from "../../api.js";
+import { useSession } from "../../session.js";
 import { SEVERITY_TONE } from "../../attention-ui.js";
 import { Today } from "../client/Today.js";
 import { Progress } from "../client/Progress.js";
@@ -24,6 +25,18 @@ interface Invite { url: string; token: string; email: string }
 
 export function Clients() {
   const nav = useNavigate();
+  const { ctx } = useSession();
+  const isOwner = ctx?.active?.role === "owner";
+  // Arrived from a downgrade blocker: `?free=N` says how many seats the smaller
+  // plan needs back. In that mode the roster grows an inline Archive on each row
+  // so the owner can clear seats here instead of opening each client in turn.
+  const [params, setParams] = useSearchParams();
+  const freeTarget = Math.max(0, Math.min(999, Number(params.get("free") ?? 0) || 0));
+  const freeing = isOwner && freeTarget > 0;
+  const [freedCount, setFreedCount] = useState(0);
+  const [toArchive, setToArchive] = useState<ClientSummary | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const [archiveErr, setArchiveErr] = useState<string | null>(null);
   const [clients, setClients] = useState<ClientSummary[] | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
@@ -72,12 +85,44 @@ export function Clients() {
   };
   const emailValid = /.+@.+\..+/.test(email.trim());
 
+  // Archive from the roster — the same endpoint the client's Manage tab calls.
+  // Deleting permanently stays on that tab: it's irreversible and needs the typed
+  // confirmation, which is not something to offer from a list.
+  const archive = async (c: ClientSummary) => {
+    if (archiveBusy) return;
+    setArchiveBusy(true); setArchiveErr(null);
+    try {
+      await api.post(`/api/clients/${c.id}/archive`);
+      setToArchive(null);
+      setFreedCount((n) => n + 1);
+      await load();
+    } catch (e) { setArchiveErr(errorText(e, "Couldn't archive that client. Please try again.")); }
+    finally { setArchiveBusy(false); }
+  };
+  const stillNeeded = Math.max(0, freeTarget - freedCount);
+
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Clients</h1>
         <Button onClick={() => setCreateOpen(true)}><Plus /> New</Button>
       </div>
+
+      {freeing && (
+        <Card className="space-y-2.5 border border-primary/25" role="status" aria-live="polite">
+          <div className="flex items-center gap-2 font-medium"><Users className="size-4 text-primary" /> Freeing seats for a smaller plan</div>
+          <p className="text-sm text-muted-foreground">
+            {stillNeeded > 0
+              ? `Free ${stillNeeded} more client seat${stillNeeded === 1 ? "" : "s"} and the plan change goes through. Archiving keeps everything on the record; deleting (on a client's Manage tab) also reclaims their storage.`
+              : "That's enough seats — head back to Business to finish the plan change."}
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" variant={stillNeeded > 0 ? "secondary" : "default"} onClick={() => nav("/business")}>Back to Business</Button>
+            <Button size="sm" variant="ghost" onClick={() => setParams((p) => { p.delete("free"); return p; }, { replace: true })}>Not now</Button>
+          </div>
+          {archiveErr && <p className="text-sm text-warning" role="alert">{archiveErr}</p>}
+        </Card>
+      )}
 
       {loadError && !clients ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load your clients" description="Something went wrong reaching the server. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
@@ -94,7 +139,16 @@ export function Clients() {
                   <div className="flex items-center gap-2 truncate font-semibold">{c.displayName}{att.has(c.id) && <span className="size-2 shrink-0 rounded-full" style={{ background: toneVar[SEVERITY_TONE[att.get(c.id)!.severity]] }} title="Needs attention" />}</div>
                   <div className="truncate text-sm text-muted-foreground">{c.email ?? "no email"}</div>
                 </div>
-                {att.has(c.id)
+                {freeing ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    disabled={archiveBusy}
+                    aria-label={`Archive ${c.displayName}`}
+                    onClick={(e) => { e.stopPropagation(); setArchiveErr(null); setToArchive(c); }}
+                  ><Archive /> Archive</Button>
+                ) : att.has(c.id)
                   ? <Badge tone={SEVERITY_TONE[att.get(c.id)!.severity]}>{att.get(c.id)!.label}{att.get(c.id)!.count > 1 ? ` +${att.get(c.id)!.count - 1}` : ""}</Badge>
                   : c.hasLogin ? <Badge tone="success">Active</Badge> : <Badge tone="neutral">Invited</Badge>}
               </Card>
@@ -119,6 +173,16 @@ export function Clients() {
           onClose={() => { const id = invite.clientId; setInvite(null); nav(`/clients/${id}/today`); }}
         />
       )}
+
+      <ConfirmDialog
+        open={!!toArchive}
+        onOpenChange={(o) => !o && setToArchive(null)}
+        title={toArchive ? `Archive ${toArchive.displayName}?` : "Archive client?"}
+        description="They come off your roster and free a seat against your plan's client limit. Everything on their record is kept, but if they have a login they lose access to their space."
+        confirmLabel={archiveBusy ? "Archiving…" : "Archive client"}
+        destructive
+        onConfirm={() => { if (toArchive) void archive(toArchive); }}
+      />
     </Page>
   );
 }

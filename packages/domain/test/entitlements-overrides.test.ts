@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   FREE_ENTITLEMENTS, resolveEntitlements, mergeOverrides, snapshotDowngrade, raiseOverride, raiseQuota,
-  clampEntitlementsForStatus, SUSPENDED_STATUSES,
+  clampEntitlementsForStatus, SUSPENDED_STATUSES, trialPeriodDays,
   FEATURE_KEYS, QUOTA_KEYS, type Entitlements, type Quotas, type Features,
 } from "../src/entitlements.js";
 
-const plan = (over: { quotas?: Partial<Quotas>; features?: Partial<Features>; aiCredits?: { monthlyGrant: number } }): Entitlements => ({
+const plan = (over: { quotas?: Partial<Quotas>; features?: Partial<Features>; aiCredits?: { monthlyGrant: number }; trialDays?: number }): Entitlements => ({
   quotas: { ...FREE_ENTITLEMENTS.quotas, ...(over.quotas ?? {}) },
   features: { ...FREE_ENTITLEMENTS.features, ...(over.features ?? {}) },
   aiCredits: { ...FREE_ENTITLEMENTS.aiCredits, ...(over.aiCredits ?? {}) },
+  trialDays: over.trialDays ?? FREE_ENTITLEMENTS.trialDays,
 });
 
 describe("grant-only overrides", () => {
@@ -115,5 +116,45 @@ describe("self-discovery keys", () => {
     // resolveEntitlements always fills every key, so the admin UI can render them all.
     const e = resolveEntitlements(JSON.stringify({ features: { aiSuite: true } }));
     expect(Object.keys(e.features).sort()).toEqual([...FEATURE_KEYS].sort());
+  });
+});
+
+// ── Free trials (SPEC §5) ─────────────────────────────────────────────────────
+// `trialDays` rides in `entitlements_json` rather than a `plans` column, so it
+// has to survive the same coercion discipline as everything else in the blob:
+// fail closed on junk, never overridable, never invented.
+
+describe("plan trial days", () => {
+  it("resolves a trial off the blob and defaults to none", () => {
+    expect(resolveEntitlements(JSON.stringify({ trialDays: 30 })).trialDays).toBe(30);
+    expect(resolveEntitlements(JSON.stringify({ quotas: { activeClients: 5 } })).trialDays).toBe(0);
+    expect(resolveEntitlements(null).trialDays).toBe(0);
+    expect(FREE_ENTITLEMENTS.trialDays).toBe(0);
+  });
+
+  it("fails closed on junk — a typo can never hand out an unbounded trial", () => {
+    for (const bad of ['"30"', "true", "null", "-5", "NaN", "{}"]) {
+      expect(resolveEntitlements(`{"trialDays":${bad}}`).trialDays, bad).toBe(0);
+    }
+    // Fractional days are floored, not rounded up.
+    expect(resolveEntitlements('{"trialDays":30.9}').trialDays).toBe(30);
+  });
+
+  it("trialPeriodDays returns null for no trial so Stripe's param is OMITTED", () => {
+    // Stripe rejects trial_period_days=0; the caller must leave it out entirely.
+    expect(trialPeriodDays({ trialDays: 0 })).toBeNull();
+    expect(trialPeriodDays({ trialDays: -1 })).toBeNull();
+    expect(trialPeriodDays({ trialDays: 30 })).toBe(30);
+    expect(trialPeriodDays({ trialDays: 14.7 })).toBe(14);
+    // Clamped to Stripe's ceiling so an admin typo can't produce a 400.
+    expect(trialPeriodDays({ trialDays: 99_999 })).toBe(730);
+  });
+
+  it("is NOT overridable per tenant — a gift can't extend a trial", () => {
+    const withTrial = plan({ trialDays: 30 });
+    expect(mergeOverrides(withTrial, JSON.stringify({ trialDays: 365 })).trialDays).toBe(30);
+    expect(mergeOverrides(plan({}), JSON.stringify({ trialDays: 90 })).trialDays).toBe(0);
+    // …and it is not a capability, so lowering it never grandfathers anyone.
+    expect(snapshotDowngrade(withTrial, plan({}))).toEqual({});
   });
 });

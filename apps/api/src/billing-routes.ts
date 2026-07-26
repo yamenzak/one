@@ -14,6 +14,7 @@ import {
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { tenantStorageBytes } from "./storage.js";
 import {
+  getPlan,
   getSubscription,
   listPacks,
   listPlans,
@@ -45,7 +46,11 @@ export const billingRoutes = new Hono<AppEnv>()
     await dobj.bind(who.tenantId);
     const balance = await dobj.view();
     const ledger = await dobj.recentLedger();
-    const plan = plans.find((p) => p.id === sub.plan_id) ?? null;
+    // The tenant's OWN plan is resolved by id, not from the active-only picker —
+    // a tenant grandfathered on a retired tier must still see its real name
+    // instead of the raw id. `plans` below stays active-only: retired tiers are
+    // never offered as a choice to anyone.
+    const plan = plans.find((p) => p.id === sub.plan_id) ?? (await getPlan(c.env.DB, sub.plan_id));
 
     // Connect account + the tenant's own client-delinquency roll-up, so the
     // owner's Business surface can nudge onboarding and flag lapsing clients.
@@ -74,12 +79,12 @@ export const billingRoutes = new Hono<AppEnv>()
       },
       balance,
       ledger,
-      plans: plans.map((p) => ({
-        id: p.id,
-        name: p.name,
-        priceUsdMonth: p.price_usd_month,
-        entitlements: resolveEntitlements(p.entitlements_json),
-      })),
+      plans: plans.map((p) => {
+        const ent = resolveEntitlements(p.entitlements_json);
+        // `trialDays` is surfaced alongside the price so the picker can say
+        // "30 days free" before the owner ever enters a card.
+        return { id: p.id, name: p.name, priceUsdMonth: p.price_usd_month, entitlements: ent, trialDays: ent.trialDays };
+      }),
       packs,
       entitlements,
       stripeEnabled: stripeEnabled(cfg),
@@ -158,8 +163,13 @@ export const adminRoutes = new Hono<AppEnv>()
     if (!body.success) return c.json({ error: "invalid body" }, 400);
     const tenantId = c.req.param("id");
     await seedBilling(c.env.DB);
-    const plans = await listPlans(c.env.DB);
-    const plan = plans.find((p) => p.id === body.data.planId);
+    // Resolves RETIRED plans too, on purpose: this is the platform-admin
+    // comp/support lane, and a tenant grandfathered on `free`/`studio`/`team`
+    // must be movable back onto their own tier (or off a mistake). Retired tiers
+    // stay unavailable to everyone else — every tenant-facing path
+    // (`GET /billing`, `check-downgrade`, `checkout-plan`, `plan-intent`) goes
+    // through the active-only `listPlans`.
+    const plan = await getPlan(c.env.DB, body.data.planId);
     if (!plan) return c.json({ error: "unknown plan" }, 404);
     await getSubscription(c.env.DB, tenantId); // ensure row
     await c.env.DB.prepare(
@@ -215,20 +225,27 @@ export const adminRoutes = new Hono<AppEnv>()
           quotas: z.record(z.string(), z.number()).default({}),
           features: z.record(z.string(), z.boolean()).default({}),
           aiCredits: z.object({ monthlyGrant: z.number().min(0) }).default({ monthlyGrant: 0 }),
+          // Declared so zod doesn't STRIP it: without this key an edit through
+          // the plan builder would silently wipe a plan's free trial.
+          trialDays: z.number().int().min(0).max(730).optional(),
         }).optional(),
       })
       .safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
     await seedBilling(c.env.DB);
     const id = c.req.param("id");
-    const plan = await c.env.DB.prepare("SELECT entitlements_json FROM plans WHERE id = ?").bind(id).first<{ entitlements_json: string | null }>();
+    const plan = await c.env.DB.prepare("SELECT entitlements_json, price_usd_month FROM plans WHERE id = ?").bind(id).first<{ entitlements_json: string | null; price_usd_month: number | null }>();
     if (!plan) return c.json({ error: "unknown plan" }, 404);
 
     let entJson = plan.entitlements_json;
     let grandfathered = 0;
     if (body.data.entitlements) {
       const oldEnt = resolveEntitlements(plan.entitlements_json);
-      const newEnt = resolveEntitlements(JSON.stringify(body.data.entitlements));
+      // An omitted `trialDays` means "leave it alone", not "no trial" — the admin
+      // console posts back the matrix it rendered, and a client that predates the
+      // field must not silently retire the plan's trial.
+      const incoming = { ...body.data.entitlements, trialDays: body.data.entitlements.trialDays ?? oldEnt.trialDays };
+      const newEnt = resolveEntitlements(JSON.stringify(incoming));
       entJson = JSON.stringify(newEnt);
       const grants = snapshotDowngrade(oldEnt, newEnt);
       if (Object.keys(grants).length) {
@@ -244,8 +261,16 @@ export const adminRoutes = new Hono<AppEnv>()
     if (body.data.name !== undefined) (sets.push("name = ?"), binds.push(body.data.name));
     if (body.data.priceUsdMonth !== undefined) (sets.push("price_usd_month = ?"), binds.push(body.data.priceUsdMonth));
     if (body.data.active !== undefined) (sets.push("active = ?"), binds.push(body.data.active ? 1 : 0));
+    // A PRICE change invalidates the plan's Stripe price id. `syncCatalog` skips
+    // any row that already has one, so leaving it in place means every future
+    // checkout keeps charging the OLD amount — silently, with a 200 back. Null
+    // the pair so the next "Sync catalog" recreates product + price at the new
+    // amount. (The old Stripe price object survives, which is what we want:
+    // tenants already subscribed on it keep their price until they re-subscribe.)
+    const repriced = body.data.priceUsdMonth !== undefined && body.data.priceUsdMonth !== plan.price_usd_month;
+    if (repriced) sets.push("stripe_product_id = NULL", "stripe_price_id = NULL");
     await c.env.DB.prepare(`UPDATE plans SET ${sets.join(", ")} WHERE id = ?`).bind(...binds, id).run();
-    return c.json({ ok: true, grandfathered });
+    return c.json({ ok: true, grandfathered, stripeResyncRequired: repriced });
   })
 
   // ── Per-tenant gifting (grant-only): raise limits / unlock features ─────────

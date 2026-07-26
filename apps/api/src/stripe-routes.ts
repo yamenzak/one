@@ -7,7 +7,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { resolveEntitlements, buildBudgetsForPurchase, mergeAddOnBalances, type Budget, type AddOnBalance } from "@mossa/domain";
+import { resolveEntitlements, trialPeriodDays, buildBudgetsForPurchase, mergeAddOnBalances, type Budget, type AddOnBalance } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { getSubscription, listPacks, listPlans, seedBilling, getConfig } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
@@ -48,6 +48,10 @@ export const stripeRoutes = new Hono<AppEnv>()
     const plan = (await listPlans(c.env.DB)).find((p) => p.id === body.data.planId);
     if (!plan?.stripe_price_id) return c.json({ error: "plan not synced to stripe" }, 409);
     const customer = await ensureCustomer(c.env.DB, cfg.secretKey, who.tenantId, c.get("user")?.email);
+    // Free trial (SPEC §5): Solo/Light carry `trialDays`. Checkout collects the
+    // card, charges nothing now, and the subscription is born `trialing` — which
+    // is NOT in `SUSPENDED_STATUSES`, so entitlements are live from minute one.
+    const trialDays = trialPeriodDays(resolveEntitlements(plan.entitlements_json));
     const session = await stripeCall<{ url: string; id: string }>(cfg.secretKey, "checkout/sessions", {
       mode: "subscription",
       customer,
@@ -57,8 +61,15 @@ export const stripeRoutes = new Hono<AppEnv>()
       cancel_url: `${body.data.returnUrl}?checkout=cancel`,
       "metadata[mossa_tenant]": who.tenantId,
       "metadata[mossa_plan]": plan.id,
+      // Mirror the metadata onto the SUBSCRIPTION as well. Session metadata is
+      // not copied down (AGENTS.md §5), so without this the `trialing`
+      // subscription's own events can't name the plan and have to fall back to
+      // customer lookup.
+      "subscription_data[metadata][mossa_tenant]": who.tenantId,
+      "subscription_data[metadata][mossa_plan]": plan.id,
+      ...(trialDays ? { "subscription_data[trial_period_days]": trialDays } : {}),
     });
-    return c.json({ url: session.url });
+    return c.json({ url: session.url, trialDays: trialDays ?? 0 });
   })
 
   .post("/billing/checkout-pack", async (c) => {
@@ -159,21 +170,51 @@ export const stripeRoutes = new Hono<AppEnv>()
     const plan = (await listPlans(c.env.DB)).find((p) => p.id === body.data.planId);
     if (!plan?.stripe_price_id) return c.json({ error: "plan not synced to stripe" }, 409);
     const customer = await ensureCustomer(c.env.DB, cfg.secretKey, who.tenantId, c.get("user")?.email);
+    const trialDays = trialPeriodDays(resolveEntitlements(plan.entitlements_json));
     // default_incomplete: the subscription is created unpaid; confirming the
     // first invoice's PaymentIntent inline activates it. The webhook
     // (customer.subscription.updated → active) stamps the plan + grants credits.
-    const sub = await stripeCall<{ id: string; latest_invoice?: { payment_intent?: { client_secret?: string } } }>(cfg.secretKey, "subscriptions", {
+    //
+    // A TRIAL changes the shape of what has to be confirmed, and this is the
+    // trap: the first invoice is $0 and auto-paid, so there is NO
+    // `latest_invoice.payment_intent` at all — the object to confirm is the
+    // subscription's `pending_setup_intent` (card saved, nothing charged).
+    // `trial_settings.end_behavior.missing_payment_method = cancel` makes Stripe
+    // cancel rather than dangle an unpayable subscription if the setup is never
+    // completed, which lands as `customer.subscription.deleted` → free.
+    const sub = await stripeCall<{
+      id: string;
+      status?: string;
+      latest_invoice?: { payment_intent?: { client_secret?: string } };
+      pending_setup_intent?: { client_secret?: string } | null;
+    }>(cfg.secretKey, "subscriptions", {
       customer,
       "items[0][price]": plan.stripe_price_id,
       payment_behavior: "default_incomplete",
       "payment_settings[save_default_payment_method]": "on_subscription",
       "expand[0]": "latest_invoice.payment_intent",
+      "expand[1]": "pending_setup_intent",
       "metadata[mossa_tenant]": who.tenantId,
       "metadata[mossa_plan]": plan.id,
+      ...(trialDays
+        ? {
+            trial_period_days: trialDays,
+            "trial_settings[end_behavior][missing_payment_method]": "cancel",
+          }
+        : {}),
     });
-    const clientSecret = sub.latest_invoice?.payment_intent?.client_secret;
+    // `mode` tells the client which Stripe.js call to make: "setup" ⇒
+    // `confirmSetup` (trial, no charge), "payment" ⇒ `confirmPayment`.
+    const setupSecret = trialDays ? sub.pending_setup_intent?.client_secret : undefined;
+    const clientSecret = setupSecret ?? sub.latest_invoice?.payment_intent?.client_secret;
     if (!clientSecret) return c.json({ error: "could not start subscription" }, 502);
-    return c.json({ clientSecret, subscriptionId: sub.id, publishableKey: cfg.publishableKey });
+    return c.json({
+      clientSecret,
+      mode: setupSecret ? "setup" : "payment",
+      trialDays: trialDays ?? 0,
+      subscriptionId: sub.id,
+      publishableKey: cfg.publishableKey,
+    });
   })
 
   // Platform webhook (public lane; signature-verified).
@@ -692,12 +733,31 @@ export const stripeAdminRoutes = new Hono<AppEnv>()
     return c.json({ ok: true, catalogSwapped, status: stripeStatus(await getConfig(c.env.DB)) });
   })
 
+  // Push plans + packs to Stripe as products + prices.
+  //
+  // `syncCatalog` SKIPS any row that already carries a `stripe_price_id`, so a
+  // repriced plan would otherwise never reach Stripe and checkout would keep
+  // charging the old amount. The catalog migration and the plan editor both null
+  // the id pair when a price moves; `{ resyncPrices: true }` is the manual escape
+  // hatch for a row whose Stripe price drifted some other way (a price edited in
+  // the Stripe dashboard, a half-finished sync). It drops the stored ids for the
+  // ACTIVE plans and lets the sync below recreate them at the current price.
+  // Orphaned Stripe prices are left alone on purpose — tenants already
+  // subscribed on one keep that price until they re-subscribe.
   .post("/admin/stripe/sync", async (c) => {
     const cfg = await stripeConfig(c.env.DB);
     if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
+    const body = z.object({ resyncPrices: z.boolean().default(false) }).safeParse(await c.req.json().catch(() => ({})));
     await seedBilling(c.env.DB);
+    let cleared = 0;
+    if (body.success && body.data.resyncPrices) {
+      const r = await c.env.DB.prepare(
+        "UPDATE plans SET stripe_product_id = NULL, stripe_price_id = NULL WHERE active = 1 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)",
+      ).run();
+      cleared = r.meta?.changes ?? 0;
+    }
     const result = await syncCatalog(c.env.DB, cfg.secretKey);
-    return c.json({ ok: true, ...result });
+    return c.json({ ok: true, cleared, ...result });
   })
 
   /** "What is Mossa actually on right now?" — presence + provenance + the lane

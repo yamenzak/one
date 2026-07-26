@@ -1,9 +1,10 @@
 /** Owner Business — tabbed: overview (plan + credits + AI usage), packages, staff. */
 
 import { useEffect, useState } from "react";
-import { Button, Card, Badge, SegmentedControl, Field, Page, Stagger, ChartCard, SectionHeader, Eyebrow, GlanceStrip, IconBadge, EmptyState, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Sparkles, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, CheckCheck, Check, Lock, Tag } from "@mossa/ui";
+import { useNavigate } from "react-router-dom";
+import { Button, Card, Badge, SegmentedControl, Field, Sheet, SubCard, Page, Stagger, ChartCard, SectionHeader, Eyebrow, GlanceStrip, IconBadge, EmptyState, Spinner, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Sparkles, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, TrendingDown, CheckCheck, Check, Lock, Tag } from "@mossa/ui";
 import { FEATURE_KEYS, FEATURE_META, QUOTA_KEYS, QUOTA_META, type Entitlements } from "@mossa/domain";
-import { api } from "../../api.js";
+import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
 import { fmtPrice } from "../../money.js";
 import { PaymentSheet, type CheckoutIntent } from "../../PaymentSheet.js";
@@ -124,6 +125,14 @@ function Overview() {
     setReloadKey((k) => k + 1);
     setTimeout(() => setReloadKey((k) => k + 1), 2500);
   };
+  // Up vs down is derived from the CATALOG price, never from a hardcoded tier
+  // order — the plan set is admin-editable and is being retuned right now.
+  const [downgrade, setDowngrade] = useState<string | null>(null);
+  const currentPrice = billing?.plans?.find((p) => p.id === billing.subscription.planId)?.priceUsdMonth ?? 0;
+  const others = (billing?.plans ?? []).filter((p) => p.id !== billing?.subscription.planId);
+  const upgrades = others.filter((p) => p.priceUsdMonth > currentPrice && p.priceUsdMonth > 0);
+  const downgrades = others.filter((p) => p.priceUsdMonth < currentPrice);
+
   const top = [...aiUsage].sort((a, b) => b.credits - a.credits).slice(0, 7);
   const maxCr = Math.max(...top.map((u) => u.credits), 1);
   const totalCr = aiUsage.reduce((n, u) => n + u.credits, 0);
@@ -267,14 +276,14 @@ function Overview() {
             </Stagger>
           </section>
 
-          {/* Plan subscribe / change — inline (no redirect). Hidden for comped tenants. */}
-          {isOwner && billing.stripeEnabled && !billing.subscription.comp && billing.plans && billing.plans.filter((p) => p.priceUsdMonth > 0 && p.id !== billing.subscription.planId).length > 0 && (
+          {/* Plan subscribe / upgrade — inline (no redirect). Hidden for comped tenants. */}
+          {isOwner && billing.stripeEnabled && !billing.subscription.comp && upgrades.length > 0 && (
             <section className="space-y-2">
               <Eyebrow>{billing.subscription.status === "active" ? "Change plan" : "Choose a plan"}</Eyebrow>
               <Stagger>
               <Card className="space-y-3">
                 <div className="space-y-1.5">
-                  {billing.plans.filter((p) => p.priceUsdMonth > 0 && p.id !== billing.subscription.planId).map((p) => (
+                  {upgrades.map((p) => (
                     <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5">
                       <div><div className="text-sm font-medium">{p.name}</div><div className="numeral text-xs text-muted-foreground">{fmtPrice(usdToCents(p.priceUsdMonth))}/mo</div></div>
                       <Button size="sm" variant="tonal" disabled={busy === `plan_${p.id}`} onClick={() => void startInline("/api/billing/plan-intent", { planId: p.id }, `Subscribe to ${p.name}`, () => `Subscribe · ${fmtPrice(usdToCents(p.priceUsdMonth))}/mo`, `plan_${p.id}`)}>
@@ -284,6 +293,29 @@ function Overview() {
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">Billed monthly. Plan credits refresh each period; unused plan credits don't roll over.</p>
+              </Card>
+              </Stagger>
+            </section>
+          )}
+
+          {/* Move to a smaller plan. Deliberately NOT gated on stripeEnabled: the
+              server can complete a downgrade with nothing to cancel, and the free
+              plan (priceUsdMonth 0) belongs in this list — the upgrade list above
+              filters it out, which used to mean an owner had no way down at all. */}
+          {isOwner && !billing.subscription.comp && downgrades.length > 0 && (
+            <section className="space-y-2">
+              <Eyebrow>Move to a smaller plan</Eyebrow>
+              <Stagger>
+              <Card className="space-y-3">
+                <div className="space-y-1.5">
+                  {downgrades.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5">
+                      <div><div className="text-sm font-medium">{p.name}</div><div className="numeral text-xs text-muted-foreground">{p.priceUsdMonth > 0 ? `${fmtPrice(usdToCents(p.priceUsdMonth))}/mo` : "Free"}</div></div>
+                      <Button size="sm" variant="secondary" onClick={() => setDowngrade(p.id)}><TrendingDown /> Switch</Button>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">We'll show you anything that needs sorting out first, and exactly what to do.</p>
               </Card>
               </Stagger>
             </section>
@@ -313,6 +345,18 @@ function Overview() {
       )}
 
       {flash && <p className="text-center text-sm text-muted-foreground" role="status">{flash}</p>}
+      {downgrade && (
+        <DowngradeSheet
+          planId={downgrade}
+          onClose={() => setDowngrade(null)}
+          onDone={(msg) => { setDowngrade(null); setFlash(msg); setReloadKey((k) => k + 1); }}
+          onCheckout={(planId, planName, priceUsdMonth) => {
+            setDowngrade(null);
+            void startInline("/api/billing/plan-intent", { planId }, `Switch to ${planName}`, () => `Switch · ${fmtPrice(usdToCents(priceUsdMonth))}/mo`, `plan_${planId}`);
+          }}
+          onPortal={() => { setDowngrade(null); void redirectTo("/api/billing/portal", "portal"); }}
+        />
+      )}
       <PaymentSheet
         open={!!checkout}
         onClose={() => setCheckout(null)}
@@ -322,6 +366,183 @@ function Overview() {
         onSuccess={onPaid}
       />
     </Page>
+  );
+}
+
+// ── Downgrade checklist (SPEC §5) ──────────────────────────────────────────
+// `POST /billing/downgrade-check` returns every dimension over the target plan's
+// ceiling with the current number, the ceiling, how many must go, and where to go
+// and fix it. Hard blockers refuse the change server-side; soft ones (storage)
+// are shown as "worth clearing" and never stand in the way — the same rule
+// `withinQuota` follows, where a quota only ever blocks the NEXT write.
+//
+// The submit path re-checks: the owner may have spent ten minutes archiving, so
+// the numbers in this sheet are never the ones the decision is made on.
+
+interface Blocker {
+  key: string;
+  kind: "quota" | "feature";
+  label: string;
+  hard: boolean;
+  current: number;
+  ceiling: number;
+  removeCount: number;
+  unit?: string;
+  message: string;
+  action?: { label: string; href: string };
+}
+interface DowngradeReport {
+  planId: string;
+  planName: string;
+  priceUsdMonth: number;
+  currentPlanName: string;
+  currentPriceUsdMonth: number;
+  eligible: boolean;
+  clean: boolean;
+  blockers: Blocker[];
+}
+type ChangeResult = DowngradeReport & { ok?: boolean; requiresCheckout?: boolean; requiresPortal?: boolean };
+
+function DowngradeSheet({ planId, onClose, onDone, onCheckout, onPortal }: {
+  planId: string;
+  onClose: () => void;
+  onDone: (message: string) => void;
+  onCheckout: (planId: string, planName: string, priceUsdMonth: number) => void;
+  onPortal: () => void;
+}) {
+  const nav = useNavigate();
+  const [report, setReport] = useState<DowngradeReport | null>(null);
+  const [loadErr, setLoadErr] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const check = async (): Promise<void> => {
+    setChecking(true); setLoadErr(false); setErr(null);
+    try { setReport(await api.post<DowngradeReport>("/api/billing/downgrade-check", { planId })); }
+    catch { setLoadErr(true); }
+    finally { setChecking(false); }
+  };
+  // Fetch on open. `alive` so a sheet closed mid-flight can't commit.
+  useEffect(() => {
+    let alive = true;
+    setLoadErr(false);
+    api.post<DowngradeReport>("/api/billing/downgrade-check", { planId })
+      .then((r) => { if (alive) setReport(r); })
+      .catch(() => { if (alive) setLoadErr(true); });
+    return () => { alive = false; };
+  }, [planId]);
+
+  const submit = async () => {
+    if (submitting) return;
+    setSubmitting(true); setErr(null);
+    try {
+      const r = await api.post<ChangeResult>("/api/billing/plan-change", { planId });
+      if (r.requiresCheckout) { onCheckout(r.planId, r.planName, r.priceUsdMonth); return; }
+      if (r.requiresPortal) { onPortal(); return; }
+      onDone(`You're on ${r.planName} now.`);
+    } catch (e) {
+      // 409 downgrade_blocked carries a fresh report — show the CURRENT numbers
+      // rather than the stale ones this sheet opened with.
+      const body = (e as { body?: DowngradeReport & { error?: string } }).body;
+      if (body?.error === "downgrade_blocked" && Array.isArray(body.blockers)) {
+        setReport(body);
+        setErr("Something changed while you were working — here's what's left.");
+      } else {
+        setErr(errorText(e, "Couldn't switch plans. Please try again."));
+      }
+    } finally { setSubmitting(false); }
+  };
+
+  const hard = (report?.blockers ?? []).filter((b) => b.hard);
+  const soft = (report?.blockers ?? []).filter((b) => !b.hard);
+  const fmtCeiling = (b: Blocker) => (b.ceiling < 0 ? "unlimited" : `${b.ceiling.toLocaleString()}${b.unit ? ` ${b.unit}` : ""}`);
+
+  return (
+    <Sheet open onClose={onClose} title={report ? `Switch to ${report.planName}` : "Switch plan"}>
+      {loadErr && !report ? (
+        <EmptyState icon={AlertTriangle} title="Couldn't check that plan" description="We couldn't reach the server to see whether you're ready to switch." action={<Button onClick={() => void check()}>{checking ? "Checking…" : "Try again"}</Button>} />
+      ) : (
+        <Reveal loading={!report} skeleton={<SkeletonList rows={3} />}>
+          {report && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>{report.currentPlanName}</span>
+                <ArrowRight className="size-4" />
+                <span className="font-medium text-foreground">{report.planName}</span>
+                <span className="numeral ml-auto">{report.priceUsdMonth > 0 ? `${fmtPrice(usdToCents(report.priceUsdMonth))}/mo` : "Free"}</span>
+              </div>
+
+              {report.clean ? (
+                <SubCard className="flex items-start gap-2.5">
+                  <IconBadge icon={CheckCheck} tone="success" size="sm" />
+                  <p className="text-sm">Everything fits on {report.planName}. Nothing to tidy up first.</p>
+                </SubCard>
+              ) : (
+                <>
+                  {hard.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        {hard.length === 1 ? "One thing" : `${hard.length} things`} to sort out before you can switch:
+                      </p>
+                      {hard.map((b) => (
+                        <SubCard key={b.key} className="space-y-2">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-sm font-medium">{b.label}</span>
+                            <span className="numeral shrink-0 text-xs text-muted-foreground">
+                              {b.current.toLocaleString()}{b.unit ? ` ${b.unit}` : ""} · {report.planName} includes {fmtCeiling(b)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{b.message}</p>
+                          {b.action && (
+                            <Button
+                              size="sm"
+                              variant="tonal"
+                              onClick={() => nav(b.key === "activeClients" ? `${b.action!.href}?free=${b.removeCount}` : b.action!.href)}
+                            >{b.action.label} <ArrowRight /></Button>
+                          )}
+                        </SubCard>
+                      ))}
+                    </div>
+                  )}
+                  {soft.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">Worth knowing — {hard.length > 0 ? "these don't" : "this doesn't"} block the switch:</p>
+                      {soft.map((b) => (
+                        <SubCard key={b.key} className="space-y-2">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-sm font-medium">{b.label}</span>
+                            <span className="numeral shrink-0 text-xs text-muted-foreground">
+                              {b.current.toLocaleString()}{b.unit ? ` ${b.unit}` : ""} · includes {fmtCeiling(b)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{b.message}</p>
+                          {b.action && <Button size="sm" variant="secondary" onClick={() => nav(b.action!.href)}>{b.action.label} <ArrowRight /></Button>}
+                        </SubCard>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {err && <p className="text-sm text-warning" role="alert">{err}</p>}
+
+              <div className="space-y-2">
+                <Button size="lg" className="w-full" disabled={!report.eligible || submitting} onClick={() => void submit()}>
+                  {submitting ? <><Spinner /> Switching…</> : report.eligible ? `Switch to ${report.planName}` : "Not ready yet"}
+                </Button>
+                <Button size="lg" variant="secondary" className="w-full" disabled={checking || submitting} onClick={() => void check()}>
+                  {checking ? <><Spinner /> Re-checking…</> : "Re-check"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Nothing on your account changes until you switch, and we check again the moment you do.
+              </p>
+            </div>
+          )}
+        </Reveal>
+      )}
+    </Sheet>
   );
 }
 
