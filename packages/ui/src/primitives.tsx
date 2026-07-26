@@ -295,6 +295,34 @@ export function IconBadge({ icon: Icon, tone = "primary", className, size = "md"
   );
 }
 
+// ── Callout (inline tone-coded notice) ─────────────────────────────────────
+/**
+ * An inline notice: soft tone container + optional leading glyph + the aria role
+ * that matches its purpose. This shape was being hand-rolled everywhere
+ * (`rounded-xl bg-danger-soft p-3 text-danger` + `role="alert"`), which is how
+ * notices drifted apart and how some ended up with no role at all. `live`
+ * decides the announcement: `"alert"` for a failure the user must see now,
+ * `"status"` (polite) for the result of something they just did.
+ */
+export function Callout({ tone = "neutral", icon: Icon, live, children, className }: {
+  tone?: Tone;
+  icon?: LucideIcon;
+  live?: "alert" | "status";
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      role={live}
+      aria-live={live === "status" ? "polite" : undefined}
+      className={cn("flex items-start gap-2 rounded-2xl p-3 text-sm leading-relaxed", toneSoft[tone], className)}
+    >
+      {Icon && <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />}
+      <span className="min-w-0 flex-1 break-words">{children}</span>
+    </div>
+  );
+}
+
 // ── Section heading ────────────────────────────────────────────────────────
 export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
