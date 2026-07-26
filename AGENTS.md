@@ -365,6 +365,9 @@ pnpm typecheck                   # 9 turbo tasks
 pnpm test                        # builds the SPA first, then every suite
 pnpm --filter @mossa/domain test # pure math, fast — run this constantly
 pnpm --filter @mossa/api test    # Miniflare integration
+pnpm e2e                         # Playwright, 3 golden paths, ~35s. Builds the
+                                 # SPA and boots the worker itself; stop any
+                                 # `wrangler dev` first (shared .wrangler state)
 cd apps/api && npx wrangler deploy --dry-run --outdir /tmp/x   # validates bindings
 ```
 

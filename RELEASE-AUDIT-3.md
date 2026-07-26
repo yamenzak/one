@@ -187,45 +187,91 @@ what is not built.
 
 ---
 
-## Deliberately not fixed
+## Round 4 — the stable-release pass
+
+Everything round 3 listed as "deliberately not fixed" was subsequently closed,
+except the items in the next section. In brief:
+
+- **The three dead screens are built.** Assign a client to a coach (the biggest gap
+  in the product — multi-trainer staffing was inoperable), archive a client (the
+  `activeClients` quota was a one-way ratchet), and edit/archive packages. All
+  three had working, tested routes and zero UI callers. Wiring them up exposed two
+  further bugs: `PackageBody.partial()` was not a partial update — zod's
+  `.partial()` leaves the underlying `.default()` intact, so the first person to
+  rename a package would have silently wiped its budgets, pulled it from every
+  client's Shop and cleared once-per-customer, with a 200 — and archiving was
+  permanent because nothing ever set `active` back to 1.
+- **Session add-on balances are enforced.** The ceiling was a literal `if` whose
+  body was only a comment; `no_show` consumed nothing; completing without a
+  balance silently no-opped. The ceiling now nets off units already promised to
+  scheduled sessions, without which "book 20 against a package of 2" stays open.
+- **`staffSeats`'s three bypasses are closed** (deep-link accept, role promotion,
+  ungated invitation creation) behind one definition built on `withinQuota`, using
+  Better Auth's organization hooks — confirmed in the vendored source *and* by
+  test, not assumed from the API surface.
+- **`ai.mock` cannot fabricate in production**, enforced at both the write path and
+  the read point, and `mocked` is now surfaced in the UI.
+- **`weekly_load_target` has one authoritative store**, so the Train tab, the
+  recovery score and the AI prompt no longer grade against three different
+  numbers.
+- **The storefront toggle is honest.** `marketplace.enabled` had zero readers; it
+  is now a card saying so. The `marketplace` *visibility* mechanism is live and was
+  merely mislabelled "Public" (it means the client's in-app Shop).
+- **Accessibility floor met** — zero sub-floor text instances remain.
+- **Playwright E2E exists**: three golden paths, six consecutive stable runs, wired
+  into CI as its own job. Writing it surfaced three more real bugs: intake answers
+  were never credited to a client's profile (so a coach saw them as permanently
+  incomplete), the FoodEditor macro inputs had no accessible name, and `pnpm dev`
+  could not create a workspace because Better Auth 1.6.23 ignores the
+  `trustedOrigins` array it is passed.
+
+## Still not fixed
 
 Real, verified, and left with reasons rather than silently dropped.
 
-- **No UI assigns an existing client to a coach** (`clients.ts` trainer routes have
-  zero callers). Multi-trainer staffing — the product's premise — can't be operated
-  from the app; a coach only sees clients they created. Needs a new screen, not a
-  fix. Documented in the trainer guide.
-- **No client-archive UI**, so the `activeClients` quota is a one-way ratchet.
-- **Packages cannot be edited or deleted** after creation.
-- **Session add-on balances are not enforced**; `no_show` consumes nothing.
-- **`staffSeats` is bypassable** via the deep-link accept and via role promotion.
-- **`ai.mock = "on"` remains an admin switch** that bills for fabricated output,
-  including clinical lab values, on any deployment, and no UI surfaces `mocked`.
-- **Seed plans sell `chat`** while the flag is `reserved: true`; SPEC still lists
-  `chat` and `integrations` as features.
-- **The marketplace storefront and public blog have no renderer**, so the storefront
-  toggle and `marketplace` visibility currently lead nowhere.
-- **`weekly_load_target` split-brain**: the column sits at a hardcoded 300 while the
-  coach writes `targets_json`, so the wellness score and the AI prompt grade
-  against a different number than the Train tab shows.
+- **No un-archive for a client.** Archiving is one-way through the API; recovery
+  needs direct D1. A `POST /clients/:id/restore` plus an "Archived" roster filter
+  is the obvious follow-up.
+- **No hard delete for a package** — archive is all the route offers, so a package
+  with a botched name can only be archived and replaced.
+- **The marketplace storefront and public blog still have no renderer.** Building
+  one is a feature, not a fix; the UI no longer pretends otherwise.
+- **Seed plans still set `chat: true`** (and `integrations` on Team) while both are
+  `reserved: true`, and SPEC still lists them in the plan table. No
+  customer-facing surface sells either — the in-app comparison filters reserved
+  features and the marketing page no longer lists them — so this is an internal
+  inconsistency, not a false public claim.
+- **`goals.ts` still exposes the raw `weekly_load_target` column**, with resolution
+  applied at each of its two call sites rather than inside it; `demo-routes.ts`
+  is the last writer that bypasses the mirror. Both resolve correctly today.
+- **No `MockedNotice` on the lab review sheet.** Mitigated at the source — the mock
+  markers are self-labelling ("SIMULATED — not real data"), and the prefix travels
+  into the sheet, the saved chart row and the prompt — but the banner is the
+  better treatment.
+- **Over-booking is prevented at booking time, not reserved at booking time.** If a
+  balance shrinks after booking, `quantityUsed` can exceed the total rather than
+  the completion failing. That records the truth instead of losing the event; the
+  alternative refuses to complete an already-delivered session.
 - **7 npm advisories**, one on a production dep (`react-router` RSC CSRF). Not
   reachable here — client-only SPA, no RSC, no server actions — but a scanner will
   flag it.
-- **No Playwright E2E**, and no integration coverage for sessions, add-on types,
-  `staffSeats`, or the per-client AI cap.
+- **There is still no linter.** `turbo.json` declares a `lint` task no package
+  implements, and there is no ESLint config.
 
 ---
 
 ## Verification
 
-| | Before | After |
-|---|---|---|
-| `pnpm typecheck` | clean (9/9) | clean (9/9) |
-| Domain tests | 188 | **191** |
-| API tests | 150 | **219** |
-| Protocol / app | 7 / 10 | 7 / **14** |
-| **Total** | **355** | **431** |
-| SPA build | ok, 8.5 MB sourcemaps published | ok, **0** published |
+| | Before | After round 3 | After round 4 |
+|---|---|---|---|
+| `pnpm typecheck` | clean (9/9) | clean (9/9) | clean (**10/10**) |
+| Domain tests | 188 | 191 | **202** |
+| API tests | 150 | 219 | **261** |
+| Protocol / app | 7 / 10 | 7 / 14 | 7 / 14 |
+| Playwright E2E | — | — | **3 specs, 6 consecutive clean runs** |
+| **Total** | **355** | 431 | **484 + 3 E2E** |
+| SPA build | ok, 8.5 MB sourcemaps published | ok, **0** published | ok, 0 published |
+| Pre-merge CI | none | added | + a separate E2E job |
 
 Every fix in the security and money sections was checked for non-vacuity: with the
 source reverted the new tests fail, and with the fix in they pass. That check
