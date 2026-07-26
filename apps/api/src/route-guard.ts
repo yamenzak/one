@@ -40,7 +40,7 @@ function isPublic(method: string, path: string): boolean {
  * The RBAC permission a route requires. `null` = any authenticated member of
  * the active tenant (identity/context reads).
  */
-function permissionFor(method: string, path: string): Record<string, string[]> | null {
+export function permissionFor(method: string, path: string): Record<string, string[]> | null {
   const isGet = method === "GET";
   const read = isGet;
   const writeVerb = method === "DELETE" ? "delete" : "update";
@@ -50,6 +50,20 @@ function permissionFor(method: string, path: string): Record<string, string[]> |
   if (path === "/api/clients" && !isGet) return { client: ["create"] };
   if (/^\/api\/clients\/[^/]+\/archive$/.test(path)) return { client: ["archive"] };
   if (/^\/api\/clients\/[^/]+\/trainers/.test(path)) return { client: ["update"] };
+  // Self-service writes on a client's OWN record: onboarding, profile, unit
+  // prefs, dashboard layout, avatar, and the lane they're currently training.
+  // The `client` role deliberately carries no `client` resource (roster
+  // management is staff-only), so these ride `tracking:["update"]` — the same
+  // idiom as /supplements/:id/log — and the own-record check is enforced by
+  // requireClientAccess in the handler. Without this the client persona 403s on
+  // the very first write onboarding makes, locking every client out of the app.
+  if (
+    (method === "PATCH" && /^\/api\/clients\/[^/]+$/.test(path)) ||
+    (method === "POST" && /^\/api\/clients\/[^/]+\/avatar$/.test(path)) ||
+    (method === "PATCH" && /^\/api\/clients\/[^/]+\/current-variant$/.test(path))
+  ) {
+    return { tracking: ["update"] };
+  }
   if (path.startsWith("/api/clients")) return read ? null : { client: ["update"] };
 
   // Goals.

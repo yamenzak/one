@@ -25,7 +25,16 @@ import { logAuthEvent } from "./auth.js";
 import { withinQuota } from "./billing-store.js";
 import { resolveSlugTenant, isPlatformHost, hostnameOf, type HostTenant } from "./host-context.js";
 import { newId, nowIso, nowMs } from "./ids.js";
+import { emailDeliverable } from "./mailer.js";
 import { verifyTurnstile } from "./turnstile.js";
+
+/** The dev lane, derived exactly as createAuth does (ENVIRONMENT=development or a
+ *  localhost serving origin) — a localhost origin cannot reach a deployed worker
+ *  through Cloudflare's edge, so this stays closed in production. */
+function isDevLane(c: Parameters<MiddlewareHandler<AppEnv>>[0]): boolean {
+  const origin = c.req.header("origin") ?? "";
+  return c.env.ENVIRONMENT === "development" || /^http:\/\/(localhost|127\.0\.0\.1)/.test(origin);
+}
 
 /** Minimum gap between two codes to the same address. The hourly cap
  *  (Better Auth's callback) still applies on top of this. */
@@ -102,6 +111,22 @@ export const otpSendGuard: MiddlewareHandler<AppEnv> = async (c) => {
       const created = await createPendingClient(c.env.DB, tenant.tenantId, email);
       if (!created) return c.json({ error: "studio_full" }, 403);
     }
+  }
+
+  // 3b) Deliverability pre-flight. This MUST happen here rather than being left
+  // to the send itself: Better Auth runs `sendVerificationOTP` through
+  // `runInBackgroundOrAwait`, which catches and merely logs anything thrown, then
+  // returns 200 {"success":true} regardless — so a failure raised inside that
+  // callback is invisible to the client and the login UI happily advances to the
+  // code-entry screen. On a fresh production deploy `email.provider` defaults to
+  // `mock`, which fails closed outside dev, so without this check the very first
+  // sign-in shows "we sent you a code" forever and NOBODY — including the
+  // platform admin — can get in. Verified against the running worker.
+  const deliverable = await emailDeliverable(c.env.DB, c.env.EMAIL, isDevLane(c));
+  if (!deliverable.ok) {
+    await logAuthEvent(c.env.DB, "otp-send-unconfigured", email, false, ip);
+    console.error(`OTP not sent: email provider "${deliverable.provider}" cannot deliver — ${deliverable.reason}`);
+    return c.json({ error: "email_not_configured", detail: deliverable.reason }, 503);
   }
 
   // 4) Hand a clean request to Better Auth's own send handler. Preserve the

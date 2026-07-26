@@ -38,6 +38,43 @@ const bareAddress = (from: string): string => {
 
 export { bareAddress };
 
+/**
+ * Can this deployment actually deliver an email right now?
+ *
+ * Callers that must not "succeed" silently — above all the OTP send path, where
+ * the emailed code is the ONLY authentication factor — pre-flight this instead of
+ * relying on `sendEmail`'s return value. The reason is specific and was proved by
+ * probing the running worker: Better Auth invokes `sendVerificationOTP` through
+ * `runInBackgroundOrAwait`, whose body is `try { await promise } catch { logger.error }`
+ * — it swallows the throw and still returns `200 {"success":true}`. So a failure
+ * raised from inside that callback can never reach the client, and the login UI
+ * advances to the code-entry screen for a code that was never sent. Checking
+ * BEFORE handing off to Better Auth is the only way to return a real error.
+ */
+export async function emailDeliverable(
+  db: D1Database,
+  binding?: SendEmailBinding,
+  isDev = false,
+): Promise<{ ok: true } | { ok: false; provider: string; reason: string }> {
+  const cfg = await getEmailConfig(db);
+  if (cfg.provider === "disabled") {
+    return { ok: false, provider: cfg.provider, reason: "email delivery is switched off for this deployment" };
+  }
+  if (cfg.provider === "cloudflare") {
+    return binding
+      ? { ok: true }
+      : { ok: false, provider: cfg.provider, reason: "the Email Sending binding is not available on this worker" };
+  }
+  // `mock` only delivers (to the console) on the dev lane; in production it is a
+  // fail-closed placeholder meaning "nobody configured a real provider yet".
+  if (isDev) return { ok: true };
+  return {
+    ok: false,
+    provider: cfg.provider,
+    reason: "no email provider is configured — set email.provider to `cloudflare` (see DEPLOY.md)",
+  };
+}
+
 export async function sendEmail(
   db: D1Database,
   msg: { to: string; subject: string; html?: string; text?: string },
