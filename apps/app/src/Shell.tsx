@@ -9,11 +9,12 @@ import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNod
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
-  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, Palette, Bell, KeyRound, ImageIcon, toneVar, type TabDef, type Tone,
+  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, Palette, Bell, KeyRound, ImageIcon, RefreshCw, toneVar, type TabDef, type Tone,
 } from "@mossa/ui";
 import { useSession, useActiveClientId } from "./session.js";
 import { useTheme } from "./theme.js";
 import { api } from "./api.js";
+import { hardRefresh } from "./hard-refresh.js";
 import { Today } from "./screens/client/Today.js";
 import { Train } from "./screens/client/Train.js";
 import { Eat } from "./screens/client/Eat.js";
@@ -314,6 +315,10 @@ function TabLayout() {
                 {ctx!.isPlatformAdmin && <DropdownMenuItem onSelect={() => nav("/admin")}><ShieldCheck /> Platform admin</DropdownMenuItem>}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={toggleMode}>{themeMode === "dark" ? <Sun /> : <Moon />} {themeMode === "dark" ? "Light mode" : "Dark mode"}</DropdownMenuItem>
+                {/* The only way off a stale cached build on a phone: mobile browsers
+                    expose no way to unregister a service worker. Keeps you signed in
+                    and keeps your settings — see hard-refresh.ts. */}
+                <DropdownMenuItem onSelect={() => void hardRefresh()}><RefreshCw /> Check for updates</DropdownMenuItem>
                 <DropdownMenuItem destructive onSelect={() => void signOut()}><LogOut /> Sign out</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

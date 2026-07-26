@@ -11,6 +11,7 @@ import { Shell } from "./Shell.js";
 import { AcceptInvite } from "./screens/AcceptInvite.js";
 import { PasskeyProvider } from "./PasskeyPrompt.js";
 import { PwaUpdatePrompt, UnhandledErrorToast } from "./notices.js";
+import { stripReloadParam } from "./hard-refresh.js";
 
 /**
  * Branded boot screen — the studio's logo on a soft brand glow with a gentle
@@ -85,6 +86,10 @@ function App() {
     </>
   );
 }
+
+// Drop the cache-buster the manual "Check for updates" reload appends, so it
+// never gets bookmarked or shared.
+stripReloadParam();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
