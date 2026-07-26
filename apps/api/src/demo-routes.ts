@@ -11,10 +11,15 @@ import { seedExercises } from "./exercise-seed.js";
 import { newId, nowIso } from "./ids.js";
 import { j } from "./db.js";
 
+/** Sample clients. The "(demo)" suffix is load-bearing: this seeds into a real
+ *  studio's roster, there is no un-seed route, and these records count against the
+ *  plan's activeClients quota — so they must be obvious at a glance and trivially
+ *  filterable when the owner comes to archive them. Realistic-looking names with
+ *  no marker are indistinguishable from real clients. */
 const SAMPLE_CLIENTS = [
-  { name: "Sara Nadir", gender: "female", ageYears: 29, heightCm: 166, weightKg: 64, goal: "lose_weight" },
-  { name: "Omar Haddad", gender: "male", ageYears: 34, heightCm: 181, weightKg: 88, goal: "build_muscle" },
-  { name: "Lina Farah", gender: "female", ageYears: 41, heightCm: 159, weightKg: 71, goal: "improve_fitness" },
+  { name: "Sara Nadir (demo)", gender: "female", ageYears: 29, heightCm: 166, weightKg: 64, goal: "lose_weight" },
+  { name: "Omar Haddad (demo)", gender: "male", ageYears: 34, heightCm: 181, weightKg: 88, goal: "build_muscle" },
+  { name: "Lina Farah (demo)", gender: "female", ageYears: 41, heightCm: 159, weightKg: 71, goal: "improve_fitness" },
 ];
 
 export const demoRoutes = new Hono<AppEnv>().post("/admin/seed-demo", async (c) => {
@@ -31,10 +36,17 @@ export const demoRoutes = new Hono<AppEnv>().post("/admin/seed-demo", async (c) 
     await db.prepare("SELECT id FROM exercises WHERE tenant_id IS NULL LIMIT 6").all<{ id: string }>()
   ).results?.map((r) => r.id) ?? [];
 
-  // A marketplace package.
+  // A sample package — deliberately `private`, NOT `marketplace`.
+  //
+  // This seeder writes into the CALLER'S OWN tenant, which on a production
+  // deployment is a real studio. A `marketplace` package is live in every one of
+  // that studio's clients' Shop and genuinely purchasable, so seeding demo data
+  // used to put a $249 "12-Week Transformation" on sale to real people. `private`
+  // keeps it visible to staff (so the demo still shows a package) while making it
+  // grant-only, so nobody can buy it by accident.
   await db
     .prepare(
-      "INSERT INTO packages (id, tenant_id, name, description, one_time_price_cents, budgets_json, visibility, active, created_at) VALUES (?, ?, '12-Week Transformation', 'Full workout + nutrition coaching', 24900, ?, 'marketplace', 1, ?)",
+      "INSERT INTO packages (id, tenant_id, name, description, one_time_price_cents, budgets_json, visibility, active, created_at) VALUES (?, ?, '12-Week Transformation (demo)', 'Sample package created by demo seeding — safe to archive.', 24900, ?, 'private', 1, ?)",
     )
     .bind(newId("pkg"), who.tenantId, j([{ feature: "all", days: 84 }]), now)
     .run();

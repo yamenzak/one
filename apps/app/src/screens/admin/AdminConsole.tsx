@@ -425,6 +425,7 @@ function Tenants() {
   const [credits, setCredits] = useState("");
   const [gift, setGift] = useState<{ id: string; name: string } | null>(null);
   const [compTarget, setCompTarget] = useState<{ id: string; name: string; planId: string } | null>(null);
+  const [confirmDemo, setConfirmDemo] = useState(false);
   const load = useCallback(async () => setTenants((await api.get<{ tenants: Tenant[] }>("/api/admin/tenants")).tenants), []);
   useEffect(() => void load(), [load]);
 
@@ -446,8 +447,29 @@ function Tenants() {
     }>
       {tenants && (
     <Stagger className="space-y-3">
-      <Button variant="tonal" className="w-full" disabled={busy === "demo"} onClick={() => void seedDemo()}><Sparkles /> {busy === "demo" ? "Seeding…" : "Seed demo data into my tenant"}</Button>
-      {msg && <p className="text-center text-sm text-muted-foreground">{msg}</p>}
+      {/* This writes into the admin's OWN studio, not a sandbox, and there is no
+          un-seed route — so say so before it's clicked rather than after. */}
+      <Card className="space-y-2">
+        <div>
+          <div className="text-sm font-semibold">Demo data</div>
+          <p className="text-xs text-muted-foreground">
+            Adds 3 sample clients (named “(demo)”) with goals and a published plan, plus one grant-only sample package, to
+            <span className="font-medium text-foreground"> your own studio</span>. For screenshots and sales demos — not needed for a real studio.
+            It's skipped entirely if you already have clients, there's no undo, and the samples count against your client limit. Remove them by archiving.
+          </p>
+        </div>
+        <Button variant="tonal" className="w-full" disabled={busy === "demo"} onClick={() => setConfirmDemo(true)}><Sparkles /> {busy === "demo" ? "Seeding…" : "Seed demo data into my studio"}</Button>
+      </Card>
+      {msg && <p className="text-center text-sm text-muted-foreground" role="status">{msg}</p>}
+      <ConfirmDialog
+        open={confirmDemo}
+        onOpenChange={(o) => !o && setConfirmDemo(false)}
+        title="Add demo data to your studio?"
+        description="3 sample clients and a grant-only sample package will be added to this studio. There's no undo — you'd remove them by archiving each one. Skipped if you already have clients."
+        confirmLabel="Add demo data"
+        onConfirm={() => { setConfirmDemo(false); void seedDemo(); }}
+      />
+
       {tenants.map((t) => (
         <Card key={t.id} className="space-y-2.5">
           <div className="flex items-center justify-between"><div><div className="font-semibold">{t.name}</div><div className="text-xs text-muted-foreground">/{t.slug}</div></div><Badge tone={t.comp ? "sleep" : t.status === "active" ? "success" : "neutral"}>{t.comp ? "comped " : ""}{t.plan_id ?? "free"}</Badge></div>
