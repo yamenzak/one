@@ -27,6 +27,16 @@ export interface StripeInstance {
     confirmParams?: Record<string, unknown>;
     redirect?: "if_required" | "always";
   }): Promise<{ error?: { message?: string }; paymentIntent?: { status?: string } }>;
+  /** Trials collect a card without charging it: a trialing subscription's first
+   *  invoice is $0 and auto-paid, so Stripe issues a SetupIntent rather than a
+   *  PaymentIntent. Confirming a setup client secret with `confirmPayment` is a
+   *  Stripe.js integration error, so the sheet must branch on the intent mode. */
+  confirmSetup(opts: {
+    elements: StripeElements;
+    clientSecret?: string;
+    confirmParams?: Record<string, unknown>;
+    redirect?: "if_required" | "always";
+  }): Promise<{ error?: { message?: string }; setupIntent?: { status?: string } }>;
 }
 type StripeCtor = (publishableKey: string, options?: { stripeAccount?: string }) => StripeInstance;
 

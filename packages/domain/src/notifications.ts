@@ -99,7 +99,7 @@ export type NotifType =
   // client commerce (their plan & billing)
   | "access_granted" | "sub_expired" | "sub_expiring" | "sub_payment_failed"
   // studio billing (owner)
-  | "billing_suspended" | "billing_canceled" | "billing_past_due"
+  | "billing_suspended" | "billing_canceled" | "billing_past_due" | "billing_trial_ending"
   // sales (owner)
   | "payment_disputed" | "payment_refunded";
 
@@ -167,6 +167,8 @@ export const NOTIF_TYPES: Record<NotifType, NotifTypeMeta> = {
     template: { subject: "Your studio is suspended", body: "<p>Your Mossa subscription lapsed, so paid features are paused for you and your clients. Update your payment method to restore everything instantly.</p>" }, vars: [] },
   billing_canceled: { category: "billing", to: "owner", title: "Subscription canceled", link: "/business",
     template: { subject: "Your subscription was canceled", body: "<p>Your Mossa subscription was canceled and your studio is on the free plan. Resubscribe anytime to bring back paid features for you and your clients.</p>" }, vars: [] },
+  billing_trial_ending: { category: "billing", to: "owner", title: "Your free trial ends soon", link: "/business",
+    template: { subject: "Your Mossa trial ends in {{daysLeft}} days", body: "<p>Your free trial of the {{planName}} plan ends in {{daysLeft}} days, and your card will be charged then. Nothing to do if you're happy — change or cancel your plan any time from Business.</p>" }, vars: ["planName", "daysLeft"] },
   billing_past_due: { category: "billing", to: "owner", title: "Payment failed", link: "/business",
     template: { subject: "Payment failed — action needed", body: "<p>We couldn't charge your card for your Mossa subscription. Update your payment method to keep your studio running — you have a short grace period before features pause.</p>" }, vars: [] },
   payment_disputed: { category: "sales", to: "owner", title: "A client payment was disputed", link: "/clients" },

@@ -109,9 +109,22 @@ function Overview() {
   const startInline = async (path: string, body: Record<string, unknown>, title: string, label: (amountCents: number | null) => string, key: string) => {
     setBusy(key);
     try {
-      const r = await api.post<{ clientSecret?: string; publishableKey?: string; granted?: boolean; amountCents?: number }>(path, body);
+      const r = await api.post<{ clientSecret?: string; publishableKey?: string; granted?: boolean; amountCents?: number; mode?: "payment" | "setup"; trialDays?: number | null }>(path, body);
       if (r.granted) { onPaid(); return; } // promo covered it fully — nothing to charge
-      if (r.clientSecret && r.publishableKey) setCheckout({ intent: { clientSecret: r.clientSecret, publishableKey: r.publishableKey }, title, label: label(typeof r.amountCents === "number" ? r.amountCents : null) });
+      // `mode` MUST be forwarded. Starting a trial yields a SetupIntent, not a
+      // PaymentIntent (the first invoice is $0), and confirming one with the other
+      // is a Stripe.js integration error — so dropping this field makes the plan
+      // buttons on every trial-bearing plan fail. When it is a trial the sheet is
+      // collecting a card for later, not taking money, so relabel accordingly.
+      if (r.clientSecret && r.publishableKey) {
+        const setup = r.mode === "setup";
+        const days = typeof r.trialDays === "number" ? r.trialDays : null;
+        setCheckout({
+          intent: { clientSecret: r.clientSecret, publishableKey: r.publishableKey, mode: r.mode ?? "payment" },
+          title: setup && days ? `Start your ${days}-day free trial` : title,
+          label: setup ? (days ? `Start ${days}-day free trial` : "Save card") : label(typeof r.amountCents === "number" ? r.amountCents : null),
+        });
+      }
       else setFlash("Couldn't start checkout — Stripe isn't fully configured yet.");
     } catch (e) {
       const msg = e instanceof Error && e.message.startsWith("promo_") ? promoError(e.message) : "Couldn't start checkout. Please try again.";

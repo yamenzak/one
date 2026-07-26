@@ -15,6 +15,15 @@ export interface CheckoutIntent {
   publishableKey: string;
   /** Set for a direct charge on a connected account (tenant rail). */
   stripeAccount?: string;
+  /**
+   * `"setup"` when the client secret is a SetupIntent rather than a
+   * PaymentIntent — which is what starting a free trial produces: the
+   * subscription's first invoice is $0 and auto-paid, so there is nothing to
+   * charge and Stripe asks only for a saved card. Confirming a setup secret with
+   * `confirmPayment` is a Stripe.js integration error, so this drives the branch
+   * below. Defaults to `"payment"` for every existing caller.
+   */
+  mode?: "payment" | "setup";
 }
 
 export function PaymentSheet({
@@ -79,21 +88,27 @@ export function PaymentSheet({
     setBusy(true);
     setError(null);
     try {
-      const res = await stripe.confirmPayment({
+      const args = {
         elements,
         clientSecret: intent.clientSecret,
         confirmParams: { return_url: window.location.href },
-        redirect: "if_required",
-      });
+        redirect: "if_required" as const,
+      };
+      const setup = intent.mode === "setup";
+      const res = setup ? await stripe.confirmSetup(args) : await stripe.confirmPayment(args);
       if (res.error) {
-        setError(res.error.message ?? "Payment failed. Try another card.");
+        setError(res.error.message ?? (setup ? "Couldn't save that card. Try another." : "Payment failed. Try another card."));
         return;
       }
       onSuccess();
     } catch {
       // A thrown confirmPayment (network/JS error) must never strand the button
       // on "Processing…" — surface a retryable error and fall through to finally.
-      setError("Payment couldn't be completed. Check your connection and try again.");
+      setError(
+        intent.mode === "setup"
+          ? "Couldn't save your card. Check your connection and try again."
+          : "Payment couldn't be completed. Check your connection and try again.",
+      );
     } finally {
       setBusy(false);
     }

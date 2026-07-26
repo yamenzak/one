@@ -49,6 +49,11 @@ export function permissionFor(method: string, path: string): Record<string, stri
   // clients themselves; the handlers scope rows via requireClientAccess.
   if (path === "/api/clients" && !isGet) return { client: ["create"] };
   if (/^\/api\/clients\/[^/]+\/archive$/.test(path)) return { client: ["archive"] };
+  // Permanent delete is irreversible and reclaims storage — hold it to the same
+  // owner-only action as archive rather than letting the generic
+  // `client:["update"]` mapping through, which the TRAINER preset also carries.
+  // The handler re-checks `role === "owner"` as well; this is the outer wall.
+  if (/^\/api\/clients\/[^/]+\/delete$/.test(path)) return { client: ["archive"] };
   // Who staffs a client is studio management, not coaching. Reads stay open to
   // any coaching role (an assigned coach should see who else is on the client),
   // but assigning and unassigning ride `member:["update"]` — a resource only the

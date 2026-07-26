@@ -9,7 +9,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { resolveEntitlements, trialPeriodDays, buildBudgetsForPurchase, mergeAddOnBalances, type Budget, type AddOnBalance } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
-import { getSubscription, listPacks, listPlans, seedBilling, getConfig } from "./billing-store.js";
+import { getSubscription, listPacks, listPlans, seedBilling, getConfig, getPlan } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
 import { requireClientAccess } from "./clients.js";
 import { notify, notifyOwners } from "./notify.js";
@@ -887,6 +887,27 @@ async function handlePlatformEvent(
       const cur = await db.prepare("SELECT stripe_sub_id FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<{ stripe_sub_id: string | null }>();
       if (!cur?.stripe_sub_id || cur.stripe_sub_id !== subId) break;
       await db.prepare("UPDATE subscriptions SET status = 'canceled', plan_id = 'free', stripe_sub_id = NULL WHERE tenant_id = ?").bind(tenantId).run();
+      break;
+    }
+    case "customer.subscription.trial_will_end": {
+      // Stripe fires this 3 days out. Without it a trial simply becomes a charge
+      // with no warning, which is the single most reliable way to manufacture a
+      // chargeback and a bad review — the owner experiences it as a surprise
+      // debit. Notify, don't touch state: the trial→active and trial→canceled
+      // transitions are driven by subscription.updated / invoice events.
+      const tenantId = await tenantByCustomer(db, obj.customer);
+      if (!tenantId) break;
+      const trialEnd = typeof obj.trial_end === "number" ? obj.trial_end * 1000 : null;
+      const daysLeft = trialEnd ? Math.max(1, Math.ceil((trialEnd - Date.now()) / 86_400_000)) : 3;
+      const planId = await planForTenant(db, tenantId);
+      const plan = planId ? await getPlan(db, planId) : null;
+      await notifyOwners(env, tenantId, {
+        type: "billing_trial_ending",
+        message: `Your free trial ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"} — your card will be charged then.`,
+        // One notice per subscription, so a redelivered event can't nag twice.
+        dedupeKey: `trial_end_${typeof obj.id === "string" ? obj.id : tenantId}`,
+        vars: { planName: plan?.name ?? "your", daysLeft },
+      });
       break;
     }
   }

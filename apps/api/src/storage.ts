@@ -135,10 +135,24 @@ export async function purgePrefix(env: Env, prefix: string): Promise<number> {
     if (!listed.truncated) break;
     cursor = listed.cursor;
   }
+  // Tombstone the ledger with substr(), NOT `LIKE 'prefix%'`.
+  //
+  // D1 enforces SQLITE_LIMIT_LIKE_PATTERN_LENGTH = 50 characters, and it raises
+  // only when a row is actually tested — so an empty table passes and a populated
+  // one throws `D1_ERROR: LIKE or GLOB pattern too complex` straight into the
+  // catch below. A per-client prefix is `t/<32-char tenant>/c/<20-char client>/%`
+  // = 59 chars, so this tombstone silently never ran for any real client purge:
+  // the R2 objects went, the ledger rows stayed, and their bytes kept counting
+  // against the tenant's storage quota forever. Tenant-wide (36) and the nuclear
+  // `%` were both under the limit, which is why it hid.
+  //
+  // substr() also fixes a second latent bug: `_` is a LIKE single-char wildcard
+  // and every generated id contains one, so the pattern was matching more keys
+  // than intended.
   await env.DB
-    .prepare("UPDATE media_assets SET deleted_at = ? WHERE r2_key LIKE ? AND deleted_at IS NULL")
-    .bind(nowIso(), `${prefix}%`)
+    .prepare("UPDATE media_assets SET deleted_at = ? WHERE substr(r2_key, 1, ?) = ? AND deleted_at IS NULL")
+    .bind(nowIso(), prefix.length, prefix)
     .run()
-    .catch(() => undefined);
+    .catch((e) => console.error(`[purgePrefix] ledger tombstone failed for ${prefix}:`, e));
   return removed;
 }

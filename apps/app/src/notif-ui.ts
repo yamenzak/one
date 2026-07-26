@@ -40,6 +40,7 @@ const CODING: Record<NotifType, NotifCoding> = {
   billing_suspended: { icon: AlertTriangle, tone: "danger" },
   billing_canceled: { icon: AlertTriangle, tone: "danger" },
   billing_past_due: { icon: CreditCard, tone: "warning" },
+  billing_trial_ending: { icon: CreditCard, tone: "warning" },
   payment_disputed: { icon: AlertTriangle, tone: "danger" },
   payment_refunded: { icon: CreditCard, tone: "warning" },
 };

@@ -70,6 +70,7 @@ describe("route gate — roster and studio management stay staff-only", () => {
   const staffOnly: [string, string, string][] = [
     ["create a client", "POST", "/api/clients"],
     ["archive a client", "POST", `${CLI}/archive`],
+    ["permanently delete a client", "POST", `${CLI}/delete`],
     ["assign a coach", "POST", `${CLI}/trainers`],
     ["unassign a coach", "DELETE", `${CLI}/trainers/u_1`],
     ["set a client's default lane", "PATCH", `${CLI}/default-lane`],
@@ -98,6 +99,17 @@ describe("route gate — roster and studio management stay staff-only", () => {
     }
     expect(passes("trainer", "GET", `${CLI}/trainers`)).toBe(true);
     expect(passes("assistant", "GET", `${CLI}/trainers`)).toBe(true);
+  });
+
+  it("permanently deleting a client is owner-only at the gate, not just in the handler", () => {
+    // The generic non-GET /api/clients mapping is `client:["update"]`, which the
+    // trainer preset carries — so without an explicit branch an irreversible,
+    // storage-reclaiming delete would clear the outer wall for a trainer and rest
+    // entirely on the in-handler role check.
+    expect(passes("owner", "POST", `${CLI}/delete`)).toBe(true);
+    for (const role of ["trainer", "assistant", "client"]) {
+      expect(passes(role, "POST", `${CLI}/delete`), `${role} deletes a client`).toBe(false);
+    }
   });
 
   it("only the owner reaches billing, settings and staff management", () => {
