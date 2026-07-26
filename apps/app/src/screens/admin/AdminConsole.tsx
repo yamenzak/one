@@ -492,28 +492,73 @@ function Tenants() {
  *    so a client pays their coach and no access is ever granted;
  *  • mode pinned to "test" → live keys could never be activated from the product.
  */
+type StripeLane = "test" | "live";
+type StripeMode = StripeLane | "disabled";
+type LaneCreds = { secretKey: string; publishableKey: string; webhookSecret: string; connectWebhookSecret: string };
+interface LaneStatus {
+  secretKey: boolean;
+  publishableKey: boolean;
+  webhookSecret: boolean;
+  connectWebhookSecret: boolean;
+  complete: boolean;
+  secretKeyLast4: string | null;
+  publishableKeyLast4: string | null;
+  secretKeyLane: StripeLane | null;
+  publishableKeyLane: StripeLane | null;
+}
+interface StripeStatusView {
+  mode: StripeMode;
+  enabled: boolean;
+  activeLane: StripeLane;
+  keyLane: StripeLane | null;
+  laneMismatch: boolean;
+  activeLaneComplete: boolean;
+  connectWebhookMissing: boolean;
+  connectWebhookFallback: boolean;
+  lanes: Record<StripeLane, LaneStatus>;
+  legacy: LaneStatus;
+  active: LaneStatus & { lane: StripeLane; sources: Record<keyof LaneCreds, "lane" | "legacy" | "none"> };
+  platformFeeBps: number;
+}
+
+const EMPTY_CREDS: LaneCreds = { secretKey: "", publishableKey: "", webhookSecret: "", connectWebhookSecret: "" };
+const CRED_LABEL: Record<keyof LaneCreds, string> = {
+  secretKey: "secret key",
+  publishableKey: "publishable key",
+  webhookSecret: "platform webhook secret",
+  connectWebhookSecret: "Connect webhook secret",
+};
+const nonEmpty = (c: LaneCreds): Partial<LaneCreds> => Object.fromEntries(Object.entries(c).filter(([, v]) => v.trim() !== ""));
+const hasAny = (c: LaneCreds) => Object.keys(nonEmpty(c)).length > 0;
+/** "stored ••3f9a — blank keeps it" / "not set", per field. */
+const storedHint = (present: boolean, last4: string | null, viaLegacy: boolean): string =>
+  present ? `stored${last4 ? ` ••${last4}` : ""}${viaLegacy ? " (from the pre-lane key)" : ""} — leave blank to keep it` : "not set";
+
 function StripeConfig() {
-  const [status, setStatus] = useState<{ mode: string; enabled: boolean; platformFeeBps?: number } | null>(null);
-  const [mode, setMode] = useState<"test" | "live" | "disabled">("test");
-  const [secretKey, setSecretKey] = useState("");
-  const [publishableKey, setPublishableKey] = useState("");
-  const [webhookSecret, setWebhookSecret] = useState("");
-  const [connectWebhookSecret, setConnectWebhookSecret] = useState("");
+  const [status, setStatus] = useState<StripeStatusView | null>(null);
+  const [mode, setMode] = useState<StripeMode>("test");
+  const [editLane, setEditLane] = useState<StripeLane>("test");
+  const [creds, setCreds] = useState<Record<StripeLane, LaneCreds>>({ test: { ...EMPTY_CREDS }, live: { ...EMPTY_CREDS } });
   const [feeBps, setFeeBps] = useState("");
-  const [busy, setBusy] = useState<"save" | "sync" | null>(null);
+  const [busy, setBusy] = useState<"save" | "sync" | "flip" | null>(null);
+  const [flipTo, setFlipTo] = useState<StripeMode | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const loadStatus = useCallback(async () => {
-    const s = await api.get<{ mode: string; enabled: boolean; platformFeeBps?: number }>("/api/admin/stripe/status");
+  const apply = useCallback((s: StripeStatusView) => {
     setStatus(s);
-    if (s.mode === "test" || s.mode === "live" || s.mode === "disabled") setMode(s.mode);
+    setMode(s.mode);
+    setEditLane(s.mode === "disabled" ? "test" : s.mode);
     if (typeof s.platformFeeBps === "number") setFeeBps(String(s.platformFeeBps));
   }, []);
-  useEffect(() => { void loadStatus().catch(() => undefined); }, [loadStatus]);
+  const loadStatus = useCallback(async () => apply(await api.get<StripeStatusView>("/api/admin/stripe/status")), [apply]);
+  useEffect(() => { void loadStatus().catch((e) => setErr(errorText(e, "Could not read the Stripe status"))); }, [loadStatus]);
+
+  const setCred = (lane: StripeLane, k: keyof LaneCreds, v: string) => setCreds((c) => ({ ...c, [lane]: { ...c[lane], [k]: v } }));
 
   // Keys are write-only (never read back), so only send what was actually typed —
-  // otherwise saving the fee would blank a key that is already stored.
+  // otherwise saving the fee would blank a key that is already stored. Both lanes
+  // go in one request, so test and live can be filled in before any flip.
   const save = async () => {
     setBusy("save");
     setErr(null);
@@ -524,22 +569,39 @@ function StripeConfig() {
         setErr("Platform fee must be a whole number of basis points between 0 and 10000.");
         return;
       }
-      await api.post("/api/admin/stripe/config", {
+      const r = await api.post<{ status: StripeStatusView }>("/api/admin/stripe/config", {
         mode,
-        ...(secretKey ? { secretKey } : {}),
-        ...(publishableKey ? { publishableKey } : {}),
-        ...(webhookSecret ? { webhookSecret } : {}),
-        ...(connectWebhookSecret ? { connectWebhookSecret } : {}),
+        lanes: {
+          ...(hasAny(creds.test) ? { test: nonEmpty(creds.test) } : {}),
+          ...(hasAny(creds.live) ? { live: nonEmpty(creds.live) } : {}),
+        },
         ...(fee !== undefined ? { platformFeeBps: fee } : {}),
       });
-      setSecretKey("");
-      setPublishableKey("");
-      setWebhookSecret("");
-      setConnectWebhookSecret("");
-      await loadStatus();
-      setMsg("Saved. Run Sync catalog to push plans + credit packs to Stripe.");
+      setCreds({ test: { ...EMPTY_CREDS }, live: { ...EMPTY_CREDS } });
+      if (r?.status) apply(r.status); else await loadStatus();
+      setMsg("Saved. Run Sync catalog to push plans + credit packs to Stripe for the active lane.");
     } catch (e) {
       setErr(errorText(e, "Could not save the Stripe configuration"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** The flip: one request that changes nothing but the active lane. */
+  const flip = async (target: StripeMode) => {
+    setBusy("flip");
+    setErr(null);
+    setMsg(null);
+    try {
+      const r = await api.post<{ status: StripeStatusView; catalogSwapped?: boolean }>("/api/admin/stripe/config", { mode: target });
+      if (r?.status) apply(r.status); else await loadStatus();
+      setMsg(
+        target === "disabled"
+          ? "Payments are now disabled. No checkout will start on either rail."
+          : `Now on the ${target} lane, using the ${target} keys already stored.${r?.catalogSwapped ? " Catalog ids were swapped to that lane — run Sync catalog if a plan or pack has none yet." : ""}`,
+      );
+    } catch (e) {
+      setErr(errorText(e, "Could not switch lane"));
     } finally {
       setBusy(null);
     }
@@ -551,7 +613,7 @@ function StripeConfig() {
     setMsg(null);
     try {
       const r = await api.post<{ plans: number; packs: number }>("/api/admin/stripe/sync");
-      setMsg(`Synced ${r.plans} plans + ${r.packs} credit packs.`);
+      setMsg(`Synced ${r.plans} plans + ${r.packs} credit packs into the ${status?.activeLane ?? "active"} lane.`);
     } catch (e) {
       setErr(errorText(e, "Catalog sync failed"));
     } finally {
@@ -559,20 +621,158 @@ function StripeConfig() {
     }
   };
 
-  const keyMismatch =
-    (mode === "live" && (secretKey.startsWith("sk_test_") || publishableKey.startsWith("pk_test_"))) ||
-    (mode === "test" && (secretKey.startsWith("sk_live_") || publishableKey.startsWith("pk_live_")));
+  // Mirrors the server's write-path refusal: a key whose prefix names the other
+  // lane is rejected, so warn before the round-trip.
+  const typedLaneClash = (["test", "live"] as const).filter((lane) => {
+    const other = lane === "test" ? "live" : "test";
+    return creds[lane].secretKey.startsWith(`sk_${other}_`) || creds[lane].publishableKey.startsWith(`pk_${other}_`);
+  });
+  const laneOf = (l: StripeLane) => status?.lanes[l];
+  const missingActive = status && status.mode !== "disabled"
+    ? (Object.keys(CRED_LABEL) as (keyof LaneCreds)[]).filter((k) => !status.active[k])
+    : [];
+  const targets: StripeMode[] = status ? (["test", "live", "disabled"] as StripeMode[]).filter((m) => m !== status.mode) : [];
 
   return (
     <Stagger className="space-y-3">
-      <Card className="space-y-4">
-        <div className="flex items-center justify-between">
+      {/* ── What is actually in force right now ───────────────────────────── */}
+      <Card className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
           <h2 className="font-semibold">Stripe</h2>
-          <Badge tone={status?.enabled ? "success" : "neutral"}>{status?.mode ?? "…"}</Badge>
+          <Badge tone={!status ? "neutral" : status.mode === "disabled" ? "neutral" : status.laneMismatch || !status.activeLaneComplete ? "warning" : "success"}>
+            {!status ? "…" : status.mode === "disabled" ? "Payments disabled" : `${status.mode === "live" ? "Live" : "Test"} · active`}
+          </Badge>
         </div>
+        <p className="text-[13px] text-muted-foreground" role="status" aria-live="polite">
+          {!status
+            ? "Reading the current configuration…"
+            : status.mode === "disabled"
+              ? "No checkout can start on either rail. Store a lane's keys below, then switch to it."
+              : status.activeLaneComplete
+                ? `All four ${status.mode} credentials are in place${status.keyLane ? `, and the active secret key really is a ${status.keyLane}-mode key` : ""}. Real money ${status.mode === "live" ? "does" : "does not"} move in this lane.`
+                : `The ${status.mode} lane is incomplete: no ${missingActive.map((k) => CRED_LABEL[k]).join(", ")}.`}
+        </p>
+        {status?.laneMismatch && (
+          <p className="rounded-xl bg-danger-soft p-3 text-[13px] font-medium text-danger" role="alert">
+            <AlertTriangle className="mr-1 inline size-4" aria-hidden />
+            The key that is active is a <b>{status.keyLane}</b>-mode key while the mode says <b>{status.mode}</b>. {status.keyLane === "live" ? "Real charges are being taken under a test label." : "Nothing you charge is real."} Store matching keys in the {status.mode} lane, or switch to {status.keyLane} mode.
+          </p>
+        )}
+        {status && status.mode !== "disabled" && status.connectWebhookMissing && (
+          <p className="rounded-xl bg-danger-soft p-3 text-[13px] font-medium text-danger" role="alert">
+            <AlertTriangle className="mr-1 inline size-4" aria-hidden />
+            No Connect webhook secret in the {status.mode} lane{status.connectWebhookFallback ? " — Connect events fall back to the platform secret, which is a different endpoint and will fail signature verification" : ""}. A client pays their coach and no access is granted, with no error anywhere.
+          </p>
+        )}
+        {status && (
+          <div className="flex flex-wrap gap-1.5" aria-label="Credentials stored per lane">
+            {(["test", "live"] as const).map((lane) => (
+              <Badge key={lane} tone={laneOf(lane)?.complete ? "success" : laneOf(lane)?.secretKey ? "warning" : "neutral"}>
+                {lane}: {laneOf(lane)?.complete ? "all 4 stored" : `${(Object.keys(CRED_LABEL) as (keyof LaneCreds)[]).filter((k) => laneOf(lane)?.[k]).length}/4 stored`}
+              </Badge>
+            ))}
+            {status.legacy.secretKey && <Badge tone="neutral">pre-lane keys present (used as a fallback)</Badge>}
+          </div>
+        )}
+      </Card>
+
+      {/* ── The flip: one action, and what it does ────────────────────────── */}
+      <Card className="space-y-3">
+        <h3 className="text-sm font-semibold">Active lane</h3>
+        <p className="text-[13px] text-muted-foreground">
+          Switching lane changes which stored credentials every payment path uses — nothing is re-pasted. Test and live products and prices are <b>separate objects</b> in Stripe, so
+          run <b>Sync catalog</b> after a switch (ids are kept per lane, so a lane you have already synced comes back with its own).
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {targets.map((t) => (
+            <Button
+              key={t}
+              variant={t === "disabled" ? "outline" : "default"}
+              className="min-h-12 flex-1"
+              disabled={busy !== null || !status}
+              onClick={() => setFlipTo(t)}
+            >
+              {busy === "flip" ? "Switching…" : t === "disabled" ? "Disable payments" : `Switch to ${t}`}
+            </Button>
+          ))}
+        </div>
+        {status && status.mode !== "disabled" && !status.activeLaneComplete && (
+          <p className="text-[13px] text-warning" role="alert">Finish the {status.mode} lane before taking a real payment — {missingActive.map((k) => CRED_LABEL[k]).join(", ")} missing.</p>
+        )}
+      </Card>
+
+      {/* ── Per-lane credential editor ────────────────────────────────────── */}
+      <Card className="space-y-4">
+        <div className="space-y-1.5">
+          <h3 className="text-sm font-semibold">Credentials</h3>
+          <p className="text-[13px] text-muted-foreground">
+            Each lane has its own keys and its own two webhook secrets. Fill in both lanes once and switching is a one-click mode change. Keys are stored write-only — a blank field keeps what is saved.
+          </p>
+        </div>
+        <SegmentedControl
+          fill
+          options={[{ value: "test", label: "Test lane" }, { value: "live", label: "Live lane" }]}
+          value={editLane}
+          onChange={setEditLane}
+        />
+        {(["test", "live"] as const).map((lane) =>
+          lane !== editLane ? null : (
+            <div key={lane} className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[13px] font-medium">Editing the <b>{lane}</b> lane{status?.mode === lane ? " (currently active)" : ""}</span>
+                {hasAny(creds[lane]) && <Badge tone="primary">unsaved</Badge>}
+              </div>
+              <Field
+                label={`${lane} secret key (sk_${lane}_…)`}
+                icon={KeyRound}
+                value={creds[lane].secretKey}
+                onChange={(e) => setCred(lane, "secretKey", e.target.value)}
+                hint={storedHint(!!laneOf(lane)?.secretKey, laneOf(lane)?.secretKeyLast4 ?? null, false)}
+                placeholder={`sk_${lane}_…`}
+              />
+              <Field
+                label={`${lane} publishable key (pk_${lane}_…)`}
+                icon={KeyRound}
+                value={creds[lane].publishableKey}
+                onChange={(e) => setCred(lane, "publishableKey", e.target.value)}
+                hint={storedHint(!!laneOf(lane)?.publishableKey, laneOf(lane)?.publishableKeyLast4 ?? null, false)}
+                placeholder="required for in-app payments"
+              />
+              <div className="space-y-2 rounded-2xl bg-surface-2 p-3">
+                <div className="text-[13px] font-medium">Webhook signing secrets ({lane})</div>
+                <p className="text-[13px] text-muted-foreground">
+                  Two endpoints, two secrets, <b>and a separate pair per lane</b>. <span className="font-medium text-foreground">Platform</span> is <code>/api/stripe/webhook</code> (studios paying Mossa).
+                  {" "}<span className="font-medium text-foreground">Connect</span> is <code>/api/connect/webhook</code> (clients paying their coach) and needs “Listen to events on connected accounts” enabled.
+                  Without the Connect secret, a client's payment succeeds and no access is granted.
+                </p>
+                <Field
+                  label={`Platform webhook secret (${lane})`}
+                  icon={KeyRound}
+                  value={creds[lane].webhookSecret}
+                  onChange={(e) => setCred(lane, "webhookSecret", e.target.value)}
+                  hint={storedHint(!!laneOf(lane)?.webhookSecret, null, false)}
+                  placeholder="whsec_…"
+                />
+                <Field
+                  label={`Connect webhook secret (${lane})`}
+                  icon={KeyRound}
+                  value={creds[lane].connectWebhookSecret}
+                  onChange={(e) => setCred(lane, "connectWebhookSecret", e.target.value)}
+                  hint={storedHint(!!laneOf(lane)?.connectWebhookSecret, null, false)}
+                  placeholder="whsec_…"
+                />
+              </div>
+            </div>
+          ),
+        )}
+        {typedLaneClash.length > 0 && (
+          <p className="text-[13px] font-medium text-warning" role="alert">
+            The {typedLaneClash.join(" and ")} lane holds a key from the other mode — a <code>sk_live_</code>/<code>pk_live_</code> key can only be stored in the live lane, and the reverse. This will be refused on save.
+          </p>
+        )}
 
         <div className="space-y-1.5">
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mode</div>
+          <div className="text-[13px] font-medium">Mode to save with</div>
           <div className="flex gap-2" role="radiogroup" aria-label="Stripe mode">
             {(["test", "live", "disabled"] as const).map((m) => (
               <button
@@ -580,28 +780,12 @@ function StripeConfig() {
                 role="radio"
                 aria-checked={mode === m}
                 onClick={() => setMode(m)}
-                className={cn("min-h-12 flex-1 rounded-xl px-3 text-sm font-medium capitalize transition-colors", mode === m ? "bg-primary text-primary-foreground" : "bg-secondary")}
+                className={cn("min-h-12 flex-1 rounded-xl px-3 text-[13px] font-medium capitalize transition-colors", mode === m ? "bg-primary text-primary-foreground" : "bg-secondary")}
               >
                 {m}
               </button>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">Keys are stored write-only — leave a field blank to keep what's already saved.</p>
-        </div>
-
-        <Field label="Secret key (sk_…)" icon={KeyRound} value={secretKey} onChange={(e) => setSecretKey(e.target.value)} placeholder="leave blank to keep current" />
-        <Field label="Publishable key (pk_…)" icon={KeyRound} value={publishableKey} onChange={(e) => setPublishableKey(e.target.value)} placeholder="required for in-app payments" />
-        {keyMismatch && <p className="text-sm text-warning" role="alert">These keys don't match the selected mode — check you haven't pasted test keys into live, or the reverse.</p>}
-
-        <div className="space-y-1.5 rounded-2xl bg-surface-2 p-3">
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Webhook signing secrets</div>
-          <p className="text-xs text-muted-foreground">
-            Two separate endpoints, two separate secrets. <span className="font-medium text-foreground">Platform</span> is <code>/api/stripe/webhook</code> (studios paying Mossa).
-            {" "}<span className="font-medium text-foreground">Connect</span> is <code>/api/connect/webhook</code> (clients paying their coach) and needs “Listen to events on connected accounts” enabled.
-            Without the Connect secret, a client's payment succeeds and no access is granted.
-          </p>
-          <Field label="Platform webhook secret (whsec_…)" icon={KeyRound} value={webhookSecret} onChange={(e) => setWebhookSecret(e.target.value)} placeholder="leave blank to keep current" />
-          <Field label="Connect webhook secret (whsec_…)" icon={KeyRound} value={connectWebhookSecret} onChange={(e) => setConnectWebhookSecret(e.target.value)} placeholder="leave blank to keep current" />
         </div>
 
         <Field
@@ -614,12 +798,26 @@ function StripeConfig() {
         />
 
         <div className="flex gap-3">
-          <Button className="flex-1" disabled={busy !== null} onClick={() => void save()}>{busy === "save" ? "Saving…" : "Save"}</Button>
-          <Button variant="outline" className="flex-1" disabled={busy !== null || !status?.enabled} onClick={() => void sync()}>{busy === "sync" ? "Syncing…" : "Sync catalog"}</Button>
+          <Button className="min-h-12 flex-1" disabled={busy !== null} onClick={() => void save()}>{busy === "save" ? "Saving…" : "Save"}</Button>
+          <Button variant="outline" className="min-h-12 flex-1" disabled={busy !== null || !status?.enabled} onClick={() => void sync()}>{busy === "sync" ? "Syncing…" : "Sync catalog"}</Button>
         </div>
-        {err && <p className="text-sm text-warning" role="alert">{err}</p>}
-        {msg && <p className="text-sm text-muted-foreground" role="status">{msg}</p>}
+        {err && <p className="text-[13px] font-medium text-warning" role="alert">{err}</p>}
+        {msg && <p className="text-[13px] text-muted-foreground" role="status" aria-live="polite">{msg}</p>}
       </Card>
+
+      <ConfirmDialog
+        open={flipTo !== null}
+        onOpenChange={(o) => !o && setFlipTo(null)}
+        title={flipTo === "disabled" ? "Disable payments?" : `Switch payments to ${flipTo}?`}
+        description={
+          flipTo === "disabled"
+            ? "Both rails stop: no plan, credit-pack or client-package checkout can start. Stored keys are kept."
+            : `Every payment path switches to the ${flipTo} keys and the ${flipTo} webhook secrets already stored — nothing is re-pasted.${flipTo && status?.lanes[flipTo as StripeLane] && !status.lanes[flipTo as StripeLane].complete ? ` That lane is incomplete (${(Object.keys(CRED_LABEL) as (keyof LaneCreds)[]).filter((k) => !status.lanes[flipTo as StripeLane][k]).map((k) => CRED_LABEL[k]).join(", ")} missing), and any gap fails silently at payment time.` : ""} Test and live products/prices are separate objects in Stripe, so run Sync catalog afterwards.`
+        }
+        confirmLabel={flipTo === "disabled" ? "Disable" : `Switch to ${flipTo}`}
+        destructive={flipTo === "live" || flipTo === "disabled"}
+        onConfirm={() => { if (flipTo) void flip(flipTo); }}
+      />
     </Stagger>
   );
 }

@@ -243,11 +243,13 @@ section 6.
 | `google.gemini_key` | *(empty)* | **The whole vision suite is unavailable**: Snap-a-Meal, Label Reader, lab-extract, image generation, body-scan voice. Every `task: "vision"` model in the seed catalog is provider `google` | Platform admin → **AI** |
 | `ai.mock` | `auto` | `auto` only falls back to the mock on the dev lane; `on` forces the mock (and bills for it) — never set `on` in production | Platform admin → **AI** |
 | `ai.markup` | `3` | **This is the multiplier tenants are billed at** for AI. Valid 1–100. Review before selling credits | Platform admin → **AI** |
-| `stripe.mode` | `disabled` | No payments at all | Platform admin → **Stripe** |
-| `stripe.secret_key` | *(empty)* | No payments | Platform admin → **Stripe** |
-| `stripe.publishable_key` | *(empty)* | Payment Element can't mount | Platform admin → **Stripe** |
-| `stripe.webhook_secret` | *(empty)* | **Platform-rail webhooks rejected 400** → subscriptions and credit packs are paid for and never granted | Platform admin → **Stripe** |
-| `stripe.connect_webhook_secret` | *(empty)* | Falls back to `stripe.webhook_secret`; if that's also unset, **Connect webhooks rejected** → clients pay and get nothing | Platform admin → **Stripe** |
+| `stripe.mode` | `disabled` | No payments at all. `test` / `live` also **select the credential lane** (below) | Platform admin → **Stripe** |
+| `stripe.<lane>.secret_key` | *(empty)* | No payments in that lane (`<lane>` = `test` or `live`) | Platform admin → **Stripe** |
+| `stripe.<lane>.publishable_key` | *(empty)* | Payment Element can't mount | Platform admin → **Stripe** |
+| `stripe.<lane>.webhook_secret` | *(empty)* | **Platform-rail webhooks rejected 400** → subscriptions and credit packs are paid for and never granted | Platform admin → **Stripe** |
+| `stripe.<lane>.connect_webhook_secret` | *(empty)* | Falls back to that lane's `webhook_secret`; if that's also unset, **Connect webhooks rejected** → clients pay and get nothing | Platform admin → **Stripe** |
+| `stripe.secret_key`, `stripe.publishable_key`, `stripe.webhook_secret`, `stripe.connect_webhook_secret` | *(empty)* | **Legacy, pre-lane slots.** Still read as a per-credential fallback when the active lane has no value, so an existing deployment keeps working; a lane-scoped write takes precedence | Platform admin → **Stripe** (writes go to a lane) |
+| `stripe.<lane>.catalog_ids` | *(empty)* | Written by the product, not by hand: the Stripe product/price ids parked for a lane across a mode flip (section 10a) | — |
 | `stripe.platform_fee_bps` | `0` | Zero application fee on tenant→client payments (the advertised "zero markup") | Platform admin → **Stripe** |
 | `turnstile.site_key` | *(empty)* | Login shows no bot check | Platform admin → **Security** |
 | `turnstile.secret` | *(empty)* | **Turnstile is off** — OTP send is unthrottled per-IP | Platform admin → **Security** |
@@ -268,11 +270,55 @@ money is captured and nothing is ever granted** — the customer is charged, the
 subscription/credit pack/client package never activates, and there is no
 reconciliation job that will notice.
 
-### 10a. Keys
+### 10a. Keys — two lanes, one switch
 
-Platform admin → **Stripe** → paste `stripe.secret_key` +
-`stripe.publishable_key`, set `stripe.mode`, then run **Sync catalog** (creates
-the Stripe products/prices for plans and credit packs).
+Every credential is stored **per lane**: `stripe.test.*` and `stripe.live.*`,
+with `stripe.mode` (`test` | `live` | `disabled`) selecting the lane that is
+actually in force. Test mode and live mode are different objects in Stripe —
+different keys *and* different webhook endpoints with different signing secrets —
+so this is what makes switching a one-click change instead of a five-value
+re-paste, and what stops a half-swap (live secret key + test webhook secret) in
+which every webhook fails signature verification and clients pay for nothing.
+
+Platform admin → **Stripe**:
+
+1. Fill in the **Test lane** and the **Live lane** independently (four fields
+   each: secret key, publishable key, platform webhook secret, Connect webhook
+   secret). Both can be stored before either is active. Fields are write-only —
+   blank keeps what is saved.
+2. **Switch to test / Switch to live** is one action and changes nothing but the
+   active lane.
+3. Run **Sync catalog** after a switch. Stripe products/prices are per-lane
+   objects, so ids are parked per lane (`stripe.<lane>.catalog_ids`) on a flip and
+   restored when you flip back; a lane that has never been synced needs one.
+
+**Existing deployments need no migration.** The pre-lane unscoped keys
+(`stripe.secret_key`, `stripe.publishable_key`, `stripe.webhook_secret`,
+`stripe.connect_webhook_secret`) are still read as a **per-credential fallback**
+for whichever lane is active, so a studio configured before lanes existed keeps
+taking payments untouched. The first lane-scoped value you save takes precedence
+over the legacy key of the same name; the legacy key is never rewritten or
+deleted.
+
+**`stripe.mode` is now honest.** The lane genuinely selects the credentials, and
+the write path **refuses** (400, nothing written) to store an `sk_live_`/`pk_live_`
+key in the test lane or the reverse, and refuses a mode whose resulting active
+keys belong to the other lane. A mismatch that already exists in the legacy keys
+(live keys stored while the mode says `test` — real money under a test label) is
+**not** silently corrected and does not fail closed at runtime, because that would
+take a paying deployment offline on deploy: instead `/api/admin/stripe/status`
+reports the key's real lane as a separate fact and the admin screen shows a red
+alert until it is resolved.
+
+**Not lane-scoped (know this before flipping a live deployment):** Stripe
+customer ids (`subscriptions.stripe_customer_id`), platform/client subscription
+ids, and connected-account ids (`tenant_settings.stripe_account_id`) are also
+per-lane objects in Stripe, and they are deliberately left alone — clearing a
+live connected-account mapping would break the Connect webhook's account→tenant
+resolution for real, paying tenants. So a flip into a lane those ids were not
+created in produces loud API failures ("No such customer") on the affected paths,
+not silent damage. Treat lane flips as a setup/staging action, not a routine
+toggle on a live studio.
 
 ### 10b. Create TWO webhook endpoints
 
@@ -291,8 +337,8 @@ Stripe Dashboard → Developers → Webhooks → **Add endpoint**, twice.
   - `customer.subscription.deleted`
   - `charge.refunded`
   - `charge.dispute.created`
-- Copy the signing secret (`whsec_…`) → platform admin → Stripe →
-  **`stripe.webhook_secret`**.
+- Copy the signing secret (`whsec_…`) → platform admin → Stripe → the **platform
+  webhook secret of the lane this endpoint belongs to** (`stripe.<lane>.webhook_secret`).
 
 **2. Connect rail** — your tenants' revenue (clients buying packages on the
 tenant's own connected account).
@@ -303,13 +349,15 @@ tenant's own connected account).
   purchase is paid-but-ungranted.
 - Events: the same nine as above, **plus `account.updated`** (this is what
   flips a tenant's onboarding status to charges-enabled).
-- Copy that endpoint's signing secret → platform admin → Stripe →
-  **`stripe.connect_webhook_secret`**.
+- Copy that endpoint's signing secret → platform admin → Stripe → the **Connect
+  webhook secret of that lane** (`stripe.<lane>.connect_webhook_secret`).
 
-The two endpoints have **different** signing secrets. If you leave
-`stripe.connect_webhook_secret` empty the code falls back to
-`stripe.webhook_secret`, which will fail signature verification for Connect
-events — a silent 400 per event.
+The two endpoints have **different** signing secrets, and **so does each lane** —
+test-mode and live-mode webhook endpoints are separate objects in Stripe. That is
+four signing secrets in total if you run both lanes. If you leave a lane's Connect
+secret empty the code falls back to that same lane's platform secret, which will
+fail signature verification for Connect events — a silent 400 per event. The
+admin screen flags a missing Connect secret in red for exactly this reason.
 
 ### 10c. Verify
 

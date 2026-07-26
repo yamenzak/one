@@ -14,13 +14,23 @@ import { gateFeature } from "./client-flags.js";
 import { requireClientAccess } from "./clients.js";
 import { notify, notifyOwners } from "./notify.js";
 import {
+  credentialLane,
   ensureCustomer,
+  laneForMode,
+  resolveStripeConfig,
   stripeCall,
   stripeConfig,
   stripeEnabled,
+  stripeLaneConfigKey,
+  stripeLaneMismatch,
+  stripeStatus,
+  swapCatalogLane,
   syncCatalog,
   verifyWebhook,
   setConfig,
+  STRIPE_CREDENTIALS,
+  type StripeCredential,
+  type StripeLane,
 } from "./stripe.js";
 import { newId, nowIso, nowMs, periodKey } from "./ids.js";
 import { parseJson, j } from "./db.js";
@@ -570,30 +580,116 @@ async function syncConnectAccount(db: D1Database, a: { id?: string; charges_enab
     .run();
 }
 
+/** Per-credential paste validation. The prefix rules are Stripe's own, so a
+ *  wrong-slot paste (publishable key into the secret field, platform signing
+ *  secret into a key field) is refused at the door rather than discovered as a
+ *  dead payment path. */
+const CREDENTIAL_SHAPE: Record<StripeCredential, { prefix: RegExp; label: string; expect: string }> = {
+  secretKey: { prefix: /^sk_/, label: "Secret key", expect: "sk_…" },
+  publishableKey: { prefix: /^pk_/, label: "Publishable key", expect: "pk_…" },
+  webhookSecret: { prefix: /^whsec_/, label: "Platform webhook secret", expect: "whsec_…" },
+  connectWebhookSecret: { prefix: /^whsec_/, label: "Connect webhook secret", expect: "whsec_…" },
+};
+
+const CredentialBody = z.object({
+  secretKey: z.string().max(400).optional(),
+  publishableKey: z.string().max(400).optional(),
+  webhookSecret: z.string().max(400).optional(),
+  connectWebhookSecret: z.string().max(400).optional(),
+});
+
 /** Admin Stripe config + catalog sync (platform-admin lane). */
 export const stripeAdminRoutes = new Hono<AppEnv>()
+  /**
+   * Write Stripe credentials into a LANE (`stripe.<lane>.*`), so test and live
+   * can both be stored and flipping between them is a `mode` change with no
+   * re-paste. Shapes accepted:
+   *   • `{ lanes: { test: {...}, live: {...} } }` — both lanes at once.
+   *   • flat `{ secretKey, … }` — targets `lane`, else the lane of the `mode`
+   *     being set, else the currently active lane. (This is the pre-lane request
+   *     shape; it now lands in a lane, which takes precedence over the legacy
+   *     unscoped key of the same name.)
+   * A blank/absent field always preserves what is stored — keys are write-only.
+   *
+   * Refusals (400, nothing written): a value whose prefix contradicts the lane
+   * it is being stored in, and a `mode` whose resulting active secret/publishable
+   * key really belongs to the other lane. That is the guard that makes
+   * `stripe.mode` honest: live keys can no longer be filed under a test label.
+   * We refuse rather than "correct" the mode, because silently relabelling what
+   * an operator typed is how a live key ends up active by accident.
+   */
   .post("/admin/stripe/config", async (c) => {
-    const body = z
-      .object({
-        mode: z.enum(["disabled", "test", "live"]).optional(),
-        secretKey: z.string().optional(),
-        publishableKey: z.string().optional(),
-        webhookSecret: z.string().optional(),
-        connectWebhookSecret: z.string().optional(),
-        /** Platform application fee on client→tenant purchases, in basis points
-         *  (0–10000 = 0–100%). Default 0 = tenant keeps everything. */
-        platformFeeBps: z.number().int().min(0).max(10000).optional(),
-      })
-      .safeParse(await c.req.json().catch(() => null));
+    const body = CredentialBody.extend({
+      mode: z.enum(["disabled", "test", "live"]).optional(),
+      /** Lane the flat credential fields target. */
+      lane: z.enum(["test", "live"]).optional(),
+      lanes: z.object({ test: CredentialBody.optional(), live: CredentialBody.optional() }).optional(),
+      /** Platform application fee on client→tenant purchases, in basis points
+       *  (0–10000 = 0–100%). Default 0 = tenant keeps everything. */
+      platformFeeBps: z.number().int().min(0).max(10000).optional(),
+    }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
     const d = body.data;
-    if (d.mode) await setConfig(c.env.DB, "stripe.mode", d.mode);
-    if (d.secretKey) await setConfig(c.env.DB, "stripe.secret_key", d.secretKey);
-    if (d.publishableKey) await setConfig(c.env.DB, "stripe.publishable_key", d.publishableKey);
-    if (d.webhookSecret) await setConfig(c.env.DB, "stripe.webhook_secret", d.webhookSecret);
-    if (d.connectWebhookSecret) await setConfig(c.env.DB, "stripe.connect_webhook_secret", d.connectWebhookSecret);
+    const raw = await getConfig(c.env.DB);
+    const current = resolveStripeConfig(raw);
+    const flatLane: StripeLane = d.lane ?? laneForMode(d.mode ?? current.mode) ?? current.lane;
+
+    // Collect every (lane, credential) write first, validate the whole set, and
+    // only then commit — a half-applied save is exactly the half-swap this
+    // feature exists to prevent.
+    const pending = new Map<string, string>();
+    const perLane: { lane: StripeLane; fields: z.infer<typeof CredentialBody> }[] = [
+      { lane: flatLane, fields: { secretKey: d.secretKey, publishableKey: d.publishableKey, webhookSecret: d.webhookSecret, connectWebhookSecret: d.connectWebhookSecret } },
+      ...(d.lanes?.test ? [{ lane: "test" as StripeLane, fields: d.lanes.test }] : []),
+      ...(d.lanes?.live ? [{ lane: "live" as StripeLane, fields: d.lanes.live }] : []),
+    ];
+    for (const { lane, fields } of perLane) {
+      for (const cred of STRIPE_CREDENTIALS) {
+        const value = (fields[cred] ?? "").trim();
+        if (!value) continue; // blank preserves the stored value
+        const shape = CREDENTIAL_SHAPE[cred];
+        if (!shape.prefix.test(value)) return c.json({ error: `${shape.label} must start with ${shape.expect}`, code: "invalid_prefix" }, 400);
+        const belongs = credentialLane(value);
+        if (belongs && belongs !== lane) {
+          return c.json({ error: `That ${shape.label.toLowerCase()} is a ${belongs}-mode key — it can't be stored in the ${lane} lane.`, code: "lane_mismatch" }, 400);
+        }
+        pending.set(stripeLaneConfigKey(lane, cred), value);
+      }
+    }
+
+    // Would the resulting active lane run keys that belong to the other lane?
+    // (Includes the pre-lane case: legacy live keys + a `test` mode.)
+    const merged: Record<string, string> = { ...raw };
+    for (const [k, v] of pending) merged[k] = v;
+    if (d.mode) merged["stripe.mode"] = d.mode;
+    const next = resolveStripeConfig(merged);
+    if (stripeLaneMismatch(next)) {
+      const real = credentialLane(next.secretKey) ?? credentialLane(next.publishableKey);
+      return c.json(
+        {
+          error: `The keys that would be active in ${next.mode} mode are ${real}-mode keys. Paste ${next.mode}-mode keys into the ${next.mode} lane first (or select ${real} mode).`,
+          code: "mode_key_mismatch",
+        },
+        400,
+      );
+    }
+
+    for (const [k, v] of pending) await setConfig(c.env.DB, k, v);
+    // Stripe product/price ids are per-lane objects: park the old lane's ids and
+    // restore the new lane's BEFORE the mode moves, so no window exists where the
+    // active lane is pointing at the other lane's price ids.
+    let catalogSwapped = false;
+    if (d.mode && d.mode !== current.mode) {
+      const from = laneForMode(current.mode);
+      const to = laneForMode(d.mode);
+      if (from && to && from !== to) {
+        await swapCatalogLane(c.env.DB, from, to);
+        catalogSwapped = true;
+      }
+      await setConfig(c.env.DB, "stripe.mode", d.mode);
+    }
     if (d.platformFeeBps !== undefined) await setConfig(c.env.DB, "stripe.platform_fee_bps", String(d.platformFeeBps));
-    return c.json({ ok: true });
+    return c.json({ ok: true, catalogSwapped, status: stripeStatus(await getConfig(c.env.DB)) });
   })
 
   .post("/admin/stripe/sync", async (c) => {
@@ -604,11 +700,12 @@ export const stripeAdminRoutes = new Hono<AppEnv>()
     return c.json({ ok: true, ...result });
   })
 
+  /** "What is Mossa actually on right now?" — presence + provenance + the lane
+   *  the active key really belongs to. No secret material is ever returned:
+   *  booleans, a last-4 hint, and prefix-derived lanes only. */
   .get("/admin/stripe/status", async (c) => {
     if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    const cfg = await stripeConfig(c.env.DB);
-    const feeBps = Number((await getConfig(c.env.DB))["stripe.platform_fee_bps"] ?? "0");
-    return c.json({ mode: cfg.mode, enabled: stripeEnabled(cfg), platformFeeBps: feeBps });
+    return c.json(stripeStatus(await getConfig(c.env.DB)));
   });
 
 // ── Webhook handlers ───────────────────────────────────────────────────────
