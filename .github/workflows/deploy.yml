@@ -1,10 +1,17 @@
 name: Deploy
 
 # Every push to main (and manual runs) typechecks, tests, builds the app, and
-# deploys the api worker + www to Cloudflare. Requires three repo secrets:
+# deploys the api worker + www to Cloudflare.
+#
+# Requires exactly TWO repo secrets:
 #   CLOUDFLARE_API_TOKEN   — token with Workers/D1/KV/R2 edit permissions
 #   CLOUDFLARE_ACCOUNT_ID  — your Cloudflare account id
-#   BETTER_AUTH_SECRET     — openssl rand -base64 32 (pushed to the worker as a secret)
+#
+# BETTER_AUTH_SECRET is deliberately NOT a repo secret and is never written by
+# this workflow — see the note on the deploy step below. It is a *worker* secret
+# set once by hand (`wrangler secret put`, DEPLOY.md §5b). Adding it as a third
+# GitHub secret has no effect, and skipping the manual step makes every
+# authenticated request throw in production.
 on:
   push:
     branches: [main]
@@ -12,7 +19,11 @@ on:
 
 concurrency:
   group: deploy-${{ github.ref }}
-  cancel-in-progress: true
+  # NOT cancel-in-progress. This job deploys TWO workers in sequence (api, then
+  # www). Cancelling mid-run can land between them, leaving the api worker on
+  # commit N and www on commit N-1 with no signal that it happened. Queueing
+  # instead costs a little CI time and always converges on the newest commit.
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -41,7 +52,7 @@ jobs:
       # across `wrangler deploy`, so re-putting BETTER_AUTH_SECRET every deploy
       # would rewrite Better Auth's cookie-signing key and invalidate all
       # sessions (forced re-auth). It's set once with `wrangler secret put`
-      # (see DEPLOY.md). Deploys only ship code — sessions + passkeys survive.
+      # (see DEPLOY.md §5b). Deploys only ship code — sessions + passkeys survive.
       - name: Deploy api worker
         uses: cloudflare/wrangler-action@v3
         with:

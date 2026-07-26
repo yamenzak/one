@@ -1,0 +1,39 @@
+name: CI
+
+# Pre-merge validation. Deploy.yml only runs on push to main, which means
+# nothing used to be checked BEFORE a merge — a PR could go green on nothing and
+# break main on the way in. This runs the same install → build → typecheck →
+# test chain as the deploy job, but touches no Cloudflare credentials and
+# deploys nothing.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # Superseding a PR's own older run is fine here — nothing is deployed, so a
+  # cancelled run leaves no partial state.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No version — read from package.json's packageManager (pnpm@10.33.0).
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Build the SPA first: the api worker's assets dir is apps/app/dist, and
+      # the Miniflare integration suite reports "no tests" without it.
+      - run: pnpm --filter @mossa/app build
+
+      - run: pnpm turbo run typecheck test

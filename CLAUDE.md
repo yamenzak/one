@@ -41,11 +41,25 @@ packages/
   root `pnpm test` handles this automatically (turbo builds the app first).
 - `pnpm --filter @mossa/app build` — build the SPA (the api worker serves `apps/app/dist`)
 
-**Local dev needs no Cloudflare account:** D1/KV/R2 are Miniflare-simulated, the
-AI suite falls back to a deterministic mock (`ai.mock` config), and the mailer
-logs OTP codes to the `wrangler dev` console. The `ai` binding is enabled in
-`wrangler.jsonc`; for a fully credential-free `wrangler dev` you can re-comment
-it (the mock lane covers local dev either way).
+**Local dev needs no Cloudflare account** — but it needs one file. Copy
+`apps/api/.dev.vars.example` → `apps/api/.dev.vars` before your first `pnpm dev`.
+D1/KV/R2 are Miniflare-simulated, and `ENVIRONMENT=development` in that file is
+what unlocks the mock lanes: the AI mock (`ai.ts` gates it on
+`ENVIRONMENT === "development"`, so **without `.dev.vars` every AI call returns
+"AI provider not configured" / "unavailable"** — not a bug, missing config) and
+the mock mailer that logs OTP codes to the `wrangler dev` console (sign-in OTP
+also has a localhost-Origin fallback; invites/notifications/action codes do not).
+It also enables the `isPlatformAdmin` dev convenience.
+
+⚠️ **`ENVIRONMENT` must never be added to `wrangler.jsonc`'s top-level `vars`** —
+that block is the *deployed* config. In production the dev lane would put
+sign-in OTPs in retained logs, accept the repo-public auth-secret fallback
+(forgeable sessions), and turn on the AI mock — which fabricates output,
+including clinical lab values from `lab-extract`, **and still bills the tenant
+credits for it**. See DEPLOY.md §8.
+
+The `ai` binding is enabled in `wrangler.jsonc`; for a fully credential-free
+`wrangler dev` you can re-comment it.
 
 ## Architecture notes (read before changing these)
 
@@ -80,19 +94,52 @@ it (the mock lane covers local dev either way).
 
 ## Status
 
-Foundation through AI suite + commerce + content + reports + media are built and
-tested (187 domain + 150 API + protocol/pricing/normalizer tests). Recently added: **tenant custom domains** (Cloudflare for
-SaaS, white-label per domain — SPEC §14.1), **passkey autofill** on login
-(WebAuthn conditional UI), and the **vision suite** (Snap-a-Meal + Label Reader)
-on a real Gemini provider path (mock lane in dev), **InboxDO real-time
-notification push** (per-user WebSocket DO; the bell keeps a slow poll as a
-backstop), and richer **plan-editor affordances** (copy-week with progression,
-superset/circuit round-logging in the player), the **workout UI parity pass**
-(exercise thumbnails + rich rows + picker filters + edit-a-logged-set), and a
-**rebuilt Train tab** (quick-start chips, a real "this week" metrics grid —
-Training Load vs target, tonnage, active days, PRs from logged sessions — a
-recent-activity feed, and a browsable library grid), and an **offline-first PWA**
-(vite-plugin-pwa service worker — app-shell precache so the app opens with no
-signal + a Background-Sync queue that replays failed log-write POSTs on
-reconnect). Not yet built: wearable import (Health Connect). See SPEC §13 for the
-phase map.
+Be conservative here: this section is read as ground truth by future agents, so
+an over-claim costs more than an under-claim. Verify before editing it.
+
+**Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
+moves. Measured most recently: **188 domain + ~208 API + 7 protocol + a small
+app suite**, four vitest projects total. The pricing and normalizer suites live
+in `apps/api/test` and are already *inside* the API count — the older
+"protocol/pricing/normalizer" phrasing double-counted them.
+
+**Built and tested:** foundation, auth (OTP + passkeys, incl. autofill /
+conditional UI), tenancy + row-level scope, the AI suite (credits reserve →
+run → settle), commerce (platform rail + Connect rail), content, reports, media,
+tenant custom domains (Cloudflare for SaaS, per-domain WebAuthn RP — SPEC §14.1),
+the vision suite (Snap-a-Meal + Label Reader) on a real Gemini path, InboxDO
+real-time notification push (WebSocket DO; the bell keeps a slow poll as a
+backstop), plan-editor affordances (copy-week with progression, superset/circuit
+round-logging), the workout UI parity pass, the rebuilt Train tab, and the
+offline-first PWA (app-shell precache + Background-Sync replay of failed
+log-write POSTs).
+
+**NOT built** (do not describe any of these as shipped):
+- **Wearable import** (Health Connect).
+- **Trainer ↔ client chat** — `chat` is `reserved: true` in
+  `@mossa/domain/entitlements.ts`, yet the Studio/Team seed plans set it `true`.
+- **Tenant API / webhooks / data exports** — the `integrations` entitlement is
+  also `reserved: true`: no export route, no CSV serializer, no download UI, no
+  tenant API-key issuance, no webhook dispatcher. SPEC §11 promises data export;
+  it does not exist. (The www pricing page no longer advertises it.)
+- **Tenant marketplace storefront** and the **public blog renderer**.
+- **Analytics Engine `USAGE`** — binding referenced, not wired.
+- **Playwright E2E golden paths.**
+- **Six catalogued AI features**: voice logging, meal swap, menu scout,
+  periodization assistant, the retention-radar per-client LLM line, and the
+  business-digest narrative. The retention *report endpoint* exists but has no
+  UI caller; the coach dashboard only shows a simpler "At risk" count.
+
+**Shipped but thinner than it sounds:**
+- The Train tab's "browsable library grid" is nearly empty in practice — the
+  platform seed ships zero exercise thumbnails, only two real categories, and no
+  favourites.
+- "Training Load vs target" doesn't reach the client in production.
+
+**Ops:** deployment is genuinely non-trivial — read DEPLOY.md before touching
+anything deploy-shaped. Notably: a fresh deploy **cannot send email** until
+`email.provider`/`email.from` are set directly in D1 (there is no admin email UI,
+and the mock provider fails closed outside dev), and the whole vision suite is
+dead until `google.gemini_key` is set.
+
+See SPEC §13 for the phase map.
