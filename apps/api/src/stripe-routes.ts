@@ -37,7 +37,29 @@ import { parseJson, j } from "./db.js";
 import { resolveAndApplyPromo, bumpPromoRedemption, consumePromoRedemption, releasePromoRedemption } from "./promo-apply.js";
 import { updateSubscriptionRunway } from "./subscription-runway.js";
 
+/**
+ * A failed Stripe call must not become an information-free 500.
+ *
+ * `stripeCall` throws `new Error(stripe's own message)` — and Stripe's messages
+ * are the good kind: "Only Stripe Connect platforms can create accounts", "No
+ * such price", "Please activate Connect". Eight of the call sites in this file
+ * had no try/catch, so all of that became a bare 500 and the owner was left with
+ * a browser console line and nothing to act on. `POST /connect/onboard` on a
+ * Stripe account without Connect enabled is the case that surfaced it.
+ *
+ * One handler on the router rather than a try/catch per route: the correct
+ * response is the same everywhere, and per-route wrapping is exactly the thing
+ * that gets forgotten on the next route added.
+ *
+ * 502, not 500 — the upstream refused, we did not break. These messages are
+ * operator-facing and safe to show a studio owner; they are the same text Stripe
+ * shows in its own dashboard, and they name what to go and fix.
+ */
 export const stripeRoutes = new Hono<AppEnv>()
+  .onError((err, c) => {
+    console.error(`[stripe] ${c.req.method} ${new URL(c.req.url).pathname}:`, err);
+    return c.json({ error: err instanceof Error ? err.message : "stripe request failed" }, 502);
+  })
   // ── Platform rail ──────────────────────────────────────────────────────────
   .post("/billing/checkout-plan", async (c) => {
     const who = requireTenant(c)!;

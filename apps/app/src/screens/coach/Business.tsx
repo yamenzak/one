@@ -113,16 +113,25 @@ function Overview() {
     return () => { alive = false; };
   }, [reloadKey]);
   // Hosted-redirect flows — Stripe returns the user right back to this page.
+  const [flash, setFlash] = useState<string | null>(null);
   const redirectTo = async (path: string, key: string) => {
     setBusy(key);
     try {
       const r = await api.post<{ url: string }>(path, { returnUrl: location.href });
       if (r.url) location.href = r.url;
-    } catch { setBusy(null); }
+      // A 200 with no url should not leave the button spinning forever either.
+      else { setBusy(null); setFlash("Stripe didn't return a link. Try again in a moment."); }
+    } catch (e) {
+      // This used to be `catch { setBusy(null) }` — the spinner stopped and
+      // nothing was said, so "Connect" looked like a dead button. Stripe's own
+      // message is what the owner needs: connecting fails on an account without
+      // Connect enabled, and Stripe says exactly that.
+      setBusy(null);
+      setFlash(errorText(e, "Couldn't reach Stripe. Please try again."));
+    }
   };
   // Inline (Payment Element) flows — no redirect; the Sheet confirms in place.
   const [checkout, setCheckout] = useState<{ intent: CheckoutIntent; title: string; label: string } | null>(null);
-  const [flash, setFlash] = useState<string | null>(null);
   const [packPromo, setPackPromo] = useState("");
   // `label` is a builder, not a string: the server may charge LESS than the list
   // price (a promo code is applied server-side before the PaymentIntent is
