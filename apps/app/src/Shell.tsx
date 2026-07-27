@@ -228,14 +228,18 @@ function TabLayout() {
         bare={ambient}
         scrolled={scrolled}
         leading={
-          <div className="flex min-w-0 items-center gap-2">
+          // Every item on the bar sits on ONE 36px (size-9) line — the height of
+          // the trailing controls. The brand used to be shorter than them (an h-8
+          // logo, and a bare text span at its own line-height), so the two sides
+          // of the bar were optically off by 4–12px.
+          <div className="flex h-9 min-w-0 items-center gap-2">
             {ctx!.branding?.logoUrl ? (
-              <img src={ctx!.branding.logoUrl} alt={active.tenantName} className="h-8 max-w-32 object-contain" />
+              <img src={ctx!.branding.logoUrl} alt={active.tenantName} className="h-9 max-w-32 object-contain" />
             ) : (
-              <span className="truncate text-base font-semibold tracking-tight">{active.tenantName}</span>
+              <span className="flex h-9 items-center truncate text-base font-semibold tracking-tight">{active.tenantName}</span>
             )}
             {isStaff && (
-              <span className="hidden rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:inline">
+              <span className="hidden h-9 items-center rounded-full bg-secondary px-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:inline-flex">
                 {clientSurface ? "Train" : "Coach"}
               </span>
             )}
@@ -279,7 +283,20 @@ function TabLayout() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="rounded-full outline-none ring-ring focus-visible:ring-2" aria-label="Account">
-                  <Avatar name={ctx!.user.name || ctx!.user.email} src={ctx!.user.image} seed={ctx!.user.email} className="size-9" />
+                  {/* The same face the rest of the app draws for this person:
+                      the photo they uploaded in Profile, else their shuffled
+                      DiceBear seed — both off the CLIENT row, which is where
+                      `POST /clients/:id/avatar` writes them and where the coach's
+                      roster reads them. `user.image` is Better Auth's own field
+                      and is never set on this passwordless stack, so the bar used
+                      to ignore an uploaded photo and seed a different robot from
+                      the email. Staff with no client record keep initials. */}
+                  <Avatar
+                    name={ctx!.user.name || ctx!.user.email}
+                    src={active.avatarUrl ?? ctx!.user.image}
+                    seed={active.avatarSeed ?? active.clientId ?? ctx!.user.email}
+                    className="size-9"
+                  />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>

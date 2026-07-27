@@ -12,6 +12,20 @@ export interface PersonaRef {
   role: TenantRole;
   /** Linked client record when this membership can "Train" (client persona). */
   clientId: string | null;
+  /**
+   * The linked client's avatar, so the app bar can show the SAME face the rest
+   * of the app shows for this person.
+   *
+   * Better Auth's `user.image` is a different field entirely and is never set on
+   * this passwordless stack — the photo a client uploads in Profile lands on the
+   * clients row (`avatar_url`), and their shuffled DiceBear seed on
+   * `avatar_seed`. The bar used to render `user.image` with `user.email` as the
+   * seed, so an uploaded photo never appeared there and the generated face did
+   * not match the one on the coach's roster. Null for staff with no client
+   * record — they fall back to their initials.
+   */
+  avatarUrl?: string | null;
+  avatarSeed?: string | null;
 }
 
 /** Tenant branding for theming the app (SPEC §7); applied at boot. */

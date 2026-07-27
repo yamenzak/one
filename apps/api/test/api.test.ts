@@ -3827,6 +3827,36 @@ describe("invited members land in the studio without an explicit switch", () => 
     expect(ctx.active!.clientId).toBe(client.id);
   }, 30_000);
 
+  it("the persona carries the client's avatar, so the app bar shows the same face as the roster", async () => {
+    // The app bar used to render Better Auth's `user.image` seeded by email —
+    // a field nothing on this passwordless stack ever sets, and a seed nothing
+    // else in the app uses. A client who uploaded a photo in Profile still saw a
+    // generated robot up there, and a different robot from the one their coach
+    // saw. The persona has to carry the client row's own avatar fields.
+    const client = (await (await SELF.fetch(`${B}/api/clients`, { method: "POST", headers: H(), body: JSON.stringify({ email: "avatar-persona@test.dev", displayName: "Ava Tar" }) })).json() as { client: { id: string } }).client;
+    const cookie = await signIn("avatar-persona@test.dev");
+    const read = async () => (await (await SELF.fetch(`${B}/api/context`, { headers: { origin: B, Cookie: cookie } })).json()) as {
+      active: { clientId: string | null; avatarUrl?: string | null; avatarSeed?: string | null };
+    };
+
+    // Fresh client: no photo, no shuffled seed. Both null — the app falls back to
+    // the clientId as the DiceBear seed, exactly as the coach's roster does.
+    const before = await read();
+    expect(before.active.avatarUrl ?? null).toBeNull();
+    expect(before.active.avatarSeed ?? null).toBeNull();
+
+    // Upload a photo → it reaches the persona, so the bar picks it up on refresh.
+    await SELF.fetch(`${B}/api/clients/${client.id}/avatar`, { method: "POST", headers: { "content-type": "application/json", origin: B, Cookie: cookie }, body: JSON.stringify({ avatarUrl: "/api/media/av-key" }) });
+    expect((await read()).active.avatarUrl).toBe("/api/media/av-key");
+
+    // Shuffling the generated face clears the photo and surfaces the new seed —
+    // the same pair of fields, staying mutually exclusive.
+    await SELF.fetch(`${B}/api/clients/${client.id}/avatar`, { method: "POST", headers: { "content-type": "application/json", origin: B, Cookie: cookie }, body: JSON.stringify({ seed: "shuffled-face" }) });
+    const after = await read();
+    expect(after.active.avatarSeed).toBe("shuffled-face");
+    expect(after.active.avatarUrl).toBeNull();
+  }, 30_000);
+
   it("an invited trainer's first /api/context resolves too, and the adoption sticks", async () => {
     const tenantId = ((await (await SELF.fetch(`${B}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } }).active.tenantId;
     const db = env.DB as D1Database;

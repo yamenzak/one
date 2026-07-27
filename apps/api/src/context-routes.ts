@@ -117,6 +117,8 @@ export const contextRoutes = new Hono<AppEnv>()
         tenantSlug: m.slug,
         role: m.role,
         clientId: clientRec?.id ?? null,
+        avatarUrl: clientRec?.avatar_url ?? null,
+        avatarSeed: clientRec?.avatar_seed ?? null,
       });
     }
 

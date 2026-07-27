@@ -26,7 +26,9 @@ export function OfflinePill() {
       title={label}
       aria-label={label}
       className={cn(
-        "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold",
+        // h-9 to match every other control on the app bar (its only caller) —
+        // the whole trailing row is size-9, and h-8 left this one pill short.
+        "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-semibold",
         "bg-warning/15 text-warning [&_svg]:size-3.5",
       )}
     >
