@@ -833,10 +833,16 @@ describe("a stale catalog id can be repaired — for packs as well as plans", ()
     expect(staleP).toBeGreaterThan(0);
     expect(staleK).toBeGreaterThan(0);
 
-    // No Stripe key in this suite, so the sync route refuses BEFORE clearing —
-    // which is the right order (never strand the catalog on a call that cannot
-    // finish). Configure a dummy key so the clearing branch runs.
-    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.secret_key', 'sk_test_dummy_for_clear') ON CONFLICT(key) DO UPDATE SET value = 'sk_test_dummy_for_clear'").run();
+    // The sync route refuses before clearing anything when Stripe is off, which is
+    // the right order — never strand the catalog on a call that cannot finish. So
+    // the clearing branch needs BOTH a key AND `stripe.mode`: `resolveStripeConfig`
+    // defaults mode to "disabled" and `stripeEnabled` checks it, so a key alone
+    // still 400s. (My first version of this test set only the key and failed on the
+    // PLANS assertion — a useful reminder that this route fails closed.)
+    const cfgSet = async (key: string, value: string) =>
+      db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?").bind(key, value, value).run();
+    await cfgSet("stripe.mode", "test");
+    await cfgSet("stripe.test.secret_key", "sk_test_dummy_for_clear");
     const res = await SELF.fetch("http://x/api/admin/stripe/sync", {
       method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ resyncPrices: true }),
@@ -848,7 +854,7 @@ describe("a stale catalog id can be repaired — for packs as well as plans", ()
     expect(clearedPlans, "plans still hold the stale id").toBe(0);
     expect(clearedPacks, "credit_packs still hold the stale id — the bug this test exists for").toBe(0);
     void res;
-    await db.prepare("DELETE FROM app_config WHERE key = 'stripe.secret_key'").run();
+    await db.prepare("DELETE FROM app_config WHERE key IN ('stripe.mode', 'stripe.test.secret_key')").run();
   }, 30_000);
 });
 
