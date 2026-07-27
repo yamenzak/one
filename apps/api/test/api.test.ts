@@ -3887,3 +3887,85 @@ describe("branding persists every appearance control", () => {
     }
   });
 });
+
+/**
+ * The voice pack is a STUDIO-WIDE singleton, and it lives in the media library.
+ *
+ * A studio has one coach voice. Every pack that is not the installed one is ten
+ * WAV files sitting in R2 against the tenant's storage quota, playable by
+ * nothing and visible on no screen — auditioning four voices used to strand
+ * forty of them permanently.
+ */
+describe("voice packs replace, they do not accumulate", () => {
+  const cueKeys = async (tenantId: string) =>
+    ((await (env.DB as D1Database)
+      .prepare("SELECT voice, media_key FROM tts_cues WHERE tenant_id = ? AND phrase_id != 'preview'")
+      .bind(tenantId)
+      .all<{ voice: string; media_key: string }>()).results ?? []);
+
+  it("installing a new voice retires the old pack from R2 and the library", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tid = ctx.active.tenantId;
+    await SELF.fetch(`http://x/api/admin/tenants/${tid}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+
+    const first = await SELF.fetch("http://x/api/body-scan/voice-pack", { method: "POST", headers: H, body: JSON.stringify({ voice: "Kore" }) });
+    expect(first.status).toBe(200);
+    const kore = await cueKeys(tid);
+    expect(kore.length, "the first pack was voiced").toBeGreaterThan(0);
+    expect(kore.every((r) => r.voice === "Kore")).toBe(true);
+    // Every cue is a real media-library asset, not a loose R2 object.
+    for (const r of kore) {
+      const asset = await (env.DB as D1Database).prepare("SELECT purpose, deleted_at FROM media_assets WHERE r2_key = ?").bind(r.media_key).first<{ purpose: string; deleted_at: string | null }>();
+      expect(asset, `${r.media_key} is missing from media_assets`).toMatchObject({ purpose: "tts", deleted_at: null });
+    }
+
+    // Switch voices.
+    const second = (await (await SELF.fetch("http://x/api/body-scan/voice-pack", { method: "POST", headers: H, body: JSON.stringify({ voice: "Puck" }) })).json()) as { retired: number };
+    expect(second.retired, "the Kore pack should have been retired").toBe(kore.length);
+
+    // Nothing of the old voice survives, in either place.
+    const after = await cueKeys(tid);
+    expect(after.every((r) => r.voice === "Puck"), "a Kore cue survived the switch").toBe(true);
+    for (const r of kore) {
+      expect(await env.MEDIA.get(r.media_key), `${r.media_key} is still in R2`).toBeNull();
+      const asset = await (env.DB as D1Database).prepare("SELECT deleted_at FROM media_assets WHERE r2_key = ?").bind(r.media_key).first<{ deleted_at: string | null }>();
+      // Tombstoned, so the storage meter and the library both drop it.
+      expect(asset?.deleted_at, `${r.media_key} was not tombstoned`).toBeTruthy();
+    }
+
+    // The status endpoint can now name what is actually installed — without it
+    // the settings card can only ever ask "generate?", never say "installed".
+    const status = (await (await SELF.fetch("http://x/api/body-scan/voice-pack?voice=Puck", { headers: auth(ownerCookie) })).json()) as { installedVoice: string | null; ready: boolean };
+    expect(status).toMatchObject({ installedVoice: "Puck", ready: true });
+  });
+
+  it("re-installing the same voice is free unless forced", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    // Self-contained: install first rather than inheriting the previous test's
+    // state, so a reordering or a single-test run cannot make this pass or fail
+    // for reasons that have nothing to do with what it is checking.
+    const install = (await (await SELF.fetch("http://x/api/body-scan/voice-pack", { method: "POST", headers: H, body: JSON.stringify({ voice: "Charon" }) })).json()) as { generated: number; ready: boolean };
+    expect(install.ready, "the pack under test must be complete before re-installing it").toBe(true);
+
+    // Idempotent: a resumed or partial pack completes without re-billing.
+    const again = (await (await SELF.fetch("http://x/api/body-scan/voice-pack", { method: "POST", headers: H, body: JSON.stringify({ voice: "Charon" }) })).json()) as { generated: number; retired: number };
+    expect(again).toMatchObject({ generated: 0, retired: 0 });
+
+    // `force` is what "Re-voice" sends. Without it that button did nothing at
+    // all — the loop skips every cached cue.
+    const forced = (await (await SELF.fetch("http://x/api/body-scan/voice-pack", { method: "POST", headers: H, body: JSON.stringify({ voice: "Charon", force: true }) })).json()) as { generated: number; retired: number };
+    expect(forced.retired, "force must retire the pack it is replacing").toBe(install.generated);
+    expect(forced.generated, "force must actually re-voice").toBe(install.generated);
+  });
+});
+
+describe("storage remaining is the owner's number", () => {
+  it("the owner sees the meter", async () => {
+    // The same-tenant NON-owner refusal is asserted in feature-gating.test.ts,
+    // where a client session in this studio already exists — `otherCookie` here
+    // is another tenant's OWNER and would 403 for the wrong reason.
+    const body = (await (await SELF.fetch("http://x/api/storage-usage", { headers: auth(ownerCookie) })).json()) as { usedMb: number };
+    expect(body).toHaveProperty("usedMb");
+  });
+});

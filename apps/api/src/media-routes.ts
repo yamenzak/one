@@ -82,6 +82,11 @@ export const mediaRoutes = new Hono<AppEnv>()
   // The tenant's storage meter — used bytes vs the plan's storageMb ceiling.
   // Drives the media-library header + the storage-full nudges.
   .get("/storage-usage", async (c) => {
+    // Owner-only. The meter reports a PLAN limit, so it is the studio's business
+    // position, not a fact about the viewer's own files. A client uploading into a
+    // full studio still gets a clear 413 from the upload route — they do not need
+    // the ledger to be told the upload failed.
+    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
     const who = requireTenant(c)!;
     const { usedBytes, limitBytes } = await storageUsage(c.env, who.tenantId);
     return c.json({ usedBytes, limitBytes, usedMb: mb(usedBytes), limitMb: limitBytes < 0 ? -1 : mb(limitBytes), unlimited: limitBytes < 0, pct: limitBytes > 0 ? Math.min(100, Math.round((usedBytes / limitBytes) * 100)) : 0 });

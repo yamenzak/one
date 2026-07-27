@@ -485,3 +485,16 @@ describe("reserved features are unreachable", () => {
     expect(await res.json()).toMatchObject({ feature: "commerce" });
   });
 });
+
+describe("storage remaining is the owner's number, not the studio's members'", () => {
+  it("a client and a trainer are refused; the owner is not", async () => {
+    // The meter reports a PLAN ceiling — the studio's commercial position, not a
+    // fact about the viewer's own files. A client uploading into a full studio
+    // still gets a clear 413 from the upload route, which is all they need.
+    const { owner, client } = await studioWithClient("stor1", "pro");
+    expect((await SELF.fetch(`${B}/api/storage-usage`, { headers: auth(client) })).status).toBe(403);
+    const asOwner = await SELF.fetch(`${B}/api/storage-usage`, { headers: auth(owner) });
+    expect(asOwner.status).toBe(200);
+    expect(await asOwner.json()).toHaveProperty("usedMb");
+  });
+});

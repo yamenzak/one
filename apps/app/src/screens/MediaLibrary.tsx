@@ -8,7 +8,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button, Card, Page, Reveal, EmptyState, Badge, Chip, IconBadge, ConfirmDialog, SkeletonList,
-  ArrowLeft, Trash2, ImageIcon, Sparkles,
+  ArrowLeft, Trash2, ImageIcon, Sparkles, Archive, Building2, Dumbbell, FlaskConical, HeartPulse, Utensils,
+  type LucideIcon,
 } from "@mossa/ui";
 import { api } from "../api.js";
 
@@ -33,6 +34,28 @@ const PURPOSE_LABEL: Record<string, string> = {
   food: "Food image", exercise: "Exercise image", label: "Label scan", "meal-snap": "Meal snap",
   ai: "AI image", tts: "Voice cue", misc: "File",
 };
+
+/**
+ * Categories, over the raw `purpose` a file was stored under.
+ *
+ * Eleven purposes is a storage-layer detail; nobody browsing their own library
+ * thinks "show me purpose=meal-snap". These group them the way someone actually
+ * looks — my body, my food, the AI's output, the studio's own assets — and every
+ * purpose belongs to exactly one, which a test asserts so a new purpose cannot be
+ * added and then quietly become invisible here.
+ */
+const CATEGORIES: { id: string; label: string; icon: LucideIcon; purposes: string[] }[] = [
+  { id: "body", label: "Body", icon: HeartPulse, purposes: ["progress", "avatar"] },
+  { id: "food", label: "Food", icon: Utensils, purposes: ["food", "meal-snap", "label"] },
+  { id: "training", label: "Training", icon: Dumbbell, purposes: ["exercise"] },
+  { id: "health", label: "Health", icon: FlaskConical, purposes: ["lab"] },
+  // AI output is media like any other — it occupies the same quota and the studio
+  // owns it, so it is browsable and deletable here rather than hidden.
+  { id: "ai", label: "AI-made", icon: Sparkles, purposes: ["ai", "tts"] },
+  { id: "studio", label: "Studio", icon: Building2, purposes: ["brand"] },
+  { id: "other", label: "Other", icon: Archive, purposes: ["misc"] },
+];
+const categoryOf = (purpose: string): string => CATEGORIES.find((c) => c.purposes.includes(purpose))?.id ?? "other";
 const fmtBytes = (n: number): string => (n >= 1024 * 1024 ? `${(n / (1024 * 1024)).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`);
 const fmtDate = (iso: string): string => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 
@@ -43,6 +66,7 @@ export function MediaLibrary({ onBack }: { onBack: () => void }) {
   const [toDelete, setToDelete] = useState<MediaItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState<string>("all"); // "all" | clientId | "tenant"
+  const [cat, setCat] = useState<string>("all");
 
   const load = useCallback(async () => {
     const [lib, use] = await Promise.all([
@@ -67,21 +91,37 @@ export function MediaLibrary({ onBack }: { onBack: () => void }) {
     for (const it of items ?? []) if (it.clientId && it.clientName) m.set(it.clientId, it.clientName);
     return [...m.entries()].map(([id, name]) => ({ id, name }));
   }, [items]);
+  /** Only the categories that actually have files — an empty chip is noise. */
+  const cats = useMemo(() => {
+    const present = new Set((items ?? []).map((i) => categoryOf(i.purpose)));
+    return CATEGORIES.filter((c) => present.has(c.id));
+  }, [items]);
   const shown = useMemo(() => {
-    const all = items ?? [];
-    if (filter === "all") return all;
-    if (filter === "tenant") return all.filter((i) => !i.clientId);
-    return all.filter((i) => i.clientId === filter);
-  }, [items, filter]);
+    let all = items ?? [];
+    if (filter === "tenant") all = all.filter((i) => !i.clientId);
+    else if (filter !== "all") all = all.filter((i) => i.clientId === filter);
+    if (cat !== "all") all = all.filter((i) => categoryOf(i.purpose) === cat);
+    return all;
+  }, [items, filter, cat]);
+  /** Bytes in view, so a filtered set says what it is costing. */
+  const shownBytes = useMemo(() => shown.reduce((n, i) => n + (i.sizeBytes || 0), 0), [shown]);
 
   return (
     <Page className="mx-auto max-w-3xl space-y-4 p-4 pb-28">
       <div className="flex items-center gap-3">
         <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
-        <h1 className="flex-1 text-xl font-bold tracking-tight">Media library</h1>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-xl font-bold tracking-tight">Media library</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            {items === null ? "Loading…" : `${items.length} file${items.length === 1 ? "" : "s"} · everything the app stores for you, including what the AI made`}
+          </p>
+        </div>
       </div>
 
-      {/* Storage meter */}
+      {/* Storage meter — OWNER ONLY. `/api/storage-usage` is owner-gated server
+          side, so a client or coach simply has no `usage` and this does not
+          render: a plan limit is the studio's commercial position, not a fact
+          about the viewer's own files. */}
       {usage && (
         <Card className="space-y-2">
           <div className="flex items-center justify-between text-sm">
@@ -99,13 +139,28 @@ export function MediaLibrary({ onBack }: { onBack: () => void }) {
         </Card>
       )}
 
-      {/* Client filter (coach / owner viewing multiple clients) */}
+      {/* Whose media (coach / owner viewing multiple clients) */}
       {clients.length > 1 && (
-        <div className="flex flex-wrap gap-1.5">
-          <Chip selected={filter === "all"} onClick={() => setFilter("all")}>All</Chip>
+        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 no-scrollbar">
+          <Chip selected={filter === "all"} onClick={() => setFilter("all")}>Everyone</Chip>
           <Chip selected={filter === "tenant"} onClick={() => setFilter("tenant")}>Studio</Chip>
           {clients.map((cl) => <Chip key={cl.id} selected={filter === cl.id} onClick={() => setFilter(cl.id)}>{cl.name}</Chip>)}
         </div>
+      )}
+
+      {/* What kind. Only categories with files, so the row never lies about
+          what is in here. */}
+      {cats.length > 1 && (
+        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 no-scrollbar">
+          <Chip selected={cat === "all"} onClick={() => setCat("all")}>All</Chip>
+          {cats.map((c) => <Chip key={c.id} selected={cat === c.id} onClick={() => setCat(c.id)}><c.icon className="size-3.5" /> {c.label}</Chip>)}
+        </div>
+      )}
+
+      {(cat !== "all" || filter !== "all") && items !== null && (
+        <p className="numeral px-1 text-xs text-muted-foreground">
+          {shown.length} of {items.length} file{items.length === 1 ? "" : "s"} · {fmtBytes(shownBytes)}
+        </p>
       )}
 
       <Reveal loading={items === null} className="space-y-4" skeleton={<SkeletonList card rows={4} thumb={56} />}>

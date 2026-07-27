@@ -20,7 +20,7 @@ import { generateSpeech, DEFAULT_TTS_VOICE } from "./ai.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
 import { notify } from "./notify.js";
-import { putMedia, StorageQuotaError } from "./storage.js";
+import { putMedia, deleteMedia, StorageQuotaError } from "./storage.js";
 
 /** The fixed cue set. Voiced once per tenant/voice/lang and cached. */
 const CUE_PHRASES: { id: string; text: string }[] = [
@@ -198,7 +198,25 @@ export const bodyScanRoutes = new Hono<AppEnv>()
       .all<{ phrase_id: string }>();
     const have = new Set((rows.results ?? []).map((r) => r.phrase_id));
     const count = CUE_PHRASES.filter((p) => have.has(p.id)).length;
-    return c.json({ voice, total: CUE_PHRASES.length, count, ready: count >= CUE_PHRASES.length });
+    // Which voice, if any, is ACTUALLY installed right now — not just how far
+    // along the selected one is. Without this the settings card could only ask
+    // "generate?" and never say "installed", even with a complete pack sitting
+    // in storage under a different voice.
+    const installed = await c.env.DB
+      .prepare(
+        `SELECT voice AS v, COUNT(*) AS n FROM tts_cues
+         WHERE tenant_id = ? AND lang = 'en' AND version = ? AND phrase_id != 'preview'
+         GROUP BY voice ORDER BY n DESC LIMIT 1`,
+      )
+      .bind(who.tenantId, TTS_VERSION)
+      .first<{ v: string; n: number }>();
+    return c.json({
+      voice,
+      total: CUE_PHRASES.length,
+      count,
+      ready: count >= CUE_PHRASES.length,
+      installedVoice: installed && installed.n >= CUE_PHRASES.length ? installed.v : null,
+    });
   })
 
   // Owner: generate + cache the whole cue pack for a voice. THIS is the billed
@@ -207,10 +225,48 @@ export const bodyScanRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
     { const g = await gateFeature(c, "bodyScan"); if (g) return g; }
-    const body = (await c.req.json().catch(() => ({}))) as { voice?: string };
+    const body = (await c.req.json().catch(() => ({}))) as { voice?: string; force?: boolean };
     const voice = await resolveVoice(c.env.DB, who.tenantId, body.voice);
     const lang = "en";
     let generated = 0, credits = 0;
+
+    // ── Retire whatever this pack replaces ──────────────────────────────────
+    //
+    // A studio has ONE voice. Every pack that is not the one being installed is
+    // dead weight: ten WAV files per voice, sitting in R2 and counting against
+    // the tenant's storage quota forever. Trying four voices used to leave forty
+    // orphaned files that nothing would ever play and no screen would ever show.
+    //
+    // `force` is what the "Regenerate" button sends. Without it that button was a
+    // lie — the loop below skips every cue that already exists, so pressing it on
+    // a complete pack did nothing at all.
+    //
+    // Previews (`phrase_id = 'preview'`) are deliberately kept: they are one short
+    // sample per voice, and the whole point of caching them is that auditioning a
+    // voice a second time does not bill the studio again.
+    // `? = 1` is the force flag, bound rather than interpolated so the statement
+    // is one shape with one parameter list: forced, EVERY pack goes (including
+    // this voice's, which is the whole point of re-voicing); unforced, only the
+    // packs that are not the one being installed.
+    const stale = await c.env.DB
+      .prepare(
+        `SELECT voice AS v, lang AS l, phrase_id AS p, version AS ver, media_key AS k FROM tts_cues
+         WHERE tenant_id = ? AND phrase_id != 'preview'
+           AND (? = 1 OR voice != ? OR version != ?)`,
+      )
+      .bind(who.tenantId, body.force ? 1 : 0, voice, TTS_VERSION)
+      .all<{ v: string; l: string; p: string; ver: number; k: string }>();
+    for (const row of stale.results ?? []) {
+      // deleteMedia removes the R2 object AND tombstones the media_assets row, so
+      // the library and the storage meter both reflect it immediately.
+      await deleteMedia(c.env, row.k, who.userId);
+      await c.env.DB
+        .prepare("DELETE FROM tts_cues WHERE tenant_id=? AND voice=? AND lang=? AND phrase_id=? AND version=?")
+        .bind(who.tenantId, row.v, row.l, row.p, row.ver)
+        .run()
+        .catch(() => undefined);
+    }
+    const retired = (stale.results ?? []).length;
     for (const phrase of CUE_PHRASES) {
       const existing = await c.env.DB.prepare("SELECT media_key FROM tts_cues WHERE tenant_id=? AND voice=? AND lang=? AND phrase_id=? AND version=?")
         .bind(who.tenantId, voice, lang, phrase.id, TTS_VERSION)
@@ -234,7 +290,7 @@ export const bodyScanRoutes = new Hono<AppEnv>()
       generated++; credits += speech.credits;
     }
     const total = (await c.env.DB.prepare("SELECT COUNT(*) AS n FROM tts_cues WHERE tenant_id=? AND voice=? AND lang='en' AND version=? AND phrase_id != 'preview'").bind(who.tenantId, voice, TTS_VERSION).first<{ n: number }>())?.n ?? 0;
-    return c.json({ ok: true, voice, generated, credits, ready: total >= CUE_PHRASES.length });
+    return c.json({ ok: true, voice, generated, credits, retired, ready: total >= CUE_PHRASES.length });
   })
 
   // Owner voice preview for the settings picker — one short sample per voice,

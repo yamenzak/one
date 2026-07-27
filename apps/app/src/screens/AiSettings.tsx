@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { AiSettingsPayload, AiFeatureMeta, AiModelMeta, TenantAiConfig, AiFeatureConfig, AiTone } from "@mossa/protocol";
-import { Card, Badge, Skeleton, Reveal, SkeletonLine, Switch, Button, Textarea, Chip, Field, IconBadge, cn, Sparkles, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, Play, Wallet, type Tone, type LucideIcon } from "@mossa/ui";
+import { Card, Badge, Skeleton, Reveal, SkeletonLine, Switch, Button, Textarea, Chip, Field, IconBadge, cn, Sparkles, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, Play, Wallet, CircleCheck, CircleAlert, type Tone, type LucideIcon } from "@mossa/ui";
 import { api } from "../api.js";
 import { useCan } from "../FeatureLock.js";
 
@@ -69,6 +69,64 @@ function costHint(models: AiModelMeta[], task: string, selectedId: string): stri
   return `~${cost} credit${cost === 1 ? "" : "s"} per request${rel}`;
 }
 
+/**
+ * The voice pack, as three states rather than one question.
+ *
+ * The old card only ever asked "generate?" — it could not say "you are done", and
+ * it could not see a complete pack sitting under a DIFFERENT voice, so an owner
+ * who had already paid for cues was invited to pay again. It also offered
+ * "Regenerate" on a finished pack, which did nothing: the server skips every
+ * cached cue unless explicitly forced.
+ *
+ * Now: installed-and-selected, installed-under-another-voice, or not installed.
+ * Each state names what clients hear today and offers exactly one action.
+ */
+function VoicePackStatus({ pack, selectedVoice, busy, note, onInstall, onRevoice }: {
+  pack: { ready: boolean; count: number; total: number; installedVoice: string | null } | null;
+  selectedVoice: string;
+  busy: boolean;
+  note: string | null;
+  onInstall: () => void;
+  onRevoice: () => void;
+}) {
+  const installed = pack?.installedVoice ?? null;
+  const current = pack?.ready === true && installed === selectedVoice;
+  const elsewhere = installed !== null && installed !== selectedVoice;
+  const partial = !current && !elsewhere && (pack?.count ?? 0) > 0;
+
+  return (
+    <div className="space-y-2 rounded-xl bg-muted/40 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2.5">
+          {current
+            ? <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
+            : <CircleAlert className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />}
+          <div className="min-w-0 text-sm">
+            {current && <><span className="font-medium">Installed</span> — clients hear <b>{selectedVoice}</b>.</>}
+            {elsewhere && <><span className="font-medium">{installed} is installed.</span> Clients hear {installed}, not {selectedVoice}, until you install it.</>}
+            {!current && !elsewhere && (
+              <span className="text-muted-foreground">
+                {partial
+                  ? `Partly voiced (${pack?.count} of ${pack?.total}). Clients hear a generic device voice until it's finished.`
+                  : "Not installed — clients hear a generic device voice."}
+              </span>
+            )}
+          </div>
+        </div>
+        {/* One action, and it always does something. */}
+        {current
+          ? <Button size="sm" variant="secondary" disabled={busy} onClick={onRevoice}>{busy ? "Re-voicing…" : "Re-voice"}</Button>
+          : <Button size="sm" disabled={busy} onClick={onInstall}>{busy ? "Installing…" : elsewhere ? `Switch to ${selectedVoice}` : partial ? "Finish pack" : "Install pack"}</Button>}
+      </div>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        {note ?? (current
+          ? "Cached, so a scan costs nothing to narrate. Re-voicing bills the pack again and replaces the files in your media library."
+          : "Voiced once and cached — you're billed in credits for the cue pack, not per scan. Installing replaces any pack already in your library.")}
+      </p>
+    </div>
+  );
+}
+
 export function AiConfigSection() {
   const [data, setData] = useState<AiSettingsPayload | null>(null);
   const [config, setConfig] = useState<TenantAiConfig>({});
@@ -119,19 +177,25 @@ export function AiConfigSection() {
   // Voice pack: cues are generated once, on the OWNER'S explicit action (the
   // billed moment) — never silently by a client's scan. Status tracks the saved voice.
   const selectedVoice = config.ttsVoice ?? "Kore";
-  const [pack, setPack] = useState<{ ready: boolean; count: number; total: number } | null>(null);
+  const [pack, setPack] = useState<{ ready: boolean; count: number; total: number; installedVoice: string | null } | null>(null);
   const [genBusy, setGenBusy] = useState(false);
   const [genNote, setGenNote] = useState<string | null>(null);
   useEffect(() => {
     setGenNote(null);
-    void api.get<{ ready: boolean; count: number; total: number }>(`/api/body-scan/voice-pack?voice=${encodeURIComponent(selectedVoice)}`).then(setPack).catch(() => setPack(null));
+    void api.get<{ ready: boolean; count: number; total: number; installedVoice: string | null }>(`/api/body-scan/voice-pack?voice=${encodeURIComponent(selectedVoice)}`).then(setPack).catch(() => setPack(null));
   }, [selectedVoice]);
-  const generatePack = async () => {
+  /** `force` re-voices a pack that is already complete; without it the server
+   *  skips every cached cue, which is what made the old "Regenerate" button do
+   *  nothing at all. Either way the server retires the pack being replaced. */
+  const generatePack = async (force = false) => {
     setGenBusy(true); setGenNote(null);
     try {
-      const r = await api.post<{ ready: boolean; generated: number; credits: number }>("/api/body-scan/voice-pack", { voice: selectedVoice });
-      setPack((p) => ({ ready: r.ready, total: p?.total ?? 10, count: r.ready ? (p?.total ?? 10) : (p?.count ?? 0) + r.generated }));
-      setGenNote(r.generated > 0 ? `Generated ${r.generated} cue${r.generated === 1 ? "" : "s"} — ${r.credits} credit${r.credits === 1 ? "" : "s"}.` : "Voice pack already up to date.");
+      const r = await api.post<{ ready: boolean; generated: number; credits: number; retired: number }>("/api/body-scan/voice-pack", { voice: selectedVoice, force });
+      setPack((p) => ({ ready: r.ready, total: p?.total ?? 10, count: r.ready ? (p?.total ?? 10) : (p?.count ?? 0) + r.generated, installedVoice: r.ready ? selectedVoice : (p?.installedVoice ?? null) }));
+      const freed = r.retired > 0 ? ` The old pack was removed from your library (${r.retired} file${r.retired === 1 ? "" : "s"} freed).` : "";
+      setGenNote(r.generated > 0
+        ? `Voiced ${r.generated} cue${r.generated === 1 ? "" : "s"} — ${r.credits} credit${r.credits === 1 ? "" : "s"}.${freed}`
+        : `Already voiced in ${selectedVoice}.${freed}`);
     } catch (e) {
       const status = (e as { status?: number }).status;
       setGenNote(status === 402 ? "Not enough credits to generate the voice pack." : status === 403 ? "The body-scan add-on isn't in your plan." : "Couldn't generate the voice pack — try again.");
@@ -236,21 +300,18 @@ export function AiConfigSection() {
                     );
                   })}
                 </div>
-                <div className="rounded-xl bg-muted/40 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 text-sm">
-                      {pack?.ready
-                        ? <span className="text-foreground">Voice pack ready — clients hear your <b>{selectedVoice}</b> voice.</span>
-                        : <span className="text-muted-foreground">Not generated yet. Until you generate it, clients hear a generic device voice.</span>}
-                    </div>
-                    <Button size="sm" variant={pack?.ready ? "secondary" : "default"} disabled={genBusy} onClick={() => void generatePack()}>
-                      {genBusy ? "Generating…" : pack?.ready ? "Regenerate" : "Generate voice pack"}
-                    </Button>
-                  </div>
-                  <div className="mt-1.5 text-xs text-muted-foreground">
-                    {genNote ?? "Generated once and cached — you're billed in credits for the cue pack, not per scan."}
-                  </div>
-                </div>
+                {/* Installed state first. A card that only ever asks "generate?"
+                    cannot tell an owner they are already done — and this one
+                    could not even see a complete pack sitting under a different
+                    voice. Three distinct states, each with one obvious action. */}
+                <VoicePackStatus
+                  pack={pack}
+                  selectedVoice={selectedVoice}
+                  busy={genBusy}
+                  note={genNote}
+                  onInstall={() => void generatePack(false)}
+                  onRevoice={() => void generatePack(true)}
+                />
               </Card>
               )}
 
@@ -369,6 +430,13 @@ function FeatureGroup({ title, icon: Icon, features, models, config, tones, onSa
 function FeatureCard({ feat, models, cfg, tones, onSave }: {
   feat: AiFeatureMeta; models: AiModelMeta[]; cfg: AiFeatureConfig; tones: readonly AiTone[]; onSave: (patch: AiFeatureConfig) => void;
 }) {
+  // ONE disclosure for the whole card, not one for the instructions box.
+  //
+  // The clutter was structural: 23 features, every enabled one showing a model
+  // <select>, a seven-chip tone row and an instructions link inline. That is
+  // ~70 controls stacked vertically on a phone, and the studio owner who came to
+  // change one thing had to scroll past all of it. Collapsed, each feature is one
+  // row that STATES its configuration; open it only to change it.
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(cfg.system ?? "");
   const enabled = cfg.enabled !== false;
@@ -380,18 +448,41 @@ function FeatureCard({ feat, models, cfg, tones, onSave }: {
         : m.task !== "vision" && m.task !== "image",
   );
 
+  // The collapsed summary. Says what is actually set, so the common case — "is
+  // this on, and on which model?" — needs no interaction at all.
+  const picked = pickable.find((m) => m.id === cfg.model);
+  const summary = !enabled ? "Off" : [
+    picked ? picked.label : "Auto model",
+    feat.tonable ? (cfg.tone ? TONE_LABEL[cfg.tone] ?? cfg.tone : "House tone") : null,
+    cfg.system ? "custom instructions" : null,
+  ].filter(Boolean).join(" · ");
+
   return (
     <Card className="space-y-3">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm font-medium">{feat.label}</div>
-          <div className="text-xs text-muted-foreground">{feat.description}</div>
-        </div>
-        <Switch checked={enabled} onCheckedChange={(v) => onSave({ enabled: v })} />
+        {/* The whole heading is the disclosure control — a bigger target than a
+            chevron, and it leaves the Switch as the only other thing to hit. */}
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          disabled={!enabled}
+          className="min-w-0 flex-1 text-left disabled:cursor-default"
+        >
+          <div className="flex items-center gap-1.5">
+            <span className="min-w-0 truncate text-sm font-medium">{feat.label}</span>
+            {enabled && <ChevronDown className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden />}
+          </div>
+          <div className={cn("truncate text-xs", open ? "text-muted-foreground" : "text-muted-foreground")}>
+            {open ? feat.description : summary}
+          </div>
+        </button>
+        <Switch checked={enabled} aria-label={feat.label} onCheckedChange={(v) => onSave({ enabled: v })} />
       </div>
 
-      {enabled && (
+      {enabled && open && (
         <div className="space-y-3 border-t border-border/50 pt-3">
+          <p className="text-xs leading-relaxed text-muted-foreground">{feat.description}</p>
           <div>
             <label className="flex items-center justify-between gap-3 text-sm">
               <span className="text-muted-foreground">Model</span>
@@ -419,20 +510,14 @@ function FeatureCard({ feat, models, cfg, tones, onSave }: {
             </div>
           )}
 
-          <div>
-            <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4">
-              <ChevronDown className={cn("transition-transform", open && "rotate-180")} /> {cfg.system ? "Extra instructions added" : "Add instructions"}
-            </button>
-            {open && (
-              <div className="mt-2 space-y-2">
-                <p className="text-xs text-muted-foreground">Added on top of the built-in instructions — the AI is told the studio also asked for this. Your notes refine the output; they don't replace how the feature works.</p>
-                <Textarea rows={4} value={draft} placeholder={exampleMod(feat.key)} onChange={(e) => setDraft(e.target.value)} className="text-xs" />
-                <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={() => onSave({ system: draft.trim() || null })}>Save</Button>
-                  {cfg.system && <Button size="sm" variant="ghost" onClick={() => { setDraft(""); onSave({ system: null }); }}>Clear</Button>}
-                </div>
-              </div>
-            )}
+          <div className="space-y-2">
+            <span className="text-sm text-muted-foreground">Extra instructions</span>
+            <p className="text-xs leading-relaxed text-muted-foreground">Added on top of the built-in instructions — the AI is told the studio also asked for this. Your notes refine the output; they don't replace how the feature works.</p>
+            <Textarea rows={3} value={draft} placeholder={exampleMod(feat.key)} onChange={(e) => setDraft(e.target.value)} className="text-xs" />
+            <div className="flex items-center gap-2">
+              <Button size="sm" disabled={draft === (cfg.system ?? "")} onClick={() => onSave({ system: draft.trim() || null })}>Save</Button>
+              {cfg.system && <Button size="sm" variant="ghost" onClick={() => { setDraft(""); onSave({ system: null }); }}>Clear</Button>}
+            </div>
           </div>
         </div>
       )}
