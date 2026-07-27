@@ -9,7 +9,7 @@ import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger, ConfirmDialog,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
   KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
-  ActionResult, TabIntro, cn, toneText, personaLabel, personaTone, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon,
+  ActionResult, ConfigRow, TabIntro, cn, toneText, personaLabel, personaTone, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon,
 } from "@mossa/ui";
 import type { LoginBranding, TenantBranding } from "@mossa/protocol";
 import { resolveUnits, cmToFeetInches, feetInchesToCm, STUDIO_SETTINGS_SECTIONS, settingsSectionVisible } from "@mossa/domain";
@@ -81,7 +81,7 @@ export type SettingsView = "profile" | "preferences" | "appearance" | "notificat
 
 const VIEW_TITLE: Record<SettingsView, string> = {
   profile: "Profile",
-  preferences: "Preferences",
+  preferences: "Preferences & notifications",
   appearance: "Appearance & units",
   notifications: "Notifications",
   passkeys: "Passkeys & security",
@@ -114,9 +114,19 @@ export function Settings({ onBack, view = "studio" }: { onBack: () => void; view
           </>
         );
       case "preferences":
-        return clientId
-          ? <PreferencesSection clientId={clientId} onSaved={() => void refresh()} />
-          : <Stagger><Card className="text-sm text-muted-foreground">Training &amp; nutrition preferences appear here once you're set up as a client.</Card></Stagger>;
+        // Notifications live HERE now, not behind their own menu entry. Both are
+        // "how this app behaves for me" — splitting them meant two destinations
+        // one tap apart, each half-empty, and a client with no coaching profile
+        // saw a Preferences page that was nothing but an apology.
+        return (
+          <>
+            <Stagger><TabIntro>How Mossa works for you — what your coach plans around, and what you want to hear about.</TabIntro></Stagger>
+            {clientId
+              ? <PreferencesSection clientId={clientId} onSaved={() => void refresh()} />
+              : <Stagger><Card className="text-sm text-muted-foreground">Training &amp; nutrition preferences appear here once you're set up as a client.</Card></Stagger>}
+            <NotificationsSection />
+          </>
+        );
       case "appearance":
         return <><UnitsSection /><AppearanceSection /></>;
       case "notifications":
@@ -678,7 +688,7 @@ function NotificationPolicySection() {
 
 /** Owner: how the studio sends email — the metered platform sender or your Brevo. */
 function EmailSection() {
-  const [cfg, setCfg] = useState<{ email: { provider: string; senderEmail: string; senderName: string; brevoKeySet: boolean; ready: boolean }; emailPlatformFrom: string } | null>(null);
+  const [cfg, setCfg] = useState<{ email: { provider: string; senderEmail: string; senderName: string; brevoKeySet: boolean; ready: boolean }; emailPlatformFrom: string; emailCreditsEach: number } | null>(null);
   const [brevoKey, setBrevoKey] = useState("");
   const [senderEmail, setSenderEmail] = useState("");
   const [senderName, setSenderName] = useState("");
@@ -687,7 +697,7 @@ function EmailSection() {
   const load = useCallback(async () => {
     setError(false);
     try {
-      const r = await api.get<{ email: { provider: string; senderEmail: string; senderName: string; brevoKeySet: boolean; ready: boolean }; emailPlatformFrom: string }>("/api/settings");
+      const r = await api.get<{ email: { provider: string; senderEmail: string; senderName: string; brevoKeySet: boolean; ready: boolean }; emailPlatformFrom: string; emailCreditsEach: number }>("/api/settings");
       setCfg(r); setSenderEmail(r.email.senderEmail); setSenderName(r.email.senderName);
     } catch { setError(true); }
   }, []);
@@ -704,6 +714,12 @@ function EmailSection() {
   if (!cfg) return null;
   const provider = cfg.email.provider;
   const setProvider = async (p: string) => { setCfg((c) => (c ? { ...c, email: { ...c.email, provider: p } } : c)); await api.patch("/api/settings", { email: { provider: p } }).catch(() => void load()); };
+  /** Sender name only — the platform lane has nothing else to save. */
+  const saveSender = async () => {
+    setBusy(true);
+    try { await api.patch("/api/settings", { email: { senderName } }); await load(); }
+    finally { setBusy(false); }
+  };
   const saveBrevo = async () => {
     setBusy(true);
     try { await api.patch("/api/settings", { email: { senderEmail, senderName, ...(brevoKey ? { brevoApiKey: brevoKey } : {}) } }); setBrevoKey(""); await load(); }
@@ -719,7 +735,36 @@ function EmailSection() {
           onChange={(v) => void setProvider(v)}
         />
         {provider === "platform" && (
-          <p className="text-sm text-muted-foreground">Sends from <span className="font-medium text-foreground">{cfg.emailPlatformFrom.replace(/.*<|>.*/g, "")}</span> and is metered against your studio credits — no setup needed.</p>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Sends from <span className="font-medium text-foreground">{cfg.emailPlatformFrom.replace(/.*<|>.*/g, "")}</span> — no setup, no account to
+              verify. Metered against your studio credits.
+            </p>
+            {/* The price, where the choice is made. It was only ever discoverable
+                afterwards, in the credit ledger. */}
+            <ConfigRow
+              label="Cost per email"
+              ok
+              okLabel={cfg.emailCreditsEach === 0 ? "Free" : `${cfg.emailCreditsEach} cr`}
+              detail={cfg.emailCreditsEach === 0
+                ? "Metering is switched off for this deployment."
+                : `Charged when the email actually goes out, and refunded if it fails. Brevo sends on your own account instead, at no credit cost.`}
+            />
+            {/* Sender name applies HERE too. It used to be a Brevo-only field, so
+                a studio on the default provider set it and nothing happened. The
+                address must stay ours — it is the authenticated domain — but the
+                name is theirs. */}
+            <Field
+              label="Sender name"
+              value={senderName}
+              onChange={(e) => setSenderName(e.target.value)}
+              placeholder={"Your studio's name"}
+              hint={`Shown as the sender: “${(senderName.trim() || "Your Studio")} <${cfg.emailPlatformFrom.replace(/.*<|>.*/g, "")}>”.`}
+            />
+            <div className="flex justify-end">
+              <Button size="sm" disabled={busy || senderName === cfg.email.senderName} onClick={() => void saveSender()}>{busy ? "Saving…" : "Save"}</Button>
+            </div>
+          </div>
         )}
         {provider === "off" && <p className="text-sm text-muted-foreground">Email is off — members still get in-app notifications. Login codes always send.</p>}
         {provider === "brevo" && (

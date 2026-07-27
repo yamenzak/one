@@ -130,31 +130,59 @@ export interface NotifTypeMeta {
   vars?: readonly string[];
 }
 
+/**
+ * Variables EVERY template can use, because `notify()` always has them.
+ *
+ * This is what makes every type customizable without inventing variables its
+ * callers never pass: `renderTemplate` blanks an unknown key, so a template
+ * built on a variable nobody supplies ships a sentence with a hole in it. A
+ * template restricted to these three is always complete, whatever the caller
+ * did or did not provide.
+ *
+ *   studioName — the tenant's brand name
+ *   title      — the notification's own headline (interpolated per type; for
+ *                staff types this is where the client's name already appears)
+ *   message    — the one-line detail the caller passed, if any
+ */
+export const UNIVERSAL_NOTIF_VARS = ["studioName", "title", "message"] as const;
+
 export const NOTIF_TYPES: Record<NotifType, NotifTypeMeta> = {
-  check_in: { category: "check-ins", to: "staff" }, // title interpolates client name
+  check_in: { category: "check-ins", to: "staff", // title interpolates client name
+    template: { subject: "{{title}}", body: "<p>{{title}}.</p><p>{{message}}</p><p>Open {{studioName}} to read it and reply.</p>" }, vars: ["title", "message", "studioName"] },
   feedback: { category: "check-ins", to: "client", title: "Coach feedback on your check-in", link: "/wellness",
     template: { subject: "{{coachName}} left you feedback", body: "<p>{{coachName}} reviewed your latest check-in and left feedback. Open {{studioName}} to read it and keep your momentum going.</p>" }, vars: ["coachName", "studioName"] },
-  body_fat_logged: { category: "body-composition", to: "staff" }, // title interpolates client name
-  pr_achieved: { category: "activity", to: "staff" }, // title interpolates client + lift name
+  body_fat_logged: { category: "body-composition", to: "staff", // title interpolates client name
+    template: { subject: "{{title}}", body: "<p>{{title}}.</p><p>{{message}}</p><p>Open {{studioName}} to see the full body-composition history.</p>" }, vars: ["title", "message", "studioName"] },
+  pr_achieved: { category: "activity", to: "staff", // title interpolates client + lift name
+    template: { subject: "{{title}}", body: "<p><strong>{{title}}</strong></p><p>{{message}}</p><p>Worth a word of congratulations next session.</p>" }, vars: ["title", "message"] },
   plan_published: { category: "plans-goals", to: "client",
     template: { subject: "Your new {{planName}} is ready", body: "<p>{{coachName}} just published <strong>{{planName}}</strong> for you. Take a look and get started.</p>" }, vars: ["coachName", "planName"] }, // title + link vary by plan kind
   goal_set: { category: "plans-goals", to: "client", title: "Your coach set a new goal", link: "/progress?tab=body",
     template: { subject: "A new goal from {{coachName}}", body: "<p>{{coachName}} set a new goal for you: <strong>{{goalLabel}}</strong>. Open {{studioName}} to see the details.</p>" }, vars: ["coachName", "goalLabel", "studioName"] },
-  lab_requested: { category: "labs", to: "client", title: "New lab test requested", link: "/wellness" },
-  lab_uploaded: { category: "labs", to: "staff" }, // title interpolates client name
-  lab_reviewed: { category: "labs", to: "client", title: "Your coach reviewed your lab results", link: "/wellness" },
-  supplement_added: { category: "labs", to: "client", title: "New supplement added", link: "/wellness" },
+  lab_requested: { category: "labs", to: "client", title: "New lab test requested", link: "/wellness",
+    template: { subject: "{{studioName}} requested a lab test", body: "<p>Your coach has requested a lab test: <strong>{{message}}</strong>.</p><p>Open {{studioName}} to see what is needed and upload your results when you have them.</p>" }, vars: ["message", "studioName"] },
+  lab_uploaded: { category: "labs", to: "staff", // title interpolates client name
+    template: { subject: "{{title}}", body: "<p>{{title}}.</p><p>{{message}}</p><p>Open {{studioName}} to review the results.</p>" }, vars: ["title", "message", "studioName"] },
+  lab_reviewed: { category: "labs", to: "client", title: "Your coach reviewed your lab results", link: "/wellness",
+    template: { subject: "Your lab results have been reviewed", body: "<p>Your coach has gone through your latest lab results.</p><p>{{message}}</p><p>Open {{studioName}} to read the notes.</p>" }, vars: ["message", "studioName"] },
+  supplement_added: { category: "labs", to: "client", title: "New supplement added", link: "/wellness",
+    template: { subject: "A new supplement from {{studioName}}", body: "<p>Your coach added <strong>{{message}}</strong> to your plan.</p><p>Open {{studioName}} for the dose and timing.</p>" }, vars: ["message", "studioName"] },
   supplement_updated: { category: "labs", to: "client", title: "A supplement was updated", link: "/wellness",
     template: { subject: "{{coachName}} updated a supplement", body: "<p>{{coachName}} updated <strong>{{supplementName}}</strong> in your plan. Open {{studioName}} to see what changed.</p>" }, vars: ["coachName", "supplementName", "studioName"] },
-  swap_request: { category: "swaps", to: "staff" }, // title interpolates client name
-  swap_approved: { category: "swaps", to: "client", title: "Your exercise swap was applied", link: "/train" },
-  swap_rejected: { category: "swaps", to: "client", title: "Your coach kept the original exercise", link: "/train" },
-  content_assigned: { category: "content", to: "client", title: "Your coach shared something with you", link: "/explore" },
+  swap_request: { category: "swaps", to: "staff", // title interpolates client name
+    template: { subject: "{{title}}", body: "<p>{{title}}.</p><p>{{message}}</p><p>Open {{studioName}} to approve or decline it.</p>" }, vars: ["title", "message", "studioName"] },
+  swap_approved: { category: "swaps", to: "client", title: "Your exercise swap was applied", link: "/train",
+    template: { subject: "Your swap was approved", body: "<p>Your coach approved your exercise swap.</p><p>{{message}}</p><p>It is already in your plan — open {{studioName}} to see it.</p>" }, vars: ["message", "studioName"] },
+  swap_rejected: { category: "swaps", to: "client", title: "Your coach kept the original exercise", link: "/train",
+    template: { subject: "Your coach kept the original exercise", body: "<p>Your coach looked at your swap request and decided to keep the original movement.</p><p>{{message}}</p><p>Open {{studioName}} to see the plan as it stands.</p>" }, vars: ["message", "studioName"] },
+  content_assigned: { category: "content", to: "client", title: "Your coach shared something with you", link: "/explore",
+    template: { subject: "{{studioName}} shared something with you", body: "<p>Your coach shared <strong>{{message}}</strong> with you.</p><p>Open {{studioName}} to read it.</p>" }, vars: ["message", "studioName"] },
   session_booked: { category: "sessions", to: "client", title: "Session booked", link: "/wellness",
     template: { subject: "Session booked — {{sessionTime}}", body: "<p>Your session with {{studioName}} is booked for <strong>{{sessionTime}}</strong>. See you there!</p>" }, vars: ["sessionTime", "studioName"] },
   session_cancelled: { category: "sessions", to: "client", title: "Your session was cancelled", link: "/wellness",
     template: { subject: "Your session was cancelled", body: "<p>Your session on <strong>{{sessionTime}}</strong> was cancelled. Book another time with {{studioName}} whenever you're ready.</p>" }, vars: ["sessionTime", "studioName"] },
-  client_assigned: { category: "roster", to: "staff", title: "You've been assigned a client" }, // link is client-scoped
+  client_assigned: { category: "roster", to: "staff", title: "You've been assigned a client", // link is client-scoped
+    template: { subject: "A new client for you at {{studioName}}", body: "<p>You have been assigned a new client: <strong>{{message}}</strong>.</p><p>Open {{studioName}} to see their profile and start building their plan.</p>" }, vars: ["message", "studioName"] },
   access_granted: { category: "commerce", to: "client", title: "You've got new access", link: "/shop",
     template: { subject: "New access at {{studioName}}", body: "<p>{{coachName}} gave you access to <strong>{{packageName}}</strong>. Open {{studioName}} to jump back in.</p>" }, vars: ["coachName", "packageName", "studioName"] },
   sub_expired: { category: "commerce", to: "client", title: "Your access has expired", link: "/shop",
@@ -171,8 +199,10 @@ export const NOTIF_TYPES: Record<NotifType, NotifTypeMeta> = {
     template: { subject: "Your Mossa trial ends in {{daysLeft}} days", body: "<p>Your free trial of the {{planName}} plan ends in {{daysLeft}} days, and your card will be charged then. Nothing to do if you're happy — change or cancel your plan any time from Business.</p>" }, vars: ["planName", "daysLeft"] },
   billing_past_due: { category: "billing", to: "owner", title: "Payment failed", link: "/business",
     template: { subject: "Payment failed — action needed", body: "<p>We couldn't charge your card for your Mossa subscription. Update your payment method to keep your studio running — you have a short grace period before features pause.</p>" }, vars: [] },
-  payment_disputed: { category: "sales", to: "owner", title: "A client payment was disputed", link: "/clients" },
-  payment_refunded: { category: "sales", to: "owner", title: "A client payment was refunded", link: "/clients" },
+  payment_disputed: { category: "sales", to: "owner", title: "A client payment was disputed", link: "/clients",
+    template: { subject: "A payment was disputed", body: "<p>A client payment has been disputed and the funds are on hold.</p><p>{{message}}</p><p>Respond through your Stripe dashboard — disputes have a deadline.</p>" }, vars: ["message"] },
+  payment_refunded: { category: "sales", to: "owner", title: "A client payment was refunded", link: "/clients",
+    template: { subject: "A payment was refunded", body: "<p>A client payment has been refunded.</p><p>{{message}}</p><p>Their access has been adjusted to match — open {{studioName}} to check.</p>" }, vars: ["message", "studioName"] },
 };
 
 /** The category that governs a notification type's delivery preferences. */

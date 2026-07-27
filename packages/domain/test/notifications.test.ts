@@ -162,12 +162,19 @@ describe("email templates + variable rendering", () => {
     }
   });
 
-  it("only client-facing + studio-billing types carry a template (phased scope)", () => {
-    expect(notifTemplateOf("feedback")).not.toBeNull();
-    expect(notifTemplateOf("billing_past_due")).not.toBeNull();
-    // Staff activity signals fall back to the generic card.
-    expect(notifTemplateOf("check_in")).toBeNull();
-    expect(notifTemplateOf("body_fat_logged")).toBeNull();
+  it("EVERY type carries a template, staff signals included", () => {
+    // This used to assert the opposite — that staff activity signals fell back to
+    // the generic card — which was a phase, not an invariant. A type without a
+    // template cannot be edited in the studio's Email templates screen at all, so
+    // "every message is customizable" was quietly untrue for half of them.
+    for (const type of Object.keys(NOTIF_TYPES) as NotifType[]) {
+      expect(notifTemplateOf(type), `${type} has no editable template`).not.toBeNull();
+    }
+    // The two ends of the range, named so a regression says which half broke.
+    expect(notifTemplateOf("feedback")).not.toBeNull();   // client-facing
+    expect(notifTemplateOf("billing_past_due")).not.toBeNull(); // studio billing
+    expect(notifTemplateOf("check_in")).not.toBeNull();   // staff activity signal
+    expect(notifTemplateOf("body_fat_logged")).not.toBeNull();
   });
 });
 

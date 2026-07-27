@@ -2763,8 +2763,12 @@ describe("email templates — tenant white-label store", () => {
     expect(fb1.customized).toBe(true);
     expect(fb1.subject).toBe("{{coachName}} says hi");
 
-    // A non-templatable type is rejected.
-    expect((await SELF.fetch("http://x/api/email-templates/check_in", { method: "PUT", headers: H, body: JSON.stringify({ subject: "x", body: "y" }) })).status).toBe(400);
+    // `check_in` used to be rejected here as "non-templatable". Every type now
+    // carries a template — that is the point — so it must be ACCEPTED, and the
+    // negative case moves to what is genuinely invalid: a type that does not
+    // exist. Keeping the old assertion would have quietly re-asserted the gap.
+    expect((await SELF.fetch("http://x/api/email-templates/check_in", { method: "PUT", headers: H, body: JSON.stringify({ subject: "x", body: "y" }) })).status).toBe(200);
+    expect((await SELF.fetch("http://x/api/email-templates/not_a_real_type", { method: "PUT", headers: H, body: JSON.stringify({ subject: "x", body: "y" }) })).status).toBe(400);
 
     // Reset drops the override → back to the registry default.
     expect((await SELF.fetch("http://x/api/email-templates/feedback", { method: "DELETE", headers: auth(ownerCookie) })).status).toBe(200);
@@ -4134,5 +4138,41 @@ describe("the starter exercise library is opt-in", () => {
     await db.prepare("INSERT OR REPLACE INTO exercises (id, tenant_id, visibility, name, slug, source, active, created_at) VALUES ('exr_mine', ?, 'tenant', 'My Lift', 'my-lift', 'manual', 1, ?)").bind(ctx.active.tenantId, new Date().toISOString()).run();
     await SELF.fetch("http://x/api/admin/starter-library", { method: "POST", headers: H, body: JSON.stringify({ install: false }) });
     expect(await db.prepare("SELECT id FROM exercises WHERE id = 'exr_mine'").first(), "a studio's own exercise was deleted").not.toBeNull();
+  });
+});
+
+/**
+ * Platform email is metered, and the studio is told the price.
+ *
+ * Two things that only show up in a ledger if they are wrong: an email that
+ * charges nothing (the platform eats the send) and an email that charges for a
+ * send that never went out. Both are silent.
+ */
+describe("email on the Mossa lane is metered and priced visibly", () => {
+  it("publishes the per-email cost with the email settings", async () => {
+    // The price belongs where the provider is CHOSEN. It used to be discoverable
+    // only afterwards, in the credit ledger.
+    const r = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as { emailCreditsEach: number; email: { provider: string } };
+    expect(typeof r.emailCreditsEach).toBe("number");
+    expect(r.emailCreditsEach).toBeGreaterThanOrEqual(0);
+  });
+
+  it("charges credits for a send, and refunds one that fails", async () => {
+    const { sendTenantEmail } = await import("../src/email-provider.js");
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const tid = ctx.active.tenantId;
+    await SELF.fetch(`http://x/api/admin/tenants/${tid}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+
+    const balance = async () =>
+      ((await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { balance: number } }).balance.balance;
+
+    const before = await balance();
+    const ok = await sendTenantEmail(env as never, tid, { to: "someone@test.dev", subject: "Metered", text: "hi", brandName: "Iron House" });
+    expect(ok.ok, "the dev mailer should accept the send").toBe(true);
+    const after = await balance();
+    // The deployment default is 1 credit; assert it MOVED rather than hard-coding
+    // a price an operator is allowed to change.
+    expect(after, "a platform email did not cost anything").toBeLessThan(before);
   });
 });

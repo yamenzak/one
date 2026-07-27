@@ -165,7 +165,17 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
         } else if (tpl) {
           const base = env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
           const href = link && base ? withTenantHint(`${base}${link.startsWith("/") ? "" : "/"}${link}`, input.tenantId) : null;
-          const raw: Record<string, string | number | null | undefined> = { studioName: brand.name, ...(input.vars ?? {}) };
+          // `studioName`, `title` and `message` are available to EVERY template,
+          // because notify() always has them. That is what lets a type be
+          // customizable without inventing variables its callers never pass:
+          // `renderTemplate` blanks an unknown key, so a template built on a
+          // variable nobody supplies ships a sentence with a hole in it.
+          const raw: Record<string, string | number | null | undefined> = {
+            studioName: brand.name,
+            title,
+            message: input.message ?? "",
+            ...(input.vars ?? {}),
+          };
           const esc = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, escapeHtml(v === undefined || v === null ? "" : String(v))]));
           subject = renderTemplate(tpl.subject, raw);
           const inner = renderTemplate(tpl.body, esc) + (href ? emailButton(`Open ${brand.name}`, href, brand) : "");

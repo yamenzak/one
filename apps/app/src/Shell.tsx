@@ -306,10 +306,13 @@ function TabLayout() {
                 )}
                 {/* Personal settings — each its own destination (no buried tabs). */}
                 {clientSurface && clientId && <DropdownMenuItem onSelect={() => nav("/profile")}><CircleUser /> Profile</DropdownMenuItem>}
-                {clientSurface && clientId && <DropdownMenuItem onSelect={() => nav("/preferences")}><SlidersHorizontal /> Preferences</DropdownMenuItem>}
+                {/* Preferences now carries notifications too, so there is one
+                    destination for "how this app behaves for me" rather than two
+                    half-empty ones a tap apart. Staff (no client profile) still
+                    reach the notification half through this entry. */}
+                <DropdownMenuItem onSelect={() => nav("/preferences")}><SlidersHorizontal /> Preferences &amp; notifications</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => nav("/media")}><ImageIcon /> Media library</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => nav("/appearance")}><Palette /> Appearance &amp; units</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => nav("/notification-settings")}><Bell /> Notifications</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => nav("/passkeys")}><KeyRound /> Passkeys &amp; security</DropdownMenuItem>
                 {active.role === "owner" && <DropdownMenuItem onSelect={() => nav("/settings")}><SettingsIcon /> Studio settings</DropdownMenuItem>}
                 {ctx!.isPlatformAdmin && <DropdownMenuItem onSelect={() => nav("/admin")}><ShieldCheck /> Platform admin</DropdownMenuItem>}

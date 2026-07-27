@@ -38,6 +38,10 @@ export const settingsRoutes = new Hono<AppEnv>()
       integrationProviders: PROVIDERS,
       email: maskEmailConfig(resolveEmailConfig(parseJson(row?.email_config_json ?? null, {}))),
       emailPlatformFrom: platformFrom,
+      // What ONE email costs on the Mossa lane. Brevo is the studio's own
+      // account and costs them nothing here, so the number is only meaningful
+      // for the platform provider — the UI shows it only there.
+      emailCreditsEach: Number((await getConfig(c.env.DB))["email.credits_per_email"] ?? "1"),
       // Owner-governed studio-wide email allow-list, by category AND audience
       // (email clients vs staff about a category, separately).
       notifCategories: NOTIF_CATEGORIES,

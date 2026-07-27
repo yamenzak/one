@@ -99,7 +99,13 @@ export async function sendTenantEmail(env: Env, tenantId: string, msg: EmailMsg)
     if (!charged.ok) return { ok: false, skipped: "no_credits" };
   }
   const platformFrom = conf["email.platform_from"] || "Mossa <noreply@fourdegreelabs.com>";
-  const from = msg.brandName ? `${msg.brandName} <${bareAddress(platformFrom)}>` : platformFrom;
+  // The From display name. `senderName` used to be honoured on the Brevo lane
+  // ONLY, so a studio that set it and left the provider on Mossa saw no effect at
+  // all — the field silently did nothing for the default configuration. The
+  // address still has to be the platform's (it is the domain that is
+  // authenticated), but the name is the studio's to choose.
+  const displayName = cfg.senderName.trim() || msg.brandName;
+  const from = displayName ? `${displayName} <${bareAddress(platformFrom)}>` : platformFrom;
   const result = await sendEmail(env.DB, msg, env.EMAIL, from, env.ENVIRONMENT === "development");
   // Refund the metered credit if the send didn't actually go out — a charged-but-
   // failed email should never silently spend a tenant's credits.
