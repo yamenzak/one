@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNod
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
-  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, Palette, Bell, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, toneVar, type TabDef, type Tone,
+  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, toneVar, type TabDef, type Tone,
 } from "@mossa/ui";
 import { useSession, useActiveClientId } from "./session.js";
 import { useTheme } from "./theme.js";
@@ -306,13 +306,12 @@ function TabLayout() {
                 )}
                 {/* Personal settings — each its own destination (no buried tabs). */}
                 {clientSurface && clientId && <DropdownMenuItem onSelect={() => nav("/profile")}><CircleUser /> Profile</DropdownMenuItem>}
-                {/* Preferences now carries notifications too, so there is one
-                    destination for "how this app behaves for me" rather than two
-                    half-empty ones a tap apart. Staff (no client profile) still
-                    reach the notification half through this entry. */}
-                <DropdownMenuItem onSelect={() => nav("/preferences")}><SlidersHorizontal /> Preferences &amp; notifications</DropdownMenuItem>
+                {/* One destination for "how this app behaves for me". These were
+                    four menu entries a tap apart — preferences, notifications,
+                    appearance, units — each a half-empty screen. They are tabs on
+                    one page now. */}
+                <DropdownMenuItem onSelect={() => nav("/preferences")}><SlidersHorizontal /> Preferences</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => nav("/media")}><ImageIcon /> Media library</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => nav("/appearance")}><Palette /> Appearance &amp; units</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => nav("/passkeys")}><KeyRound /> Passkeys &amp; security</DropdownMenuItem>
                 {active.role === "owner" && <DropdownMenuItem onSelect={() => nav("/settings")}><SettingsIcon /> Studio settings</DropdownMenuItem>}
                 {ctx!.isPlatformAdmin && <DropdownMenuItem onSelect={() => nav("/admin")}><ShieldCheck /> Platform admin</DropdownMenuItem>}

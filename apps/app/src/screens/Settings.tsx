@@ -81,7 +81,7 @@ export type SettingsView = "profile" | "preferences" | "appearance" | "notificat
 
 const VIEW_TITLE: Record<SettingsView, string> = {
   profile: "Profile",
-  preferences: "Preferences & notifications",
+  preferences: "Preferences",
   appearance: "Appearance & units",
   notifications: "Notifications",
   passkeys: "Passkeys & security",
@@ -114,23 +114,13 @@ export function Settings({ onBack, view = "studio" }: { onBack: () => void; view
           </>
         );
       case "preferences":
-        // Notifications live HERE now, not behind their own menu entry. Both are
-        // "how this app behaves for me" — splitting them meant two destinations
-        // one tap apart, each half-empty, and a client with no coaching profile
-        // saw a Preferences page that was nothing but an apology.
-        return (
-          <>
-            <Stagger><TabIntro>How Mossa works for you — what your coach plans around, and what you want to hear about.</TabIntro></Stagger>
-            {clientId
-              ? <PreferencesSection clientId={clientId} onSaved={() => void refresh()} />
-              : <Stagger><Card className="text-sm text-muted-foreground">Training &amp; nutrition preferences appear here once you're set up as a client.</Card></Stagger>}
-            <NotificationsSection />
-          </>
-        );
+        return <PersonalSettings clientId={clientId} onSaved={() => void refresh()} />;
+      // Kept as its own route for deep links and back-compat; the menu now goes
+      // to Preferences, which carries these as tabs.
       case "appearance":
-        return <><UnitsSection /><AppearanceSection /></>;
+        return <PersonalSettings clientId={clientId} initialTab="appearance" onSaved={() => void refresh()} />;
       case "notifications":
-        return <NotificationsSection />;
+        return <PersonalSettings clientId={clientId} initialTab="notifications" onSaved={() => void refresh()} />;
       case "passkeys":
         return <><SecuritySection /><SignOutSection /><DeleteAccountSection /></>;
       case "studio":
@@ -156,6 +146,52 @@ export function Settings({ onBack, view = "studio" }: { onBack: () => void; view
  * sections don't pile into one endless page. Each sub-tab groups a cohesive
  * concern; a tab only appears when it has content the tenant is entitled to.
  */
+/**
+ * Everything that is "how this app behaves for ME", in one destination.
+ *
+ * These were four menu entries a tap apart — preferences, notifications,
+ * appearance, units — each one a half-empty screen, and a client with no
+ * coaching profile landed on a Preferences page that was nothing but an apology.
+ * They are one page with tabs now, the same shape the studio settings use, so
+ * the surfaces are comparable and none of them is a dead end.
+ *
+ * The old routes still resolve (deep links, and anything already bookmarked) —
+ * they just open this page on the matching tab.
+ */
+type PersonalTab = "preferences" | "notifications" | "appearance" | "units";
+
+function PersonalSettings({ clientId, initialTab = "preferences", onSaved }: {
+  clientId: string | null;
+  initialTab?: PersonalTab;
+  onSaved: () => void;
+}) {
+  const tabs: { value: PersonalTab; label: string; intro: string }[] = [
+    { value: "preferences", label: "Preferences", intro: "What your coach plans around — your goal, your training, what to avoid." },
+    { value: "notifications", label: "Notifications", intro: "What you want to hear about, and where it reaches you." },
+    { value: "appearance", label: "Appearance", intro: "How Mossa looks on this device." },
+    { value: "units", label: "Units", intro: "Whether weights, heights and volumes read metric or imperial." },
+  ];
+  const [tab, setTab] = useState<PersonalTab>(initialTab);
+  const active = tabs.find((t) => t.value === tab) ?? tabs[0]!;
+
+  return (
+    <div className="space-y-5">
+      <div className="-mx-4 overflow-x-auto px-4 no-scrollbar">
+        <SegmentedControl options={tabs.map((t) => ({ value: t.value, label: t.label }))} value={tab} onChange={(v) => setTab(v as PersonalTab)} />
+      </div>
+      <motion.div key={tab} variants={stagger} initial="hidden" animate="show" className="space-y-6">
+        <Stagger><TabIntro>{active.intro}</TabIntro></Stagger>
+        {tab === "preferences" && (clientId
+          ? <PreferencesSection clientId={clientId} onSaved={onSaved} />
+          : <Stagger><Card className="text-sm text-muted-foreground">Training &amp; nutrition preferences appear here once you're set up as a client.</Card></Stagger>)}
+        {tab === "notifications" && <NotificationsSection />}
+        {tab === "appearance" && <AppearanceSection />}
+        {tab === "units" && <UnitsSection />}
+      </motion.div>
+    </div>
+  );
+}
+
 function StudioSettings({ canBrand }: { canBrand: boolean }) {
   const { ctx, refresh } = useSession();
   const { preview } = useTheme();
