@@ -320,6 +320,7 @@ section 6.
 | `cf.saas.api_token` | *(empty)* | Tenant custom domains can't be registered | Platform admin → **Domains** |
 | `cf.saas.zone_id` | *(empty)* | Same | Platform admin → **Domains** |
 | `cf.saas.cname_target` | *(empty)* | Tenants get no CNAME to point at | Platform admin → **Domains** |
+| `cf.saas.worker_name` | `mossa` | Per-hostname routes point at a missing script | Only if the worker is renamed |
 
 Worker-level config that is **not** in `app_config`: `BETTER_AUTH_SECRET`
 (wrangler secret, step 5b), `ADMIN_EMAILS` and `BETTER_AUTH_URL`
@@ -515,33 +516,26 @@ Budget ~30 minutes, most of it waiting for a status to flip.
 platform host. For `mossa.4dl.app` that zone is **`4dl.app`**. Your marketing site
 is a different zone and is not involved.
 
-**Step 1 — add the Worker route that makes custom hostnames reach the worker.**
+**Step 1 — nothing to do; the routing is automatic.**
 
-Do this FIRST, because without it the rest of the setup completes cleanly and
-custom domains still 5xx, which is a miserable thing to debug.
+Worth understanding, because it is the part that silently breaks otherwise. A
+Cloudflare route is matched by hostname, and a tenant's domain is not in your
+zone — so the worker's own `custom_domain` route (`mossa.4dl.app`) never matches
+`train.byshujaa.com`. Without a route the certificate issues, the DNS resolves,
+and every request still dies: the worker never runs, and the fallback origin is
+originless by design.
 
-`wrangler.jsonc` ships with one route: `mossa.4dl.app` (`custom_domain: true`).
-That matches exactly one hostname. A SaaS custom hostname like
-`train.byshujaa.com` is NOT in your zone, so it matches no route, the worker never
-runs, and the request dies at the fallback origin. Custom domains cannot work
-until the zone has a route that matches them:
+Cloudflare documents a zone-wide `*/*` route for this. **We deliberately do not
+use it**: this zone hosts unrelated apps, and `*/*` would route every one of them
+into Mossa. Excluding them by hand is worse — a new app on the zone starts serving
+Mossa the day someone forgets an exclusion, and the blast radius is another
+product.
 
-```jsonc
-"routes": [
-  { "pattern": "mossa.4dl.app", "custom_domain": true },
-  { "pattern": "*/*", "zone_name": "4dl.app" }
-]
-```
-
-⚠️ `*/*` captures **every hostname on that zone**, not just custom hostnames. If
-`4dl.app` serves anything else — another worker, a static site, an API on a
-different subdomain — that traffic now hits the mossa worker too. Two ways out:
-put Mossa on a zone of its own, or add a second route for the hostname you want
-to exclude with **no worker assigned** (Cloudflare treats an empty route as "do
-not run a worker here"). Decide this before deploying.
-
-*Check:* `wrangler deploy`, then `curl -I https://mossa.4dl.app/health` still
-returns 200, and anything else you host on the zone still works.
+Instead Mossa creates **one worker route per registered hostname** and deletes it
+with the domain (`createWorkerRoute` / `deleteWorkerRoute` in `cloudflare.ts`).
+Nothing on the zone is touched that a tenant did not explicitly bring, and the
+route's lifetime is exactly the domain's. This is why the token in Step 5 needs a
+second permission.
 
 **Step 2 — enable Cloudflare for SaaS.** Dashboard → the zone → **SSL/TLS** →
 **Custom Hostnames** → *Enable*.
@@ -574,7 +568,12 @@ proxied hostname on this zone — write it down for Step 6.
 **Step 5 — create a scoped API token.** Dashboard → **My Profile** → **API
 Tokens** → *Create Token* → *Custom token*:
 
-- Permissions: **Zone · SSL and Certificates · Edit**
+- Permission 1: **Zone · SSL and Certificates · Edit** — registers the hostname
+  and issues its certificate.
+- Permission 2: **Zone · Workers Routes · Edit** — points that hostname at this
+  worker. Without it, `POST /api/domains` fails with a Cloudflare permission error
+  and rolls the hostname back rather than leaving one that can never serve
+  traffic.
 - Zone Resources: **Include · Specific zone ·** your zone
 
 Scope it to the one zone. This token can issue certificates — do not use a global
@@ -589,6 +588,11 @@ key, and do not reuse it elsewhere.
 | API token | the token from Step 5 | shown once at creation |
 | Zone id | the zone's id | zone **Overview** → right sidebar → *Zone ID* |
 | CNAME target | e.g. `saas.4dl.app` | your choice in Step 4 |
+
+Optional: `cf.saas.worker_name` overrides which worker script the per-hostname
+routes point at. It defaults to `mossa`, matching `wrangler.jsonc`'s `name` — set
+it only if you rename the worker, otherwise every newly added domain would route
+at a script that no longer exists.
 
 Stored in `app_config` as `cf.saas.*`. Until all three are set,
 `saasConfig()` returns null and the owner-facing domain UI answers
@@ -612,9 +616,9 @@ hostname → the app registers a CF custom hostname and shows the **CNAME** +
 **DCV TXT** records → owner adds them at their DNS → "Check now" polls until the
 cert issues → status flips to **Live**. Removing the domain deregisters it.
 
-Notes: the worker is host-agnostic (`host-context.ts` reads `Host`), so no
-*per-domain* route is needed — but the zone DOES need the wildcard route from
-Step 1, or no custom hostname reaches the worker at all. `BETTER_AUTH_URL` stays the platform origin; the
+Notes: the worker is host-agnostic (`host-context.ts` reads `Host`), so no code
+changes per tenant — but each hostname DOES need its own worker route, which
+Mossa creates and removes for you (Step 1). `BETTER_AUTH_URL` stays the platform origin; the
 request origin drives auth on custom domains. Because passkeys are origin-bound,
 a user in more than one tenancy enrolls a passkey per domain (OTP is always the
 bootstrap).

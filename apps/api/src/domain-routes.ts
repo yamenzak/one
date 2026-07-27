@@ -16,7 +16,7 @@ import { type AppEnv, requireTenant, requirePermission, isPlatformAdmin } from "
 import { setConfig, getConfig } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
 import { turnstileConfig } from "./turnstile.js";
-import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostname, type CustomHostname } from "./cloudflare.js";
+import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostname, createWorkerRoute, deleteWorkerRoute, type CustomHostname } from "./cloudflare.js";
 import { hostnameOf, isPlatformHost, invalidateHostCache, resolveTenantDoor } from "./host-context.js";
 import { nowIso } from "./ids.js";
 
@@ -28,7 +28,7 @@ const HOSTNAME = z
   .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/, "enter a valid domain, e.g. train.yourgym.com");
 
 interface DomainRow {
-  hostname: string; tenant_id: string; cf_hostname_id: string | null;
+  hostname: string; tenant_id: string; cf_hostname_id: string | null; cf_route_id: string | null;
   status: string; ssl_status: string | null; verify_name: string | null; verify_value: string | null; cname_target: string | null;
 }
 
@@ -128,10 +128,27 @@ export const domainRoutes = new Hono<AppEnv>()
       return c.json({ error: e instanceof Error ? e.message : "cloudflare error" }, 502);
     }
     const status = ch.status === "active" && ch.sslStatus === "active" ? "active" : "pending";
+
+    // Point the hostname at this worker. Without a route the certificate issues,
+    // the DNS resolves, and every request still dies — the worker never runs,
+    // because a Cloudflare route is matched by hostname and a tenant's domain is
+    // not in our zone. One route per hostname rather than a zone-wide `*/*`,
+    // which would swallow the unrelated apps on this zone (see cloudflare.ts).
+    let routeId: string | null = null;
+    try {
+      routeId = await createWorkerRoute(cfg, hostname);
+    } catch (e) {
+      // Roll the hostname back rather than leaving a registration that can never
+      // serve traffic: a half-provisioned domain reads as "pending" forever and
+      // there is nothing the owner can do about it.
+      await deleteCustomHostname(cfg, ch.id);
+      return c.json({ error: e instanceof Error ? e.message : "cloudflare route error" }, 502);
+    }
+
     await c.env.DB.prepare(
-      "INSERT INTO tenant_domains (hostname, tenant_id, cf_hostname_id, status, ssl_status, verify_name, verify_value, cname_target, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO tenant_domains (hostname, tenant_id, cf_hostname_id, cf_route_id, status, ssl_status, verify_name, verify_value, cname_target, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
-      .bind(hostname, who.tenantId, ch.id, status, ch.sslStatus, ch.verify.name ?? null, ch.verify.value ?? null, cfg.cnameTarget, who.userId, nowIso(), nowIso())
+      .bind(hostname, who.tenantId, ch.id, routeId, status, ch.sslStatus, ch.verify.name ?? null, ch.verify.value ?? null, cfg.cnameTarget, who.userId, nowIso(), nowIso())
       .run();
     const row = await c.env.DB.prepare("SELECT * FROM tenant_domains WHERE hostname = ?").bind(hostname).first<DomainRow>();
     return c.json({ domain: present(row!) }, 201);
@@ -160,7 +177,10 @@ export const domainRoutes = new Hono<AppEnv>()
     const row = await c.env.DB.prepare("SELECT * FROM tenant_domains WHERE hostname = ? AND tenant_id = ?").bind(c.req.param("hostname").toLowerCase(), who.tenantId).first<DomainRow>();
     if (!row) return c.json({ error: "not found" }, 404);
     const cfg = await saasConfig(c.env.DB);
+    // Both sides, or the zone accumulates routes pointing at hostnames nobody
+    // owns any more — and a tenant re-adding the domain later would collide.
     if (cfg && row.cf_hostname_id) await deleteCustomHostname(cfg, row.cf_hostname_id);
+    if (cfg && row.cf_route_id) await deleteWorkerRoute(cfg, row.cf_route_id);
     await c.env.DB.prepare("DELETE FROM tenant_domains WHERE hostname = ? AND tenant_id = ?").bind(row.hostname, who.tenantId).run();
     await invalidateHostCache(c.env, row.hostname);
     return c.json({ ok: true });

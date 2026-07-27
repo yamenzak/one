@@ -11,6 +11,11 @@
  *   cf.saas.api_token   — token with `SSL and Certificates: Edit` on the zone
  *   cf.saas.zone_id     — the SaaS-enabled zone id
  *   cf.saas.cname_target — what tenants point their CNAME at (e.g. ssl.mossa.4dl.app)
+ *   cf.saas.worker_name  — the worker script to route hostnames at (default "mossa")
+ *
+ * The token needs TWO permissions: `SSL and Certificates: Edit` to register the
+ * hostname, and `Workers Routes: Edit` to point it at this worker. See the
+ * worker-routes section below for why the route is per-hostname.
  */
 
 import { getConfig } from "./billing-store.js";
@@ -21,6 +26,10 @@ export interface SaasConfig {
   apiToken: string;
   zoneId: string;
   cnameTarget: string;
+  /** The worker script a custom hostname's route points at. Configurable rather
+   *  than hardcoded so renaming the worker in wrangler.jsonc surfaces as a
+   *  settable value instead of every new domain silently 404ing. */
+  workerName: string;
 }
 
 /** Read + validate the CF for SaaS config. Returns null when not configured. */
@@ -30,7 +39,7 @@ export async function saasConfig(db: D1Database): Promise<SaasConfig | null> {
   const zoneId = cfg["cf.saas.zone_id"];
   const cnameTarget = cfg["cf.saas.cname_target"];
   if (!apiToken || !zoneId || !cnameTarget) return null;
-  return { apiToken, zoneId, cnameTarget };
+  return { apiToken, zoneId, cnameTarget, workerName: cfg["cf.saas.worker_name"] || "mossa" };
 }
 
 /** A normalized DCV/ownership record the tenant must add at their DNS. */
@@ -106,4 +115,49 @@ export async function getCustomHostname(cfg: SaasConfig, id: string): Promise<Cu
 /** Deregister a custom hostname (best-effort; ignore if already gone). */
 export async function deleteCustomHostname(cfg: SaasConfig, id: string): Promise<void> {
   await cf(cfg, `/custom_hostnames/${id}`, { method: "DELETE" }).catch(() => undefined);
+}
+
+// ── Worker routes, one per custom hostname ───────────────────────────────────
+//
+// A custom hostname reaching the zone is not enough: Worker routes are matched
+// by hostname pattern, and a tenant's domain is not IN our zone, so the worker's
+// own `custom_domain` route (`mossa.4dl.app`) never matches it. Without a route
+// the worker does not run and the request dies at the fallback origin — which is
+// an originless record on purpose.
+//
+// Cloudflare's documented answer is a zone-wide `*/*` route, but this zone hosts
+// unrelated apps and `*/*` would swallow every one of them. Excluding them by
+// hand is worse: a new app on the zone silently starts serving Mossa the day
+// someone forgets to add an exclusion, and the blast radius is another product.
+//
+// So we create ONE route per registered hostname and delete it with the domain.
+// Nothing on the zone is affected that a tenant did not explicitly bring, the
+// route's lifetime is exactly the domain's, and it stays self-serve.
+//
+// This needs `Workers Routes: Edit` on the token IN ADDITION to
+// `SSL and Certificates: Edit` — see DEPLOY.md §11.
+
+interface CfRoute { id: string; pattern?: string; script?: string }
+
+/**
+ * Point one hostname at the worker. Returns the route id to store alongside the
+ * domain, so removal can be exact rather than a pattern search.
+ *
+ * `/*` is appended because a Cloudflare route pattern matches a URL, not a host:
+ * a bare `train.byshujaa.com` matches only the empty path.
+ */
+export async function createWorkerRoute(cfg: SaasConfig, hostname: string): Promise<string> {
+  const env = await cf<CfRoute>(cfg, "/workers/routes", {
+    method: "POST",
+    body: JSON.stringify({ pattern: `${hostname}/*`, script: cfg.workerName }),
+  });
+  if (!env.success || !env.result?.id) {
+    throw new Error(env.errors?.[0]?.message ?? "cloudflare worker-route create failed");
+  }
+  return env.result.id;
+}
+
+/** Remove a hostname's worker route (best-effort; ignore if already gone). */
+export async function deleteWorkerRoute(cfg: SaasConfig, routeId: string): Promise<void> {
+  await cf(cfg, `/workers/routes/${routeId}`, { method: "DELETE" }).catch(() => undefined);
 }
