@@ -120,7 +120,7 @@ beforeAll(async () => {
   await ensureSchema(env.DB as D1Database);
 });
 
-describe("client offboarding — archive frees a slot, delete frees it and reclaims storage", () => {
+describe("client offboarding — archive keeps the seat, delete frees it and reclaims storage", () => {
   it("delete removes the client's rows AND its R2 objects, and frees a slot a 403 proved was full", async () => {
     const db = env.DB as D1Database;
     const cookie = await signInFlow("lc-del@test.dev", "Delete Studio");
@@ -210,7 +210,7 @@ describe("client offboarding — archive frees a slot, delete frees it and recla
     expect((await mkClient(cookie, "Third")).status).toBe(201);
   }, 30_000);
 
-  it("archive frees a slot but retains the record", async () => {
+  it("archive does NOT free a seat — only deleting does", async () => {
     const db = env.DB as D1Database;
     const cookie = await signInFlow("lc-arch@test.dev", "Archive Studio");
     const tenantId = await tenantOf(cookie);
@@ -225,9 +225,14 @@ describe("client offboarding — archive frees a slot, delete frees it and recla
     expect((await mkClient(cookie, "Third")).status).toBe(403);
     expect((await SELF.fetch(`${B}/api/clients/${b.id}/archive`, { method: "POST", headers: json(cookie), body: "{}" })).status).toBe(200);
 
-    // Slot freed …
-    expect((await mkClient(cookie, "Third")).status).toBe(201);
-    // … and NOTHING erased — this is the whole difference from delete.
+    // The seat is STILL TAKEN. Archiving takes a client off the roster; it does
+    // not stop the studio storing their record, their logs, their photos and
+    // their lab files, so it cannot hand the capacity back. Archiving used to
+    // free the seat, which made it an unlimited-storage loophole: archive
+    // everyone, keep every byte, stay on a 2-seat plan forever. Deleting is the
+    // only thing that frees a seat, because it is the only thing that erases.
+    expect((await mkClient(cookie, "Third")).status).toBe(403);
+    // NOTHING erased — this is the whole difference from delete.
     const row = await db.prepare("SELECT status, archived_at FROM clients WHERE id = ?").bind(b.id).first<{ status: string; archived_at: string | null }>();
     expect(row!.status).toBe("archived");
     expect(row!.archived_at).toBeTruthy();
@@ -235,6 +240,76 @@ describe("client offboarding — archive frees a slot, delete frees it and recla
     // Off the roster, but still readable by id (history review).
     const roster = (await (await SELF.fetch(`${B}/api/clients`, { headers: auth(cookie) })).json()) as { clients: { id: string }[] };
     expect(roster.clients.find((c) => c.id === b.id)).toBeFalsy();
+
+    // Deleting the archived record DOES free the seat — the loophole closes
+    // without making archive a dead end.
+    const del = await SELF.fetch(`${B}/api/clients/${b.id}/delete`, { method: "POST", headers: json(cookie), body: JSON.stringify({ confirm: "Retired" }) });
+    expect(del.status).toBe(200);
+    expect((await mkClient(cookie, "Third")).status).toBe(201);
+  }, 30_000);
+
+  it("an archived client can still READ their own history, but not add to it", async () => {
+    // "If the data exists on a tenancy, the person it is about has access to it."
+    // `clientForUser` used to filter archived out, so an archived client signed in
+    // to a shell — role client, clientId null, every screen empty, no explanation.
+    // Now the record resolves and writes are refused, which is the honest shape:
+    // your history is yours, but nobody is coaching you here any more.
+    const db = env.DB as D1Database;
+    const ownerCk = await signInFlow("lc-arch-ro@test.dev", "ReadOnly Studio");
+    const tenantId = await tenantOf(ownerCk);
+    const cl = await mkClient(ownerCk, "Alumni", "lc-alumni@test.dev");
+    expect(cl.status).toBe(201);
+    await SELF.fetch(`${B}/api/check-ins`, { method: "POST", headers: json(ownerCk), body: JSON.stringify({ clientId: cl.id, data: { date: "2026-06-12", mood: 4 } }) });
+
+    // The client signs in and auto-links, then the studio archives them.
+    // Plain sign-in — a client must NOT create an organization of their own here.
+    const clientCk = await signIn("lc-alumni@test.dev");
+    await SELF.fetch(`${B}/api/context/switch`, { method: "POST", headers: json(clientCk), body: JSON.stringify({ tenantId }) });
+    expect((await SELF.fetch(`${B}/api/clients/${cl.id}/archive`, { method: "POST", headers: json(ownerCk), body: "{}" })).status).toBe(200);
+
+    // Their persona still resolves — not a null clientId.
+    const ctx = (await (await SELF.fetch(`${B}/api/context`, { headers: auth(clientCk) })).json()) as { active: { clientId: string | null; role: string } };
+    expect(ctx.active.clientId).toBe(cl.id);
+
+    // READ works: the record and the check-in they logged are both reachable.
+    expect((await SELF.fetch(`${B}/api/clients/${cl.id}`, { headers: auth(clientCk) })).status).toBe(200);
+
+    // WRITE is refused, with a reason rather than a bare 403.
+    const write = await SELF.fetch(`${B}/api/check-ins`, { method: "POST", headers: json(clientCk), body: JSON.stringify({ clientId: cl.id, data: { date: "2026-06-13", mood: 5 } }) });
+    expect(write.status).toBe(403);
+    expect(await write.json()).toMatchObject({ error: "archived" });
+    // …and it actually refused: no second check-in landed.
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM check_ins WHERE client_id = ?").bind(cl.id).first<{ n: number }>())!.n).toBe(1);
+
+    // Staff are unaffected — the owner can still edit an archived record, which is
+    // how you would correct or restore one.
+    expect((await SELF.fetch(`${B}/api/clients/${cl.id}`, { method: "PATCH", headers: json(ownerCk), body: JSON.stringify({ displayName: "Alumni R" }) })).status).toBe(200);
+  }, 30_000);
+
+  it("archiving is the owner's call, not an employed coach's", async () => {
+    // The offboarding UI has always said "both are owner-only" and hid the whole
+    // section from non-owners, but only `/delete` enforced it — `/archive` was
+    // guarded by `requireClientAccess` alone, which an assigned trainer passes.
+    // So a coach could end the studio's relationship with their own client by
+    // calling the route directly, and nobody would be asked.
+    const cookie = await signInFlow("lc-arch-perm@test.dev", "Archive Perms Studio");
+    const tenantId = await tenantOf(cookie);
+    const cl = await mkClient(cookie, "Guarded");
+    expect(cl.status).toBe(201);
+
+    const db = env.DB as D1Database;
+    const trainerCookie = await signInFlow("lc-arch-coach@test.dev", "Coach Own Studio");
+    const trainerUserId = (await db.prepare('SELECT id FROM "user" WHERE email = ?').bind("lc-arch-coach@test.dev").first<{ id: string }>())!.id;
+    await db.prepare("INSERT OR IGNORE INTO member (id, organizationId, userId, role, createdAt) VALUES (?, ?, ?, 'trainer', '2026-01-01')").bind(`mem_archperm`, tenantId, trainerUserId).run();
+    await db.prepare("INSERT OR IGNORE INTO client_trainers (client_id, trainer_user_id, tenant_id, is_primary, created_at) VALUES (?, ?, ?, 1, '2026-01-01')").bind(cl.id, trainerUserId, tenantId).run();
+    await SELF.fetch(`${B}/api/context/switch`, { method: "POST", headers: json(trainerCookie), body: JSON.stringify({ tenantId }) });
+
+    const asCoach = await SELF.fetch(`${B}/api/clients/${cl.id}/archive`, { method: "POST", headers: json(trainerCookie), body: "{}" });
+    expect(asCoach.status).toBe(403);
+    // Still active — the refusal actually refused.
+    expect((await db.prepare("SELECT status FROM clients WHERE id = ?").bind(cl.id).first<{ status: string }>())!.status).toBe("active");
+    // The owner can.
+    expect((await SELF.fetch(`${B}/api/clients/${cl.id}/archive`, { method: "POST", headers: json(cookie), body: "{}" })).status).toBe(200);
   }, 30_000);
 
   it("delete is refused for a non-owner: an unassigned trainer 403s, and an assigned one still can't", async () => {

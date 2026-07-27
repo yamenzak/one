@@ -244,6 +244,33 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (t !== ctx.active.tenantId) void switchTenant(t).catch(() => undefined);
   }, [loading, ctx, params, setParams, switchTenant]);
 
+  /**
+   * A `/t/<slug>` door must also LAND you in that studio, not just brand itself.
+   *
+   * On the platform host nothing pins the tenant — `activeOrganizationId` decides
+   * every API call, and it is stamped once at session CREATE to the user's OLDEST
+   * membership (`ORDER BY createdAt ASC LIMIT 1`). So a user who belongs to two
+   * studios and signed in through `/t/studio-b` landed in studio-a: right brand
+   * on the login, wrong tenancy behind it, every subsequent API call scoped to
+   * the wrong studio. The `?t=` email hint already handled this; the door did not.
+   *
+   * A custom domain is unaffected — there `hostTenant` pins the tenant server-side
+   * (`auth-context.ts`), which is exactly why domains are the stronger mechanism.
+   * The server validates membership on switch, so an unknown slug or a studio the
+   * user has no persona in is a no-op rather than an escalation.
+   */
+  const doorSwitchDone = useRef(false);
+  useEffect(() => {
+    if (loading || !ctx?.active || doorSwitchDone.current) return;
+    const slug = /^\/t\/([^/?#]+)/.exec(location.pathname)?.[1];
+    if (!slug) return;
+    doorSwitchDone.current = true;
+    const want = decodeURIComponent(slug).toLowerCase();
+    if (ctx.active.tenantSlug?.toLowerCase() === want) return;
+    const persona = ctx.personas.find((p) => p.tenantSlug?.toLowerCase() === want);
+    if (persona) void switchTenant(persona.tenantId).catch(() => undefined);
+  }, [loading, ctx, switchTenant]);
+
   const signOut = useCallback(async () => {
     // The session cookie is HttpOnly — ONLY the server can clear it — so the
     // sign-out request must actually reach the server and succeed. Send a

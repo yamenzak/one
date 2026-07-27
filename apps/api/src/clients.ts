@@ -58,11 +58,50 @@ export async function getClient(db: D1Database, tenantId: string, clientId: stri
 }
 
 /** The client record linked to a user in a tenant (their "Train" persona). */
+/**
+ * This user's client record in this tenancy — ARCHIVED INCLUDED.
+ *
+ * If the data is on the tenancy, the person it is about can read it. Archiving
+ * is the studio's filing decision (off my roster, stop billing me a seat's worth
+ * of attention); it is not a reason to lock someone out of their own logs,
+ * measurements, photos and plan history. So this returns the archived record and
+ * the caller decides what that means — see `requireClientAccess`, which makes an
+ * archived client's own persona READ-ONLY rather than absent.
+ *
+ * It used to filter archived out, which meant an archived client signed in to a
+ * shell: role `client`, `clientId: null`, every screen empty, and no explanation.
+ */
 export async function clientForUser(db: D1Database, tenantId: string, userId: string): Promise<ClientRow | null> {
   return db
-    .prepare("SELECT * FROM clients WHERE tenant_id = ? AND user_id = ? AND status != 'archived'")
+    .prepare("SELECT * FROM clients WHERE tenant_id = ? AND user_id = ? ORDER BY (status != 'archived') DESC LIMIT 1")
     .bind(tenantId, userId)
     .first<ClientRow>();
+}
+
+/**
+ * Seats consumed against the `activeClients` quota.
+ *
+ * Counts EVERY client record the studio holds, archived included. Archiving
+ * takes a client off the roster; it does not hand the seat back. The record and
+ * everything on it — logs, check-ins, photos, lab files — is still stored on the
+ * tenancy and the client can still sign in and read it, so the studio is still
+ * using the capacity it is paying for. The only thing that frees a seat is
+ * `POST /clients/:id/delete`, which actually erases the data.
+ *
+ * Three sites used to count this three different ways: the create gate and the
+ * signup gate said `status != 'archived'`, the number shown to the owner in
+ * Billing said `status = 'active'`, and nothing said "all of them". So archiving
+ * was an unlimited-storage loophole on a 30-seat plan, AND the figure the owner
+ * read did not match the one being enforced against them. One function now, used
+ * everywhere the quota is counted.
+ */
+export async function countClientSeats(db: D1Database, tenantId: string): Promise<number> {
+  const row = await db
+    .prepare("SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ?")
+    .bind(tenantId)
+    .first<{ n: number }>()
+    .catch(() => null);
+  return row?.n ?? 0;
 }
 
 export async function isAssignedTrainer(
@@ -100,8 +139,30 @@ export async function requireClientAccess(
     role === "trainer" && !isOwnRecord
       ? await isAssignedTrainer(c.env.DB, who.tenantId, clientId, who.userId)
       : false;
-  if (canAccessClient(role, { isAssignedCoach, isOwnRecord })) return { client };
-  return { response: c.json({ error: "forbidden" }, 403) };
+  if (!canAccessClient(role, { isAssignedCoach, isOwnRecord })) {
+    return { response: c.json({ error: "forbidden" }, 403) };
+  }
+  /**
+   * An archived client keeps READ access to their own record and loses write.
+   *
+   * The data is theirs — logs, measurements, photos, plan history — and it is
+   * still on the tenancy, so locking them out of reading it would be wrong. But
+   * they are off the roster: no coach is watching, so accepting new logs would
+   * quietly collect data nobody will ever look at, and let someone keep
+   * "training" at a studio that has ended the relationship.
+   *
+   * Staff are unaffected — a coach or owner can still open and edit an archived
+   * record (that is how you'd correct or restore one).
+   */
+  if (client.status === "archived" && role === "client" && c.req.method !== "GET") {
+    return {
+      response: c.json(
+        { error: "archived", message: "Your record at this studio is archived — you can still read your history, but not add to it. Ask the studio to reactivate you." },
+        403,
+      ),
+    };
+  }
+  return { client };
 }
 
 /** Roster scope: which client ids the caller may see. */
@@ -351,10 +412,7 @@ export const clientRoutes = new Hono<AppEnv>()
     if (!body.success) return c.json({ error: "invalid body" }, 400);
     // Active-client capacity gate: block adding past the plan ceiling (gifts
     // and grandfathering raise it automatically; -1 = unlimited).
-    const active = await c.env.DB.prepare(
-      "SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ? AND status != 'archived'",
-    ).bind(who.tenantId).first<{ n: number }>();
-    const cap = await withinQuota(c.env.DB, who.tenantId, "activeClients", active?.n ?? 0);
+    const cap = await withinQuota(c.env.DB, who.tenantId, "activeClients", await countClientSeats(c.env.DB, who.tenantId));
     if (!cap.ok) return c.json({ error: "active client limit reached", limit: cap.max }, 403);
     const id = newId("cli");
     await c.env.DB.prepare(
@@ -486,9 +544,23 @@ export const clientRoutes = new Hono<AppEnv>()
     return c.json({ client: clientView(row!), metrics });
   })
 
+  /**
+   * Take a client off the roster. OWNER ONLY.
+   *
+   * Ending the studio's relationship with a client is the owner's call, not an
+   * employed coach's — the same reasoning as `/delete`, and the offboarding UI
+   * already claimed "both are owner-only" while this route enforced nothing but
+   * `requireClientAccess`, which the trainer preset satisfies for any client
+   * assigned to them. A coach could offboard their own client silently.
+   *
+   * Archiving no longer frees an `activeClients` seat (see `countClientSeats`):
+   * the record and its data stay on the tenancy, so the capacity is still in use.
+   * Only `/delete` frees a seat, because only it erases the data.
+   */
   .post("/clients/:id/archive", async (c) => {
     const access = await requireClientAccess(c, c.req.param("id"));
     if ("response" in access) return access.response;
+    if (c.get("role") !== "owner") return c.json({ error: "forbidden", message: "Only the studio owner can archive a client." }, 403);
     await c.env.DB.prepare("UPDATE clients SET status = 'archived', archived_at = ? WHERE id = ?")
       .bind(nowIso(), access.client.id)
       .run();
@@ -537,11 +609,8 @@ export const clientRoutes = new Hono<AppEnv>()
     const { id, tenant_id: tenantId, display_name: displayName } = access.client;
     const freed = await purgeClient(c.env, tenantId, id);
     // Post-delete capacity, so the UI can say the seat is actually back.
-    const active = await c.env.DB
-      .prepare("SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ? AND status != 'archived'")
-      .bind(tenantId)
-      .first<{ n: number }>();
-    const cap = await withinQuota(c.env.DB, tenantId, "activeClients", active?.n ?? 0);
+    const seatsUsed = await countClientSeats(c.env.DB, tenantId);
+    const cap = await withinQuota(c.env.DB, tenantId, "activeClients", seatsUsed);
     return c.json({
       ok: true,
       deleted: { id, displayName },
@@ -550,7 +619,7 @@ export const clientRoutes = new Hono<AppEnv>()
         bytesFreed: freed.bytesFreed,
         mbFreed: Math.round((freed.bytesFreed / (1024 * 1024)) * 10) / 10,
       },
-      activeClients: { used: active?.n ?? 0, max: cap.max },
+      activeClients: { used: seatsUsed, max: cap.max },
     });
   })
 

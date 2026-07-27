@@ -430,14 +430,15 @@ function CoachesSection({ clientId }: { clientId: string }) {
 // Two OUTCOMES that must never be confused, so they are two separate cards with
 // different weight, different icons and a comparison line between them:
 //
-//   Archive — `POST /clients/:id/archive`. Flips `status = 'archived'`. Frees an
-//     activeClients slot (the quota counts `status != 'archived'`) and KEEPS
-//     everything. Reversible in principle (the row is intact), just not from the
-//     app yet.
+//   Archive — `POST /clients/:id/archive`. Flips `status = 'archived'`. Takes them
+//     off the roster and KEEPS everything. Does NOT free a seat: the record and
+//     its data are still on the tenancy, so the capacity is still in use. The
+//     client keeps READ access to their own history and loses write.
 //   Delete  — `POST /clients/:id/delete`. Runs `purgeClient`: every client-scoped
-//     D1 row plus their R2 objects. Frees the same slot AND reclaims the storage.
-//     Irreversible, so it demands the client's name typed out (the server checks
-//     it too) and reports what it freed rather than silently vanishing.
+//     D1 row plus their R2 objects. This is the ONLY thing that frees a seat,
+//     because it is the only thing that stops storing the data. Irreversible, so
+//     it demands the client's name typed out (the server checks it too) and
+//     reports what it freed rather than silently vanishing.
 //
 // Both are owner-only. Archive is the default-looking action; delete lives behind
 // a danger-toned card so the destructive one is never the easy tap.
@@ -468,10 +469,10 @@ function OffboardSection({ clientId, clientName }: { clientId: string; clientNam
       <Card className="space-y-2.5">
         <div className="flex items-center gap-2 font-medium"><Archive className="size-4 text-muted-foreground" /> Archive this client</div>
         <p className="text-sm text-muted-foreground">
-          They come off your roster and stop counting against your plan's active-client limit, which frees the seat for someone new. Everything on the record — logs, plans, check-ins, labs, files — is kept.
+          They come off your roster. Everything on the record — logs, plans, check-ins, labs, files — is kept, and {who} can still sign in to read their own history but can&rsquo;t add to it.
         </p>
         <p className="text-sm text-muted-foreground">
-          If they have a login, they lose access to their space. There's no un-archive in the app yet, so treat this as one-way.
+          This does <span className="font-medium text-foreground">not</span> free a seat on your plan — you&rsquo;re still storing their data. Only deleting does. There&rsquo;s no un-archive in the app yet, so treat this as one-way.
         </p>
         <Button variant="outline" className="w-full" disabled={busy} onClick={() => { setErr(null); setConfirmArchive(true); }}><Archive /> {busy ? "Archiving…" : "Archive client…"}</Button>
         {err && <p className="text-sm text-warning" role="alert">{err}</p>}
@@ -480,7 +481,7 @@ function OffboardSection({ clientId, clientName }: { clientId: string; clientNam
       <Card className="space-y-2.5 border border-danger/30">
         <div className="flex items-center gap-2 font-medium text-danger"><Trash2 className="size-4" /> Delete this client permanently</div>
         <p className="text-sm text-muted-foreground">
-          Erases the record and everything on it — logs, measurements, check-ins, progress photos, uploaded lab files and their whole history. It frees the same plan seat as archiving <span className="font-medium text-foreground">and</span> reclaims the storage those files were using.
+          Erases the record and everything on it — logs, measurements, check-ins, progress photos, uploaded lab files and their whole history. This is the <span className="font-medium text-foreground">only</span> action that frees a seat on your plan, because it&rsquo;s the only one that stops storing their data — and it reclaims the storage those files were using.
         </p>
         <p className="text-sm text-danger">
           There is no backup and no undo. Archive instead if there's any chance you'll want their history back.
@@ -493,7 +494,7 @@ function OffboardSection({ clientId, clientName }: { clientId: string; clientNam
         open={confirmArchive}
         onOpenChange={setConfirmArchive}
         title={`Archive ${who}?`}
-        description={`${who} comes off your roster and frees a seat against your plan's active-client limit. Their data is kept, but they lose access to their space and this can't be undone from the app.`}
+        description={`${who} comes off your roster and their data is kept — they can still sign in to read their own history, but not add to it. This does NOT free a seat on your plan (you're still storing their data); only deleting does. It can't be undone from the app.`}
         confirmLabel="Archive client"
         destructive
         onConfirm={() => void archive()}

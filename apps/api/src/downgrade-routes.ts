@@ -41,6 +41,7 @@ import { checkDowngrade, resolveEntitlements, mergeOverrides, type Entitlements,
 import { type AppEnv, type AppContext, requireTenant } from "./auth-context.js";
 import { getSubscription, listPlans, seedBilling, tenantEntitlements, type PlanRow } from "./billing-store.js";
 import { staffSeatsUsed } from "./auth.js";
+import { countClientSeats } from "./clients.js";
 import { tenantStorageBytes } from "./storage.js";
 import { stripeConfig, stripeEnabled } from "./stripe.js";
 import { nowIso } from "./ids.js";
@@ -109,7 +110,7 @@ async function measureUsage(db: D1Database, tenantId: string): Promise<TenantUsa
   const count = async (sql: string, binds: unknown[]): Promise<number> =>
     (await db.prepare(sql).bind(...binds).first<{ n: number }>().catch(() => null))?.n ?? 0;
   const [activeClients, seats, templates, storageBytes, commerceSubs] = await Promise.all([
-    count("SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ? AND status != 'archived'", [tenantId]),
+    countClientSeats(db, tenantId),
     staffSeatsUsed(db, tenantId),
     count(
       "SELECT (SELECT COUNT(*) FROM workout_templates WHERE tenant_id = ?) + (SELECT COUNT(*) FROM meal_templates WHERE tenant_id = ?) AS n",

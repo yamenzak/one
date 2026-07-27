@@ -5,7 +5,8 @@
  * The payoff assertion is deliberately made THROUGH `GET /api/clients` as the
  * trainer, not by reading `client_trainers` — `visibleClientIds` is what turns a
  * row in that table into a roster, and the roster is what the coach actually
- * sees. Same for archive: the seat is only freed if `POST /clients` stops 403ing.
+ * sees. Same for archive: the seat must STAY taken, proven by `POST /clients`
+ * still 403ing after it — and come back only once the record is deleted.
  *
  * Note (AGENTS.md §4): the pool sets ADMIN_EMAILS "" + ENVIRONMENT development,
  * so every signed-in user here is a platform admin and route-guard's ACTION gate
@@ -204,7 +205,7 @@ describe("coach assignment (client_trainers)", () => {
 });
 
 describe("archive / offboard", () => {
-  it("archiving drops the client from the roster and frees an activeClients seat", async () => {
+  it("archiving drops the client from the roster but keeps the seat", async () => {
     // A brand-new tenant starts on `free` (billing-store DEFAULT_PLANS):
     // activeClients = 3, so the ceiling is reachable in three creates.
     const cookie = await signInFlow("cm-quota@test.dev", "CM Quota Studio");
@@ -226,7 +227,17 @@ describe("archive / offboard", () => {
     expect(roster).not.toContain(a);
     expect(roster).toContain(b);
 
-    // …and the freed seat is spendable on a real new client.
+    // …but the seat is NOT back. The studio is still storing that client's whole
+    // record, so it is still using the capacity it bought. Archiving used to free
+    // the seat, which meant a 3-seat studio could hold unlimited client data by
+    // archiving everyone. Deleting is what frees a seat, because deleting is what
+    // stops the storage.
+    const still = await SELF.fetch("http://x/api/clients", { method: "POST", headers: json(cookie), body: JSON.stringify({ displayName: "Quota Four" }) });
+    expect(still.status).toBe(403);
+
+    // Erasing the archived record does free it.
+    const del = await SELF.fetch(`http://x/api/clients/${a}/delete`, { method: "POST", headers: json(cookie), body: JSON.stringify({ confirm: "Quota One" }) });
+    expect(del.status).toBe(200);
     const allowed = await SELF.fetch("http://x/api/clients", { method: "POST", headers: json(cookie), body: JSON.stringify({ displayName: "Quota Four" }) });
     expect(allowed.status).toBe(201);
   });

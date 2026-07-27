@@ -13,6 +13,7 @@ import {
 } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { tenantStorageBytes } from "./storage.js";
+import { countClientSeats } from "./clients.js";
 import {
   getPlan,
   getSubscription,
@@ -169,9 +170,10 @@ export const billingRoutes = new Hono<AppEnv>()
       staffSeats: await count(
         `SELECT COUNT(*) AS n FROM "member" WHERE organizationId = ? AND role != 'client'`,
       ),
-      activeClients: await count(
-        "SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ? AND status = 'active'",
-      ),
+      // The same count the create gate enforces (archived included) — this used
+      // to say `status = 'active'`, so the owner was shown a smaller number than
+      // the one they were being blocked by.
+      activeClients: await countClientSeats(db, who.tenantId),
       templates:
         (await count("SELECT COUNT(*) AS n FROM workout_templates WHERE tenant_id = ?")) +
         (await count("SELECT COUNT(*) AS n FROM meal_templates WHERE tenant_id = ?")),

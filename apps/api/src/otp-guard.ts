@@ -23,6 +23,7 @@ import type { MiddlewareHandler } from "hono";
 import { type AppEnv } from "./auth-context.js";
 import { logAuthEvent } from "./auth.js";
 import { withinQuota } from "./billing-store.js";
+import { countClientSeats } from "./clients.js";
 import { resolveSlugTenant, isPlatformHost, hostnameOf, type HostTenant } from "./host-context.js";
 import { newId, nowIso, nowMs } from "./ids.js";
 import { emailDeliverable } from "./mailer.js";
@@ -148,7 +149,9 @@ async function isExistingOrInvited(db: D1Database, tenantId: string, email: stri
   const user = await db.prepare('SELECT 1 AS x FROM "user" WHERE LOWER(email) = ?').bind(email).first<{ x: number }>().catch(() => null);
   if (user) return true;
   const client = await db
-    .prepare("SELECT 1 AS x FROM clients WHERE tenant_id = ? AND LOWER(email) = ? AND status != 'archived'")
+    // Archived counts as known: an archived client must still be able to sign in
+    // and read their own history, so their address is not "new here".
+    .prepare("SELECT 1 AS x FROM clients WHERE tenant_id = ? AND LOWER(email) = ?")
     .bind(tenantId, email)
     .first<{ x: number }>()
     .catch(() => null);
@@ -159,8 +162,7 @@ async function isExistingOrInvited(db: D1Database, tenantId: string, email: stri
  *  Name is intentionally derived from the address — they set it themselves on
  *  the complete-your-profile screen. Returns false if the studio is at capacity. */
 async function createPendingClient(db: D1Database, tenantId: string, email: string): Promise<boolean> {
-  const active = await db.prepare("SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ? AND status != 'archived'").bind(tenantId).first<{ n: number }>();
-  const cap = await withinQuota(db, tenantId, "activeClients", active?.n ?? 0);
+  const cap = await withinQuota(db, tenantId, "activeClients", await countClientSeats(db, tenantId));
   if (!cap.ok) return false;
   const displayName = email.split("@")[0] ?? "New client";
   await db
