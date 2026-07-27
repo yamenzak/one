@@ -98,10 +98,34 @@ export default defineConfig({
         // purge the precache under a live session (the mid-workout chunk 404).
         clientsClaim: true,
         skipWaiting: false,
-        // Serve the cached shell for client-side routes when offline; never for
-        // the API, health, or the (worker-served) manifest.
-        navigateFallback: "/index.html",
+        // Serve the cached shell for client-side routes; never for the API,
+        // health, or the (worker-served) manifest.
+        //
+        // The fallback is `/`, NOT `/index.html`, and that is load-bearing.
+        // Cloudflare Workers Assets defaults to `html_handling:
+        // "auto-trailing-slash"`, which answers `/index.html` with a 307 to
+        // `/`. The navigation fallback is a precache handler: on a HIT it
+        // serves from Cache Storage and all is well, but on a MISS it falls
+        // back to the network — and a navigation `respondWith()`n a redirected
+        // response is rejected by the browser, so the whole page load dies as
+        // ERR_FAILED. That is not hypothetical: it took out every deep link
+        // (/admin, /settings, …) while `/` kept working, because `/` matches
+        // the precache route directly and never reaches this fallback.
+        //
+        // A precache miss is ordinary, not exotic — iOS evicts Cache Storage
+        // under pressure, and the in-app hard-refresh clears it on purpose.
+        // Pointing both the precached entry and the fallback at `/` (which the
+        // edge serves 200, see the wrangler `html_handling` note) means the
+        // miss path fetches a URL that does not redirect. Keep the two in step:
+        // `navigateFallback` must name a URL that is IN the manifest below.
+        navigateFallback: "/",
         navigateFallbackDenylist: [/^\/api\//, /^\/health/, /^\/manifest\.webmanifest/],
+        manifestTransforms: [
+          (entries) => ({
+            manifest: entries.map((e) => (e.url === "index.html" ? { ...e, url: "/" } : e)),
+            warnings: [],
+          }),
+        ],
         runtimeCaching: [
           {
             // Log-write POSTs (food/water/sets/activity/sleep/mood, check-ins,
