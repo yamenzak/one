@@ -224,6 +224,19 @@ async function applySchema(db: D1Database): Promise<void> {
           // human line; ref points at the affected row. Listed newest-first per
           // client, so the index is (client_id, at DESC).
           "CREATE TABLE IF NOT EXISTS audit_log (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, actor_user_id TEXT, action TEXT, summary TEXT, ref TEXT, at INTEGER);",
+
+          // Offboarding requests. Archiving and deleting a client are owner-only
+          // (they end the studio's relationship with someone and, for delete,
+          // erase their data irreversibly), but the coach who actually works with
+          // that client is the one who knows they should go. This is the hand-off:
+          // a coach asks with a reason, the owner approves or declines, and the
+          // approval is what performs the action. `kind` is 'archive' | 'delete';
+          // `status` is 'pending' | 'approved' | 'declined'.
+          "CREATE TABLE IF NOT EXISTS offboard_requests (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, kind TEXT, reason TEXT, status TEXT DEFAULT 'pending', requested_by TEXT, decided_by TEXT, decided_at TEXT, decision_note TEXT, created_at TEXT);",
+          "CREATE INDEX IF NOT EXISTS idx_offboard_pending ON offboard_requests(tenant_id, status);",
+          // One live request per client — a second ask while one is pending is the
+          // same ask, not a queue to work through.
+          "CREATE UNIQUE INDEX IF NOT EXISTS idx_offboard_one_pending ON offboard_requests(client_id) WHERE status = 'pending';",
           "CREATE INDEX IF NOT EXISTS idx_audit_client ON audit_log(client_id, at);",
 
           // ── R2 media ledger (storage accounting + the media library) ────────

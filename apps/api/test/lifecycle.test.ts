@@ -292,6 +292,63 @@ describe("client offboarding — archive keeps the seat, delete frees it and rec
     expect((await SELF.fetch(`${B}/api/clients/${cl.id}`, { method: "PATCH", headers: json(ownerCk), body: JSON.stringify({ displayName: "Alumni R" }) })).status).toBe(200);
   }, 30_000);
 
+  it("a coach asks, the owner decides, and only the approval acts", async () => {
+    // Archive and delete are owner-only, but the coach who works with the client
+    // is the one who knows they should go. Without this the coach saw nothing and
+    // had to find the owner some other way, losing the reason and the trail.
+    const db = env.DB as D1Database;
+    const ownerCk = await signInFlow("lc-obr-owner@test.dev", "Request Studio");
+    const tenantId = await tenantOf(ownerCk);
+    const cl = await mkClient(ownerCk, "Requested");
+    expect(cl.status).toBe(201);
+
+    const coachCk = await signInFlow("lc-obr-coach@test.dev", "Coach Own Studio 2");
+    const coachId = (await db.prepare('SELECT id FROM "user" WHERE email = ?').bind("lc-obr-coach@test.dev").first<{ id: string }>())!.id;
+    await db.prepare("INSERT OR IGNORE INTO member (id, organizationId, userId, role, createdAt) VALUES ('mem_obr', ?, ?, 'trainer', '2026-01-01')").bind(tenantId, coachId).run();
+    await db.prepare("INSERT OR IGNORE INTO client_trainers (client_id, trainer_user_id, tenant_id, is_primary, created_at) VALUES (?, ?, ?, 1, '2026-01-01')").bind(cl.id, coachId, tenantId).run();
+    await SELF.fetch(`${B}/api/context/switch`, { method: "POST", headers: json(coachCk), body: JSON.stringify({ tenantId }) });
+
+    // A reason is mandatory — a bare "remove them" is not a request an owner can act on.
+    expect((await SELF.fetch(`${B}/api/clients/${cl.id}/offboard-request`, { method: "POST", headers: json(coachCk), body: JSON.stringify({ kind: "archive" }) })).status).toBe(400);
+
+    const made = await SELF.fetch(`${B}/api/clients/${cl.id}/offboard-request`, { method: "POST", headers: json(coachCk), body: JSON.stringify({ kind: "archive", reason: "Moved away" }) });
+    expect(made.status).toBe(201);
+    // NOTHING has happened to the client — that is the whole point of a request.
+    expect((await db.prepare("SELECT status FROM clients WHERE id = ?").bind(cl.id).first<{ status: string }>())!.status).toBe("active");
+    // The owner was told.
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE tenant_id = ? AND type = 'offboard_requested'").bind(tenantId).first<{ n: number }>())!.n).toBe(1);
+
+    // A second ask while one is pending is the same ask, not a queue.
+    expect((await SELF.fetch(`${B}/api/clients/${cl.id}/offboard-request`, { method: "POST", headers: json(coachCk), body: JSON.stringify({ kind: "delete", reason: "again" }) })).status).toBe(409);
+
+    // A coach cannot decide their own request.
+    const list = (await (await SELF.fetch(`${B}/api/offboard-requests`, { headers: auth(coachCk) })).json()) as { requests: { id: string }[]; canDecide: boolean };
+    expect(list.canDecide).toBe(false);
+    expect(list.requests.length).toBe(1);
+    const reqId = list.requests[0]!.id;
+    expect((await SELF.fetch(`${B}/api/offboard-requests/${reqId}/decide`, { method: "POST", headers: json(coachCk), body: JSON.stringify({ approve: true }) })).status).toBe(403);
+    expect((await db.prepare("SELECT status FROM clients WHERE id = ?").bind(cl.id).first<{ status: string }>())!.status).toBe("active");
+
+    // The owner declines → still nothing happens to the client, and the coach hears.
+    const declined = await SELF.fetch(`${B}/api/offboard-requests/${reqId}/decide`, { method: "POST", headers: json(ownerCk), body: JSON.stringify({ approve: false, note: "Keep them for now" }) });
+    expect(declined.status).toBe(200);
+    expect((await db.prepare("SELECT status FROM clients WHERE id = ?").bind(cl.id).first<{ status: string }>())!.status).toBe("active");
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE tenant_id = ? AND type = 'offboard_decided'").bind(tenantId).first<{ n: number }>())!.n).toBe(1);
+    // A decided request cannot be decided twice.
+    expect((await SELF.fetch(`${B}/api/offboard-requests/${reqId}/decide`, { method: "POST", headers: json(ownerCk), body: JSON.stringify({ approve: true }) })).status).toBe(409);
+
+    // A fresh request, approved, DOES act — the approval is what performs it.
+    const again = await SELF.fetch(`${B}/api/clients/${cl.id}/offboard-request`, { method: "POST", headers: json(coachCk), body: JSON.stringify({ kind: "archive", reason: "Really moved away" }) });
+    expect(again.status).toBe(201);
+    const id2 = ((await again.json()) as { request: { id: string } }).request.id;
+    expect((await SELF.fetch(`${B}/api/offboard-requests/${id2}/decide`, { method: "POST", headers: json(ownerCk), body: JSON.stringify({ approve: true }) })).status).toBe(200);
+    expect((await db.prepare("SELECT status FROM clients WHERE id = ?").bind(cl.id).first<{ status: string }>())!.status).toBe("archived");
+
+    // An OWNER has no business in this flow — they act directly.
+    const cl2 = await mkClient(ownerCk, "Direct");
+    expect((await SELF.fetch(`${B}/api/clients/${cl2.id}/offboard-request`, { method: "POST", headers: json(ownerCk), body: JSON.stringify({ kind: "archive", reason: "x" }) })).status).toBe(400);
+  }, 30_000);
+
   it("archiving is the owner's call, not an employed coach's", async () => {
     // The offboarding UI has always said "both are owner-only" and hid the whole
     // section from non-owners, but only `/delete` enforced it — `/archive` was

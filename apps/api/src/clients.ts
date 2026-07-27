@@ -623,6 +623,155 @@ export const clientRoutes = new Hono<AppEnv>()
     });
   })
 
+  /**
+   * ── Offboarding requests ─────────────────────────────────────────────────
+   *
+   * Archive and delete are owner-only: one ends the studio's relationship with
+   * a person, the other erases their data irreversibly. But the coach who works
+   * with that client every week is the one who knows they should go, and making
+   * them chase the owner by other means loses the reason and the audit trail.
+   *
+   * So: a coach asks with a reason; the owner approves or declines; the APPROVAL
+   * is what performs the action. Nothing happens to the client in between, and
+   * every step lands in the audit log.
+   */
+  .post("/clients/:id/offboard-request", async (c) => {
+    const access = await requireClientAccess(c, c.req.param("id"));
+    if ("response" in access) return access.response;
+    const role = c.get("role");
+    // An owner doesn't request — they act. Sending them down this path would
+    // make them approve their own request, which is theatre.
+    if (role === "owner") return c.json({ error: "owner_acts_directly", message: "You can archive or delete directly." }, 400);
+    if (role !== "trainer" && role !== "assistant") return c.json({ error: "forbidden" }, 403);
+    const body = z
+      .object({ kind: z.enum(["archive", "delete"]), reason: z.string().trim().min(1).max(500) })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body", message: "Say which action and why." }, 400);
+
+    const who = requireTenant(c)!;
+    const { id: clientId, tenant_id: tenantId, display_name: name } = access.client;
+    const existing = await c.env.DB
+      .prepare("SELECT id FROM offboard_requests WHERE client_id = ? AND status = 'pending'")
+      .bind(clientId)
+      .first<{ id: string }>();
+    if (existing) return c.json({ error: "already_pending", message: "There's already a request waiting on the owner for this client." }, 409);
+
+    const id = newId("obr");
+    await c.env.DB.prepare(
+      "INSERT INTO offboard_requests (id, tenant_id, client_id, kind, reason, status, requested_by, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)",
+    ).bind(id, tenantId, clientId, body.data.kind, body.data.reason, who.userId, nowIso()).run();
+
+    const actor = c.get("user")?.name || c.get("user")?.email || "A coach";
+    await recordAudit(c.env, { tenantId, clientId, actorUserId: who.userId, action: "client.offboard_request", summary: `${body.data.kind}: ${name}` });
+    // Every owner hears about it — this is a decision waiting on them.
+    const owners = await c.env.DB.prepare('SELECT userId FROM "member" WHERE organizationId = ? AND role = ?').bind(tenantId, "owner").all<{ userId: string | null }>();
+    for (const o of owners.results ?? []) {
+      if (o.userId) {
+        await notify(c.env, {
+          tenantId, userId: o.userId, type: "offboard_requested",
+          message: `${actor} asked to ${body.data.kind} ${name}. Reason: ${body.data.reason}`,
+          link: `/clients/${clientId}`,
+        });
+      }
+    }
+    return c.json({ request: { id, kind: body.data.kind, status: "pending" } }, 201);
+  })
+
+  /** Requests this caller should see: an owner sees the studio's pending queue,
+   *  a coach sees the ones they raised (so they can tell it landed). */
+  .get("/offboard-requests", async (c) => {
+    const who = requireTenant(c)!;
+    const role = c.get("role");
+    const isOwner = role === "owner";
+    const rows = await c.env.DB.prepare(
+      `SELECT r.id, r.client_id, r.kind, r.reason, r.status, r.created_at, r.decision_note, r.decided_at,
+              c.display_name, u.name AS requester_name, u.email AS requester_email
+         FROM offboard_requests r
+         LEFT JOIN clients c ON c.id = r.client_id
+         LEFT JOIN "user" u ON u.id = r.requested_by
+        WHERE r.tenant_id = ?${isOwner ? "" : " AND r.requested_by = ?"}
+        ORDER BY r.status = 'pending' DESC, r.created_at DESC
+        LIMIT 100`,
+    ).bind(...(isOwner ? [who.tenantId] : [who.tenantId, who.userId])).all<{
+      id: string; client_id: string; kind: string; reason: string; status: string; created_at: string;
+      decision_note: string | null; decided_at: string | null; display_name: string | null;
+      requester_name: string | null; requester_email: string | null;
+    }>();
+    return c.json({
+      requests: (rows.results ?? []).map((r) => ({
+        id: r.id, clientId: r.client_id, clientName: r.display_name, kind: r.kind, reason: r.reason,
+        status: r.status, createdAt: r.created_at, decidedAt: r.decided_at, decisionNote: r.decision_note,
+        requestedBy: r.requester_name || r.requester_email || "A coach",
+      })),
+      canDecide: isOwner,
+    });
+  })
+
+  /**
+   * The owner's decision. Approving PERFORMS the action, so this route is the
+   * only place a coach-initiated archive or delete can actually happen — and it
+   * still runs the same owner-only code paths, not a bypass.
+   */
+  .post("/offboard-requests/:id/decide", async (c) => {
+    const who = requireTenant(c)!;
+    if (c.get("role") !== "owner") return c.json({ error: "forbidden", message: "Only the studio owner can decide this." }, 403);
+    const body = z
+      .object({ approve: z.boolean(), note: z.string().trim().max(500).optional() })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body" }, 400);
+
+    const req = await c.env.DB
+      .prepare("SELECT * FROM offboard_requests WHERE id = ? AND tenant_id = ?")
+      .bind(c.req.param("id"), who.tenantId)
+      .first<{ id: string; client_id: string; kind: string; reason: string; status: string; requested_by: string | null }>();
+    if (!req) return c.json({ error: "not found" }, 404);
+    if (req.status !== "pending") return c.json({ error: "already_decided", message: `This request was already ${req.status}.` }, 409);
+
+    const client = await getClient(c.env.DB, who.tenantId, req.client_id);
+    const name = client?.display_name ?? "the client";
+    let freed: { objects: number; bytesFreed: number } | null = null;
+
+    if (body.data.approve) {
+      if (!client) return c.json({ error: "client_gone", message: "That client no longer exists." }, 409);
+      if (req.kind === "delete") {
+        freed = await purgeClient(c.env, who.tenantId, req.client_id);
+      } else {
+        await c.env.DB.prepare("UPDATE clients SET status = 'archived', archived_at = ? WHERE id = ?").bind(nowIso(), req.client_id).run();
+      }
+    }
+
+    await c.env.DB.prepare(
+      "UPDATE offboard_requests SET status = ?, decided_by = ?, decided_at = ?, decision_note = ? WHERE id = ?",
+    ).bind(body.data.approve ? "approved" : "declined", who.userId, nowIso(), body.data.note ?? null, req.id).run();
+
+    await recordAudit(c.env, {
+      tenantId: who.tenantId, clientId: req.client_id, actorUserId: who.userId,
+      action: body.data.approve ? `client.offboard_approved` : `client.offboard_declined`,
+      summary: `${req.kind}: ${name}`,
+    });
+
+    // Tell the coach who asked — a request that vanishes silently is worse than
+    // no request flow at all.
+    if (req.requested_by) {
+      await notify(c.env, {
+        tenantId: who.tenantId, userId: req.requested_by, type: "offboard_decided",
+        title: body.data.approve ? `${name} was ${req.kind === "delete" ? "deleted" : "archived"}` : `Removal of ${name} was declined`,
+        message: body.data.note || (body.data.approve ? "The owner approved your request." : "The owner declined your request."),
+        link: body.data.approve && req.kind === "delete" ? "/clients" : `/clients/${req.client_id}`,
+      });
+    }
+
+    const seatsUsed = await countClientSeats(c.env.DB, who.tenantId);
+    const cap = await withinQuota(c.env.DB, who.tenantId, "activeClients", seatsUsed);
+    return c.json({
+      ok: true,
+      status: body.data.approve ? "approved" : "declined",
+      kind: req.kind,
+      storage: freed ? { objectsRemoved: freed.objects, mbFreed: Math.round((freed.bytesFreed / (1024 * 1024)) * 10) / 10 } : null,
+      activeClients: { used: seatsUsed, max: cap.max },
+    });
+  })
+
   // Trainer assignment (many-to-many, is_primary flag).
   .get("/clients/:id/trainers", async (c) => {
     const access = await requireClientAccess(c, c.req.param("id"));

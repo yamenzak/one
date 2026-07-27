@@ -247,7 +247,12 @@ export function ClientManage({ clientId, clientName }: { clientId: string; clien
 
       <ActivityLog clientId={clientId} />
 
-      {isOwner && <OffboardSection clientId={clientId} clientName={clientName} />}
+      {/* Owners act; coaches ask. Both surfaces live here so offboarding is in
+          the same place whoever you are — a coach used to see nothing at all and
+          had to find the owner by other means, losing the reason and the trail. */}
+      {isOwner
+        ? <><OffboardRequestQueue clientId={clientId} onDecided={load} /><OffboardSection clientId={clientId} clientName={clientName} /></>
+        : <OffboardRequestSection clientId={clientId} clientName={clientName} />}
 
       <Sheet open={grantOpen} onClose={() => setGrantOpen(false)} title="Grant a package">
         {/* `/api/packages` + `/api/subscriptions/grant` are gated on `commerce`.
@@ -447,6 +452,144 @@ interface DeleteResult {
   deleted: { id: string; displayName: string };
   storage: { objectsRemoved: number; bytesFreed: number; mbFreed: number };
   activeClients: { used: number; max: number };
+}
+
+interface OffboardRequest {
+  id: string; clientId: string; clientName: string | null; kind: "archive" | "delete";
+  reason: string; status: "pending" | "approved" | "declined"; createdAt: string;
+  decidedAt: string | null; decisionNote: string | null; requestedBy: string;
+}
+
+/**
+ * A coach's side of offboarding: ask, with a reason.
+ *
+ * Archive and delete are owner-only, and before this a coach saw nothing here at
+ * all — they had to go find the owner some other way, which lost both the reason
+ * and the audit trail. Asking in-app keeps the request, the reason and the
+ * decision attached to the client record.
+ */
+function OffboardRequestSection({ clientId, clientName }: { clientId: string; clientName?: string | null }) {
+  const [mine, setMine] = useState<OffboardRequest[] | null>(null);
+  const [kind, setKind] = useState<"archive" | "delete">("archive");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const who = clientName?.trim() || "this client";
+  const load = useCallback(async () => {
+    try {
+      const r = await api.get<{ requests: OffboardRequest[] }>("/api/offboard-requests");
+      setMine(r.requests.filter((x) => x.clientId === clientId));
+    } catch { setMine([]); }
+  }, [clientId]);
+  useEffect(() => { void load(); }, [load]);
+
+  const pending = mine?.find((r) => r.status === "pending") ?? null;
+  const submit = async () => {
+    if (busy || !reason.trim()) return;
+    setBusy(true); setErr(null);
+    try { await api.post(`/api/clients/${clientId}/offboard-request`, { kind, reason: reason.trim() }); setReason(""); await load(); }
+    catch (e) { setErr(errorText(e, "Couldn't send that request. Please try again.")); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <section className="space-y-2">
+      <Eyebrow>Offboard</Eyebrow>
+      <Stagger>
+        <Card className="space-y-3">
+          {pending ? (
+            <>
+              <div className="flex items-center gap-2 font-medium"><Archive className="size-4 text-warning" /> Waiting on the owner</div>
+              <p className="text-sm text-muted-foreground">
+                You asked to <span className="font-medium text-foreground">{pending.kind}</span> {who}. Nothing has happened to
+                the record — the owner decides, and you&rsquo;ll get a notification either way.
+              </p>
+              <SubCard className="text-sm text-muted-foreground">&ldquo;{pending.reason}&rdquo;</SubCard>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 font-medium"><Archive className="size-4 text-muted-foreground" /> Ask to remove {who}</div>
+              <p className="text-sm text-muted-foreground">
+                Only the studio owner can archive or delete a client. Send them the request and the reason; they approve or decline it.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Chip selected={kind === "archive"} onClick={() => setKind("archive")}>Archive — keep the data</Chip>
+                <Chip selected={kind === "delete"} onClick={() => setKind("delete")}>Delete — erase everything</Chip>
+              </div>
+              <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="Why? e.g. moved away, stopped training, duplicate record" />
+              <Button variant="outline" className="w-full" disabled={busy || !reason.trim()} onClick={() => void submit()}>
+                {busy ? "Sending…" : "Send request"}
+              </Button>
+              {err && <p className="text-sm text-warning" role="alert">{err}</p>}
+              {mine?.some((r) => r.status !== "pending") && (
+                <SubCard className="space-y-1 text-xs text-muted-foreground">
+                  {mine.filter((r) => r.status !== "pending").slice(0, 3).map((r) => (
+                    <div key={r.id}>
+                      <span className="font-medium text-foreground">{r.status === "approved" ? "Approved" : "Declined"}</span> · {r.kind}
+                      {r.decisionNote ? ` — “${r.decisionNote}”` : ""}
+                    </div>
+                  ))}
+                </SubCard>
+              )}
+            </>
+          )}
+        </Card>
+      </Stagger>
+    </section>
+  );
+}
+
+/** The owner's side: a pending request on THIS client, with the two decisions. */
+function OffboardRequestQueue({ clientId, onDecided }: { clientId: string; onDecided: () => void }) {
+  const [reqs, setReqs] = useState<OffboardRequest[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    try {
+      const r = await api.get<{ requests: OffboardRequest[] }>("/api/offboard-requests");
+      setReqs(r.requests.filter((x) => x.clientId === clientId && x.status === "pending"));
+    } catch { setReqs([]); }
+  }, [clientId]);
+  useEffect(() => { void load(); }, [load]);
+
+  const req = reqs?.[0];
+  if (!req) return null;
+
+  const decide = async (approve: boolean) => {
+    if (busy) return;
+    setBusy(true); setErr(null);
+    try {
+      await api.post(`/api/offboard-requests/${req.id}/decide`, { approve, note: note.trim() || undefined });
+      setNote("");
+      await load();
+      onDecided();
+    } catch (e) { setErr(errorText(e, "Couldn't record that decision. Please try again.")); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <section className="space-y-2">
+      <Eyebrow>Needs your decision</Eyebrow>
+      <Stagger>
+        <Card className="space-y-3 border border-warning/40">
+          <div className="flex items-center gap-2 font-medium"><AlertTriangle className="size-4 text-warning" /> {req.requestedBy} asked to {req.kind} this client</div>
+          <SubCard className="text-sm text-muted-foreground">&ldquo;{req.reason}&rdquo;</SubCard>
+          <p className="text-sm text-muted-foreground">
+            {req.kind === "delete"
+              ? "Approving erases the record and everything on it — logs, photos, lab files. There's no undo, and it frees a seat on your plan."
+              : "Approving takes them off the roster and keeps the data. They can still read their own history. It does not free a seat."}
+          </p>
+          <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="Optional note back to the coach" />
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" disabled={busy} onClick={() => void decide(false)}>Decline</Button>
+            <Button className="flex-1" disabled={busy} onClick={() => void decide(true)}>{busy ? "…" : `Approve ${req.kind}`}</Button>
+          </div>
+          {err && <p className="text-sm text-warning" role="alert">{err}</p>}
+        </Card>
+      </Stagger>
+    </section>
+  );
 }
 
 function OffboardSection({ clientId, clientName }: { clientId: string; clientName?: string | null }) {

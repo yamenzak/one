@@ -158,12 +158,37 @@ async function isExistingOrInvited(db: D1Database, tenantId: string, email: stri
   return Boolean(client);
 }
 
+/**
+ * How many UNCLAIMED self-signup reservations a studio may hold at once.
+ *
+ * This row is created at OTP-SEND — before anyone has proved they own the
+ * address — and it consumes an `activeClients` seat from that moment. Archiving
+ * no longer frees a seat, so nothing reclaims these: every person who asked for
+ * a code at a `selfRegister` studio and never finished holds capacity
+ * indefinitely, and the owner's only recovery is deleting each row by hand.
+ *
+ * At worst that is a denial-of-capacity: request codes for made-up addresses at
+ * a studio's public door until its plan is full and real clients are refused.
+ * The IP throttle above limits the rate, not the total.
+ *
+ * So reservations are capped. Genuine signups keep working (they claim their row
+ * on first sign-in, which takes it out of this count), while unclaimed ones can
+ * only ever occupy a bounded slice of the plan.
+ */
+const MAX_UNCLAIMED_SIGNUPS = 5;
+
 /** Reserve a pending client row for a self-signing-up email (capacity-gated).
  *  Name is intentionally derived from the address — they set it themselves on
  *  the complete-your-profile screen. Returns false if the studio is at capacity. */
 async function createPendingClient(db: D1Database, tenantId: string, email: string): Promise<boolean> {
   const cap = await withinQuota(db, tenantId, "activeClients", await countClientSeats(db, tenantId));
   if (!cap.ok) return false;
+  const unclaimed = await db
+    .prepare("SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ? AND user_id IS NULL AND status != 'archived'")
+    .bind(tenantId)
+    .first<{ n: number }>()
+    .catch(() => null);
+  if ((unclaimed?.n ?? 0) >= MAX_UNCLAIMED_SIGNUPS) return false;
   const displayName = email.split("@")[0] ?? "New client";
   await db
     .prepare("INSERT INTO clients (id, tenant_id, display_name, email, created_at) VALUES (?, ?, ?, ?, ?)")

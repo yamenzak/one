@@ -93,7 +93,7 @@ export type NotifType =
   // sessions
   | "session_booked" | "session_cancelled"
   // roster & staff
-  | "client_assigned"
+  | "client_assigned" | "offboard_requested" | "offboard_decided"
   // client commerce (their plan & billing)
   | "access_granted" | "sub_expired" | "sub_expiring" | "sub_payment_failed"
   // studio billing (owner)
@@ -181,6 +181,10 @@ export const NOTIF_TYPES: Record<NotifType, NotifTypeMeta> = {
     template: { subject: "Your session was cancelled", body: "<p>Your session on <strong>{{sessionTime}}</strong> was cancelled. Book another time with {{studioName}} whenever you're ready.</p>" }, vars: ["sessionTime", "studioName"] },
   client_assigned: { category: "roster", to: "staff", title: "You've been assigned a client", // link is client-scoped
     template: { subject: "A new client for you at {{studioName}}", body: "<p>You have been assigned a new client: <strong>{{message}}</strong>.</p><p>Open {{studioName}} to see their profile and start building their plan.</p>" }, vars: ["message", "studioName"] },
+  offboard_requested: { category: "roster", to: "owner", title: "A coach asked to remove a client", link: "/clients",
+    template: { subject: "Removal requested at {{studioName}}", body: "<p>{{message}}</p><p>Open {{studioName}} to approve or decline it — nothing happens to the client until you do.</p>" }, vars: ["message", "studioName"] },
+  offboard_decided: { category: "roster", to: "staff", // title carries the decision
+    template: { subject: "{{title}}", body: "<p>{{title}}.</p><p>{{message}}</p>" }, vars: ["title", "message"] },
   access_granted: { category: "commerce", to: "client", title: "You've got new access", link: "/shop",
     template: { subject: "New access at {{studioName}}", body: "<p>{{coachName}} gave you access to <strong>{{packageName}}</strong>. Open {{studioName}} to jump back in.</p>" }, vars: ["coachName", "packageName", "studioName"] },
   sub_expired: { category: "commerce", to: "client", title: "Your access has expired", link: "/shop",

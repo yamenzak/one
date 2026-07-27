@@ -9,7 +9,7 @@
 import type { NotifType } from "@mossa/domain";
 import {
   ClipboardList, BadgeCheck, Scale, Target, FlaskConical, Pill, ArrowLeftRight,
-  BookOpen, Calendar, CreditCard, AlertTriangle, Bell, Trophy, type LucideIcon, type Tone,
+  BookOpen, Calendar, CreditCard, AlertTriangle, Archive, Bell, Trophy, type LucideIcon, type Tone,
 } from "@mossa/ui";
 
 export interface NotifCoding { icon: LucideIcon; tone: Tone }
@@ -33,6 +33,10 @@ const CODING: Record<NotifType, NotifCoding> = {
   session_booked: { icon: Calendar, tone: "cardio" },
   session_cancelled: { icon: Calendar, tone: "warning" },
   client_assigned: { icon: BadgeCheck, tone: "cardio" },
+  // A decision waiting on the owner reads as a warning; the answer that comes
+  // back is neutral — it may be an approval or a refusal.
+  offboard_requested: { icon: AlertTriangle, tone: "warning" },
+  offboard_decided: { icon: Archive, tone: "neutral" },
   access_granted: { icon: BadgeCheck, tone: "success" },
   sub_expired: { icon: CreditCard, tone: "danger" },
   sub_expiring: { icon: CreditCard, tone: "warning" },
