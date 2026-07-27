@@ -12,9 +12,9 @@ import {
 import type { PersonaRef, SessionContext } from "@mossa/protocol";
 import { resolveUnits, overallDaysRemaining, NOTIF_TYPES, notifVisibleInSurface, type UnitPrefs, type NotifType } from "@mossa/domain";
 import { type AppEnv, isPlatformAdmin, requireTenant } from "./auth-context.js";
-import { clientForUser } from "./clients.js";
+import { clientForUser, countClientSeats, PENDING_SIGNUP } from "./clients.js";
 import { resolveClientFlagsFor, loadClientAccessRows, accessBudgetsOf } from "./client-flags.js";
-import { tenantEntitlements, seedBilling } from "./billing-store.js";
+import { tenantEntitlements, seedBilling, withinQuota } from "./billing-store.js";
 import { checkStaffSeat } from "./auth.js";
 import { parseJson, j } from "./db.js";
 import { nowIso } from "./ids.js";
@@ -35,11 +35,32 @@ export const contextRoutes = new Hono<AppEnv>()
     // matching unlinked record and mint the `client` membership. This is what
     // makes "invite = create the record; they sign in with that email" work.
     const unlinked = await c.env.DB.prepare(
-      "SELECT id, tenant_id FROM clients WHERE user_id IS NULL AND LOWER(email) = LOWER(?) AND status != 'archived'",
+      "SELECT id, tenant_id, status FROM clients WHERE user_id IS NULL AND LOWER(email) = LOWER(?) AND status != 'archived'",
     )
       .bind(user.email)
-      .all<{ id: string; tenant_id: string }>();
+      .all<{ id: string; tenant_id: string; status: string }>();
     for (const row of unlinked.results ?? []) {
+      /**
+       * Claiming a self-signup RESERVATION is where the seat is actually spent.
+       *
+       * A `pending_signup` row was created when someone typed this address into a
+       * studio's public form; it cost nothing and stayed off the roster because
+       * nobody had proved they owned the address. Now they have — this request is
+       * authenticated — so the reservation becomes a real client, and the capacity
+       * check belongs HERE rather than at OTP-send, which is the only point at
+       * which a human is known to be on the other end.
+       *
+       * A studio that filled up in the meantime simply doesn't get the claim: the
+       * reservation stays pending (free, invisible) rather than pushing the studio
+       * over its plan behind the owner's back.
+       */
+      if (row.status === PENDING_SIGNUP) {
+        const cap = await withinQuota(c.env.DB, row.tenant_id, "activeClients", await countClientSeats(c.env.DB, row.tenant_id));
+        if (!cap.ok) continue;
+        await c.env.DB.prepare("UPDATE clients SET status = 'active' WHERE id = ? AND status = ?")
+          .bind(row.id, PENDING_SIGNUP)
+          .run();
+      }
       await c.env.DB.prepare("UPDATE clients SET user_id = ? WHERE id = ? AND user_id IS NULL")
         .bind(user.id, row.id)
         .run();

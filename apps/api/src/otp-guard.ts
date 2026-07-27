@@ -23,7 +23,7 @@ import type { MiddlewareHandler } from "hono";
 import { type AppEnv } from "./auth-context.js";
 import { logAuthEvent } from "./auth.js";
 import { withinQuota } from "./billing-store.js";
-import { countClientSeats } from "./clients.js";
+import { countClientSeats, PENDING_SIGNUP } from "./clients.js";
 import { resolveSlugTenant, isPlatformHost, hostnameOf, type HostTenant } from "./host-context.js";
 import { newId, nowIso, nowMs } from "./ids.js";
 import { emailDeliverable } from "./mailer.js";
@@ -184,15 +184,19 @@ async function createPendingClient(db: D1Database, tenantId: string, email: stri
   const cap = await withinQuota(db, tenantId, "activeClients", await countClientSeats(db, tenantId));
   if (!cap.ok) return false;
   const unclaimed = await db
-    .prepare("SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ? AND user_id IS NULL AND status != 'archived'")
-    .bind(tenantId)
+    .prepare("SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ? AND status = ?")
+    .bind(tenantId, PENDING_SIGNUP)
     .first<{ n: number }>()
     .catch(() => null);
   if ((unclaimed?.n ?? 0) >= MAX_UNCLAIMED_SIGNUPS) return false;
   const displayName = email.split("@")[0] ?? "New client";
   await db
-    .prepare("INSERT INTO clients (id, tenant_id, display_name, email, created_at) VALUES (?, ?, ?, ?, ?)")
-    .bind(newId("cli"), tenantId, displayName, email, nowIso())
+    // `pending_signup`, not `active`: nobody has proved they own this address yet,
+    // so it costs no seat and stays off the roster until the first authenticated
+    // context read claims it. The capacity check below is still worth doing here —
+    // it stops us mailing a code to someone we would have to turn away.
+    .prepare("INSERT INTO clients (id, tenant_id, display_name, email, status, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+    .bind(newId("cli"), tenantId, displayName, email, PENDING_SIGNUP, nowIso())
     .run()
     .catch(() => undefined);
   return true;

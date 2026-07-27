@@ -79,6 +79,31 @@ export async function clientForUser(db: D1Database, tenantId: string, userId: st
 }
 
 /**
+ * The status of a self-signup RESERVATION: an email that asked for a code at a
+ * `selfRegister` studio and has not yet proved it owns that address.
+ *
+ * It is not a client. Nobody has signed in, there is no data, and the studio did
+ * not choose them — a stranger typed an address into a public form. So it costs
+ * no seat and stays off the roster until it is CLAIMED, which happens on the
+ * first authenticated context read (see the auto-link in `context-routes.ts`),
+ * where the capacity check actually belongs.
+ *
+ * This is the difference between the two ways an unclaimed row can exist:
+ *
+ *   coach-invited  → `active`. The studio deliberately added this person and
+ *                    expects to see them on the roster and to be billed for them
+ *                    even before they sign in.
+ *   self-signed-up → `pending`. Free and invisible until a real person arrives.
+ *
+ * Reservations used to be created as `active` at OTP-SEND, so every stranger who
+ * requested a code and never finished held a seat forever — and since archiving
+ * stopped freeing seats, nothing reclaimed them. At the limit that is a
+ * denial-of-capacity: request codes for invented addresses at a studio's public
+ * door until its plan is full and real clients are refused.
+ */
+export const PENDING_SIGNUP = "pending_signup";
+
+/**
  * Seats consumed against the `activeClients` quota.
  *
  * Counts EVERY client record the studio holds, archived included. Archiving
@@ -97,12 +122,13 @@ export async function clientForUser(db: D1Database, tenantId: string, userId: st
  */
 export async function countClientSeats(db: D1Database, tenantId: string): Promise<number> {
   const row = await db
-    .prepare("SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ?")
+    .prepare(`SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ? AND status != '${PENDING_SIGNUP}'`)
     .bind(tenantId)
     .first<{ n: number }>()
     .catch(() => null);
   return row?.n ?? 0;
 }
+
 
 export async function isAssignedTrainer(
   db: D1Database,
@@ -397,8 +423,8 @@ export const clientRoutes = new Hono<AppEnv>()
     if (scope !== "all" && scope.length === 0) return c.json({ clients: [] });
     const where =
       scope === "all"
-        ? "tenant_id = ? AND status != 'archived'"
-        : `tenant_id = ? AND status != 'archived' AND id IN (${scope.map(() => "?").join(",")})`;
+        ? `tenant_id = ? AND status NOT IN ('archived', '${PENDING_SIGNUP}')`
+        : `tenant_id = ? AND status NOT IN ('archived', '${PENDING_SIGNUP}') AND id IN (${scope.map(() => "?").join(",")})`;
     const binds = scope === "all" ? [who.tenantId] : [who.tenantId, ...scope];
     const rows = await c.env.DB.prepare(`SELECT * FROM clients WHERE ${where} ORDER BY display_name`)
       .bind(...binds)

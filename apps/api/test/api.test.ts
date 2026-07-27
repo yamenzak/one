@@ -30,6 +30,30 @@ function grabCookies(res: Response): string {
 }
 
 /** Full passwordless sign-in: request OTP, read it from D1, verify, create org. */
+/**
+ * Verify an emailed code and stop — NO organization created.
+ *
+ * `signInFlow` also creates a studio, which is wrong for a client: they must land
+ * in the studio that invited them (or that they self-registered at), not become
+ * an owner of their own. The OTP has already been sent by the caller in the
+ * self-signup case, so this only reads it and verifies.
+ */
+async function verifyExistingOtp(email: string): Promise<string> {
+  const db = env.DB as D1Database;
+  const row = await db
+    .prepare("SELECT value FROM verification WHERE identifier LIKE ? ORDER BY createdAt DESC LIMIT 1")
+    .bind(`%otp%${email}%`)
+    .first<{ value: string }>();
+  const otp = ((row?.value ?? "").match(/\d{6}/) ?? [])[0];
+  if (!otp) throw new Error(`no OTP on record for ${email}`);
+  const verify = await SELF.fetch(`${ORIGIN}/api/auth/sign-in/email-otp`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: ORIGIN },
+    body: JSON.stringify({ email, otp }),
+  });
+  return grabCookies(verify);
+}
+
 async function signInFlow(email: string, studioName: string): Promise<string> {
   const db = env.DB as D1Database;
   await SELF.fetch(`${ORIGIN}/api/auth/email-otp/send-verification-otp`, {
@@ -1996,6 +2020,40 @@ describe("OTP-send gate — sign-up eligibility + cooldown", () => {
     expect(row?.display_name).toBe("joiner-1"); // seeded from the address, not asked
     await setSelfRegister(false);
   });
+
+  it("a reservation costs no seat and no roster slot until a real person claims it", async () => {
+    // The row is created at OTP-SEND, before anyone has proved they own the
+    // address. It used to be created as `active`, so it took a seat immediately —
+    // and since archiving stopped freeing seats, nothing ever reclaimed it. Every
+    // stranger who requested a code and never finished held capacity forever, and
+    // at the limit that is a denial-of-capacity against a public studio door.
+    const db = env.DB as D1Database;
+    await setSelfRegister(true);
+    const tenantId = ((await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } }).active.tenantId;
+    const seats = async () => (await db.prepare("SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ? AND status != 'pending_signup'").bind(tenantId).first<{ n: number }>())!.n;
+    const before = await seats();
+
+    expect((await send({ email: "reserve-1@test.dev", type: "sign-in", slug: "studio-one", intent: "signup" })).status).toBe(200);
+    const row = await db.prepare("SELECT id, status FROM clients WHERE tenant_id = ? AND LOWER(email) = 'reserve-1@test.dev'").bind(tenantId).first<{ id: string; status: string }>();
+    expect(row?.status).toBe("pending_signup");
+    // No seat spent…
+    expect(await seats()).toBe(before);
+    // …and not on the coach's roster: an unverified address is not a client.
+    const roster = (await (await SELF.fetch("http://x/api/clients", { headers: auth(ownerCookie) })).json()) as { clients: { id: string }[] };
+    expect(roster.clients.find((cl) => cl.id === row!.id)).toBeFalsy();
+
+    // Claiming it — the first authenticated context read — is where the seat goes.
+    const claimCookie = await verifyExistingOtp("reserve-1@test.dev");
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(claimCookie) })).json()) as { personas: { tenantId: string; clientId: string | null }[] };
+    expect(ctx.personas.find((p) => p.tenantId === tenantId)?.clientId).toBe(row!.id);
+    expect((await db.prepare("SELECT status, user_id FROM clients WHERE id = ?").bind(row!.id).first<{ status: string; user_id: string | null }>())!.status).toBe("active");
+    expect(await seats()).toBe(before + 1);
+    // Now it IS a client, so the coach sees them.
+    const roster2 = (await (await SELF.fetch("http://x/api/clients", { headers: auth(ownerCookie) })).json()) as { clients: { id: string }[] };
+    expect(roster2.clients.find((cl) => cl.id === row!.id)).toBeTruthy();
+
+    await setSelfRegister(false);
+  }, 30_000);
 
   it("enforces a per-email cooldown between codes", async () => {
     const first = await send({ email: "cooldown-1@test.dev", type: "sign-in" });
