@@ -815,6 +815,43 @@ describe("capability gates enforce plan features + quotas", () => {
   });
 });
 
+describe("a stale catalog id can be repaired — for packs as well as plans", () => {
+  it("resyncPrices clears BOTH plans and credit_packs", async () => {
+    // The bug: `resyncPrices` nulled plan ids only, and `syncCatalog` skips any
+    // row that already holds a `stripe_price_id`. So a pack whose price had gone
+    // stale — dangling in Stripe, created under another account, or half-written
+    // by an interrupted sync — had NO repair path: sync reported "0 packs"
+    // because it believed them done, and every top-up checkout failed with
+    // "No such price", unfixable from the admin UI.
+    const db = env.DB as D1Database;
+    await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) }); // seedBilling
+    // Plant a stale id on an active plan AND an active pack.
+    await db.prepare("UPDATE plans SET stripe_product_id = 'prod_stale', stripe_price_id = 'price_stale' WHERE active = 1 AND price_usd_month > 0").run();
+    await db.prepare("UPDATE credit_packs SET stripe_product_id = 'prod_stale', stripe_price_id = 'price_stale' WHERE active = 1").run();
+    const staleP = (await db.prepare("SELECT COUNT(*) AS n FROM plans WHERE stripe_price_id = 'price_stale'").first<{ n: number }>())!.n;
+    const staleK = (await db.prepare("SELECT COUNT(*) AS n FROM credit_packs WHERE stripe_price_id = 'price_stale'").first<{ n: number }>())!.n;
+    expect(staleP).toBeGreaterThan(0);
+    expect(staleK).toBeGreaterThan(0);
+
+    // No Stripe key in this suite, so the sync route refuses BEFORE clearing —
+    // which is the right order (never strand the catalog on a call that cannot
+    // finish). Configure a dummy key so the clearing branch runs.
+    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.secret_key', 'sk_test_dummy_for_clear') ON CONFLICT(key) DO UPDATE SET value = 'sk_test_dummy_for_clear'").run();
+    const res = await SELF.fetch("http://x/api/admin/stripe/sync", {
+      method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ resyncPrices: true }),
+    });
+    // The Stripe calls themselves fail against a dummy key; what matters is that
+    // BOTH tables had their stale ids dropped so a real sync can recreate them.
+    const clearedPlans = (await db.prepare("SELECT COUNT(*) AS n FROM plans WHERE stripe_price_id = 'price_stale'").first<{ n: number }>())!.n;
+    const clearedPacks = (await db.prepare("SELECT COUNT(*) AS n FROM credit_packs WHERE stripe_price_id = 'price_stale'").first<{ n: number }>())!.n;
+    expect(clearedPlans, "plans still hold the stale id").toBe(0);
+    expect(clearedPacks, "credit_packs still hold the stale id — the bug this test exists for").toBe(0);
+    void res;
+    await db.prepare("DELETE FROM app_config WHERE key = 'stripe.secret_key'").run();
+  }, 30_000);
+});
+
 describe("the 👍/👎 signal is readable, not just writable", () => {
   it("votes aggregate per insight type, with a helpful rate", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

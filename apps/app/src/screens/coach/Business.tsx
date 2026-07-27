@@ -149,7 +149,14 @@ function Overview() {
       }
       else setFlash("Couldn't start checkout — Stripe isn't fully configured yet.");
     } catch (e) {
-      const msg = e instanceof Error && e.message.startsWith("promo_") ? promoError(e.message) : "Couldn't start checkout. Please try again.";
+      // Say what the SERVER said. "Please try again" was actively misleading on
+      // the two failures that actually happen here — `plan not synced to stripe`
+      // and `stripe not configured` — because retrying can never fix either, and
+      // the reason was sitting in the response the whole time. Only genuinely
+      // unrecognised failures get the generic line.
+      const msg = e instanceof Error && e.message.startsWith("promo_")
+        ? promoError(e.message)
+        : errorText(e, "Couldn't start checkout. Please try again.");
       setFlash(msg);
     } finally { setBusy(null); }
   };

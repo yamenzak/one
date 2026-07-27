@@ -767,14 +767,26 @@ export const stripeAdminRoutes = new Hono<AppEnv>()
     const body = z.object({ resyncPrices: z.boolean().default(false) }).safeParse(await c.req.json().catch(() => ({})));
     await seedBilling(c.env.DB);
     let cleared = 0;
+    let clearedPacks = 0;
     if (body.success && body.data.resyncPrices) {
       const r = await c.env.DB.prepare(
         "UPDATE plans SET stripe_product_id = NULL, stripe_price_id = NULL WHERE active = 1 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)",
       ).run();
       cleared = r.meta?.changes ?? 0;
+      // CREDIT PACKS TOO. This cleared plans only, which left packs with no
+      // repair path at all: `syncCatalog` skips any row that already holds a
+      // `stripe_price_id`, and nothing else ever nulled a pack's. So a pack whose
+      // price had gone stale — dangling in Stripe, created under a different
+      // account, or half-written by an interrupted sync — was permanently broken.
+      // Sync reported "0 packs" because it believed them done, and every top-up
+      // checkout failed with "No such price", with no way out of the admin UI.
+      const rp = await c.env.DB.prepare(
+        "UPDATE credit_packs SET stripe_product_id = NULL, stripe_price_id = NULL WHERE active = 1 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)",
+      ).run();
+      clearedPacks = rp.meta?.changes ?? 0;
     }
     const result = await syncCatalog(c.env.DB, cfg.secretKey);
-    return c.json({ ok: true, cleared, ...result });
+    return c.json({ ok: true, cleared, clearedPacks, ...result });
   })
 
   /** "What is Mossa actually on right now?" — presence + provenance + the lane
