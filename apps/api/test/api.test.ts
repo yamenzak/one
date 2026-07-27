@@ -4176,3 +4176,54 @@ describe("email on the Mossa lane is metered and priced visibly", () => {
     expect(after, "a platform email did not cost anything").toBeLessThan(before);
   });
 });
+
+/**
+ * An invite that was never emailed must say so.
+ *
+ * The coach's whole mental model is "I added them, they'll get an email". When
+ * the send fails — email switched off, out of credits, an unconfigured Brevo
+ * account, or a FRESH DEPLOY that cannot send at all until the platform sender is
+ * configured — the client is simply never contacted and nobody finds out. The
+ * response already carries a working invite link and QR token, so the recovery is
+ * trivial; the coach just has to be TOLD.
+ */
+describe("client invites report whether the email actually went", () => {
+  const invite = async (email: string) => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const r = await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ email, displayName: "Invitee" }) });
+    return (await r.json()) as { invite: { url: string; token: string; email: string; delivery: { sent: boolean; reason: string | null } } | null };
+  };
+
+  it("reports a successful send, alongside the link and token", async () => {
+    const r = await invite(`inv-ok-${Date.now()}@test.dev`);
+    expect(r.invite, "an email address should produce an invite").not.toBeNull();
+    expect(r.invite!.url).toContain("invite=");
+    expect(r.invite!.token.length).toBeGreaterThan(10);
+    expect(r.invite!.delivery.sent).toBe(true);
+    expect(r.invite!.delivery.reason).toBeNull();
+  });
+
+  it("reports a FAILED send with a reason the coach can act on", async () => {
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    // Switch the studio's email off — one of the several ordinary ways a send
+    // does not happen.
+    await SELF.fetch("http://x/api/settings", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ email: { provider: "off" } }),
+    });
+    try {
+      const r = await invite(`inv-off-${Date.now()}@test.dev`);
+      // The client is STILL created and the link still works — only the claim
+      // about email changes.
+      expect(r.invite).not.toBeNull();
+      expect(r.invite!.url).toContain("invite=");
+      expect(r.invite!.delivery.sent, "a send that did not happen was reported as sent").toBe(false);
+      expect(r.invite!.delivery.reason, "no reason given for the failure").toBeTruthy();
+      expect(r.invite!.delivery.reason!.length).toBeGreaterThan(10);
+    } finally {
+      await db.prepare("UPDATE tenant_settings SET email_config_json = NULL WHERE tenant_id = ?").bind(ctx.active.tenantId).run().catch(() => undefined);
+    }
+  });
+});

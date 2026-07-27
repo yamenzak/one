@@ -21,7 +21,7 @@ export interface ClientSummary { id: string; displayName: string; email: string 
 
 /** The invite payload POST /api/clients returns when an email is present — the
  *  branded deep-link (also emailed) the coach can show in the gym. */
-interface Invite { url: string; token: string; email: string }
+interface Invite { url: string; token: string; email: string; delivery: { sent: boolean; reason: string | null } }
 
 export function Clients() {
   const nav = useNavigate();
@@ -199,15 +199,39 @@ function InviteSheet({ invite, onClose }: { invite: Invite; onClose: () => void 
   return (
     <Sheet open onClose={onClose} title="Client invited">
       <div className="space-y-4">
+        {/* The truth about the email, not a claim. This said "We emailed a
+            branded sign-in link" unconditionally — including when email was off,
+            the studio was out of credits, or the deployment could not send at
+            all, which is the state a FRESH install is in. The coach walked away
+            believing the client had been contacted. */}
         <div className="flex items-start gap-3">
-          <div className="grid size-11 shrink-0 place-items-center rounded-2xl [&_svg]:size-[1.35rem]" style={{ background: `color-mix(in oklch, ${toneVar.success} 15%, transparent)`, color: toneVar.success }}><Check /></div>
+          <div
+            className="grid size-11 shrink-0 place-items-center rounded-2xl [&_svg]:size-[1.35rem]"
+            style={{
+              background: `color-mix(in oklch, ${invite.delivery.sent ? toneVar.success : toneVar.warning} 15%, transparent)`,
+              color: invite.delivery.sent ? toneVar.success : toneVar.warning,
+            }}
+          >
+            {invite.delivery.sent ? <Check /> : <AlertTriangle />}
+          </div>
           <div className="min-w-0">
-            <p className="text-sm">We emailed a branded sign-in link to <span className="font-medium text-foreground">{invite.email}</span>.</p>
-            <p className="mt-1 text-sm text-muted-foreground">Share this link in the gym too — they open it and sign in with a one-time code, no password.</p>
+            {invite.delivery.sent ? (
+              <>
+                <p className="text-sm">We emailed a branded sign-in link to <span className="font-medium text-foreground">{invite.email}</span>.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Share this link in the gym too — they open it and sign in with a one-time code, no password.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm"><span className="font-medium text-foreground">The invite email didn't go out.</span> {invite.delivery.reason}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  The client was still created — send them the link below and they can sign in with it right away.
+                </p>
+              </>
+            )}
           </div>
         </div>
         <div className="space-y-2 rounded-2xl bg-card p-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Invite link</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{invite.delivery.sent ? "Invite link" : "Invite link — send this to them"}</div>
           <div className="break-all rounded-xl bg-surface-3 px-3 py-2.5 font-mono text-xs">{invite.url}</div>
           <div className="flex gap-2">
             <Button size="sm" variant="tonal" className="flex-1" onClick={() => void copy()}>{copied ? <><Check /> Copied</> : <><Copy /> Copy link</>}</Button>

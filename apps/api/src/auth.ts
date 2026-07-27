@@ -308,7 +308,19 @@ export function createAuth(env: Env, origin?: string) {
             html,
             text,
             brandName: brand.name,
-          }).catch(() => undefined);
+          })
+            .catch((e: unknown) => ({ ok: false as const, skipped: undefined, error: e instanceof Error ? e.message : String(e) }))
+            .then((r) => {
+              // Better Auth calls this fire-and-forget — the result cannot be
+              // threaded back into the API response. So at minimum it must not
+              // vanish: an invitation whose email never went out looks identical
+              // to one that did, and the invitee is simply never contacted. The
+              // accept link stays reachable from the Staff screen, which is the
+              // manual path out.
+              if (!r.ok) {
+                console.warn(`[invite] staff invitation to ${data.email} for org ${data.organization.id} was NOT emailed: ${r.skipped ?? r.error ?? "unknown"} — the accept link must be shared manually`);
+              }
+            });
         },
       }),
       // THE sign-in method: 6-digit emailed code, 10-min TTL, DB rate-limited.

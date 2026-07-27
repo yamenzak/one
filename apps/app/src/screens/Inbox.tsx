@@ -90,7 +90,17 @@ export function Inbox({ onBack }: { onBack: () => void }) {
                 {g.items.map((n) => {
                   const { icon, tone } = notifCoding(n.type);
                   return (
-                    <Card key={n.id} onClick={() => void open(n)} className={`flex cursor-pointer items-start gap-3 transition-colors hover:bg-secondary ${n.read ? "opacity-60" : ""}`}>
+                    // A notification with no destination is not tappable. It
+                    // still marked itself read on click and then sat there, which
+                    // reads as the app ignoring you.
+                    <Card
+                      key={n.id}
+                      onClick={n.link ? () => void open(n) : undefined}
+                      role={n.link ? "button" : undefined}
+                      tabIndex={n.link ? 0 : undefined}
+                      onKeyDown={n.link ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); void open(n); } } : undefined}
+                      className={`flex items-start gap-3 transition-colors ${n.link ? "cursor-pointer hover:bg-secondary" : ""} ${n.read ? "opacity-60" : ""}`}
+                    >
                       <IconBadge icon={icon} tone={tone} size="sm" />
                       <div className="min-w-0 flex-1">
                         <div className="font-medium">{n.title}</div>

@@ -276,11 +276,12 @@ async function tenantLoginUrl(env: Env, tenantId: string): Promise<string> {
 /** Build the invite deep-link + opaque token, and send the branded invite email
  *  (SPEC §4, §8.1). Best-effort: a mail failure never fails client creation, and
  *  the returned QR data still lets the coach show the in-gym invite. */
-async function buildClientInvite(env: Env, tenantId: string, clientId: string, email: string): Promise<{ url: string; token: string; email: string }> {
+async function buildClientInvite(env: Env, tenantId: string, clientId: string, email: string): Promise<{ url: string; token: string; email: string; delivery: InviteDelivery }> {
   const loginUrl = await tenantLoginUrl(env, tenantId);
   const token = await signInviteToken(env, { c: clientId, t: tenantId, e: email });
   const url = `${loginUrl}${loginUrl.includes("?") ? "&" : "?"}invite=${encodeURIComponent(token)}`;
   const brand = await tenantBrandKit(env.DB, tenantId).catch(() => null);
+  let delivery: InviteDelivery = { sent: false, reason: "This studio has no branding set up yet, so no invite email was sent." };
   if (brand) {
     const html = emailShell(
       `Welcome to ${escapeHtml(brand.name)}`,
@@ -291,9 +292,40 @@ async function buildClientInvite(env: Env, tenantId: string, clientId: string, e
       { brand, preheader: `Your ${brand.name} space is ready`, eyebrow: "You're invited" },
     );
     const text = `Your coach set up your space on ${brand.name}. Open it and sign in with this email: ${url}`;
-    await sendTenantEmail(env, tenantId, { to: email, subject: `Your ${brand.name} space is ready`, html, text, brandName: brand.name }).catch(() => undefined);
+    const sent = await sendTenantEmail(env, tenantId, { to: email, subject: `Your ${brand.name} space is ready`, html, text, brandName: brand.name })
+      .catch((e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : String(e) }));
+    delivery = describeDelivery(sent);
   }
-  return { url, token, email };
+  return { url, token, email, delivery };
+}
+
+/** Whether the invite email actually went out, and if not, why — in words a
+ *  coach can act on. */
+export interface InviteDelivery { sent: boolean; reason: string | null }
+
+/**
+ * Translate a send result into something the coach is told.
+ *
+ * This used to be `.catch(() => undefined)`: the email result was thrown away and
+ * the route reported success either way. A studio with email switched off, out of
+ * credits, or on an unconfigured Brevo account — and a FRESH DEPLOY cannot send
+ * at all until the platform sender is configured — added a client, saw "invited",
+ * and the client never heard anything. Nobody could tell, because the failure had
+ * no representation anywhere.
+ *
+ * The recovery already exists and is good: the same response carries the invite
+ * link and its QR token, so a coach who is TOLD can hand the client the link or
+ * show the code in the gym. They just have to be told.
+ */
+function describeDelivery(r: { ok: boolean; skipped?: string; error?: string }): InviteDelivery {
+  if (r.ok) return { sent: true, reason: null };
+  const why: Record<string, string> = {
+    provider_off: "Email is switched off in your studio settings.",
+    no_credits: "Your studio is out of credits, so the email wasn't sent.",
+    brevo_unconfigured: "Brevo needs an API key and a verified sender before it can send.",
+    email_not_configured: "This deployment can't send email yet.",
+  };
+  return { sent: false, reason: (r.skipped && why[r.skipped]) || why[r.error ?? ""] || "The invite email couldn't be delivered." };
 }
 
 export const clientRoutes = new Hono<AppEnv>()
@@ -353,7 +385,7 @@ export const clientRoutes = new Hono<AppEnv>()
     // Send the branded invite + build the QR invite data (SPEC §4): the email is
     // the activation channel, and `invite` carries the deep-link + opaque token
     // the coach can show as an in-gym QR. Best-effort — never fails creation.
-    let invite: { url: string; token: string; email: string } | null = null;
+    let invite: { url: string; token: string; email: string; delivery: InviteDelivery } | null = null;
     if (body.data.email) {
       invite = await buildClientInvite(c.env, who.tenantId, id, body.data.email).catch(() => null);
     }

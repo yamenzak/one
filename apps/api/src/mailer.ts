@@ -227,7 +227,7 @@ export function emailButton(label: string, href: string, brand: BrandKit = MOSSA
 export function emailShell(
   heading: string,
   bodyHtml: string,
-  opts: { brand?: BrandKit; preheader?: string; footnote?: string; eyebrow?: string } = {},
+  opts: { brand?: BrandKit; preheader?: string; footnote?: string; eyebrow?: string; manageUrl?: string } = {},
 ): string {
   const brand = opts.brand ?? MOSSA_BRAND;
   const font = EMAIL_FONT;
@@ -238,7 +238,14 @@ export function emailShell(
     : `<span style="font-size:17px;font-weight:600;letter-spacing:-0.01em;color:${T.fg}">${escapeHtml(brand.name)}</span>`;
   const preheader = opts.preheader ?? heading;
   const isMossa = brand.name === MOSSA_BRAND.name;
-  const footnote = opts.footnote ?? (isMossa ? "Mossa · coaching, organized." : `Sent by ${escapeHtml(brand.name)}. Manage notifications in your account settings.`);
+  // The footer told people to "manage notifications in your account settings"
+  // and gave them no way to get there — a dead instruction in every email, and
+  // the one thing a recipient reaches for when they want fewer of them. When the
+  // caller knows the app's origin it becomes a real link.
+  const footnote = opts.footnote ?? (isMossa ? "Mossa · coaching, organized." : `Sent by ${escapeHtml(brand.name)}.`);
+  const manage = opts.manageUrl
+    ? `<a href="${encodeURI(opts.manageUrl)}" style="color:${T.muted};text-decoration:underline">Manage notifications</a>`
+    : "";
   const eyebrow = opts.eyebrow
     ? `<div style="font-size:12px;font-weight:600;letter-spacing:0.01em;color:${brand.accent};margin:0 0 10px">${escapeHtml(opts.eyebrow)}</div>`
     : "";
@@ -258,8 +265,11 @@ export function emailShell(
           </td></tr>
         </table>
       </td></tr>
-      <tr><td style="padding:18px 8px 0;font-family:${font};font-size:12px;line-height:1.6;color:${T.muted}">
-        ${escapeHtml(footnote)}
+      <tr><td style="padding:16px 8px 0">
+        <div style="height:1px;line-height:1px;font-size:0;background:${T.hair}">&nbsp;</div>
+      </td></tr>
+      <tr><td style="padding:14px 8px 0;font-family:${font};font-size:12px;line-height:1.6;color:${T.muted}">
+        ${escapeHtml(footnote)}${manage ? ` ${manage}` : ""}
       </td></tr>
     </table>
   </td></tr>

@@ -179,7 +179,15 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
           const esc = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, escapeHtml(v === undefined || v === null ? "" : String(v))]));
           subject = renderTemplate(tpl.subject, raw);
           const inner = renderTemplate(tpl.body, esc) + (href ? emailButton(`Open ${brand.name}`, href, brand) : "");
-          html = emailShell(escapeHtml(subject), inner, { brand, preheader: subject, footnote, eyebrow });
+          html = emailShell(escapeHtml(subject), inner, {
+            brand,
+            preheader: subject,
+            footnote,
+            eyebrow,
+            // Preferences and notifications are one destination now, so this is
+            // where "I want fewer of these" actually leads.
+            manageUrl: base ? withTenantHint(`${base}/preferences`, input.tenantId) : undefined,
+          });
         } else {
           html = notifEmailHtml(env, brand, input.tenantId, { title, message: input.message, link, footnote: signature, eyebrow });
         }
