@@ -78,6 +78,27 @@ const GAP_LABELS: Record<string, string> = {
   workoutLocation: "Where you train",
 };
 
+/**
+ * Which SCREEN can actually fill each gap. `profileGaps` returns one flat list,
+ * but the nine fields live on two different pages — and the card used to send
+ * everyone to /profile, where six of the nine simply are not editable. You
+ * arrived asked for your primary goal and found a form with name, DOB and
+ * height on it.
+ *
+ * Only gender/DOB/height are on the profile form; everything else is on
+ * Preferences → Training & nutrition.
+ */
+export const PROFILE_GAPS = new Set(["gender", "dateOfBirth", "height"]);
+
+/** Where "Complete your profile" should land, given what is still missing.
+ *  Preferences first because it owns the majority; once those are done the card
+ *  points at the profile for the remaining three, so each tap lands on a screen
+ *  that can actually fix something. */
+export const gapDestination = (gaps: string[]): { href: string; label: string } =>
+  gaps.some((g) => !PROFILE_GAPS.has(g))
+    ? { href: "/preferences", label: "Complete your preferences" }
+    : { href: "/profile", label: "Complete your profile" };
+
 /** Loggable kinds that open their own detail drawer (a swipe-to-dismiss sheet,
  *  so you keep your place in the feed). Coach / plan events keep routing to
  *  their existing surfaces (sheets / tabs). */
@@ -244,16 +265,17 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
             const done = total - data.profile.gaps.length;
             const pct = total ? done / total : 0;
             const needsPasskey = ownView && pk?.supported && pk.hasPasskey === false;
+            const dest = gapDestination(data.profile.gaps);
             return (
               <Stagger>
                 <Card className="relative overflow-hidden">
                   <div className="pointer-events-none absolute -right-12 -top-14 size-44 rounded-full bg-primary/15 blur-3xl" />
-                  <button onClick={ownView ? () => nav("/profile") : undefined} disabled={!ownView} className="block w-full text-left">
+                  <button onClick={ownView ? () => nav(dest.href) : undefined} disabled={!ownView} className="block w-full text-left">
                     <div className="relative flex items-center gap-4">
                       <ProgressRing size={66} strokeWidth={7} tone="primary" progress={pct || 0.001} value={<span className="text-sm font-bold">{done}/{total}</span>} softTrack tintValue />
                       <div className="min-w-0 flex-1">
                         <div className="text-xs font-medium uppercase tracking-wide text-primary">{ownView ? "Finish setting up" : "Profile incomplete"}</div>
-                        <h3 className="mt-0.5 text-lg font-semibold tracking-tight">Complete your profile</h3>
+                        <h3 className="mt-0.5 text-lg font-semibold tracking-tight">{ownView ? dest.label : "Complete your profile"}</h3>
                         <p className="mt-0.5 text-sm text-muted-foreground">{ownView ? "A few details let your coach tailor your plans and targets to you." : "Ask this client to finish their profile for accurate targets."}</p>
                       </div>
                       {ownView && <ChevronRight className="size-5 shrink-0 self-center text-muted-foreground" />}
