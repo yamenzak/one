@@ -28,9 +28,12 @@ import { api, isOffline, setUnauthorizedHandler } from "./api.js";
  * `/t/<slug>` prefix is not sticky. Once you are in, the app runs on clean paths
  * — /today, /train, /clients/… — on whichever hostname served it.)
  */
+// Guarded because this runs at IMPORT time: any module that transitively pulls
+// in this file — including a unit test in a node environment — would otherwise
+// throw `window is not defined` before a single test ran.
 const ENTRY = {
-  slug: /^\/t\/([^/?#]+)/.exec(window.location.pathname)?.[1] ?? null,
-  tenantHint: new URLSearchParams(window.location.search).get("t"),
+  slug: typeof window === "undefined" ? null : /^\/t\/([^/?#]+)/.exec(window.location.pathname)?.[1] ?? null,
+  tenantHint: typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("t"),
 };
 
 export const LAST_DOOR_KEY = "mossa:last-door";
@@ -192,8 +195,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    * working whichever door is showing.
    */
   useEffect(() => {
-    const slug = /^\/t\/([^/?#]+)/.exec(location.pathname)?.[1];
-    const hinted = new URLSearchParams(location.search).get("t");
+    const slug = ENTRY.slug;
+    const hinted = ENTRY.tenantHint;
     const q = slug
       ? `?slug=${encodeURIComponent(decodeURIComponent(slug))}`
       : hinted
@@ -281,7 +284,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const doorSwitchDone = useRef(false);
   useEffect(() => {
     if (loading || !ctx?.active || doorSwitchDone.current) return;
-    const slug = /^\/t\/([^/?#]+)/.exec(location.pathname)?.[1];
+    const slug = ENTRY.slug;
     if (!slug) return;
     doorSwitchDone.current = true;
     const want = decodeURIComponent(slug).toLowerCase();

@@ -108,10 +108,29 @@ export const contextRoutes = new Hono<AppEnv>()
       .bind(user.id)
       .all<{ tenant_id: string; role: PersonaRefRole; name: string; slug: string }>();
 
+    // One read for every membership's brand, so the switcher can show each studio
+    // as itself. Batched rather than per-persona: a coach on five studios would
+    // otherwise cost five extra round trips on every context read.
+    const brandRows = memberships.results?.length
+      ? (await c.env.DB.prepare(
+          `SELECT tenant_id, branding_json FROM tenant_settings WHERE tenant_id IN (${memberships.results.map(() => "?").join(",")})`,
+        ).bind(...memberships.results.map((m) => m.tenant_id)).all<{ tenant_id: string; branding_json: string | null }>()).results ?? []
+      : [];
+    const brandOf = new Map(
+      brandRows.map((r) => [r.tenant_id, parseJson<SessionContext["branding"]>(r.branding_json, null)]),
+    );
+
     const personas: PersonaRef[] = [];
     for (const m of memberships.results ?? []) {
       const clientRec = await clientForUser(c.env.DB, m.tenant_id, user.id);
+      const brand = brandOf.get(m.tenant_id) ?? null;
       personas.push({
+        iconUrl: brand?.iconUrl ?? null,
+        logoUrl: brand?.logoUrl ?? null,
+        // The colour a studio actually renders with: an explicit `primary`, else
+        // whatever its generated dark-mode token set carries (which is what most
+        // studios end up with, since the branding editor writes tokens).
+        primary: brand?.primary ?? brand?.tokens?.dark?.["--primary"] ?? brand?.tokens?.light?.["--primary"] ?? null,
         tenantId: m.tenant_id,
         tenantName: m.name,
         tenantSlug: m.slug,

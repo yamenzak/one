@@ -26,6 +26,20 @@ export interface PersonaRef {
    */
   avatarUrl?: string | null;
   avatarSeed?: string | null;
+  /**
+   * Enough of the studio's brand to render it as a BUSINESS in the switcher — its
+   * mark and its primary colour. A person who trains at one studio and coaches at
+   * another is looking at two companies, and a list of names in one typeface does
+   * not say that; the logo and the colour are how you recognise which is which
+   * before you read anything.
+   *
+   * Deliberately not the whole `TenantBranding`: the switcher needs an icon and a
+   * colour, and shipping every token for every persona on every context read
+   * would put a studio's full theme in a payload that only wants a swatch.
+   */
+  iconUrl?: string | null;
+  logoUrl?: string | null;
+  primary?: string | null;
 }
 
 /** Tenant branding for theming the app (SPEC §7); applied at boot. */

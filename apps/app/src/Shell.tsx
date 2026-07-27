@@ -38,6 +38,7 @@ import { AdminConsole } from "./screens/admin/AdminConsole.js";
 import { AcceptInvite } from "./screens/AcceptInvite.js";
 import { NotificationBell } from "./NotificationBell.js";
 import { OfflinePill } from "./notices.js";
+import { StudioSwitcher } from "./StudioSwitcher.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { TourProvider, useTour, type TourId } from "./tour.js";
 
@@ -243,6 +244,10 @@ function TabLayout() {
                 {clientSurface ? "Train" : "Coach"}
               </span>
             )}
+            {/* Which studio am I in, and are there others? Next to the brand,
+                because that is what it changes — not in the account menu, where
+                it read as a personal setting rather than a change of workspace. */}
+            <StudioSwitcher />
           </div>
         }
         trailing={
@@ -307,17 +312,6 @@ function TabLayout() {
                     <DropdownMenuItem onSelect={clientSurface ? () => { setMode("coach"); nav("/today"); } : () => void enterTrainMode()}>
                       <ArrowLeftRight /> {clientSurface ? "Switch to Coach mode" : "Switch to Train mode"}
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-                {ctx!.personas.length > 1 && !ctx!.hostTenantId && (
-                  <>
-                    {ctx!.personas.map((p) => (
-                      <DropdownMenuItem key={p.tenantId} onSelect={() => void switchTenant(p.tenantId)}>
-                        <Store /> {p.tenantName}
-                        {p.tenantId === active.tenantId && <Check className="ml-auto size-4 text-primary" />}
-                      </DropdownMenuItem>
-                    ))}
                     <DropdownMenuSeparator />
                   </>
                 )}
