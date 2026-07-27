@@ -1406,9 +1406,17 @@ export async function syncModelCatalog(
   // Guarantee a default per generation task (cheapest output among enabled).
   // Runs AFTER reconciliation so a task whose default was just switched off
   // immediately re-elects instead of leaving the lane defaultless.
+  //
+  // The vision lane is Gemini-only (`modelSupportsTask`), so its election is
+  // constrained to Google rows. Unconstrained, this loop would happily crown the
+  // cheapest vision-tagged row whatever its provider — and a Workers-AI one
+  // fails every call with "model cannot read images", i.e. the sync itself could
+  // break the lane. The `db.ts` migration retags those rows, but the election
+  // must not be able to recreate the situation from a hand-edited catalog.
   for (const task of ["text", "text-small", "vision"]) {
-    const has = await db.prepare("SELECT 1 x FROM ai_models WHERE task = ? AND enabled = 1 AND is_default = 1").bind(task).first();
-    if (!has) await db.prepare("UPDATE ai_models SET is_default = 1 WHERE id = (SELECT id FROM ai_models WHERE task = ? AND enabled = 1 ORDER BY output_rate ASC LIMIT 1)").bind(task).run();
+    const providerClause = task === "vision" ? " AND provider = 'google'" : "";
+    const has = await db.prepare(`SELECT 1 x FROM ai_models WHERE task = ? AND enabled = 1 AND is_default = 1${providerClause}`).bind(task).first();
+    if (!has) await db.prepare(`UPDATE ai_models SET is_default = 1 WHERE id = (SELECT id FROM ai_models WHERE task = ? AND enabled = 1${providerClause} ORDER BY output_rate ASC LIMIT 1)`).bind(task).run();
   }
 
   return { ok: providers.some((p) => p.ok), providers, total: (await listModels(db)).length, errors };

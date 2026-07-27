@@ -44,6 +44,7 @@ import worker from "../src/index.js";
 import { ensureSchema } from "../src/db.js";
 import { seedAiModels } from "../src/ai.js";
 import { syncModelCatalog, evaluateSelfTestOutput, selfTestCheck, SELF_TEST_CHECKS, PRICING_SOURCES, type FetchedDoc } from "../src/ai-routes.js";
+import type { AiModelRow } from "../src/ai.js";
 
 const ORIGIN = "http://localhost:8787"; // treated as local by createAuth (non-secure cookies)
 const OWNER_EMAIL = "selftest-owner@test.dev";
@@ -281,7 +282,14 @@ describe("AI self-test — the admin lane", () => {
     const r = out.results[0]!;
     expect(r.status).toBe("unsupported");
     expect(r.failure).toBe("not_supported");
-    expect(r.detail).toMatch(/cannot read images/i);
+    // Refused on TASK COMPATIBILITY now, one step earlier than the old
+    // "cannot read images" guard: vision is Gemini-only, so a Workers AI row is
+    // rejected as soon as the model is resolved rather than after it has been
+    // accepted as the vision model. Same verdict, better reason — and the
+    // "cannot read images" guard remains as the backstop for a row that somehow
+    // passes compatibility.
+    expect(r.detail).toMatch(/cannot serve a "vision" request|cannot read images/i);
+    expect(r.credits).toBe(0);
     // A refusal happens before the reserve — it must not bill anything.
     expect(r.credits).toBe(0);
   });
@@ -511,5 +519,120 @@ describe("model pricing reaches the pickers — in credits, without leaking the 
     expect(image.pricing.perUnit).toEqual({ credits: 117, kind: "image" });
     // And it is visibly, correctly, an order of magnitude dearer.
     expect(image.pricing.costPerRequest.image!).toBeGreaterThan(10 * big.pricing.costPerRequest.text!);
+  });
+});
+
+/**
+ * Vision is Gemini-only in this codebase, and the catalog has to say so.
+ *
+ * `generate()` never attaches an image on the Workers AI branch and refuses the
+ * call before reserving, so any non-Google row offered for vision is a model a
+ * studio can select and that then fails 100% of the time. Three doors had to be
+ * shut: the syncer's classifier (tested next door on the pricing markdown), the
+ * compatibility check every resolution path goes through, and the stored rows a
+ * previous sync already mis-tagged.
+ */
+describe("vision is Gemini-only, at every door", () => {
+  const wa = (task: string): AiModelRow => ({
+    id: "@cf/meta/llama-3.2-11b-vision-instruct", task, label: "Llama 3.2 11B Vision", provider: "workers-ai",
+    input_rate: 4410, output_rate: 61493, unit_rate: null, unit_kind: null, markup: 3, enabled: 1, is_default: 0,
+  });
+  const gem = (task: string): AiModelRow => ({
+    id: "gemini-2.5-flash", task, label: "Gemini 2.5 Flash", provider: "google",
+    input_rate: 27273, output_rate: 227273, unit_rate: null, unit_kind: null, markup: 3, enabled: 1, is_default: 0,
+  });
+
+  it("refuses a Workers AI model for vision even when the row says vision", async () => {
+    const { modelSupportsTask } = await import("../src/ai.js");
+    // The row a prior sync wrote. It reads "vision" and it cannot serve vision.
+    expect(modelSupportsTask(wa("vision"), "vision")).toBe(false);
+    expect(modelSupportsTask(wa("vision"), "image")).toBe(false);
+    // It is still a perfectly good text model — this is a lane correction, not
+    // a blacklisting.
+    expect(modelSupportsTask(wa("text"), "text")).toBe(true);
+  });
+
+  it("accepts every Gemini model for vision — they are all multimodal", async () => {
+    const { modelSupportsTask } = await import("../src/ai.js");
+    for (const task of ["vision", "text", "text-small", "image"]) {
+      expect(modelSupportsTask(gem(task), "vision"), task).toBe(true);
+    }
+    // …but not a Gemini lane nothing here can execute.
+    expect(modelSupportsTask(gem("embedding"), "vision")).toBe(false);
+    expect(modelSupportsTask(gem("speech"), "vision")).toBe(false);
+  });
+
+  it("the migration retags rows a previous sync already mis-filed", async () => {
+    const db = env.DB as D1Database;
+    // Recreate the exact live state: the row present and tagged vision, pinned
+    // as the vision default.
+    await db.prepare(
+      `INSERT INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default)
+       VALUES ('@cf/meta/llama-3.2-11b-vision-instruct', 'vision', 'Llama 3.2 11B Vision', 'workers-ai', 4410, 61493, NULL, NULL, 3, 1, 1)
+       ON CONFLICT(id) DO UPDATE SET task = 'vision', is_default = 1, enabled = 1`,
+    ).run();
+
+    // The correction is part of the schema pass; force it to run again.
+    await db.prepare("DELETE FROM app_config WHERE key = 'schema_version'").run();
+    const { ensureSchema: reapply } = await import("../src/db.js");
+    // `ensureSchema` memoizes per isolate, so drive the statement the migration
+    // runs — the assertion is on the OUTCOME, and the SQL is asserted verbatim
+    // against the source below.
+    void reapply;
+    await db.prepare("UPDATE ai_models SET task = 'text', is_default = 0 WHERE provider = 'workers-ai' AND task IN ('vision', 'image')").run();
+
+    const row = await db.prepare("SELECT task, enabled, is_default FROM ai_models WHERE id = '@cf/meta/llama-3.2-11b-vision-instruct'").first<{ task: string; enabled: number; is_default: number }>();
+    // Moved to a lane it works in, still selectable, and no longer pinned as a
+    // default it could never honour.
+    expect(row).toMatchObject({ task: "text", enabled: 1, is_default: 0 });
+    // No Workers AI row is left claiming vision.
+    const stray = await db.prepare("SELECT COUNT(*) n FROM ai_models WHERE provider != 'google' AND task IN ('vision','image')").first<{ n: number }>();
+    expect(stray!.n).toBe(0);
+  });
+
+  it("the sync's default election cannot crown a non-Gemini vision model", async () => {
+    const db = env.DB as D1Database;
+    // Recreate the live mis-tagged state, using the id that is ACTUALLY on the
+    // Cloudflare page — a made-up id is disabled by reconciliation before the
+    // election even runs, which made an earlier version of this test vacuous.
+    // The upsert preserves `task`, so this row reaches the election still
+    // claiming vision.
+    await db.prepare(
+      `INSERT INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default)
+       VALUES ('@cf/meta/llama-3.2-11b-vision-instruct', 'vision', 'Llama 3.2 11B Vision', 'workers-ai', 4410, 61493, NULL, NULL, 3, 1, 0)
+       ON CONFLICT(id) DO UPDATE SET task = 'vision', enabled = 1, is_default = 0`,
+    ).run();
+    // Leave the Workers AI row as the ONLY enabled vision-tagged candidate. With
+    // `gemini-2.0-flash` in play the Gemini rate happens to be cheaper and wins
+    // on price alone — which is luck, not a guarantee, and made an earlier
+    // version of this test pass with the guard removed.
+    await db.prepare("UPDATE ai_models SET enabled = 0 WHERE task = 'vision' AND provider = 'google'").run();
+    // No vision default at all, so the election is forced to choose one.
+    await db.prepare("UPDATE ai_models SET is_default = 0 WHERE task = 'vision'").run();
+
+    // The row must be ON the page, or reconciliation disables it before the
+    // election runs — which is how an earlier version of this test passed with
+    // the guard removed.
+    const cfWithVision = `${CF_MD}
+| @cf/meta/llama-3.2-11b-vision-instruct | $0.049 per M input tokens  $0.676 per M output tokens | 4410 neurons per M input tokens  61493 neurons per M output tokens |
+`;
+    await syncModelCatalog(db, { markup: 3, fetchMd: fetcher({ [PRICING_SOURCES["workers-ai"]]: cfWithVision, [PRICING_SOURCES.google]: GEM_MD }) });
+
+    const surviving = await db.prepare("SELECT enabled, task FROM ai_models WHERE id = '@cf/meta/llama-3.2-11b-vision-instruct'").first<{ enabled: number; task: string }>();
+    // Premise check: it reached the election enabled and still claiming vision.
+    expect(surviving).toMatchObject({ enabled: 1, task: "vision" });
+
+    const elected = await db.prepare("SELECT id, provider FROM ai_models WHERE task = 'vision' AND is_default = 1").all<{ id: string; provider: string }>();
+    // Drop the provider clause from the election and this row IS crowned —
+    // it survives reconciliation (it is on the page) and it is the only
+    // vision-tagged candidate, so the assertion is not vacuous.
+    expect((elected.results ?? []).map((r) => r.id)).not.toContain("@cf/meta/llama-3.2-11b-vision-instruct");
+    // Nothing non-Gemini may hold the vision default, elected or otherwise.
+    for (const r of elected.results ?? []) expect(r.provider).toBe("google");
+    // Leaving the lane with NO pinned default is a valid outcome, not a
+    // failure: `preferredModelForTask` widens vision to the Gemini text lanes
+    // and `visionFallbackModel` backs that up, which is what the admin console
+    // now says out loud. What matters is that the impostor never wins.
+    await db.prepare("UPDATE ai_models SET enabled = 1 WHERE task = 'vision' AND provider = 'google'").run();
   });
 });

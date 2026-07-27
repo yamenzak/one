@@ -69,8 +69,23 @@ const num = (s: string): number => Number(s.replace(/,/g, ""));
 
 /** Small/cheap text models get task "text-small" so there's always a cheap
  *  default; larger ones "text". Vision by name. */
+/**
+ * The lane a Workers AI text-generation model lands in.
+ *
+ * Deliberately never returns `vision`, even for an id that says so
+ * (`@cf/meta/llama-3.2-11b-vision-instruct`, Moondream). `generate()` refuses to
+ * attach an image to any non-Google provider by construction — the Workers AI
+ * branch has no image path at all — so a Workers-AI row tagged `vision` is a
+ * model a studio can SELECT for Snap-a-Meal and that then fails every call with
+ * "model cannot read images". Worse, the sync's default-election picks the
+ * cheapest enabled model per lane, so it could crown that row the vision
+ * default and break the whole lane unprompted.
+ *
+ * These are perfectly good TEXT models, so they land in a text lane where they
+ * work. If Workers AI vision is ever wired up, tag it here and in
+ * `modelSupportsTask` together — the two must agree.
+ */
 function workersTask(id: string): SeedTask {
-  if (/vision/i.test(id)) return "vision";
   if (/-(1b|2b|3b|micro)\b|flash|lite|mini|small|7b|8b/i.test(id)) return "text-small";
   return "text";
 }

@@ -60,7 +60,13 @@ describe("parseWorkersAiPricing", () => {
     const byId = new Map(models.map((m) => [m.id, m]));
     expect(byId.get("@cf/meta/llama-3.2-3b-instruct")).toMatchObject({ provider: "workers-ai", task: "text-small", inputRate: 4625, outputRate: 30475 });
     expect(byId.get("@cf/meta/llama-3.3-70b-instruct-fp8-fast")).toMatchObject({ task: "text", inputRate: 26668, outputRate: 204805 });
-    expect(byId.get("@cf/meta/llama-3.2-11b-vision-instruct")!.task).toBe("vision");
+    // A Workers AI id that says "vision" must NOT land in the vision lane.
+    // `generate()` has no image path for Workers AI and refuses the call
+    // ("model cannot read images"), so a vision-tagged row here becomes a
+    // pickable Snap-a-Meal model that fails every time — and the sync's
+    // cheapest-per-lane election could crown it. It is a fine text model.
+    expect(byId.get("@cf/meta/llama-3.2-11b-vision-instruct")!.task).toBe("text");
+    expect(models.some((m) => m.task === "vision")).toBe(false);
     // Embedding (input only) and image (tile-priced) rows are not text models.
     expect(byId.has("@cf/baai/bge-small-en-v1.5")).toBe(false);
     expect(byId.has("@cf/black-forest-labs/flux-1-schnell")).toBe(false);
