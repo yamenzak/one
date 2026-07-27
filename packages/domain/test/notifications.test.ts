@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   defaultChannels, resolveChannels, parseNotifPrefs, categoriesForRole, categoryAppliesTo, resolveAllChannels,
   parseNotifPolicy, emailAllowedByPolicy, resolveEmailPolicy, sanitizeEmailPolicy, isNotifCategory, audienceForRole,
-  NOTIF_TYPES, notifCategoryOf, notifTitleOf, notifLinkOf,
+  NOTIF_TYPES, NOTIF_CATEGORIES, notifCategoryOf, notifTitleOf, notifLinkOf,
   notifAudienceOf, notifVisibleInSurface, unreadInSurface, type NotifType,
   renderTemplate, notifTemplateOf, notifVarsOf,
 } from "../src/notifications.js";
@@ -75,6 +75,36 @@ describe("notification preferences", () => {
     expect(categoriesForRole("trainer").map((c) => c.key)).toContain("body-composition");
     expect(categoriesForRole("client").map((c) => c.key)).not.toContain("body-composition");
     expect(defaultChannels("trainer", "body-composition")).toEqual({ inbox: true, email: true });
+  });
+});
+
+describe("no category is decorative", () => {
+  /**
+   * A preference row users can toggle must govern something. `system`
+   * ("Security — new passkeys and sign-ins") shipped as a switch in every
+   * member's Preferences AND a row in the owner's studio-wide email policy, and
+   * no code path ever emitted it: a user could turn security alerts "on" and
+   * receive nothing, or turn them "off" and believe they had suppressed
+   * something real. It was removed rather than left lying.
+   *
+   * `digest` is the sole legitimate exception — it is not a `notify()` type at
+   * all; the weekly cron builds and sends it directly, and honours the same
+   * policy (see the digest-policy suite). Any OTHER category with no emitting
+   * type is a control that does nothing.
+   */
+  const EMITTED_BY_CRON_NOT_NOTIFY = new Set(["digest"]);
+
+  it("every category is emitted by at least one type (or is the cron digest)", () => {
+    const emitted = new Set(Object.values(NOTIF_TYPES).map((m) => m.category));
+    const dead = NOTIF_CATEGORIES.filter((c) => !emitted.has(c.key) && !EMITTED_BY_CRON_NOT_NOTIFY.has(c.key));
+    expect(dead.map((c) => `${c.key} (${c.label})`), "category shown in settings that nothing ever fires").toEqual([]);
+  });
+
+  it("the exception list stays honest — `digest` really has no type", () => {
+    // Guards the escape hatch itself: if a `digest` type is ever added, the
+    // exemption must go, or it would start hiding a real dead category again.
+    const emitted = new Set(Object.values(NOTIF_TYPES).map((m) => m.category));
+    for (const k of EMITTED_BY_CRON_NOT_NOTIFY) expect(emitted.has(k as never), `${k} now has a type — drop it from the exemption`).toBe(false);
   });
 });
 

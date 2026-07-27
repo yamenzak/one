@@ -207,11 +207,21 @@ async function digestForTenant(env: Env, tenantId: string, _brand: string, weekA
   const db = env.DB;
   const sentAt = new Date().toISOString();
   // The digest goes out over email, so it honors the same owner email policy as
-  // every other notification: if the owner disabled the `digest` category
-  // studio-wide, no digests are emailed for this tenant (members still keep it
-  // in their own prefs, but the studio-level email switch wins).
+  // every other notification: if the owner disabled the `digest` category for an
+  // audience, no digests are emailed to that audience (members still keep it in
+  // their own prefs, but the studio-level email switch wins).
+  //
+  // Resolved PER AUDIENCE, like `notify()` does. It used to be one audience-less
+  // check that returned early for the whole tenant, and that made the switch
+  // INERT: the owner UI writes only `emailAudience`, so an audience-less lookup
+  // fell through to the legacy `emailCategories` map — which nothing writes any
+  // more — and read the `?? true` default. Every studio that turned the weekly
+  // digest off kept receiving it. It also could not express the setting the UI
+  // offers, which is digest-off-for-clients-but-on-for-staff.
   const policyRow = await db.prepare("SELECT notif_policy_json FROM tenant_settings WHERE tenant_id = ?").bind(tenantId).first<{ notif_policy_json: string | null }>();
-  if (!emailAllowedByPolicy(parseNotifPolicy(policyRow?.notif_policy_json ?? null), "digest")) return;
+  const policy = parseNotifPolicy(policyRow?.notif_policy_json ?? null);
+  const digestTo = { staff: emailAllowedByPolicy(policy, "digest", "staff"), client: emailAllowedByPolicy(policy, "digest", "client") };
+  if (!digestTo.staff && !digestTo.client) return;
   const brand = await tenantBrandKit(db, tenantId);
   // Every CTA carries the tenant hint (?t=) so a multi-studio recipient lands in
   // THIS studio; the coach CTA deep-links to /today, where the attention queue
@@ -237,7 +247,7 @@ async function digestForTenant(env: Env, tenantId: string, _brand: string, weekA
   const active = num(activeClients);
   const engaged = num(activeThisWeek);
   const owners = await db.prepare("SELECT userId FROM member WHERE organizationId = ? AND role = 'owner'").bind(tenantId).all<{ userId: string | null }>();
-  if ((owners.results ?? []).some((o) => o.userId)) {
+  if (digestTo.staff && (owners.results ?? []).some((o) => o.userId)) {
     // Tenant-wide engagement analytics — the SAME rollup /reports/roster-analytics
     // serves the in-app screen, so the digest's charts never drift from the app.
     const ownerAnalytics = await rosterAnalytics(db, activeRows.map((r) => r.id), period, 14);
@@ -276,6 +286,7 @@ async function digestForTenant(env: Env, tenantId: string, _brand: string, weekA
   // ── Trainers: their assigned clients this week ─────────────────────────────
   const trainers = await db.prepare("SELECT DISTINCT trainer_user_id FROM client_trainers WHERE tenant_id = ?").bind(tenantId).all<{ trainer_user_id: string }>();
   for (const tr of trainers.results ?? []) {
+    if (!digestTo.staff) break;
     if (!tr.trainer_user_id || !(await digestOn(db, tr.trainer_user_id, "trainer"))) continue;
     if (!(await claimSend(db, tr.trainer_user_id, period, "trainer", sentAt))) continue;
     const email = (await db.prepare('SELECT email FROM "user" WHERE id = ?').bind(tr.trainer_user_id).first<{ email: string | null }>())?.email;
@@ -317,6 +328,7 @@ async function digestForTenant(env: Env, tenantId: string, _brand: string, weekA
   const eightWeeksAgo = shiftDate(period, -56);
   const week = lastNDates(period, 7);
   for (const cl of clients.results ?? []) {
+    if (!digestTo.client) break;
     try {
       if (!(await digestOn(db, cl.user_id, "client"))) continue;
       if (!(await claimSend(db, cl.user_id, period, "client", sentAt))) continue;

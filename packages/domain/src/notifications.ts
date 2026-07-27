@@ -23,8 +23,7 @@ export type NotifCategory =
   | "roster"
   | "sales"
   | "billing"
-  | "digest"
-  | "system";
+  | "digest";
 
 export interface ChannelPref {
   inbox: boolean;
@@ -57,7 +56,6 @@ export const NOTIF_CATEGORIES: NotifCategoryMeta[] = [
   { key: "sales", label: "Sales", blurb: "New sales, refunds and disputes", roles: ["owner"] },
   { key: "billing", label: "Studio billing", blurb: "Your Mossa subscription, credits and setup", roles: ["owner"] },
   { key: "digest", label: "Weekly digest", blurb: "Your week, summarised, every Monday", roles: ALL },
-  { key: "system", label: "Security", blurb: "New passkeys and sign-ins", roles: ALL },
 ];
 
 const CATEGORY_KEYS = new Set(NOTIF_CATEGORIES.map((c) => c.key));

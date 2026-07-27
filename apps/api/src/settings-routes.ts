@@ -78,6 +78,10 @@ export const settingsRoutes = new Hono<AppEnv>()
             // but it has to persist or the next colour change silently discards it.
             neutral: z.enum(["brand", "gray", "cool", "warm"]).nullish(),
             defaultMode: z.enum(["dark", "light"]).nullish(),
+            // Section-colour chrome. Studio-wide, not per device: it decides how
+            // the studio LOOKS, so every member sees the same app.
+            tintedNav: z.boolean().nullish(),
+            ambient: z.boolean().nullish(),
             logoUrl: z.string().max(500).nullish(),
             iconUrl: z.string().max(500).nullish(),
             aiAvatarUrl: z.string().max(500).nullish(),

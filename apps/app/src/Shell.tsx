@@ -96,7 +96,10 @@ export function Shell() {
       <Route path="/settings" element={<SettingsRoute view="studio" />} />
       <Route path="/profile" element={<SettingsRoute view="profile" />} />
       <Route path="/preferences" element={<SettingsRoute view="preferences" />} />
-      <Route path="/appearance" element={<SettingsRoute view="appearance" />} />
+      {/* The personal Appearance page is gone — its two studio-wide toggles moved
+          into Studio → Branding and dark mode lives in the account menu. The path
+          stays so old bookmarks and links land somewhere sensible. */}
+      <Route path="/appearance" element={<SettingsRoute view="preferences" />} />
       <Route path="/notification-settings" element={<SettingsRoute view="notifications" />} />
       <Route path="/passkeys" element={<SettingsRoute view="passkeys" />} />
       <Route path="/inbox" element={<InboxRoute />} />

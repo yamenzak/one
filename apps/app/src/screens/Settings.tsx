@@ -77,12 +77,11 @@ function LoadError({ label, error, onRetry }: { label: string; error?: string | 
 /** Personal + studio surfaces are now reached as SEPARATE destinations from the
  *  avatar dropdown — `view` selects which one this route renders. `studio` is the
  *  owner-only studio-config surface; the rest are personal-to-the-user. */
-export type SettingsView = "profile" | "preferences" | "appearance" | "notifications" | "passkeys" | "studio";
+export type SettingsView = "profile" | "preferences" | "notifications" | "passkeys" | "studio";
 
 const VIEW_TITLE: Record<SettingsView, string> = {
   profile: "Profile",
   preferences: "Preferences",
-  appearance: "Appearance & units",
   notifications: "Notifications",
   passkeys: "Passkeys & security",
   studio: "Studio settings",
@@ -116,9 +115,7 @@ export function Settings({ onBack, view = "studio" }: { onBack: () => void; view
       case "preferences":
         return <PersonalSettings clientId={clientId} onSaved={() => void refresh()} />;
       // Kept as its own route for deep links and back-compat; the menu now goes
-      // to Preferences, which carries these as tabs.
-      case "appearance":
-        return <PersonalSettings clientId={clientId} initialTab="appearance" onSaved={() => void refresh()} />;
+      // to Preferences, which carries this as a tab.
       case "notifications":
         return <PersonalSettings clientId={clientId} initialTab="notifications" onSaved={() => void refresh()} />;
       case "passkeys":
@@ -158,7 +155,7 @@ export function Settings({ onBack, view = "studio" }: { onBack: () => void; view
  * The old routes still resolve (deep links, and anything already bookmarked) —
  * they just open this page on the matching tab.
  */
-type PersonalTab = "preferences" | "notifications" | "appearance" | "units";
+type PersonalTab = "preferences" | "notifications" | "units";
 
 function PersonalSettings({ clientId, initialTab = "preferences", onSaved }: {
   clientId: string | null;
@@ -168,7 +165,6 @@ function PersonalSettings({ clientId, initialTab = "preferences", onSaved }: {
   const tabs: { value: PersonalTab; label: string; intro: string }[] = [
     { value: "preferences", label: "Preferences", intro: "What your coach plans around — your goal, your training, what to avoid." },
     { value: "notifications", label: "Notifications", intro: "What you want to hear about, and where it reaches you." },
-    { value: "appearance", label: "Appearance", intro: "How Mossa looks on this device." },
     { value: "units", label: "Units", intro: "Whether weights, heights and volumes read metric or imperial." },
   ];
   const [tab, setTab] = useState<PersonalTab>(initialTab);
@@ -185,7 +181,6 @@ function PersonalSettings({ clientId, initialTab = "preferences", onSaved }: {
           ? <PreferencesSection clientId={clientId} onSaved={onSaved} />
           : <Stagger><Card className="text-sm text-muted-foreground">Training &amp; nutrition preferences appear here once you're set up as a client.</Card></Stagger>)}
         {tab === "notifications" && <NotificationsSection />}
-        {tab === "appearance" && <AppearanceSection />}
         {tab === "units" && <UnitsSection />}
       </motion.div>
     </div>
@@ -514,20 +509,11 @@ function SecuritySection() {
   );
 }
 
-/** Personalization — theme, tinted nav, ambient wash. All device-local to you. */
-function AppearanceSection() {
-  const { mode, toggleMode, tintedNav, setTintedNav, ambient, setAmbient } = useTheme();
-  return (
-    <section>
-      <SectionHead title="Appearance" icon={Moon} />
-      <Card className="divide-y divide-border/50 p-0">
-        <ToggleRow icon={mode === "dark" ? Moon : Sun} title="Dark mode" desc="Switch the whole app between light and dark." checked={mode === "dark"} onChange={() => toggleMode()} />
-        <ToggleRow icon={Palette} title="Colorful tab bar" desc="Tint the active tab by section — Train green, Eat amber, and so on." checked={tintedNav} onChange={setTintedNav} />
-        <ToggleRow icon={Sparkles} title="Ambient page color" desc="Wash each page's hero in its section's color, fading into the background." checked={ambient} onChange={setAmbient} />
-      </Card>
-    </section>
-  );
-}
+// The personal "Appearance" tab is gone. It held three toggles; two of them
+// (tinted nav, ambient wash) turned out to be studio decisions rather than
+// personal ones and moved into Studio → Branding, and the third — dark mode —
+// is one tap away in the account menu in the app bar. What was left was a tab
+// containing a control that already exists somewhere better.
 
 function ToggleRow({ icon: Icon, title, desc, checked, onChange }: { icon: LucideIcon; title: string; desc: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -1427,6 +1413,10 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   // one); a single custom colour applies to BOTH modes, so it is opt-in.
   const [borderColor, setBorderColor] = useState<string>(initial?.borderColor ?? "");
   const [borderWidth, setBorderWidth] = useState<number>(initial?.borderWidth ?? 1);
+  // Both default ON, matching what the old per-device toggles defaulted to, so a
+  // studio that never touches them looks exactly as it did before the move.
+  const [tintedNav, setTintedNav] = useState<boolean>(initial?.tintedNav ?? true);
+  const [ambient, setAmbient] = useState<boolean>(initial?.ambient ?? true);
   const [logoUrl, setLogoUrl] = useState<string | null>(initial?.logoUrl ?? null);
   const [iconUrl, setIconUrl] = useState<string | null>(initial?.iconUrl ?? null);
   const [aiAvatarUrl, setAiAvatarUrl] = useState<string | null>(initial?.aiAvatarUrl ?? null);
@@ -1478,7 +1468,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   const save = async () => {
     setSaving(true);
     // Tokens carry everything now — null out legacy preset/primary fields.
-    try { await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, borderWidth, neutral, logoUrl, iconUrl, aiAvatarUrl, aiName: aiName.trim() || null, preset: null, primary: null, primaryForeground: null } }); onSaved(); setMsg("Branding saved."); }
+    try { await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, borderWidth, neutral, tintedNav, ambient, logoUrl, iconUrl, aiAvatarUrl, aiName: aiName.trim() || null, preset: null, primary: null, primaryForeground: null } }); onSaved(); setMsg("Branding saved."); }
     finally { setSaving(false); }
   };
 
@@ -1637,6 +1627,26 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
           </p>
         </div>
         )}
+
+        {/* Section colour. These two used to be per-device toggles in a personal
+            "Appearance" tab, which meant two clients of the same studio could see
+            differently-coloured chrome — and a studio that had deliberately dialled
+            its palette down to two greys got a rainbow tab bar back on whatever
+            phone happened to have it stored. They describe how the STUDIO looks,
+            so they belong to branding. */}
+        <div className="space-y-1.5">
+          <span className="text-sm text-muted-foreground">Section colour</span>
+          <div className="overflow-hidden rounded-2xl border border-border/60 bg-card">
+            <ToggleRow icon={Palette} title="Colorful tab bar" desc="Tint the active tab by section — Train green, Eat amber, and so on." checked={tintedNav} onChange={setTintedNav} />
+            <div className="border-t border-border/50" />
+            <ToggleRow icon={Sparkles} title="Ambient page colour" desc="Wash each page's hero in its section's colour, fading into the background." checked={ambient} onChange={setAmbient} />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {tintedNav || ambient
+              ? "Applies to everyone in the studio — clients and staff alike."
+              : "Off: every section wears the brand colour instead of its own."}
+          </p>
+        </div>
 
         {/* Advanced */}
         <button onClick={() => setAdvanced((a) => !a)} className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground">

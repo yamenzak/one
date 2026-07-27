@@ -61,6 +61,21 @@ export interface Branding {
   borderColor?: string | null;
   /** Tenant's default mode; the user can still toggle. */
   defaultMode?: ThemeMode | null;
+  /**
+   * Tint the active nav tab by its section's domain token (Train green, Eat
+   * amber…). Defaults on.
+   *
+   * Like `neutral`, NOT a runtime token — no `--var` carries it; the Shell reads
+   * it and passes `tinted` to the nav. It lives in branding rather than in a
+   * per-device preference because it is a decision about how the STUDIO looks:
+   * two clients of the same studio should not see differently-coloured chrome,
+   * and a studio that has dialled its palette down to two greys does not want a
+   * rainbow tab bar reintroduced by whatever each phone happened to store.
+   */
+  tintedNav?: boolean | null;
+  /** Wash each page's hero in its section's domain token. Studio-wide for the
+   *  same reason as `tintedNav`. Defaults on. */
+  ambient?: boolean | null;
   /** Wide wordmark/logo (app bar). */
   logoUrl?: string | null;
   /** Square app icon/mark (nav rail, favicon). */

@@ -10,13 +10,18 @@ import type { SessionContext, TenantBranding } from "@mossa/protocol";
 import { api, isOffline, setUnauthorizedHandler } from "./api.js";
 
 /**
- * Display preferences that are NOT identifying and carry no account data —
- * chosen theme, tinted nav, ambient background. Sign-out used to wipe every
- * `mossa`-prefixed key, so a light-theme user signed back in to a dark app and
- * had to re-set their preferences every time. Anything that could leak between
- * accounts (session cache, mode, per-plan shopping lists) must stay OUT of here.
+ * Display preferences that are NOT identifying and carry no account data — just
+ * the chosen light/dark theme. Sign-out used to wipe every `mossa`-prefixed key,
+ * so a light-theme user signed back in to a dark app and had to re-set it every
+ * time. Anything that could leak between accounts (session cache, per-plan
+ * shopping lists) must stay OUT of here.
+ *
+ * The tinted nav and ambient wash used to be listed here too. They now live in
+ * the tenant's branding rather than on the device, so there is nothing local to
+ * preserve — and leaving the dead keys behind would have quietly restored one
+ * studio's chrome after signing into another.
  */
-const KEEP_ON_SIGN_OUT = new Set(["mossa-theme", "mossa:tintedNav", "mossa:ambient"]);
+const KEEP_ON_SIGN_OUT = new Set(["mossa-theme"]);
 
 /** Remove the app's own localStorage keys (mode, cached session, per-plan
  *  shopping lists) — all `mossa`-prefixed — so nothing leaks across accounts. */

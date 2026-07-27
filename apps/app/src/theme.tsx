@@ -13,24 +13,14 @@ interface ThemeCtx {
   toggleMode: () => void;
   /** Live-preview a branding (no persistence) — for the editor. */
   preview: (b: Branding | null) => void;
-  /** Tint the active nav tab by its section's domain token (persisted). */
+  /** Tint the active nav tab by its section's domain token. From the STUDIO's
+   *  branding — read-only here; the owner sets it in Studio → Branding. */
   tintedNav: boolean;
-  setTintedNav: (v: boolean) => void;
-  /** Wash each page's hero area in its section's domain token (persisted). */
+  /** Wash each page's hero area in its section's domain token. Studio branding. */
   ambient: boolean;
-  setAmbient: (v: boolean) => void;
 }
 
 const Ctx = createContext<ThemeCtx | null>(null);
-
-const TINTED_NAV_KEY = "mossa:tintedNav";
-const AMBIENT_KEY = "mossa:ambient";
-const readBool = (key: string, dflt: boolean): boolean => {
-  if (typeof localStorage === "undefined") return dflt;
-  const v = localStorage.getItem(key);
-  return v === null ? dflt : v !== "0";
-};
-const writeBool = (key: string, v: boolean) => { try { localStorage.setItem(key, v ? "1" : "0"); } catch { /* private mode */ } };
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const { ctx, host } = useSession();
@@ -96,15 +86,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyMode(mode);
   }, [mode]);
 
-  const [tintedNav, setTintedNavState] = useState<boolean>(() => readBool(TINTED_NAV_KEY, true));
-  const setTintedNav = useCallback((v: boolean) => { setTintedNavState(v); writeBool(TINTED_NAV_KEY, v); }, []);
-  const [ambient, setAmbientState] = useState<boolean>(() => readBool(AMBIENT_KEY, true));
-  const setAmbient = useCallback((v: boolean) => { setAmbientState(v); writeBool(AMBIENT_KEY, v); }, []);
+  // Studio-wide, straight off the tenant's branding. Both default ON, so a studio
+  // that has never touched them looks exactly as it did when these were device
+  // preferences — only now every member sees the same thing.
+  const tintedNav = branding?.tintedNav ?? true;
+  const ambient = branding?.ambient ?? true;
 
   const toggleMode = useCallback(() => { userChoseMode.current = true; setMode((m) => (m === "dark" ? "light" : "dark")); }, []);
   const preview = useCallback((b: Branding | null) => applyBranding(b ?? branding), [branding]);
 
-  const value = useMemo(() => ({ mode, toggleMode, preview, tintedNav, setTintedNav, ambient, setAmbient }), [mode, toggleMode, preview, tintedNav, setTintedNav, ambient, setAmbient]);
+  const value = useMemo(() => ({ mode, toggleMode, preview, tintedNav, ambient }), [mode, toggleMode, preview, tintedNav, ambient]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
