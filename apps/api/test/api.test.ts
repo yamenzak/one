@@ -4014,3 +4014,57 @@ describe("the platform exercise seed re-seeds after a wipe", () => {
     expect(await seedCount()).toBe(seeded);
   });
 });
+
+/**
+ * The nuclear reset must not cost you your credentials.
+ *
+ * It wipes every tenant, user and byte — that is the point. But platform
+ * CONFIGURATION is not tenant data: Stripe secret/publishable keys and both
+ * webhook secrets, the Gemini key, the credit markup, the email provider, and
+ * the catalogs whose rows carry `stripe_product_id` / `stripe_price_id`. Losing
+ * those means re-issuing keys at Stripe and re-pointing webhooks by hand, with
+ * no way back, for something that was never anyone's tenant data.
+ *
+ * `purgeEverything` already leaves them alone — this pins it, because the failure
+ * mode is silent and only shows up when someone has already pressed the button.
+ */
+describe("a nuclear reset keeps platform configuration", () => {
+  it("preserves API credentials and the Stripe-linked catalogs", async () => {
+    const db = env.DB as D1Database;
+    const { purgeEverything } = await import("../src/purge.js");
+
+    // Everything an operator would hate to re-enter.
+    const secrets: [string, string][] = [
+      ["stripe.test.secret_key", "sk_test_sentinel"],
+      ["stripe.test.publishable_key", "pk_test_sentinel"],
+      ["stripe.test.webhook_secret", "whsec_sentinel"],
+      ["stripe.test.connect_webhook_secret", "whsec_connect_sentinel"],
+      ["stripe.mode", "test"],
+      ["google.gemini_key", "gemini_sentinel"],
+      ["ai.markup", "4"],
+      ["email.provider", "brevo"],
+    ];
+    for (const [k, v] of secrets) {
+      await db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v).run();
+    }
+    // The catalogs hold the Stripe product/price links created during setup.
+    await db.prepare("INSERT OR REPLACE INTO plans (id, name, price_usd_month, entitlements_json, stripe_product_id, stripe_price_id, ord, active) VALUES ('nuke_plan', 'Nuke', 9, '{}', 'prod_sentinel', 'price_sentinel', 1, 1)").run();
+    await db.prepare("INSERT OR REPLACE INTO credit_packs (id, name, credits, price_usd, stripe_product_id, stripe_price_id, ord, active) VALUES ('nuke_pack', 'Nuke', 100, 5, 'prod_pack_sentinel', 'price_pack_sentinel', 1, 1)").run();
+
+    await purgeEverything(env as never);
+
+    // The credentials survived, byte for byte.
+    for (const [k, v] of secrets) {
+      const row = await db.prepare("SELECT value FROM app_config WHERE key = ?").bind(k).first<{ value: string }>();
+      expect(row?.value, `${k} was wiped by the reset`).toBe(v);
+    }
+    // …and so did the rows that point at Stripe objects.
+    expect((await db.prepare("SELECT stripe_price_id FROM plans WHERE id = 'nuke_plan'").first<{ stripe_price_id: string }>())?.stripe_price_id).toBe("price_sentinel");
+    expect((await db.prepare("SELECT stripe_price_id FROM credit_packs WHERE id = 'nuke_pack'").first<{ stripe_price_id: string }>())?.stripe_price_id).toBe("price_pack_sentinel");
+
+    // Sanity: the reset DID do its job, or the assertions above are vacuous.
+    expect((await db.prepare('SELECT COUNT(*) AS n FROM "organization"').first<{ n: number }>())?.n).toBe(0);
+    expect((await db.prepare('SELECT COUNT(*) AS n FROM "user"').first<{ n: number }>())?.n).toBe(0);
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM clients").first<{ n: number }>())?.n).toBe(0);
+  });
+});
