@@ -70,6 +70,9 @@ export const settingsRoutes = new Hono<AppEnv>()
             shadow: z.enum(["none", "subtle", "soft", "dramatic"]).nullish(),
             borderColor: z.string().max(120).nullish(),
             borderWidth: z.number().min(0).max(4).nullish(),
+            // Surface tint. Only a generator input — the tokens carry the effect —
+            // but it has to persist or the next colour change silently discards it.
+            neutral: z.enum(["brand", "gray", "cool", "warm"]).nullish(),
             defaultMode: z.enum(["dark", "light"]).nullish(),
             logoUrl: z.string().max(500).nullish(),
             iconUrl: z.string().max(500).nullish(),

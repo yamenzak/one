@@ -1333,7 +1333,12 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   const { ctx } = useSession();
   const [tokens, setTokens] = useState<BrandTokens>(() => (initial?.tokens && hasTokens(initial.tokens) ? initial.tokens : deriveTokens({ primary: seedFrom(initial) })));
   const [seed, setSeed] = useState<string>(seedFrom(initial));
-  const [neutral, setNeutral] = useState<NeutralTint>("brand");
+  // Seeded from what was saved, not hardcoded. Two things broke when it was not:
+  // the chip always read "Brand" on a reload however the app actually looked, and
+  // — worse — `generate(color)` passes this value through, so nudging the brand
+  // colour silently regenerated the palette with the stale default and threw the
+  // studio's tint away with no indication.
+  const [neutral, setNeutral] = useState<NeutralTint>(initial?.neutral ?? "brand");
   const [radius, setRadius] = useState(initial?.radius ?? 0.95);
   const [shadow, setShadow] = useState<ShadowPreset>(initial?.shadow ?? "soft");
   // Hairline colour. Empty = the shipped per-mode default, which is the right
@@ -1392,7 +1397,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   const save = async () => {
     setSaving(true);
     // Tokens carry everything now — null out legacy preset/primary fields.
-    try { await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, borderWidth, logoUrl, iconUrl, aiAvatarUrl, aiName: aiName.trim() || null, preset: null, primary: null, primaryForeground: null } }); onSaved(); setMsg("Branding saved."); }
+    try { await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, borderWidth, neutral, logoUrl, iconUrl, aiAvatarUrl, aiName: aiName.trim() || null, preset: null, primary: null, primaryForeground: null } }); onSaved(); setMsg("Branding saved."); }
     finally { setSaving(false); }
   };
 

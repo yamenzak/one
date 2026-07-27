@@ -46,6 +46,16 @@ export interface Branding {
   shadow?: ShadowPreset | null;
   /** Hairline weight in px (`--border-width`). 0 removes every border app-wide. */
   borderWidth?: number | null;
+  /**
+   * Which way the neutral surfaces are tinted.
+   *
+   * NOT a runtime token — `applyBranding` ignores it, because the tint is already
+   * baked into the `tokens` it generated. It is stored so the editor can show
+   * which tint is in force, and so REGENERATING from a new brand colour keeps it.
+   * Without it, `deriveTokens` silently fell back to "brand" on the next colour
+   * change and threw the studio's choice away.
+   */
+  neutral?: NeutralTint | null;
   /** Hairline colour (`--border` + `--input`). Applied to BOTH modes; the
    *  advanced token editor can still set a different one per mode. */
   borderColor?: string | null;
@@ -215,9 +225,17 @@ function cssBlock(vars: Record<string, string>): string {
   return Object.entries(vars).map(([k, v]) => `${k}:${v};`).join("");
 }
 
-/** Apply a tenant's branding by injecting/refreshing the branding stylesheet. */
-export function applyBranding(branding: Branding | null | undefined): void {
-  if (typeof document === "undefined") return;
+/**
+ * The stylesheet a branding produces — pure, so it can be tested.
+ *
+ * Split out of `applyBranding` because ALL the judgement lives here: which
+ * tokens get written, how the elevation preset expands, and the clamping that
+ * keeps a bad number out of the page's CSS. `applyBranding` is then a two-line
+ * DOM write with nothing left to get wrong. Without the split, none of it was
+ * reachable from a test — the UI package has no DOM environment, and adding one
+ * to test string concatenation would be the wrong trade.
+ */
+export function brandingCss(branding: Branding | null | undefined): string {
   const preset = presetById(branding?.preset);
   const primary = branding?.primary || preset?.primary;
   // Always guarantee a readable on-primary color: if the tenant set a primary but
@@ -261,13 +279,15 @@ export function applyBranding(branding: Branding | null | undefined): void {
   if (branding?.borderWidth != null && Number.isFinite(branding.borderWidth)) {
     rootExtra += `--border-width:${Math.max(0, Math.min(4, branding.borderWidth))}px;`;
   }
-  const css =
-    `:root{${rootExtra}${cssBlock(dark)}}` +
-    `:root[data-theme="light"]{${cssBlock(light)}}`;
+  return `:root{${rootExtra}${cssBlock(dark)}}` + `:root[data-theme="light"]{${cssBlock(light)}}`;
+}
 
+/** Apply a tenant's branding by injecting/refreshing the branding stylesheet. */
+export function applyBranding(branding: Branding | null | undefined): void {
+  if (typeof document === "undefined") return;
   let el = document.getElementById("mossa-branding") as HTMLStyleElement | null;
   if (!el) { el = document.createElement("style"); el.id = "mossa-branding"; document.head.appendChild(el); }
-  el.textContent = css;
+  el.textContent = brandingCss(branding);
 }
 
 /** Read the user's mode preference (falls back to tenant default, else dark). */

@@ -3837,15 +3837,21 @@ describe("branding persists every appearance control", () => {
       shadow: "dramatic" as const,
       borderColor: "#3a3a42",
       borderWidth: 0,
+      // The surface tint. Only a generator input — the tokens carry the visual
+      // effect — but it MUST persist: the editor passes it straight back into
+      // `deriveTokens` on the next colour change, so losing it silently reverted
+      // a studio's tint to "brand" the moment they nudged their brand colour.
+      neutral: "warm" as const,
       tokens: { dark: { "--primary": "oklch(0.62 0.19 262)" }, light: { "--primary": "oklch(0.55 0.19 262)" } },
     };
     const put = await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ branding: sent }) });
     expect(put.status).toBe(200);
 
     const back = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as {
-      branding: { radius?: number; shadow?: string; borderColor?: string; borderWidth?: number; tokens?: { dark?: Record<string, string> } };
+      branding: { radius?: number; shadow?: string; borderColor?: string; borderWidth?: number; neutral?: string; tokens?: { dark?: Record<string, string> } };
     };
     expect(back.branding.radius).toBe(0.55);
+    expect(back.branding.neutral).toBe("warm");
     expect(back.branding.shadow).toBe("dramatic");
     expect(back.branding.borderColor).toBe("#3a3a42");
     // 0 is the interesting one: "no borders at all" must survive every
@@ -3868,14 +3874,14 @@ describe("branding persists every appearance control", () => {
     const after = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as {
       branding: { radius?: number; shadow?: string; borderWidth?: number };
     };
-    expect(after.branding).toMatchObject({ radius: 1.2, shadow: "dramatic", borderWidth: 0 });
+    expect(after.branding).toMatchObject({ radius: 1.2, shadow: "dramatic", borderWidth: 0, neutral: "warm" });
   });
 
   it("refuses a border weight or elevation the stylesheet could not survive", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     // These land in a <style> block, so the schema is the only thing between a
     // bad value and broken CSS on every page.
-    for (const bad of [{ borderWidth: -1 }, { borderWidth: 99 }, { shadow: "sparkly" }, { radius: 12 }]) {
+    for (const bad of [{ borderWidth: -1 }, { borderWidth: 99 }, { shadow: "sparkly" }, { radius: 12 }, { neutral: "chartreuse" }]) {
       const res = await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ branding: bad }) });
       expect(res.status, JSON.stringify(bad)).toBe(400);
     }
