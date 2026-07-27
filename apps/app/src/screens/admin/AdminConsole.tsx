@@ -22,7 +22,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AlertTriangle, ArrowLeft, Badge, Building2, Button, Callout, Card, ChevronRight, Chip, CircleAlert, CircleCheck,
-  ConfirmDialog, CreditCard, EmptyState, Eyebrow, Field, Gift, GlanceStrip, Globe, IconBadge, Info, Input, KeyRound,
+  ConfirmDialog, CreditCard, EmptyState, Eyebrow, Field, Gift, GlanceStrip, Globe, IconBadge, Info, Input, KeyRound, ThumbsUp,
   Dumbbell, LayoutGrid, Page, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, Sheet, ShieldCheck,
   Skeleton, SkeletonLine, Play, Plug, Spinner, Stagger, Switch, Tag, Trash2, Wallet, cn, toneText, type Tone,
   ActionResult, ConfigRow, Group, LoadError, TabIntro, useLoad, useAction as useActionBase,
@@ -1095,10 +1095,58 @@ function AiConfig() {
           </Reveal>
         )}
 
+        {/* ── The 👍/👎 signal ──────────────────────────────────────────── */}
+        <AiFeedbackPanel />
+
         {/* ── Live self-test ────────────────────────────────────────────── */}
         <AiSelfTest models={models.data ?? []} />
       </Stagger>
     </>
+  );
+}
+
+interface FeedbackRow { type: string; up: number; down: number; total: number; lastAt: number; helpfulPct: number | null }
+
+/**
+ * What clients actually thought of the AI's output.
+ *
+ * The 👍/👎 under a coach note posts to `insight_feedback`, and until now
+ * nothing read that table — the votes were collected and discarded. This is the
+ * read side. It is deliberately plain: per insight type, how many votes and what
+ * share were positive, so a type that clients consistently dislike is visible
+ * rather than buried in D1.
+ */
+function AiFeedbackPanel() {
+  const fb = useAdminLoad(() => api.get<{ types: FeedbackRow[]; totalVotes: number }>("/api/admin/ai/feedback"), "AI feedback");
+  return (
+    <Card className="space-y-4">
+      <SectionHeader icon={ThumbsUp} title="Client feedback" count={fb.data ? fb.data.totalVotes : undefined} />
+      <p className="text-sm text-muted-foreground">
+        The 👍/👎 clients leave under an AI insight, by type. A low helpful rate is the signal to revisit that
+        feature&rsquo;s prompt or model.
+      </p>
+      <Reveal loading={fb.loading} skeleton={<SkeletonLine w="60%" h="text" />}>
+        {fb.error ? (
+          <p className="text-sm text-warning">Couldn&rsquo;t load feedback.</p>
+        ) : !fb.data?.types.length ? (
+          <EmptyState icon={ThumbsUp} title="No votes yet" description="Nothing has been rated. The thumbs appear under coach notes on a client's screens." />
+        ) : (
+          <div className="divide-y divide-border/50">
+            {fb.data.types.map((t) => (
+              <div key={t.type} className="flex items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">{t.type}</div>
+                  <div className="text-xs text-muted-foreground">{t.up} helpful · {t.down} not · last {new Date(t.lastAt).toLocaleDateString()}</div>
+                </div>
+                {t.helpfulPct != null && (
+                  <Badge tone={t.helpfulPct >= 70 ? "success" : t.helpfulPct >= 40 ? "warning" : "danger"}>{t.helpfulPct}% helpful</Badge>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Reveal>
+    </Card>
   );
 }
 

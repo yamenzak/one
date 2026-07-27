@@ -791,6 +791,34 @@ describe("capability gates enforce plan features + quotas", () => {
   });
 });
 
+describe("the 👍/👎 signal is readable, not just writable", () => {
+  it("votes aggregate per insight type, with a helpful rate", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const vote = (insightType: string, v: 1 | -1) =>
+      SELF.fetch("http://x/api/ai/feedback", { method: "POST", headers: H, body: JSON.stringify({ insightType, insightRef: "r1", vote: v }) });
+    const read = async () => (await (await SELF.fetch("http://x/api/admin/ai/feedback", { headers: auth(ownerCookie) })).json()) as {
+      types: { type: string; up: number; down: number; total: number; helpfulPct: number | null }[]; totalVotes: number;
+    };
+
+    // `insight_feedback` was write-only — the POST inserted and nothing ever
+    // selected, so every vote a client cast was discarded. Asking "Helpful?" and
+    // throwing the answer away is worse than not asking.
+    await vote("coach-note", 1);
+    await vote("coach-note", 1);
+    await vote("coach-note", -1);
+    await vote("weekly-recap", -1);
+
+    const r = await read();
+    expect(r.totalVotes).toBe(4);
+    const note = r.types.find((t) => t.type === "coach-note")!;
+    expect(note).toMatchObject({ up: 2, down: 1, total: 3 });
+    expect(note.helpfulPct).toBe(67); // 2/3 rounded
+    expect(r.types.find((t) => t.type === "weekly-recap")!.helpfulPct).toBe(0);
+    // A 0% helpful rate and "nobody voted" must not look identical.
+    expect(r.types.every((t) => t.total > 0 && t.helpfulPct !== null)).toBe(true);
+  });
+});
+
 describe("AI model catalog + markup (platform admin)", () => {
   it("sets a global markup applied to every model, and toggles models", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };

@@ -13,6 +13,12 @@ import { ThumbsUp, ThumbsDown, Check, cn } from "@mossa/ui";
 
 const MUTE_PREFIX = "mossa:insight-muted:";
 
+/** Human labels for the mutable insight types, for the un-mute list. A type with
+ *  no entry still un-mutes; it just shows its raw key. */
+export const INSIGHT_LABELS: Record<string, string> = {
+  "coach-note": "Coach notes on your screens",
+};
+
 /** Has this device muted this insight type? Hosts check before rendering. */
 export function isInsightMuted(type: string): boolean {
   try {
@@ -22,11 +28,39 @@ export function isInsightMuted(type: string): boolean {
   }
 }
 
+/**
+ * Every insight type this device has muted.
+ *
+ * "Mute these" used to be a ONE-WAY DOOR: it wrote the flag and nothing could
+ * read the set back, so there was no screen that could offer to undo it. The
+ * only route to un-muting was signing out, which clears the app's localStorage
+ * — undiscoverable, and it meant the setting silently didn't survive a sign-out
+ * either. Preferences → Coach notes lists these and turns them back on.
+ */
+export function mutedInsights(): string[] {
+  try {
+    return Object.keys(localStorage)
+      .filter((k) => k.startsWith(MUTE_PREFIX) && localStorage.getItem(k) === "1")
+      .map((k) => k.slice(MUTE_PREFIX.length));
+  } catch {
+    return [];
+  }
+}
+
 function persistMuted(type: string): void {
   try {
     localStorage.setItem(MUTE_PREFIX + type, "1");
   } catch {
     /* private mode / storage disabled — mute is best-effort */
+  }
+}
+
+/** Turn an insight type back on for this device. */
+export function unmuteInsight(type: string): void {
+  try {
+    localStorage.removeItem(MUTE_PREFIX + type);
+  } catch {
+    /* private mode / storage disabled */
   }
 }
 

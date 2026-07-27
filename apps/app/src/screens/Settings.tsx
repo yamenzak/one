@@ -8,7 +8,7 @@ import { motion } from "motion/react";
 import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger, ConfirmDialog,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
-  KeyRound, Moon, Sun, LogOut, Palette, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
+  KeyRound, Moon, Sun, LogOut, Palette, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
   ActionResult, ConfigRow, TabIntro, cn, toneText, personaLabel, personaTone, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon,
 } from "@mossa/ui";
 import type { LoginBranding, TenantBranding } from "@mossa/protocol";
@@ -16,6 +16,7 @@ import { resolveUnits, cmToFeetInches, feetInchesToCm, STUDIO_SETTINGS_SECTIONS,
 import { useUnits } from "../units.js";
 import { useSession } from "../session.js";
 import { PreferencesEditorCard } from "./PreferencesEditor.js";
+import { INSIGHT_LABELS, mutedInsights, unmuteInsight } from "./client/InsightFeedback.js";
 import { useTheme } from "../theme.js";
 import { api, errorText, uploadMedia } from "../api.js";
 import { enrollPasskey, listPasskeys, removePasskey, passkeySupported, passkeyErrorMessage, deviceLabel } from "../passkey.js";
@@ -178,7 +179,7 @@ function PersonalSettings({ clientId, initialTab = "preferences", onSaved }: {
       <motion.div key={tab} variants={stagger} initial="hidden" animate="show" className="space-y-6">
         <Stagger><TabIntro>{active.intro}</TabIntro></Stagger>
         {tab === "preferences" && (clientId
-          ? <PreferencesSection clientId={clientId} onSaved={onSaved} />
+          ? <><PreferencesSection clientId={clientId} onSaved={onSaved} /><MutedInsightsSection /></>
           : <Stagger><Card className="text-sm text-muted-foreground">Training &amp; nutrition preferences appear here once you're set up as a client.</Card></Stagger>)}
         {tab === "notifications" && <NotificationsSection />}
         {tab === "units" && <UnitsSection />}
@@ -506,6 +507,40 @@ function SecuritySection() {
         onConfirm={() => { if (toRemove) void remove(toRemove.id); }}
       />
     </section>
+  );
+}
+
+/**
+ * Insight types this device has muted, with a way back.
+ *
+ * "Mute these" under a coach note was a one-way door — it wrote a localStorage
+ * flag and nothing could read the set back, so no screen could offer to undo
+ * it. The only route to un-muting was signing out (which clears the app's
+ * storage): undiscoverable, and it meant the choice silently didn't survive a
+ * sign-out either. This renders nothing at all when nothing is muted, so it
+ * costs a reader nothing until it has something to say.
+ */
+function MutedInsightsSection() {
+  const [muted, setMuted] = useState<string[]>(() => mutedInsights());
+  if (!muted.length) return null;
+  const unmute = (t: string) => { unmuteInsight(t); setMuted((m) => m.filter((x) => x !== t)); };
+  return (
+    <Stagger>
+      <section>
+        <SectionHead title="Muted on this device" icon={BellOff} />
+        <Card className="divide-y divide-border/50 p-0">
+          {muted.map((t) => (
+            <div key={t} className="flex items-center justify-between gap-3 p-4">
+              <div className="min-w-0">
+                <div className="text-sm font-medium">{INSIGHT_LABELS[t] ?? t}</div>
+                <div className="text-xs text-muted-foreground">Hidden on this device only — your other devices still show them.</div>
+              </div>
+              <Button size="sm" variant="secondary" onClick={() => unmute(t)}>Turn back on</Button>
+            </div>
+          ))}
+        </Card>
+      </section>
+    </Stagger>
   );
 }
 

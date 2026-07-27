@@ -1132,6 +1132,35 @@ export const aiAdminRoutes = new Hono<AppEnv>()
     // Never echo the key — only whether it's set.
     return c.json({ geminiKeySet: !!cfg["google.gemini_key"], mockMode: cfg["ai.mock"] ?? "auto", markup: globalMarkup(cfg), modelCount: models.length });
   })
+  /**
+   * The 👍/👎 signal, aggregated per insight type.
+   *
+   * `insight_feedback` was WRITE-ONLY: the route inserted rows and nothing in
+   * the product ever selected from the table, so every vote a client cast went
+   * somewhere nobody could look. Asking a user "Helpful?" and then discarding
+   * the answer is worse than not asking. This is the read side — the smallest
+   * honest one: counts and a helpful-rate per type, newest activity first.
+   */
+  .get("/admin/ai/feedback", async (c) => {
+    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    const rows = await c.env.DB.prepare(
+      `SELECT insight_type AS type,
+              SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END) AS up,
+              SUM(CASE WHEN vote = -1 THEN 1 ELSE 0 END) AS down,
+              COUNT(*) AS total,
+              MAX(at) AS lastAt
+         FROM insight_feedback
+        GROUP BY insight_type
+        ORDER BY lastAt DESC`,
+    ).all<{ type: string; up: number; down: number; total: number; lastAt: number }>();
+    const types = (rows.results ?? []).map((r) => ({
+      ...r,
+      // Null rather than 0 when there are no votes, so the UI can say "no data"
+      // instead of showing a confident 0% that means "nobody voted".
+      helpfulPct: r.total > 0 ? Math.round((r.up / r.total) * 100) : null,
+    }));
+    return c.json({ types, totalVotes: types.reduce((n, t) => n + t.total, 0) });
+  })
   .post("/admin/ai/config", async (c) => {
     if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
     const d = z
