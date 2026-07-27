@@ -841,7 +841,44 @@ function GiftSheet({ tenantId, name, onClose }: { tenantId: string; name: string
 // ── AI ───────────────────────────────────────────────────────────────────────
 
 interface AiStatus { geminiKeySet: boolean; mockMode: string; markup: number; modelCount: number }
-interface ModelRow { id: string; label: string; provider: string; task: string; input_rate: number | null; output_rate: number | null; unit_rate: number | null; unit_kind: string | null; markup: number | null; enabled: number; is_default: number }
+interface ModelPricing {
+  /** Credits a typical request costs, per lane. */
+  costPerRequest: Record<string, number>;
+  /** Credits per 1M tokens in / out, after markup. */
+  perMillion: { input: number | null; output: number | null };
+  /** Credits per billed unit (one image, 1k chars…), after markup. */
+  perUnit: { credits: number; kind: string } | null;
+}
+interface ModelRow { id: string; label: string; provider: string; task: string; input_rate: number | null; output_rate: number | null; unit_rate: number | null; unit_kind: string | null; markup: number | null; enabled: number; is_default: number; pricing?: ModelPricing }
+
+/** The catalog lanes, in the order an operator thinks about them. A lane only
+ *  renders if the catalog actually has models for it. */
+const TASK_LANES: { task: string; label: string; desc: string }[] = [
+  { task: "text", label: "Text", desc: "Plans, meals, articles, summaries." },
+  { task: "text-small", label: "Text (small)", desc: "Short factual jobs — food and exercise metadata." },
+  { task: "vision", label: "Vision", desc: "Snap-a-Meal, label reader, lab extraction." },
+  { task: "image", label: "Image", desc: "Generated cover, food and exercise images." },
+  { task: "speech", label: "Speech", desc: "Spoken body-scan cues." },
+];
+const laneLabel = (task: string) => TASK_LANES.find((l) => l.task === task)?.label ?? task;
+
+const nf = new Intl.NumberFormat("en-US");
+
+/** A model's price in the currency a studio spends: credits for a typical
+ *  request of its lane. Null when the catalog has no rates for it yet. */
+const requestCost = (m: ModelRow): number | null => {
+  const c = m.pricing?.costPerRequest?.[m.task];
+  return typeof c === "number" && c > 0 ? c : null;
+};
+
+/** The exact credit rate card — per million tokens, or per unit. */
+function creditRateLine(m: ModelRow): string | null {
+  const p = m.pricing;
+  if (!p) return null;
+  if (p.perUnit) return `${nf.format(p.perUnit.credits)} cr / ${p.perUnit.kind === "image" ? "image" : p.perUnit.kind}`;
+  if (p.perMillion.input === null && p.perMillion.output === null) return null;
+  return `${nf.format(p.perMillion.input ?? 0)} / ${nf.format(p.perMillion.output ?? 0)} cr per 1M tok`;
+}
 
 /** Providers are server-side strings; an unknown one renders as itself instead
  *  of being mislabelled as Workers AI. */
@@ -926,6 +963,17 @@ function AiConfig() {
       models.reload();
       return `${m.label}: ${what}`;
     }, `Couldn't update ${m.label}.`);
+
+  /** Make `m` the default for its lane. `enabled: true` rides along on purpose:
+   *  `modelForTask` only ever selects `enabled = 1`, so a disabled default is
+   *  silently ignored and some other model of that lane answers instead — a
+   *  default you set and the engine quietly overrules is worse than none. */
+  const setDefaultModel = (m: ModelRow) =>
+    catalog.run(`lane:${m.task}`, async () => {
+      await api.patch(`/api/admin/ai/models/${encodeURIComponent(m.id)}`, { isDefault: true, enabled: true });
+      models.reload();
+      return `${laneLabel(m.task)} now defaults to ${m.label}.`;
+    }, `Couldn't set the ${laneLabel(m.task)} default.`);
 
   const rate = (m: ModelRow) => (m.unit_kind === "image" ? `${m.unit_rate ?? "?"} n/img` : `${m.input_rate ?? "?"} / ${m.output_rate ?? "?"} n/M`);
   const grouped = (models.data ?? []).reduce<Record<string, ModelRow[]>>((acc, m) => {
@@ -1081,10 +1129,11 @@ function AiConfig() {
               <div className="space-y-3">
                 <ActionResult msg={catalog.msg} err={catalog.err} />
                 {models.error && <Callout tone="warning" icon={AlertTriangle} live="alert">{models.error} Showing the last catalog that loaded.</Callout>}
+                <DefaultModelPicker models={models.data} busy={catalog.busy} onPick={setDefaultModel} />
                 <p className="px-1 text-xs leading-relaxed text-muted-foreground">
-                  The switch decides whether a model can be picked at all; the circle makes it the default for its task
-                  (one default per task). Rates are neurons — <span className="numeral">in / out per million</span>, or per
-                  image — followed by the markup applied.
+                  The switch decides whether a studio can pick a model at all. Prices are what the STUDIO pays:{" "}
+                  <span className="numeral">~n cr</span> is a typical request of that model&apos;s lane, and the second
+                  line is the exact credit rate card. Neurons and the markup that produced them follow, as the cost basis.
                 </p>
                 {Object.entries(grouped).map(([prov, rows]) => (
                   <Card key={prov} className="space-y-1">
@@ -1097,26 +1146,21 @@ function AiConfig() {
                     <div className="divide-y divide-border/40">
                       {rows.map((m) => {
                         const busy = catalog.busy === `model:${m.id}`;
+                        const cost = requestCost(m);
+                        const rateLine = creditRateLine(m);
                         return (
-                          <div key={m.id} className="flex items-center gap-2 py-1.5">
-                            <button
-                              type="button"
-                              disabled={busy || m.is_default === 1}
-                              onClick={() => void patchModel(m, { isDefault: true }, `now the default for ${m.task}`)}
-                              aria-pressed={m.is_default === 1}
-                              aria-label={m.is_default === 1 ? `${m.label} is the default for ${m.task}` : `Make ${m.label} the default for ${m.task}`}
-                              className="grid size-12 shrink-0 place-items-center rounded-xl transition-colors hover:bg-secondary disabled:hover:bg-transparent"
-                            >
-                              {m.is_default === 1
-                                ? <CircleCheck className="size-5 text-primary" aria-hidden />
-                                : <span aria-hidden className="size-5 rounded-full border border-border" />}
-                            </button>
+                          <div key={m.id} className="flex items-center gap-2.5 py-2">
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-1.5">
                                 <span className="min-w-0 truncate text-sm font-medium">{m.label}</span>
-                                {m.is_default === 1 && <Badge tone="primary">default</Badge>}
+                                {m.is_default === 1 && <Badge tone="primary">default · {laneLabel(m.task)}</Badge>}
                               </div>
-                              <div className="numeral truncate text-xs text-muted-foreground">{m.task} · {rate(m)} · {m.markup ?? "?"}×</div>
+                              <div className="numeral truncate text-xs text-foreground/80">
+                                {m.task}
+                                {cost !== null && <> · <span className="font-semibold">~{nf.format(cost)} cr</span> per request</>}
+                                {rateLine && <> · {rateLine}</>}
+                              </div>
+                              <div className="numeral truncate text-xs text-muted-foreground">{rate(m)} · {m.markup ?? "?"}×</div>
                             </div>
                             {busy
                               ? <Spinner className="size-4 shrink-0" />
@@ -1141,6 +1185,78 @@ function AiConfig() {
         <AiSelfTest models={models.data ?? []} />
       </Stagger>
     </>
+  );
+}
+
+/**
+ * The default model for each lane, as a straight list of selectors.
+ *
+ * This replaced a radio circle on every catalog row. The circle was accurate
+ * and unreadable: "which model answers a plan draft today?" meant scanning
+ * every provider group for a filled dot, and the answer to "one default per
+ * task" was nowhere on screen. A selector per lane states the question and the
+ * answer in one line — and prices the options while it asks.
+ */
+function DefaultModelPicker({ models, busy, onPick }: { models: ModelRow[]; busy: string | null; onPick: (m: ModelRow) => void }) {
+  const lanes = TASK_LANES.map((lane) => {
+    // Defaults are scoped to a model's OWN task server-side (`UPDATE ai_models
+    // SET is_default = 0 WHERE task = ?`), so only exact-lane models belong here.
+    const options = models.filter((m) => m.task === lane.task);
+    if (!options.length) return null;
+    const current = options.find((m) => m.is_default === 1 && m.enabled === 1)
+      ?? options.find((m) => m.is_default === 1)
+      // What the engine falls back to: first enabled row of the lane.
+      ?? options.find((m) => m.enabled === 1)
+      ?? null;
+    return { lane, options, current, adrift: !options.some((m) => m.is_default === 1 && m.enabled === 1) };
+  }).filter((l): l is NonNullable<typeof l> => !!l);
+  if (!lanes.length) return null;
+
+  return (
+    <Card className="space-y-3">
+      <SectionHeader icon={CircleCheck} title="Default models" />
+      <p className="text-sm text-muted-foreground">
+        What answers each kind of call when a studio hasn&apos;t chosen its own model — which is most of them. Picking
+        one here switches it on too, since the engine only ever serves an enabled model.
+      </p>
+      <div className="space-y-2.5">
+        {lanes.map(({ lane, options, current, adrift }) => (
+          <div key={lane.task} className="space-y-1">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-medium">{lane.label}</div>
+                <div className="truncate text-xs text-muted-foreground">{lane.desc}</div>
+              </div>
+              {busy === `lane:${lane.task}` ? <Spinner className="size-4 shrink-0" /> : (
+                <select
+                  aria-label={`Default model for ${lane.label}`}
+                  value={current?.id ?? ""}
+                  disabled={busy !== null}
+                  onChange={(e) => { const m = options.find((x) => x.id === e.target.value); if (m) onPick(m); }}
+                  className="max-w-[52%] shrink-0 truncate rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none disabled:opacity-60"
+                >
+                  {!current && <option value="">Choose a model…</option>}
+                  {options.map((m) => {
+                    const cost = requestCost(m);
+                    return (
+                      <option key={m.id} value={m.id}>
+                        {m.label}{cost !== null ? ` — ~${nf.format(cost)} cr` : ""}{m.enabled === 1 ? "" : " (off)"}
+                      </option>
+                    );
+                  })}
+                </select>
+              )}
+            </div>
+            {adrift && (
+              <p className="text-xs text-warning">
+                No enabled default — the engine is falling back to{" "}
+                {current ? <b>{current.label}</b> : <>nothing, and this lane will fail</>}. Pick one to pin it.
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 
@@ -1258,7 +1374,7 @@ const FAILURE_LABEL: Record<string, string> = {
   insufficient_credits: "the studio is out of credits",
   transport: "the call never completed (timeout / network)",
   provider: "the provider returned an error",
-  empty: "a 200 with an empty body",
+  empty: "the model answered with nothing (no credits charged)",
   unparseable_json: "the answer was not JSON the product can read",
   schema: "valid JSON, wrong shape for this feature",
 };

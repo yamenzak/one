@@ -17,6 +17,16 @@
   "assets": {
     "directory": "../app/dist",
     "not_found_handling": "single-page-application",
+    // No HTML path rewriting. The default, "auto-trailing-slash", answers
+    // `/index.html` with a 307 to `/` — and a 307 is poison to a service
+    // worker: the navigation fallback fetches the shell on a precache miss, and
+    // a navigation cannot be answered with a redirected response, so every deep
+    // link (/admin, /settings, …) died as ERR_FAILED while `/` kept working.
+    // This app has exactly one HTML file and does its own routing, so there is
+    // nothing for the redirect logic to help with. `/` and every client-side
+    // route still resolve — through `not_found_handling` above, which serves
+    // the shell with a 200 and no redirect.
+    "html_handling": "none",
     "run_worker_first": ["/api/*", "/health", "/manifest.webmanifest"]
   },
 

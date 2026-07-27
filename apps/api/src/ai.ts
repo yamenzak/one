@@ -19,7 +19,7 @@
  * tenant credits for the privilege. See AGENTS §6.
  */
 
-import { creditsForUsage, shouldUseMockLane, type ModelRate, type Usage } from "@mossa/domain";
+import { creditsForUsage, creditsPerMillionTokens, creditsPerUnit, referenceCredits, shouldUseMockLane, REFERENCE_USAGE, type ModelRate, type Usage } from "@mossa/domain";
 import type { TenantAiConfig, AiTone } from "@mossa/protocol";
 import type { Env } from "./env.js";
 import { newId, nowMs } from "./ids.js";
@@ -296,6 +296,26 @@ const rateOf = (m: AiModelRow): ModelRate => ({
   markup: m.markup ?? undefined,
 });
 
+/** What a typical request on `m` costs, in credits, for every lane it could be
+ *  picked for. This is the ONLY cost shape a tenant is given: the neuron rate
+ *  card and the platform markup are the inputs, and they stay on the server. */
+export function modelCostPerRequest(m: AiModelRow): Record<string, number> {
+  const rate = rateOf(m);
+  return Object.fromEntries(Object.keys(REFERENCE_USAGE).map((lane) => [lane, referenceCredits(lane, rate)]));
+}
+
+/** The same model priced for an operator: credits per typical request in each
+ *  lane, plus the exact credit rate card. Admin-only — it still says nothing
+ *  about markup, which the admin reads from its own field. */
+export function modelPricing(m: AiModelRow): {
+  costPerRequest: Record<string, number>;
+  perMillion: { input: number | null; output: number | null };
+  perUnit: { credits: number; kind: string } | null;
+} {
+  const rate = rateOf(m);
+  return { costPerRequest: modelCostPerRequest(m), perMillion: creditsPerMillionTokens(rate), perUnit: creditsPerUnit(rate) };
+}
+
 export interface GenerateInput {
   tenantId: string;
   actorUserId: string;
@@ -426,6 +446,77 @@ async function runGemini(
   };
 }
 
+// ── Workers AI response envelopes ────────────────────────────────────────────
+//
+// The classic text-generation binding answers `{ response: "…" }`, and for
+// years that was the only shape we read. It is no longer the only shape the
+// catalog emits: newer entries (the gemma-4 and gpt-oss families) answer in the
+// OpenAI-compatible `{ choices: [{ message: { content } }] }` envelope, and
+// `content` may itself be an array of typed parts rather than a string.
+// Reading only `response` turned a perfectly good 24-second generation into an
+// empty string — which `generate()` then billed as a success. Read every shape
+// the platform documents, and treat "still nothing" as an error (below).
+
+interface WorkersAiContentPart { type?: string; text?: string }
+interface WorkersAiChoice {
+  message?: { content?: string | WorkersAiContentPart[] | null; reasoning_content?: string | null } | null;
+  text?: string | null;
+}
+interface WorkersAiResult {
+  response?: unknown;
+  choices?: WorkersAiChoice[] | null;
+  output_text?: string | null;
+  output?: { content?: WorkersAiContentPart[] | null }[] | null;
+  usage?: { prompt_tokens?: number; completion_tokens?: number };
+}
+
+function partsToText(parts: WorkersAiContentPart[] | null | undefined): string {
+  return (parts ?? []).map((p) => (typeof p?.text === "string" ? p.text : "")).join("").trim();
+}
+
+/** Pull the assistant's text out of whichever envelope the model used.
+ *  Exported for unit tests — the live provider is not reachable from CI, so the
+ *  documented shapes are the contract this is held to. */
+export function readWorkersAiOutput(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  if (!raw || typeof raw !== "object") return "";
+  const r = raw as WorkersAiResult;
+
+  // 1. Classic text-generation. Under JSON mode some models hand back the
+  //    already-parsed value here, so re-serialize it for the normalizer.
+  if (typeof r.response === "string" && r.response.trim()) return r.response;
+  if (r.response && typeof r.response === "object") return JSON.stringify(r.response);
+
+  // 2. OpenAI-compatible chat completions.
+  for (const choice of r.choices ?? []) {
+    const content = choice?.message?.content;
+    if (typeof content === "string" && content.trim()) return content;
+    if (Array.isArray(content)) {
+      const text = partsToText(content);
+      if (text) return text;
+    }
+    if (typeof choice?.text === "string" && choice.text.trim()) return choice.text;
+  }
+
+  // 3. Responses-API style.
+  if (typeof r.output_text === "string" && r.output_text.trim()) return r.output_text;
+  for (const item of r.output ?? []) {
+    const text = partsToText(item?.content);
+    if (text) return text;
+  }
+
+  // 4. Last resort: a reasoning model that spent its whole token budget
+  //    thinking and left `content` empty. If an answer exists at all it is in
+  //    there. This is not a free pass — `extractJson` still has to find a valid
+  //    document, so raw chain-of-thought fails validation downstream rather
+  //    than being billed as a good answer.
+  for (const choice of r.choices ?? []) {
+    const reasoning = choice?.message?.reasoning_content;
+    if (typeof reasoning === "string" && reasoning.trim()) return reasoning;
+  }
+  return "";
+}
+
 export async function generate(env: Env, input: GenerateInput): Promise<GenerateResult> {
   // Resolve the tenant's per-feature AI config (enable, model, prompt, tone).
   const { config, toggles } = await loadTenantAi(env.DB, input.tenantId);
@@ -548,11 +639,17 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
       if (input.expectsJson && input.jsonSchema) {
         args.response_format = { type: "json_schema", json_schema: input.jsonSchema };
       }
-      const run = env.AI!.run(model.id as Parameters<Ai["run"]>[0], args as Parameters<Ai["run"]>[1]) as Promise<{ response?: string | object; usage?: { prompt_tokens?: number; completion_tokens?: number } }>;
+      const run = env.AI!.run(model.id as Parameters<Ai["run"]>[0], args as Parameters<Ai["run"]>[1]) as Promise<WorkersAiResult>;
       const result = await withTimeout(run);
-      // json_object mode can hand back an already-parsed object — re-serialize
-      // so the normalizer + callers always see a JSON string.
-      output = typeof result.response === "string" ? result.response : result.response ? JSON.stringify(result.response) : "";
+      output = readWorkersAiOutput(result);
+      // An empty body is a FAILURE, not a free success. Gemini has always thrown
+      // here (finishReason/empty check above); Workers AI did not, so a model that
+      // answered in an envelope we didn't read returned `ok: true` with "" — and
+      // still settled credits, because the estimate covers the input tokens. The
+      // self-test caught exactly that: three checks "succeeded" against
+      // gemma-4-26b for 1-3 credits each with nothing to show. Throwing releases
+      // the hold, so nothing is charged.
+      if (!output.trim()) throw new Error("empty model response");
       usage = {
         inputTokens: result.usage?.prompt_tokens ?? estUsage.inputTokens,
         outputTokens: result.usage?.completion_tokens ?? Math.ceil(output.length / 4),

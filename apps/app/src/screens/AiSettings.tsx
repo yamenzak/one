@@ -42,6 +42,33 @@ const EXAMPLE_MODS: Record<string, string> = {
 };
 const exampleMod = (key: string) => EXAMPLE_MODS[key] ?? "e.g. add a house rule or preference — it's applied on top of the built-in instructions.";
 
+/** Credits a typical request on this model costs, in the lane it is being
+ *  picked for. The server prices every lane, so a Gemini text model chosen for
+ *  a vision feature is quoted as a vision call, not a text one. */
+const costOf = (m: AiModelMeta, task: string): number | null => {
+  const c = m.costPerRequest?.[task] ?? m.costPerRequest?.[m.task];
+  return typeof c === "number" && c > 0 ? c : null;
+};
+
+/** The option label a studio owner chooses on: the model, then its price. */
+const modelOption = (m: AiModelMeta, task: string): string => {
+  const c = costOf(m, task);
+  return c === null ? m.label : `${m.label} — ~${c} cr`;
+};
+
+/** "the cheapest here costs 2" → "4× the cheapest option". Comparison inside
+ *  one picker is what makes an absolute credit figure actionable. */
+function costHint(models: AiModelMeta[], task: string, selectedId: string): string | null {
+  const priced = models.map((m) => costOf(m, task)).filter((c): c is number => c !== null);
+  const picked = models.find((m) => m.id === selectedId);
+  const cost = picked ? costOf(picked, task) : null;
+  if (cost === null || !priced.length) return null;
+  const cheapest = Math.min(...priced);
+  const ratio = cheapest > 0 ? cost / cheapest : 1;
+  const rel = ratio >= 1.15 ? ` · ${ratio >= 10 ? Math.round(ratio) : ratio.toFixed(1)}× the cheapest option here` : priced.length > 1 ? " · the cheapest option here" : "";
+  return `~${cost} credit${cost === 1 ? "" : "s"} per request${rel}`;
+}
+
 export function AiConfigSection() {
   const [data, setData] = useState<AiSettingsPayload | null>(null);
   const [config, setConfig] = useState<TenantAiConfig>({});
@@ -260,10 +287,13 @@ export function AiConfigSection() {
 /** Quick model picks — set the model for a whole category (text / vision /
  *  image) in one tap; it applies to every feature of that type. Individual
  *  features can still override below. */
-const MODEL_GROUPS: { key: string; label: string; desc: string; icon: LucideIcon; tone: Tone; matchFeature: (t: string) => boolean; matchModel: (m: AiModelMeta) => boolean }[] = [
-  { key: "text", label: "Text model", desc: "Plans, summaries, notes & writing.", icon: Sparkles, tone: "primary", matchFeature: (t) => t === "text" || t === "text-small", matchModel: (m) => m.task !== "vision" && m.task !== "image" },
-  { key: "vision", label: "Vision model", desc: "Reading meal photos, labels & lab reports.", icon: Camera, tone: "cardio", matchFeature: (t) => t === "vision", matchModel: (m) => m.task === "vision" || m.provider === "google" },
-  { key: "image", label: "Image model", desc: "Generated cover, food & exercise images.", icon: ImageIcon, tone: "nutrition", matchFeature: (t) => t === "image", matchModel: (m) => m.task === "image" || m.provider === "google" },
+const MODEL_GROUPS: { key: string; label: string; desc: string; icon: LucideIcon; tone: Tone; priceTask: string; matchFeature: (t: string) => boolean; matchModel: (m: AiModelMeta) => boolean }[] = [
+  // `priceTask` is the lane the group is QUOTED in. The text group spans text
+  // and text-small features, so it is quoted on the larger of the two — a price
+  // that surprises upward is the one nobody wants.
+  { key: "text", label: "Text model", desc: "Plans, summaries, notes & writing.", icon: Sparkles, tone: "primary", priceTask: "text", matchFeature: (t) => t === "text" || t === "text-small", matchModel: (m) => m.task !== "vision" && m.task !== "image" },
+  { key: "vision", label: "Vision model", desc: "Reading meal photos, labels & lab reports.", icon: Camera, tone: "cardio", priceTask: "vision", matchFeature: (t) => t === "vision", matchModel: (m) => m.task === "vision" || m.provider === "google" },
+  { key: "image", label: "Image model", desc: "Generated cover, food & exercise images.", icon: ImageIcon, tone: "nutrition", priceTask: "image", matchFeature: (t) => t === "image", matchModel: (m) => m.task === "image" || m.provider === "google" },
 ];
 
 function DefaultModels({ features, models, config, onApply }: {
@@ -283,20 +313,43 @@ function DefaultModels({ features, models, config, onApply }: {
       <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Default models</h3>
       <Card className="space-y-3">
         <p className="text-xs text-muted-foreground">Pick a model per category — it applies to every feature of that type at once. Fine-tune any single feature below.</p>
-        {rows.map(({ g, keys, pickable, current, mixed }) => (
-          <div key={g.key} className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <IconBadge icon={g.icon} tone={g.tone} size="sm" />
-              <div className="min-w-0"><div className="text-sm font-medium">{g.label}</div><div className="truncate text-xs text-muted-foreground">{g.desc}</div></div>
+        {rows.map(({ g, keys, pickable, current, mixed }) => {
+          const hint = costHint(pickable, g.priceTask, current);
+          return (
+            <div key={g.key} className="space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <IconBadge icon={g.icon} tone={g.tone} size="sm" />
+                  <div className="min-w-0"><div className="text-sm font-medium">{g.label}</div><div className="truncate text-xs text-muted-foreground">{g.desc}</div></div>
+                </div>
+                <select value={current} onChange={(e) => onApply(keys, { model: e.target.value || null })} className="max-w-[44%] shrink-0 truncate rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none">
+                  <option value="">{mixed ? "Mixed — set all…" : "Default (auto)"}</option>
+                  {pickable.map((m) => <option key={m.id} value={m.id}>{modelOption(m, g.priceTask)}</option>)}
+                </select>
+              </div>
+              {hint && <div className="numeral pl-[2.9rem] text-xs text-muted-foreground">{hint}</div>}
             </div>
-            <select value={current} onChange={(e) => onApply(keys, { model: e.target.value || null })} className="max-w-[44%] shrink-0 truncate rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none">
-              <option value="">{mixed ? "Mixed — set all…" : "Default (auto)"}</option>
-              {pickable.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-            </select>
-          </div>
-        ))}
+          );
+        })}
+        <CostLegend />
       </Card>
     </div>
+  );
+}
+
+/** Says once, plainly, what the numbers in every picker mean. Without this the
+ *  "~8 cr" is a mystery unit; with it, it is a price. */
+function CostLegend() {
+  return (
+    <p className="flex items-start gap-1.5 rounded-xl bg-muted/40 p-2.5 text-xs leading-relaxed text-muted-foreground">
+      <Wallet className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+      <span>
+        <b className="text-foreground">cr</b> = AI credits, the same balance your plan tops up. Figures are for a{" "}
+        <b className="text-foreground">typical</b> request of that kind, so models compare like for like — a long plan
+        costs more than a short note on any model. A pricier model is usually a better writer; a cheap one is plenty for
+        short, factual jobs.
+      </span>
+    </p>
   );
 }
 
@@ -339,17 +392,24 @@ function FeatureCard({ feat, models, cfg, tones, onSave }: {
 
       {enabled && (
         <div className="space-y-3 border-t border-border/50 pt-3">
-          <label className="flex items-center justify-between gap-3 text-sm">
-            <span className="text-muted-foreground">Model</span>
-            <select
-              value={cfg.model ?? ""}
-              onChange={(e) => onSave({ model: e.target.value || null })}
-              className="max-w-[60%] truncate rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none"
-            >
-              <option value="">Default (auto)</option>
-              {pickable.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-            </select>
-          </label>
+          <div>
+            <label className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-muted-foreground">Model</span>
+              <select
+                value={cfg.model ?? ""}
+                onChange={(e) => onSave({ model: e.target.value || null })}
+                className="max-w-[60%] truncate rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none"
+              >
+                <option value="">Default (auto)</option>
+                {pickable.map((m) => <option key={m.id} value={m.id}>{modelOption(m, feat.task)}</option>)}
+              </select>
+            </label>
+            {/* Priced in THIS feature's lane, so the number is what this feature
+                will actually cost — not a generic figure for the model. */}
+            {costHint(pickable, feat.task, cfg.model ?? "") && (
+              <div className="numeral mt-1 text-right text-xs text-muted-foreground">{costHint(pickable, feat.task, cfg.model ?? "")}</div>
+            )}
+          </div>
 
           {feat.tonable && (
             <div className="flex flex-wrap items-center gap-2">
