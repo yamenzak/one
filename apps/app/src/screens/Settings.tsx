@@ -1142,6 +1142,10 @@ interface DomainInfo {
   sslStatus: string | null;
   cname: { name: string; target: string | null };
   txt: { name: string; value: string } | null;
+  /** EVERY DCV record Cloudflare asked for. It can require two `_acme-challenge`
+   *  TXTs at one name and issues the certificate only once BOTH exist. Showing
+   *  one left owners waiting on a cert that could never come. */
+  txts?: { name: string; value: string }[];
 }
 
 /** A single copyable DNS field (label + monospace value + copy affordance). */
@@ -1236,9 +1240,19 @@ function DomainSection() {
                 <div className="flex gap-2.5">
                   <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary">1</span>
                   <div className="min-w-0 space-y-2">
-                    <p className="text-sm">In your domain's DNS settings (GoDaddy, Namecheap, Cloudflare…), add {d.txt ? "these records" : "this record"}:</p>
+                    <p className="text-sm">In your domain&rsquo;s DNS settings (GoDaddy, Namecheap, Cloudflare…), add {(d.txts?.length ?? (d.txt ? 1 : 0)) > 0 ? "these records" : "this record"}:</p>
                     {d.cname.target && <DnsRecord type="CNAME" name={d.cname.name} value={d.cname.target} hint="Routes your domain to the app" />}
-                    {d.txt && <DnsRecord type="TXT" name={d.txt.name} value={d.txt.value} hint="Proves you own it (for the SSL certificate)" />}
+                    {(d.txts?.length ? d.txts : d.txt ? [d.txt] : []).map((t, i, arr) => (
+                      <DnsRecord
+                        key={`${t.name}:${t.value}`}
+                        type="TXT"
+                        name={t.name}
+                        value={t.value}
+                        hint={arr.length > 1
+                          ? `Proves you own it — record ${i + 1} of ${arr.length}. Add ALL of them as separate TXT rows at the same name; the certificate won't issue until every one is in place.`
+                          : "Proves you own it (for the SSL certificate)"}
+                      />
+                    ))}
                     {isApex && <p className="text-xs text-warning">Tip: use a subdomain like <span className="font-mono">app.{d.hostname}</span> — most providers can't point a root domain with a CNAME.</p>}
                   </div>
                 </div>

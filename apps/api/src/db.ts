@@ -19,7 +19,7 @@ let schemaReady: Promise<void> | null = null;
  *  isolate. A matching `schema_version` marker row lets subsequent cold starts
  *  skip the full DDL+ALTER+backfill (a single SELECT instead of ~110 DDL + ~45
  *  ALTER round-trips against live D1). */
-const SCHEMA_VERSION = "2026-07-28";
+const SCHEMA_VERSION = "2026-07-29";
 
 export function ensureSchema(db: D1Database): Promise<void> {
   if (!schemaReady) {
@@ -215,7 +215,7 @@ async function applySchema(db: D1Database): Promise<void> {
           // ── Custom domains (SPEC §14.1) — Cloudflare for SaaS white-label.
           // Keyed by hostname for the Host→tenant lookup on every request. One
           // row per tenant hostname; status/ssl mirror the CF custom hostname.
-          "CREATE TABLE IF NOT EXISTS tenant_domains (hostname TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, cf_hostname_id TEXT, cf_route_id TEXT, status TEXT DEFAULT 'pending', ssl_status TEXT, verify_name TEXT, verify_value TEXT, cname_target TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
+          "CREATE TABLE IF NOT EXISTS tenant_domains (hostname TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, cf_hostname_id TEXT, cf_route_id TEXT, status TEXT DEFAULT 'pending', ssl_status TEXT, verify_name TEXT, verify_value TEXT, verify_json TEXT, cname_target TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
           "CREATE INDEX IF NOT EXISTS idx_tenant_domains_tenant ON tenant_domains(tenant_id);",
 
           // ── Coach-action audit log (SPEC §9; REGISTRY-PLAN Phase 3) ────────
@@ -266,6 +266,11 @@ async function applySchema(db: D1Database): Promise<void> {
           // searching by pattern — see cloudflare.ts for why the route is
           // per-hostname instead of a zone-wide `*/*`.
           "ALTER TABLE tenant_domains ADD COLUMN cf_route_id TEXT",
+          // EVERY DCV record Cloudflare asked for, not just the first. It can
+          // demand two `_acme-challenge` TXTs at one name (different values) when
+          // issuing more than one certificate, and all must exist before any
+          // validates. The singular columns stay for back-compat.
+          "ALTER TABLE tenant_domains ADD COLUMN verify_json TEXT",
           "ALTER TABLE clients ADD COLUMN avatar_url TEXT",
           "ALTER TABLE clients ADD COLUMN avatar_seed TEXT",
           // Rich micronutrients on foods (ByShujaa parity).

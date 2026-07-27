@@ -52,7 +52,23 @@ export interface CustomHostname {
   id: string;
   status: string; // pending | active | ...  (hostname/ownership status)
   sslStatus: string | null; // pending_validation | active | ...
+  /** The FIRST validation record, kept for callers that only render one. */
   verify: VerifyRecord;
+  /**
+   * EVERY validation record Cloudflare asked for.
+   *
+   * Cloudflare can return more than one `_acme-challenge` TXT — same name,
+   * different values — when it is issuing more than one certificate for the
+   * hostname. All of them must exist in DNS before the certs issue; DNS allows
+   * multiple TXT records at one name, so they are added as separate rows.
+   *
+   * We used to `.find()` the first and drop the rest, so a tenant following our
+   * screen added one record and then waited on a certificate that could never
+   * issue — with nothing on the page to suggest anything was missing. Found by an
+   * owner comparing our instructions against Cloudflare's own dashboard, which
+   * listed two.
+   */
+  verifyAll: VerifyRecord[];
   errors: string[];
 }
 
@@ -83,16 +99,23 @@ async function cf<T>(cfg: SaasConfig, path: string, init?: RequestInit): Promise
 }
 
 function normalize(h: CfHostname): CustomHostname {
-  // Prefer the SSL DCV TXT record; fall back to ownership verification.
-  const dcv = h.ssl?.validation_records?.find((r) => r.txt_name && r.txt_value);
-  const verify: VerifyRecord = dcv
-    ? { name: dcv.txt_name ?? null, value: dcv.txt_value ?? null }
-    : { name: h.ownership_verification?.name ?? null, value: h.ownership_verification?.value ?? null };
+  // Prefer the SSL DCV TXT records; fall back to ownership verification. ALL of
+  // them — Cloudflare issues more than one certificate for some hostnames and
+  // every challenge record must be present before any of them validate.
+  const dcv = (h.ssl?.validation_records ?? [])
+    .filter((r) => r.txt_name && r.txt_value)
+    .map((r) => ({ name: r.txt_name ?? null, value: r.txt_value ?? null }));
+  const verifyAll: VerifyRecord[] = dcv.length
+    ? dcv
+    : h.ownership_verification?.name
+      ? [{ name: h.ownership_verification.name ?? null, value: h.ownership_verification.value ?? null }]
+      : [];
+  const verify: VerifyRecord = verifyAll[0] ?? { name: null, value: null };
   const errors = [
     ...(h.verification_errors ?? []),
     ...((h.ssl?.validation_errors ?? []).map((e) => e.message)),
   ].filter(Boolean);
-  return { id: h.id, status: h.status, sslStatus: h.ssl?.status ?? null, verify, errors };
+  return { id: h.id, status: h.status, sslStatus: h.ssl?.status ?? null, verify, verifyAll, errors };
 }
 
 /** Register a hostname; CF returns the DCV record(s) to validate ownership. */

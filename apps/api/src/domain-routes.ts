@@ -19,6 +19,7 @@ import { turnstileConfig } from "./turnstile.js";
 import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostname, createWorkerRoute, deleteWorkerRoute, type CustomHostname } from "./cloudflare.js";
 import { hostnameOf, isPlatformHost, invalidateHostCache, resolveTenantDoor } from "./host-context.js";
 import { nowIso } from "./ids.js";
+import { parseJson } from "./db.js";
 
 const HOSTNAME = z
   .string()
@@ -29,7 +30,7 @@ const HOSTNAME = z
 
 interface DomainRow {
   hostname: string; tenant_id: string; cf_hostname_id: string | null; cf_route_id: string | null;
-  status: string; ssl_status: string | null; verify_name: string | null; verify_value: string | null; cname_target: string | null;
+  status: string; ssl_status: string | null; verify_name: string | null; verify_value: string | null; verify_json: string | null; cname_target: string | null;
 }
 
 /** Shape returned to the owner UI. */
@@ -39,7 +40,17 @@ function present(row: DomainRow) {
     status: row.status, // pending | active | error
     sslStatus: row.ssl_status,
     cname: { name: row.hostname, target: row.cname_target },
+    // `txt` is the first record (existing callers); `txts` is all of them.
+    // Cloudflare can require two TXTs at the same name and the certificate issues
+    // only once BOTH exist — showing one had owners waiting on a cert that could
+    // never come, with nothing on the page to say why.
     txt: row.verify_name && row.verify_value ? { name: row.verify_name, value: row.verify_value } : null,
+    txts: ((): { name: string; value: string }[] => {
+      const all = parseJson<{ name: string | null; value: string | null }[]>(row.verify_json, []);
+      const kept = all.filter((r): r is { name: string; value: string } => Boolean(r?.name && r?.value));
+      if (kept.length) return kept;
+      return row.verify_name && row.verify_value ? [{ name: row.verify_name, value: row.verify_value }] : [];
+    })(),
   };
 }
 
@@ -47,8 +58,8 @@ function present(row: DomainRow) {
 async function syncStatus(env: { DB: D1Database; CACHE?: KVNamespace }, row: DomainRow, ch: CustomHostname): Promise<string> {
   const status = ch.status === "active" && ch.sslStatus === "active" ? "active" : ch.errors.length ? "error" : "pending";
   await env.DB
-    .prepare("UPDATE tenant_domains SET status = ?, ssl_status = ?, verify_name = ?, verify_value = ?, updated_at = ? WHERE hostname = ?")
-    .bind(status, ch.sslStatus, ch.verify.name ?? row.verify_name, ch.verify.value ?? row.verify_value, nowIso(), row.hostname)
+    .prepare("UPDATE tenant_domains SET status = ?, ssl_status = ?, verify_name = ?, verify_value = ?, verify_json = ?, updated_at = ? WHERE hostname = ?")
+    .bind(status, ch.sslStatus, ch.verify.name ?? row.verify_name, ch.verify.value ?? row.verify_value, ch.verifyAll.length ? JSON.stringify(ch.verifyAll) : row.verify_json, nowIso(), row.hostname)
     .run();
   // A status flip (esp. active→pending/error) must not linger in the host cache.
   await invalidateHostCache(env, row.hostname);
@@ -146,9 +157,9 @@ export const domainRoutes = new Hono<AppEnv>()
     }
 
     await c.env.DB.prepare(
-      "INSERT INTO tenant_domains (hostname, tenant_id, cf_hostname_id, cf_route_id, status, ssl_status, verify_name, verify_value, cname_target, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO tenant_domains (hostname, tenant_id, cf_hostname_id, cf_route_id, status, ssl_status, verify_name, verify_value, verify_json, cname_target, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
-      .bind(hostname, who.tenantId, ch.id, routeId, status, ch.sslStatus, ch.verify.name ?? null, ch.verify.value ?? null, cfg.cnameTarget, who.userId, nowIso(), nowIso())
+      .bind(hostname, who.tenantId, ch.id, routeId, status, ch.sslStatus, ch.verify.name ?? null, ch.verify.value ?? null, JSON.stringify(ch.verifyAll), cfg.cnameTarget, who.userId, nowIso(), nowIso())
       .run();
     const row = await c.env.DB.prepare("SELECT * FROM tenant_domains WHERE hostname = ?").bind(hostname).first<DomainRow>();
     return c.json({ domain: present(row!) }, 201);
