@@ -506,17 +506,106 @@ get scope on it. The platform host stays the neutral entry + `/t/<slug>`
 fallback + platform admin. No code change is needed to add a tenant — it is all
 runtime config + DNS.
 
-**One-time platform setup:**
+### One-time platform setup — first time through
 
-1. **Enable Cloudflare for SaaS** on your zone (Dashboard → the zone → SSL/TLS →
-   Custom Hostnames → *Enable*). Set a **Fallback Origin** to a proxied record
-   resolving to the `mossa` worker (e.g. `ssl.<host>` → CNAME `<host>`,
-   orange-cloud on). That hostname is what tenants CNAME to.
-2. **Create a scoped API token** — permission **Zone · SSL and Certificates ·
-   Edit** on that zone.
-3. **Enter the credentials in-app** — Platform admin → **Domains**: the API
-   token, the **Zone id**, and the **CNAME target**. Stored in `app_config`
-   (`cf.saas.*`).
+Do these in order; each step's "check" tells you it worked before you move on.
+Budget ~30 minutes, most of it waiting for a status to flip.
+
+**Step 0 — know your zone.** Everything below happens on the zone that serves the
+platform host. For `mossa.4dl.app` that zone is **`4dl.app`**. Your marketing site
+is a different zone and is not involved.
+
+**Step 1 — add the Worker route that makes custom hostnames reach the worker.**
+
+Do this FIRST, because without it the rest of the setup completes cleanly and
+custom domains still 5xx, which is a miserable thing to debug.
+
+`wrangler.jsonc` ships with one route: `mossa.4dl.app` (`custom_domain: true`).
+That matches exactly one hostname. A SaaS custom hostname like
+`train.byshujaa.com` is NOT in your zone, so it matches no route, the worker never
+runs, and the request dies at the fallback origin. Custom domains cannot work
+until the zone has a route that matches them:
+
+```jsonc
+"routes": [
+  { "pattern": "mossa.4dl.app", "custom_domain": true },
+  { "pattern": "*/*", "zone_name": "4dl.app" }
+]
+```
+
+⚠️ `*/*` captures **every hostname on that zone**, not just custom hostnames. If
+`4dl.app` serves anything else — another worker, a static site, an API on a
+different subdomain — that traffic now hits the mossa worker too. Two ways out:
+put Mossa on a zone of its own, or add a second route for the hostname you want
+to exclude with **no worker assigned** (Cloudflare treats an empty route as "do
+not run a worker here"). Decide this before deploying.
+
+*Check:* `wrangler deploy`, then `curl -I https://mossa.4dl.app/health` still
+returns 200, and anything else you host on the zone still works.
+
+**Step 2 — enable Cloudflare for SaaS.** Dashboard → the zone → **SSL/TLS** →
+**Custom Hostnames** → *Enable*.
+
+*Check:* the Custom Hostnames page loads and shows an empty list plus a Fallback
+Origin field.
+
+**Step 3 — create the fallback origin as an ORIGINLESS record.**
+
+This is the step the old version of this doc got wrong. Do **not** CNAME the
+fallback origin at the worker's hostname. When the origin is a Worker, Cloudflare
+documents an originless record — the Worker route from Step 1 is what actually
+serves the request, so the record only needs to exist and be proxied:
+
+| Type | Name | Content | Proxy |
+|------|------|---------|-------|
+| AAAA | `saas` | `100::` | **Proxied** (orange cloud) |
+
+`100::` is the IPv6 discard prefix — it deliberately routes nowhere.
+
+Then Custom Hostnames → **Fallback Origin** → enter `saas.4dl.app` → Add.
+
+*Check:* the fallback origin shows **Active**. It sits at "Pending" for a minute
+or two first; wait for Active before testing a tenant domain.
+
+**Step 4 — pick the CNAME target you hand to tenants.** This is what a tenant
+puts in their DNS. `saas.4dl.app` works. Whatever you choose, it must be a
+proxied hostname on this zone — write it down for Step 6.
+
+**Step 5 — create a scoped API token.** Dashboard → **My Profile** → **API
+Tokens** → *Create Token* → *Custom token*:
+
+- Permissions: **Zone · SSL and Certificates · Edit**
+- Zone Resources: **Include · Specific zone ·** your zone
+
+Scope it to the one zone. This token can issue certificates — do not use a global
+key, and do not reuse it elsewhere.
+
+*Check:* Cloudflare shows the token once. Copy it now; you cannot read it again.
+
+**Step 6 — enter the three values in Mossa.** Platform admin → **Domains**:
+
+| Field | Value | Where it came from |
+|-------|-------|--------------------|
+| API token | the token from Step 5 | shown once at creation |
+| Zone id | the zone's id | zone **Overview** → right sidebar → *Zone ID* |
+| CNAME target | e.g. `saas.4dl.app` | your choice in Step 4 |
+
+Stored in `app_config` as `cf.saas.*`. Until all three are set,
+`saasConfig()` returns null and the owner-facing domain UI answers
+**503 "custom domains aren't enabled on this platform yet"** — which is the
+expected response before setup, not a fault.
+
+*Check:* as a studio owner, Settings → Custom domain no longer 503s.
+
+**Step 7 — prove it with one real domain** before telling any tenant it exists.
+Use a domain you control. Follow the per-tenant flow below end to end and confirm
+you can sign in on it. Expect the certificate to take a few minutes after the DNS
+records resolve.
+
+**Cost:** Cloudflare for SaaS includes a number of custom hostnames on paid plans
+and bills per hostname beyond it. Check the current figure on Cloudflare's pricing
+page before you promise custom domains on a plan tier — this doc deliberately does
+not quote a number that will go stale.
 
 **Per-tenant flow (self-serve):** owner → Settings → **Custom domain** → enter
 hostname → the app registers a CF custom hostname and shows the **CNAME** +
@@ -524,7 +613,8 @@ hostname → the app registers a CF custom hostname and shows the **CNAME** +
 cert issues → status flips to **Live**. Removing the domain deregisters it.
 
 Notes: the worker is host-agnostic (`host-context.ts` reads `Host`), so no
-per-domain route is needed. `BETTER_AUTH_URL` stays the platform origin; the
+*per-domain* route is needed — but the zone DOES need the wildcard route from
+Step 1, or no custom hostname reaches the worker at all. `BETTER_AUTH_URL` stays the platform origin; the
 request origin drives auth on custom domains. Because passkeys are origin-bound,
 a user in more than one tenancy enrolls a passkey per domain (OTP is always the
 bootstrap).
