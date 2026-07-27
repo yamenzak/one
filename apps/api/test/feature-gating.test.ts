@@ -235,7 +235,7 @@ describe("platform entitlements are enforced per route", () => {
     const ex = await SELF.fetch(`${B}/api/exercises/search-external?q=squat`, { headers: auth(owner) });
     expect(ex.status).toBe(403);
     expect(await ex.json()).toMatchObject({ feature: "externalSearch" });
-  }, 20_000);
+  });
 
   // NB: no assistant-seat assertion here. `frontDesk` is sold as "Assistant role
   // + sessions/booking" (SPEC §5) but only the sessions half is gated; promotion
@@ -413,7 +413,7 @@ describe("client capability is the intersection, in both directions", () => {
     const off = (await (await SELF.fetch(`${B}/api/context`, { headers: auth(client) })).json()) as { clientFlags: ClientFlags | null; entitlements: { features: Record<string, boolean> } };
     expect(off.entitlements.features.bfCamera).toBe(false);
     expect(off.clientFlags?.canUseBodyScan).toBe(false);
-  }, 20_000);
+  });
 
   it("the AI master switch kills the AI groups it bounds", async () => {
     const { owner, clientId, client } = await studioWithClient("ix5", "pro");

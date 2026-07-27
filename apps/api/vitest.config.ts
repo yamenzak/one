@@ -2,6 +2,27 @@ import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
 
 export default defineWorkersConfig({
   test: {
+    // Vitest's 5s default is wrong for THIS suite, and it fails on a slow runner
+    // rather than on a bug.
+    //
+    // Almost every test here provisions its own world through the real HTTP
+    // surface — two passwordless OTP sign-in flows, an organization create, a
+    // client, a package grant — before it asserts anything. Measured locally the
+    // slowest single test is ~2.2s and the typical gated-route test is 1.4-2.0s,
+    // so the whole suite was running with barely a 2.3x margin. A shared CI
+    // runner is routinely slower than that, so the first casualty was a
+    // three-line assertion timing out at 5s while asserting a 403 that the local
+    // run returns in 1.8s. The cascading "Isolated storage failed" that follows is
+    // the pool's teardown reacting to the abort, not a second fault.
+    //
+    // 30s is ~13x the local worst case, so a genuine hang still surfaces (the
+    // whole file set finishes in ~140s) while ordinary CI variance cannot trip
+    // it. Set here rather than sprinkled per-test: the two tests that carried an
+    // inline timeout were the ones someone had already been bitten by, and the
+    // other ~400 were one slow runner away from the same thing.
+    testTimeout: 30_000,
+    // `beforeAll` does the same sign-in work, and its default is tighter still.
+    hookTimeout: 30_000,
     poolOptions: {
       workers: {
         wrangler: { configPath: "./wrangler.jsonc" },
