@@ -14,7 +14,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { Button, ArrowRight, ArrowLeft, X, Sparkles, Hand, CircleCheck, toneVar, type Tone } from "@mossa/ui";
+import { Button, ArrowRight, ArrowLeft, X, Info, Hand, CircleCheck, toneVar, type Tone } from "@mossa/ui";
 import { setApiInterceptor } from "./api.js";
 import { tourInterceptor } from "./tour-mock.js";
 
@@ -240,7 +240,7 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
             className="pointer-events-auto mx-auto max-w-md rounded-3xl border border-border/50 bg-card p-5 shadow-lg outline-none"
           >
             <div className="flex items-start gap-3">
-              <div className="grid size-9 shrink-0 place-items-center rounded-xl [&_svg]:size-[1.1rem]" style={{ backgroundColor: `color-mix(in oklch, ${accent} 16%, transparent)`, color: accent }}>{done ? <CircleCheck /> : step.action ? <Hand /> : <Sparkles />}</div>
+              <div className="grid size-9 shrink-0 place-items-center rounded-xl [&_svg]:size-[1.1rem]" style={{ backgroundColor: `color-mix(in oklch, ${accent} 16%, transparent)`, color: accent }}>{done ? <CircleCheck /> : step.action ? <Hand /> : <Info />}</div>
               <div className="min-w-0 flex-1">
                 <div className="font-semibold leading-tight">{shown.title}</div>
                 <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{shown.body}</p>

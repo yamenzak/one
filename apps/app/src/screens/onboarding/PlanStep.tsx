@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Badge, Button, Card, Callout, Reveal, SkeletonList, AlertTriangle, Check, Sparkles, Users } from "@mossa/ui";
+import { Badge, Button, Card, Callout, Reveal, SkeletonList, AlertTriangle, Check, Gift, Users } from "@mossa/ui";
 import { FEATURE_META } from "@mossa/domain";
 import { api, errorText } from "../../api.js";
 import { fmtPrice } from "../../money.js";
@@ -130,7 +130,7 @@ export function PlanStep({
                         <span className="font-semibold tracking-tight">{p.name}</span>
                         {p.trialDays > 0 && (
                           <Badge tone="success">
-                            <Sparkles aria-hidden /> {p.trialDays} days free
+                            <Gift aria-hidden /> {p.trialDays} days free
                           </Badge>
                         )}
                       </div>

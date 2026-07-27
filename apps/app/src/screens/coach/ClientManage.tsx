@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, personaLabel, personaTone } from "@mossa/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, personaLabel, personaTone } from "@mossa/ui";
 import { api, errorText, todayLocal } from "../../api.js";
 import { FeatureLock, useCan } from "../../FeatureLock.js";
 import { useSession } from "../../session.js";
@@ -581,7 +581,7 @@ function DeleteClientSheet({ clientId, clientName, onClose, onDone }: { clientId
  *  AUDIT_ACTIONS registry (server-rendered); the icon is coded by action family. */
 interface AuditItem { id: string; action: string; label: string; summary: string | null; at: number; actor: string | null }
 const AUDIT_ICON: Record<string, typeof Pill> = {
-  goal: BarChart3, plan: ClipboardList, checkin: Check, supplement: Pill, lab: FlaskConical, swap: ArrowLeftRight, content: Sparkles, package: Ticket, client: User, member: User,
+  goal: BarChart3, plan: ClipboardList, checkin: Check, supplement: Pill, lab: FlaskConical, swap: ArrowLeftRight, content: BookOpen, package: Ticket, client: User, member: User,
 };
 const timeAgo = (ms: number): string => {
   const s = Math.max(0, (Date.now() - ms) / 1000);

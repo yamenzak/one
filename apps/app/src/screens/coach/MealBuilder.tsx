@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { MealBody, MealOption, MealFood } from "@mossa/protocol";
 import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy, scaleFood, servingsToQuantity, SERVING_PRESETS } from "@mossa/domain";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, MacroBar, ProgressRing, Eyebrow, Chip, IconBadge, ConfirmDialog, EmptyState, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, AlertTriangle, ArrowLeft, Plus, Sparkles, Utensils, Flame, History, LayoutGrid, ChevronRight, Trash2, X } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, MacroBar, ProgressRing, Eyebrow, Chip, IconBadge, ConfirmDialog, EmptyState, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, AlertTriangle, ArrowLeft, Plus, PencilLine, Utensils, Flame, History, LayoutGrid, ChevronRight, Trash2, X } from "@mossa/ui";
 import { api, ApiError, errorText } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { AiAvatar } from "../../AiAvatar.js";
@@ -586,7 +586,7 @@ function AiMealSheet({ onClose, onRun }: { onClose: () => void; onRun: (i: strin
     <Sheet open onClose={onClose} title="AI meal draft">
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">Drafts meal options from this client's targets, body and dietary preferences — every food comes from your library. You'll review before publishing.</p>
-        <Field label="Instructions (optional)" icon={Sparkles} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="e.g. high-protein, no dairy, 4 meals" />
+        <Field label="Instructions (optional)" icon={PencilLine} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="e.g. high-protein, no dairy, 4 meals" />
         <Button size="lg" className="w-full" disabled={busy} onClick={() => void run()}>{busy ? "Drafting…" : "Generate options"}</Button>
         {dropped ? <div className="rounded-xl border border-border/60 bg-surface-2 p-3 text-xs text-muted-foreground">Options added. {dropped.length} suggested food{dropped.length === 1 ? "" : "s"} weren't in your library and {dropped.length === 1 ? "was" : "were"} skipped: {dropped.join(", ")}. Add {dropped.length === 1 ? "it" : "them"} to your library to include next time.</div> : null}
         {err ? <AiErrorBox error={err} /> : null}

@@ -100,7 +100,6 @@ import {
   Sliders,
   Smile,
   Soup,
-  Sparkles,
   Star,
   Store,
   Sun,
@@ -130,6 +129,14 @@ import {
   X,
   Zap,
   type LucideIcon,
+  // Sparkles is deliberately NOT re-exported. It had spread to ~20 screens as a
+  // stand-in for "something happens here" — an empty media library, a free-trial
+  // badge, progress photos, a passkey benefit, the notification fallback — none of
+  // which are about sparkle. Where a surface is genuinely the studio's AI, it wears
+  // that AI's avatar and name (`AiAvatar` / `useAiIdentity`), which the owner sets
+  // in Branding; everywhere else it wears the icon for the thing it actually is.
+  // lucide-react is a dependency of THIS package only, so leaving it out here is
+  // the enforcement: there is no other door.
 } from "lucide-react";
 
 export type { LucideIcon };
@@ -230,7 +237,6 @@ export {
   Sliders,
   Smile,
   Soup,
-  Sparkles,
   Star,
   Store,
   Sun,

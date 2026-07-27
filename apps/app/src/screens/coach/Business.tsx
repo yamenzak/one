@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Badge, SegmentedControl, Field, Sheet, SubCard, Page, Stagger, ChartCard, SectionHeader, Eyebrow, GlanceStrip, IconBadge, EmptyState, Spinner, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Sparkles, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, TrendingDown, CheckCheck, Check, Lock, Tag } from "@mossa/ui";
+import { Button, Card, Badge, SegmentedControl, Field, Sheet, SubCard, Page, Stagger, ChartCard, SectionHeader, Eyebrow, GlanceStrip, IconBadge, EmptyState, Spinner, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Wallet, Gauge, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, TrendingDown, CheckCheck, Check, Lock, Tag } from "@mossa/ui";
 import { FEATURE_KEYS, FEATURE_META, QUOTA_KEYS, QUOTA_META, type Entitlements } from "@mossa/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -269,7 +269,7 @@ function Overview() {
           <Stagger>
             <GlanceStrip items={[
               { icon: CreditCard, tone: "primary", value: isPending ? pendingName : billing.subscription.planName, label: STATE_LABEL[billingState] },
-              { icon: Sparkles, tone: "warning", value: billing.balance.available.toLocaleString(), label: "AI credits left" },
+              { icon: Wallet, tone: "warning", value: billing.balance.available.toLocaleString(), label: "AI credits left" },
             ]} />
           </Stagger>
 
@@ -310,7 +310,7 @@ function Overview() {
 
           {top.length > 0 && (
             <Stagger>
-              <ChartCard title="AI usage" icon={Sparkles} tone="warning" value={totalCr.toLocaleString()} unit="cr" delta={<Badge tone="neutral">30 days · {totalCalls} runs</Badge>}>
+              <ChartCard title="AI usage" icon={Gauge} tone="warning" value={totalCr.toLocaleString()} unit="cr" delta={<Badge tone="neutral">30 days · {totalCalls} runs</Badge>}>
                 <div className="space-y-2.5">
                   {top.map((u) => (
                     <div key={u.feature} className="min-w-0">

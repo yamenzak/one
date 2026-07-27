@@ -7,7 +7,7 @@ import { motion } from "motion/react";
 import type { ReactNode } from "react";
 import { cn } from "./lib/utils.js";
 import { toneVar, type Tone } from "./primitives.js";
-import { Sparkles, ThumbsDown, ThumbsUp, type LucideIcon } from "./lib/icons.js";
+import { ThumbsDown, ThumbsUp, type LucideIcon } from "./lib/icons.js";
 
 export interface TabDef {
   key: string;
@@ -127,11 +127,18 @@ export function NavRail({ tabs, active, onSelect, footer, brand, tinted }: { tab
 }
 
 // ── Timeline feed ────────────────────────────────────────────────────────────
-export function InsightCard({ timestamp, title, ai, aiGlyph, tone, children, onFeedback }: { timestamp: string; title: string; ai?: boolean; aiGlyph?: ReactNode; tone?: "default" | "primary"; children?: ReactNode; onFeedback?: (v: 1 | -1) => void }) {
+/**
+ * `aiGlyph` is the caller's to supply — the design system has no AI mark of its
+ * own. It used to default to a Sparkles icon, which is exactly the generic
+ * shrug this app is trying not to make: the studio HAS an AI identity (an
+ * avatar and a name it chose in Branding), and that is what belongs here. A
+ * caller that passes nothing gets nothing, which is honest.
+ */
+export function InsightCard({ timestamp, title, aiGlyph, tone, children, onFeedback }: { timestamp: string; title: string; aiGlyph?: ReactNode; tone?: "default" | "primary"; children?: ReactNode; onFeedback?: (v: 1 | -1) => void }) {
   return (
     <motion.article initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.4 }} className="py-3">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        {ai && (aiGlyph ?? <Sparkles className="size-4 text-primary" />)}
+        {aiGlyph}
         <span>{timestamp}</span>
       </div>
       <h3 className={cn("mt-1 text-xl font-semibold tracking-tight", tone === "primary" ? "text-foreground" : "text-foreground")}>{title}</h3>

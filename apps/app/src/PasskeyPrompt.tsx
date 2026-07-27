@@ -11,7 +11,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { Button, Dialog, DialogContent, ShieldCheck, KeyRound, Sparkles, ArrowRight } from "@mossa/ui";
+import { Button, Dialog, DialogContent, ShieldCheck, KeyRound, Hand, ArrowRight } from "@mossa/ui";
 import { passkeySupported, listPasskeys, enrollPasskey, passkeyErrorMessage, deviceLabel } from "./passkey.js";
 
 interface PasskeyState {
@@ -75,7 +75,7 @@ export function PasskeyProvider({ children }: { children: ReactNode }) {
               <p className="text-sm text-muted-foreground">Add a passkey and sign in with just your face, fingerprint, or device PIN — no codes to wait for. It's more secure, and it stays on this device.</p>
             </div>
             <ul className="space-y-2 text-sm">
-              <li className="flex items-center gap-2.5"><Sparkles className="size-4 shrink-0 text-primary" /> One tap, every time — no emailed code</li>
+              <li className="flex items-center gap-2.5"><Hand className="size-4 shrink-0 text-primary" /> One tap, every time — no emailed code</li>
               <li className="flex items-center gap-2.5"><KeyRound className="size-4 shrink-0 text-primary" /> Phishing-proof; nothing to remember or leak</li>
             </ul>
             <div className="space-y-2">

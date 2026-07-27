@@ -13,7 +13,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Card, Button, Badge, Spinner, IconBadge, EmptyState, SegmentedControl, cn, toneVar, POSTURE_SEVERITY_TONE,
-  AreaChart, ScanLine, Camera, Sparkles, Percent, History, RotateCcw, ChevronRight,
+  AreaChart, ScanLine, Camera, Percent, History, RotateCcw, ChevronRight,
 } from "@mossa/ui";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -108,7 +108,7 @@ export function BodyScanCard({ clientId }: { clientId: string }) {
             <ScanSummary scans={scans} latest={latest} onOpenHistory={(initialId) => setHistory({ initialId })} />
           ) : (
             <EmptyState
-              icon={Sparkles}
+              icon={ScanLine}
               title="No scans yet"
               description="Take a private, on-device scan to estimate your body composition and track the trend."
               action={<Button onClick={open}><Camera /> Start body scan</Button>}

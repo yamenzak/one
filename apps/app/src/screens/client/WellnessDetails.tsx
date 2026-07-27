@@ -9,7 +9,7 @@
 import { fmtWeight, fmtVolume } from "@mossa/domain";
 import {
   Sheet, SubCard, Badge, IconBadge, PhotoGrid, cn, toneVar, METRICS, type Photo, type Tone, type LucideIcon,
-  ImageIcon, FlaskConical, ClipboardList, Calendar, Sparkles, HeartPulse,
+  ImageIcon, FlaskConical, ClipboardList, Calendar, Camera, HeartPulse,
 } from "@mossa/ui";
 import { useUnits } from "../../units.js";
 import type { UnitPrefs } from "@mossa/domain";
@@ -121,7 +121,7 @@ export function CheckInDetailSheet({ checkIn, onClose }: { checkIn: CheckInFull;
 
         {photos.length > 0 && (
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><Sparkles className="size-3.5" /> Progress photos</div>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><Camera className="size-3.5" /> Progress photos</div>
             <PhotoGrid photos={photos} />
           </div>
         )}

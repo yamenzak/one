@@ -2,7 +2,7 @@
  *  cards), Stripe Connect / inline buy, redeem codes. */
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Button, Card, Badge, Field, Sheet, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, EmptyState, toneVar, ArrowLeft, LogOut, Ticket, Store, Sparkles, Check, RotateCcw, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, EmptyState, toneVar, ArrowLeft, LogOut, Ticket, Store, Check, RotateCcw, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
 import { CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "@mossa/domain";
 import { api } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
@@ -136,7 +136,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
         <Card className="relative overflow-hidden">
           <div className="pointer-events-none absolute -right-10 -top-12 size-40 rounded-full bg-primary/15 blur-3xl" />
           <div className="relative flex items-start gap-3">
-            <IconBadge icon={Sparkles} tone="primary" size="sm" />
+            <IconBadge icon={Ticket} tone="primary" size="sm" />
             <div className="min-w-0 text-sm"><div className="font-medium">{canCommerce ? "Choose a plan to get started" : "Let's get your access set up"}</div><div className="text-muted-foreground">{canCommerce ? "Your access is inactive. Pick a package below or enter a code — or ask your coach to set you up." : "Your access is inactive. Enter an access code below, or ask your coach to set you up."}</div></div>
           </div>
         </Card>

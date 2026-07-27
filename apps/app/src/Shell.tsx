@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNod
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
-  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, toneVar, type TabDef, type Tone,
+  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Hand, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, toneVar, type TabDef, type Tone,
 } from "@mossa/ui";
 import { useSession, useActiveClientId } from "./session.js";
 import { useTheme } from "./theme.js";
@@ -51,7 +51,7 @@ const CLIENT_TABS: TabDef[] = [
 
 /** The guided tours offered from the Help menu (client surface). */
 const HELP_TOURS: { id: TourId; icon: typeof Home; tone: Tone; title: string; sub: string }[] = [
-  { id: "app", icon: Sparkles, tone: "primary", title: "App walkthrough", sub: "A hands-on tour of everything, with sample data." },
+  { id: "app", icon: Hand, tone: "primary", title: "App walkthrough", sub: "A hands-on tour of everything, with sample data." },
   { id: "workout", icon: Dumbbell, tone: "activity", title: "Workout player", sub: "Days, sets, rest timers and logging." },
   { id: "meal", icon: Utensils, tone: "nutrition", title: "Meal plan & shopping", sub: "Options, macros, recipes and your list." },
 ];

@@ -11,12 +11,12 @@ import { kgToDisplay, weightLabel, type RangePreset } from "@mossa/domain";
 import {
   Button, Card, Badge, SegmentedControl, Page, Stagger, StatCard, ChartCard, AreaChart, SectionHeader, Eyebrow, GlanceStrip, Sparkline, toneVar,
   Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList,
-  Flame, Gauge, Dumbbell, Utensils, Scale, Moon, Smile, Sparkles, TrendingUp, Percent, cn,
+  Flame, Gauge, Dumbbell, Utensils, Scale, Moon, Smile, TrendingUp, Percent, cn,
 } from "@mossa/ui";
 import { api, errorText, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
-import { AiAvatar } from "../../AiAvatar.js";
+import { AiAvatar, useAiIdentity } from "../../AiAvatar.js";
 import { Markdown } from "../../Markdown.js";
 import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
 
@@ -32,6 +32,7 @@ interface Report {
 const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
 export function ClientReport({ clientId }: { clientId: string }) {
+  const ai = useAiIdentity();
   const [range, setRange] = useState<RangePreset>("30d");
   const [report, setReport] = useState<Report | null>(null);
   const [exMap, setExMap] = useState<Map<string, ExerciseInfo>>(new Map());
@@ -72,8 +73,15 @@ export function ClientReport({ clientId }: { clientId: string }) {
       {canAi && (
       <Stagger>
         <Card className="space-y-3">
-          <SectionHeader icon={Sparkles} tone="primary" title="AI status"
-            action={<Button size="sm" variant="tonal" disabled={summaryBusy} onClick={() => void genSummary()}><AiAvatar className="size-5" /> {summary ? "Refresh" : "Generate"}</Button>} />
+          {/* The studio's assistant, by name and face. "AI status" behind a
+              sparkle said nothing about whose read this is or what it contains;
+              the avatar already appears on the button and on the summary itself,
+              so leading with it makes the whole card one voice. */}
+          <div className="flex items-center gap-2.5">
+            <AiAvatar className="size-9" />
+            <h2 className="min-w-0 flex-1 truncate font-semibold">{ai.name}&rsquo;s read</h2>
+            <Button size="sm" variant="tonal" disabled={summaryBusy} onClick={() => void genSummary()}>{summary ? "Refresh" : "Generate"}</Button>
+          </div>
           {summaryBusy ? (
             <p className="text-sm text-muted-foreground">Reading this client's context…</p>
           ) : summary ? (

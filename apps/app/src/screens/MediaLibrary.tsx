@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button, Card, Page, Reveal, EmptyState, Badge, Chip, IconBadge, ConfirmDialog, SkeletonList,
-  ArrowLeft, Trash2, ImageIcon, Sparkles, Archive, Building2, Dumbbell, FlaskConical, HeartPulse, Utensils,
+  ArrowLeft, Trash2, ImageIcon, Wand2, Archive, Building2, Dumbbell, FlaskConical, HeartPulse, Utensils,
   type LucideIcon,
 } from "@mossa/ui";
 import { api } from "../api.js";
@@ -51,7 +51,7 @@ const CATEGORIES: { id: string; label: string; icon: LucideIcon; purposes: strin
   { id: "health", label: "Health", icon: FlaskConical, purposes: ["lab"] },
   // AI output is media like any other — it occupies the same quota and the studio
   // owns it, so it is browsable and deletable here rather than hidden.
-  { id: "ai", label: "AI-made", icon: Sparkles, purposes: ["ai", "tts"] },
+  { id: "ai", label: "AI-made", icon: Wand2, purposes: ["ai", "tts"] },
   { id: "studio", label: "Studio", icon: Building2, purposes: ["brand"] },
   { id: "other", label: "Other", icon: Archive, purposes: ["misc"] },
 ];
@@ -165,7 +165,7 @@ export function MediaLibrary({ onBack }: { onBack: () => void }) {
 
       <Reveal loading={items === null} className="space-y-4" skeleton={<SkeletonList card rows={4} thumb={56} />}>
         {items !== null && (shown.length === 0 ? (
-          <EmptyState icon={Sparkles} title="No media yet" description={canManage ? "Photos, files and images you upload will show up here." : "Media for the clients you can see will show up here."} />
+          <EmptyState icon={ImageIcon} title="No media yet" description={canManage ? "Photos, files and images you upload will show up here." : "Media for the clients you can see will show up here."} />
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {shown.map((it) => (

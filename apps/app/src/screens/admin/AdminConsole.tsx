@@ -24,7 +24,7 @@ import {
   AlertTriangle, ArrowLeft, Badge, Building2, Button, Callout, Card, ChevronRight, Chip, CircleAlert, CircleCheck,
   ConfirmDialog, CreditCard, EmptyState, Eyebrow, Field, Gift, GlanceStrip, Globe, IconBadge, Info, Input, KeyRound,
   Dumbbell, LayoutGrid, Page, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, Sheet, ShieldCheck,
-  Skeleton, SkeletonLine, Sparkles, Spinner, Stagger, Switch, Tag, Trash2, Wallet, cn, toneText, type Tone,
+  Skeleton, SkeletonLine, Play, Plug, Spinner, Stagger, Switch, Tag, Trash2, Wallet, cn, toneText, type Tone,
   ActionResult, ConfigRow, Group, LoadError, TabIntro, useLoad, useAction as useActionBase,
 } from "@mossa/ui";
 import { api, errorText } from "../../api.js";
@@ -917,7 +917,7 @@ function AiConfig() {
             {status && (
               <Card className="space-y-4">
                 <SectionHeader
-                  icon={Sparkles}
+                  icon={Plug}
                   title="Providers"
                   action={<Badge tone={status.geminiKeySet ? "success" : "warning"}>{status.geminiKeySet ? "Gemini + Workers AI" : "Workers AI only"}</Badge>}
                 />
@@ -1035,7 +1035,7 @@ function AiConfig() {
           >
             {models.data && (models.data.length === 0 ? (
               <EmptyState
-                icon={Sparkles}
+                icon={LayoutGrid}
                 title="No models in the catalog"
                 description="Nothing can be generated until the catalog is populated. Run the sync above to pull rates from the pricing docs."
               />
@@ -1376,7 +1376,7 @@ function AiSelfTest({ models }: { models: ModelRow[] }) {
 
   return (
     <Card className="space-y-4">
-      <SectionHeader icon={Sparkles} title="Live self-test" />
+      <SectionHeader icon={Play} title="Live self-test" />
       <p className="text-sm text-muted-foreground">
         Runs the product's <span className="font-medium text-foreground">real prompts</span> — a plan draft, a food parse,
         a check-in summary, an exercise auto-fill, a nutrition estimate and a vision call — through the normal metered

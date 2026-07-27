@@ -8,7 +8,7 @@ import {
   Button, Card, Skeleton, MacroBar, IconBadge, Sheet, EmptyState, ProgressRing,
   Reveal, SkeletonHero, SkeletonList, SkeletonHeader,
   Page, Stagger, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
-  Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Sparkles, Utensils, Croissant, Soup, Apple,
+  Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Send, Info, Utensils, Croissant, Soup, Apple,
   Store, Ticket, AlertTriangle, ShieldCheck, toneVar, ChevronLeft, ChevronRight, Target, ScanLine, Calendar, BookOpen, type Tone, type LucideIcon,
 } from "@mossa/ui";
 import type { WidgetItem } from "@mossa/protocol";
@@ -383,7 +383,7 @@ const FEED_META: Record<string, { icon: LucideIcon; tone: Tone }> = {
   activity: { icon: Footprints, tone: "cardio" },
   measurement: { icon: Weight, tone: "cardio" },
   checkin: { icon: ClipboardList, tone: "nutrition" },
-  feedback: { icon: Sparkles, tone: "primary" },
+  feedback: { icon: Send, tone: "primary" },
   sleep: { icon: Moon, tone: "sleep" },
   mood: { icon: Smile, tone: "nutrition" },
   fast: { icon: Timer, tone: "sleep" },
@@ -396,7 +396,7 @@ const FEED_META: Record<string, { icon: LucideIcon; tone: Tone }> = {
   bodyscan: { icon: ScanLine, tone: "sleep" },
   goal: { icon: Target, tone: "cardio" },
 };
-const metaFor = (kind: string) => FEED_META[kind] ?? { icon: Sparkles, tone: "neutral" as Tone };
+const metaFor = (kind: string) => FEED_META[kind] ?? { icon: Info, tone: "neutral" as Tone };
 
 function formatMetric(metric: FeedEvent["metric"], units: UnitPrefs): string | null {
   if (!metric) return null;

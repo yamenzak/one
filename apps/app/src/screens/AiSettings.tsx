@@ -7,8 +7,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { AiSettingsPayload, AiFeatureMeta, AiModelMeta, TenantAiConfig, AiFeatureConfig, AiTone } from "@mossa/protocol";
-import { Card, Badge, Skeleton, Reveal, SkeletonLine, Switch, Button, Textarea, Chip, Field, IconBadge, cn, Sparkles, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, Play, Wallet, CircleCheck, CircleAlert, type Tone, type LucideIcon } from "@mossa/ui";
+import { Card, Badge, Skeleton, Reveal, SkeletonLine, Switch, Button, Textarea, Chip, Field, IconBadge, cn, PencilLine, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, Play, Wallet, CircleCheck, CircleAlert, type Tone, type LucideIcon } from "@mossa/ui";
 import { api } from "../api.js";
+import { AiAvatar, useAiIdentity } from "../AiAvatar.js";
 import { useCan } from "../FeatureLock.js";
 
 const TONE_LABEL: Record<string, string> = {
@@ -128,6 +129,7 @@ function VoicePackStatus({ pack, selectedVoice, busy, note, onInstall, onRevoice
 }
 
 export function AiConfigSection() {
+  const ai = useAiIdentity();
   const [data, setData] = useState<AiSettingsPayload | null>(null);
   const [config, setConfig] = useState<TenantAiConfig>({});
   // The coach voice exists only to narrate BODY-SCAN cues, and every route behind
@@ -266,9 +268,13 @@ export function AiConfigSection() {
                 <Badge tone="primary"><Building2 /> Studio</Badge>
               </div>
               <Card className="space-y-3">
+                {/* This is the studio's AI speaking, so it wears the studio's AI
+                    face and name — not a generic glyph. The name is the one the
+                    owner set in Branding, so "the tone Nova writes in" reads as a
+                    property of a specific assistant. */}
                 <div className="flex items-center gap-2.5">
-                  <IconBadge icon={Sparkles} tone="primary" size="sm" />
-                  <div><div className="font-medium">House voice</div><div className="text-sm text-muted-foreground">The tone every personalized message is written in.</div></div>
+                  <AiAvatar className="size-9" />
+                  <div><div className="font-medium">{ai.name}&rsquo;s voice</div><div className="text-sm text-muted-foreground">The tone every personalized message is written in.</div></div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {data.tones.map((t) => <Chip key={t} selected={(config.tone ?? "professional") === t} onClick={() => void saveHouseTone(t)}>{TONE_LABEL[t] ?? t}</Chip>)}
@@ -352,7 +358,7 @@ const MODEL_GROUPS: { key: string; label: string; desc: string; icon: LucideIcon
   // `priceTask` is the lane the group is QUOTED in. The text group spans text
   // and text-small features, so it is quoted on the larger of the two — a price
   // that surprises upward is the one nobody wants.
-  { key: "text", label: "Text model", desc: "Plans, summaries, notes & writing.", icon: Sparkles, tone: "primary", priceTask: "text", matchFeature: (t) => t === "text" || t === "text-small", matchModel: (m) => m.task !== "vision" && m.task !== "image" },
+  { key: "text", label: "Text model", desc: "Plans, summaries, notes & writing.", icon: PencilLine, tone: "primary", priceTask: "text", matchFeature: (t) => t === "text" || t === "text-small", matchModel: (m) => m.task !== "vision" && m.task !== "image" },
   { key: "vision", label: "Vision model", desc: "Reading meal photos, labels & lab reports.", icon: Camera, tone: "cardio", priceTask: "vision", matchFeature: (t) => t === "vision", matchModel: (m) => m.task === "vision" || m.provider === "google" },
   { key: "image", label: "Image model", desc: "Generated cover, food & exercise images.", icon: ImageIcon, tone: "nutrition", priceTask: "image", matchFeature: (t) => t === "image", matchModel: (m) => m.task === "image" || m.provider === "google" },
 ];

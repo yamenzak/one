@@ -9,7 +9,7 @@
 import type { NotifType } from "@mossa/domain";
 import {
   ClipboardList, BadgeCheck, Scale, Target, FlaskConical, Pill, ArrowLeftRight,
-  BookOpen, Calendar, CreditCard, AlertTriangle, Sparkles, Trophy, type LucideIcon, type Tone,
+  BookOpen, Calendar, CreditCard, AlertTriangle, Bell, Trophy, type LucideIcon, type Tone,
 } from "@mossa/ui";
 
 export interface NotifCoding { icon: LucideIcon; tone: Tone }
@@ -45,7 +45,8 @@ const CODING: Record<NotifType, NotifCoding> = {
   payment_refunded: { icon: CreditCard, tone: "warning" },
 };
 
-const DEFAULT: NotifCoding = { icon: Sparkles, tone: "primary" };
+// An unknown type is still a notification — say that, rather than decorating it.
+const DEFAULT: NotifCoding = { icon: Bell, tone: "primary" };
 
 /** Icon + tone for a notification type; a neutral default for unknown types. */
 export function notifCoding(type: string): NotifCoding {

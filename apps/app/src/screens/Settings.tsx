@@ -8,7 +8,7 @@ import { motion } from "motion/react";
 import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger, ConfirmDialog,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
-  KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
+  KeyRound, Moon, Sun, LogOut, Palette, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
   ActionResult, ConfigRow, TabIntro, cn, toneText, personaLabel, personaTone, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon,
 } from "@mossa/ui";
 import type { LoginBranding, TenantBranding } from "@mossa/protocol";
@@ -1639,7 +1639,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
           <div className="overflow-hidden rounded-2xl border border-border/60 bg-card">
             <ToggleRow icon={Palette} title="Colorful tab bar" desc="Tint the active tab by section — Train green, Eat amber, and so on." checked={tintedNav} onChange={setTintedNav} />
             <div className="border-t border-border/50" />
-            <ToggleRow icon={Sparkles} title="Ambient page colour" desc="Wash each page's hero in its section's colour, fading into the background." checked={ambient} onChange={setAmbient} />
+            <ToggleRow icon={Waves} title="Ambient page colour" desc="Wash each page's hero in its section's colour, fading into the background." checked={ambient} onChange={setAmbient} />
           </div>
           <p className="text-xs text-muted-foreground">
             {tintedNav || ambient
