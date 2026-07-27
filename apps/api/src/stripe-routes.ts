@@ -416,8 +416,12 @@ export const stripeRoutes = new Hono<AppEnv>()
     }
     if (promoId && amount < 50) return c.json({ error: "promo_min_amount" }, 400);
     const feeBps = Number((await getConfig(c.env.DB))["stripe.platform_fee_bps"] ?? "0");
-    // The application fee must stay strictly below the charge (Stripe rejects a
-    // fee >= amount on a direct charge), so clamp it — a 100% feeBps footgun.
+    // Clamp the fee strictly below the charge. NOT because Stripe enforces it — it
+    // does not: verified in test mode, `application_fee_amount` equal to AND greater
+    // than the charge amount were both accepted and both succeeded. This clamp is
+    // the only thing standing between a mis-set `platform_fee_bps` (say someone
+    // types 10000 meaning "100 bps") and Mossa taking the tenant's entire payment.
+    // Do not remove it believing Stripe will catch it.
     const fee = feeBps > 0 ? Math.min(Math.round((amount * feeBps) / 10000), Math.max(0, amount - 1)) : 0;
     try {
       const pi = await stripeCall<{ client_secret: string; id: string }>(
@@ -999,7 +1003,22 @@ async function syncStripeSubscription(db: D1Database, obj: Record<string, unknow
   // sub is stored yet (a fresh inline sub), let it through so it gets adopted.
   const cur = await db.prepare("SELECT stripe_sub_id FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<{ stripe_sub_id: string | null }>();
   if (cur?.stripe_sub_id && subId && cur.stripe_sub_id !== subId) return;
-  const cpe = typeof obj.current_period_end === "number" ? new Date(obj.current_period_end * 1000).toISOString() : null;
+  // `current_period_end` moved OFF the Subscription root in Basil (2025-03-31+) and
+  // onto each item, and webhook payloads render at the ENDPOINT's dashboard API
+  // version — not the version this repo pins for its own requests. Verified against
+  // real events on an account defaulting to 2025-11-17.clover: the root field is
+  // absent and the value lives at `items.data[].current_period_end`. Reading only
+  // the root meant `cpe` was always null, the COALESCE wrote nothing, and the
+  // "renews on" date on Business stayed blank until an invoice.paid arrived (that
+  // branch reads `period_end`, which does still exist). No money impact — but every
+  // synthetic fixture in the suite hand-feeds the pre-Basil shape, so nothing caught
+  // it. Read both, newest-period-wins across items.
+  const items = (obj.items as { data?: { current_period_end?: unknown }[] } | undefined)?.data ?? [];
+  const itemEnd = items
+    .map((i) => (typeof i.current_period_end === "number" ? i.current_period_end : 0))
+    .reduce((a, b) => Math.max(a, b), 0);
+  const cpeEpoch = typeof obj.current_period_end === "number" ? obj.current_period_end : itemEnd;
+  const cpe = cpeEpoch > 0 ? new Date(cpeEpoch * 1000).toISOString() : null;
   const now = nowIso();
   await db.prepare("UPDATE subscriptions SET stripe_sub_id = COALESCE(?, stripe_sub_id), current_period_end = COALESCE(?, current_period_end), updated_at = ? WHERE tenant_id = ?").bind(subId, cpe, now, tenantId).run();
   switch (obj.status as string) {
@@ -1059,9 +1078,11 @@ async function syncStripeSubscription(db: D1Database, obj: Record<string, unknow
  * version 2019-03-14 and is present on the current one (verified), so absence
  * means "no setup pending", not "old payload". Because webhook payload shape does
  * follow the endpoint's dashboard API version and nothing in this repo sets it
- * (AGENTS.md §5), the one genuinely ambiguous shape — `trialing`, no payment
- * method, no `pending_setup_intent` key at all — is logged rather than passed over
- * in silence, so a payload-shape drift that could re-open this bug is observable.
+ * (AGENTS.md §5), the shape is checked positively rather than by absence: only an
+ * attached payment method counts. The theoretically ambiguous shape — `trialing`,
+ * no payment method, no `pending_setup_intent` key at all — does not occur in
+ * practice (real payloads carry both keys, verified), and because the check is
+ * fail-closed it would be treated as "not payable" if it ever did.
  *
  * Note it is deliberately *not* enough that the customer has a card on file: for
  * a returning owner whose customer already carries a default payment method,

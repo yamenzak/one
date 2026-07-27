@@ -39,3 +39,33 @@ ENVIRONMENT=development
 # Uncomment to test the real Better Auth signing path locally (otherwise the
 # dev fallback key is used):
 # BETTER_AUTH_SECRET=run-openssl-rand-base64-32-and-paste-here
+
+# ── Stripe test-mode keys (optional; for the live billing suite) ─────────────
+# `apps/api/test/stripe-live.test.ts` is the only suite that talks to real
+# Stripe. It reads ONE variable:
+#
+#   STRIPE_TEST_SECRET_KEY      a test-mode secret key (sk_test_…)
+#
+# and a publishable key is useful alongside it for driving the Payment Element
+# by hand in `pnpm dev`:
+#
+#   STRIPE_TEST_PUBLISHABLE_KEY (pk_test_…)
+#
+# Get both from the Stripe dashboard in **test mode** and paste them into
+# `.dev.vars` (gitignored). NEVER put a key value in this example file, in a
+# test, in a fixture, or in a commit message — reference it by name only.
+#
+# ⚠️ TEST MODE ONLY. The suite asserts the key starts with `sk_test_` and FAILS
+# (rather than skips) on anything else: it creates subscriptions, charges,
+# refunds and real disputes, and must never touch live money.
+#
+# Putting the key here is NOT enough to switch the suite on. `vitest.config.ts`
+# threads the binding from the SHELL and defaults it to "", so the suite skips
+# during a normal `pnpm test` and in CI. Export it for the run you want:
+#
+#   export STRIPE_TEST_SECRET_KEY=sk_test_…
+#   pnpm --filter @mossa/api exec vitest run test/stripe-live.test.ts
+#
+# See DEPLOY.md §10c.
+# STRIPE_TEST_SECRET_KEY=
+# STRIPE_TEST_PUBLISHABLE_KEY=

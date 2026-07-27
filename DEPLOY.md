@@ -352,6 +352,26 @@ tenant's own connected account).
 - Copy that endpoint's signing secret → platform admin → Stripe → the **Connect
   webhook secret of that lane** (`stripe.<lane>.connect_webhook_secret`).
 
+**Pin the API version on BOTH endpoints to `2025-02-24.acacia`** (the value of
+`STRIPE_API_VERSION` in `apps/api/src/stripe.ts`). This is not cosmetic, and it is
+now measured rather than assumed — `apps/api/test/stripe-live.test.ts` observed all
+of it against real Stripe:
+
+- A webhook payload is rendered at the **endpoint's** version (or, with none set,
+  the **account default**) — never at the version of the requests Mossa makes.
+  On a sandbox created recently the account default is already `2025-11-17.clover`,
+  four+ releases past the pin.
+- At that default, `invoice.subscription` **does not exist**. The id lives under
+  `parent.subscription_details.subscription`. `invoiceSubscriptionId` reads both,
+  so renewals still work — but that fallback is the only thing keeping a Connect
+  renewal from being "card charged, budget never topped up, HTTP 200".
+- At that default a Subscription payload has **no root `current_period_end`**
+  either (it moved onto `items.data[].current_period_end`), which the handlers do
+  NOT read — see AGENTS.md §5 for the consequence.
+
+Pinning the endpoints is the cheap fix; leaving them unpinned means the payload
+shape changes under you whenever Stripe's default moves.
+
 The two endpoints have **different** signing secrets, and **so does each lane** —
 test-mode and live-mode webhook endpoints are separate objects in Stripe. That is
 four signing secrets in total if you run both lanes. If you leave a lane's Connect
@@ -365,6 +385,51 @@ Send a test event from each endpoint in the Stripe dashboard and confirm a 200.
 Then do one real end-to-end purchase in test mode and check the grant actually
 landed (credit balance / subscription row / client budget). Do not treat "Stripe
 says paid" as proof.
+
+### 10d. The live Stripe suite (`apps/api/test/stripe-live.test.ts`)
+
+The only suite in the repo that leaves the machine. It drives a real Stripe
+**test-mode** account and asserts our assumptions against what Stripe actually
+returns and emits — catalog prices, the trial SetupIntent transition, trial end
+under a test clock, credit-pack PaymentIntents, refund/dispute payload shapes, the
+Connect rail, the API-version drift above, and real event bodies replayed through
+our own `/api/stripe/webhook`. Everything else that touches Stripe uses payloads
+we wrote ourselves, which is how the two trial bugs shipped.
+
+Run it:
+
+```sh
+export STRIPE_TEST_SECRET_KEY=sk_test_…      # test mode ONLY; never commit it
+pnpm --filter @mossa/app build               # Miniflare needs apps/app/dist
+pnpm --filter @mossa/api exec vitest run test/stripe-live.test.ts
+```
+
+- **~110 s, 39 tests, and it costs nothing** (test mode). It creates real objects
+  in the sandbox: products/prices, customers, subscriptions, charges, refunds and
+  one real dispute.
+- **Without the variable exported it SKIPS** (38 skipped, 1 lane-guard test
+  passes) and makes no network call, so `pnpm test` and CI stay green and offline.
+  Note that a key sitting in `apps/api/.dev.vars` is deliberately **not** enough:
+  `apps/api/vitest.config.ts` threads the binding from the shell and defaults it
+  to `""`, so the live lane is opt-in per run.
+- **A non-`sk_test_` key fails the suite rather than running it.** It creates
+  charges and disputes; it must never see live money.
+- It cleans up test clocks, connected accounts, customers and subscriptions, and
+  **archives** (Stripe cannot delete) the products/prices `syncCatalog` created.
+  Charges, refunds, disputes, PaymentIntents and Events are permanent in Stripe
+  and are left in the sandbox by design.
+- **Point it at a sandbox you don't also use by hand.** Because it archives the
+  prices it creates, a shared test account would end up with a pile of inactive
+  products, and any manual checkout still holding one of those price ids breaks.
+- There is no `pnpm test:stripe` alias — adding one means a line in
+  `apps/api/package.json`:
+  `"test:stripe": "vitest run test/stripe-live.test.ts"`.
+
+Not covered by it, and still manual: **Stripe.js / the Payment Element**
+(`confirmSetup` / `confirmPayment` are browser-only — the second trial bug lived
+there), a signature Stripe itself delivered (needs a public URL or the Stripe CLI;
+the suite constructs signatures per Stripe's documented scheme over real event
+bodies instead), and completing Connect onboarding.
 
 ---
 

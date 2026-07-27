@@ -236,6 +236,29 @@ if (!ok) throw new Error("runway_cas_failed");
   track cumulative reversal per charge id, or a $5 goodwill refund revokes the
   whole pack.
 
+### Verified against real Stripe (`test/stripe-live.test.ts`)
+
+Every bullet below was **observed**, not reasoned about. Re-run the suite before
+changing anything it covers — see DEPLOY.md §10d for how, and §9 below for the
+one-liner.
+
+| Assumption | What Stripe really does |
+|---|---|
+| a `trial_period_days` sub is born card-less | `status: trialing`, `default_payment_method: null`, `pending_setup_intent` set (`requires_payment_method`) — **and `latest_invoice.payment_intent` is `null`**, so the client must confirm a *SetupIntent*, not a PaymentIntent |
+| a trial's first invoice | `invoice.paid`, `amount_paid: 0`, `billing_reason: subscription_create`, emitted **not after** `customer.subscription.created` |
+| confirming the SetupIntent | Stripe re-fires `customer.subscription.updated` with `default_payment_method: "pm_…"` + `pending_setup_intent: null`, still `trialing`. No new event type to subscribe to |
+| a returning customer with a card on file | still gets a `pending_setup_intent` (status `requires_confirmation`) and the *subscription's* own `default_payment_method` stays `null` |
+| trial end, no card, `missing_payment_method: cancel` | `customer.subscription.deleted`, status `canceled`, **no invoice, no charge** |
+| trial end, carded | `customer.subscription.updated` → `active` plus `invoice.paid` `billing_reason: subscription_cycle` with the real amount |
+| `trial_will_end` | fires for the card-less trial too, carrying `default_payment_method: null` — so the copy must branch on it |
+| PaymentIntent metadata | **is inherited by the Charge**, which is the only reason `charge.refunded` can compute a proportional credit reversal |
+| `charge.refunded` | Charge object; `amount` + a **cumulative** `amount_refunded`; `refunded: false` while partial |
+| `charge.dispute.created` | a **Dispute**: no `customer` key at all, `metadata: {}`, carries `charge` / `payment_intent` / `amount` |
+| webhook payload version | renders at the **endpoint / account** version, never at our request pin. On a current account `invoice.subscription` is absent and **`subscription.current_period_end` is absent** |
+| losing the API pin | `expand=latest_invoice.payment_intent` **silently returns nothing** — no Stripe error — so `/billing/plan-intent` would 502 with nothing to debug |
+| `application_fee_amount >= amount` | **accepted, and the charge succeeds.** Stripe does not reject it; the clamp in `/connect/pay-intent` is our rule, and it is the only thing stopping the platform taking the whole charge |
+| `charges_enabled: false` | does **not** stop a direct charge in test mode. That gate is ours |
+
 ---
 
 ## 6. AI
@@ -368,6 +391,10 @@ pnpm --filter @mossa/api test    # Miniflare integration
 pnpm e2e                         # Playwright, 3 golden paths, ~35s. Builds the
                                  # SPA and boots the worker itself; stop any
                                  # `wrangler dev` first (shared .wrangler state)
+
+# The real-Stripe billing suite — opt-in, ~110s, NOT part of `pnpm test`
+export STRIPE_TEST_SECRET_KEY=sk_test_…   # test mode ONLY; never commit a key
+pnpm --filter @mossa/api exec vitest run test/stripe-live.test.ts
 cd apps/api && npx wrangler deploy --dry-run --outdir /tmp/x   # validates bindings
 ```
 
@@ -377,6 +404,16 @@ cd apps/api && npx wrangler deploy --dry-run --outdir /tmp/x   # validates bindi
   and reports **"no tests"** rather than failing — a silent green. `pnpm test`
   handles the ordering; a direct `--filter @mossa/api test` does not.
 - **Stop `wrangler dev` before running tests** — they share `.wrangler` state.
+- **`test/stripe-live.test.ts` skips unless `STRIPE_TEST_SECRET_KEY` is exported.**
+  Putting it in `apps/api/.dev.vars` is deliberately not enough: `vitest.config.ts`
+  threads the binding from the shell and defaults it to `""`, so a keyless or
+  offline `pnpm test` stays green. A non-`sk_test_` key **fails** rather than
+  skips. It is the one place assumptions about Stripe's behaviour get proven —
+  §5's table and DEPLOY.md §10d.
+- **The Workers pool runs with `isolatedStorage`, so D1/DO writes are rolled back
+  after every `it`.** A test that needs a previous test's rows must redo them
+  itself; suite fixtures go in `beforeAll`. This is silent — it looks like a
+  handler bug.
 - Don't append `--force` to `pnpm --filter @mossa/app build`; pnpm forwards it to
   vite, which dies with `CACError`.
 - **There is no linter.** `turbo.json` declares a `lint` task no package

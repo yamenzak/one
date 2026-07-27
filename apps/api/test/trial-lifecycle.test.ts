@@ -60,9 +60,9 @@ async function seedTenant(tenantId: string, customerId: string): Promise<void> {
 
 const subRow = async (tenantId: string) =>
   (await (env.DB as D1Database)
-    .prepare("SELECT plan_id, status, pending_plan_id, stripe_sub_id FROM subscriptions WHERE tenant_id = ?")
+    .prepare("SELECT plan_id, status, pending_plan_id, stripe_sub_id, current_period_end FROM subscriptions WHERE tenant_id = ?")
     .bind(tenantId)
-    .first<{ plan_id: string; status: string; pending_plan_id: string | null; stripe_sub_id: string | null }>())!;
+    .first<{ plan_id: string; status: string; pending_plan_id: string | null; stripe_sub_id: string | null; current_period_end: string | null }>())!;
 
 /** The `customer.subscription.created|updated` payload Stripe really sends for a
  *  `/billing/plan-intent` trial. `card: false` is the observed pre-confirmation
@@ -175,6 +175,39 @@ describe("trial lifecycle — a trial grants nothing until a card is attached", 
     const row = await subRow(tenantId);
     expect([row.plan_id, row.status]).toEqual(["light", "active"]);
     expect((await stub.view()).granted).toBe(3000);
+  });
+
+  it("stamps the renewal date from a Basil-shaped payload, where it lives on the items", async () => {
+    // Regression guard for a bug the live-Stripe suite caught and this suite could
+    // not: `current_period_end` moved OFF the Subscription root in Basil
+    // (2025-03-31+) onto `items.data[].current_period_end`, and webhook payloads
+    // render at the ENDPOINT's dashboard API version — not the version this repo
+    // pins for its own requests. Reading only the root left the date null forever,
+    // so Business showed no "renews on" until an invoice arrived.
+    //
+    // Every other fixture in this file hand-feeds the pre-Basil root field, which is
+    // precisely why the synthetic suite was blind to it. This one deliberately does
+    // NOT set the root, exactly as a current Stripe account delivers it.
+    const tenantId = "tenant_trial_basil";
+    await seedTenant(tenantId, "cus_trial_basil");
+    const periodEnd = Math.floor(Date.now() / 1000) + 30 * 86_400;
+    const payload = JSON.stringify({
+      id: "evt_trial_basil",
+      type: "customer.subscription.updated",
+      data: {
+        object: {
+          id: "sub_trial_basil",
+          status: "active",
+          customer: "cus_trial_basil",
+          items: { data: [{ current_period_end: periodEnd }] },
+          metadata: { mossa_tenant: tenantId, mossa_plan: "light" },
+        },
+      },
+    });
+    expect((await post(payload)).status).toBe(200);
+    const row = await subRow(tenantId);
+    expect(row.plan_id).toBe("light");
+    expect(row.current_period_end).toBe(new Date(periodEnd * 1000).toISOString());
   });
 
   it("the $0 trial-start invoice.paid is not a payment — the second door stays shut", async () => {
