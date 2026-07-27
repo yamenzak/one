@@ -444,3 +444,72 @@ describe("model-catalog sync — discovery and per-provider reconciliation", () 
     expect((await modelRow("gemini-2.0-flash"))!.task).toBe(beforeTask);
   });
 });
+
+/**
+ * Model pricing, as it reaches the two surfaces that show it.
+ *
+ * The domain math is unit-tested next door; what is proven here is that the
+ * numbers actually arrive, in the right shape, on the right side of the
+ * tenant/platform line. A price that never reaches the picker cannot help
+ * anyone choose, and a rate card that leaks the platform's cost basis and
+ * margin to a tenant is a different kind of bug entirely.
+ */
+describe("model pricing reaches the pickers — in credits, without leaking the markup", () => {
+  interface TenantModel { id: string; label: string; task: string; provider: string; costPerRequest: Record<string, number> }
+
+  it("the tenant's AI settings quote every model in credits, per lane", async () => {
+    const r = (await (await SELF.fetch(`${ORIGIN}/api/settings/ai`, { headers: auth(ownerCookie) })).json()) as { models: TenantModel[] };
+    expect(r.models.length).toBeGreaterThan(0);
+
+    for (const m of r.models) {
+      // Every lane a feature could pick this model for is priced, and nothing
+      // is quoted free — a 0 would read as "this model costs nothing".
+      for (const lane of ["text", "text-small", "vision", "image", "speech"]) {
+        expect(typeof m.costPerRequest[lane], `${m.id}.${lane}`).toBe("number");
+        expect(m.costPerRequest[lane], `${m.id}.${lane}`).toBeGreaterThan(0);
+      }
+      // A small request is never dearer than a full one on the same model —
+      // the picker's ordering hint would be backwards.
+      expect(m.costPerRequest["text-small"]!).toBeLessThanOrEqual(m.costPerRequest.text!);
+    }
+
+    // The catalog spreads: a cheap model and a big one must not quote alike, or
+    // the whole surface tells an owner nothing.
+    const cheap = r.models.find((m) => m.id === "@cf/meta/llama-3.2-3b-instruct")!;
+    const big = r.models.find((m) => m.id === "@cf/meta/llama-3.3-70b-instruct-fp8-fast")!;
+    expect(cheap.costPerRequest.text!).toBeLessThan(big.costPerRequest.text!);
+  });
+
+  it("the tenant is told its price and NOT the platform's cost or margin", async () => {
+    const r = (await (await SELF.fetch(`${ORIGIN}/api/settings/ai`, { headers: auth(ownerCookie) })).json()) as { models: Record<string, unknown>[] };
+    for (const m of r.models) {
+      // Neuron rates are the platform's purchase price and `markup` is its
+      // margin. Both are inputs to the credit figure; neither is the tenant's
+      // business, and both used to be one `SELECT *` away from shipping.
+      for (const leak of ["input_rate", "output_rate", "unit_rate", "markup", "inputRate", "outputRate", "unitRate"]) {
+        expect(Object.keys(m), `${String(m.id)} leaks ${leak}`).not.toContain(leak);
+      }
+    }
+  });
+
+  it("the admin catalog carries the credit rate card alongside the neuron one", async () => {
+    interface AdminModel { id: string; task: string; markup: number | null; input_rate: number | null; pricing: { costPerRequest: Record<string, number>; perMillion: { input: number | null; output: number | null }; perUnit: { credits: number; kind: string } | null } }
+    const r = (await (await SELF.fetch(`${ORIGIN}/api/admin/ai/models`, { headers: auth(ownerCookie) })).json()) as { models: AdminModel[] };
+    expect(r.models.length).toBeGreaterThan(0);
+
+    const big = r.models.find((m) => m.id === "@cf/meta/llama-3.3-70b-instruct-fp8-fast")!;
+    // The operator keeps the cost basis…
+    expect(big.input_rate).toBe(26_668);
+    expect(big.markup).toBe(3);
+    // …and gains the price in the currency the studio is billed in.
+    expect(big.pricing.costPerRequest.text).toBe(8);
+    expect(big.pricing.perMillion).toEqual({ input: 881, output: 6_759 });
+    expect(big.pricing.perUnit).toBeNull();
+
+    // A per-unit model prices per unit, not per million tokens.
+    const image = r.models.find((m) => m.id === "gemini-2.5-flash-image")!;
+    expect(image.pricing.perUnit).toEqual({ credits: 117, kind: "image" });
+    // And it is visibly, correctly, an order of magnitude dearer.
+    expect(image.pricing.costPerRequest.image!).toBeGreaterThan(10 * big.pricing.costPerRequest.text!);
+  });
+});

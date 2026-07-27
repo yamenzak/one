@@ -19,7 +19,7 @@
  * tenant credits for the privilege. See AGENTS §6.
  */
 
-import { creditsForUsage, shouldUseMockLane, type ModelRate, type Usage } from "@mossa/domain";
+import { creditsForUsage, creditsPerMillionTokens, creditsPerUnit, referenceCredits, shouldUseMockLane, REFERENCE_USAGE, type ModelRate, type Usage } from "@mossa/domain";
 import type { TenantAiConfig, AiTone } from "@mossa/protocol";
 import type { Env } from "./env.js";
 import { newId, nowMs } from "./ids.js";
@@ -295,6 +295,26 @@ const rateOf = (m: AiModelRow): ModelRate => ({
   unitKind: (m.unit_kind as ModelRate["unitKind"]) ?? undefined,
   markup: m.markup ?? undefined,
 });
+
+/** What a typical request on `m` costs, in credits, for every lane it could be
+ *  picked for. This is the ONLY cost shape a tenant is given: the neuron rate
+ *  card and the platform markup are the inputs, and they stay on the server. */
+export function modelCostPerRequest(m: AiModelRow): Record<string, number> {
+  const rate = rateOf(m);
+  return Object.fromEntries(Object.keys(REFERENCE_USAGE).map((lane) => [lane, referenceCredits(lane, rate)]));
+}
+
+/** The same model priced for an operator: credits per typical request in each
+ *  lane, plus the exact credit rate card. Admin-only — it still says nothing
+ *  about markup, which the admin reads from its own field. */
+export function modelPricing(m: AiModelRow): {
+  costPerRequest: Record<string, number>;
+  perMillion: { input: number | null; output: number | null };
+  perUnit: { credits: number; kind: string } | null;
+} {
+  const rate = rateOf(m);
+  return { costPerRequest: modelCostPerRequest(m), perMillion: creditsPerMillionTokens(rate), perUnit: creditsPerUnit(rate) };
+}
 
 export interface GenerateInput {
   tenantId: string;

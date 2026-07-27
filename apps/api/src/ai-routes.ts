@@ -15,7 +15,7 @@ import { gateFeature, resolveClientFlagsFor } from "./client-flags.js";
 import { tenantEntitlements, hasFeature, getConfig, setConfig } from "./billing-store.js";
 import {
   generate, generateImage, extractJson, listModels, checkClientDailyBudget,
-  estimateRunCredits, modelSupportsTask, preferredModelForTask, modelForTask, modelById, seedAiModels,
+  estimateRunCredits, modelSupportsTask, preferredModelForTask, modelForTask, modelById, seedAiModels, modelPricing,
   type AiModelRow,
 } from "./ai.js";
 import { buildClientContext } from "./ai-context.js";
@@ -1168,8 +1168,14 @@ export const aiAdminRoutes = new Hono<AppEnv>()
     if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
     const { seedAiModels } = await import("./ai.js");
     await seedAiModels(c.env.DB);
-    const rows = await c.env.DB.prepare("SELECT * FROM ai_models ORDER BY provider, task, label").all();
-    return c.json({ models: rows.results ?? [] });
+    const rows = await c.env.DB.prepare("SELECT * FROM ai_models ORDER BY provider, task, label").all<AiModelRow>();
+    // Every row carries its price in CREDITS as well as its neuron rate card.
+    // The neuron figures are the cost basis and stay useful to an operator, but
+    // they are not the currency anyone spends — without the credit conversion
+    // the catalog cannot answer "is this model expensive?", which is the only
+    // question being asked of it.
+    const models = (rows.results ?? []).map((m) => ({ ...m, pricing: modelPricing(m) }));
+    return c.json({ models });
   })
 
   /** Toggle / default / per-model markup override. */

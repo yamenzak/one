@@ -20,7 +20,7 @@ import { resolveEmailConfig, maskEmailConfig } from "./email-provider.js";
 
 const notifRole = (r: string | null | undefined): NotifRole => (r === "owner" || r === "trainer" || r === "assistant" || r === "client" ? r : "member");
 import { AI_FEATURES } from "./ai-features.js";
-import { listModels } from "./ai.js";
+import { listModels, modelCostPerRequest } from "./ai.js";
 
 export const settingsRoutes = new Hono<AppEnv>()
   .get("/settings", async (c) => {
@@ -259,7 +259,12 @@ export const settingsRoutes = new Hono<AppEnv>()
     const row = await c.env.DB.prepare("SELECT ai_config_json FROM tenant_settings WHERE tenant_id = ?")
       .bind(who.tenantId)
       .first<{ ai_config_json: string | null }>();
-    const models = (await listModels(c.env.DB)).map((m) => ({ id: m.id, label: m.label, task: m.task, provider: m.provider }));
+    // `costPerRequest` is what makes the picker a real decision: credits are the
+    // owner's currency, and a raw neuron rate card is not one. The markup and
+    // the neuron rates that produce it stay server-side.
+    const models = (await listModels(c.env.DB)).map((m) => ({
+      id: m.id, label: m.label, task: m.task, provider: m.provider, costPerRequest: modelCostPerRequest(m),
+    }));
     return c.json({ features: AI_FEATURES, models, tones: AI_TONES, voices: TTS_VOICES, config: parseJson(row?.ai_config_json, {}) });
   })
 
