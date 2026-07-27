@@ -2184,9 +2184,11 @@ describe("access gate — clientAccess in context", () => {
     await SELF.fetch(`${B}/api/context`, { headers: { origin: B, Cookie: cookie } }); // mints membership
     await SELF.fetch(`${B}/api/context/switch`, { method: "POST", headers: { "content-type": "application/json", origin: B, Cookie: cookie }, body: JSON.stringify({ tenantId }) });
 
-    const before = (await (await SELF.fetch(`${B}/api/context`, { headers: { origin: B, Cookie: cookie } })).json()) as { active: { role: string; clientId: string | null }; clientAccess: { active: boolean; required: boolean; daysRemaining: number | null } | null };
+    const before = (await (await SELF.fetch(`${B}/api/context`, { headers: { origin: B, Cookie: cookie } })).json()) as { active: { role: string; clientId: string | null }; clientAccess: { active: boolean; required: boolean; daysRemaining: number | null; archived: boolean } | null };
     expect(before.active.role).toBe("client");
-    expect(before.clientAccess).toEqual({ active: false, required: true, daysRemaining: null });
+    // `archived: false` is part of the contract now — the app checks it BEFORE the
+    // access gate, because a studio that archived someone must not sell to them.
+    expect(before.clientAccess).toEqual({ active: false, required: true, daysRemaining: null, archived: false });
 
     // Owner grants the package → the client is now covered.
     const grant = await SELF.fetch(`${B}/api/subscriptions/grant`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: client.id, packageId: pkg.id }) });
