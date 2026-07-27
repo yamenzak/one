@@ -402,6 +402,18 @@ describe("notifications — email provider + per-user preferences", () => {
     await SELF.fetch("http://x/api/notification-prefs", { method: "PATCH", headers: H, body: JSON.stringify({ "check-ins": { email: true } }) });
     const prefs1 = (await (await SELF.fetch("http://x/api/notification-prefs", { headers: auth(ownerCookie) })).json()) as { prefs: Record<string, { email: boolean }> };
     expect(prefs1.prefs["check-ins"]!.email).toBe(true);
+
+    // The write path offers exactly what the read path does. `commerce` is a real
+    // category, just not the owner's — posting it is a 400, not a silent no-op the
+    // caller reads back as saved. Same for a key that is not a category at all.
+    for (const body of [{ commerce: { email: true } }, { nonsense: { email: true } }]) {
+      const bad = await SELF.fetch("http://x/api/notification-prefs", { method: "PATCH", headers: H, body: JSON.stringify(body) });
+      expect(bad.status, JSON.stringify(body)).toBe(400);
+    }
+    // …and the rejected write left the stored row untouched.
+    const prefs2 = (await (await SELF.fetch("http://x/api/notification-prefs", { headers: auth(ownerCookie) })).json()) as { prefs: Record<string, { email: boolean }> };
+    expect(prefs2.prefs.commerce).toBeUndefined();
+    expect(prefs2.prefs["check-ins"]!.email).toBe(true);
   });
 
   it("a body-fat reading notifies the primary trainer (never the logger), deduped per day", async () => {

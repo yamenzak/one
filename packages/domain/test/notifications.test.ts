@@ -54,6 +54,22 @@ describe("notification preferences", () => {
     expect(m["plans-goals"]).toEqual({ inbox: true, email: true });
   });
 
+  it("a stored preference cannot grant a category the role does not have", () => {
+    // The escalation this guards: a row that already carries staff keys — written
+    // when the user WAS a coach, or by a client posting a hand-made body — must not
+    // survive the demotion. Role wins over storage, at read time, every time.
+    const staffKeys = JSON.stringify({ roster: { inbox: true, email: true }, billing: { inbox: true, email: true }, activity: { email: true } });
+    const stored = parseNotifPrefs(staffKeys);
+    expect(stored.roster).toEqual({ inbox: true, email: true }); // it IS stored…
+    for (const cat of ["roster", "billing", "activity", "sales"] as const) {
+      expect(resolveChannels("client", stored, cat), cat).toEqual({ inbox: false, email: false });
+    }
+    // …and the same row still resolves normally for someone who does hold the role.
+    expect(resolveChannels("owner", stored, "roster")).toEqual({ inbox: true, email: true });
+    // The matrix the settings UI renders never gains the key either.
+    expect(Object.keys(resolveAllChannels("client", stored))).not.toContain("roster");
+  });
+
   it("body-composition is a staff category the coach can tune", () => {
     expect(isNotifCategory("body-composition")).toBe(true);
     expect(categoriesForRole("trainer").map((c) => c.key)).toContain("body-composition");

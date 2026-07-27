@@ -192,6 +192,15 @@ export const settingsRoutes = new Hono<AppEnv>()
     const parsed = z.record(z.string(), z.object({ inbox: z.boolean().optional(), email: z.boolean().optional() }))
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    // Write the same set the GET offers, and no more. The read path re-checks the
+    // role anyway, so this is not the security boundary — it is what stops a
+    // client's row filling with staff-only keys (or arbitrary junk) that nothing
+    // will ever render, and it turns a wrong key into a 400 instead of a silent
+    // no-op the caller reads as success.
+    const role = notifRole(c.get("role"));
+    const allowed = new Set(categoriesForRole(role).map((x) => x.key as string));
+    const bad = Object.keys(parsed.data).filter((k) => !allowed.has(k));
+    if (bad.length) return c.json({ error: `not your category: ${bad.join(", ")}` }, 400);
     const row = await c.env.DB.prepare("SELECT notif_json FROM user_prefs WHERE user_id = ?").bind(who.userId).first<{ notif_json: string | null }>();
     const cur = parseNotifPrefs(row?.notif_json ?? null) as StoredNotifPrefs;
     for (const [cat, patch] of Object.entries(parsed.data)) {

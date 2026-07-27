@@ -323,8 +323,16 @@ export function parseNotifPrefs(json: string | null | undefined): StoredNotifPre
   }
 }
 
-/** The user's effective channels for a category = defaults overlaid by their stored choice. */
+/**
+ * The user's effective channels for a category = defaults overlaid by their
+ * stored choice — EXCEPT that a category the role cannot receive stays off no
+ * matter what is stored. A stored preference is a preference, not a grant: a
+ * client who once had `roster` written into their row (or who was a coach and
+ * was demoted) must not carry the old value forward into a role that shouldn't
+ * have it. Role is re-checked here, at read time, every time.
+ */
 export function resolveChannels(role: NotifRole, stored: StoredNotifPrefs, category: NotifCategory): ChannelPref {
+  if (!categoryAppliesTo(category, role)) return { inbox: false, email: false };
   const def = defaultChannels(role, category);
   const s = stored[category];
   return { inbox: s?.inbox ?? def.inbox, email: s?.email ?? def.email };
