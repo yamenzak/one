@@ -36,6 +36,10 @@ export const STUDIO_SETTINGS_SECTIONS: SettingsSectionMeta[] = [
   // does not exist and must never get a settings tab. Gating it here keeps the tab
   // consistent with the 403 `/foods/search-external` already returns.
   { key: "integrations", label: "Integrations", scope: "studio", requiresFeature: "externalSearch" },
+  // Closing the studio is irreversible, so it gets its own destination rather
+  // than sitting under whichever tab an owner happened to be reading. Last in
+  // the row, and never the default.
+  { key: "danger", label: "Danger zone", scope: "studio" },
 ];
 
 /**

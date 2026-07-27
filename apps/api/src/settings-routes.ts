@@ -69,6 +69,7 @@ export const settingsRoutes = new Hono<AppEnv>()
             // `applyBranding` would inject broken CSS into every page.
             shadow: z.enum(["none", "subtle", "soft", "dramatic"]).nullish(),
             borderColor: z.string().max(120).nullish(),
+            borderWidth: z.number().min(0).max(4).nullish(),
             defaultMode: z.enum(["dark", "light"]).nullish(),
             logoUrl: z.string().max(500).nullish(),
             iconUrl: z.string().max(500).nullish(),

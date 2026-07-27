@@ -44,6 +44,8 @@ export interface Branding {
   radius?: number | null;
   /** Elevation preset — scales every `--shadow-*` token together. */
   shadow?: ShadowPreset | null;
+  /** Hairline weight in px (`--border-width`). 0 removes every border app-wide. */
+  borderWidth?: number | null;
   /** Hairline colour (`--border` + `--input`). Applied to BOTH modes; the
    *  advanced token editor can still set a different one per mode. */
   borderColor?: string | null;
@@ -72,6 +74,13 @@ export interface Branding {
  * never touches this setting is unaffected.
  */
 export type ShadowPreset = "none" | "subtle" | "soft" | "dramatic";
+
+/** Hairline weights offered in the brand editor. */
+export const BORDER_WIDTHS: { value: number; label: string }[] = [
+  { value: 0, label: "None" },
+  { value: 1, label: "Hairline" },
+  { value: 2, label: "Bold" },
+];
 
 export const SHADOW_PRESETS: { id: ShadowPreset; label: string; hint: string }[] = [
   { id: "none", label: "Flat", hint: "No shadows at all — hairlines carry the layering." },
@@ -247,6 +256,11 @@ export function applyBranding(branding: Branding | null | undefined): void {
   // derived from the brand primary and is an accent, not an elevation step.
   const scale = branding?.shadow ? SHADOW_SCALE[branding.shadow] : undefined;
   if (scale) rootExtra += `--shadow-sm:${scale[0]};--shadow-md:${scale[1]};--shadow-lg:${scale[2]};`;
+  // Hairline weight. Clamped rather than trusted: this value lands in a
+  // stylesheet, and a NaN or a negative would take out every border silently.
+  if (branding?.borderWidth != null && Number.isFinite(branding.borderWidth)) {
+    rootExtra += `--border-width:${Math.max(0, Math.min(4, branding.borderWidth))}px;`;
+  }
   const css =
     `:root{${rootExtra}${cssBlock(dark)}}` +
     `:root[data-theme="light"]{${cssBlock(light)}}`;

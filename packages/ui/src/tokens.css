@@ -339,3 +339,27 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/**
+ * Border width, themeable.
+ *
+ * Tailwind emits `.border { border-width: 1px }` as a literal, so a studio could
+ * pick a hairline COLOUR but never its weight — and "turn every border off" was
+ * not expressible at all. These re-point the width utilities the app actually
+ * uses at `--border-width`, which `applyBranding` sets. `0` genuinely removes
+ * every hairline app-wide.
+ *
+ * Only the width utilities are touched; `border-0` / `border-t-0` are deliberate
+ * removals and stay at zero. `border-2` scales with the same factor, so it
+ * disappears together with the rest rather than being the one line left behind.
+ *
+ * Declared after the Tailwind import so source order settles the tie.
+ */
+@layer utilities {
+  .border { border-width: var(--border-width, 1px); }
+  .border-t { border-top-width: var(--border-width, 1px); }
+  .border-b { border-bottom-width: var(--border-width, 1px); }
+  .border-l { border-left-width: var(--border-width, 1px); }
+  .border-r { border-right-width: var(--border-width, 1px); }
+  .border-2 { border-width: calc(var(--border-width, 1px) * 2); }
+}

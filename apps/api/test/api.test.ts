@@ -3815,3 +3815,69 @@ describe("invited members land in the studio without an explicit switch", () => 
     expect(inv?.status).toBe("accepted");
   }, 30_000);
 });
+
+/**
+ * Branding round-trip.
+ *
+ * The brand editor seeds its form from what this returns, so a field the PATCH
+ * schema drops or the merge loses does not fail loudly — it silently shows a
+ * returning owner the DEFAULTS while the app around them stays correctly themed.
+ * That is exactly the shape of bug reported for the appearance controls, so every
+ * field the editor writes is asserted to come back.
+ */
+describe("branding persists every appearance control", () => {
+  it("round-trips radius, elevation, hairline colour and border weight", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    // Branding edits need the entitlement.
+    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+
+    const sent = {
+      radius: 0.55,
+      shadow: "dramatic" as const,
+      borderColor: "#3a3a42",
+      borderWidth: 0,
+      tokens: { dark: { "--primary": "oklch(0.62 0.19 262)" }, light: { "--primary": "oklch(0.55 0.19 262)" } },
+    };
+    const put = await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ branding: sent }) });
+    expect(put.status).toBe(200);
+
+    const back = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as {
+      branding: { radius?: number; shadow?: string; borderColor?: string; borderWidth?: number; tokens?: { dark?: Record<string, string> } };
+    };
+    expect(back.branding.radius).toBe(0.55);
+    expect(back.branding.shadow).toBe("dramatic");
+    expect(back.branding.borderColor).toBe("#3a3a42");
+    // 0 is the interesting one: "no borders at all" must survive every
+    // `|| default` and `?? default` between here and the stylesheet.
+    expect(back.branding.borderWidth).toBe(0);
+    // The token set is what the editor reads the brand colour back out of, now
+    // that `primary`/`preset` are deliberately nulled on save.
+    expect(back.branding.tokens?.dark?.["--primary"]).toBe("oklch(0.62 0.19 262)");
+
+    // …and /api/context carries the same branding, since that is what actually
+    // themes the app and seeds the editor.
+    const ctx2 = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as {
+      branding: { radius?: number; shadow?: string; borderWidth?: number } | null;
+    };
+    expect(ctx2.branding).toMatchObject({ radius: 0.55, shadow: "dramatic", borderWidth: 0 });
+
+    // A partial edit must not wipe the rest — the editor saves the whole object,
+    // but the merge is what makes an unrelated PATCH safe.
+    await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ branding: { radius: 1.2 } }) });
+    const after = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as {
+      branding: { radius?: number; shadow?: string; borderWidth?: number };
+    };
+    expect(after.branding).toMatchObject({ radius: 1.2, shadow: "dramatic", borderWidth: 0 });
+  });
+
+  it("refuses a border weight or elevation the stylesheet could not survive", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    // These land in a <style> block, so the schema is the only thing between a
+    // bad value and broken CSS on every page.
+    for (const bad of [{ borderWidth: -1 }, { borderWidth: 99 }, { shadow: "sparkly" }, { radius: 12 }]) {
+      const res = await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ branding: bad }) });
+      expect(res.status, JSON.stringify(bad)).toBe(400);
+    }
+  });
+});

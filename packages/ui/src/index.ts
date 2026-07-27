@@ -13,3 +13,4 @@ export * from "./charts.js";
 export * from "./media.js";
 export * from "./shell.js";
 export * from "./patterns.js";
+export * from "./controls.js";

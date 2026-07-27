@@ -7,7 +7,7 @@ import { Fragment, useCallback, useEffect, useState, type ReactNode } from "reac
 import { motion } from "motion/react";
 import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger, ConfirmDialog,
-  BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, Input, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
+  BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
   KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
   ActionResult, TabIntro, cn, toneText, personaLabel, personaTone, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon,
 } from "@mossa/ui";
@@ -159,6 +159,7 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
     messaging: () => <><EmailSection /><NotificationPolicySection /><EmailTemplatesSection /></>,
     marketplace: () => <MarketplaceSection />,
     integrations: () => <IntegrationsSection />,
+    danger: () => <CloseStudioSection />,
   };
   const features = ctx?.entitlements.features;
   const groups = STUDIO_SETTINGS_SECTIONS
@@ -175,6 +176,7 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
     messaging: "How email leaves your studio — who sends it, which categories are allowed, and what the templates say.",
     marketplace: "Your public storefront: whether it's open, and whether clients can sign themselves up.",
     integrations: "Outside data sources you connect, and the keys they use.",
+    danger: "Closing the studio. Billing stops immediately, your data is held for seven days, then everything is erased — for you and for every member.",
   };
   const [sub, setSub] = useState<string>(groups[0]?.value ?? "signin");
   const active = groups.find((g) => g.value === sub) ?? groups[0];
@@ -189,7 +191,6 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
         {active && INTRO[active.value] && <TabIntro>{INTRO[active.value]}</TabIntro>}
         {active?.render()}
       </motion.div>
-      <CloseStudioSection />
     </div>
   );
 }
@@ -1297,9 +1298,39 @@ function IntegrationsSection() {
   );
 }
 
-function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | null; onPreview: (b: Branding | null) => void; onSaved: () => void }) {
+/**
+ * The saved brand colour.
+ *
+ * `primary` and `preset` are deliberately nulled on save — the generated token
+ * set is authoritative, so a second copy of the seed could only ever disagree
+ * with it. That means the seed has to be READ BACK OUT of the tokens, or the
+ * picker reverts to Mossa green on every reload even though the app around it is
+ * correctly themed. Dark is the canonical set; light is derived from it.
+ */
+const seedFrom = (b: Branding | null): string =>
+  b?.primary
+  || BRAND_PRESETS.find((p) => p.id === b?.preset)?.primary
+  || b?.tokens?.dark?.["--primary"]
+  || b?.tokens?.light?.["--primary"]
+  || "oklch(0.74 0.15 164)";
+
+/**
+ * `key`s the editor to the arrival of saved branding.
+ *
+ * Every field below is seeded with `useState(initial?.…)`, which runs once, on
+ * mount. Branding reaches the client with `/api/context` — normally AFTER this
+ * component mounts — so a returning owner was shown the DEFAULTS while the app
+ * around them was correctly themed from the values they had saved. Keying on
+ * "has branding loaded" remounts the editor exactly once, when the real values
+ * arrive; it deliberately does NOT key on the values themselves, which would
+ * discard in-progress edits every time a save refreshed the context.
+ */
+function BrandingEditor(props: { initial: Branding | null; onPreview: (b: Branding | null) => void; onSaved: () => void }) {
+  return <BrandingEditorForm key={props.initial ? "loaded" : "empty"} {...props} />;
+}
+
+function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding | null; onPreview: (b: Branding | null) => void; onSaved: () => void }) {
   const { ctx } = useSession();
-  const seedFrom = (b: Branding | null) => b?.primary || BRAND_PRESETS.find((p) => p.id === b?.preset)?.primary || "oklch(0.74 0.15 164)";
   const [tokens, setTokens] = useState<BrandTokens>(() => (initial?.tokens && hasTokens(initial.tokens) ? initial.tokens : deriveTokens({ primary: seedFrom(initial) })));
   const [seed, setSeed] = useState<string>(seedFrom(initial));
   const [neutral, setNeutral] = useState<NeutralTint>("brand");
@@ -1309,6 +1340,7 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
   // answer for most studios (dark needs a light translucent edge, light a dark
   // one); a single custom colour applies to BOTH modes, so it is opt-in.
   const [borderColor, setBorderColor] = useState<string>(initial?.borderColor ?? "");
+  const [borderWidth, setBorderWidth] = useState<number>(initial?.borderWidth ?? 1);
   const [logoUrl, setLogoUrl] = useState<string | null>(initial?.logoUrl ?? null);
   const [iconUrl, setIconUrl] = useState<string | null>(initial?.iconUrl ?? null);
   const [aiAvatarUrl, setAiAvatarUrl] = useState<string | null>(initial?.aiAvatarUrl ?? null);
@@ -1319,7 +1351,7 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
   const [msg, setMsg] = useState<string | null>(null);
 
   // Live-preview whenever the tokens or radius change (logo isn't a token).
-  useEffect(() => { onPreview({ tokens, radius, shadow, borderColor: borderColor || null, logoUrl, iconUrl }); }, [JSON.stringify(tokens), radius, shadow, borderColor]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { onPreview({ tokens, radius, shadow, borderColor: borderColor || null, borderWidth, logoUrl, iconUrl }); }, [JSON.stringify(tokens), radius, shadow, borderColor, borderWidth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Generate a full palette from one color (the smart path).
   const generate = (color: string, tint: NeutralTint = neutral) => { setSeed(color); setNeutral(tint); setTokens(deriveTokens({ primary: color, neutral: tint })); };
@@ -1360,7 +1392,7 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
   const save = async () => {
     setSaving(true);
     // Tokens carry everything now — null out legacy preset/primary fields.
-    try { await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, logoUrl, iconUrl, aiAvatarUrl, aiName: aiName.trim() || null, preset: null, primary: null, primaryForeground: null } }); onSaved(); setMsg("Branding saved."); }
+    try { await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, borderWidth, logoUrl, iconUrl, aiAvatarUrl, aiName: aiName.trim() || null, preset: null, primary: null, primaryForeground: null } }); onSaved(); setMsg("Branding saved."); }
     finally { setSaving(false); }
   };
 
@@ -1432,7 +1464,7 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
             <span className="text-sm font-medium">Brand color</span>
             <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
               Custom
-              <input type="color" value={seedHex} onChange={(e) => generate(e.target.value)} className="size-7 cursor-pointer rounded-md bg-transparent" />
+              <ColorSwatch size="sm" value={seedHex} onChange={(hex) => generate(hex)} label="Custom brand colour" />
             </label>
           </div>
           <div className="grid grid-cols-3 gap-2">
@@ -1455,10 +1487,12 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
           <div className="flex gap-2">{NEUTRALS.map((n) => <Chip key={n.id} selected={neutral === n.id} onClick={() => generate(seed, n.id)}>{n.label}</Chip>)}</div>
         </div>
 
-        {/* Radius */}
-        <div>
-          <div className="mb-1.5 flex items-center justify-between text-sm"><span className="text-muted-foreground">Corner radius</span><span className="numeral">{radius.toFixed(2)}rem</span></div>
-          <input type="range" min={0.4} max={1.4} step={0.05} value={radius} onChange={(e) => setRadius(Number(e.target.value))} className="w-full accent-primary" />
+        {/* Radius — the slider belongs to the design system now, and a live
+            preview sits beside it so the number is not the only feedback. */}
+        <div className="flex items-end gap-3">
+          <Slider className="min-w-0 flex-1" label="Corner radius" display={`${radius.toFixed(2)}rem`}
+            min={0.4} max={1.4} step={0.05} value={radius} onChange={setRadius} />
+          <span aria-hidden className="size-10 shrink-0 rounded-xl border border-border bg-primary/15" />
         </div>
 
         {/* Elevation. One preset drives --shadow-sm/md/lg, so every raised
@@ -1472,21 +1506,38 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
           <p className="text-xs text-muted-foreground">{SHADOW_PRESETS.find((p) => p.id === shadow)?.hint}</p>
         </div>
 
-        {/* Hairline colour. Blank keeps the per-mode defaults, which is usually
-            what you want; a single colour is applied to both modes. */}
+        {/* Border WEIGHT. 0 genuinely removes every hairline in the app — the
+            width utilities resolve to --border-width (see tokens.css). */}
+        <PreviewPicker
+          label="Borders"
+          value={borderWidth}
+          onChange={setBorderWidth}
+          options={BORDER_WIDTHS.map((w) => ({
+            value: w.value,
+            label: w.label,
+            preview: (
+              <span
+                aria-hidden
+                className="block w-9 rounded-md bg-surface-2"
+                /* design-tokens-exempt: this IS the border-width picker — each swatch has to draw its own candidate weight, so it cannot resolve to the live token it is choosing. */
+                style={{ height: "1.25rem", border: `${w.value}px solid var(--border)` }}
+              />
+            ),
+          }))}
+          hint={borderWidth === 0
+            ? "Every divider and card edge is off — surfaces separate by colour and elevation alone."
+            : "The weight of every divider and card edge in the app."}
+        />
+
+        {/* Hairline colour — pointless while borders are off, so it hides. */}
+        {borderWidth > 0 && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Border colour</span>
-            {borderColor && <button onClick={() => setBorderColor("")} className="text-xs font-medium text-primary">Reset</button>}
+            {borderColor && <button onClick={() => setBorderColor("")} className="text-xs font-medium text-primary">Reset to default</button>}
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="color"
-              aria-label="Border colour"
-              value={/^#[0-9a-f]{6}$/i.test(borderColor) ? borderColor : "#3a3a42"}
-              onChange={(e) => setBorderColor(e.target.value)}
-              className="size-10 shrink-0 cursor-pointer rounded-xl border border-border bg-surface-2 p-1"
-            />
+            <ColorSwatch value={borderColor} onChange={setBorderColor} label="Border colour" />
             <Input
               value={borderColor}
               onChange={(e) => setBorderColor(e.target.value)}
@@ -1495,10 +1546,11 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Every divider and card edge in the app. Leave it blank unless you need a specific hairline — the default is tuned
-            separately for light and dark, and one colour has to serve both. Fine-tune per mode below.
+            Leave blank unless you need a specific hairline — the default is tuned separately for light and dark, and one
+            colour has to serve both. Fine-tune per mode below.
           </p>
         </div>
+        )}
 
         {/* Advanced */}
         <button onClick={() => setAdvanced((a) => !a)} className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground">
@@ -1560,13 +1612,8 @@ function TokenGrid({ tokens, onSet }: { tokens: BrandTokens; onSet: (mode: "ligh
 function TokenCell({ mode, tokenKey, value, def, onSet }: { mode: "light" | "dark"; tokenKey: string; value: string; def: string; onSet: (mode: "light" | "dark", key: string, value: string) => void }) {
   return (
     <div className="flex w-[5.5rem] items-center gap-1 rounded-md border border-border/60 px-1.5 py-1">
-      <input
-        type="color"
-        value={colorToHex(value || def)}
-        onChange={(e) => onSet(mode, tokenKey, hexToOklchString(e.target.value))}
-        className="size-4 shrink-0 cursor-pointer rounded bg-transparent p-0"
-        aria-label={`${tokenKey} ${mode}`}
-      />
+      <ColorSwatch size="sm" className="size-5" value={colorToHex(value || def)}
+        onChange={(hex) => onSet(mode, tokenKey, hexToOklchString(hex))} label={`${tokenKey} ${mode}`} />
       <input
         value={value}
         placeholder={def.replace(/oklch\(|\)/g, "")}
