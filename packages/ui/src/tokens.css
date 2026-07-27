@@ -17,6 +17,9 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
+  /* The dim behind a modal/sheet. A token so a studio can soften or deepen it
+     — it was the last full-bleed surface in the app painted with a literal. */
+  --color-scrim: var(--scrim);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
@@ -91,6 +94,7 @@
   --card-foreground: oklch(0.975 0.003 285);
   --surface-2: oklch(0.235 0.007 285);
   --surface-3: oklch(0.275 0.008 285);
+  --scrim: oklch(0 0 0 / 0.6);
   --popover: oklch(0.21 0.006 285);
   --popover-foreground: oklch(0.975 0.003 285);
 
@@ -156,6 +160,8 @@
   --card-foreground: oklch(0.2 0.01 285);
   --surface-2: oklch(0.965 0.003 285);
   --surface-3: oklch(0.94 0.004 285);
+  /* Lighter in light mode: a 60% black dim over a white page is oppressive. */
+  --scrim: oklch(0 0 0 / 0.45);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.2 0.01 285);
 

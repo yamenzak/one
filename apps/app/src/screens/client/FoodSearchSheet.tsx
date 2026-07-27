@@ -403,8 +403,8 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
             <div className="space-y-2.5">
               {/* Snap a meal — the premium hero (gated the same as before: log mode). */}
               <button onClick={() => snapInputRef.current?.click()} className="group relative flex w-full items-center gap-4 overflow-hidden rounded-2xl bg-primary p-4 text-left text-primary-foreground shadow-sm transition-transform active:scale-[0.99]">
-                <span aria-hidden className="pointer-events-none absolute -right-6 -top-10 size-32 rounded-full bg-white/20 blur-2xl" />
-                <span className="relative grid size-12 shrink-0 place-items-center rounded-2xl bg-white/20 [&_svg]:size-6"><Camera /></span>
+                <span aria-hidden className="pointer-events-none absolute -right-6 -top-10 size-32 rounded-full bg-primary-foreground/20 blur-2xl" />
+                <span className="relative grid size-12 shrink-0 place-items-center rounded-2xl bg-primary-foreground/20 [&_svg]:size-6"><Camera /></span>
                 <span className="relative min-w-0 flex-1">
                   <span className="flex items-center gap-1.5 font-semibold"><AiAvatar className="size-4" /> Snap a meal</span>
                   <span className="mt-0.5 block text-sm text-primary-foreground/80">Photo → macros in seconds</span>

@@ -27,7 +27,7 @@ export function AiAnalyzing({ label, sub }: { label: string; sub?: string }) {
         <motion.span
           aria-hidden
           className="absolute inset-1 rounded-full opacity-60 blur-md"
-          style={{ background: "conic-gradient(from 0deg, transparent, var(--color-primary, #a3e635), transparent)" }}
+          style={{ background: "conic-gradient(from 0deg, transparent, var(--color-primary), transparent)" }}
           animate={{ rotate: 360 }}
           transition={{ duration: 2.4, ease: "linear", repeat: Infinity }}
         />
@@ -57,11 +57,11 @@ export function AiAnalyzing({ label, sub }: { label: string; sub?: string }) {
         {[0, 1, 2].map((i) => (
           <div key={i} className="flex items-center gap-3 rounded-xl bg-surface-2 p-3">
             <div className="size-9 shrink-0 overflow-hidden rounded-lg bg-surface-3">
-              <motion.div className="size-full bg-gradient-to-r from-transparent via-white/10 to-transparent" animate={{ x: ["-100%", "100%"] }} transition={{ duration: 1.3, ease: "easeInOut", repeat: Infinity, delay: i * 0.15 }} />
+              <motion.div className="size-full bg-gradient-to-r from-transparent via-foreground/10 to-transparent" animate={{ x: ["-100%", "100%"] }} transition={{ duration: 1.3, ease: "easeInOut", repeat: Infinity, delay: i * 0.15 }} />
             </div>
             <div className="flex-1 space-y-1.5">
               <div className="h-3 overflow-hidden rounded-full bg-surface-3" style={{ width: `${70 - i * 12}%` }}>
-                <motion.div className="size-full bg-gradient-to-r from-transparent via-white/10 to-transparent" animate={{ x: ["-100%", "100%"] }} transition={{ duration: 1.3, ease: "easeInOut", repeat: Infinity, delay: i * 0.15 }} />
+                <motion.div className="size-full bg-gradient-to-r from-transparent via-foreground/10 to-transparent" animate={{ x: ["-100%", "100%"] }} transition={{ duration: 1.3, ease: "easeInOut", repeat: Infinity, delay: i * 0.15 }} />
               </div>
               <div className="h-2.5 w-1/3 rounded-full bg-surface-3" />
             </div>

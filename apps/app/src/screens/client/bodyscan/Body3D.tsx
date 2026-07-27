@@ -194,6 +194,7 @@ export function Body3D({ profile, front, side, slices, heightCm, width = 220, he
     canvas.height = Math.round(height * dpr);
 
     // Resolve the accent to concrete rgb so shading works on any tenant colour.
+    // design-tokens-exempt: a last-resort fallback for getComputedStyle, used only if the probe element is missing; the real value IS read from the theme on the line above.
     const resolved = colorRef.current ? getComputedStyle(colorRef.current).color : "rgb(120,180,255)";
     const m = resolved.match(/(\d+(?:\.\d+)?)/g);
     const base = m && m.length >= 3 ? [Number(m[0]), Number(m[1]), Number(m[2])] : [120, 180, 255];
@@ -285,6 +286,7 @@ export function Body3D({ profile, front, side, slices, heightCm, width = 220, he
     <div className={className} style={{ width, height, position: "relative" }}>
       {/* A neutral clay gray reads as a clean anatomical model (the accent tint
           looked garish); Lambert shading below gives it form. */}
+      {/* design-tokens-exempt: fed to a WebGL Lambert shader, not to CSS. A deliberate anatomical clay grey — see the note above; the brand accent read as garish on a body mesh. */}
       <div ref={colorRef} style={{ color: "rgb(166,170,182)", width: 0, height: 0, position: "absolute" }} />
       <canvas ref={canvasRef} style={{ width, height, touchAction: "none", cursor: "grab" }} aria-label="Rotatable 3-D body from your silhouettes" />
     </div>

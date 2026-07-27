@@ -255,6 +255,7 @@ export function Switch({ className, ...props }: React.ComponentProps<typeof Swit
       )}
       {...props}
     >
+      {/* design-tokens-exempt: a switch thumb is white in BOTH modes, like the platform control it imitates — the track carries the brand (bg-input unchecked, bg-primary checked) and the thumb has to stay legible on both. */}
       <SwitchPrimitive.Thumb className="pointer-events-none block size-5 rounded-full bg-white shadow transition-transform data-[state=checked]:translate-x-[1.35rem] data-[state=unchecked]:translate-x-0.5" />
     </SwitchPrimitive.Root>
   );

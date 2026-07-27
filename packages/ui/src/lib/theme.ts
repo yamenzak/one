@@ -122,7 +122,7 @@ const SHADOW_SCALE: Record<ShadowPreset, [string, string, string]> = {
 
 /** Every themeable token, grouped for the advanced editor (bare names). */
 export const THEME_TOKEN_GROUPS: { label: string; tokens: string[] }[] = [
-  { label: "Surfaces", tokens: ["background", "foreground", "card", "card-foreground", "surface-2", "surface-3", "popover", "popover-foreground"] },
+  { label: "Surfaces", tokens: ["background", "foreground", "card", "card-foreground", "surface-2", "surface-3", "popover", "popover-foreground", "scrim"] },
   { label: "Brand & UI", tokens: ["primary", "primary-foreground", "secondary", "secondary-foreground", "muted", "muted-foreground", "accent", "accent-foreground", "border", "input", "ring"] },
   { label: "Status", tokens: ["destructive", "destructive-foreground", "success", "success-soft", "warning", "warning-soft", "danger", "danger-soft"] },
   { label: "Macros", tokens: ["calories", "calories-soft", "protein", "protein-soft", "carbs", "carbs-soft", "fat", "fat-soft"] },

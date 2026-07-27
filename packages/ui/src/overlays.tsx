@@ -18,7 +18,7 @@ import { Button } from "./primitives.js";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 const overlayCls =
-  "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm data-[state=open]:animate-[overlay-in_0.2s_ease] data-[state=closed]:animate-[overlay-out_0.15s_ease]";
+  "fixed inset-0 z-50 bg-scrim backdrop-blur-sm data-[state=open]:animate-[overlay-in_0.2s_ease] data-[state=closed]:animate-[overlay-out_0.15s_ease]";
 
 /**
  * How many px the on-screen keyboard overlaps the layout viewport, via the
@@ -174,7 +174,7 @@ export function Sheet({ open, onClose, title, titleAction, children }: { open: b
   return (
     <Drawer.Root open={open} onOpenChange={(o) => !o && onClose()} repositionInputs={false}>
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+        <Drawer.Overlay className="fixed inset-0 z-50 bg-scrim backdrop-blur-sm" />
         <Drawer.Content
           style={{ bottom: kb || undefined, maxHeight: kb ? `calc(100dvh - ${kb}px)` : undefined }}
           className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92vh] max-w-xl flex-col rounded-t-3xl border-t border-border/60 bg-popover outline-none transition-[max-height,bottom] duration-200 ease-out"
