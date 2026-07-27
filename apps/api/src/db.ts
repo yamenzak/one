@@ -19,7 +19,7 @@ let schemaReady: Promise<void> | null = null;
  *  isolate. A matching `schema_version` marker row lets subsequent cold starts
  *  skip the full DDL+ALTER+backfill (a single SELECT instead of ~110 DDL + ~45
  *  ALTER round-trips against live D1). */
-const SCHEMA_VERSION = "2026-07-24";
+const SCHEMA_VERSION = "2026-07-27";
 
 export function ensureSchema(db: D1Database): Promise<void> {
   if (!schemaReady) {
@@ -380,6 +380,25 @@ async function applySchema(db: D1Database): Promise<void> {
           )
           .run()
           .catch(() => undefined);
+        // Correction: a Workers AI model whose id says "vision"
+        // (`@cf/meta/llama-3.2-11b-vision-instruct`) used to be catalogued as
+        // `task = 'vision'`. Nothing here can run it that way — the Workers AI
+        // branch of `generate()` has no image path and the guard above it
+        // refuses the call — so the row was a pickable Snap-a-Meal model that
+        // failed every time with "model cannot read images", and the sync's
+        // cheapest-per-lane default election could crown it and break the lane
+        // outright. Vision is Gemini-only here (see `modelSupportsTask`). These
+        // are good TEXT models, so move them to a lane where they work rather
+        // than disabling them; `is_default` is cleared so the correction can
+        // never leave a stale vision default pointing at them.
+        await db
+          .prepare(
+            `UPDATE ai_models SET task = 'text', is_default = 0
+             WHERE provider = 'workers-ai' AND task IN ('vision', 'image')`,
+          )
+          .run()
+          .catch(() => undefined);
+
   // Stamp the version LAST — only a fully-applied schema records the marker, so
   // a failed run retries on the next request instead of being marked done.
   await db

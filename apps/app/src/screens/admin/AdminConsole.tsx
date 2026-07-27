@@ -856,7 +856,7 @@ interface ModelRow { id: string; label: string; provider: string; task: string; 
 const TASK_LANES: { task: string; label: string; desc: string }[] = [
   { task: "text", label: "Text", desc: "Plans, meals, articles, summaries." },
   { task: "text-small", label: "Text (small)", desc: "Short factual jobs — food and exercise metadata." },
-  { task: "vision", label: "Vision", desc: "Snap-a-Meal, label reader, lab extraction." },
+  { task: "vision", label: "Vision", desc: "Snap-a-Meal, label reader, lab extraction. Gemini only." },
   { task: "image", label: "Image", desc: "Generated cover, food and exercise images." },
   { task: "speech", label: "Speech", desc: "Spoken body-scan cues." },
 ];
@@ -1198,17 +1198,26 @@ function AiConfig() {
  * answer in one line — and prices the options while it asks.
  */
 function DefaultModelPicker({ models, busy, onPick }: { models: ModelRow[]; busy: string | null; onPick: (m: ModelRow) => void }) {
+  // Vision is served by ANY Gemini model (they are all multimodal), but
+  // `is_default` is scoped to a model's own task server-side (`UPDATE ai_models
+  // SET is_default = 0 WHERE task = ?`), so only an exact-lane row can be
+  // pinned. When the vision lane has no pinned row the engine still answers —
+  // `preferredModelForTask` widens to the Gemini text lanes — so name what will
+  // actually run instead of claiming the lane is broken.
+  const visionFallback = models.find((m) => m.provider === "google" && m.enabled === 1 && (m.task === "text" || m.task === "text-small") && m.is_default === 1)
+    ?? models.find((m) => m.provider === "google" && m.enabled === 1 && (m.task === "text" || m.task === "text-small"))
+    ?? null;
+
   const lanes = TASK_LANES.map((lane) => {
-    // Defaults are scoped to a model's OWN task server-side (`UPDATE ai_models
-    // SET is_default = 0 WHERE task = ?`), so only exact-lane models belong here.
     const options = models.filter((m) => m.task === lane.task);
     if (!options.length) return null;
-    const current = options.find((m) => m.is_default === 1 && m.enabled === 1)
+    const pinned = options.find((m) => m.is_default === 1 && m.enabled === 1) ?? null;
+    const current = pinned
       ?? options.find((m) => m.is_default === 1)
       // What the engine falls back to: first enabled row of the lane.
       ?? options.find((m) => m.enabled === 1)
       ?? null;
-    return { lane, options, current, adrift: !options.some((m) => m.is_default === 1 && m.enabled === 1) };
+    return { lane, options, current, pinned, fallback: lane.task === "vision" ? visionFallback : null };
   }).filter((l): l is NonNullable<typeof l> => !!l);
   if (!lanes.length) return null;
 
@@ -1220,7 +1229,7 @@ function DefaultModelPicker({ models, busy, onPick }: { models: ModelRow[]; busy
         one here switches it on too, since the engine only ever serves an enabled model.
       </p>
       <div className="space-y-2.5">
-        {lanes.map(({ lane, options, current, adrift }) => (
+        {lanes.map(({ lane, options, current, pinned, fallback }) => (
           <div key={lane.task} className="space-y-1">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -1247,11 +1256,20 @@ function DefaultModelPicker({ models, busy, onPick }: { models: ModelRow[]; busy
                 </select>
               )}
             </div>
-            {adrift && (
-              <p className="text-xs text-warning">
-                No enabled default — the engine is falling back to{" "}
-                {current ? <b>{current.label}</b> : <>nothing, and this lane will fail</>}. Pick one to pin it.
-              </p>
+            {!pinned && (
+              fallback ? (
+                // Vision with nothing pinned: any Gemini model reads images, so
+                // this is a working configuration, not a fault.
+                <p className="text-xs text-muted-foreground">
+                  Nothing pinned — <b className="text-foreground">{fallback.label}</b> answers it (every Gemini model
+                  reads images). Pin one above to fix it.
+                </p>
+              ) : (
+                <p className="text-xs text-warning">
+                  No enabled default — the engine is falling back to{" "}
+                  {current ? <b>{current.label}</b> : <>nothing, and this lane will fail</>}. Pick one to pin it.
+                </p>
+              )
             )}
           </div>
         ))}

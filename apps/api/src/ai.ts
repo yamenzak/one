@@ -257,8 +257,14 @@ export async function visionFallbackModel(db: D1Database): Promise<AiModelRow | 
  */
 export function modelSupportsTask(m: AiModelRow, task: "text" | "text-small" | "vision" | "image"): boolean {
   const text = m.task === "text" || m.task === "text-small";
-  if (task === "image") return m.task === "image" || (m.provider === "google" && text);
-  if (task === "vision") return m.task === "vision" || (m.provider === "google" && (text || m.task === "image"));
+  // Image generation and vision are GOOGLE-ONLY, and that is a property of this
+  // codebase, not of the models. The Workers AI branch of `generate()` never
+  // attaches `input.image` and the guard above it refuses the call outright, so
+  // a Workers-AI row is unusable for vision however its id reads — trusting the
+  // tag made `@cf/meta/llama-3.2-11b-vision-instruct` a pickable Snap-a-Meal
+  // model that failed every call with "model cannot read images".
+  if (task === "image") return m.provider === "google" && (m.task === "image" || text);
+  if (task === "vision") return m.provider === "google" && (m.task === "vision" || text || m.task === "image");
   return text;
 }
 
@@ -556,7 +562,12 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   // the stronger model and honors native JSON mode, so structured features are
   // far more reliable. Falls back to the Workers AI default otherwise.
   if (!model && geminiKey) model = await preferredModelForTask(env.DB, input.task, "google");
-  if (!model) model = await modelForTask(env.DB, input.task);
+  // `modelForTask` matches on the stored `task` column alone, so it can hand
+  // back a row this codebase cannot actually run on that lane — a Workers-AI
+  // row tagged `vision` being the case that bit. Re-check compatibility rather
+  // than trusting the tag; falling through to the vision fallback (or to an
+  // honest refusal) beats a model that errors on every call.
+  if (!model) { const m = await modelForTask(env.DB, input.task); if (m && compatible(m)) model = m; }
   // Vision fallback: no vision-tagged model → pick any enabled Gemini model.
   if (!model && input.task === "vision") model = await visionFallbackModel(env.DB);
   if (!model) return { ok: false, error: "unavailable", detail: `no enabled model for task "${input.task}" — sync the model catalog in admin` };

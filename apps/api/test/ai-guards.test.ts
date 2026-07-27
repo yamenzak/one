@@ -190,9 +190,18 @@ describe('ai.mock = "on" cannot fabricate data outside development', () => {
 
   it("a stored ai.mock=on no longer bypasses the vision-image refusal in production", async () => {
     const db = env.DB as D1Database;
-    // Force vision onto a NON-multimodal Workers AI model. That is the only
-    // configuration that reaches the `input.image && !isGoogle` refusal — and the
-    // one `mockMode === "on"` used to skip, fabricating billable "vision" output.
+    // Force vision onto a NON-multimodal Workers AI model — the configuration
+    // `mockMode === "on"` used to sail through, fabricating billable "vision"
+    // output (clinical lab markers, in this feature's case).
+    //
+    // Vision is now Gemini-only at the compatibility check (`modelSupportsTask`),
+    // because a Workers-AI row tagged `vision` is a model a studio could pick and
+    // that failed every call. So this configuration is refused one step EARLIER
+    // than it used to be — at model resolution rather than at the
+    // `input.image && !isGoogle` guard, which survives as a backstop for any
+    // future resolution path that forgets to check. The assertion below accepts
+    // either refusal: what must never change is that it is refused, before the
+    // reserve, with nothing fabricated and nothing billed.
     await db.prepare("UPDATE ai_models SET enabled = 0 WHERE provider = 'google'").run();
     await db
       .prepare(
@@ -204,7 +213,7 @@ describe('ai.mock = "on" cannot fabricate data outside development', () => {
       const res = await prodFetch("/api/ai/lab-extract", { method: "POST", headers: H(), body: JSON.stringify({ clientId, labId }) });
       expect(res.status).toBe(503);
       const body = (await res.json()) as { detail?: string };
-      expect(body.detail ?? "").toMatch(/cannot read images/i);
+      expect(body.detail ?? "").toMatch(/cannot read images|no enabled model for task "vision"/i);
       // Refused BEFORE the reserve — nothing held, nothing settled.
       expect(await balance()).toBe(before);
     } finally {
