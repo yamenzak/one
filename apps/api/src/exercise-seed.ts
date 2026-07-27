@@ -79,6 +79,9 @@ const SEED: SeedExercise[] = [
   E("exr_seed_farmer", "Farmer's Carry", "full_body", "forearms,traps,core", "dumbbell", "beginner", "static", "compound"),
 ];
 
+/** How many exercises the starter library installs. */
+export const SEED_COUNT = SEED.length;
+
 /**
  * Seed the platform starter library, once.
  *

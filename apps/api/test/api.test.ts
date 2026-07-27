@@ -837,11 +837,28 @@ describe("AI meal draft — library-grounded (never fabricated)", () => {
 });
 
 describe("AI workout draft — named exercises resolve to real ids", () => {
+  it("refuses outright when the library is empty, instead of billing for a doomed draft", async () => {
+    // The prompt whitelists library ids and discards anything outside them, so
+    // with no library every drafted exercise is thrown away. Refusing before the
+    // credit reserve is the difference between a clear message and a charge for
+    // an empty plan.
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "NoLib" }) })).json()) as { client: { id: string } };
+    const res = await SELF.fetch("http://x/api/ai/draft-plan", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: "empty_library" });
+  });
+
   it("drafts a plan and resolves each named exercise to a library/custom id", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
     const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "PlanAI" }) })).json()) as { client: { id: string } };
+    // A draft can only pick from a library that exists, and nothing installs one
+    // implicitly any more — so this test has to do what a real studio does.
+    await SELF.fetch("http://x/api/admin/starter-library", { method: "POST", headers: H, body: JSON.stringify({ install: true }) });
     const r = (await (await SELF.fetch("http://x/api/ai/draft-plan", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { draft: { days: { blocks: { slots: { exerciseId: string }[] }[] }[] } };
     const slots = r.draft.days.flatMap((d) => d.blocks.flatMap((b) => b.slots));
     expect(slots.length).toBeGreaterThan(0);
@@ -4048,7 +4065,12 @@ describe("a nuclear reset keeps platform configuration", () => {
       await db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v).run();
     }
     // The catalogs hold the Stripe product/price links created during setup.
-    await db.prepare("INSERT OR REPLACE INTO plans (id, name, price_usd_month, entitlements_json, stripe_product_id, stripe_price_id, ord, active) VALUES ('nuke_plan', 'Nuke', 9, '{}', 'prod_sentinel', 'price_sentinel', 1, 1)").run();
+    // A LIVE tier: the reset now sweeps retired ones, so the thing worth pinning
+    // is that a shipped plan keeps the Stripe objects created during setup.
+    await db.prepare("INSERT OR REPLACE INTO plans (id, name, price_usd_month, entitlements_json, stripe_product_id, stripe_price_id, ord, active) VALUES ('pro', 'Pro', 9, '{}', 'prod_sentinel', 'price_sentinel', 1, 1)").run();
+    // …and a RETIRED one, which must not survive: with no tenants left there is
+    // nobody to grandfather, and it is pure clutter in the admin catalog.
+    await db.prepare("INSERT OR REPLACE INTO plans (id, name, price_usd_month, entitlements_json, ord, active) VALUES ('team', 'Team (retired)', 99, '{}', 9, 0)").run();
     await db.prepare("INSERT OR REPLACE INTO credit_packs (id, name, credits, price_usd, stripe_product_id, stripe_price_id, ord, active) VALUES ('nuke_pack', 'Nuke', 100, 5, 'prod_pack_sentinel', 'price_pack_sentinel', 1, 1)").run();
 
     await purgeEverything(env as never);
@@ -4059,12 +4081,58 @@ describe("a nuclear reset keeps platform configuration", () => {
       expect(row?.value, `${k} was wiped by the reset`).toBe(v);
     }
     // …and so did the rows that point at Stripe objects.
-    expect((await db.prepare("SELECT stripe_price_id FROM plans WHERE id = 'nuke_plan'").first<{ stripe_price_id: string }>())?.stripe_price_id).toBe("price_sentinel");
+    expect((await db.prepare("SELECT stripe_price_id FROM plans WHERE id = 'pro'").first<{ stripe_price_id: string }>())?.stripe_price_id).toBe("price_sentinel");
+    expect(await db.prepare("SELECT id FROM plans WHERE id = 'team'").first(), "a retired tier survived the reset").toBeNull();
     expect((await db.prepare("SELECT stripe_price_id FROM credit_packs WHERE id = 'nuke_pack'").first<{ stripe_price_id: string }>())?.stripe_price_id).toBe("price_pack_sentinel");
 
     // Sanity: the reset DID do its job, or the assertions above are vacuous.
     expect((await db.prepare('SELECT COUNT(*) AS n FROM "organization"').first<{ n: number }>())?.n).toBe(0);
     expect((await db.prepare('SELECT COUNT(*) AS n FROM "user"').first<{ n: number }>())?.n).toBe(0);
     expect((await db.prepare("SELECT COUNT(*) AS n FROM clients").first<{ n: number }>())?.n).toBe(0);
+  });
+});
+
+/**
+ * The starter library is a choice, not a default.
+ *
+ * It used to install itself on the first `GET /api/exercises`, so a deployment
+ * could not be empty — deleting the rows just brought them back on the next
+ * request, which is why a nuclear reset appeared to "come back with premade
+ * exercises". Content an operator cannot refuse is not a starter kit.
+ */
+describe("the starter exercise library is opt-in", () => {
+  const seeded = async () =>
+    (await (env.DB as D1Database).prepare("SELECT COUNT(*) AS n FROM exercises WHERE source = 'seed' AND tenant_id IS NULL").first<{ n: number }>())?.n ?? 0;
+
+  it("browsing the library never installs it", async () => {
+    const res = await SELF.fetch("http://x/api/exercises", { headers: auth(ownerCookie) });
+    expect(res.status).toBe(200);
+    expect(await seeded(), "reading the library installed content into it").toBe(0);
+  });
+
+  it("an admin installs and removes it explicitly", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const before = (await (await SELF.fetch("http://x/api/admin/starter-library", { headers: auth(ownerCookie) })).json()) as { installed: boolean; available: number };
+    expect(before.installed).toBe(false);
+    expect(before.available).toBeGreaterThan(0);
+
+    const on = (await (await SELF.fetch("http://x/api/admin/starter-library", { method: "POST", headers: H, body: JSON.stringify({ install: true }) })).json()) as { count: number };
+    expect(on.count).toBe(before.available);
+    expect(await seeded()).toBe(before.available);
+
+    const off = (await (await SELF.fetch("http://x/api/admin/starter-library", { method: "POST", headers: H, body: JSON.stringify({ install: false }) })).json()) as { installed: boolean };
+    expect(off.installed).toBe(false);
+    // …and it STAYS removed: nothing re-seeds it behind the operator's back.
+    await SELF.fetch("http://x/api/exercises", { headers: auth(ownerCookie) });
+    expect(await seeded(), "the library re-seeded itself after being removed").toBe(0);
+  });
+
+  it("removing it leaves a studio's OWN exercises alone", async () => {
+    const db = env.DB as D1Database;
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await db.prepare("INSERT OR REPLACE INTO exercises (id, tenant_id, visibility, name, slug, source, active, created_at) VALUES ('exr_mine', ?, 'tenant', 'My Lift', 'my-lift', 'manual', 1, ?)").bind(ctx.active.tenantId, new Date().toISOString()).run();
+    await SELF.fetch("http://x/api/admin/starter-library", { method: "POST", headers: H, body: JSON.stringify({ install: false }) });
+    expect(await db.prepare("SELECT id FROM exercises WHERE id = 'exr_mine'").first(), "a studio's own exercise was deleted").not.toBeNull();
   });
 });

@@ -300,13 +300,18 @@ export const aiRoutes = new Hono<AppEnv>()
     if ("response" in access) return access.response;
 
     // Ground the model in the real library + the client's intake.
-    const { seedExercises } = await import("./exercise-seed.js");
-    await seedExercises(c.env.DB);
     const library = await c.env.DB.prepare(
       "SELECT id, name, muscle_groups, equipment FROM exercises WHERE active = 1 AND (tenant_id IS NULL OR tenant_id = ?) LIMIT 120",
     )
       .bind(who.tenantId)
       .all<{ id: string; name: string; muscle_groups: string | null; equipment: string | null }>();
+    // The prompt whitelists library ids and every drafted exercise is checked
+    // against them, so an EMPTY library cannot produce a usable plan — the model
+    // would invent ids and every one would be discarded. Refuse before reserving
+    // credits rather than bill for a draft that is guaranteed to come back empty.
+    if (!(library.results ?? []).length) {
+      return c.json({ error: "empty_library", detail: "Add exercises to your library first — a plan can only be drafted from exercises you have." }, 409);
+    }
     const libIds = new Set((library.results ?? []).map((e) => e.id));
     const nameOf = new Map((library.results ?? []).map((e) => [e.id, e.name]));
     // Few-shot: this studio's recent published plans as a style reference.

@@ -10,7 +10,6 @@ import { z } from "zod";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
-import { seedExercises } from "./exercise-seed.js";
 
 const CreateExercise = z.object({
   name: z.string().min(1).max(120),
@@ -86,7 +85,6 @@ export const libraryRoutes = new Hono<AppEnv>()
   // ── Exercises ──────────────────────────────────────────────────────────────
   .get("/exercises", async (c) => {
     const who = requireTenant(c)!;
-    await seedExercises(c.env.DB);
     const q = (c.req.query("q") ?? "").trim().toLowerCase();
     const muscle = c.req.query("muscle");
     // scope=all drops the active filter and the browse cap: it's the resolve

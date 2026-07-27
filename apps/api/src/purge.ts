@@ -19,6 +19,7 @@ import { stripeConfig, stripeEnabled, stripeCall } from "./stripe.js";
 import { notifyUser } from "./inbox-do.js";
 import { saasConfig, deleteCustomHostname } from "./cloudflare.js";
 import { invalidateHostCache } from "./host-context.js";
+import { DEFAULT_PLANS } from "./billing-store.js";
 
 /** Tables that carry a `client_id` — everything a single client's record owns.
  *
@@ -300,6 +301,18 @@ export async function purgeEverything(env: Env): Promise<{ tenants: number }> {
     "DELETE FROM auth_logs", "DELETE FROM verification", "DELETE FROM stripe_events", "DELETE FROM ai_cache",
   ];
   for (const sql of wipe) await run(env.DB, sql);
+
+  // Retired plan tiers (free / studio / team) exist for ONE reason: a tenant that
+  // bought them keeps exactly what it was sold. A nuclear reset leaves no tenants,
+  // so there is nobody left to grandfather and they are pure clutter in the admin
+  // catalog. Drop anything not in the shipped ladder; the live tiers keep their
+  // rows AND their Stripe product/price ids, which are expensive to re-create.
+  const live = DEFAULT_PLANS.map((p) => p.id);
+  await run(env.DB, `DELETE FROM plans WHERE id NOT IN (${live.map(() => "?").join(",")})`, ...live);
+
+  // The starter exercise library is platform content, not tenant data, so the
+  // blanket `DELETE FROM exercises` above already took it. It only returns if an
+  // admin installs it again — see `seedExercises`, which is no longer automatic.
   return { tenants: orgs.length };
 }
 
