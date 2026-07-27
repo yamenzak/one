@@ -3969,3 +3969,48 @@ describe("storage remaining is the owner's number", () => {
     expect(body).toHaveProperty("usedMb");
   });
 });
+
+/**
+ * The platform starter library must survive a wipe.
+ *
+ * `purgeEverything` (the nuclear reset) runs `DELETE FROM exercises`, which takes
+ * the platform seed with it. The seed is CODE, so it comes back — but only if the
+ * guard asks the database rather than remembering. A module-level flag lives for
+ * the life of the isolate, so a reset and the next request sharing one isolate
+ * left the library permanently empty until that isolate recycled: 40 exercises or
+ * 0, depending on nothing an operator could see. Empty is the worse outcome — the
+ * AI plan draft whitelists library ids, so with none it has nothing to pick from.
+ */
+describe("the platform exercise seed re-seeds after a wipe", () => {
+  const seedCount = async () =>
+    (await (env.DB as D1Database)
+      .prepare("SELECT COUNT(*) AS n FROM exercises WHERE source = 'seed' AND tenant_id IS NULL")
+      .first<{ n: number }>())?.n ?? 0;
+
+  it("comes back in the SAME isolate that emptied it", async () => {
+    const { seedExercises } = await import("../src/exercise-seed.js");
+    await seedExercises(env.DB as D1Database);
+    const before = await seedCount();
+    expect(before, "the seed should populate a fresh database").toBeGreaterThan(0);
+
+    // Exactly what the nuclear reset does to this table.
+    await (env.DB as D1Database).prepare("DELETE FROM exercises").run();
+    expect(await seedCount()).toBe(0);
+
+    // Same isolate, same module instance — this is the case the old flag failed.
+    await seedExercises(env.DB as D1Database);
+    expect(await seedCount(), "the library stayed empty after a wipe").toBe(before);
+  });
+
+  it("is idempotent, so the hot path does not re-write it", async () => {
+    // Each test gets its own storage stack, so seed FIRST and take the baseline
+    // from that — a baseline read before any seed is just 0.
+    const { seedExercises } = await import("../src/exercise-seed.js");
+    await seedExercises(env.DB as D1Database);
+    const seeded = await seedCount();
+    expect(seeded).toBeGreaterThan(0);
+    await seedExercises(env.DB as D1Database);
+    await seedExercises(env.DB as D1Database);
+    expect(await seedCount()).toBe(seeded);
+  });
+});

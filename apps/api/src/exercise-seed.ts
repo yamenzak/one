@@ -79,11 +79,31 @@ const SEED: SeedExercise[] = [
   E("exr_seed_farmer", "Farmer's Carry", "full_body", "forearms,traps,core", "dumbbell", "beginner", "static", "compound"),
 ];
 
-let exercisesSeeded = false;
-
+/**
+ * Seed the platform starter library, once.
+ *
+ * The guard is a cheap existence CHECK, not a module-level flag, and that
+ * distinction is load-bearing. A flag lives for the life of the isolate, but the
+ * rows it is tracking do not: `purgeEverything` (the platform nuclear reset)
+ * runs `DELETE FROM exercises`, which takes the seed with it. If the reset and
+ * the next request happened to share an isolate, the flag still said "seeded" and
+ * the library came back EMPTY — and stayed empty until that isolate recycled. So
+ * a reset produced 40 exercises or 0 depending on nothing the operator could see
+ * or control.
+ *
+ * Empty is the worse outcome, too: the AI plan draft whitelists library ids and
+ * grounds its prompt in them, so with no library it has nothing to pick from.
+ *
+ * `seedAiModels` already solved this the same way — one indexed `LIMIT 1` read
+ * skips the 40-row batch on the hot path, and it is correct in every isolate
+ * because it asks the database instead of remembering.
+ */
 export async function seedExercises(db: D1Database): Promise<void> {
-  if (exercisesSeeded) return;
-  exercisesSeeded = true;
+  const already = await db
+    .prepare("SELECT 1 AS x FROM exercises WHERE source = 'seed' AND tenant_id IS NULL LIMIT 1")
+    .first<{ x: number }>()
+    .catch(() => null);
+  if (already) return;
   const now = nowIso();
   await db
     .batch(
@@ -109,7 +129,7 @@ export async function seedExercises(db: D1Database): Promise<void> {
           ),
       ),
     )
-    .catch(() => {
-      exercisesSeeded = false;
-    });
+    // A failed batch simply leaves the table empty, and the check above will try
+    // again on the next request rather than latching "seeded" on a failure.
+    .catch(() => undefined);
 }
