@@ -10,6 +10,10 @@ import {
   referenceCredits,
   referenceUsage,
   REFERENCE_USAGE,
+  NEURON_COST_USD,
+  CREDITS_PER_DOLLAR,
+  type ModelRate,
+  type Usage,
 } from "../src/credits.js";
 
 describe("credits", () => {
@@ -105,5 +109,79 @@ describe("model pricing, in the currency a studio spends", () => {
   it("an image generation is visibly dearer than a text call — the point of showing it", () => {
     const image = referenceCredits("image", { inputRate: 27_273, unitRate: 3_545, unitKind: "image" as const, markup: 3 });
     expect(image).toBeGreaterThan(10 * referenceCredits("text", at(26_668, 204_805)));
+  });
+});
+
+// AI is the platform's margin. These pin the two properties that keep it: both
+// provider rails price through the SAME formula, and every rounding decision
+// falls the platform's way. A regression here does not throw — it quietly bills
+// less than the provider charges.
+describe("the meter never bills below cost, on either rail", () => {
+  const usdPerMToNeurons = (u: number) => Math.round(u / NEURON_COST_USD);
+  const usd = (credits: number) => credits / CREDITS_PER_DOLLAR;
+  const cost = (usage: Usage, rate: ModelRate) => neuronsForUsage(usage, rate) * NEURON_COST_USD;
+
+  // Workers AI publishes neurons directly; Gemini publishes USD, converted to
+  // neuron-equivalents at the same $0.011/1k. Same unit in, same formula out.
+  const RAILS: [string, ModelRate][] = [
+    ["workers-ai llama-3.3-70b", { inputRate: 26_668, outputRate: 204_805, markup: 3 }],
+    ["workers-ai llama-3.2-3b", { inputRate: 4_625, outputRate: 30_475, markup: 3 }],
+    ["gemini-2.5-flash", { inputRate: usdPerMToNeurons(0.3), outputRate: usdPerMToNeurons(2.5), markup: 3 }],
+    ["gemini-2.5-pro", { inputRate: usdPerMToNeurons(1.25), outputRate: usdPerMToNeurons(10), markup: 3 }],
+    ["gemini image (per unit)", { inputRate: usdPerMToNeurons(0.3), unitRate: Math.round(0.039 / NEURON_COST_USD), unitKind: "image", markup: 3 }],
+    ["gemini TTS (audio out)", { inputRate: usdPerMToNeurons(0.5), outputRate: usdPerMToNeurons(10), markup: 3 }],
+  ];
+
+  const WORKLOADS: [string, Usage][] = [
+    ["tiny", { inputTokens: 40, outputTokens: 12 }],
+    ["typical", { inputTokens: 2_000, outputTokens: 800 }],
+    ["long context", { inputTokens: 120_000, outputTokens: 4_000 }],
+    ["heavy thinking", { inputTokens: 2_000, outputTokens: 28_000 }],
+    ["one image", { inputTokens: 200, images: 1 }],
+  ];
+
+  it("bills at least markup × the real provider cost, for every rail × workload", () => {
+    for (const [rail, rate] of RAILS) {
+      for (const [name, usage] of WORKLOADS) {
+        const c = cost(usage, rate);
+        if (c <= 0) continue; // this rail does not bill that axis
+        const billed = usd(creditsForUsage(usage, rate));
+        // >= not ==: `ceil` on the credit rounds UP, so the platform's side.
+        expect(billed, `${rail} / ${name}`).toBeGreaterThanOrEqual(c * (rate.markup ?? 3));
+      }
+    }
+  });
+
+  it("rounding always favours the platform, never the tenant", () => {
+    for (const [rail, rate] of RAILS) {
+      for (const [name, usage] of WORKLOADS) {
+        const c = cost(usage, rate);
+        if (c <= 0) continue;
+        const billed = usd(creditsForUsage(usage, rate));
+        const realised = 1 - c / billed;
+        // Never below the nominal margin (66.7% at markup 3)…
+        expect(realised, `${rail} / ${name} margin`).toBeGreaterThanOrEqual(marginAt(rate.markup ?? 3) - 1e-9);
+        // …and the rounding bonus stays bounded, i.e. we are not wildly
+        // over-charging tiny calls either (the 1-credit floor is the only source).
+        expect(billed, `${rail} / ${name} sanity`).toBeLessThanOrEqual(Math.max(c * (rate.markup ?? 3) * 6, 0.002));
+      }
+    }
+  });
+
+  it("a sub-credit call still costs a credit — nothing is ever given away", () => {
+    const rate = { inputRate: 4_625, outputRate: 30_475, markup: 3 };
+    expect(creditsForUsage({ inputTokens: 1, outputTokens: 1 }, rate)).toBe(1);
+    // …but genuinely zero work is genuinely free (a released hold, a cache hit).
+    expect(creditsForUsage({}, rate)).toBe(0);
+  });
+
+  it("the two rails agree: equal real cost ⇒ equal credits", () => {
+    // $2.50/1M on Gemini and the neuron rate that costs the same on Workers AI
+    // must bill identically — the whole point of metering in neurons.
+    const same = usdPerMToNeurons(2.5);
+    const gemini = { outputRate: same, markup: 3 };
+    const workers = { outputRate: same, markup: 3 };
+    const usage = { outputTokens: 10_000 };
+    expect(creditsForUsage(usage, gemini)).toBe(creditsForUsage(usage, workers));
   });
 });

@@ -166,7 +166,16 @@ export class TenantBillingDO extends DurableObject<Env> {
     const holds = (await this.ctx.storage.get<Record<string, Hold>>("holds")) ?? {};
     const held = holds[hold];
     if (!held) return this.view(); // already settled/released/reaped — no double charge
-    const charge = Math.min(held.credits, Math.max(0, Math.ceil(actual)));
+    const want = Math.max(0, Math.ceil(actual));
+    const charge = Math.min(held.credits, want);
+    // The cap is a safety property — a hold is a promise the tenant can pay, so
+    // the settle must never exceed it. But every credit it shaves off is margin
+    // the platform silently eats, so it must not be invisible: if this fires, the
+    // reserve was not the upper bound it is supposed to be (see `estimateUsage` —
+    // hidden reasoning tokens and non-Latin input were both getting under it).
+    if (want > held.credits) {
+      console.warn(`[billing] settle capped for ${await this.tenant()}: wanted ${want} credits, reserve held ${held.credits} — ${want - held.credits} absorbed by the platform (reason=${reason} ref=${ref ?? "-"})`);
+    }
     delete holds[hold];
     await this.ctx.storage.put("holds", holds);
     await this.debit(charge, reason, ref);

@@ -363,20 +363,92 @@ const RUN_TIMEOUT_MS = 120_000;
 // overrun. 2048 covers a high-resolution photo with margin.
 const IMAGE_TOKEN_EST = 2048;
 
-/** The worst-case usage `generate()` reserves against — chars/4 in (plus an
- *  image allowance) and the full output cap out. Exported so the admin
- *  self-test can quote the same number it is about to spend, rather than a
- *  second, drifting estimate. */
-export function estimateUsage(args: { system: string; prompt: string; maxOutputTokens?: number; hasImage?: boolean }): Usage {
+/**
+ * Characters per input token, for sizing the reserve.
+ *
+ * NOT 4. Four chars/token is the English average, and an average is the wrong
+ * statistic for a bound: `settle` caps the charge at the reserve, so a reserve
+ * that lands under the real usage is money the platform pays and the studio does
+ * not. Arabic — which this product is squarely aimed at — tokenizes at roughly
+ * 2 chars/token, so chars/4 reserved about HALF the real input on an Arabic
+ * prompt and the shortfall was silently absorbed. 2.5 covers Latin comfortably
+ * and Arabic with a little room; over-reserving costs nothing but a slightly
+ * larger transient hold, released moments later.
+ */
+const CHARS_PER_INPUT_TOKEN = 2.5;
+
+/**
+ * Multiplier on the output cap when reserving against a Gemini model.
+ *
+ * `maxOutputTokens` bounds the ANSWER, not the billing. Gemini 2.5+ thinks by
+ * default and bills `thoughtsTokenCount` at the output rate on top of the
+ * answer, from a budget the request does not cap. Reserving only the answer cap
+ * therefore under-reserves every thinking model, and the settle cap turns that
+ * straight into lost margin. 3x is a working upper bound for a thinking budget
+ * against a capped answer.
+ */
+const THINKING_RESERVE_MULTIPLIER = 3;
+
+/** The worst-case usage a run reserves against: a conservative character→token
+ *  ratio in (plus an image allowance), and the output cap out — widened for a
+ *  provider that bills hidden reasoning tokens. Exported so the admin self-test
+ *  quotes the same number it is about to spend, not a second, drifting estimate. */
+export function estimateUsage(args: { system: string; prompt: string; maxOutputTokens?: number; hasImage?: boolean; provider?: string }): Usage {
+  const outCap = args.maxOutputTokens ?? 1024;
   return {
-    inputTokens: Math.ceil((args.system.length + args.prompt.length) / 4) + (args.hasImage ? IMAGE_TOKEN_EST : 0),
-    outputTokens: args.maxOutputTokens ?? 1024,
+    inputTokens: Math.ceil((args.system.length + args.prompt.length) / CHARS_PER_INPUT_TOKEN) + (args.hasImage ? IMAGE_TOKEN_EST : 0),
+    outputTokens: args.provider === "google" ? outCap * THINKING_RESERVE_MULTIPLIER : outCap,
   };
 }
 
 /** Upper-bound credits a `generate()` call on `model` would reserve. */
 export function estimateRunCredits(model: AiModelRow, args: { system: string; prompt: string; maxOutputTokens?: number; hasImage?: boolean }): number {
-  return creditsForUsage(estimateUsage(args), rateOf(model));
+  // `provider` comes from the model, so a quote can never disagree with the
+  // reserve the same run would actually take.
+  return creditsForUsage(estimateUsage({ ...args, provider: model.provider }), rateOf(model));
+}
+
+/**
+ * What to BILL for a completed run, given whatever the provider chose to report.
+ *
+ * `settle` caps the charge at the reserve (`Math.min(held.credits, actual)`), so
+ * every token we fail to count is a token the platform pays for and the studio
+ * does not. Two rules follow:
+ *
+ *  - A reported count is used as-is. It is the truth and it is what the provider
+ *    invoices us for.
+ *  - A MISSING count falls back to the RESERVE, not to a character estimate.
+ *    This is deliberate and it is the conservative direction: the reserve is the
+ *    worst case the tenant already had held, so charging it can never exceed
+ *    what they agreed to, and it cannot silently lose money. A chars/4 guess
+ *    would systematically under-bill — badly on a reasoning model, whose hidden
+ *    thinking tokens have no relationship at all to the visible answer's length,
+ *    and on any non-Latin script, where 4 chars/token is roughly double the real
+ *    ratio (Arabic runs ~2).
+ *
+ * The visible-output estimate is kept only as a FLOOR when the reserve somehow
+ * came out smaller, so the charge is never below what the text alone implies.
+ * A provider that reports nothing is also an anomaly worth seeing, so it is
+ * logged rather than absorbed quietly.
+ */
+function billedUsage(
+  reported: { inputTokens?: number; outputTokens?: number },
+  reserved: Usage,
+  output: string,
+  model: AiModelRow,
+): Usage {
+  const missing: string[] = [];
+  let inputTokens = reported.inputTokens;
+  if (typeof inputTokens !== "number") { missing.push("input"); inputTokens = reserved.inputTokens ?? 0; }
+  let outputTokens = reported.outputTokens;
+  if (typeof outputTokens !== "number") {
+    missing.push("output");
+    outputTokens = Math.max(reserved.outputTokens ?? 0, Math.ceil(output.length / 4));
+  }
+  if (missing.length) {
+    console.warn(`[ai] ${model.provider}/${model.id} reported no ${missing.join("/")} token count — billing the reserve (${inputTokens} in / ${outputTokens} out)`);
+  }
+  return { inputTokens, outputTokens };
 }
 
 function withTimeout<T>(p: Promise<T>): Promise<T> {
@@ -384,9 +456,48 @@ function withTimeout<T>(p: Promise<T>): Promise<T> {
 }
 
 interface GeminiPart { text?: string }
+interface GeminiUsage {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  /** Reasoning tokens. Google BILLS these at the output rate and they are NOT
+   *  included in candidatesTokenCount. Thinking is on by default on 2.5+. */
+  thoughtsTokenCount?: number;
+  totalTokenCount?: number;
+}
 interface GeminiResponse {
   candidates?: { content?: { parts?: GeminiPart[] }; finishReason?: string }[];
-  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+  usageMetadata?: GeminiUsage;
+}
+
+/**
+ * Output tokens Google will BILL for — not the same as the tokens it showed us.
+ * `candidatesTokenCount` counts only the visible answer; `thoughtsTokenCount`
+ * (reasoning, default-on for Gemini 2.5 and 3.x) is billed at the same output
+ * rate and is routinely several times larger. Reading only the visible count
+ * under-billed every thinking model badly enough to invert the margin: 800
+ * visible + 2,000 thinking tokens costs the platform 2,800 output tokens while
+ * the studio is charged for 800 — ~29% of cost recovered against a 3x markup,
+ * i.e. a loss on every call.
+ *
+ * `totalTokenCount - promptTokenCount` is the robust form: it sweeps up thoughts,
+ * the answer, and any future billed-output category Google adds without this
+ * needing to know its name. The named fields are the fallback.
+ *
+ * Returns undefined when the response carried no usage at all, so the caller
+ * falls back to its own estimate. Returning 0 — which is what this used to do —
+ * made the generation FREE: 0 is not nullish, so the caller's `?? estimate`
+ * never fired and `creditsForUsage` charged nothing.
+ */
+export function geminiBilledTokens(u: GeminiUsage | undefined): { inputTokens?: number; outputTokens?: number } {
+  if (!u) return {};
+  const inputTokens = typeof u.promptTokenCount === "number" ? u.promptTokenCount : undefined;
+  let outputTokens: number | undefined;
+  if (typeof u.totalTokenCount === "number" && typeof inputTokens === "number" && u.totalTokenCount - inputTokens >= 0) {
+    outputTokens = u.totalTokenCount - inputTokens;
+  } else if (typeof u.candidatesTokenCount === "number" || typeof u.thoughtsTokenCount === "number") {
+    outputTokens = (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0);
+  }
+  return { inputTokens, outputTokens };
 }
 
 /** Convert a standard JSON Schema to Gemini's responseSchema dialect (uppercase
@@ -446,10 +557,7 @@ async function runGemini(
   const finish = cand.finishReason;
   if (finish && finish !== "STOP" && finish !== "MAX_TOKENS") throw new Error(`response stopped (finishReason=${finish})`);
   if (!output.trim()) throw new Error("empty model response");
-  return {
-    output,
-    usage: { inputTokens: json.usageMetadata?.promptTokenCount ?? 0, outputTokens: json.usageMetadata?.candidatesTokenCount ?? 0 },
-  };
+  return { output, usage: geminiBilledTokens(json.usageMetadata) };
 }
 
 // ── Workers AI response envelopes ────────────────────────────────────────────
@@ -523,6 +631,47 @@ export function readWorkersAiOutput(raw: unknown): string {
   return "";
 }
 
+/**
+ * Assemble the system prompt actually sent to the model. Extracted so the three
+ * promises the AI settings screen makes to a studio owner are checkable rather
+ * than asserted:
+ *
+ *   1. EVERY feature's prompt is extendible. `extra` is the tenant's own
+ *      instructions and they are APPENDED, never substituted — the built-in
+ *      prompt carries the output contract each route parses against, so
+ *      replacing it would let a studio break its own features. The model is told
+ *      the studio asked, and told the house rules lose to the built-in ones.
+ *   2. Tone applies where tone means something. Only a `tonable` feature gets it:
+ *      a strict extractor (lab markers, food macros) must not be talked into a
+ *      "motivating" voice, and a per-feature tone overrides the house tone.
+ *   3. A JSON feature says so in words as well as in the provider's JSON mode.
+ *      Gemini has native JSON mode; Workers AI models obey a firm instruction
+ *      far better than a bare schema hint, and it costs nothing when both apply.
+ *
+ * Order matters and is fixed: built-in rules, then studio additions, then tone,
+ * then the output contract — so the format directive is the last thing the model
+ * reads and a chatty tone cannot bury it.
+ */
+export function composeSystem(args: {
+  base: string;
+  feature: string;
+  extra?: string | null;
+  tone?: AiTone | null;
+  expectsJson?: boolean;
+}): string {
+  let system = args.base;
+  if (args.extra && args.extra.trim()) {
+    system = `${system}\n\nThe studio has also asked you to follow these additional instructions, as long as they don't conflict with the rules above:\n${args.extra.trim()}`;
+  }
+  if (featureDef(args.feature)?.tonable && args.tone && TONE_GUIDE[args.tone]) {
+    system = `${system}\n\n${TONE_GUIDE[args.tone]}`;
+  }
+  if (args.expectsJson) {
+    system = `${system}\n\nOutput format: respond with ONLY a single valid JSON value — no prose, no explanation, no markdown code fences. Do not wrap the JSON in \`\`\`.`;
+  }
+  return system;
+}
+
 export async function generate(env: Env, input: GenerateInput): Promise<GenerateResult> {
   // Resolve the tenant's per-feature AI config (enable, model, prompt, tone).
   const { config, toggles } = await loadTenantAi(env.DB, input.tenantId);
@@ -577,21 +726,13 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   // tenant's custom instructions are APPENDED (framed as an extra request), so
   // they refine rather than clobber the engine's output contract. A house or
   // per-feature tone is appended for tonable (creative) features only.
-  const def = featureDef(input.feature);
-  let system = input.system;
-  if (fcfg.system && fcfg.system.trim()) {
-    system = `${system}\n\nThe studio has also asked you to follow these additional instructions, as long as they don't conflict with the rules above:\n${fcfg.system.trim()}`;
-  }
-  if (def?.tonable) {
-    const tone = (fcfg.tone ?? config.tone) as AiTone | null | undefined;
-    if (tone && TONE_GUIDE[tone]) system = `${system}\n\n${TONE_GUIDE[tone]}`;
-  }
-  // JSON features: nail the output contract in the system prompt too. Gemini
-  // has native JSON mode, but Workers AI models obey a firm instruction far
-  // better than a bare schema hint — and it costs nothing when JSON mode is on.
-  if (input.expectsJson) {
-    system = `${system}\n\nOutput format: respond with ONLY a single valid JSON value — no prose, no explanation, no markdown code fences. Do not wrap the JSON in \`\`\`.`;
-  }
+  const system = composeSystem({
+    base: input.system,
+    feature: input.feature,
+    extra: fcfg.system,
+    tone: (fcfg.tone ?? config.tone) as AiTone | null | undefined,
+    expectsJson: input.expectsJson,
+  });
   const runInput: GenerateInput = { ...input, system };
 
   const mockMode = cfg["ai.mock"] ?? "auto";
@@ -613,7 +754,7 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   // Worst-case estimate for the hold: prompt tokens (~chars/4) in, cap out, plus
   // a worst-case image allowance so a vision call reserves for the image tokens
   // the char count can't see (keeps the reserve a true upper bound).
-  const estUsage = estimateUsage({ system, prompt: input.prompt, maxOutputTokens: input.maxOutputTokens, hasImage: !!input.image });
+  const estUsage = estimateUsage({ system, prompt: input.prompt, maxOutputTokens: input.maxOutputTokens, hasImage: !!input.image, provider: model.provider });
   const estimate = creditsForUsage(estUsage, rate);
 
   const dobj = env.BILLING.get(env.BILLING.idFromName(input.tenantId));
@@ -634,7 +775,7 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
     } else if (isGoogle) {
       const g = await withTimeout(runGemini(geminiKey!, model.id, runInput));
       output = g.output;
-      usage = { inputTokens: g.usage.inputTokens ?? estUsage.inputTokens, outputTokens: g.usage.outputTokens ?? Math.ceil(output.length / 4) };
+      usage = billedUsage(g.usage, estUsage, output, model);
     } else {
       const args: Record<string, unknown> = {
         messages: [
@@ -661,10 +802,7 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
       // gemma-4-26b for 1-3 credits each with nothing to show. Throwing releases
       // the hold, so nothing is charged.
       if (!output.trim()) throw new Error("empty model response");
-      usage = {
-        inputTokens: result.usage?.prompt_tokens ?? estUsage.inputTokens,
-        outputTokens: result.usage?.completion_tokens ?? Math.ceil(output.length / 4),
-      };
+      usage = billedUsage({ inputTokens: result.usage?.prompt_tokens, outputTokens: result.usage?.completion_tokens }, estUsage, output, model);
     }
   } catch (err) {
     await dobj.release(hold.hold);
@@ -719,7 +857,7 @@ async function runGeminiImage(key: string, modelId: string, prompt: string, refe
   const json = (await res.json()) as GeminiImageResponse;
   const part = (json.candidates?.[0]?.content?.parts ?? []).find((p) => p.inlineData?.data);
   if (!part?.inlineData?.data) throw new Error("no image");
-  return { bytes: b64ToBytes(part.inlineData.data), mimeType: part.inlineData.mimeType ?? "image/png", inputTokens: json.usageMetadata?.promptTokenCount ?? Math.ceil(prompt.length / 4) };
+  return { bytes: b64ToBytes(part.inlineData.data), mimeType: part.inlineData.mimeType ?? "image/png", inputTokens: json.usageMetadata?.promptTokenCount ?? Math.ceil(prompt.length / CHARS_PER_INPUT_TOKEN) };
 }
 
 /**
@@ -736,7 +874,9 @@ export async function generateImage(env: Env, input: GenerateImageInput): Promis
   // Any Gemini model can generate images; prefer a dedicated image-priced model
   // (per-image billing), else fall back to any enabled Gemini model.
   let model: AiModelRow | null = null;
-  if (fcfg.model) { const m = await modelById(env.DB, fcfg.model); if (m && (m.task === "image" || m.provider === "google")) model = m; }
+  // One shared compatibility rule, so the per-feature override here cannot
+  // accept a model `generate()`/`modelSupportsTask` would reject.
+  if (fcfg.model) { const m = await modelById(env.DB, fcfg.model); if (m && modelSupportsTask(m, "image")) model = m; }
   if (!model) model = await modelForTask(env.DB, "image");
   if (!model) model = await visionFallbackModel(env.DB);
   if (!model || model.provider !== "google") return { ok: false, error: "unavailable", detail: "no enabled Gemini image model — add a Gemini key and sync the catalog" };
@@ -762,7 +902,7 @@ export async function generateImage(env: Env, input: GenerateImageInput): Promis
     if (limitBytes >= 0 && usedBytes >= limitBytes) return { ok: false, error: "storage_full", usedBytes, limitBytes };
   }
 
-  const estUsage: Usage = { inputTokens: Math.ceil(prompt.length / 4), images: 1 };
+  const estUsage: Usage = { inputTokens: Math.ceil(prompt.length / CHARS_PER_INPUT_TOKEN), images: 1 };
   const estimate = creditsForUsage(estUsage, rate);
   const dobj = env.BILLING.get(env.BILLING.idFromName(input.tenantId));
   await dobj.bind(input.tenantId);
@@ -839,7 +979,7 @@ interface GeminiTtsResponse {
   usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
 }
 
-async function runGeminiTts(key: string, modelId: string, text: string, voice: string): Promise<{ pcm: Uint8Array; sampleRate: number; inputTokens: number; outputTokens: number }> {
+async function runGeminiTts(key: string, modelId: string, text: string, voice: string): Promise<{ pcm: Uint8Array; sampleRate: number; inputTokens?: number; outputTokens?: number }> {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`,
     {
@@ -859,8 +999,10 @@ async function runGeminiTts(key: string, modelId: string, text: string, voice: s
   return {
     pcm: b64ToBytes(part.inlineData.data),
     sampleRate,
-    inputTokens: json.usageMetadata?.promptTokenCount ?? Math.ceil(text.length / 4),
-    outputTokens: json.usageMetadata?.candidatesTokenCount ?? 0,
+    // Audio output is the dearest rate in the catalog (~$10/1M tokens). `?? 0`
+    // here made a voice pack FREE whenever Google omitted usageMetadata, so an
+    // absent count falls back to the reserve via `billedUsage` at the call site.
+    ...geminiBilledTokens(json.usageMetadata),
   };
 }
 
@@ -890,7 +1032,7 @@ export async function generateSpeech(env: Env, input: { tenantId: string; featur
 
   // Worst-case reserve: text tokens in + a generous audio-token cap out (a short
   // cue is a few seconds of audio); the settle uses the provider's real counts.
-  const estUsage: Usage = { inputTokens: Math.ceil(input.text.length / 4), outputTokens: Math.max(200, input.text.length * 12) };
+  const estUsage: Usage = { inputTokens: Math.ceil(input.text.length / CHARS_PER_INPUT_TOKEN), outputTokens: Math.max(200, input.text.length * 12) };
   const dobj = env.BILLING.get(env.BILLING.idFromName(input.tenantId));
   await dobj.bind(input.tenantId);
   const hold = await dobj.reserve(creditsForUsage(estUsage, rate));
@@ -902,7 +1044,7 @@ export async function generateSpeech(env: Env, input: { tenantId: string; featur
     else {
       const r = await withTimeout(runGeminiTts(geminiKey!, modelId, input.text, input.voice ?? DEFAULT_TTS_VOICE));
       bytes = pcmToWav(r.pcm, r.sampleRate);
-      usage = { inputTokens: r.inputTokens, outputTokens: r.outputTokens };
+      usage = billedUsage(r, estUsage, "", { ...(model ?? ({} as AiModelRow)), id: modelId, provider: "google" });
     }
   } catch (err) {
     await dobj.release(hold.hold);
