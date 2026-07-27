@@ -226,7 +226,11 @@ export const contextRoutes = new Hono<AppEnv>()
       // packages, so this banner and the routes can never disagree.
       const rows = await loadClientAccessRows(c.env.DB, active.tenantId, active.clientId);
       const days = overallDaysRemaining(accessBudgetsOf(rows), now);
-      clientAccess = { active: days > 0, required, daysRemaining: rows.length ? days : null };
+      // Archived outranks the access gate: a studio that ended the relationship
+      // must not greet them with a sales screen. Read from the row the persona
+      // resolved from, so it cannot disagree with `requireClientAccess`.
+      const archived = (await clientForUser(c.env.DB, active.tenantId, user.id))?.status === "archived";
+      clientAccess = { active: days > 0, required, daysRemaining: rows.length ? days : null, archived };
     }
 
     const prefRow = await c.env.DB.prepare("SELECT units_json, widgets_json FROM user_prefs WHERE user_id = ?")

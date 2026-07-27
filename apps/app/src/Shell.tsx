@@ -11,6 +11,7 @@ import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
   Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Hand, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, toneVar, type TabDef, type Tone,
 } from "@mossa/ui";
+import { resolveStanding } from "@mossa/domain";
 import { useSession, useActiveClientId } from "./session.js";
 import { useTheme } from "./theme.js";
 import { api } from "./api.js";
@@ -80,9 +81,27 @@ export function Shell() {
   if (gateClientId && needsOnboarding === null) return <div className="grid min-h-dvh place-items-center"><Spinner /></div>;
   if (gateClientId && needsOnboarding) return <Onboarding clientId={gateClientId} displayName={ctx!.user.name || "there"} onDone={() => setNeedsOnboarding(false)} />;
 
-  // Access gate: on a tenant that requires a live plan/package, a client with no
-  // active access is locked to the Plans screen (only clients — never staff).
-  if (active.role === "client" && active.clientId && ctx!.clientAccess?.required && !ctx!.clientAccess.active) {
+  /**
+   * Access gate: on a tenant that requires a live plan/package, a client with no
+   * active access is locked to the Plans screen (only clients — never staff).
+   *
+   * ARCHIVED OUTRANKS IT. A studio that archived someone has ended the
+   * relationship; greeting them with a screen selling that studio's packages
+   * would be absurd, and buying one would not un-archive them anyway. An archived
+   * client goes into the app read-only instead (see `requireClientAccess`, which
+   * refuses their writes) with a banner saying so.
+   */
+  const standing = active.clientId && ctx!.clientAccess
+    ? resolveStanding({
+        membership: ctx!.clientAccess.archived ? "archived" : "active",
+        accessActive: ctx!.clientAccess.active,
+        accessRequired: ctx!.clientAccess.required,
+        // The client's own view of a delinquent studio: they keep reading and
+        // logging. Entitlements degrade the STUDIO's paid features separately.
+        studioDelinquent: false,
+      })
+    : null;
+  if (active.role === "client" && active.clientId && standing?.lockedToStorefront) {
     return <Shop clientId={active.clientId} locked />;
   }
 
@@ -346,6 +365,17 @@ function TabLayout() {
           screen — an owner cannot reach any part of their studio without passing
           it, and it is structurally invisible to clients (see BillingNotice). */}
       {!clientSurface && active.role === "owner" && <BillingNotice />}
+
+      {/* An archived client can READ their history but not add to it. Without
+          saying so, every log button becomes a 403 with no explanation — the
+          server refuses correctly and the person has no idea why. Directly under
+          the bar, above every screen, so it cannot be missed or scrolled past. */}
+      {clientSurface && ctx!.clientAccess?.archived && (
+        <div role="status" className="border-b border-border/40 bg-warning/10 px-4 py-2.5 text-center text-sm text-warning">
+          <span className="font-medium">Your history is read-only.</span>{" "}
+          {active.tenantName} has closed your place here — everything you logged is still yours to look back on.
+        </div>
+      )}
 
       {/* Remount the routed content when the APP tour toggles, so screens refetch
           through the (mock ↔ live) api interceptor. The workout/meal tours annotate

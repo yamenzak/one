@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Button, Card, Badge, Field, Sheet, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, EmptyState, toneVar, ArrowLeft, LogOut, Ticket, Store, Check, RotateCcw, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
 import { CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "@mossa/domain";
 import { api } from "../../api.js";
+import { StudioListCard } from "../../StudioSwitcher.js";
 import { useCan } from "../../FeatureLock.js";
 import { useSession } from "../../session.js";
 import { fmtPrice } from "../../money.js";
@@ -131,6 +132,17 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
         </div>
         {locked && <Button size="sm" variant="ghost" onClick={() => void signOut()}><LogOut /> Sign out</Button>}
       </div>
+
+      {/* THE STRANDING FIX. In `locked` mode this screen replaces the whole Shell,
+          so there is no app bar and therefore no studio switcher — the only way
+          out was Sign out. A client locked at one studio who has a live plan at
+          ANOTHER was stuck: signing out and back in lands them in whichever tenant
+          the session's activeOrganizationId names, which can be the locked one
+          again. One studio's unpaid access must never cost you the studios you did
+          pay for. Renders nothing when there is only one studio. */}
+      {locked && (
+        <StudioListCard />
+      )}
 
       {locked && (
         <Card className="relative overflow-hidden">

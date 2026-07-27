@@ -21,7 +21,7 @@
 import { useState } from "react";
 import type { PersonaRef } from "@mossa/protocol";
 import {
-  Badge, Button, Sheet, Check, ChevronsUpDown, Store, Spinner, cn,
+  Badge, Button, Card, Sheet, Check, ChevronsUpDown, Store, Spinner, cn,
   personaLabel, personaTone,
 } from "@mossa/ui";
 import { useSession } from "./session.js";
@@ -137,6 +137,31 @@ export function StudioSwitcher() {
         </div>
       </Sheet>
     </>
+  );
+}
+
+/**
+ * The studio list as a CARD, for a surface that has replaced the whole Shell and
+ * therefore has no app bar to switch from.
+ *
+ * The locked Shop is the case that needs it: a client with no live access at this
+ * studio sees only that screen, and before this the only control on it was Sign
+ * out. Someone locked at one studio who has a paid plan at another was stranded —
+ * signing out and back in lands them in whichever tenant the session names, which
+ * can be the locked one again. One studio's unpaid access must not cost you the
+ * studios you did pay for.
+ */
+export function StudioListCard() {
+  const { ctx } = useSession();
+  if ((ctx?.personas.length ?? 0) < 2 || ctx?.hostTenantId) return null;
+  return (
+    <Card className="space-y-2">
+      <div className="text-sm font-medium">Your other studios</div>
+      <p className="text-sm text-muted-foreground">
+        This studio needs an active plan. Your access elsewhere is unaffected — switch to another studio to keep training.
+      </p>
+      <StudioList />
+    </Card>
   );
 }
 

@@ -20,7 +20,7 @@ import { emailShell, emailButton, escapeHtml } from "./mailer.js";
 import { newId, nowIso } from "./ids.js";
 import { recordAudit } from "./audit.js";
 import { parseJson, j } from "./db.js";
-import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps, rangeStatus, auditLabel, canAccessClient, seesWholeRoster } from "@mossa/domain";
+import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps, rangeStatus, auditLabel, canAccessClient, seesWholeRoster, resolveStanding } from "@mossa/domain";
 
 export interface ClientRow {
   id: string;
@@ -180,13 +180,30 @@ export async function requireClientAccess(
    * Staff are unaffected — a coach or owner can still open and edit an archived
    * record (that is how you'd correct or restore one).
    */
-  if (client.status === "archived" && role === "client" && c.req.method !== "GET") {
-    return {
-      response: c.json(
-        { error: "archived", message: "Your record at this studio is archived — you can still read your history, but not add to it. Ask the studio to reactivate you." },
-        403,
-      ),
-    };
+  //
+  // Decided by `resolveStanding` (@mossa/domain), the ONE definition of what a
+  // person may do in a tenancy — the same function the Shell renders from, so the
+  // gate and the UI cannot disagree about who is read-only.
+  if (role === "client") {
+    const standing = resolveStanding({
+      membership: client.status === "archived" ? "archived" : client.status === PENDING_SIGNUP ? "pending_signup" : "active",
+      // Access/delinquency are enforced by their own gates (client-flags,
+      // entitlements); this call is only about the membership half, so the other
+      // axes are passed as satisfied and cannot mask an archived record.
+      accessActive: true,
+      accessRequired: false,
+      studioDelinquent: false,
+    });
+    const writing = c.req.method !== "GET";
+    if (writing && !standing.canWrite) {
+      return {
+        response: c.json(
+          { error: standing.reason, message: "Your record at this studio is archived — you can still read your history, but not add to it. Ask the studio to reactivate you." },
+          403,
+        ),
+      };
+    }
+    if (!writing && !standing.canRead) return { response: c.json({ error: standing.reason }, 403) };
   }
   return { client };
 }

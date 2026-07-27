@@ -292,6 +292,44 @@ describe("client offboarding — archive keeps the seat, delete frees it and rec
     expect((await SELF.fetch(`${B}/api/clients/${cl.id}`, { method: "PATCH", headers: json(ownerCk), body: JSON.stringify({ displayName: "Alumni R" }) })).status).toBe(200);
   }, 30_000);
 
+  it("archived outranks the access gate — context says read-only, not 'go buy something'", async () => {
+    // The Shell's access gate fired on `required && !active` with no regard for
+    // archived, so a studio that had just let someone go met them with a screen
+    // selling that studio's packages — and buying one would not have un-archived
+    // them, so it was not even a way out. `clientAccess.archived` is what the app
+    // checks first; assert the server actually reports it alongside the gate.
+    const db = env.DB as D1Database;
+    const ownerCk = await signInFlow("lc-arch-gate@test.dev", "Gated Studio");
+    const tenantId = await tenantOf(ownerCk);
+    // Turn the gate ON: this studio requires a live plan to use the app.
+    await SELF.fetch(`${B}/api/settings`, { method: "PATCH", headers: json(ownerCk), body: JSON.stringify({ marketplace: { requireActiveAccess: true } }) });
+
+    const cl = await mkClient(ownerCk, "Gated Gail", "lc-gail@test.dev");
+    expect(cl.status).toBe(201);
+    const clientCk = await signIn("lc-gail@test.dev");
+    const before = (await (await SELF.fetch(`${B}/api/context`, { headers: auth(clientCk) })).json()) as {
+      clientAccess: { required: boolean; active: boolean; archived: boolean } | null;
+    };
+    // Gate on, no package → the app locks them to the storefront. Not archived yet.
+    expect(before.clientAccess).toMatchObject({ required: true, active: false, archived: false });
+
+    // Archive them. The gate facts do not change — but `archived` now outranks them.
+    expect((await SELF.fetch(`${B}/api/clients/${cl.id}/archive`, { method: "POST", headers: json(ownerCk), body: "{}" })).status).toBe(200);
+    const after = (await (await SELF.fetch(`${B}/api/context`, { headers: auth(clientCk) })).json()) as {
+      clientAccess: { required: boolean; active: boolean; archived: boolean } | null;
+      active: { clientId: string | null } | null;
+    };
+    expect(after.clientAccess).toMatchObject({ required: true, active: false, archived: true });
+    // Their persona still resolves, so there IS an app to read read-only.
+    expect(after.active?.clientId).toBe(cl.id);
+    // And reads work while writes do not — the read-only half, server-enforced.
+    expect((await SELF.fetch(`${B}/api/clients/${cl.id}`, { headers: auth(clientCk) })).status).toBe(200);
+    const write = await SELF.fetch(`${B}/api/check-ins`, { method: "POST", headers: json(clientCk), body: JSON.stringify({ clientId: cl.id, data: { date: "2026-07-01", mood: 3 } }) });
+    expect(write.status).toBe(403);
+    expect(await write.json()).toMatchObject({ error: "archived" });
+    void db;
+  }, 30_000);
+
   it("a coach asks, the owner decides, and only the approval acts", async () => {
     // Archive and delete are owner-only, but the coach who works with the client
     // is the one who knows they should go. Without this the coach saw nothing and

@@ -112,7 +112,15 @@ export interface SessionContext {
    * plan/package (`!active`), the app locks to the plans screen. `daysRemaining`
    * is the covering budget's remaining days (null when none).
    */
-  clientAccess: { active: boolean; required: boolean; daysRemaining: number | null } | null;
+  /**
+   * The client persona's standing in the ACTIVE tenancy.
+   *
+   * `archived` is separate from `active`/`required` on purpose, because it
+   * OUTRANKS them: a studio that archived someone has ended the relationship, so
+   * asking them to buy a package would be absurd. The app must check archived
+   * before it applies the access gate.
+   */
+  clientAccess: { active: boolean; required: boolean; daysRemaining: number | null; archived: boolean } | null;
   isPlatformAdmin: boolean;
   /**
    * Set when the app is served on a tenant's custom domain (SPEC §14.1): the
