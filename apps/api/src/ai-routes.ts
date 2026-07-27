@@ -7,18 +7,23 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { WorkoutBody, MUSCLE_GROUPS, EQUIPMENT_TYPES, normalizeMuscle, normalizeEquipment } from "@mossa/protocol";
-import { resolveUnits, activityByKey, estimateBurnedCalories, mockModeSettable } from "@mossa/domain";
+import { resolveUnits, activityByKey, estimateBurnedCalories, mockModeSettable, shouldUseMockLane } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
+import type { Env } from "./env.js";
 import { requireClientAccess, clientForUser } from "./clients.js";
 import { gateFeature, resolveClientFlagsFor } from "./client-flags.js";
 import { tenantEntitlements, hasFeature, getConfig, setConfig } from "./billing-store.js";
-import { generate, generateImage, extractJson, listModels, checkClientDailyBudget } from "./ai.js";
+import {
+  generate, generateImage, extractJson, listModels, checkClientDailyBudget,
+  estimateRunCredits, modelSupportsTask, preferredModelForTask, modelForTask, modelById, seedAiModels,
+  type AiModelRow,
+} from "./ai.js";
 import { buildClientContext } from "./ai-context.js";
 // ONE fence implementation, shared with the renderKnowledge prompt path (which
 // carries the same client-authored fields into far more AI surfaces).
 import { untrusted } from "./client-knowledge.js";
 import { featureDef } from "./ai-features.js";
-import { parseWorkersAiPricing, parseGeminiPricing } from "./ai-pricing.js";
+import { parseWorkersAiCatalog, parseGeminiCatalog, isRunnableTask, type SkippedModel } from "./ai-pricing.js";
 import { tenantIntegrations, type Integrations } from "./integrations.js";
 import { resolveFoodId, resolveExerciseId, type ResolveEnv } from "./library-resolve.js";
 import { parseJson } from "./db.js";
@@ -193,6 +198,58 @@ async function workoutPlanExamples(db: D1Database, tenantId: string, nameOf: Map
     return daySummaries.length ? `- "${p.name}": ${daySummaries.join(" | ")}` : null;
   }).filter(Boolean);
   return lines.length ? `STYLE EXAMPLES (match this coach's split, selection and volume):\n${lines.join("\n")}` : "";
+}
+
+// ── exercise-meta: one prompt/schema/validator, two callers ──────────────────
+// The route below AND the admin self-test both drive these, so the diagnostic
+// exercises the exact contract a coach hits rather than a look-alike.
+
+/** Enum-constrained schema → the model can only return our slugs (Gemini
+ *  responseSchema + Workers AI json_schema). `foldExerciseMeta` stays as a
+ *  backstop for any provider that ignores the enum. */
+const EXERCISE_META_SCHEMA = {
+  type: "object",
+  properties: {
+    primaryMuscles: { type: "array", items: { type: "string", enum: [...MUSCLE_GROUPS] } },
+    secondaryMuscles: { type: "array", items: { type: "string", enum: [...MUSCLE_GROUPS] } },
+    equipment: { type: "array", items: { type: "string", enum: [...EQUIPMENT_TYPES] } },
+    difficulty: { type: "string", enum: ["beginner", "intermediate", "advanced"] },
+    force: { type: "string", enum: ["push", "pull", "static"] },
+    mechanic: { type: "string", enum: ["compound", "isolation"] },
+  },
+  required: ["primaryMuscles", "secondaryMuscles", "equipment", "difficulty", "force", "mechanic"],
+};
+
+const exerciseMetaPrompt = (name: string) =>
+  `EXERCISE: ${name}\n\nAllowed muscles: ${MUSCLE_GROUPS.join(", ")}\nAllowed equipment: ${EQUIPMENT_TYPES.join(", ")}\n\nClassify it now.`;
+
+const EXERCISE_META_MOCK = () =>
+  JSON.stringify({ primaryMuscles: ["quads"], secondaryMuscles: ["glutes", "hamstrings"], equipment: ["barbell"], difficulty: "intermediate", force: "push", mechanic: "compound" });
+
+export interface ExerciseMeta {
+  primaryMuscles: string[];
+  secondaryMuscles: string[];
+  equipment: string[];
+  difficulty: string | null;
+  force: string | null;
+  mechanic: string | null;
+}
+
+/** Fold model output onto our slugs tolerantly (anatomical names, plurals,
+ *  synonyms) so real-model answers actually populate the editor; coerce enums. */
+function foldExerciseMeta(raw: Record<string, unknown>): ExerciseMeta {
+  const uniq = <T,>(xs: T[]) => [...new Set(xs)];
+  const mapArr = <T,>(v: unknown, fn: (x: string) => T | null): T[] =>
+    Array.isArray(v) ? uniq(v.map((x) => fn(String(x))).filter((x): x is T => x != null)) : [];
+  const oneOf = (v: unknown, opts: string[]) => (typeof v === "string" && opts.includes(v.toLowerCase().trim()) ? v.toLowerCase().trim() : null);
+  return {
+    primaryMuscles: mapArr(raw.primaryMuscles, normalizeMuscle),
+    secondaryMuscles: mapArr(raw.secondaryMuscles, normalizeMuscle),
+    equipment: mapArr(raw.equipment, normalizeEquipment),
+    difficulty: oneOf(raw.difficulty, ["beginner", "intermediate", "advanced"]),
+    force: oneOf(raw.force, ["push", "pull", "static"]),
+    mechanic: oneOf(raw.mechanic, ["compound", "isolation"]),
+  };
 }
 
 export const aiRoutes = new Hono<AppEnv>()
@@ -948,43 +1005,17 @@ export const aiRoutes = new Hono<AppEnv>()
     // Enum-constrained schema → the model can only return our slugs (Gemini
     // responseSchema + Workers AI json_schema). The normalizer below stays as a
     // backstop for any provider that ignores the enum.
-    const muscleEnum = { type: "string", enum: [...MUSCLE_GROUPS] };
-    const metaSchema = {
-      type: "object",
-      properties: {
-        primaryMuscles: { type: "array", items: muscleEnum },
-        secondaryMuscles: { type: "array", items: muscleEnum },
-        equipment: { type: "array", items: { type: "string", enum: [...EQUIPMENT_TYPES] } },
-        difficulty: { type: "string", enum: ["beginner", "intermediate", "advanced"] },
-        force: { type: "string", enum: ["push", "pull", "static"] },
-        mechanic: { type: "string", enum: ["compound", "isolation"] },
-      },
-      required: ["primaryMuscles", "secondaryMuscles", "equipment", "difficulty", "force", "mechanic"],
-    };
     const result = await generate(c.env, {
-      tenantId: who.tenantId, actorUserId: who.userId, feature: "exercise-meta", task: "text", expectsJson: true, jsonSchema: metaSchema,
+      tenantId: who.tenantId, actorUserId: who.userId, feature: "exercise-meta", task: "text", expectsJson: true, jsonSchema: EXERCISE_META_SCHEMA,
       system: sys("exercise-meta"),
-      prompt: `EXERCISE: ${parsed.data.name}\n\nAllowed muscles: ${MUSCLE_GROUPS.join(", ")}\nAllowed equipment: ${EQUIPMENT_TYPES.join(", ")}\n\nClassify it now.`,
+      prompt: exerciseMetaPrompt(parsed.data.name),
       maxOutputTokens: 300,
-      mock: () => JSON.stringify({ primaryMuscles: ["quads"], secondaryMuscles: ["glutes", "hamstrings"], equipment: ["barbell"], difficulty: "intermediate", force: "push", mechanic: "compound" }),
+      mock: EXERCISE_META_MOCK,
     });
     if (!result.ok) return aiFail(c, result);
     const raw = extractJson<Record<string, unknown>>(result.output);
     if (!raw) return c.json({ error: "The AI didn't return valid details.", raw: result.output.slice(0, 800), mocked: result.mocked }, 422);
-    // Fold model output onto our slugs tolerantly (anatomical names, plurals,
-    // synonyms) so real-model answers actually populate the editor; coerce enums.
-    const uniq = <T,>(xs: T[]) => [...new Set(xs)];
-    const mapArr = <T,>(v: unknown, fn: (x: string) => T | null): T[] =>
-      Array.isArray(v) ? uniq(v.map((x) => fn(String(x))).filter((x): x is T => x != null)) : [];
-    const oneOf = (v: unknown, opts: string[]) => (typeof v === "string" && opts.includes(v.toLowerCase().trim()) ? v.toLowerCase().trim() : null);
-    const meta = {
-      primaryMuscles: mapArr(raw.primaryMuscles, normalizeMuscle),
-      secondaryMuscles: mapArr(raw.secondaryMuscles, normalizeMuscle),
-      equipment: mapArr(raw.equipment, normalizeEquipment),
-      difficulty: oneOf(raw.difficulty, ["beginner", "intermediate", "advanced"]),
-      force: oneOf(raw.force, ["push", "pull", "static"]),
-      mechanic: oneOf(raw.mechanic, ["compound", "isolation"]),
-    };
+    const meta = foldExerciseMeta(raw);
     return c.json({ meta, credits: result.credits, mocked: result.mocked });
   })
 
@@ -1162,42 +1193,646 @@ export const aiAdminRoutes = new Hono<AppEnv>()
 
   /**
    * Refresh the catalog from the official pricing docs (Cloudflare Workers AI +
-   * Google Gemini). Parses neuron-equivalent rates so every model bills through
-   * the same credit math; preserves enable/default/markup on existing rows.
+   * Google Gemini). See `syncModelCatalog` for exactly what it does.
    */
   .post("/admin/ai/models/sync", async (c) => {
     if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
     const cfg = await getConfig(c.env.DB);
-    const markup = globalMarkup(cfg);
-    const errors: string[] = [];
-    const fetchMd = async (url: string): Promise<string | null> => {
-      try { const r = await fetch(url, { headers: { accept: "text/markdown" } }); return r.ok ? await r.text() : (errors.push(`${url}: ${r.status}`), null); }
-      catch (e) { errors.push(`${url}: ${String(e)}`); return null; }
-    };
-    const [cfMd, gemMd] = await Promise.all([
-      fetchMd("https://developers.cloudflare.com/workers-ai/platform/pricing/index.md"),
-      fetchMd("https://ai.google.dev/gemini-api/docs/pricing.md.txt"),
-    ]);
-    const seeds = [
-      ...(cfMd ? parseWorkersAiPricing(cfMd) : []),
-      ...(gemMd ? parseGeminiPricing(gemMd) : []),
-    ];
-    if (seeds.length === 0) return c.json({ error: "no models parsed", errors }, 502);
-    // Upsert: refresh rates/label/task/provider; preserve enabled/default/markup
-    // on existing rows, new rows inherit the global markup and land enabled.
-    await c.env.DB.batch(seeds.map((m) =>
-      c.env.DB.prepare(
-        `INSERT INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0)
-         ON CONFLICT(id) DO UPDATE SET task = excluded.task, label = excluded.label, provider = excluded.provider,
-           input_rate = excluded.input_rate, output_rate = excluded.output_rate, unit_rate = excluded.unit_rate, unit_kind = excluded.unit_kind`,
-      ).bind(m.id, m.task, m.label, m.provider, m.inputRate, m.outputRate, m.unitRate, m.unitKind, markup),
-    ));
-    // Guarantee a default per text/text-small/vision task (cheapest output).
-    for (const task of ["text", "text-small", "vision"]) {
-      const has = await c.env.DB.prepare("SELECT 1 x FROM ai_models WHERE task = ? AND enabled = 1 AND is_default = 1").bind(task).first();
-      if (!has) await c.env.DB.prepare("UPDATE ai_models SET is_default = 1 WHERE id = (SELECT id FROM ai_models WHERE task = ? AND enabled = 1 ORDER BY output_rate ASC LIMIT 1)").bind(task).run();
+    const report = await syncModelCatalog(c.env.DB, { markup: globalMarkup(cfg), fetchMd: fetchPricingDoc });
+    // 502 only when NEITHER provider produced a usable parse — a one-sided
+    // failure still applied real work and must return it, not a bare error.
+    return c.json(report, report.ok ? 200 : 502);
+  })
+
+  /**
+   * AI self-test (platform admin) — the plan. What the suite would run against
+   * the chosen scope, and what it will COST, so the operator sees the bill
+   * before the button spends it.
+   */
+  .get("/admin/ai/selftest", async (c) => {
+    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    const tenantId = c.get("tenantId");
+    if (!tenantId) return c.json({ error: "switch into a studio first — the self-test spends that studio's credits" }, 400);
+    const q = SelfTestScope.safeParse({ scope: c.req.query("scope"), provider: c.req.query("provider"), modelId: c.req.query("modelId") });
+    if (!q.success) return c.json({ error: "invalid query" }, 400);
+    const plan = await planSelfTest(c.env, q.data);
+    return c.json(plan);
+  })
+
+  /**
+   * AI self-test (platform admin) — run it. Every check goes through the real
+   * metered `generate()` (reserve → run → settle) and is validated with the
+   * product's own parser, so a 200 that returns prose instead of JSON is a
+   * FAILURE here exactly as it is for a coach.
+   */
+  .post("/admin/ai/selftest", async (c) => {
+    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    const who = requireTenant(c);
+    if (!who) return c.json({ error: "switch into a studio first — the self-test spends that studio's credits" }, 400);
+    const body = z
+      .object({
+        runs: z.array(z.object({ check: z.string().max(40), modelId: z.string().max(200) })).max(MAX_SELFTEST_RUNS).optional(),
+        scope: z.enum(["default", "compare", "provider", "model", "all"]).optional(),
+        provider: z.enum(["workers-ai", "google"]).optional(),
+        modelId: z.string().max(200).optional(),
+      })
+      .safeParse(await c.req.json().catch(() => ({})));
+    if (!body.success) return c.json({ error: "invalid body" }, 400);
+
+    let runs = body.data.runs ?? [];
+    if (!runs.length) {
+      const plan = await planSelfTest(c.env, { scope: body.data.scope ?? "default", provider: body.data.provider, modelId: body.data.modelId });
+      runs = plan.runs.map((r) => ({ check: r.check, modelId: r.modelId }));
     }
-    const total = (await listModels(c.env.DB)).length;
-    return c.json({ ok: true, parsed: seeds.length, total, errors });
+    if (!runs.length) return c.json({ error: "nothing to run — no enabled model matches that scope" }, 400);
+
+    const started = Date.now();
+    const results: SelfTestResult[] = [];
+    let stopped: string | null = null;
+    for (const run of runs) {
+      const check = SELF_TEST_CHECKS.find((x) => x.key === run.check);
+      if (!check) continue;
+      const r = await runSelfTestCheck(c.env, who.tenantId, who.userId, check, run.modelId);
+      results.push(r);
+      // Out of credits: every later run would fail identically and each one
+      // still costs a round trip. Stop and say so.
+      if (r.failure === "insufficient_credits") { stopped = "Stopped early — the studio ran out of AI credits."; break; }
+    }
+    return c.json({
+      results,
+      totalCredits: results.reduce((n, r) => n + r.credits, 0),
+      passed: results.filter((r) => r.status === "pass").length,
+      failed: results.filter((r) => r.status === "fail").length,
+      mocked: results.some((r) => r.mocked),
+      durationMs: Date.now() - started,
+      stopped,
+    });
   });
+
+// ── Model-catalog sync ───────────────────────────────────────────────────────
+
+export const PRICING_SOURCES = {
+  "workers-ai": "https://developers.cloudflare.com/workers-ai/platform/pricing/index.md",
+  google: "https://ai.google.dev/gemini-api/docs/pricing.md.txt",
+} as const;
+
+export interface FetchedDoc { md: string | null; error: string | null }
+
+/** Fetch one pricing doc. Separated from the sync so the sync's reconciliation
+ *  logic is testable without the network. */
+export async function fetchPricingDoc(url: string): Promise<FetchedDoc> {
+  try {
+    const r = await fetch(url, { headers: { accept: "text/markdown" } });
+    if (!r.ok) return { md: null, error: `HTTP ${r.status}` };
+    return { md: await r.text(), error: null };
+  } catch (e) {
+    return { md: null, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export interface ProviderSyncReport {
+  provider: "workers-ai" | "google";
+  source: string;
+  /** The doc was fetched AND parsed into at least one model. */
+  ok: boolean;
+  /** Models priced from the page. */
+  parsed: number;
+  /** Ids that were not in the catalog before this sync. */
+  added: number;
+  addedIds: string[];
+  /** Existing ids whose rates/label were refreshed. */
+  updated: number;
+  /** Enabled ids that vanished from the source and were switched off. */
+  disabled: number;
+  disabledIds: string[];
+  /** Rows the page lists but the catalog cannot price, and why. */
+  unpriceable: SkippedModel[];
+  error: string | null;
+}
+
+export interface SyncReport {
+  ok: boolean;
+  providers: ProviderSyncReport[];
+  total: number;
+  errors: string[];
+}
+
+/**
+ * Reconcile the model catalog against the two official pricing docs.
+ *
+ * Per provider, independently (a Cloudflare failure must never touch a single
+ * Gemini row, and vice versa):
+ *   • DISCOVER — every priceable row on the page is upserted. New ids land in
+ *     the catalog; runnable lanes (text / text-small / vision / image / speech)
+ *     arrive ENABLED, the rest (embedding / transcribe / tts / classify) arrive
+ *     disabled, because no code path here can execute them.
+ *   • REFRESH — an existing row's label + rates are updated. `task`, `enabled`,
+ *     `is_default` and `markup` are NOT touched: those are operator/seed
+ *     decisions and the page's own lane guess would silently re-route traffic
+ *     (it used to retask `gemini-2.5-flash` to text-small, pushing every text
+ *     feature onto the ~8× pricier `gemini-2.5-pro`).
+ *   • RECONCILE — an ENABLED row of that provider that is absent from a good
+ *     parse is switched off (`enabled = 0, is_default = 0`). Never deleted: a
+ *     tenant's `ai_config_json` may still name it and `ai_generations` history
+ *     must stay readable. Only runs when that provider's fetch AND parse
+ *     succeeded, so a 404 on one doc cannot disable the other provider's models.
+ *
+ * A provider that fetched but parsed ZERO models is treated as a parse failure,
+ * not as "the provider has no models" — a doc-format change would otherwise
+ * disable the whole catalog in one click.
+ */
+export async function syncModelCatalog(
+  db: D1Database,
+  opts: { markup: number; fetchMd: (url: string) => Promise<FetchedDoc> },
+): Promise<SyncReport> {
+  await seedAiModels(db);
+  const existing = await db.prepare("SELECT id, provider, enabled FROM ai_models").all<{ id: string; provider: string; enabled: number }>();
+  const known = new Map((existing.results ?? []).map((r) => [r.id, r]));
+
+  const providers: ProviderSyncReport[] = [];
+  const errors: string[] = [];
+
+  for (const provider of ["workers-ai", "google"] as const) {
+    const source = PRICING_SOURCES[provider];
+    const report: ProviderSyncReport = { provider, source, ok: false, parsed: 0, added: 0, addedIds: [], updated: 0, disabled: 0, disabledIds: [], unpriceable: [], error: null };
+    providers.push(report);
+
+    const doc = await opts.fetchMd(source);
+    if (!doc.md) {
+      report.error = `couldn't fetch the pricing page (${doc.error ?? "unknown error"}) — every ${provider} model was left exactly as it was`;
+      errors.push(`${provider}: ${report.error}`);
+      continue;
+    }
+    const parsedDoc = provider === "workers-ai" ? parseWorkersAiCatalog(doc.md) : parseGeminiCatalog(doc.md);
+    report.unpriceable = parsedDoc.skipped;
+    report.parsed = parsedDoc.models.length;
+    if (parsedDoc.models.length === 0) {
+      report.error = "the page fetched but 0 models parsed — the doc format has probably changed; nothing was written or disabled";
+      errors.push(`${provider}: ${report.error}`);
+      continue;
+    }
+
+    for (const m of parsedDoc.models) {
+      if (known.has(m.id)) report.updated++;
+      else { report.added++; report.addedIds.push(m.id); }
+    }
+
+    await db.batch(parsedDoc.models.map((m) =>
+      db.prepare(
+        `INSERT INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+         ON CONFLICT(id) DO UPDATE SET label = excluded.label, provider = excluded.provider,
+           input_rate = excluded.input_rate, output_rate = excluded.output_rate, unit_rate = excluded.unit_rate, unit_kind = excluded.unit_kind`,
+      ).bind(m.id, m.task, m.label, m.provider, m.inputRate, m.outputRate, m.unitRate, m.unitKind, opts.markup, isRunnableTask(m.task) ? 1 : 0),
+    ));
+
+    const live = new Set(parsedDoc.models.map((m) => m.id));
+    const gone = (existing.results ?? []).filter((r) => r.provider === provider && r.enabled === 1 && !live.has(r.id)).map((r) => r.id);
+    if (gone.length) {
+      const ph = gone.map(() => "?").join(",");
+      await db.prepare(`UPDATE ai_models SET enabled = 0, is_default = 0 WHERE id IN (${ph})`).bind(...gone).run();
+      report.disabled = gone.length;
+      report.disabledIds = gone;
+    }
+    report.ok = true;
+  }
+
+  // Guarantee a default per generation task (cheapest output among enabled).
+  // Runs AFTER reconciliation so a task whose default was just switched off
+  // immediately re-elects instead of leaving the lane defaultless.
+  for (const task of ["text", "text-small", "vision"]) {
+    const has = await db.prepare("SELECT 1 x FROM ai_models WHERE task = ? AND enabled = 1 AND is_default = 1").bind(task).first();
+    if (!has) await db.prepare("UPDATE ai_models SET is_default = 1 WHERE id = (SELECT id FROM ai_models WHERE task = ? AND enabled = 1 ORDER BY output_rate ASC LIMIT 1)").bind(task).run();
+  }
+
+  return { ok: providers.some((p) => p.ok), providers, total: (await listModels(db)).length, errors };
+}
+
+// ── AI self-test (platform admin) ────────────────────────────────────────────
+//
+// A live diagnostic that runs the PRODUCT'S OWN prompts through the PRODUCT'S
+// OWN metered path and validates the answers with the PRODUCT'S OWN parsers.
+// Three rules make it worth trusting:
+//
+//   1. It goes through `generate()` — reserve → run → settle. A diagnostic that
+//      bypasses metering does not test the thing that breaks, so this SPENDS
+//      REAL CREDITS from whichever studio the admin is switched into. The plan
+//      endpoint quotes the upper bound before the button is pressed.
+//   2. HTTP 200 is not a pass. A plan draft that comes back as prose, or with
+//      invented exercise ids, is a FAILURE with a named reason — that is very
+//      often what "the model isn't working" actually means.
+//   3. A mocked result says so. In development the mock lane answers with canned
+//      output; a green board that proves nothing is worse than a red one.
+
+const MAX_SELFTEST_RUNS = 36;
+
+const SelfTestScope = z.object({
+  scope: z.enum(["default", "compare", "provider", "model", "all"]).default("default"),
+  provider: z.enum(["workers-ai", "google"]).optional(),
+  modelId: z.string().max(200).optional(),
+});
+type SelfTestScopeInput = z.infer<typeof SelfTestScope>;
+
+/** A 64×64 PNG of a plated meal — three coloured masses on a white plate.
+ *  Synthetic, not a photograph: enough to prove the vision transport, the
+ *  provider's response shape and the Workers AI refusal, NOT enough to judge
+ *  recognition quality. Bundled so every run is byte-identical. */
+const TEST_IMAGE = {
+  mimeType: "image/png",
+  data:
+    "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAABZUlEQVR42u3auw0CMQyAYU9EzQzUjMMIzIgoKOiRKFAKCqRrwjl27NiO76QM8H" +
+    "8CQR6G2/0x9YIdkB1QymcaQCkf+goEYHWrS8AxXYUB7ulCBgRJ72ZAtHquAQLWswwQMJ3FgMj1FEN2gHrN+/XEF9cAZvXNdJzBBjjWswwWgI76" +
+    "vwYGoNl0PR/WllY90cAGIOk1Q1hfG0gAef1iUAfUBgaAVf9bDgDFei0D/nNEAnTXqxi2BBhRLzfgm4vogOYOrwFQqe82ULaocQHEPXZQAP2QYA" +
+    "eQnAcCAdSPaWDwEzQCsBgSfQI7gAQ4XY74igtoprMY0QFNg/VeiFvfNMwBQAym54Hu+jWD9YHGHyAxCOvZAF2DvL4GmN4L+QAUb+bUAdZ3o24A" +
+    "xdvpofVG1+uDvv2mLzSD6k3fyEbUO7xSCv+2NvlOPP1LfYZZiSTTKhnmhTJMbCWZmUsytZhkbjTP5O4+/N2zvp6EWYW+Ub9eAAAAAElFTkSuQm" +
+    "CC",
+};
+
+/** A small, fixed client picture so results are comparable run to run. */
+const SAMPLE_CONTEXT = [
+  "CLIENT: Sam Rivera — 34, male, 82.0 kg, 178 cm, intermediate lifter.",
+  "GOAL: build muscle. Targets 2,700 kcal / 175 g protein / 300 g carbs / 80 g fat per day, 4 training days a week.",
+  "EQUIPMENT: full commercial gym. TRAINING LOCATION: gym.",
+  "LIMITATIONS: mild left-shoulder impingement — avoid heavy overhead pressing.",
+  "RECENT: trained 3× last week, logged food 6 of 7 days, weight +0.4 kg over 14 days, sleep averaging 6h50m.",
+].join("\n");
+
+/** A fixed exercise library. The ids are deliberately synthetic: the draft-plan
+ *  check asserts the model picked from THIS list, which is the same whitelist
+ *  rule the real route enforces before a draft ever reaches a coach. */
+const SAMPLE_LIBRARY = [
+  { id: "exr_st_squat", name: "Barbell Back Squat", muscles: "quads, glutes", equipment: "barbell" },
+  { id: "exr_st_rdl", name: "Romanian Deadlift", muscles: "hamstrings, glutes", equipment: "barbell" },
+  { id: "exr_st_row", name: "Chest-Supported Row", muscles: "back, biceps", equipment: "dumbbell" },
+  { id: "exr_st_press", name: "Incline Dumbbell Press", muscles: "chest, triceps", equipment: "dumbbell" },
+  { id: "exr_st_pulldown", name: "Lat Pulldown", muscles: "back, biceps", equipment: "cable" },
+  { id: "exr_st_curl", name: "Cable Curl", muscles: "biceps", equipment: "cable" },
+  { id: "exr_st_plank", name: "Plank", muscles: "core", equipment: "bodyweight" },
+];
+const SAMPLE_LIB_IDS = new Set(SAMPLE_LIBRARY.map((e) => e.id));
+
+const SAMPLE_CHECKINS = [
+  { date_local: "2026-07-21", weight_kg: 82.0, mood: 4, energy: 3, stress: 3, sleep_hours: 6.5, notes: "Shoulder felt better this week." },
+  { date_local: "2026-07-14", weight_kg: 81.6, mood: 3, energy: 3, stress: 4, sleep_hours: 6.9, notes: "Busy at work, missed one session." },
+  { date_local: "2026-07-07", weight_kg: 81.4, mood: 4, energy: 4, stress: 2, sleep_hours: 7.4, notes: "Good week, hit all four sessions." },
+];
+
+export type SelfTestFailure =
+  | "feature_off" | "not_configured" | "not_supported" | "insufficient_credits"
+  | "transport" | "provider" | "empty" | "unparseable_json" | "schema";
+
+export type SelfTestStatus = "pass" | "fail" | "unsupported" | "blocked";
+
+export interface SelfTestResult {
+  check: string;
+  label: string;
+  feature: string;
+  task: "text" | "text-small" | "vision";
+  modelId: string;
+  modelLabel: string;
+  provider: string;
+  status: SelfTestStatus;
+  failure: SelfTestFailure | null;
+  /** The real reason, verbatim from the provider where there is one. */
+  detail: string | null;
+  latencyMs: number;
+  credits: number;
+  mocked: boolean;
+  /** What the model actually said (truncated) — the point of the exercise. */
+  excerpt: string;
+  /** On a pass, what the validator got out of it. */
+  summary: string | null;
+}
+
+type Validation =
+  | { ok: true; summary: string }
+  | { ok: false; failure: "unparseable_json" | "schema"; detail: string };
+
+export interface SelfTestCheck {
+  key: string;
+  label: string;
+  /** An AI_FEATURES key — the system prompt, tenant overrides and tone all come
+   *  from the registry, exactly as they do for a real call. */
+  feature: string;
+  task: "text" | "text-small" | "vision";
+  prompt: string;
+  maxOutputTokens: number;
+  expectsJson: boolean;
+  jsonSchema?: Record<string, unknown>;
+  image?: boolean;
+  mock: () => string;
+  validate: (output: string) => Validation;
+}
+
+const bad = (failure: "unparseable_json" | "schema", detail: string): Validation => ({ ok: false, failure, detail });
+
+/** The six checks. One per shape of thing the product asks a model to do. */
+export const SELF_TEST_CHECKS: SelfTestCheck[] = [
+  {
+    key: "draft-plan",
+    label: "Workout plan draft",
+    feature: "draft-plan",
+    task: "text",
+    maxOutputTokens: 3072,
+    expectsJson: true,
+    prompt: [
+      SAMPLE_CONTEXT,
+      `EXERCISE LIBRARY — you MUST choose exercises ONLY from this list, by id (format "exerciseId: name [muscles] {equipment}"):`,
+      ...SAMPLE_LIBRARY.map((e) => `${e.id}: ${e.name} [${e.muscles}] {${e.equipment}}`),
+      "COACH INSTRUCTIONS: a 2-day full-body split.",
+    ].join("\n"),
+    mock: () => JSON.stringify({
+      days: [{
+        name: "Full Body A",
+        isRestDay: false,
+        blocks: [{
+          type: "single", rounds: null,
+          slots: [{ exerciseId: "exr_st_squat", measurementMode: "reps", sets: [
+            { setType: "warmup", reps: 10, weightMode: "unspecified", restAfterSec: 60 },
+            { setType: "working", reps: 8, weightMode: "unspecified", restAfterSec: 90 },
+          ] }],
+        }],
+      }],
+    }),
+    // The real route's contract: extractJson → a `days` array → every slot's
+    // exerciseId whitelisted against the fed library → WorkoutBody.
+    validate: (out) => {
+      const raw = extractJson<{ days?: RawDay[] }>(out);
+      if (!raw) return bad("unparseable_json", "no JSON found in the response — the model answered in prose");
+      if (!Array.isArray(raw.days)) return bad("schema", 'parsed as JSON but there is no top-level "days" array');
+      const invented: string[] = [];
+      const days = raw.days.map((d) => ({
+        name: d.name ?? "", dayNotes: d.dayNotes ?? null, isRestDay: !!d.isRestDay,
+        blocks: (d.blocks ?? []).map((b) => ({
+          type: b.type ?? "single", rounds: b.rounds ?? null,
+          restBetweenExercisesSec: b.restBetweenExercisesSec ?? null, restBetweenRoundsSec: b.restBetweenRoundsSec ?? null,
+          blockNotes: b.blockNotes ?? null,
+          slots: (b.slots ?? []).flatMap((s) => {
+            const id = typeof s.exerciseId === "string" && SAMPLE_LIB_IDS.has(s.exerciseId) ? s.exerciseId : null;
+            if (!id) { invented.push(String(s.exerciseId ?? s.exercise ?? s.exerciseName ?? s.name ?? "?").slice(0, 40)); return []; }
+            return [{ exerciseId: id, measurementMode: s.measurementMode ?? "reps", slotNotes: s.slotNotes ?? null, sets: Array.isArray(s.sets) ? s.sets : [] }];
+          }),
+        })).filter((b) => b.slots.length),
+      }));
+      const body = WorkoutBody.safeParse({ days });
+      if (!body.success) return bad("schema", body.error.issues.slice(0, 3).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "));
+      const slots = body.data.days.reduce((n, d) => n + d.blocks.reduce((m, b) => m + b.slots.length, 0), 0);
+      if (slots === 0) {
+        return bad("schema", invented.length
+          ? `every exercise was invented, none matched the library it was given: ${[...new Set(invented)].slice(0, 6).join(", ")}`
+          : "parsed, but the plan contains no exercises");
+      }
+      return { ok: true, summary: `${body.data.days.length} day(s), ${slots} exercise slot(s)${invented.length ? `, ${new Set(invented).size} invented id(s) dropped` : ""}` };
+    },
+  },
+  {
+    key: "parse-food",
+    label: "Natural-language food log",
+    feature: "parse-food",
+    task: "text-small",
+    maxOutputTokens: 512,
+    expectsJson: true,
+    prompt: "two scrambled eggs, a slice of wholemeal toast with butter and a medium banana",
+    mock: () => JSON.stringify([
+      { label: "Scrambled eggs", mealType: "breakfast", calories: 180, proteinG: 13, carbsG: 2, fatG: 13, quantity: 2, unit: "egg" },
+      { label: "Wholemeal toast with butter", mealType: "breakfast", calories: 150, proteinG: 4, carbsG: 18, fatG: 7, quantity: 1, unit: "slice" },
+    ]),
+    validate: (out) => {
+      const entries = extractJson<unknown[]>(out);
+      if (!entries) return bad("unparseable_json", "no JSON found in the response");
+      if (!Array.isArray(entries)) return bad("schema", "parsed as JSON but it is not the array of entries the diary expects");
+      const good = entries.filter((e) => {
+        const o = (e ?? {}) as Record<string, unknown>;
+        return typeof o.label === "string" && o.label.length > 0 && Number.isFinite(Number(o.calories));
+      });
+      if (!good.length) return bad("schema", `${entries.length} item(s), none with both a label and a numeric calorie value`);
+      return { ok: true, summary: `${good.length} of ${entries.length} entries usable` };
+    },
+  },
+  {
+    key: "checkin-reply",
+    label: "Check-in summary + reply",
+    feature: "checkin-reply",
+    task: "text-small",
+    maxOutputTokens: 400,
+    expectsJson: true,
+    prompt: [SAMPLE_CONTEXT, untrusted("RAW CHECK-INS (last 14)", JSON.stringify(SAMPLE_CHECKINS))].join("\n\n"),
+    mock: () => JSON.stringify({ summary: "Sam has checked in three weeks running with steady mood and a small upward weight trend. Sleep is the weak link at under 7h. No red flags.", suggestedReply: "Great consistency, Sam — three weeks straight. Let's get sleep closer to 7.5h and keep the same intent in the gym." }),
+    validate: (out) => {
+      const o = extractJson<{ summary?: unknown; suggestedReply?: unknown }>(out);
+      if (!o) return bad("unparseable_json", "no JSON found in the response");
+      const missing = ["summary", "suggestedReply"].filter((k) => typeof (o as Record<string, unknown>)[k] !== "string" || !String((o as Record<string, unknown>)[k]).trim());
+      if (missing.length) return bad("schema", `missing or non-string field(s): ${missing.join(", ")}`);
+      return { ok: true, summary: `summary ${String(o.summary).length} chars, reply ${String(o.suggestedReply).length} chars` };
+    },
+  },
+  {
+    key: "exercise-meta",
+    label: "Exercise detail auto-fill",
+    feature: "exercise-meta",
+    task: "text",
+    maxOutputTokens: 300,
+    expectsJson: true,
+    jsonSchema: EXERCISE_META_SCHEMA,
+    prompt: exerciseMetaPrompt("Barbell Back Squat"),
+    mock: EXERCISE_META_MOCK,
+    validate: (out) => {
+      const raw = extractJson<Record<string, unknown>>(out);
+      if (!raw) return bad("unparseable_json", "no JSON found in the response");
+      const meta = foldExerciseMeta(raw);
+      if (!meta.primaryMuscles.length) return bad("schema", `no primary muscle survived the allowed-slug fold (model said: ${JSON.stringify(raw.primaryMuscles ?? null).slice(0, 80)})`);
+      if (!meta.difficulty) return bad("schema", `difficulty was not one of beginner/intermediate/advanced (model said: ${JSON.stringify(raw.difficulty ?? null).slice(0, 40)})`);
+      return { ok: true, summary: `${meta.primaryMuscles.join(", ")} · ${meta.equipment.join(", ") || "no equipment"} · ${meta.difficulty}` };
+    },
+  },
+  {
+    key: "food-meta",
+    label: "Food nutrition estimate",
+    feature: "food-meta",
+    task: "text",
+    maxOutputTokens: 300,
+    expectsJson: true,
+    prompt: "FOOD: grilled chicken breast\n\nEstimate its nutrition now.",
+    mock: () => JSON.stringify({ servingSize: 100, servingUnit: "g", calories: 165, proteinG: 31, carbsG: 0, fatG: 4, fiberG: 0, sugarG: 0, sodiumMg: 74 }),
+    validate: (out) => {
+      const raw = extractJson<Record<string, unknown>>(out);
+      if (!raw) return bad("unparseable_json", "no JSON found in the response");
+      const n = (v: unknown) => { const x = typeof v === "string" ? parseFloat(v) : Number(v); return Number.isFinite(x) ? x : NaN; };
+      const kcal = n(raw.calories);
+      if (!(kcal > 0)) return bad("schema", `calories is not a positive number (model said: ${JSON.stringify(raw.calories ?? null).slice(0, 40)})`);
+      if (!Number.isFinite(n(raw.proteinG))) return bad("schema", "proteinG is missing or not numeric");
+      return { ok: true, summary: `${Math.round(kcal)} kcal / ${Math.round(n(raw.proteinG))} g protein per ${n(raw.servingSize) || 100}${raw.servingUnit === "ml" ? "ml" : "g"}` };
+    },
+  },
+  {
+    key: "snap-meal",
+    label: "Snap-a-Meal (vision)",
+    feature: "snap-meal",
+    task: "vision",
+    maxOutputTokens: 1024,
+    expectsJson: true,
+    image: true,
+    prompt: "A photo of a meal. Identify the foods, estimate portions + macros, and give one short assessment as the JSON object.",
+    mock: () => JSON.stringify({
+      items: [{ label: "Grilled chicken breast", mealType: "lunch", calories: 280, proteinG: 52, carbsG: 0, fatG: 6, quantity: 170, unit: "g" }],
+      note: "Solid protein anchor — add a carb source alongside it.",
+    }),
+    validate: (out) => {
+      const raw = extractJson<{ items?: unknown[] } | unknown[]>(out);
+      if (!raw) return bad("unparseable_json", "no JSON found in the response");
+      const list = Array.isArray(raw) ? raw : Array.isArray(raw?.items) ? raw.items : null;
+      if (!list) return bad("schema", 'parsed as JSON but there is no "items" array');
+      const good = list.filter((it) => {
+        const o = (it ?? {}) as Record<string, unknown>;
+        const num = (v: unknown) => { const x = typeof v === "string" ? parseFloat(v) : Number(v); return Number.isFinite(x) ? x : 0; };
+        return typeof (o.label ?? o.name) === "string" && (num(o.calories) > 0 || num(o.proteinG) > 0 || num(o.carbsG) > 0 || num(o.fatG) > 0);
+      });
+      if (!good.length) return bad("schema", `${list.length} item(s), none with a label and at least one macro above zero`);
+      return { ok: true, summary: `${good.length} food item(s) read from the image` };
+    },
+  },
+];
+
+export const selfTestCheck = (key: string): SelfTestCheck | undefined => SELF_TEST_CHECKS.find((c) => c.key === key);
+
+/**
+ * Grade one model answer exactly as the endpoint reports it. Split out so the
+ * verdict can be exercised on hand-written model output: in the mock lane a
+ * check can never fail validation (a feature's `mock` is contractually required
+ * to return output that passes its own parser — AGENTS §6.3), so this is the
+ * only way to prove that a 200 carrying prose, or JSON of the wrong shape, is
+ * reported as a FAILURE with a named reason instead of a pass.
+ */
+export function evaluateSelfTestOutput(check: SelfTestCheck, output: string): {
+  status: SelfTestStatus; failure: SelfTestFailure | null; detail: string | null; summary: string | null;
+} {
+  if (!output.trim()) return { status: "fail", failure: "empty", detail: "the call succeeded but the response body was empty", summary: null };
+  const v = check.validate(output);
+  if (!v.ok) return { status: "fail", failure: v.failure, detail: v.detail, summary: null };
+  return { status: "pass", failure: null, detail: null, summary: v.summary };
+}
+
+/** Map a `generate()` refusal onto a named cause. The Workers AI vision refusal
+ *  is by design (the image used to be silently dropped and billed anyway), so it
+ *  reports as "not supported on this provider", never as a crash. */
+function classifyUnavailable(detail: string): { failure: SelfTestFailure; status: SelfTestStatus } {
+  const d = detail.toLowerCase();
+  if (d.includes("cannot read images")) return { failure: "not_supported", status: "unsupported" };
+  if (d.includes("cannot serve a") || d.includes("not in the catalog")) return { failure: "not_supported", status: "unsupported" };
+  if (d.includes("is turned off in ai settings")) return { failure: "feature_off", status: "blocked" };
+  if (d.includes("provider not configured") || d.includes("no enabled model")) return { failure: "not_configured", status: "blocked" };
+  if (d.includes("timeout")) return { failure: "transport", status: "fail" };
+  return { failure: "provider", status: "fail" };
+}
+
+/** Run ONE check against ONE pinned model, through the real metered path. */
+async function runSelfTestCheck(
+  env: Env,
+  tenantId: string,
+  actorUserId: string,
+  check: SelfTestCheck,
+  modelId: string,
+): Promise<SelfTestResult> {
+  const model = await modelById(env.DB, modelId);
+  const base = {
+    check: check.key, label: check.label, feature: check.feature, task: check.task,
+    modelId, modelLabel: model?.label ?? modelId, provider: model?.provider ?? "unknown",
+  };
+  const t0 = Date.now();
+  const result = await generate(env, {
+    tenantId,
+    actorUserId,
+    feature: check.feature,
+    task: check.task,
+    modelId,
+    system: sys(check.feature),
+    prompt: check.prompt,
+    maxOutputTokens: check.maxOutputTokens,
+    expectsJson: check.expectsJson,
+    jsonSchema: check.jsonSchema,
+    image: check.image ? TEST_IMAGE : undefined,
+    mock: check.mock,
+  });
+  const latencyMs = Date.now() - t0;
+
+  if (!result.ok) {
+    if (result.error === "insufficient_credits") {
+      return { ...base, status: "blocked", failure: "insufficient_credits", detail: `needs ${result.needed} credits, ${result.available} available`, latencyMs, credits: 0, mocked: false, excerpt: "", summary: null };
+    }
+    const detail = result.detail ?? "the provider gave no reason";
+    const { failure, status } = classifyUnavailable(detail);
+    return { ...base, status, failure, detail, latencyMs, credits: 0, mocked: false, excerpt: "", summary: null };
+  }
+
+  const verdict = evaluateSelfTestOutput(check, result.output);
+  return { ...base, ...verdict, latencyMs, credits: result.credits, mocked: result.mocked, excerpt: result.output.trim().slice(0, 400) };
+}
+
+export interface SelfTestPlanRun {
+  check: string;
+  label: string;
+  feature: string;
+  task: string;
+  modelId: string;
+  modelLabel: string;
+  provider: string;
+  estimatedCredits: number;
+}
+
+/** What the chosen scope would run, and the upper bound it would spend. */
+async function planSelfTest(env: Env, s: SelfTestScopeInput) {
+  const enabled = await listModels(env.DB);
+  const cfg = await getConfig(env.DB);
+  const geminiKeySet = !!cfg["google.gemini_key"];
+  const mockMode = cfg["ai.mock"] ?? "auto";
+  const isDevelopment = env.ENVIRONMENT === "development";
+
+  const runs: SelfTestPlanRun[] = [];
+  let truncated = 0;
+  for (const check of SELF_TEST_CHECKS) {
+    let models: AiModelRow[] = [];
+    if (s.scope === "model") {
+      const m = s.modelId ? enabled.find((x) => x.id === s.modelId) : undefined;
+      if (m && modelSupportsTask(m, check.task)) models = [m];
+    } else if (s.scope === "all") {
+      models = enabled.filter((m) => modelSupportsTask(m, check.task));
+    } else if (s.scope === "provider") {
+      const m = s.provider ? await preferredModelForTask(env.DB, check.task, s.provider) : null;
+      if (m) models = [m];
+    } else if (s.scope === "compare") {
+      // Adjacent by design: the same prompt on Workers AI then on Gemini, so the
+      // two rows sit next to each other in the results table.
+      for (const p of ["workers-ai", "google"] as const) {
+        const m = await preferredModelForTask(env.DB, check.task, p);
+        if (m && !models.some((x) => x.id === m.id)) models.push(m);
+      }
+    } else {
+      // "default" — whatever generate() would pick right now, for this task.
+      let m: AiModelRow | null = geminiKeySet ? await preferredModelForTask(env.DB, check.task, "google") : null;
+      if (!m) m = await modelForTask(env.DB, check.task);
+      if (m) models = [m];
+    }
+    for (const m of models) {
+      if (runs.length >= MAX_SELFTEST_RUNS) { truncated++; continue; }
+      runs.push({
+        check: check.key, label: check.label, feature: check.feature, task: check.task,
+        modelId: m.id, modelLabel: m.label, provider: m.provider,
+        estimatedCredits: estimateRunCredits(m, { system: sys(check.feature), prompt: check.prompt, maxOutputTokens: check.maxOutputTokens, hasImage: !!check.image }),
+      });
+    }
+  }
+  return {
+    scope: s.scope,
+    runs,
+    truncated,
+    maxRuns: MAX_SELFTEST_RUNS,
+    totalEstimatedCredits: runs.reduce((n, r) => n + r.estimatedCredits, 0),
+    geminiKeySet,
+    mockMode,
+    /** Per provider: would this run hit the canned mock instead of a real model? */
+    willMock: {
+      "workers-ai": shouldUseMockLane({ mockMode, canRunReal: !!env.AI, isDevelopment }),
+      google: shouldUseMockLane({ mockMode, canRunReal: geminiKeySet, isDevelopment }),
+    },
+  };
+}

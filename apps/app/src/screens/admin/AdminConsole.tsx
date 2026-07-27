@@ -905,14 +905,19 @@ function AiConfig() {
     }, "Couldn't set the markup.");
   };
 
+  const [syncReport, setSyncReport] = useState<SyncReport | null>(null);
   const sync = () =>
     pricing.run("sync", async () => {
-      const r = await api.post<{ parsed: number; total: number; errors: string[] }>("/api/admin/ai/models/sync", {});
+      const r = await api.post<SyncReport>("/api/admin/ai/models/sync", {});
+      setSyncReport(r);
       cfg.reload();
       models.reload();
-      return r.errors?.length
-        ? `Synced ${plural(r.parsed, "model")}, with ${plural(r.errors.length, "source error")}: ${r.errors.join("; ")}`
-        : `Synced ${plural(r.parsed, "model")} from the pricing docs.`;
+      // The per-provider breakdown is rendered below; keep the one-liner to the
+      // headline so "Gemini: 0 parsed" is never hidden behind a generic message.
+      const line = r.providers
+        .map((p) => (p.error ? `${providerLabel(p.provider)}: ${p.error}` : `${providerLabel(p.provider)}: ${p.parsed} parsed, ${p.added} new, ${p.disabled} switched off`))
+        .join(" · ");
+      return `${line}. ${plural(r.total, "model")} selectable.`;
     }, "Sync failed — check outbound access to the pricing docs.");
 
   const patchModel = (m: ModelRow, body: { enabled?: boolean; isDefault?: boolean }, what: string) =>
@@ -1028,12 +1033,16 @@ function AiConfig() {
               {pricing.busy === "markup" ? <><Spinner className="size-4" /> …</> : "Apply"}
             </Button>
           </div>
-          <Group title="Catalog sync" hint="Re-reads the official Cloudflare and Gemini pricing pages and refreshes every model's rate. Enable/default/markup choices survive.">
+          <Group
+            title="Catalog sync"
+            hint="Re-reads the official Cloudflare and Gemini pricing pages: it DISCOVERS models new to the page, refreshes every rate, and switches off any model that has disappeared from its provider's page (never deletes one — a studio may still reference it). Task routing, enable/default and markup choices survive. Each provider is handled on its own, so a failed fetch on one never touches the other's models."
+          >
             <Button variant="tonal" className="min-h-12 w-full" disabled={pricing.busy !== null} onClick={() => void sync()}>
               {pricing.busy === "sync" ? <><Spinner className="size-4" /> Syncing…</> : <><RefreshCw /> Sync from the pricing docs</>}
             </Button>
           </Group>
           <ActionResult msg={pricing.msg} err={pricing.err} />
+          {syncReport && <SyncReportCard report={syncReport} />}
         </Card>
 
         {/* ── Model catalog ─────────────────────────────────────────────── */}
@@ -1127,8 +1136,319 @@ function AiConfig() {
             ))}
           </Reveal>
         )}
+
+        {/* ── Live self-test ────────────────────────────────────────────── */}
+        <AiSelfTest models={models.data ?? []} />
       </Stagger>
     </>
+  );
+}
+
+// ── Catalog sync report ──────────────────────────────────────────────────────
+
+interface ProviderSyncReport {
+  provider: string;
+  source: string;
+  ok: boolean;
+  parsed: number;
+  added: number;
+  addedIds: string[];
+  updated: number;
+  disabled: number;
+  disabledIds: string[];
+  unpriceable: { id: string; reason: string }[];
+  error: string | null;
+}
+interface SyncReport { ok: boolean; providers: ProviderSyncReport[]; total: number; errors: string[] }
+
+/** What the last sync actually did, per provider. A generic "sync failed" hides
+ *  the one thing an operator needs — WHICH source broke and what it cost them. */
+function SyncReportCard({ report }: { report: SyncReport }) {
+  return (
+    <div className="space-y-2" role="status" aria-live="polite">
+      {report.providers.map((p) => (
+        <div key={p.provider} className="rounded-2xl bg-surface-2 p-3 text-xs">
+          <div className="flex items-center justify-between gap-2 pb-1">
+            <span className="min-w-0 truncate text-sm font-semibold">{providerLabel(p.provider)}</span>
+            <Badge tone={p.error ? "danger" : "success"}>{p.error ? "not reconciled" : `${p.parsed} parsed`}</Badge>
+          </div>
+          {p.error ? (
+            <p className="leading-relaxed text-danger">{p.error}</p>
+          ) : (
+            <p className="leading-relaxed text-muted-foreground">
+              <span className="numeral">{p.added}</span> new · <span className="numeral">{p.updated}</span> re-priced ·{" "}
+              <span className={cn("numeral", p.disabled > 0 && "font-semibold text-foreground")}>{p.disabled}</span> switched off
+              {p.disabledIds.length > 0 && <> — {p.disabledIds.slice(0, 6).join(", ")}{p.disabledIds.length > 6 ? "…" : ""}</>}
+            </p>
+          )}
+          {p.addedIds.length > 0 && (
+            <p className="pt-1 leading-relaxed text-muted-foreground">New: {p.addedIds.slice(0, 8).join(", ")}{p.addedIds.length > 8 ? ` +${p.addedIds.length - 8} more` : ""}</p>
+          )}
+          {p.unpriceable.length > 0 && (
+            <details className="pt-1.5">
+              <summary className="min-h-6 cursor-pointer text-muted-foreground">{plural(p.unpriceable.length, "model")} on the page could not be priced</summary>
+              <ul className="space-y-1 pt-1.5">
+                {p.unpriceable.map((u) => (
+                  <li key={u.id} className="leading-relaxed text-muted-foreground"><span className="font-medium text-foreground">{u.id}</span> — {u.reason}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── AI self-test ─────────────────────────────────────────────────────────────
+
+interface SelfTestPlanRun {
+  check: string; label: string; feature: string; task: string;
+  modelId: string; modelLabel: string; provider: string; estimatedCredits: number;
+}
+interface SelfTestPlan {
+  scope: string;
+  runs: SelfTestPlanRun[];
+  truncated: number;
+  maxRuns: number;
+  totalEstimatedCredits: number;
+  geminiKeySet: boolean;
+  mockMode: string;
+  willMock: Record<string, boolean>;
+}
+interface SelfTestResult {
+  check: string; label: string; feature: string; task: string;
+  modelId: string; modelLabel: string; provider: string;
+  status: "pass" | "fail" | "unsupported" | "blocked";
+  failure: string | null;
+  detail: string | null;
+  latencyMs: number;
+  credits: number;
+  mocked: boolean;
+  excerpt: string;
+  summary: string | null;
+}
+
+type SelfTestScope = "default" | "compare" | "workers-ai" | "google" | "model";
+
+const SCOPE_OPTIONS: { value: SelfTestScope; label: string }[] = [
+  { value: "default", label: "As shipped" },
+  { value: "compare", label: "Compare" },
+  { value: "workers-ai", label: "Workers AI" },
+  { value: "google", label: "Gemini" },
+  { value: "model", label: "One model" },
+];
+
+const SCOPE_HINT: Record<SelfTestScope, string> = {
+  default: "Exactly the model each feature would use right now — the studio's real experience.",
+  compare: "The same prompt on the default Workers AI model and the default Gemini model, side by side per check.",
+  "workers-ai": "Every check on the default Workers AI model for its task.",
+  google: "Every check on the default Gemini model for its task.",
+  model: "Every check the chosen model can serve.",
+};
+
+const CHECK_TONE: Record<SelfTestResult["status"], Tone> = { pass: "success", fail: "danger", unsupported: "neutral", blocked: "warning" };
+const CHECK_LABEL: Record<SelfTestResult["status"], string> = { pass: "Pass", fail: "Fail", unsupported: "N/A", blocked: "Blocked" };
+
+/** Why a check failed, in words an operator can act on. */
+const FAILURE_LABEL: Record<string, string> = {
+  feature_off: "feature switched off in AI settings",
+  not_configured: "no provider configured for this lane",
+  not_supported: "not supported on this provider",
+  insufficient_credits: "the studio is out of credits",
+  transport: "the call never completed (timeout / network)",
+  provider: "the provider returned an error",
+  empty: "a 200 with an empty body",
+  unparseable_json: "the answer was not JSON the product can read",
+  schema: "valid JSON, wrong shape for this feature",
+};
+
+/**
+ * Run the product's real AI prompts against real models and show what comes
+ * back. Spends real credits, so the plan (and its cost) is shown first and the
+ * button says what it will spend. Runs are issued ONE AT A TIME so a slow
+ * provider shows as progress rather than a frozen button.
+ */
+function AiSelfTest({ models }: { models: ModelRow[] }) {
+  const [scope, setScope] = useState<SelfTestScope>("default");
+  const [pickedModel, setPickedModel] = useState("");
+  const [results, setResults] = useState<SelfTestResult[]>([]);
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(0);
+  const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  const query = useMemo(() => {
+    if (scope === "compare" || scope === "default") return `scope=${scope}`;
+    if (scope === "model") return `scope=model&modelId=${encodeURIComponent(pickedModel)}`;
+    return `scope=provider&provider=${scope}`;
+  }, [scope, pickedModel]);
+  const loadPlan = useCallback(() => api.get<SelfTestPlan>(`/api/admin/ai/selftest?${query}`), [query]);
+  const plan = useAdminLoad(loadPlan, "the self-test plan");
+
+  const runs = plan.data?.runs ?? [];
+  const willMock = plan.data?.willMock ?? {};
+  const mockedProviders = runs.filter((r) => willMock[r.provider]).map((r) => r.provider);
+  const anyMock = mockedProviders.length > 0;
+
+  const run = async () => {
+    setRunning(true);
+    setResults([]);
+    setDone(0);
+    setErr(null);
+    setNote(null);
+    try {
+      const acc: SelfTestResult[] = [];
+      for (const r of runs) {
+        const out = await api.post<{ results: SelfTestResult[]; stopped: string | null }>("/api/admin/ai/selftest", {
+          runs: [{ check: r.check, modelId: r.modelId }],
+        });
+        acc.push(...out.results);
+        setResults([...acc]);
+        setDone(acc.length);
+        if (out.stopped) { setNote(out.stopped); break; }
+      }
+    } catch (e) {
+      setErr(errorText(e, "The self-test couldn't run."));
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const spent = results.reduce((n, r) => n + r.credits, 0);
+  const passed = results.filter((r) => r.status === "pass").length;
+  const failed = results.filter((r) => r.status === "fail").length;
+  // Group by check so the same prompt on two providers sits adjacent.
+  const byCheck = results.reduce<{ label: string; rows: SelfTestResult[] }[]>((acc, r) => {
+    const g = acc.find((x) => x.label === r.label);
+    if (g) g.rows.push(r);
+    else acc.push({ label: r.label, rows: [r] });
+    return acc;
+  }, []);
+
+  return (
+    <Card className="space-y-4">
+      <SectionHeader icon={Sparkles} title="Live self-test" />
+      <p className="text-sm text-muted-foreground">
+        Runs the product's <span className="font-medium text-foreground">real prompts</span> — a plan draft, a food parse,
+        a check-in summary, an exercise auto-fill, a nutrition estimate and a vision call — through the normal metered
+        path, then validates each answer with the same parser the feature uses. A 200 that comes back as prose is a{" "}
+        <span className="font-medium text-foreground">failure</span> here, because it is one for a coach.
+      </p>
+      <Callout tone="warning" icon={AlertTriangle}>
+        This spends real credits from the studio you are currently switched into. Nothing is faked or refunded.
+      </Callout>
+
+      <Group title="What to run" hint={SCOPE_HINT[scope]}>
+        <div className="overflow-x-auto no-scrollbar">
+          <SegmentedControl options={SCOPE_OPTIONS} value={scope} onChange={(v) => setScope(v as SelfTestScope)} />
+        </div>
+        {scope === "model" && (
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Model</span>
+            <select
+              className="min-h-12 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm"
+              value={pickedModel}
+              onChange={(e) => setPickedModel(e.target.value)}
+            >
+              <option value="">Choose a model…</option>
+              {models.filter((m) => m.enabled === 1).map((m) => (
+                <option key={m.id} value={m.id}>{providerLabel(m.provider)} — {m.label} ({m.task})</option>
+              ))}
+            </select>
+          </label>
+        )}
+      </Group>
+
+      {plan.error && !plan.data ? (
+        <LoadError what="the self-test plan" error={plan.error} onRetry={plan.reload} />
+      ) : (
+        <Reveal loading={plan.loading} skeleton={<Skeleton className="h-24 w-full rounded-2xl" />}>
+          {plan.data && (
+            <div className="space-y-3">
+              <div className="rounded-2xl bg-surface-2 p-3 text-sm">
+                {runs.length === 0 ? (
+                  <p className="text-muted-foreground">Nothing to run — no enabled model matches that choice.</p>
+                ) : (
+                  <p className="text-muted-foreground">
+                    <span className="numeral font-semibold text-foreground">{plural(runs.length, "check")}</span> ·
+                    estimated at most{" "}
+                    <span className="numeral font-semibold text-foreground">{plural(plan.data.totalEstimatedCredits, "credit")}</span>
+                    {plan.data.truncated > 0 && <> · {plan.data.truncated} further run(s) trimmed at the {plan.data.maxRuns}-run cap</>}
+                  </p>
+                )}
+              </div>
+
+              {anyMock && (
+                <Callout tone="warning" icon={AlertTriangle}>
+                  {[...new Set(mockedProviders)].map(providerLabel).join(" and ")} will answer from the{" "}
+                  <b>canned mock</b> ({plan.data.mockMode === "on" ? "mock mode is forced on" : "no real provider is configured"}),
+                  so those rows prove the plumbing and the billing — not the model.
+                </Callout>
+              )}
+
+              <Button
+                className="min-h-12 w-full"
+                disabled={running || runs.length === 0}
+                onClick={() => void run()}
+              >
+                {running
+                  ? <><Spinner className="size-4" /> Running check {Math.min(done + 1, runs.length)} of {runs.length}…</>
+                  : <>Run {plural(runs.length, "check")} · spend up to {plural(plan.data.totalEstimatedCredits, "credit")}</>}
+              </Button>
+            </div>
+          )}
+        </Reveal>
+      )}
+
+      {running && (
+        <div role="status" aria-live="polite" className="text-xs text-muted-foreground">
+          {done} of {runs.length} finished. Providers can take 20-60 seconds each — this is not stuck.
+        </div>
+      )}
+      {err && <Callout tone="danger" icon={AlertTriangle} live="alert">{err}</Callout>}
+      {note && <Callout tone="warning" icon={AlertTriangle} live="alert">{note}</Callout>}
+
+      {results.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-1.5" role="status" aria-live="polite">
+            <Badge tone={failed > 0 ? "danger" : "success"}>{passed} passed</Badge>
+            {failed > 0 && <Badge tone="danger">{failed} failed</Badge>}
+            <Badge tone="neutral">{plural(spent, "credit")} spent</Badge>
+            {results.some((r) => r.mocked) && <Badge tone="warning">mocked</Badge>}
+          </div>
+          {byCheck.map((g) => (
+            <div key={g.label} className="space-y-1.5 rounded-2xl bg-surface-2 p-3">
+              <h4 className="text-sm font-semibold">{g.label}</h4>
+              {g.rows.map((r) => (
+                <div key={`${r.check}:${r.modelId}`} className="space-y-1 border-t border-border/40 pt-2 first:border-t-0 first:pt-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge tone={CHECK_TONE[r.status]}>{CHECK_LABEL[r.status]}</Badge>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.modelLabel}</span>
+                    {r.mocked && <Badge tone="warning">mock</Badge>}
+                  </div>
+                  <div className="numeral text-xs text-muted-foreground">
+                    {providerLabel(r.provider)} · {r.modelId} · {r.latencyMs} ms · {plural(r.credits, "credit")}
+                  </div>
+                  {r.status === "pass" && r.summary && <p className="text-xs text-muted-foreground">{r.summary}</p>}
+                  {r.failure && (
+                    <p className={cn("text-xs leading-relaxed", toneText[CHECK_TONE[r.status]])}>
+                      <b>{FAILURE_LABEL[r.failure] ?? r.failure}</b>{r.detail ? ` — ${r.detail}` : ""}
+                    </p>
+                  )}
+                  {r.excerpt && (
+                    <details>
+                      <summary className="min-h-6 cursor-pointer text-xs text-muted-foreground">What the model said</summary>
+                      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-surface-1 p-2 text-[11px] leading-relaxed">{r.excerpt}</pre>
+                    </details>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }
 

@@ -227,6 +227,70 @@ production and re-opens four fail-closed guards at once:
 
 ---
 
+## 8b. The AI model catalog, and proving AI works
+
+Two controls on **Platform admin → AI**, both worth running on a fresh deploy.
+
+### Sync from the pricing docs
+
+Re-reads Cloudflare's and Google's official pricing pages (their `.md`
+versions). Per provider, **independently**:
+
+| It does | Detail |
+| --- | --- |
+| **Discover** | Any model on the page that is not in the catalog is added. Generation lanes (text / text-small / vision / image / speech) arrive **enabled**; embedding / transcription / TTS / classifier models arrive **disabled** — they are priced and listed, but nothing in Mossa can call one |
+| **Re-price** | Existing rows get the page's current rates and label. Your **task routing, enable/default and markup are preserved** — a sync never re-routes a lane behind you |
+| **Reconcile** | A model that has **disappeared** from its provider's page is switched **off** (`enabled = 0`, and it loses any default flag). It is never deleted: a studio's saved per-feature model may still name it, and the `ai_generations` history has to stay readable. Re-enable it by hand if it comes back |
+| **Report** | Per provider: parsed / new / re-priced / switched-off counts, the ids switched off, and every row on the page it **could not** price, with the reason |
+
+Failure is isolated. If Cloudflare's page 404s and Google's is fine, **only**
+Gemini is reconciled; not one Workers AI row is touched. A page that fetches but
+parses to **zero** models is treated as a doc-format change — nothing is written
+and nothing is disabled — so a Cloudflare docs rewrite cannot empty your catalog
+in one click. The console prints the per-provider line, so `Gemini: 0 parsed`
+reads as itself rather than as a generic "sync failed".
+
+What it still **cannot** discover, and will tell you so:
+
+- **Workers AI image models** (flux, lucid-origin, phoenix). They are priced per
+  512×512 tile *plus* per step (or in per-megapixel tiers); the catalog holds one
+  unit rate, so any single figure would undercharge. They are also unreachable —
+  image generation is Gemini-only.
+- **Gemini's newer image models** (`gemini-3.1-flash-image`, `gemini-3-pro-image`)
+  — priced per resolution tier (0.5K / 1K / 2K / 4K), not per image.
+- **Imagen / Veo / Lyria** — a different Google API surface (`predict` /
+  long-running operations) that the app's `generateContent` path cannot drive.
+- **Live API / native-audio** models — a bidirectional streaming protocol
+  nothing here speaks.
+- Workers AI rows whose Model cell is a pricing variant rather than an id
+  (`@cf/deepgram/nova-3 (WebSocket)`).
+
+### Live self-test
+
+Runs six of the product's **real** prompts — a workout-plan draft, a
+natural-language food parse, a check-in summary, an exercise auto-fill, a food
+nutrition estimate and a Snap-a-Meal vision call — through the normal metered
+path, then validates each answer with the same parser the feature uses. A model
+that returns prose instead of JSON is reported as a **failure**, which is the
+usual meaning of "the AI isn't working".
+
+- **It spends real credits** from the studio you are switched into. The plan and
+  its upper-bound cost are shown before the button, and the button says what it
+  will spend. Nothing is refunded.
+- Scopes: *As shipped* (what each feature would use right now), *Compare*
+  (the default Workers AI model and the default Gemini model on the same prompt,
+  shown adjacent), one provider, or one model.
+- Each row reports the model, provider, pass/fail, latency, credits spent, the
+  reason on failure (verbatim provider error where there is one) and an excerpt
+  of what the model actually said.
+- A row that came from the **canned mock** is labelled as such. On the dev lane
+  that is everything, and it proves the plumbing and the billing, not the model.
+- A vision check on a Workers AI model reports **"not supported on this
+  provider"**, not a failure. That refusal is deliberate: the image was
+  previously dropped silently and the fabricated answer billed anyway.
+
+---
+
 ## 9. Runtime configuration reference (`app_config` in D1)
 
 Everything here is admin-editable at runtime and lives in the `app_config` D1

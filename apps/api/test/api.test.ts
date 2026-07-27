@@ -648,7 +648,7 @@ describe("AI config (per-tenant model / prompt / tone / enable)", () => {
     };
     expect(reg.features.some((f) => f.key === "coach-note" && f.audience === "client")).toBe(true);
     expect(reg.features.some((f) => f.key === "draft-plan" && f.audience === "trainer")).toBe(true);
-    expect(reg.models.some((m) => m.id === "@cf/meta/llama-3.1-8b-instruct-fast")).toBe(true);
+    expect(reg.models.some((m) => m.id === "@cf/meta/llama-3.1-8b-instruct-fp8-fast")).toBe(true);
     expect(reg.tones).toContain("motivating");
 
     const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "AICfg" }) })).json()) as { client: { id: string } };
@@ -665,13 +665,13 @@ describe("AI config (per-tenant model / prompt / tone / enable)", () => {
     expect(offBody.detail ?? offBody.error).toContain("turned off");
 
     // Re-enable with a model override — generation runs again (mock lane).
-    await SELF.fetch("http://x/api/settings/ai", { method: "PATCH", headers: H, body: JSON.stringify({ features: { "parse-food": { enabled: true, model: "@cf/meta/llama-3.1-8b-instruct-fast" } } }) });
+    await SELF.fetch("http://x/api/settings/ai", { method: "PATCH", headers: H, body: JSON.stringify({ features: { "parse-food": { enabled: true, model: "@cf/meta/llama-3.1-8b-instruct-fp8-fast" } } }) });
     const on = await SELF.fetch("http://x/api/ai/parse-food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
     expect(on.status).toBe(200);
     // The earlier tone edit is preserved across the second PATCH (deep merge).
     const cfg3 = (await (await SELF.fetch("http://x/api/settings/ai", { headers: auth(ownerCookie) })).json()) as { config: { tone: string; features: Record<string, { enabled: boolean; model: string }> } };
     expect(cfg3.config.tone).toBe("motivating");
-    expect(cfg3.config.features["parse-food"]).toMatchObject({ enabled: true, model: "@cf/meta/llama-3.1-8b-instruct-fast" });
+    expect(cfg3.config.features["parse-food"]).toMatchObject({ enabled: true, model: "@cf/meta/llama-3.1-8b-instruct-fp8-fast" });
   });
 });
 

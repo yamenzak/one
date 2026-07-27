@@ -282,6 +282,59 @@ Adding a metered call:
    `intake`, coach feedback. A client could otherwise steer the coach's supplement
    recommender with instruction-shaped text in their own injury field.
 
+### The model catalog (`ai_models`) and its sync
+
+`POST /api/admin/ai/models/sync` (`syncModelCatalog`, `ai-routes.ts`) reads the
+two official pricing pages as markdown and reconciles the catalog **per
+provider, independently**:
+
+- **Discovery is real.** Anything priceable on a page is upserted, including ids
+  the catalog has never seen. Runnable lanes (`text` / `text-small` / `vision` /
+  `image` / `speech`) land `enabled = 1`; the lanes nothing here can execute
+  (`embedding` / `transcribe` / `tts` / `classify`) land `enabled = 0` — priced
+  and visible to an operator, never offered to a tenant as a model that would
+  fail at call time. `modelSupportsTask` (`ai.ts`) is the **whitelist** that
+  keeps them out of a generation; do not turn it back into a blacklist.
+- **A refresh never re-routes.** The upsert updates label + rates only. `task`,
+  `enabled`, `is_default` and `markup` are operator/seed decisions. Overwriting
+  `task` used to retag `gemini-2.5-flash` as `text-small` from the page's own
+  naming, which pushed every text feature onto `gemini-2.5-pro` (~8× the output
+  rate) on the next sync.
+- **Reconciliation disables, never deletes.** A model that vanished from its
+  provider's page is set `enabled = 0, is_default = 0`; a tenant's
+  `ai_config_json` may still name it and `ai_generations` must stay readable.
+  It runs **only** for a provider whose fetch *and* parse succeeded — a fetched
+  page that parses to zero models is treated as a doc-format change, not as an
+  empty provider, or one bad deploy of Cloudflare's docs empties the catalog.
+- **What it still cannot discover** is reported back per row in
+  `unpriceable[]`, with the reason. Workers AI image models are the big one:
+  they are priced on two additive dimensions (per 512×512 tile **and** per step,
+  or per-MP tiers) and `ai_models` has exactly one `unit_rate`/`unit_kind`, so
+  recording a tile-only figure would undercharge ~3× — and an under-estimate
+  makes the platform eat the overrun at settle (§5). Also unpriceable: Gemini's
+  tiered per-resolution image models, Live-API/native-audio models, and the
+  Imagen/Veo/Lyria families (a different Google API surface entirely).
+
+### The AI self-test
+
+`GET|POST /api/admin/ai/selftest` (platform admin) runs six of the product's own
+prompts — plan draft, food parse, check-in summary, exercise auto-fill, food
+nutrition, Snap-a-Meal — through the **real metered `generate()`** and grades
+each answer with the feature's own parser. Rules if you extend it:
+
+- It **spends real credits** from whichever studio the admin is switched into.
+  `GET` returns the plan and its upper-bound cost; never make `POST` cheaper by
+  skipping the reserve → run → settle loop, or it stops testing the thing that
+  breaks.
+- **HTTP 200 is not a pass.** `evaluateSelfTestOutput` names the cause:
+  `unparseable_json`, `schema`, `empty`, `provider`, `transport`,
+  `not_supported`, `feature_off`, `not_configured`, `insufficient_credits`.
+- Pin a model with `GenerateInput.modelId`. It overrides the tenant's config and
+  the task default and **never falls back** — an incompatible or disabled id is
+  an error, because the operator asked about *that* model.
+- Every result carries `mocked`. In development the mock lane answers, and a
+  green board that does not say so proves nothing.
+
 **The mock lane may never activate in production.** The `auto` fallback is gated
 on `env.ENVIRONMENT === "development"`. **Never add `ENVIRONMENT` to
 `wrangler.jsonc`'s top-level `vars`** — that block is the *deployed* config, and

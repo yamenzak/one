@@ -68,8 +68,20 @@ const DEFAULT_MODELS: Omit<AiModelRow, "enabled" | "is_default">[] = [
   // Additional Workers AI text models the tenant can pick per feature. Rates are
   // neuron-equivalents by size class (admin-tunable in ai_models); the credit
   // math applies markup on neurons so margins hold across the catalog.
+  // NOTE: every rate below is the published Workers AI neuron rate, verbatim.
+  // They used to be "neuron-equivalents by size class" — i.e. guesses — and
+  // three of them UNDER-charged the real cost (gemma-3-12b input 12k vs 31,371;
+  // llama-4-scout input 14k vs 24,545; mistral-small output 120k vs 50,488), so
+  // a studio on those models was billed less than the platform paid until
+  // someone ran the catalog sync. A seed rate is a reserve estimate, and an
+  // estimate that is not an upper bound is a money bug (AGENTS §5).
   {
-    id: "@cf/meta/llama-3.1-8b-instruct-fast",
+    // Cloudflare publishes `-fp8-fast`; the seed used to read `-instruct-fast`,
+    // which is not a real model id, so picking this row in AI settings failed at
+    // the provider. `syncModelCatalog` would now retire it on the first sync, but
+    // a seed that is wrong until someone presses a button is still wrong — a
+    // fresh deploy offers it immediately.
+    id: "@cf/meta/llama-3.1-8b-instruct-fp8-fast",
     task: "text-small",
     label: "Llama 3.1 8B (fast)",
     provider: "workers-ai",
@@ -84,8 +96,8 @@ const DEFAULT_MODELS: Omit<AiModelRow, "enabled" | "is_default">[] = [
     task: "text-small",
     label: "Gemma 3 12B",
     provider: "workers-ai",
-    input_rate: 12_000,
-    output_rate: 80_000,
+    input_rate: 31_371,
+    output_rate: 50_560,
     unit_rate: null,
     unit_kind: null,
     markup: 3,
@@ -95,8 +107,8 @@ const DEFAULT_MODELS: Omit<AiModelRow, "enabled" | "is_default">[] = [
     task: "text",
     label: "Llama 4 Scout 17B",
     provider: "workers-ai",
-    input_rate: 14_000,
-    output_rate: 100_000,
+    input_rate: 24_545,
+    output_rate: 77_273,
     unit_rate: null,
     unit_kind: null,
     markup: 3,
@@ -106,8 +118,8 @@ const DEFAULT_MODELS: Omit<AiModelRow, "enabled" | "is_default">[] = [
     task: "text",
     label: "Mistral Small 3.1 24B",
     provider: "workers-ai",
-    input_rate: 16_000,
-    output_rate: 120_000,
+    input_rate: 31_876,
+    output_rate: 50_488,
     unit_rate: null,
     unit_kind: null,
     markup: 3,
@@ -234,6 +246,22 @@ export async function visionFallbackModel(db: D1Database): Promise<AiModelRow | 
     .first<AiModelRow>();
 }
 
+/**
+ * Can this catalog row serve `task`? The catalog now also carries lanes nothing
+ * here can execute (embedding / transcribe / tts / classify — discovered and
+ * priced by the admin sync so the catalog is honest about what the providers
+ * sell, but inert), so this is a WHITELIST of the generation lanes rather than
+ * a blacklist of the ones we happened to know about: a blacklist quietly let a
+ * Gemini embedding model satisfy a vision request. Gemini models are multimodal,
+ * so any Google text model also reads images and can generate them.
+ */
+export function modelSupportsTask(m: AiModelRow, task: "text" | "text-small" | "vision" | "image"): boolean {
+  const text = m.task === "text" || m.task === "text-small";
+  if (task === "image") return m.task === "image" || (m.provider === "google" && text);
+  if (task === "vision") return m.task === "vision" || (m.provider === "google" && (text || m.task === "image"));
+  return text;
+}
+
 /** An enabled model by id — for a tenant's per-feature model override. */
 export async function modelById(db: D1Database, id: string): Promise<AiModelRow | null> {
   await seedAiModels(db);
@@ -279,6 +307,12 @@ export interface GenerateInput {
   maxOutputTokens?: number;
   /** Inline image for vision tasks (base64 + mime), routed to a vision model. */
   image?: { data: string; mimeType: string };
+  /** Pin an exact catalog model, overriding the tenant's per-feature config and
+   *  the task default. Used by the admin AI self-test to run the SAME prompt
+   *  across providers. Still fully metered — this pins the model, nothing else.
+   *  A missing / disabled / task-incompatible id fails the call rather than
+   *  silently falling back to a different model than the caller asked about. */
+  modelId?: string;
   /** Ask the provider for JSON natively (Gemini responseMimeType / Workers AI
    *  response_format) — belt-and-suspenders with the response normalizer. */
   expectsJson?: boolean;
@@ -302,6 +336,22 @@ const RUN_TIMEOUT_MS = 120_000;
 // the hold under-reserves and the settle cap (billing-do) silently eats the
 // overrun. 2048 covers a high-resolution photo with margin.
 const IMAGE_TOKEN_EST = 2048;
+
+/** The worst-case usage `generate()` reserves against — chars/4 in (plus an
+ *  image allowance) and the full output cap out. Exported so the admin
+ *  self-test can quote the same number it is about to spend, rather than a
+ *  second, drifting estimate. */
+export function estimateUsage(args: { system: string; prompt: string; maxOutputTokens?: number; hasImage?: boolean }): Usage {
+  return {
+    inputTokens: Math.ceil((args.system.length + args.prompt.length) / 4) + (args.hasImage ? IMAGE_TOKEN_EST : 0),
+    outputTokens: args.maxOutputTokens ?? 1024,
+  };
+}
+
+/** Upper-bound credits a `generate()` call on `model` would reserve. */
+export function estimateRunCredits(model: AiModelRow, args: { system: string; prompt: string; maxOutputTokens?: number; hasImage?: boolean }): number {
+  return creditsForUsage(estimateUsage(args), rateOf(model));
+}
 
 function withTimeout<T>(p: Promise<T>): Promise<T> {
   return Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), RUN_TIMEOUT_MS))]);
@@ -395,14 +445,22 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   // interchangeable and never route to a vision-only or image model.
   // Gemini models are multimodal — they read images (vision) and generate them,
   // so a Google model is valid on any lane, not just its tagged task.
-  const visionCapable = (m: AiModelRow) => m.task === "vision" || m.provider === "google";
-  const imageCapable = (m: AiModelRow) => m.task === "image" || m.provider === "google";
-  const compatible = (m: AiModelRow) =>
-    input.task === "image" ? imageCapable(m)
-      : input.task === "vision" ? visionCapable(m)
-        : m.task !== "vision" && m.task !== "image" && m.task !== "speech";
+  // The catalog now also carries lanes nothing here can execute (embedding,
+  // transcribe, tts, classify — discovered and priced by the sync so the
+  // catalog is honest, but inert). Compatibility is therefore a WHITELIST of
+  // the generation lanes, not a blacklist of the ones we knew about: a
+  // blacklist silently let a Gemini embedding model serve a vision request.
+  const compatible = (m: AiModelRow) => modelSupportsTask(m, input.task);
   let model: AiModelRow | null = null;
-  if (fcfg.model) { const m = await modelById(env.DB, fcfg.model); if (m && compatible(m)) model = m; }
+  // An explicitly pinned model (the admin self-test) wins over everything and
+  // never falls back — the whole point is to learn what THAT model does.
+  if (input.modelId) {
+    const pinned = await modelById(env.DB, input.modelId);
+    if (!pinned) return { ok: false, error: "unavailable", detail: `model "${input.modelId}" is not in the catalog, or is disabled` };
+    if (!compatible(pinned)) return { ok: false, error: "unavailable", detail: `model "${pinned.id}" is a "${pinned.task}" model and cannot serve a "${input.task}" request` };
+    model = pinned;
+  }
+  if (!model && fcfg.model) { const m = await modelById(env.DB, fcfg.model); if (m && compatible(m)) model = m; }
   // No explicit override: when a Gemini key is configured, prefer Gemini — it's
   // the stronger model and honors native JSON mode, so structured features are
   // far more reliable. Falls back to the Workers AI default otherwise.
@@ -453,10 +511,7 @@ export async function generate(env: Env, input: GenerateInput): Promise<Generate
   // Worst-case estimate for the hold: prompt tokens (~chars/4) in, cap out, plus
   // a worst-case image allowance so a vision call reserves for the image tokens
   // the char count can't see (keeps the reserve a true upper bound).
-  const estUsage: Usage = {
-    inputTokens: Math.ceil((system.length + input.prompt.length) / 4) + (input.image ? IMAGE_TOKEN_EST : 0),
-    outputTokens: input.maxOutputTokens ?? 1024,
-  };
+  const estUsage = estimateUsage({ system, prompt: input.prompt, maxOutputTokens: input.maxOutputTokens, hasImage: !!input.image });
   const estimate = creditsForUsage(estUsage, rate);
 
   const dobj = env.BILLING.get(env.BILLING.idFromName(input.tenantId));
