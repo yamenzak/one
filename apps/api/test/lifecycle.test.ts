@@ -261,10 +261,16 @@ describe("client offboarding — archive keeps the seat, delete frees it and rec
     expect(cl.status).toBe(201);
     await SELF.fetch(`${B}/api/check-ins`, { method: "POST", headers: json(ownerCk), body: JSON.stringify({ clientId: cl.id, data: { date: "2026-06-12", mood: 4 } }) });
 
-    // The client signs in and auto-links, then the studio archives them.
     // Plain sign-in — a client must NOT create an organization of their own here.
+    // Reading /api/context is what auto-links them to the invited row and adopts
+    // the tenant, and it has to happen BEFORE the archive: the auto-link query
+    // deliberately skips archived rows, so an invitee who never signed in cannot
+    // be adopted into a record the studio has already retired.
     const clientCk = await signIn("lc-alumni@test.dev");
-    await SELF.fetch(`${B}/api/context/switch`, { method: "POST", headers: json(clientCk), body: JSON.stringify({ tenantId }) });
+    const linked = (await (await SELF.fetch(`${B}/api/context`, { headers: auth(clientCk) })).json()) as { active: { tenantId: string; clientId: string | null } | null };
+    expect(linked.active?.tenantId).toBe(tenantId);
+    expect(linked.active?.clientId).toBe(cl.id);
+
     expect((await SELF.fetch(`${B}/api/clients/${cl.id}/archive`, { method: "POST", headers: json(ownerCk), body: "{}" })).status).toBe(200);
 
     // Their persona still resolves — not a null clientId.
@@ -435,9 +441,22 @@ describe("downgrade checklist + server-side enforcement", () => {
 
     const roster = (await (await SELF.fetch(`${B}/api/clients`, { headers: auth(cookie) })).json()) as { clients: { id: string; displayName: string }[] };
     expect(roster.clients.length).toBe(3);
-    // One archived, one deleted — both must count towards the ceiling.
+    const del = (i: number) =>
+      SELF.fetch(`${B}/api/clients/${roster.clients[i]!.id}/delete`, { method: "POST", headers: json(cookie), body: JSON.stringify({ confirm: roster.clients[i]!.displayName }) });
+
+    // ARCHIVING DOES NOT CLEAR THE BLOCKER. The studio still stores that client's
+    // record, so it still occupies a seat and the checklist still refuses. This
+    // test used to archive one and delete one and expect the downgrade through —
+    // which is exactly the loophole (archive your way onto a cheaper plan while
+    // keeping every byte).
     expect((await SELF.fetch(`${B}/api/clients/${roster.clients[0]!.id}/archive`, { method: "POST", headers: json(cookie), body: "{}" })).status).toBe(200);
-    expect((await SELF.fetch(`${B}/api/clients/${roster.clients[1]!.id}/delete`, { method: "POST", headers: json(cookie), body: JSON.stringify({ confirm: roster.clients[1]!.displayName }) })).status).toBe(200);
+    expect((await check(cookie, target)).body.eligible).toBe(false);
+    const stillBlocked = await SELF.fetch(`${B}/api/billing/plan-change`, { method: "POST", headers: json(cookie), body: JSON.stringify({ planId: target }) });
+    expect(stillBlocked.status).toBe(409);
+
+    // Deleting does. Two gone, one left, target ceiling is 1.
+    expect((await del(0)).status).toBe(200);
+    expect((await del(1)).status).toBe(200);
 
     // Submit WITHOUT re-opening the sheet: the route re-checks and lets it through.
     const change = await SELF.fetch(`${B}/api/billing/plan-change`, { method: "POST", headers: json(cookie), body: JSON.stringify({ planId: target }) });

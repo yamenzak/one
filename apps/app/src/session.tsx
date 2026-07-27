@@ -14,6 +14,25 @@ import { api, isOffline, setUnauthorizedHandler } from "./api.js";
  * active session in. NOT identifying (a public slug, no account data) and the
  * one thing sign-out must NOT forget, because it is what sign-out navigates to.
  */
+/**
+ * The door in the URL THE APP WAS OPENED WITH, captured once at module load.
+ *
+ * This has to be read before React renders anything, because `/t/<slug>` is an
+ * ENTRY path, not a route: nothing in the Shell matches it, so the catch-all
+ * `<Route path="*" element={<Navigate to="/today" replace />} />` rewrites the
+ * URL the instant a session resolves. And `Navigate` is a descendant of this
+ * provider, so its effect runs BEFORE ours — an effect here that read
+ * `location.pathname` would find `/today` and conclude there was no door.
+ *
+ * (That rewrite is the right behaviour and answers the obvious question: the
+ * `/t/<slug>` prefix is not sticky. Once you are in, the app runs on clean paths
+ * — /today, /train, /clients/… — on whichever hostname served it.)
+ */
+const ENTRY = {
+  slug: /^\/t\/([^/?#]+)/.exec(window.location.pathname)?.[1] ?? null,
+  tenantHint: new URLSearchParams(window.location.search).get("t"),
+};
+
 export const LAST_DOOR_KEY = "mossa:last-door";
 
 export function rememberDoor(slug: string | null | undefined): void {
