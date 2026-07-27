@@ -12,10 +12,11 @@ import { PERMISSION_CATALOG } from "@mossa/domain";
 import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, Plus, personaLabel, personaTone } from "@mossa/ui";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
+import { useCan } from "../../FeatureLock.js";
 
 interface Member { userId: string; role: string; name: string | null; email: string | null; customGrant?: Record<string, string[]> | null }
 // Labels + tones read from the persona registry — `trainer` shows as "Coach".
-const ROLES = ["owner", "trainer", "assistant", "client"].map((value) => ({ value, label: personaLabel(value) }));
+const roleOption = (value: string) => ({ value, label: personaLabel(value) });
 
 export function Staff() {
   const [members, setMembers] = useState<Member[] | null>(null);
@@ -25,6 +26,19 @@ export function Staff() {
   const [msg, setMsg] = useState<string | null>(null);
   const [permMember, setPermMember] = useState<Member | null>(null);
   const [pendingRole, setPendingRole] = useState<{ member: Member; role: string } | null>(null);
+
+  // The assistant SEAT is half of what `frontDesk` sells (SPEC §5), so a studio
+  // without it should not be offered the role. `sessions` is the registry's
+  // frontDesk spec. NB this is currently the UI half only — the promotion route
+  // is still ungated (see the AUDIT FINDING in member-routes.ts), so this stops
+  // the studio walking into a role it wasn't sold, not a determined caller.
+  // Members already holding it stay listed and selectable (a grandfathered
+  // assistant must remain demotable).
+  const canAssistant = useCan("sessions");
+  const rolesFor = (current: string) =>
+    ["owner", "trainer", "assistant", "client"]
+      .filter((r) => r !== "assistant" || canAssistant || current === "assistant")
+      .map(roleOption);
 
   const load = useCallback(async () => setMembers((await api.get<{ members: Member[] }>("/api/members")).members), []);
   useEffect(() => void load(), [load]);
@@ -79,7 +93,7 @@ export function Staff() {
                 {/* `Select` has no disabled prop, so gate the mutation itself on
                     `busy` — a second role change mid-flight would race the roster
                     reload and show a stale role. */}
-                <div className="w-28"><Select aria-label="Role" value={m.role} onChange={(v) => v !== m.role && !busy && setPendingRole({ member: m, role: v })} options={ROLES} /></div>
+                <div className="w-28"><Select aria-label="Role" value={m.role} onChange={(v) => v !== m.role && !busy && setPendingRole({ member: m, role: v })} options={rolesFor(m.role)} /></div>
               </Card>
             ))}
           </Stagger>
@@ -91,7 +105,10 @@ export function Staff() {
       <Sheet open={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite staff">
         <div className="space-y-4">
           <Field label="Email" icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <div className="flex gap-2"><Chip selected={role === "trainer"} onClick={() => setRole("trainer")}>{personaLabel("trainer")}</Chip><Chip selected={role === "assistant"} onClick={() => setRole("assistant")}>{personaLabel("assistant")}</Chip></div>
+          <div className="flex gap-2">
+            <Chip selected={role === "trainer"} onClick={() => setRole("trainer")}>{personaLabel("trainer")}</Chip>
+            {canAssistant && <Chip selected={role === "assistant"} onClick={() => setRole("assistant")}>{personaLabel("assistant")}</Chip>}
+          </div>
           <Button size="lg" className="w-full" disabled={!email.includes("@") || busy} onClick={() => void invite()}>{busy ? "Sending…" : "Send invite"}</Button>
           <p className="text-xs text-muted-foreground">They sign in with a code — no password to set.</p>
         </div>

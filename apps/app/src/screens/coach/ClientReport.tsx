@@ -13,7 +13,8 @@ import {
   Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList,
   Flame, Gauge, Dumbbell, Utensils, Scale, Moon, Smile, Sparkles, TrendingUp, Percent, cn,
 } from "@mossa/ui";
-import { api, todayLocal } from "../../api.js";
+import { api, errorText, todayLocal } from "../../api.js";
+import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { Markdown } from "../../Markdown.js";
@@ -42,10 +43,17 @@ export function ClientReport({ clientId }: { clientId: string }) {
   useEffect(() => { setReport(null); void api.get<Report>(`/api/reports/client/${clientId}?range=${range}&today=${today}`).then(setReport).catch(() => setReport(null)); }, [clientId, range, today]);
   useEffect(() => { void api.get<{ exercises: ExerciseInfo[] }>("/api/exercises?scope=all").then((r) => setExMap(new Map(r.exercises.map((e) => [e.id, e])))).catch(() => undefined); }, []);
 
+  // `/api/ai/client-summary` is gated on aiSuite. The card used to render on
+  // every plan and, on the 403, WRITE "AI status isn't available on your studio's
+  // plan." into the summary body — an entitlement message dressed up as an AI
+  // answer. Hide the card instead, and surface real failures as an error.
+  const canAi = useCan("aiSuite");
+  const [summaryErr, setSummaryErr] = useState<string | null>(null);
   const genSummary = async () => {
     setSummaryBusy(true);
+    setSummaryErr(null);
     try { setSummary((await api.post<{ summary: string }>("/api/ai/client-summary", { clientId, today })).summary); }
-    catch { setSummary("AI status isn't available on your studio's plan."); }
+    catch (e) { setSummaryErr(errorText(e, "Couldn't generate the status — try again.")); }
     finally { setSummaryBusy(false); }
   };
 
@@ -61,6 +69,7 @@ export function ClientReport({ clientId }: { clientId: string }) {
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <SegmentedControl options={[{ value: "7d", label: "7 days" }, { value: "30d", label: "30 days" }, { value: "90d", label: "90 days" }]} value={range} onChange={(v) => setRange(v as RangePreset)} />
 
+      {canAi && (
       <Stagger>
         <Card className="space-y-3">
           <SectionHeader icon={Sparkles} tone="primary" title="AI status"
@@ -72,8 +81,10 @@ export function ClientReport({ clientId }: { clientId: string }) {
           ) : (
             <p className="text-sm text-muted-foreground">Generate a coach-facing read: current phase, adherence, trajectory, and the single most important thing to address next.</p>
           )}
+          {summaryErr && <p role="status" aria-live="polite" className="text-sm text-warning">{summaryErr}</p>}
         </Card>
       </Stagger>
+      )}
 
       <Reveal loading={!report} className="space-y-4" skeleton={
         <>

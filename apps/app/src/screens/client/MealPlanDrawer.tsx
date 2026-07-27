@@ -12,6 +12,7 @@ import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy, kcalToDisplay, featureEnabled } from "@mossa/domain";
 import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, ConfirmDialog, useModalOverlay, Utensils, ShoppingCart, Plus, Minus, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
+import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
 import { useTour } from "../../tour.js";
@@ -63,6 +64,11 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   // when the server would 403.
   const features = ctx?.entitlements?.features;
   const aiMealTools = !!features && featureEnabled("aiMealTools", { features, clientFlags: ctx?.clientFlags });
+  // Logging an option posts to `/api/logs/food`, which is gated on `foodLogging`
+  // (canLogOwnFood). A package that sells the meal PLAN without self-logging
+  // otherwise showed a live "Log this" button that 403'd — so fold the missing
+  // capability into the drawer's existing read-only mode.
+  const canLogFood = useCan("foodLogging");
   const date = todayLocal();
   // `active` is the plan being viewed — the current published one by default, or
   // a past (superseded) plan the client picked from history. The shopping list is
@@ -286,7 +292,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
             {view === "plan" ? (
               groups.length === 0 ? <EmptyState icon={Utensils} title="No options yet" /> : (
                 <div className="space-y-6">
-                  <p className="-mt-1 px-1 text-sm text-muted-foreground">{isPast ? "A plan you were on before — browse the meals and recipes." : <>Pick one option per meal each day, then tap <span className="font-medium text-foreground">Log</span> when you eat it.</>}</p>
+                  <p className="-mt-1 px-1 text-sm text-muted-foreground">{isPast || !canLogFood ? "Browse the meals and recipes in your plan." : <>Pick one option per meal each day, then tap <span className="font-medium text-foreground">Log</span> when you eat it.</>}</p>
                   {groups.map(([type, opts], gi) => {
                     const meta = metaFor(type);
                     return (
@@ -299,8 +305,8 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                         <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 py-2">
                           {opts.map(({ opt, index }, oi) => (
                             <OptionPhotoCard
-                              key={index} opt={opt} index={index} units={units} image={optionImage(opt)} totals={optionMacroTotals(opt, foodMap)} readOnly={isPast} anchor={gi === 0 && oi === 0}
-                              logged={!isPast && loggedIdx.has(index)} logging={logging === index} onLog={() => void logOption(opt, index)} onOpen={() => setDetail({ opt, index })}
+                              key={index} opt={opt} index={index} units={units} image={optionImage(opt)} totals={optionMacroTotals(opt, foodMap)} readOnly={isPast || !canLogFood} anchor={gi === 0 && oi === 0}
+                              logged={!isPast && canLogFood && loggedIdx.has(index)} logging={logging === index} onLog={() => void logOption(opt, index)} onOpen={() => setDetail({ opt, index })}
                             />
                           ))}
                         </div>
@@ -372,8 +378,8 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
 
       {detail && (
         <OptionDetailSheet
-          opt={detail.opt} index={detail.index} units={units} foods={foods} foodMap={foodMap} image={optionImage(detail.opt)} readOnly={isPast}
-          logged={!isPast && loggedIdx.has(detail.index)} logging={logging === detail.index} onLog={() => void logOption(detail.opt, detail.index)}
+          opt={detail.opt} index={detail.index} units={units} foods={foods} foodMap={foodMap} image={optionImage(detail.opt)} readOnly={isPast || !canLogFood}
+          logged={!isPast && canLogFood && loggedIdx.has(detail.index)} logging={logging === detail.index} onLog={() => void logOption(detail.opt, detail.index)}
           aiMealTools={aiMealTools} recipeBusy={recipeBusy === detail.index} onRecipe={() => void recommendRecipe(detail.opt, detail.index)}
           onClose={() => setDetail(null)}
         />

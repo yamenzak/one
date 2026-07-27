@@ -20,6 +20,7 @@ import {
   Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, Calendar, Scale, type Tone, type LucideIcon,
 } from "@mossa/ui";
 import { api, todayLocal } from "../../api.js";
+import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
 import { CoachNote } from "./CoachNote.js";
 import { BodyScanCard } from "./BodyScanCard.js";
@@ -55,7 +56,17 @@ export function Progress({ clientId }: { clientId: string }) {
   // Deep-link: a notification (or another screen) can open a specific lens via
   // `?tab=body|training|wellness`. Seed from it once, then strip the param.
   const [params, setParams] = useSearchParams();
-  const [tab, setTab] = useState<Tab>(() => (isTab(params.get("tab")) ? (params.get("tab") as Tab) : "overview"));
+  const [tabState, setTab] = useState<Tab>(() => (isTab(params.get("tab")) ? (params.get("tab") as Tab) : "overview"));
+  // Which lenses this client's package includes. Overview and Wellness are
+  // check-in/consistency data, which no flag governs, so they always show.
+  const canBody = useCan("bodyMetrics");
+  const canTraining = useCan("exerciseReport");
+  const canNutrition = useCan("nutritionReports");
+  const canBodyScan = useCan("bodyScan");
+  const lenses = LENSES.filter((l) => (l.value === "body" ? canBody : l.value === "training" ? canTraining : true));
+  // A deep link (?tab=body) can name a lens this client doesn't have — fall
+  // back to the first available one instead of rendering nothing.
+  const tab: Tab = lenses.some((l) => l.value === tabState) ? tabState : lenses[0]?.value ?? "overview";
   useEffect(() => {
     if (params.get("tab")) setParams((p) => { p.delete("tab"); return p; }, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,7 +110,7 @@ export function Progress({ clientId }: { clientId: string }) {
           so the whole row — tabs + range — fits the Progress column. "Custom"
           is a calendar icon; picking it reveals the start→end pickers below. */}
       <div className="flex flex-wrap items-center gap-2">
-        <LensTabs tab={tab} onChange={setTab} />
+        <LensTabs lenses={lenses} tab={tab} onChange={setTab} />
         <SegmentedControl className="ml-auto" value={range} onChange={(v) => setRange(v as RangePreset | "custom")}
           options={[
             { value: "7d", label: "7d" }, { value: "30d", label: "30d" }, { value: "90d", label: "90d" },
@@ -131,8 +142,8 @@ export function Progress({ clientId }: { clientId: string }) {
              wait-handshake (which could strand the incoming tab unmounted).
              Dim while a new range loads (prior data stays put — no skeleton flash). */
           <motion.div key={tab} variants={stagger} initial="hidden" animate="show" className={cn("space-y-4 transition-opacity", loading && "pointer-events-none opacity-50")}>
-            {tab === "overview" && <Overview data={data} units={units} dateLabel={dateLabel} />}
-            {tab === "body" && <Body data={data} units={units} dateLabel={dateLabel} clientId={clientId} />}
+            {tab === "overview" && <Overview data={data} units={units} dateLabel={dateLabel} canNutrition={canNutrition} canTraining={canTraining} />}
+            {tab === "body" && <Body data={data} units={units} dateLabel={dateLabel} clientId={clientId} canBodyScan={canBodyScan} />}
             {tab === "training" && <Training data={data} units={units} />}
             {tab === "wellness" && <Wellness data={data} />}
           </motion.div>
@@ -146,7 +157,7 @@ export function Progress({ clientId }: { clientId: string }) {
 }
 
 // ── Overview ──
-function Overview({ data, units, dateLabel }: { data: ProgressData; units: ReturnType<typeof useUnits>; dateLabel: (i: number) => string }) {
+function Overview({ data, units, dateLabel, canNutrition, canTraining }: { data: ProgressData; units: ReturnType<typeof useUnits>; dateLabel: (i: number) => string; canNutrition: boolean; canTraining: boolean }) {
   const { consistency, wellness, nutrition, body } = data;
   const days = data.range.days;
   const cals = nutrition.perDay.map((p) => (p.logged ? p.calories : null));
@@ -170,10 +181,12 @@ function Overview({ data, units, dateLabel }: { data: ProgressData; units: Retur
       <section className="space-y-2">
         <Eyebrow>At a glance</Eyebrow>
         <Stagger>
+          {/* Workouts is strength-report data, Days logged is nutrition-report
+              data; check-ins are governed by no flag. */}
           <GlanceStrip items={[
-            { icon: Dumbbell, tone: "activity", value: data.training.workoutDays, label: "Workouts" },
-            { icon: METRICS.calories.icon, tone: "calories", value: nutrition.loggedDays, label: "Days logged" },
-            { icon: Activity, tone: "cardio", value: consistency.checkInDays, label: "Check-ins" },
+            ...(canTraining ? [{ icon: Dumbbell, tone: "activity" as const, value: data.training.workoutDays, label: "Workouts" }] : []),
+            ...(canNutrition ? [{ icon: METRICS.calories.icon, tone: "calories" as const, value: nutrition.loggedDays, label: "Days logged" }] : []),
+            { icon: Activity, tone: "cardio" as const, value: consistency.checkInDays, label: "Check-ins" },
           ]} />
         </Stagger>
       </section>
@@ -184,17 +197,20 @@ function Overview({ data, units, dateLabel }: { data: ProgressData; units: Retur
         </ChartCard>
       </Stagger>
 
+      {/* Calorie adherence is a nutrition report (`nutritionReports`). */}
+      {canNutrition && (
       <Stagger>
         <ChartCard title="Calorie adherence" icon={METRICS.calories.icon} tone="calories" value={nutrition.adherencePct != null ? nutrition.adherencePct : "—"} unit={nutrition.adherencePct != null ? "%" : undefined} delta={nutrition.targets.targetCalories ? <Badge tone="neutral">target {fmtEnergy(nutrition.targets.targetCalories, units)}</Badge> : undefined}>
           <AreaChart values={cals} tone="calories" targetSeries={calTargets} target={nutrition.targets.targetCalories} trend label={dateLabel} format={(v) => `${kcalToDisplay(v, units)}`} />
         </ChartCard>
       </Stagger>
+      )}
     </>
   );
 }
 
 // ── Body ──
-function Body({ data, units, dateLabel, clientId }: { data: ProgressData; units: ReturnType<typeof useUnits>; dateLabel: (i: number) => string; clientId: string }) {
+function Body({ data, units, dateLabel, clientId, canBodyScan }: { data: ProgressData; units: ReturnType<typeof useUnits>; dateLabel: (i: number) => string; clientId: string; canBodyScan: boolean }) {
   const days = data.range.days;
   const { body } = data;
   const wl = weightLabel(units), ll = lengthLabel(units);
@@ -215,7 +231,8 @@ function Body({ data, units, dateLabel, clientId }: { data: ProgressData; units:
     .map((m) => ({ ...m, conv: (v: number) => cmToLengthDisplay(v, units) }));
   return (
     <>
-      <Stagger><BodyScanCard clientId={clientId} /></Stagger>
+      {/* The camera scan + its posture read-outs are `bodyScan`. */}
+      {canBodyScan && <Stagger><BodyScanCard clientId={clientId} /></Stagger>}
 
       {/* Hero — weight is the anchor metric, kept full-width. */}
       <Stagger>
@@ -273,7 +290,7 @@ function Body({ data, units, dateLabel, clientId }: { data: ProgressData; units:
         </Stagger>
       )}
 
-      {body.posture.length > 0 && (
+      {canBodyScan && body.posture.length > 0 && (
         <Stagger>
           <ChartCard title="Posture" icon={METRICS.posture.icon} tone={METRICS.posture.tone}
             value={body.latest.postureCva != null ? body.latest.postureCva.toFixed(0) : "—"} unit="° neck angle"
@@ -282,7 +299,7 @@ function Body({ data, units, dateLabel, clientId }: { data: ProgressData; units:
           </ChartCard>
         </Stagger>
       )}
-      {body.latest.postureSeverity && body.latest.postureSeverity !== "good" && (
+      {canBodyScan && body.latest.postureSeverity && body.latest.postureSeverity !== "good" && (
         <Stagger>
           <Card className="flex items-start gap-3 border border-warning/25 bg-warning-soft/40">
             <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
@@ -442,10 +459,10 @@ const LENSES: { value: Tab; label: string; icon: LucideIcon }[] = [
   { value: "wellness", label: "Wellness", icon: HeartPulse },
 ];
 
-function LensTabs({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
+function LensTabs({ lenses, tab, onChange }: { lenses: typeof LENSES; tab: Tab; onChange: (t: Tab) => void }) {
   return (
     <div className="relative flex items-center gap-0.5 rounded-full bg-secondary p-1">
-      {LENSES.map((l) => {
+      {lenses.map((l) => {
         const on = tab === l.value;
         return (
           <button key={l.value} onClick={() => onChange(l.value)} aria-current={on ? "page" : undefined} title={l.label}

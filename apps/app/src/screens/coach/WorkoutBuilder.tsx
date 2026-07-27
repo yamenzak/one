@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@mossa/protocol";
 import { Button, Card, Badge, Field, Input, Select, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, Eyebrow, GlanceStrip, IconBadge, ConfirmDialog, toneVar, type Tone, cn, colorToHex, Reveal, SkeletonLine, Search, ArrowLeft, Plus, Copy, Trash2, Sparkles, Dumbbell, Moon, ChevronRight, CheckCheck, Save, History, LayoutGrid, X, BarChart3, AlertTriangle } from "@mossa/ui";
 import { api, ApiError, errorText } from "../../api.js";
+import { useCan } from "../../FeatureLock.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { ClientPrefsStrip } from "./ClientPrefsStrip.js";
 import { AiErrorBox } from "../../AiError.js";
@@ -94,6 +95,10 @@ const DAY_STYLES = [
 
 /** Per-day branded cover: generate in the tenant's accent colour, pick a style. */
 function DayCover({ dayName, value, onChange }: { dayName: string; value?: string | null; onChange: (url: string | null) => void }) {
+  // Covers come from `/api/ai/generate-image`, which is gated on aiSuite. Without
+  // it the generate/restyle buttons only ever produced a 403 rendered as
+  // "Couldn't generate", so hide them (an existing cover still shows + removes).
+  const canAi = useCan("aiSuite");
   const [pickOpen, setPickOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -113,15 +118,15 @@ function DayCover({ dayName, value, onChange }: { dayName: string; value?: strin
           <img src={value} alt="" className="h-32 w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
           <div className="absolute right-2 top-2 flex gap-1.5">
-            <button onClick={() => setPickOpen(true)} disabled={busy} className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><AiAvatar className="size-3.5" /> {busy ? "…" : "Restyle"}</button>
+            {canAi && <button onClick={() => setPickOpen(true)} disabled={busy} className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><AiAvatar className="size-3.5" /> {busy ? "…" : "Restyle"}</button>}
             <button onClick={() => onChange(null)} aria-label="Remove cover" className="grid size-7 place-items-center rounded-full bg-black/50 text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><Trash2 /></button>
           </div>
         </div>
-      ) : (
+      ) : canAi ? (
         <button onClick={() => setPickOpen(true)} disabled={busy} className="flex h-24 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface-2 text-sm text-muted-foreground transition-colors hover:bg-surface-3 disabled:opacity-60 [&_svg]:size-4">
           {busy ? <><span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> Generating cover…</> : <><AiAvatar className="size-4" /> Generate a branded day cover</>}
         </button>
-      )}
+      ) : null}
       {err && <p className="text-xs text-warning">{err}</p>}
       {pickOpen && (
         <Sheet open onClose={() => setPickOpen(false)} title="Cover style">
@@ -272,6 +277,8 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   const [library, setLibrary] = useState<ExerciseLite[]>([]);
   const [picker, setPicker] = useState<{ blockIdx: number } | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
+  // Every AI affordance in the builder posts to a route gated on aiSuite.
+  const canAi = useCan("aiSuite");
   const [exportOpen, setExportOpen] = useState(false);
   const [copyWeekOpen, setCopyWeekOpen] = useState(false);
   // Seed-the-draft: the client's most recent OTHER plan + a template picker.
@@ -474,7 +481,12 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
 
       <Stagger className="space-y-4">
       {days.length === 0 ? (
-        <EmptyState icon={Dumbbell} title="Empty plan" description="Add a day, or let AI draft one from the client's intake." action={<Button onClick={() => setAiOpen(true)}><AiAvatar className="size-5" /> AI draft plan</Button>} />
+        <EmptyState
+          icon={Dumbbell}
+          title="Empty plan"
+          description={canAi ? "Add a day, or let AI draft one from the client's intake." : "Add a day to get started."}
+          action={canAi ? <Button onClick={() => setAiOpen(true)}><AiAvatar className="size-5" /> AI draft plan</Button> : <Button onClick={() => { mutate((d) => d.push(emptyDay("Day 1"))); setDayIdx(0); }}><Plus /> Add a day</Button>}
+        />
       ) : day ? (
         <>
           <Card className="space-y-3">
@@ -536,7 +548,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
           {!day.isRestDay && (
             <div className="flex gap-2">
               <Button variant="ghost" className="flex-1" onClick={() => mutate((d) => d[dayIdx]!.blocks.push(emptyBlock()))}><Plus /> Block</Button>
-              <Button variant="ghost" className="flex-1" onClick={() => setAiOpen(true)}><AiAvatar className="size-5" /> AI draft</Button>
+              {canAi && <Button variant="ghost" className="flex-1" onClick={() => setAiOpen(true)}><AiAvatar className="size-5" /> AI draft</Button>}
             </div>
           )}
         </>

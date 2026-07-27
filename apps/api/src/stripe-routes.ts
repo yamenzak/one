@@ -48,9 +48,12 @@ export const stripeRoutes = new Hono<AppEnv>()
     const plan = (await listPlans(c.env.DB)).find((p) => p.id === body.data.planId);
     if (!plan?.stripe_price_id) return c.json({ error: "plan not synced to stripe" }, 409);
     const customer = await ensureCustomer(c.env.DB, cfg.secretKey, who.tenantId, c.get("user")?.email);
-    // Free trial (SPEC §5): Solo/Light carry `trialDays`. Checkout collects the
-    // card, charges nothing now, and the subscription is born `trialing` — which
-    // is NOT in `SUSPENDED_STATUSES`, so entitlements are live from minute one.
+    // Free trial (SPEC §5): Solo/Light carry `trialDays`. Hosted Checkout collects
+    // the card BEFORE the subscription exists and charges nothing now, so the
+    // subscription is born `trialing` with a payment method already attached —
+    // `hasPaymentMethod` is satisfied and entitlements are live from minute one.
+    // (The inline `/billing/plan-intent` path below is the opposite shape: the
+    // subscription is born card-less. See the guard in the webhook.)
     const trialDays = trialPeriodDays(resolveEntitlements(plan.entitlements_json));
     const session = await stripeCall<{ url: string; id: string }>(cfg.secretKey, "checkout/sessions", {
       mode: "subscription",
@@ -182,6 +185,16 @@ export const stripeRoutes = new Hono<AppEnv>()
     // `trial_settings.end_behavior.missing_payment_method = cancel` makes Stripe
     // cancel rather than dangle an unpayable subscription if the setup is never
     // completed, which lands as `customer.subscription.deleted` → free.
+    //
+    // ⚠️ THE SUBSCRIPTION EXISTS, IN STATUS `trialing`, THE MOMENT THIS CALL
+    // RETURNS — before the client has confirmed anything. Verified against live
+    // Stripe test mode: this exact request answers `status: "trialing"`,
+    // `default_payment_method: null`, `pending_setup_intent.status:
+    // "requires_payment_method"`, and it immediately fires
+    // `customer.subscription.created` (trialing, no card) plus an `invoice.paid`
+    // for a $0 `subscription_create` invoice. NOTHING here may be read as "the
+    // tenant is on this plan" — the webhook gates both of those events on
+    // `hasPaymentMethod`, and only records `pending_plan_id` until a card lands.
     const sub = await stripeCall<{
       id: string;
       status?: string;
@@ -811,7 +824,24 @@ async function handlePlatformEvent(
     case "invoice.paid": {
       const tenantId = meta.mossa_tenant ?? (await tenantByCustomer(db, obj.customer));
       const planId = await planForTenant(db, tenantId);
-      if (tenantId && planId) await activatePlan(db, billing, tenantId, planId);
+      // ⚠️ A TRIAL'S FIRST INVOICE IS $0 AND AUTO-PAID THE INSTANT THE
+      // SUBSCRIPTION IS CREATED — before any card exists. Verified against live
+      // Stripe test mode: creating a `trial_period_days` subscription fires
+      // `invoice.paid` with `billing_reason: "subscription_create"` and
+      // `amount_paid: 0`, and it arrives BEFORE `customer.subscription.created`.
+      // So this branch was a second, independent door to the same bug the
+      // trialing guard below closes: activate a full paid plan and grant its
+      // monthly credits for a subscription Stripe cannot charge. A zero-amount
+      // trial-start invoice is not a payment, so it activates nothing.
+      //
+      // Nothing is lost by skipping it: a genuinely $0 subscription (a 100%
+      // discount, no trial) is born `status: "active"` and activates through
+      // `customer.subscription.created|updated` instead, and the real trial
+      // conversion at period end is a `subscription_cycle` invoice with
+      // `amount_paid > 0` (also verified — see the lifecycle table in AGENTS/DEPLOY).
+      const amountPaid = typeof obj.amount_paid === "number" ? obj.amount_paid : 0;
+      const zeroTrialStart = amountPaid <= 0 && obj.billing_reason === "subscription_create";
+      if (tenantId && planId && !zeroTrialStart) await activatePlan(db, billing, tenantId, planId);
       // Capture the Stripe subscription id + the renewal date this invoice covers.
       if (tenantId) {
         // Same version-shape defence as the Connect rail: on a Basil-shaped
@@ -850,15 +880,22 @@ async function handlePlatformEvent(
     case "customer.subscription.created":
     case "customer.subscription.updated": {
       // Inline (default_incomplete) subscriptions carry the plan on their
-      // metadata. Stamp the plan id as soon as we see it (even while
-      // `incomplete`) so a first invoice.paid resolves the right plan; only
-      // GRANT once the subscription is actually active/trialing.
+      // metadata. A subscription we cannot yet charge records the tenant's CHOICE
+      // (`pending_plan_id`) and nothing else; only a subscription Stripe can
+      // actually bill stamps `plan_id` and grants credits.
       const status = obj.status as string;
       const subId = typeof obj.id === "string" ? obj.id : null;
       if (meta.mossa_plan && meta.mossa_tenant) {
         await getSubscription(db, meta.mossa_tenant);
         const cur = await db.prepare("SELECT stripe_sub_id FROM subscriptions WHERE tenant_id = ?").bind(meta.mossa_tenant).first<{ stripe_sub_id: string | null }>();
-        const activating = !!subId && (status === "active" || status === "trialing");
+        // `trialing` alone is NOT a paid-for plan — see hasPaymentMethod. This is
+        // the reported bug: `/billing/plan-intent` creates the subscription with
+        // `trial_period_days` and hands the client a SetupIntent to confirm, so
+        // Stripe fires `customer.subscription.created` in status `trialing`
+        // BEFORE any card is attached. Activating on that gave a studio whose
+        // card confirmation FAILED a fully-entitled paid plan plus its whole
+        // monthly credit grant, repeatable per studio. `active` is unchanged.
+        const activating = !!subId && (status === "active" || (status === "trialing" && hasPaymentMethod(obj)));
         // Once this sub is live, it's authoritative: if the tenant had a
         // DIFFERENT sub (a mid-month upgrade creates a second Stripe sub), cancel
         // the old one and adopt this id as current, so no double-billing and so
@@ -870,8 +907,15 @@ async function handlePlatformEvent(
         // carry its own plan metadata — must not restamp/downgrade the live plan.
         const isCurrent = activating || !cur?.stripe_sub_id || cur.stripe_sub_id === subId;
         if (isCurrent) {
-          await db.prepare("UPDATE subscriptions SET plan_id = ? WHERE tenant_id = ?").bind(meta.mossa_plan, meta.mossa_tenant).run();
-          if (activating) await activatePlan(db, billing, meta.mossa_tenant, meta.mossa_plan);
+          if (activating) {
+            // activatePlan stamps plan_id and clears pending_plan_id.
+            await activatePlan(db, billing, meta.mossa_tenant, meta.mossa_plan);
+          } else {
+            // Not payable yet (incomplete, or a card-less trial). Record what they
+            // picked so `GET /billing` can tell the owner their setup never
+            // completed — never `plan_id`, which IS the entitlement.
+            await db.prepare("UPDATE subscriptions SET pending_plan_id = ?, updated_at = ? WHERE tenant_id = ?").bind(meta.mossa_plan, nowIso(), meta.mossa_tenant).run();
+          }
         }
       }
       await syncStripeSubscription(db, obj);
@@ -901,9 +945,17 @@ async function handlePlatformEvent(
       const daysLeft = trialEnd ? Math.max(1, Math.ceil((trialEnd - Date.now()) / 86_400_000)) : 3;
       const planId = await planForTenant(db, tenantId);
       const plan = planId ? await getPlan(db, planId) : null;
+      // Verified: Stripe fires trial_will_end for a CARD-LESS trial too. Telling
+      // that owner "your card will be charged" is false in both directions — there
+      // is no card, and what actually happens at trial end is
+      // `missing_payment_method: cancel` (verified: the subscription goes straight
+      // to `canceled`, no invoice). Say the true thing per case.
+      const carded = hasPaymentMethod(obj);
       await notifyOwners(env, tenantId, {
         type: "billing_trial_ending",
-        message: `Your free trial ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"} — your card will be charged then.`,
+        message: carded
+          ? `Your free trial ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"} — your card will be charged then.`
+          : `Your free trial ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"} and we have no card on file, so it will simply be cancelled. Add a payment method to keep your studio.`,
         // One notice per subscription, so a redelivered event can't nag twice.
         dedupeKey: `trial_end_${typeof obj.id === "string" ? obj.id : tenantId}`,
         vars: { planName: plan?.name ?? "your", daysLeft },
@@ -961,18 +1013,99 @@ async function syncStripeSubscription(db: D1Database, obj: Record<string, unknow
       await db.prepare("UPDATE subscriptions SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?) WHERE tenant_id = ? AND status NOT IN ('suspended','canceled')").bind(now, tenantId).run();
       break;
     case "active":
-    case "trialing":
-      await db.prepare("UPDATE subscriptions SET status = ?, past_due_at = NULL, suspend_at = NULL, delete_at = NULL WHERE tenant_id = ?").bind((obj.status as string) === "trialing" ? "trialing" : "active", tenantId).run();
+    case "trialing": {
+      // A card-less trial must not be stamped `trialing` either. `status` is read
+      // as "this studio has a live subscription" in two places that both cost
+      // money: the daily sweep grants the plan's monthly credits to every tenant
+      // whose status is `active` or `trialing` (index.ts), and `GET /billing`
+      // reports it to the owner. Leave it exactly where it was — like
+      // `incomplete` — until a payment method lands and Stripe re-fires
+      // `customer.subscription.updated`.
+      const st = obj.status as string;
+      if (st === "trialing" && !hasPaymentMethod(obj)) break;
+      await db.prepare("UPDATE subscriptions SET status = ?, past_due_at = NULL, suspend_at = NULL, delete_at = NULL WHERE tenant_id = ?").bind(st === "trialing" ? "trialing" : "active", tenantId).run();
       break;
+    }
     // incomplete / incomplete_expired / paused → leave status untouched.
   }
+}
+
+/**
+ * Does this Stripe **subscription** object carry a payment method Stripe can
+ * actually charge? This is the whole answer to "is this trial paid for".
+ *
+ * VERIFIED against live Stripe test mode (not inferred from the docs — the bug
+ * this closes shipped because the behaviour was assumed). For the exact request
+ * `/billing/plan-intent` makes (`default_incomplete` + `trial_period_days` +
+ * `save_default_payment_method: on_subscription`):
+ *
+ *   • at creation, with no card:      status trialing · default_payment_method
+ *                                     null · pending_setup_intent "seti_…"
+ *                                     (a bare STRING in the webhook payload)
+ *   • after the SetupIntent is confirmed (what Stripe.js `confirmSetup` does),
+ *     Stripe fires `setup_intent.succeeded` and then, ~1s later,
+ *     **`customer.subscription.updated`** carrying
+ *     `default_payment_method: "pm_…"` and `pending_setup_intent: null`.
+ *
+ * That second event is what re-drives activation, so NO new webhook event type
+ * has to be subscribed — `customer.subscription.updated` was already handled.
+ *
+ * So the test is: a trial is paid for unless Stripe is still asking us for a
+ * payment method. A SET `pending_setup_intent` is Stripe saying exactly that, and
+ * it is the one field that reliably separates the two observed shapes; it clears
+ * to `null` the moment a card attaches. An ABSENT `pending_setup_intent` reads as
+ * "nothing left to collect" — the hosted-Checkout shape, where the card is taken
+ * before the subscription exists. The field has been on Subscription since API
+ * version 2019-03-14 and is present on the current one (verified), so absence
+ * means "no setup pending", not "old payload". Because webhook payload shape does
+ * follow the endpoint's dashboard API version and nothing in this repo sets it
+ * (AGENTS.md §5), the one genuinely ambiguous shape — `trialing`, no payment
+ * method, no `pending_setup_intent` key at all — is logged rather than passed over
+ * in silence, so a payload-shape drift that could re-open this bug is observable.
+ *
+ * Note it is deliberately *not* enough that the customer has a card on file: for
+ * a returning owner whose customer already carries a default payment method,
+ * Stripe still mints a pending SetupIntent (verified — status
+ * `requires_confirmation` rather than `requires_payment_method`) and still leaves
+ * the subscription's own `default_payment_method` null. Such a trial only
+ * activates once the owner completes the card sheet, which is the safe direction:
+ * an unentitled studio with a one-click fix, not an entitled unpaid one.
+ */
+function hasPaymentMethod(obj: Record<string, unknown>): boolean {
+  // FAIL CLOSED: a positive signal is required, never merely the absence of a
+  // negative one. This gates whether a `trialing` subscription is allowed to grant
+  // a paid plan and its whole monthly credit grant, and the bug it exists to stop
+  // was exactly a card-less trial being entitled — free Light plus 3,000 credits,
+  // repeatable once per studio. An earlier version treated "no pending_setup_intent
+  // field" as "nothing left to collect", which reads reasonably and is wrong for a
+  // money path: any payload shape we did not anticipate would grant.
+  //
+  // Verified against live Stripe test mode: a trial created the way
+  // /billing/plan-intent creates one carries `default_payment_method: null` and a
+  // set `pending_setup_intent`; ~1s after Stripe.js confirms the SetupIntent,
+  // `customer.subscription.updated` re-fires with `default_payment_method: "pm_…"`
+  // and `pending_setup_intent: null`. So the positive signal always arrives — the
+  // paid plan is granted a second later, not never.
+  //
+  // Note a non-trial subscription is unaffected: `status === "active"` activates on
+  // its own, and Stripe only reports `active` once money has actually moved.
+  return Boolean(stripeId(obj.default_payment_method) || stripeId(obj.default_source));
 }
 
 async function activatePlan(db: D1Database, billing: AppEnv["Bindings"]["BILLING"], tenantId: string, planId: string): Promise<void> {
   await getSubscription(db, tenantId);
   // A successful payment fully recovers the tenant: clear every dunning marker
   // so the status clamp lifts and service (theirs + their clients') resumes.
-  await db.prepare("UPDATE subscriptions SET plan_id = ?, status = 'active', past_due_at = NULL, suspend_at = NULL, delete_at = NULL, updated_at = ? WHERE tenant_id = ?").bind(planId, nowIso(), tenantId).run();
+  // `pending_plan_id` clears only when the plan it NAMED is the one going live —
+  // this is the single place a "you picked a plan and never finished paying"
+  // marker is retired, and an unrelated activation (a renewal invoice landing
+  // while plan_id is still `free`) must not silently retire someone else's.
+  await db
+    .prepare(
+      "UPDATE subscriptions SET plan_id = ?, status = 'active', pending_plan_id = CASE WHEN pending_plan_id = ? THEN NULL ELSE pending_plan_id END, past_due_at = NULL, suspend_at = NULL, delete_at = NULL, updated_at = ? WHERE tenant_id = ?",
+    )
+    .bind(planId, planId, nowIso(), tenantId)
+    .run();
   const plan = await db.prepare("SELECT entitlements_json FROM plans WHERE id = ?").bind(planId).first<{ entitlements_json: string | null }>();
   const grant = resolveEntitlements(plan?.entitlements_json).aiCredits.monthlyGrant;
   if (grant > 0) {

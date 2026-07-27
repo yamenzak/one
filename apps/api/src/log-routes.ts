@@ -26,7 +26,7 @@ import { newId, nowIso } from "./ids.js";
 import { notify } from "./notify.js";
 import { recordAudit } from "./audit.js";
 import { parseJson, j } from "./db.js";
-import { loadClientAccessRows, accessBudgetsOf, REPORTED_ACCESS_STATUSES } from "./client-flags.js";
+import { loadClientAccessRows, accessBudgetsOf, REPORTED_ACCESS_STATUSES, gateFeature } from "./client-flags.js";
 
 /** Every log payload arrives wrapped with the target clientId. */
 const withClient = <T extends z.ZodTypeAny>(schema: T) =>
@@ -317,6 +317,7 @@ export const logRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    { const g = await gateFeature(c, "extraWorkouts", access.client.id); if (g) return g; }
     const d = parsed.data.data;
     let calories = d.caloriesBurned ?? null;
     let locked = calories != null;
@@ -382,6 +383,7 @@ export const logRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    { const g = await gateFeature(c, "extraWorkouts", access.client.id); if (g) return g; }
     const d = parsed.data;
     const row = await c.env.DB.prepare("SELECT activity_key, duration_min, avg_hr_bpm, calories_locked FROM activity_logs WHERE id = ? AND client_id = ?")
       .bind(c.req.param("id"), access.client.id)
@@ -421,6 +423,7 @@ export const logRoutes = new Hono<AppEnv>()
     if (!clientId) return c.json({ error: "clientId required" }, 400);
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
+    { const g = await gateFeature(c, "extraWorkouts", access.client.id); if (g) return g; }
     await c.env.DB.prepare("DELETE FROM activity_logs WHERE id = ? AND client_id = ?")
       .bind(c.req.param("id"), access.client.id)
       .run();
@@ -433,6 +436,7 @@ export const logRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    { const g = await gateFeature(c, "foodLogging", access.client.id); if (g) return g; }
     const d = parsed.data.data;
     const id = newId("fen");
     // Freeze the calorie/protein target that was in force for THIS day onto the
@@ -488,6 +492,7 @@ export const logRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    { const g = await gateFeature(c, "foodLogging", access.client.id); if (g) return g; }
     const d = parsed.data;
     const map: Record<string, unknown> = {
       meal_type: d.mealType, quantity: d.quantity, unit: d.unit,
@@ -506,6 +511,7 @@ export const logRoutes = new Hono<AppEnv>()
     if (!clientId) return c.json({ error: "clientId required" }, 400);
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
+    { const g = await gateFeature(c, "foodLogging", access.client.id); if (g) return g; }
     await c.env.DB.prepare("DELETE FROM food_entries WHERE id = ? AND client_id = ?")
       .bind(c.req.param("id"), access.client.id)
       .run();
@@ -533,6 +539,8 @@ export const logRoutes = new Hono<AppEnv>()
     if (!clientId || !date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return c.json({ error: "clientId + date required" }, 400);
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
+    // The nutrition-trend surface itself (`showNutritionReports`), not the diary.
+    { const g = await gateFeature(c, "nutritionReports", access.client.id); if (g) return g; }
     const db = c.env.DB;
 
     // 7 local dates ending at `date` (inclusive), oldest first.
@@ -1024,6 +1032,7 @@ export const logRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    { const g = await gateFeature(c, "waterLogging", access.client.id); if (g) return g; }
     const d = parsed.data.data;
     // Atomic increment: the conflict clause adds THIS amount to the stored total
     // and appends the entry via json_insert, so two near-simultaneous logs can't
@@ -1046,6 +1055,7 @@ export const logRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    { const g = await gateFeature(c, "sleepLogging", access.client.id); if (g) return g; }
     const d = parsed.data.data;
     await c.env.DB.prepare(
       "INSERT INTO sleep_logs (client_id, date_local, tenant_id, duration_minutes, quality, notes, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(client_id, date_local) DO UPDATE SET duration_minutes = ?, quality = ?, notes = ?, updated_at = ?",
@@ -1063,6 +1073,7 @@ export const logRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    { const g = await gateFeature(c, "moodLogging", access.client.id); if (g) return g; }
     const d = parsed.data.data;
     await c.env.DB.prepare(
       "INSERT INTO mood_logs (client_id, date_local, tenant_id, mood, energy, stress, notes, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(client_id, date_local) DO UPDATE SET mood = ?, energy = ?, stress = ?, notes = ?, updated_at = ?",
@@ -1081,6 +1092,7 @@ export const logRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    { const g = await gateFeature(c, "measurementLogging", access.client.id); if (g) return g; }
     const d = parsed.data.data;
     await c.env.DB.prepare(
       `INSERT INTO measurements (id, tenant_id, client_id, date_local, weight_kg, body_fat_percent, neck_cm, waist_cm, hips_cm, chest_cm, notes, created_at)
@@ -1274,6 +1286,7 @@ export const logRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    { const g = await gateFeature(c, "fastingTimer", access.client.id); if (g) return g; }
     const d = parsed.data.data;
     if (d.action === "start") {
       const active = await c.env.DB.prepare(
@@ -1341,6 +1354,8 @@ export const logRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    // Picking/customising meal-plan options is what `canEditMealPlan` sells.
+    { const g = await gateFeature(c, "mealPlanEditing", access.client.id); if (g) return g; }
     const d = parsed.data.data;
     await c.env.DB.prepare(
       "INSERT INTO meal_arrangements (client_id, meal_plan_id, tenant_id, slots_json, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(client_id, meal_plan_id) DO UPDATE SET slots_json = ?, updated_at = ?",

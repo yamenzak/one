@@ -13,6 +13,7 @@ import {
   AlertTriangle, ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, LifeBuoy, Plus, Minus, RotateCcw, cn,
 } from "@mossa/ui";
 import { api, todayLocal, errorText } from "../../api.js";
+import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
 import { useTour } from "../../tour.js";
 import { Markdown } from "../../Markdown.js";
@@ -51,6 +52,9 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   const [reloadKey, setReloadKey] = useState(0);
   const pingRest = (key: string) => setRestSignals((m) => new Map(m).set(key, (m.get(key) ?? 0) + 1));
   const units = useUnits();
+  // `exerciseSwap` — both swap paths (instant alternative + "ask your coach")
+  // post to /api/swaps, which 403s without the capability. No entry point, no drawer.
+  const canSwap = useCan("exerciseSwap");
   // Capture the session date ONCE (lazy initializer) — re-deriving todayLocal()
   // each render would flip `date` at midnight, reloading the player and splitting
   // an in-progress workout across two day buckets.
@@ -409,7 +413,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                       {step.slot.slotNotes && <p className="mt-2 text-xs italic leading-snug text-muted-foreground">“{step.slot.slotNotes}”</p>}
                     </div>
                     <div className="mt-2 flex items-center gap-2 border-t border-border/50 p-2">
-                      <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex: step.blockIndex, slotIndex: step.slotIndex, exerciseId: step.slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>
+                      {canSwap && <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex: step.blockIndex, slotIndex: step.slotIndex, exerciseId: step.slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>}
                       <Button data-tour={i === 0 ? "wp-log" : undefined} size="sm" className="flex-1" variant={done ? "secondary" : "default"} onClick={() => setLogSlot({ blockIndex: step.blockIndex, slotIndex: step.slotIndex, slot: step.slot })}>{done ? <><Check /> Done</> : `Log · ${logged}/${step.slot.sets.length}`}</Button>
                     </div>
                   </div>
@@ -422,7 +426,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                       {step.block.slots.map((slot, slotIndex) => (
                         <div key={slotIndex} className="rounded-xl bg-surface-2 p-2">
                           <ExerciseRow ex={exercises.get(slot.exerciseId)} info thumbSize={40} sub={measureSummary(slot)} onClick={() => setDetailSlot(slot)}
-                            trailing={<Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex: step.blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>} />
+                            trailing={canSwap ? <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex: step.blockIndex, slotIndex, exerciseId: slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button> : null} />
                         </div>
                       ))}
                       <Button className="w-full" variant={done ? "secondary" : "default"} disabled={done} onClick={() => setRoundBlock({ blockIndex: step.blockIndex, block: step.block, roundIndex: roundsDone })}>
@@ -459,7 +463,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
       {roundBlock && (
         <RoundLogDrawer block={roundBlock.block} roundIndex={roundBlock.roundIndex} exercises={exercises} fetchLast={fetchLast} onClose={() => setRoundBlock(null)} onSave={(entries) => saveRound(roundBlock.blockIndex, roundBlock.roundIndex, entries)} />
       )}
-      {swapSlot && (
+      {canSwap && swapSlot && (
         <SwapDrawer clientId={clientId} planId={plan.id} dayIndex={dayIndex} coords={swapSlot} currentName={exercises.get(swapSlot.exerciseId)?.name ?? "Exercise"} onClose={() => setSwapSlot(null)} onDone={(m) => { setSwapSlot(null); void load(); setToast(m); setTimeout(() => setToast(null), 3000); }} />
       )}
       {detailSlot && <ExerciseDetailSheet ex={exercises.get(detailSlot.exerciseId)} slot={detailSlot} onClose={() => setDetailSlot(null)} />}

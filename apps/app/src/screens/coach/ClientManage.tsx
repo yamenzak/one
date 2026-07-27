@@ -9,6 +9,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
 import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, Sparkles, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, personaLabel, personaTone } from "@mossa/ui";
 import { api, errorText, todayLocal } from "../../api.js";
+import { FeatureLock, useCan } from "../../FeatureLock.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
@@ -39,7 +40,10 @@ function focusRow(id: string): boolean {
 
 export function ClientManage({ clientId, clientName }: { clientId: string; clientName?: string | null }) {
   const { ctx } = useSession();
-  const canSuppLabs = !!ctx?.entitlements?.features?.supplementsLabs;
+  const canSuppLabs = useCan("supplementsLabs");
+  // Every `/api/ai/*` call on this screen (supplement-reco, summarize-checkins,
+  // lab-extract) is gated on aiSuite.
+  const canAi = useCan("aiSuite");
   // Coach assignment and archive are presented as OWNER powers: a coach must not
   // be able to hand a client to someone else or retire a record out of the
   // roster. Archive is owner-only in the API too (route-guard demands
@@ -190,7 +194,7 @@ export function ClientManage({ clientId, clientName }: { clientId: string; clien
       <section className="space-y-2">
         <Eyebrow action={
           <div className="flex gap-2">
-            <Button size="sm" variant="tonal" onClick={() => setSuggestOpen(true)}><AiAvatar className="size-5" /> Suggest</Button>
+            {canAi && <Button size="sm" variant="tonal" onClick={() => setSuggestOpen(true)}><AiAvatar className="size-5" /> Suggest</Button>}
             <Button size="sm" variant="secondary" onClick={() => setSuppOpen(true)}><Plus /> Prescribe</Button>
           </div>
         }>Supplements</Eyebrow>
@@ -245,10 +249,15 @@ export function ClientManage({ clientId, clientName }: { clientId: string; clien
       {isOwner && <OffboardSection clientId={clientId} clientName={clientName} />}
 
       <Sheet open={grantOpen} onClose={() => setGrantOpen(false)} title="Grant a package">
+        {/* `/api/packages` + `/api/subscriptions/grant` are gated on `commerce`.
+            Commerce is something the studio can BUY, so lock-with-a-reason here
+            rather than hiding the button and leaving the coach guessing. */}
+        <FeatureLock feature="commerce">
         <div className="space-y-2">
           {packages.length === 0 && <p className="text-sm text-muted-foreground">No packages yet — create one in the Business tab.</p>}
           {packages.map((p) => <button key={p.id} onClick={() => void grant(p.id)} className="flex w-full items-center justify-between rounded-xl bg-secondary px-4 py-3 text-left transition-colors hover:bg-surface-3"><span>{p.name}</span><span className="text-primary">Grant</span></button>)}
         </div>
+        </FeatureLock>
       </Sheet>
 
       {suppOpen && <PrescribeSheet clientId={clientId} onClose={() => setSuppOpen(false)} onDone={() => { setSuppOpen(false); void load(); }} />}
@@ -669,6 +678,7 @@ function SwapResolver({ swap, exercises, onResolve }: { swap: Swap; exercises: E
 }
 
 function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; checkIns: CheckIn[]; onFeedback: () => Promise<void> }) {
+  const canAi = useCan("aiSuite");
   const [summary, setSummary] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<unknown>(null);
@@ -703,7 +713,8 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
   };
   return (
     <section className="space-y-2">
-      <Eyebrow action={<Button size="sm" variant="tonal" disabled={busy || checkIns.length === 0} onClick={() => void summarize()}><AiAvatar className="size-5" /> {busy ? "…" : "Summarize"}</Button>}>Check-ins</Eyebrow>
+      {/* `/api/ai/summarize-checkins` is gated on aiSuite. */}
+      <Eyebrow action={canAi ? <Button size="sm" variant="tonal" disabled={busy || checkIns.length === 0} onClick={() => void summarize()}><AiAvatar className="size-5" /> {busy ? "…" : "Summarize"}</Button> : undefined}>Check-ins</Eyebrow>
       <Stagger>
       <Card className="space-y-3">
       {err ? <AiErrorBox error={err} /> : null}
@@ -844,6 +855,7 @@ const rowId = (): string => (typeof crypto !== "undefined" && crypto.randomUUID 
 function ReviewLabSheet({ clientId, lab, onClose, onDone }: { clientId: string; lab: Lab; onClose: () => void; onDone: () => void }) {
   const [values, setValues] = useState<LabValue[]>(() => (lab.values && lab.values.length ? lab.values.map((v) => ({ _id: rowId(), marker: v.marker, value: v.value, unit: v.unit ?? "", flag: (v.flag as LabValue["flag"]) ?? "normal" })) : [{ _id: rowId(), marker: "", value: "", unit: "", flag: "normal" }]));
   const [feedback, setFeedback] = useState(lab.trainer_feedback ?? "");
+  const canAi = useCan("aiSuite");
   const [busy, setBusy] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [extractErr, setExtractErr] = useState<unknown>(null);
@@ -879,7 +891,8 @@ function ReviewLabSheet({ clientId, lab, onClose, onDone }: { clientId: string; 
           </div>
         )}
         {lab.client_notes && <SubCard className="text-sm text-muted-foreground">Client note: {lab.client_notes}</SubCard>}
-        {fileUrl && <Button size="sm" variant="tonal" className="w-full" disabled={extracting} onClick={() => void autofill()}><AiAvatar className="size-5" /> {extracting ? "Reading report…" : "Auto-fill from report"}</Button>}
+        {/* `/api/ai/lab-extract` is gated on aiSuite. */}
+        {fileUrl && canAi && <Button size="sm" variant="tonal" className="w-full" disabled={extracting} onClick={() => void autofill()}><AiAvatar className="size-5" /> {extracting ? "Reading report…" : "Auto-fill from report"}</Button>}
         {extractErr ? <AiErrorBox error={extractErr} /> : null}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-muted-foreground">Values</label>

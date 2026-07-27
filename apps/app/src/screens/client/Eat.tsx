@@ -10,6 +10,7 @@ import {
 import type { UnitPrefs } from "@mossa/domain";
 import { api, errorText, isQueued, todayLocal } from "../../api.js";
 import { QueuedNotice } from "../../notices.js";
+import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
 import { FoodRow, FoodThumb, normFood } from "../food.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
@@ -61,6 +62,13 @@ export function Eat({ clientId }: { clientId: string }) {
   const reqRef = useRef(0);
   const units = useUnits();
   const date = todayLocal();
+  // What this client's package includes. Absent capabilities are omitted, not
+  // locked: a client can't buy their studio's plan, so an upsell here is noise.
+  const canFood = useCan("foodLogging");
+  const canMealPlan = useCan("mealPlan");
+  const canMacros = useCan("macroBreakdown");
+  const canWater = useCan("waterLogging");
+  const canWeekReport = useCan("nutritionReports");
 
   // Guards stale writes (fast client swap in coach view) and surfaces a load
   // failure instead of stranding the screen on the skeleton forever.
@@ -72,22 +80,29 @@ export function Eat({ clientId }: { clientId: string }) {
   const load = useCallback(async () => {
     const rid = ++reqRef.current;
     setError(false);
+    // A read whose section this client doesn't hold is skipped (the week read
+    // 403s without `nutritionReports`); positions are held by resolved stubs.
     const [eR, todayR, wkR, mpR, rcR] = await Promise.allSettled([
       api.get<{ entries: Entry[] }>(`/api/logs/food?clientId=${clientId}&date=${date}`),
-      api.get<{ goal: { targets: Targets | null } | null }>(`/api/today?clientId=${clientId}&date=${date}`),
-      api.get<Week>(`/api/logs/nutrition/week?clientId=${clientId}&date=${date}`),
-      api.get<{ plans: { status: string; name: string; variantId: string | null; body?: { mealOptions?: { mealType: string }[] } }[]; variants: Lane[]; currentVariantId: string | null; defaultLabel?: string }>(`/api/meal-plans?clientId=${clientId}`),
-      api.get<{ recents: Recent[] }>(`/api/foods/recent?clientId=${clientId}&limit=8`),
+      api.get<{ waterMl?: number; goal: { targets: Targets | null } | null }>(`/api/today?clientId=${clientId}&date=${date}`),
+      canWeekReport ? api.get<Week>(`/api/logs/nutrition/week?clientId=${clientId}&date=${date}`) : Promise.resolve<Week | null>(null),
+      canMealPlan ? api.get<{ plans: { status: string; name: string; variantId: string | null; body?: { mealOptions?: { mealType: string }[] } }[]; variants: Lane[]; currentVariantId: string | null; defaultLabel?: string }>(`/api/meal-plans?clientId=${clientId}`) : Promise.resolve(null),
+      canFood ? api.get<{ recents: Recent[] }>(`/api/foods/recent?clientId=${clientId}&limit=8`) : Promise.resolve({ recents: [] as Recent[] }),
     ]);
     if (rid !== reqRef.current) return;
     // The diary is the screen — without it there's nothing to show, so that one
     // failure is the only one that becomes the full-screen retry.
     if (eR.status !== "fulfilled") { setError(true); return; }
     setEntries(eR.value.entries);
-    if (todayR.status === "fulfilled") setTargets(todayR.value.goal?.targets ?? null);
+    if (todayR.status === "fulfilled") {
+      setTargets(todayR.value.goal?.targets ?? null);
+      // Today's water normally rides the /week read; with that read skipped the
+      // today bundle is where the total comes from, so the pill still moves.
+      if (!canWeekReport && todayR.value.waterMl != null) setWaterMl(todayR.value.waterMl);
+    }
     if (rcR.status === "fulfilled") setRecents(rcR.value.recents ?? []);
-    if (wkR.status === "fulfilled") { setWeek(wkR.value); setWaterMl(wkR.value.days[wkR.value.days.length - 1]?.waterMl ?? 0); }
-    if (mpR.status === "fulfilled") {
+    if (wkR.status === "fulfilled" && wkR.value) { setWeek(wkR.value); setWaterMl(wkR.value.days[wkR.value.days.length - 1]?.waterMl ?? 0); }
+    if (mpR.status === "fulfilled" && mpR.value) {
       const mp = mpR.value;
       setVariants(mp.variants ?? []); setCurrentVariantId(mp.currentVariantId ?? null); setDefaultLabel(mp.defaultLabel || "Main");
       const cur = mp.currentVariantId ?? null;
@@ -95,7 +110,7 @@ export function Eat({ clientId }: { clientId: string }) {
       const opts = published?.body?.mealOptions ?? [];
       setMealPlan(published ? { name: published.name, meals: new Set(opts.map((o) => o.mealType)).size, options: opts.length } : null);
     }
-  }, [clientId, date]);
+  }, [clientId, date, canFood, canMealPlan, canWeekReport]);
   useEffect(() => void load(), [load]);
 
   const waterTarget = targets?.targetWaterMl ?? week?.targets.waterMl ?? 2500;
@@ -168,9 +183,10 @@ export function Eat({ clientId }: { clientId: string }) {
       }>
         {entries && (
         <>
-      <LaneSwitcher clientId={clientId} variants={variants} currentVariantId={currentVariantId} defaultLabel={defaultLabel} onSwitched={() => void load()} />
+      {/* Lane switching only means something with a meal plan (`mealPlan`). */}
+      {canMealPlan && <LaneSwitcher clientId={clientId} variants={variants} currentVariantId={currentVariantId} defaultLabel={defaultLabel} onSwitched={() => void load()} />}
       {/* Your meal plan — the primary entry (parity with Train's active-plan hero) */}
-      {mealPlan && (
+      {canMealPlan && mealPlan && (
         <Stagger>
           <button onClick={() => setPlanOpen(true)} className="w-full text-left">
             <Card interactive className="relative overflow-hidden">
@@ -188,11 +204,14 @@ export function Eat({ clientId }: { clientId: string }) {
         </Stagger>
       )}
 
-      {/* Primary actions — logging is always one prominent tap away */}
+      {/* Primary actions — logging is always one prominent tap away (when the
+          package includes it: `foodLogging` / `mealPlan`). */}
+      {(canFood || (canMealPlan && mealPlan)) && (
       <Stagger className="flex gap-2">
-        <Button className="min-w-0 flex-1" onClick={() => openLog()}><Plus /> Log food</Button>
-        {mealPlan && <Button variant="secondary" onClick={() => setPlanOpen(true)}><Utensils /> View plan</Button>}
+        {canFood && <Button className="min-w-0 flex-1" onClick={() => openLog()}><Plus /> Log food</Button>}
+        {canMealPlan && mealPlan && <Button variant="secondary" onClick={() => setPlanOpen(true)}><Utensils /> View plan</Button>}
       </Stagger>
+      )}
       {/* One-tap write feedback (quick-add / water) — sits above both so a queued
           or failed tap is never a silent no-op the user retries blindly. */}
       {queuedMsg && <QueuedNotice />}
@@ -218,18 +237,22 @@ export function Eat({ clientId }: { clientId: string }) {
                 <ProgressRing size={92} strokeWidth={9} tone={remaining < 0 ? "danger" : "calories"} progress={pct} value={`${Math.round(pct * 100)}%`} className="shrink-0" />
               )}
             </div>
-            <MacroBar
+            {/* Per-macro detail is `macroBreakdown`. */}
+            {canMacros && <MacroBar
               className="relative mt-4"
               proteinG={sum((e) => e.protein_g)}
               carbsG={sum((e) => e.carbs_g)}
               fatG={sum((e) => e.fat_g)}
               targets={targets ? { proteinG: targets.targetProteinG, carbsG: targets.targetCarbsG, fatG: targets.targetFatG } : null}
-            />
+            />}
           </Card>
         </Stagger>
 
-        {/* Hydration + protein — same toneSoft-pill language as the MacroBar above */}
+        {/* Hydration (`waterLogging`) + protein (`macroBreakdown`) — same
+            toneSoft-pill language as the MacroBar above. */}
+        {(canWater || canMacros) && (
         <Stagger className="grid grid-cols-2 gap-3">
+          {canWater && (
           <div className="space-y-1.5">
             <MetricPill
               icon={METRICS.water.icon}
@@ -242,6 +265,8 @@ export function Eat({ clientId }: { clientId: string }) {
               {waterPresets.map((v) => <button key={v} onClick={() => void addWater(v)} className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-transform active:scale-95 ${toneSoft.hydration}`}>+{v}</button>)}
             </div>
           </div>
+          )}
+          {canMacros && (
           <div className="space-y-1.5">
             <MetricPill
               icon={METRICS.protein.icon}
@@ -252,11 +277,14 @@ export function Eat({ clientId }: { clientId: string }) {
             />
             <div className="px-1 text-xs text-muted-foreground">{proteinTarget > 0 ? (proteinTotal >= proteinTarget ? "Goal reached" : `${proteinTarget - proteinTotal} g to go`) : "No target set"}</div>
           </div>
+          )}
         </Stagger>
+        )}
       </section>
 
-      {/* Quick add — one-tap re-log of the client's recent foods at their last portion */}
-      {recents.length > 0 && (
+      {/* Quick add — one-tap re-log of the client's recent foods at their last
+          portion. A re-log is a food write, so it follows `foodLogging`. */}
+      {canFood && recents.length > 0 && (
         <section className="space-y-2">
           <Eyebrow>Quick add</Eyebrow>
           <Stagger className="no-scrollbar -mx-4 flex snap-x gap-2.5 overflow-x-auto px-4 pb-1">
@@ -292,9 +320,10 @@ export function Eat({ clientId }: { clientId: string }) {
 
       {/* Today's meals */}
       <section className="space-y-2">
-        <Eyebrow action={entries.length > 0 ? <button onClick={() => openLog()} className="inline-flex items-center gap-1 text-sm font-medium normal-case tracking-normal text-primary [&_svg]:size-4"><Plus /> Log</button> : undefined}>Today's meals</Eyebrow>
+        {/* Every entry point into food writing follows `foodLogging`. */}
+        <Eyebrow action={canFood && entries.length > 0 ? <button onClick={() => openLog()} className="inline-flex items-center gap-1 text-sm font-medium normal-case tracking-normal text-primary [&_svg]:size-4"><Plus /> Log</button> : undefined}>Today's meals</Eyebrow>
         {entries.length === 0 ? (
-          <EmptyState icon={Utensils} title="Nothing logged today" description="Log your first meal — search, barcode, snap a photo, or your plan." action={<Button onClick={() => openLog()}><Plus /> Log food</Button>} />
+          <EmptyState icon={Utensils} title="Nothing logged today" description={canFood ? "Log your first meal — search, barcode, snap a photo, or your plan." : "Nothing here yet — your coach logs your meals for you."} action={canFood ? <Button onClick={() => openLog()}><Plus /> Log food</Button> : undefined} />
         ) : (
           <Stagger className="space-y-3">
             {meals.map((meal) => {
@@ -314,12 +343,13 @@ export function Eat({ clientId }: { clientId: string }) {
                         {...normFood(e)}
                         sub={e.quantity ? `${Math.round(e.quantity)} ${e.unit ?? "g"}` : undefined}
                         thumbSize={36}
-                        onClick={() => setEdit(e)}
+                        macros={canMacros}
+                        onClick={canFood ? () => setEdit(e) : undefined}
                         className="py-2.5"
                       />
                     ))}
                   </div>
-                  <button onClick={() => openLog(meal)} className="pt-0.5 text-xs font-semibold text-primary">+ Add to {meta.label.toLowerCase()}</button>
+                  {canFood && <button onClick={() => openLog(meal)} className="pt-0.5 text-xs font-semibold text-primary">+ Add to {meta.label.toLowerCase()}</button>}
                 </Card>
               );
             })}
@@ -327,8 +357,8 @@ export function Eat({ clientId }: { clientId: string }) {
         )}
       </section>
 
-      {/* This week */}
-      {week && (
+      {/* This week — a nutrition trend report (`nutritionReports`). */}
+      {canWeekReport && week && (
         <section className="space-y-2">
           <Eyebrow>This week</Eyebrow>
           <Stagger><WeekStrip week={week} /></Stagger>
@@ -341,9 +371,9 @@ export function Eat({ clientId }: { clientId: string }) {
       </Reveal>
       )}
 
-      {logOpen && <FoodSearchSheet clientId={clientId} mealType={logMeal} onClose={() => setLogOpen(false)} onLogged={() => void load()} />}
-      {planOpen && <MealPlanDrawer clientId={clientId} onClose={() => setPlanOpen(false)} onLogged={() => void load()} />}
-      {edit && <EditEntrySheet entry={edit} clientId={clientId} units={units} onClose={() => setEdit(null)} onSaved={() => void load()} />}
+      {canFood && logOpen && <FoodSearchSheet clientId={clientId} mealType={logMeal} onClose={() => setLogOpen(false)} onLogged={() => void load()} />}
+      {canMealPlan && planOpen && <MealPlanDrawer clientId={clientId} onClose={() => setPlanOpen(false)} onLogged={() => void load()} />}
+      {canFood && edit && <EditEntrySheet entry={edit} clientId={clientId} units={units} onClose={() => setEdit(null)} onSaved={() => void load()} />}
     </Page>
   );
 }

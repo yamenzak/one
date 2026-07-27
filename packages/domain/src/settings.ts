@@ -30,7 +30,12 @@ export const STUDIO_SETTINGS_SECTIONS: SettingsSectionMeta[] = [
   { key: "ai", label: "AI", scope: "studio", requiresFeature: "aiSuite" },
   { key: "messaging", label: "Messaging", scope: "studio" },
   { key: "marketplace", label: "Marketplace", scope: "studio" },
-  { key: "integrations", label: "Integrations", scope: "studio" },
+  // "Integrations" is the food/exercise DATA-PROVIDER surface (USDA, Nutritionix,
+  // FatSecret, ExerciseDB keys) — i.e. the `externalSearch` entitlement. It is NOT
+  // the reserved `integrations` feature (tenant API / webhooks / exports), which
+  // does not exist and must never get a settings tab. Gating it here keeps the tab
+  // consistent with the 403 `/foods/search-external` already returns.
+  { key: "integrations", label: "Integrations", scope: "studio", requiresFeature: "externalSearch" },
 ];
 
 /**

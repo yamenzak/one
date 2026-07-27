@@ -51,6 +51,9 @@ export const billingRoutes = new Hono<AppEnv>()
     // instead of the raw id. `plans` below stays active-only: retired tiers are
     // never offered as a choice to anyone.
     const plan = plans.find((p) => p.id === sub.plan_id) ?? (await getPlan(c.env.DB, sub.plan_id));
+    // The plan the owner PICKED but never finished paying for. Resolved through
+    // getPlan (not the active-only list) so a retired id still renders a name.
+    const pendingPlan = sub.pending_plan_id ? await getPlan(c.env.DB, sub.pending_plan_id) : null;
 
     // Connect account + the tenant's own client-delinquency roll-up, so the
     // owner's Business surface can nudge onboarding and flag lapsing clients.
@@ -68,6 +71,30 @@ export const billingRoutes = new Hono<AppEnv>()
       else if (overallDaysRemaining(budgets, now) <= 7) expiringSoon++;
     }
 
+    // ── Is this studio actually paying for anything? ──────────────────────────
+    // Derived server-side, once, because two surfaces (the owner banner in
+    // Shell.tsx and the Business overview) must not drift apart, and because
+    // `status` alone lies: a brand-new tenant is `plan_id: 'free', status:
+    // 'active'`, which reads as a healthy subscription and is exactly how the
+    // trialing-without-a-card bug stayed invisible.
+    const paidPlan = (plan?.price_usd_month ?? 0) > 0;
+    const dunning = ["past_due", "unpaid", "suspended", "canceled"].includes(sub.status);
+    const billingState: "comp" | "active" | "trialing" | "delinquent" | "pending" | "none" = sub.comp
+      ? "comp"
+      : paidPlan && !dunning
+        ? sub.status === "trialing"
+          ? "trialing"
+          : "active"
+        : paidPlan
+          ? "delinquent"
+          : sub.pending_plan_id
+            ? "pending"
+            : "none";
+    // What the free baseline actually costs them, straight off the effective
+    // entitlements so the copy can't drift from what's enforced. Reserved
+    // (unreleased) features are excluded — they're off for everyone.
+    const lockedFeatures = FEATURE_KEYS.filter((k) => !FEATURE_META[k]?.reserved && !entitlements.features[k]).map((k) => FEATURE_META[k]?.label ?? k);
+
     return c.json({
       subscription: {
         planId: sub.plan_id,
@@ -76,6 +103,17 @@ export const billingRoutes = new Hono<AppEnv>()
         comp: Boolean(sub.comp),
         currentPeriodEnd: sub.current_period_end,
         pendingPlanId: sub.pending_plan_id,
+        pendingPlanName: pendingPlan?.name ?? sub.pending_plan_id,
+        /** True when Mossa is billing this tenant for a priced plan. */
+        paidPlan,
+        /** The one honest name for the tenant's billing situation. */
+        billingState,
+      },
+      /** Everything the "you have no subscription" notice needs to be specific. */
+      baseline: {
+        lockedFeatures,
+        activeClientLimit: entitlements.quotas.activeClients,
+        monthlyCredits: entitlements.aiCredits.monthlyGrant,
       },
       balance,
       ledger,

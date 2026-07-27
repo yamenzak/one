@@ -11,11 +11,21 @@ import { PaymentSheet, type CheckoutIntent } from "../../PaymentSheet.js";
 import { Staff } from "./Staff.js";
 import { Packages } from "./Packages.js";
 
+/** `billingState` is the server's one honest answer to "is this studio paying for
+ *  anything" — derived in `GET /billing`, never re-inferred here. `status` alone
+ *  cannot answer it: a studio that never completed checkout sits at
+ *  `plan_id: 'free', status: 'active'`, which reads as perfectly healthy. */
+type BillingState = "comp" | "active" | "trialing" | "delinquent" | "pending" | "none";
+
 interface Billing {
-  subscription: { planId: string; planName: string; status: string; comp: boolean; currentPeriodEnd?: string | null };
+  subscription: {
+    planId: string; planName: string; status: string; comp: boolean; currentPeriodEnd?: string | null;
+    pendingPlanId?: string | null; pendingPlanName?: string | null; paidPlan?: boolean; billingState?: BillingState;
+  };
+  baseline?: { lockedFeatures: string[]; activeClientLimit: number; monthlyCredits: number };
   balance: { balance: number; purchased: number; granted: number; available: number };
   packs: { id: string; name: string; credits: number; price_usd: number }[];
-  plans?: { id: string; name: string; priceUsdMonth: number }[];
+  plans?: { id: string; name: string; priceUsdMonth: number; trialDays?: number | null }[];
   ledger: { delta: number; reason: string; at: number }[];
   stripeEnabled?: boolean;
   publishableKey?: string | null;
@@ -29,6 +39,18 @@ const DUNNING: Record<string, { title: string; body: string }> = {
   suspended: { title: "Studio suspended", body: "Your subscription lapsed, so paid features are paused for you and your clients. Update payment to restore everything instantly." },
   unpaid: { title: "Payment overdue", body: "Your invoice is unpaid and features are limited. Update payment to restore full access." },
   canceled: { title: "Subscription canceled", body: "You're on the free plan. Resubscribe to bring back paid features for you and your clients." },
+};
+
+/** The GlanceStrip's plan caption. Never `${status} plan`: a studio that never
+ *  finished checkout is `status: 'active'` on the free plan, and captioning that
+ *  "active plan" is exactly the lie this pass exists to remove. */
+const STATE_LABEL: Record<BillingState, string> = {
+  comp: "Comped plan",
+  active: "Active plan",
+  trialing: "Free trial",
+  delinquent: "Needs payment",
+  pending: "Not activated",
+  none: "No subscription",
 };
 interface AiUsage { usage: { feature: string; calls: number; credits: number }[] }
 type Tab = "overview" | "packages" | "staff";
@@ -146,6 +168,27 @@ function Overview() {
   const upgrades = others.filter((p) => p.priceUsdMonth > currentPrice && p.priceUsdMonth > 0);
   const downgrades = others.filter((p) => p.priceUsdMonth < currentPrice);
 
+  // Billing state, straight from the server (see BillingState). `?? "active"`
+  // only covers an old cached response — never a re-derivation.
+  const billingState: BillingState = billing?.subscription.billingState ?? "active";
+  const isPending = billingState === "pending";
+  const noSub = isPending || billingState === "none";
+  const pendingPlanId = billing?.subscription.pendingPlanId ?? null;
+  const pendingPlan = billing?.plans?.find((p) => p.id === pendingPlanId) ?? null;
+  const pendingName = billing?.subscription.pendingPlanName ?? pendingPlan?.name ?? "That plan";
+  // What the baseline costs them — from the server's effective entitlements, so
+  // it can't drift from what's enforced.
+  const baselineText = (() => {
+    const b = billing?.baseline;
+    if (!b) return null;
+    const locked = b.lockedFeatures;
+    return [
+      b.activeClientLimit >= 0 ? `${b.activeClientLimit} active client${b.activeClientLimit === 1 ? "" : "s"} max` : null,
+      b.monthlyCredits > 0 ? `${b.monthlyCredits.toLocaleString()} AI credits a month` : "no AI credits",
+      locked.length ? `${locked.slice(0, 3).join(", ")}${locked.length > 3 ? ` and ${locked.length - 3} more` : ""} ${locked.length === 1 ? "is" : "are"} locked` : null,
+    ].filter(Boolean).join(" · ");
+  })();
+
   const top = [...aiUsage].sort((a, b) => b.credits - a.credits).slice(0, 7);
   const maxCr = Math.max(...top.map((u) => u.credits), 1);
   const totalCr = aiUsage.reduce((n, u) => n + u.credits, 0);
@@ -168,6 +211,39 @@ function Overview() {
       }>
         {billing && (
         <>
+          {/* No live subscription. Distinct from dunning: a past-due studio HAS a
+              subscription and a card to fix; this one is either sitting on the free
+              baseline or holding a plan whose checkout never completed. The Shell
+              bar says the same thing on every coach screen — this is where it gets
+              resolved, so it carries the actual action. */}
+          {noSub && (
+            <Stagger>
+              <Card className="relative overflow-hidden border border-danger/30">
+                <div className="pointer-events-none absolute -right-12 -top-14 size-44 rounded-full blur-3xl" style={{ backgroundColor: `color-mix(in oklch, ${toneVar.danger} 18%, transparent)` }} />
+                <div className="relative flex items-start gap-3.5">
+                  <div className="grid size-11 shrink-0 place-items-center rounded-2xl [&_svg]:size-[1.35rem]" style={{ backgroundColor: `color-mix(in oklch, ${toneVar.danger} 15%, transparent)`, color: toneVar.danger }}><AlertTriangle /></div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold tracking-tight" style={{ color: toneVar.danger }}>
+                      {isPending ? `${pendingName} was never activated` : "No subscription"}
+                    </h3>
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      {isPending
+                        ? `You picked ${pendingName} but the card step never completed, so nothing is being billed.`
+                        : "Nothing is being billed for this studio."}
+                      {" "}You're on Mossa's free baseline{baselineText ? `: ${baselineText}.` : "."}
+                    </p>
+                    {isOwner && billing.stripeEnabled && isPending && pendingPlanId && (
+                      <Button size="sm" className="mt-3" style={{ backgroundColor: toneVar.danger }} disabled={busy === `plan_${pendingPlanId}`} onClick={() => void startInline("/api/billing/plan-intent", { planId: pendingPlanId }, `Activate ${pendingName}`, () => `Subscribe · ${fmtPrice(usdToCents(pendingPlan?.priceUsdMonth ?? 0))}/mo`, `plan_${pendingPlanId}`)}>
+                        {busy === `plan_${pendingPlanId}` ? "…" : "Finish setup"} <ArrowRight />
+                      </Button>
+                    )}
+                    {!billing.stripeEnabled && <p className="mt-2 text-xs text-muted-foreground">Subscriptions turn on once Stripe is configured on this deployment.</p>}
+                  </div>
+                </div>
+              </Card>
+            </Stagger>
+          )}
+
           {/* Dunning banner — the visible half of the me→tenant lifecycle. */}
           {!billing.subscription.comp && DUNNING[billing.subscription.status] && (
             <Stagger>
@@ -192,7 +268,7 @@ function Overview() {
           {/* Headline glance — plan + credit balance, deliberately card-less. */}
           <Stagger>
             <GlanceStrip items={[
-              { icon: CreditCard, tone: "primary", value: billing.subscription.planName, label: billing.subscription.comp ? "Comped plan" : `${billing.subscription.status} plan` },
+              { icon: CreditCard, tone: "primary", value: isPending ? pendingName : billing.subscription.planName, label: STATE_LABEL[billingState] },
               { icon: Sparkles, tone: "warning", value: billing.balance.available.toLocaleString(), label: "AI credits left" },
             ]} />
           </Stagger>
@@ -292,7 +368,9 @@ function Overview() {
           {/* Plan subscribe / upgrade — inline (no redirect). Hidden for comped tenants. */}
           {isOwner && billing.stripeEnabled && !billing.subscription.comp && upgrades.length > 0 && (
             <section className="space-y-2">
-              <Eyebrow>{billing.subscription.status === "active" ? "Change plan" : "Choose a plan"}</Eyebrow>
+              {/* Keyed on paidPlan, not status: a studio on the free baseline is
+                  `status: 'active'`, and "Change plan" implies they have one. */}
+              <Eyebrow>{billing.subscription.paidPlan ? "Change plan" : "Choose a plan"}</Eyebrow>
               <Stagger>
               <Card className="space-y-3">
                 <div className="space-y-1.5">

@@ -6,6 +6,7 @@ import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
 import { fmtEnergy, scaleFood, servingsToQuantity, SERVING_PRESETS } from "@mossa/domain";
 import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, MacroBar, ProgressRing, Eyebrow, Chip, IconBadge, ConfirmDialog, EmptyState, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, AlertTriangle, ArrowLeft, Plus, Sparkles, Utensils, Flame, History, LayoutGrid, ChevronRight, Trash2, X } from "@mossa/ui";
 import { api, ApiError, errorText } from "../../api.js";
+import { useCan } from "../../FeatureLock.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { ClientPrefsStrip } from "./ClientPrefsStrip.js";
 import { AiErrorBox } from "../../AiError.js";
@@ -45,6 +46,8 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const [foodPicker, setFoodPicker] = useState<{ optIdx: number } | null>(null);
   const units = useUnits();
   const [aiOpen, setAiOpen] = useState(false);
+  // Every AI affordance here posts to a route gated on the aiSuite entitlement.
+  const canAi = useCan("aiSuite");
   const [typeOpen, setTypeOpen] = useState(false);
   const [newType, setNewType] = useState("");
   // Seed-the-draft: the client's most recent OTHER plan + a template picker.
@@ -225,8 +228,9 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
       <PlanHealth allTypes={allTypes} byType={byType} foods={foods} targets={targets} />
 
       <div className="flex gap-2">
-        <Button variant="tonal" className="flex-1" onClick={() => setAiOpen(true)}><AiAvatar className="size-5" /> AI meal draft</Button>
-        <Button variant="secondary" onClick={() => setTypeOpen(true)}><Plus /> Meal type</Button>
+        {/* `/api/ai/draft-meal` is gated on aiSuite — don't offer a 403. */}
+        {canAi && <Button variant="tonal" className="flex-1" onClick={() => setAiOpen(true)}><AiAvatar className="size-5" /> AI meal draft</Button>}
+        <Button variant="secondary" className={canAi ? undefined : "flex-1"} onClick={() => setTypeOpen(true)}><Plus /> Meal type</Button>
       </div>
 
       {/* Seed the draft — load the client's most recent other plan, or a saved
@@ -497,6 +501,8 @@ const accentHex = (): string => { try { return colorToHex(getComputedStyle(docum
 
 /** Per-option plated-meal photo — an appetizing AI render of the option's foods. */
 function MealImage({ mealName, foodNames, value, onChange }: { mealName: string; foodNames: string[]; value?: string | null; onChange: (url: string | null) => void }) {
+  // `/api/ai/generate-image` is gated on aiSuite.
+  const canAi = useCan("aiSuite");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const gen = async () => {
@@ -514,12 +520,13 @@ function MealImage({ mealName, foodNames, value, onChange }: { mealName: string;
         <img src={value} alt="" className="h-24 w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
         <div className="absolute right-2 top-2 flex gap-1.5">
-          <button onClick={() => void gen()} disabled={busy} className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><AiAvatar className="size-3.5" /> {busy ? "…" : "Redo"}</button>
+          {canAi && <button onClick={() => void gen()} disabled={busy} className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><AiAvatar className="size-3.5" /> {busy ? "…" : "Redo"}</button>}
           <button onClick={() => onChange(null)} aria-label="Remove photo" className="grid size-7 place-items-center rounded-full bg-black/50 text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><X /></button>
         </div>
       </div>
     );
   }
+  if (!canAi) return null;
   return (
     <>
       <button onClick={() => void gen()} disabled={busy} className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface-3 text-xs text-muted-foreground transition-colors hover:bg-surface-2 disabled:opacity-50 [&_svg]:size-3.5">

@@ -507,12 +507,12 @@ describe("trial lifecycle — the webhook events that drive it", () => {
   const subRow = (tid: string) =>
     db().prepare("SELECT plan_id, status, stripe_sub_id, past_due_at FROM subscriptions WHERE tenant_id = ?").bind(tid).first<{ plan_id: string; status: string; stripe_sub_id: string | null; past_due_at: string | null }>();
 
-  it("`customer.subscription.created` with status=trialing activates the plan IMMEDIATELY and grants credits", async () => {
+  it("`customer.subscription.created` status=trialing WITH a card attached activates immediately and grants credits", async () => {
     const tid = await trialTenant("a");
     const payload = JSON.stringify({
       id: `evt_trial_a_${Date.now()}`,
       type: "customer.subscription.created",
-      data: { object: { id: "sub_trial_a", status: "trialing", customer: "cus_trial_a", current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400, metadata: { mossa_tenant: tid, mossa_plan: "light" } } },
+      data: { object: { id: "sub_trial_a", status: "trialing", customer: "cus_trial_a", default_payment_method: "pm_trial_a", pending_setup_intent: null, current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400, metadata: { mossa_tenant: tid, mossa_plan: "light" } } },
     });
     expect((await post(payload)).status).toBe(200);
 
@@ -534,7 +534,7 @@ describe("trial lifecycle — the webhook events that drive it", () => {
   it("trial → active: the same event with status=active keeps the plan and clears the trial flag", async () => {
     const tid = await trialTenant("b");
     const mk = (status: string, id: string) =>
-      JSON.stringify({ id, type: "customer.subscription.updated", data: { object: { id: "sub_trial_b", status, customer: "cus_trial_b", metadata: { mossa_tenant: tid, mossa_plan: "solo" } } } });
+      JSON.stringify({ id, type: "customer.subscription.updated", data: { object: { id: "sub_trial_b", status, customer: "cus_trial_b", default_payment_method: "pm_trial_b", pending_setup_intent: null, metadata: { mossa_tenant: tid, mossa_plan: "solo" } } } });
     expect((await post(mk("trialing", `evt_trial_b1_${Date.now()}`))).status).toBe(200);
     expect((await subRow(tid))!.status).toBe("trialing");
     // Trial end, card charged → Stripe flips the same subscription to `active`.
@@ -546,7 +546,7 @@ describe("trial lifecycle — the webhook events that drive it", () => {
 
   it("trial → past_due → canceled: a card that fails at trial end lapses, and the plan falls back to free", async () => {
     const tid = await trialTenant("c");
-    await post(JSON.stringify({ id: `evt_trial_c1_${Date.now()}`, type: "customer.subscription.updated", data: { object: { id: "sub_trial_c", status: "trialing", customer: "cus_trial_c", metadata: { mossa_tenant: tid, mossa_plan: "light" } } } }));
+    await post(JSON.stringify({ id: `evt_trial_c1_${Date.now()}`, type: "customer.subscription.updated", data: { object: { id: "sub_trial_c", status: "trialing", customer: "cus_trial_c", default_payment_method: "pm_trial_c", pending_setup_intent: null, metadata: { mossa_tenant: tid, mossa_plan: "light" } } } }));
     expect((await subRow(tid))!.status).toBe("trialing");
 
     // The first real invoice fails → grace window opens (dunning cron escalates).

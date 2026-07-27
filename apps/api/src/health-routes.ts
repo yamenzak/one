@@ -498,6 +498,9 @@ export const healthRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
+    // `canRequestExerciseSwap` was a registered flag nothing checked: a client on
+    // a package without it could still open (and auto-approve) a swap.
+    { const g = await gateFeature(c, "exerciseSwap", access.client.id); if (g) return g; }
     const d = parsed.data;
 
     // The plan being swapped must belong to THIS client — requireClientAccess

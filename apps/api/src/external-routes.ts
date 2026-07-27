@@ -359,7 +359,7 @@ export const externalRoutes = new Hono<AppEnv>()
 
   .get("/exercises/search-external", async (c) => {
     const who = requireTenant(c)!;
-    { const gate = await gateFeature(c, "externalFoodSearch"); if (gate) return gate; }
+    { const gate = await gateFeature(c, "externalExerciseSearch"); if (gate) return gate; }
     const q = (c.req.query("q") ?? "").trim();
     if (q.length < 2) return c.json({ exercises: [] });
     const cfg = await tenantIntegrations(c.env.DB, who.tenantId);

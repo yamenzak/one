@@ -16,6 +16,7 @@ import {
   Dumbbell, Play, Moon, ChevronRight, Plus, Footprints, Flame, TrendingUp, Trophy, Activity, AlertTriangle, Search,
 } from "@mossa/ui";
 import { api, todayLocal, shiftDay } from "../../api.js";
+import { useCan } from "../../FeatureLock.js";
 import { activityIcon } from "./activityIcons.js";
 import { useUnits } from "../../units.js";
 import { LogSheet } from "./LogSheet.js";
@@ -44,6 +45,11 @@ export function Train({ clientId }: { clientId: string }) {
   const [error, setError] = useState(false);
   const reqRef = useRef(0);
   const today = todayLocal();
+  // What this client's package includes. Absent capabilities are omitted, not
+  // locked: the client isn't the buyer of their studio's plan.
+  const canPlan = useCan("workoutPlan");
+  const canActivities = useCan("extraWorkouts");
+  const canStats = useCan("exerciseReport");
 
   // Load the three feeds together so one guard covers them, and surface a load
   // failure with a retry instead of an endless skeleton.
@@ -51,10 +57,17 @@ export function Train({ clientId }: { clientId: string }) {
     const rid = ++reqRef.current;
     setError(false);
     try {
+      // Reads for a section this client doesn't hold are skipped rather than
+      // fired: no plan surface means no plan read, no activity surface no
+      // activity read. Stubs keep the destructuring positional.
       const [p, s, a, g] = await Promise.all([
-        api.get<{ plans: Plan[]; variants: Lane[]; currentVariantId: string | null; defaultLabel?: string }>(`/api/workout-plans?clientId=${clientId}`),
+        canPlan
+          ? api.get<{ plans: Plan[]; variants: Lane[]; currentVariantId: string | null; defaultLabel?: string }>(`/api/workout-plans?clientId=${clientId}`)
+          : Promise.resolve({ plans: [] as Plan[], variants: [] as Lane[], currentVariantId: null, defaultLabel: "Main" }),
         api.get<{ sessions: Session[] }>(`/api/logs/workout-sessions?clientId=${clientId}&from=${shiftDay(today, -89)}&to=${today}`),
-        api.get<{ activities: ActivityLog[] }>(`/api/logs/activities?clientId=${clientId}&from=${shiftDay(today, -29)}&to=${today}`),
+        canActivities
+          ? api.get<{ activities: ActivityLog[] }>(`/api/logs/activities?clientId=${clientId}&from=${shiftDay(today, -29)}&to=${today}`)
+          : Promise.resolve({ activities: [] as ActivityLog[] }),
         api.get<{ goals: Goal[] }>(`/api/goals?clientId=${clientId}`).catch(() => ({ goals: [] as Goal[] })),
       ]);
       if (rid !== reqRef.current) return;
@@ -63,7 +76,7 @@ export function Train({ clientId }: { clientId: string }) {
       if (rid !== reqRef.current) return;
       setError(true);
     }
-  }, [clientId, today]);
+  }, [clientId, today, canPlan, canActivities]);
   useEffect(() => void load(), [load]);
 
   // The weekly Training-Load target is trainer-set on the active goal (SPEC
@@ -138,16 +151,18 @@ export function Train({ clientId }: { clientId: string }) {
   const recent = useMemo(() => {
     type Item = { id: string; date: string; title: string; sub: string; icon: typeof Dumbbell; tone: "activity" | "cardio"; load: number };
     const items: Item[] = [];
-    for (const s of sessions) {
+    // Logged-workout rows carry set counts + tonnage — strength-report detail
+    // (`exerciseReport`); the plain activity rows are `extraWorkouts`.
+    if (canStats) for (const s of sessions) {
       const sets = s.entries.flatMap((e) => e.sets).filter((x) => x.completed);
       if (sets.length === 0) continue;
       items.push({ id: s.id, date: s.date_local, title: "Workout", sub: `${sets.length} sets · ${kgToDisplay(sessionTonnage(sets), units).toLocaleString()} ${weightLabel(units)}`, icon: Dumbbell, tone: "activity", load: sessionLoad({ sets }) });
     }
-    for (const a of activities) {
+    if (canActivities) for (const a of activities) {
       items.push({ id: a.id, date: a.date_local, title: a.label || pretty(a.activity_key), sub: [a.duration_min ? `${a.duration_min} min` : null, a.calories ? fmtEnergy(a.calories, units) : null].filter(Boolean).join(" · ") || "Logged", icon: activityIcon(a.activity_key), tone: "cardio", load: sessionLoad({ cardio: [{ met: activityByKey(a.activity_key).met, durationMin: a.duration_min ?? 0 }] }) });
     }
     return items.sort((x, y) => y.date.localeCompare(x.date)).slice(0, 6);
-  }, [sessions, activities, units]);
+  }, [sessions, activities, units, canStats, canActivities]);
 
   const start = (day?: number) => nav(day != null ? `/train/session/${day}` : "/train/session");
 
@@ -181,8 +196,9 @@ export function Train({ clientId }: { clientId: string }) {
       }>
         {plans && (
         <>
-      <LaneSwitcher clientId={clientId} variants={variants} currentVariantId={currentVariantId} defaultLabel={defaultLabel} onSwitched={() => void load()} />
-      {published ? (
+      {/* Everything plan-shaped follows `workoutPlan`. */}
+      {canPlan && <LaneSwitcher clientId={clientId} variants={variants} currentVariantId={currentVariantId} defaultLabel={defaultLabel} onSwitched={() => void load()} />}
+      {canPlan && (published ? (
         <Stagger data-tour="train-hero">
           <button onClick={() => start()} className="w-full text-left">
             <Card interactive className="relative overflow-hidden">
@@ -199,17 +215,20 @@ export function Train({ clientId }: { clientId: string }) {
           </button>
         </Stagger>
       ) : (
-        <EmptyState icon={Dumbbell} title="No plan yet" description="Your coach hasn't published a plan. You can still log activities." />
+        <EmptyState icon={Dumbbell} title="No plan yet" description={canActivities ? "Your coach hasn't published a plan. You can still log activities." : "Your coach hasn't published a plan yet."} />
+      ))}
+
+      {/* Quick-start chips — one per capability the package includes. */}
+      {((canPlan && published) || canActivities) && (
+      <Stagger className="flex flex-wrap gap-2">
+        {canPlan && published && <Chip icon={Play} selected onClick={() => start()}>Start workout</Chip>}
+        {canActivities && <Chip icon={Footprints} onClick={() => setActivityOpen(true)}>Log activity</Chip>}
+      </Stagger>
       )}
 
-      {/* Quick-start chips */}
-      <Stagger className="flex flex-wrap gap-2">
-        {published && <Chip icon={Play} selected onClick={() => start()}>Start workout</Chip>}
-        <Chip icon={Footprints} onClick={() => setActivityOpen(true)}>Log activity</Chip>
-      </Stagger>
-
-      {/* This week — key metrics from real logs */}
-      {hasData && (
+      {/* This week — volume / tonnage / PR stats are the strength report
+          (`exerciseReport`). */}
+      {canStats && hasData && (
         <section className="space-y-2">
           <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">This week</h3>
           <Stagger className="grid grid-cols-2 gap-3">
@@ -231,7 +250,7 @@ export function Train({ clientId }: { clientId: string }) {
         <section className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent</h3>
-            <button onClick={() => setActivityOpen(true)} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><Plus /> Log activity</button>
+            {canActivities && <button onClick={() => setActivityOpen(true)} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><Plus /> Log activity</button>}
           </div>
           <Stagger className="space-y-1.5">
             {recent.map((r) => (
@@ -248,8 +267,8 @@ export function Train({ clientId }: { clientId: string }) {
         </section>
       )}
 
-      {/* Plan days — a carousel of branded day covers, tap to start. */}
-      {published && (
+      {/* Plan days — a carousel of branded day covers, tap to start (`workoutPlan`). */}
+      {canPlan && published && (
         <section className="space-y-2">
           <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Plan days</h3>
           <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
@@ -276,7 +295,7 @@ export function Train({ clientId }: { clientId: string }) {
       )}
 
       {!published && !hasData && (
-        <EmptyState icon={Activity} title="Nothing here yet" description="Log an activity to get started." action={<Button onClick={() => setActivityOpen(true)}><Plus /> Log activity</Button>} />
+        <EmptyState icon={Activity} title="Nothing here yet" description={canActivities ? "Log an activity to get started." : "Your training will show up here."} action={canActivities ? <Button onClick={() => setActivityOpen(true)}><Plus /> Log activity</Button> : undefined} />
       )}
 
       {/* Browsable exercise library (SPEC §8.11) — freestyle content for no-plan
@@ -289,7 +308,7 @@ export function Train({ clientId }: { clientId: string }) {
       </Reveal>
       )}
 
-      {activityOpen && <LogSheet open initialKind="activity" clientId={clientId} onClose={() => setActivityOpen(false)} onLogged={() => void load()} />}
+      {canActivities && activityOpen && <LogSheet open initialKind="activity" clientId={clientId} onClose={() => setActivityOpen(false)} onLogged={() => void load()} />}
     </Page>
   );
 }

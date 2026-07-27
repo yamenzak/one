@@ -2,9 +2,10 @@
  *  cards), Stripe Connect / inline buy, redeem codes. */
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Button, Card, Badge, Field, Sheet, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, toneVar, ArrowLeft, LogOut, Ticket, Store, Sparkles, Check, RotateCcw, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
+import { Button, Card, Badge, Field, Sheet, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, EmptyState, toneVar, ArrowLeft, LogOut, Ticket, Store, Sparkles, Check, RotateCcw, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
 import { CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "@mossa/domain";
 import { api } from "../../api.js";
+import { useCan } from "../../FeatureLock.js";
 import { useSession } from "../../session.js";
 import { fmtPrice } from "../../money.js";
 import { PaymentSheet, type CheckoutIntent } from "../../PaymentSheet.js";
@@ -37,12 +38,19 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
   const [busy, setBusy] = useState(false);
   const [buying, setBuying] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  // The studio has to have bought `commerce` from Mossa for any of this to
+  // exist. Without it both reads below 403 — which left the storefront on its
+  // skeleton forever — so skip them and say plainly that there's nothing to buy.
+  // The redeem-a-code path stays live either way: for a client `Shell.tsx` has
+  // pinned here by `requireActiveAccess`, it is the only way forward.
+  const canCommerce = useCan("commerce");
 
   const load = useCallback(async () => {
+    if (!canCommerce) { setPackages([]); setSub(null); return; }
     const [p, s] = await Promise.all([api.get<{ packages: Pkg[] }>("/api/packages"), api.get<{ subscriptions: Sub[] }>(`/api/subscriptions?clientId=${clientId}`)]);
     setPackages(p.packages.filter((x) => x.visibility === "marketplace"));
     setSub(s.subscriptions.find((x) => x.status === "active") ?? null);
-  }, [clientId]);
+  }, [clientId, canCommerce]);
   useEffect(() => void load(), [load]);
 
   const redeem = async () => {
@@ -129,7 +137,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
           <div className="pointer-events-none absolute -right-10 -top-12 size-40 rounded-full bg-primary/15 blur-3xl" />
           <div className="relative flex items-start gap-3">
             <IconBadge icon={Sparkles} tone="primary" size="sm" />
-            <div className="min-w-0 text-sm"><div className="font-medium">Choose a plan to get started</div><div className="text-muted-foreground">Your access is inactive. Pick a package below or enter a code — or ask your coach to set you up.</div></div>
+            <div className="min-w-0 text-sm"><div className="font-medium">{canCommerce ? "Choose a plan to get started" : "Let's get your access set up"}</div><div className="text-muted-foreground">{canCommerce ? "Your access is inactive. Pick a package below or enter a code — or ask your coach to set you up." : "Your access is inactive. Enter an access code below, or ask your coach to set you up."}</div></div>
           </div>
         </Card>
       )}
@@ -145,7 +153,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
         <>
       {msg && <Card className="border border-primary/20 bg-primary/5 text-sm text-foreground/85">{msg}</Card>}
 
-      {sub ? (
+      {canCommerce && (sub ? (
         <div className="space-y-2">
           <Card className="space-y-3">
             <div className="flex items-center justify-between gap-3">
@@ -168,7 +176,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
         </div>
       ) : (
         !locked && <p className="px-1 text-xs text-muted-foreground">Pick a package below to unlock your plan. Buy again anytime to extend — access stacks, it never resets.</p>
-      )}
+      ))}
 
       <PlanIncludes />
 
@@ -189,7 +197,12 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
         </section>
       )}
 
-      {packages.length === 0 && !sub && (
+      {/* No `commerce` = there is no online storefront to show. Say that calmly
+          and honestly — an "upgrade your plan" card would be aimed at the wrong
+          person, since the client isn't the buyer of the studio's plan. */}
+      {!canCommerce ? (
+        <EmptyState icon={Store} title="Your coach isn't selling plans online" description="This studio doesn't take payments here. Your coach sets up your access for you — or enter an access code below if you have one." />
+      ) : packages.length === 0 && !sub && (
         <Card className="text-center text-sm text-muted-foreground">No packages are available to buy right now. Enter a code below, or ask your coach to set you up.</Card>
       )}
 

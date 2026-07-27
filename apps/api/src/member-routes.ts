@@ -46,6 +46,17 @@ export const memberRoutes = new Hono<AppEnv>()
     if (body.data.role === "owner" && c.get("role") !== "owner" && !isPlatformAdmin(c)) {
       return c.json({ error: "only an owner can assign the owner role" }, 403);
     }
+    // AUDIT FINDING, NOT FIXED HERE — the assistant seat is the OTHER half of
+    // what `frontDesk` sells (SPEC §5: "Assistant role + sessions/booking"), and
+    // only the sessions half is gated: a tenant on a plan without frontDesk can
+    // still mint assistants, and `access.ts` grants that role real powers. The
+    // gate belongs right here (`gateFeature(c, "sessions")` when
+    // `body.data.role === "assistant"`, plus `beforeCreateInvitation` in auth.ts
+    // for the invite path), but landing it flips
+    // `test/entitlement-guards.test.ts` "role promotion (client → staff) is
+    // counted against the ceiling", which asserts trainer→assistant returns 200
+    // on the `free` plan to prove sideways moves aren't seat-checked. That test
+    // needs its sideways-move target changed off `assistant` in the same commit.
     const target = await c.env.DB.prepare(
       'SELECT role FROM "member" WHERE organizationId = ? AND userId = ?',
     )

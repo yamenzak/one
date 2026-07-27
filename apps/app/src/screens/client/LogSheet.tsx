@@ -13,6 +13,8 @@ import {
 } from "@mossa/ui";
 import { api, errorText, isQueued, todayLocal, uploadMedia } from "../../api.js";
 import { QueuedNotice } from "../../notices.js";
+import { useCan } from "../../FeatureLock.js";
+import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
 import { AiAvatar, useAiIdentity } from "../../AiAvatar.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
@@ -48,7 +50,7 @@ function Rating({ label, value, onChange }: { label: string; value: number | nul
 }
 
 export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { open: boolean; onClose: () => void; clientId: string; onLogged: () => void; initialKind?: LogKind }) {
-  const [kind, setKind] = useState<LogKind | null>(initialKind ?? null);
+  const [kindState, setKind] = useState<LogKind | null>(initialKind ?? null);
   const [foodMode, setFoodMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [f, setF] = useState<Record<string, string>>({});
@@ -65,6 +67,41 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
   const date = todayLocal();
   const units = useUnits();
   const ai = useAiIdentity();
+  // The chip registry is the switchboard: every kind below writes to a route
+  // that now 403s without its client capability, so a kind the client doesn't
+  // hold is dropped from the grid entirely (check-in is governed by no flag).
+  const canFood = useCan("foodLogging");
+  const canActivity = useCan("extraWorkouts");
+  const canWater = useCan("waterLogging");
+  const canMeasure = useCan("measurementLogging");
+  const canSleep = useCan("sleepLogging");
+  const canMood = useCan("moodLogging");
+  // The camera scan inside the Body form posts to /api/body-scans (`bodyScan`).
+  const canBodyScan = useCan("bodyScan");
+  const chips = CHIPS.filter((c) =>
+    c.kind === "food" ? canFood
+    : c.kind === "activity" ? canActivity
+    : c.kind === "water" ? canWater
+    : c.kind === "weight" || c.kind === "body" ? canMeasure
+    : c.kind === "sleep" ? canSleep
+    : c.kind === "mood" ? canMood
+    : true);
+  // A caller's `initialKind` can name a chip this client's package no longer
+  // includes (Wellness deep-links sleep/mood, Train deep-links activity) — fall
+  // back to the first available form rather than opening an empty sheet.
+  const kind: LogKind | null = kindState == null || chips.some((c) => c.kind === kindState)
+    ? kindState
+    : chips.find((c) => c.kind !== "food")?.kind ?? null;
+  // Check-in FORM composition — which fields the coach's package asks for. These
+  // shape the form, they are not a security gate, so an absent clientFlags
+  // (staff, or no package context) means "include everything".
+  const { ctx } = useSession();
+  const cf = ctx?.clientFlags;
+  const ciMood = cf?.checkInIncludesMood ?? true;
+  const ciSleep = cf?.checkInIncludesSleep ?? true;
+  const ciStress = cf?.checkInIncludesStress ?? true;
+  const ciMeasurements = cf?.checkInIncludesMeasurements ?? true;
+  const ciPhotos = cf?.checkInIncludesPhotos ?? true;
   const num = (k: string) => (f[k] ? Number(f[k]) : undefined);
   const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
   // Decimal entry: allow digits and a single decimal point only — never let a
@@ -157,7 +194,9 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
       else if (kind === "activity") await api.post("/api/logs/activity", { clientId, data: { date, activityKey, label: activityKey === "other" && f.actLabel ? f.actLabel : activityLabel, durationMin: num("duration") ?? null, reps: track === "reps" ? (num("reps") ?? null) : null, avgHrBpm: num("hr") ?? null, distanceM: track === "distance" ? (distanceToM() ?? null) : null, notes: f.actNotes || null, caloriesBurned: kcal("kcal") ?? null } });
       else if (kind === "sleep") await api.post("/api/logs/sleep", { clientId, data: { date, durationMinutes: Math.round((num("hours") ?? 0) * 60), quality: ratings.sleepQ ?? undefined, notes: f.notes || undefined } });
       else if (kind === "mood") await api.post("/api/logs/mood", { clientId, data: { date, mood: ratings.mood ?? undefined, energy: ratings.energy ?? undefined, stress: ratings.stress ?? undefined, notes: f.notes || undefined } });
-      else if (kind === "checkin") await api.post("/api/check-ins", { clientId, data: { date, weightKg: kg("weight"), mood: ratings.mood ?? undefined, energy: ratings.energy ?? undefined, stress: ratings.stress ?? undefined, sleepHours: num("sleepHours"), stepsCount: num("steps"), notes: f.notes || undefined, progressPhotos: photos.length ? photos : undefined } });
+      // Only send what the form actually rendered — an un-asked-for field must
+      // not arrive as a value the coach then sees on the check-in.
+      else if (kind === "checkin") await api.post("/api/check-ins", { clientId, data: { date, weightKg: ciMeasurements ? kg("weight") : undefined, mood: ciMood ? (ratings.mood ?? undefined) : undefined, energy: ciMood ? (ratings.energy ?? undefined) : undefined, stress: ciStress ? (ratings.stress ?? undefined) : undefined, sleepHours: ciSleep ? num("sleepHours") : undefined, stepsCount: num("steps"), notes: f.notes || undefined, progressPhotos: ciPhotos && photos.length ? photos : undefined } });
       onLogged();
       close();
     } catch (e) {
@@ -180,7 +219,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
     <Sheet open={open} onClose={close} title={kind ? undefined : "Log"}>
       {!kind ? (
         <div className="grid grid-cols-2 gap-3 pb-2">
-          {CHIPS.map((c) => (
+          {chips.map((c) => (
             <button key={c.kind} onClick={() => (c.kind === "food" ? setFoodMode(true) : setKind(c.kind))} className="flex items-center gap-3 rounded-2xl bg-surface-2 p-4 text-left transition-all hover:bg-surface-3 active:scale-[0.98]">
               <IconBadge icon={c.icon} tone={c.tone} size="sm" />
               <span className="font-medium">{c.label}</span>
@@ -200,6 +239,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
           </>)}
           {kind === "body" && (<>
             <h2 className="text-lg font-semibold">Body measurements</h2>
+            {canBodyScan && (
             <BodyScanLauncher clientId={clientId} onSaved={() => { onLogged(); close(); }}>
               {({ open, loading, profileReady }) =>
                 profileReady ? (
@@ -212,6 +252,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
                 )
               }
             </BodyScanLauncher>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={f.weight ?? ""} onChange={(e) => setDec("weight", e.target.value)} />
               <Field label="Body fat %" inputMode="decimal" value={f.bf ?? ""} onChange={(e) => setDec("bf", e.target.value)} />
@@ -285,15 +326,17 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
           </>)}
           {kind === "checkin" && (<>
             <h2 className="text-lg font-semibold">Daily check-in</h2>
+            {/* Form composition from the package's check-in flags. */}
             <div className="grid grid-cols-2 gap-3">
-              <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={f.weight ?? ""} onChange={(e) => setDec("weight", e.target.value)} />
-              <Field label="Sleep (hrs)" inputMode="decimal" value={f.sleepHours ?? ""} onChange={(e) => setDec("sleepHours", e.target.value)} />
+              {ciMeasurements && <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={f.weight ?? ""} onChange={(e) => setDec("weight", e.target.value)} />}
+              {ciSleep && <Field label="Sleep (hrs)" inputMode="decimal" value={f.sleepHours ?? ""} onChange={(e) => setDec("sleepHours", e.target.value)} />}
               <Field label="Steps" inputMode="numeric" value={f.steps ?? ""} onChange={(e) => set("steps", e.target.value.replace(/\D/g, ""))} />
             </div>
-            <Rating label="Mood" value={ratings.mood} onChange={(n) => setRatings((r) => ({ ...r, mood: n }))} />
-            <Rating label="Energy" value={ratings.energy} onChange={(n) => setRatings((r) => ({ ...r, energy: n }))} />
-            <Rating label="Stress" value={ratings.stress} onChange={(n) => setRatings((r) => ({ ...r, stress: n }))} />
+            {ciMood && <Rating label="Mood" value={ratings.mood} onChange={(n) => setRatings((r) => ({ ...r, mood: n }))} />}
+            {ciMood && <Rating label="Energy" value={ratings.energy} onChange={(n) => setRatings((r) => ({ ...r, energy: n }))} />}
+            {ciStress && <Rating label="Stress" value={ratings.stress} onChange={(n) => setRatings((r) => ({ ...r, stress: n }))} />}
             <Textarea rows={2} placeholder="Notes for your coach…" value={f.notes ?? ""} onChange={(e) => set("notes", e.target.value)} />
+            {ciPhotos && (
             <div>
               <div className="mb-2 flex items-center justify-between text-sm text-muted-foreground"><span>Progress photos</span></div>
               <div className="flex flex-wrap gap-2">
@@ -308,6 +351,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
               {photoErr && <p className="mt-1.5 text-xs text-warning">{photoErr}</p>}
               {photos.length > 0 && <p className="mt-1.5 text-xs text-muted-foreground">Photos are private. Toggle to allow featuring as a before/after.</p>}
             </div>
+            )}
           </>)}
           {err && <p className="text-sm text-warning" role="alert">{err}</p>}
           {queued && <QueuedNotice />}

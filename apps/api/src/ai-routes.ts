@@ -10,7 +10,7 @@ import { WorkoutBody, MUSCLE_GROUPS, EQUIPMENT_TYPES, normalizeMuscle, normalize
 import { resolveUnits, activityByKey, estimateBurnedCalories, mockModeSettable } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { requireClientAccess, clientForUser } from "./clients.js";
-import { gateFeature, requireClientFlag, resolveClientFlagsFor } from "./client-flags.js";
+import { gateFeature, resolveClientFlagsFor } from "./client-flags.js";
 import { tenantEntitlements, hasFeature, getConfig, setConfig } from "./billing-store.js";
 import { generate, generateImage, extractJson, listModels, checkClientDailyBudget } from "./ai.js";
 import { buildClientContext } from "./ai-context.js";
@@ -862,11 +862,10 @@ export const aiRoutes = new Hono<AppEnv>()
     if (!p.durationMin && !p.reps && !p.distanceM) return c.json({ error: "give a duration, count or distance to estimate from" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
-    { const g = await gateFeature(c, "aiSuite"); if (g) return g; }
-    // The aiSuite gate carries no client flag, so enforce the client's master
-    // canUseAi capability explicitly (a client excluded from AI can't spend the
-    // tenant's credits here), plus the per-client daily budget.
-    { const g = await requireClientFlag(c, access.client.id, "canUseAi"); if (g) return g; }
+    // `clientAi` composes aiSuite ∩ canUseAi from the registry, so the pairing
+    // can't drift (it replaces a hand-rolled gateFeature + requireClientFlag pair
+    // here). A client excluded from AI can't spend the tenant's credits.
+    { const g = await gateFeature(c, "clientAi", access.client.id); if (g) return g; }
     { const g = await clientBudgetGate(c, who.userId); if (g) return g; }
     const activityLabel = p.label?.trim() || activityByKey(p.activityKey ?? "other").label;
     const ctx = await buildClientContext(c.env, access.client, { today: new Date().toISOString().slice(0, 10), hour: 12, units: await unitsFor(c.env.DB, who.userId), sections: ["client", "body", "training"] });

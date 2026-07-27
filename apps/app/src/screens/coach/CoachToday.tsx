@@ -1,6 +1,6 @@
 /** Coach Today — triage inbox: roster pulse + recent notifications. */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fmtWeight, type AttentionType } from "@mossa/domain";
 import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, Avatar, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, CountUp, cn, type Tone, type LucideIcon } from "@mossa/ui";
@@ -13,6 +13,7 @@ import type { UnitPrefs } from "@mossa/domain";
 import type { ClientSummary } from "./Clients.js";
 import { WidgetCarousel, WidgetCustomizeSheet } from "../widget-kit.js";
 import { COACH_WIDGETS, DEFAULT_COACH_WIDGETS, type CoachWidgetData } from "./CoachWidgets.js";
+import { featureEnabled } from "@mossa/domain";
 
 interface Notification { id: string; type: string; title: string; message: string; created_at: string; read: number }
 interface AttentionItem { type: AttentionType; severity: "info" | "warn" | "urgent"; label: string; actionLabel: string; detail: string | null; link: string }
@@ -41,6 +42,14 @@ export function CoachToday() {
   const nav = useNavigate();
   const units = useUnits();
   const { ctx, refresh } = useSession();
+  // Mirror client/Today.tsx: a widget whose capability the studio doesn't hold
+  // must not reach the carousel OR the customise picker (the picker was the leak
+  // — a coach could add "Labs to review" on a plan without supplementsLabs).
+  const features = ctx?.entitlements?.features;
+  const widgetCatalog = useMemo(
+    () => (features ? COACH_WIDGETS.filter((w) => !w.feature || featureEnabled(w.feature, { features, clientFlags: null })) : []),
+    [features],
+  );
   const [clients, setClients] = useState<ClientSummary[] | null>(null);
   const [notifications, setNotifications] = useState<Notification[] | null>(null);
   const [attention, setAttention] = useState<AttentionData>({ clients: [], totals: {}, total: 0 });
@@ -107,7 +116,7 @@ export function CoachToday() {
         return (
           <>
             <Stagger>
-              <WidgetCarousel catalog={COACH_WIDGETS} items={widgetItems} defaults={DEFAULT_COACH_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
+              <WidgetCarousel catalog={widgetCatalog} items={widgetItems} defaults={DEFAULT_COACH_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
             </Stagger>
 
       {analytics && analytics.roster.total > 0 && (
@@ -217,7 +226,7 @@ export function CoachToday() {
       })()}
       </Reveal>
 
-      {widgetsOpen && <WidgetCustomizeSheet catalog={COACH_WIDGETS} items={widgetItems} defaults={DEFAULT_COACH_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
+      {widgetsOpen && <WidgetCustomizeSheet catalog={widgetCatalog} items={widgetItems} defaults={DEFAULT_COACH_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
     </Page>
   );
 }

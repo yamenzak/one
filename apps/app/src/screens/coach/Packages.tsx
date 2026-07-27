@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Badge, Field, Textarea, Switch, Sheet, Chip, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonHeader, SkeletonList, CreditCard, Ticket, Tag, Trash2, Plus, X, PencilLine, Archive, RotateCcw, AlertTriangle } from "@mossa/ui";
-import { CLIENT_FLAG_META, CLIENT_FLAG_CATEGORIES, CLIENT_FLAG_KEYS, DEFAULT_CLIENT_FLAGS, type ClientFlags } from "@mossa/domain";
+import { CLIENT_FLAG_META, CLIENT_FLAG_CATEGORIES, SELLABLE_CLIENT_FLAG_KEYS, DEFAULT_CLIENT_FLAGS, type ClientFlags } from "@mossa/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
 import { FeatureLock } from "../../FeatureLock.js";
@@ -393,7 +393,11 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
             <p className="text-xs text-muted-foreground/80">What this package includes. Plan access also follows the budgets above — a workout-only budget already hides the meal plan.</p>
           </div>
           {CLIENT_FLAG_CATEGORIES.map((cat) => {
-            const keys = CLIENT_FLAG_KEYS.filter(
+            // `SELLABLE_CLIENT_FLAG_KEYS` drops the `reserved` flags — ones the
+            // builder used to offer with nothing behind them (no route, no screen),
+            // so a tenant could sell a capability the product doesn't have. Stored
+            // values on existing packages still resolve; only the toggle is gone.
+            const keys = SELLABLE_CLIENT_FLAG_KEYS.filter(
               (k) => CLIENT_FLAG_META[k].category === cat.key && (!CLIENT_FLAG_META[k].requiresFeature || entFeatures[CLIENT_FLAG_META[k].requiresFeature as string]),
             );
             if (!keys.length) return null;

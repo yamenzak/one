@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AiSettingsPayload, AiFeatureMeta, AiModelMeta, TenantAiConfig, AiFeatureConfig, AiTone } from "@mossa/protocol";
 import { Card, Badge, Skeleton, Reveal, SkeletonLine, Switch, Button, Textarea, Chip, Field, IconBadge, cn, Sparkles, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, Play, Wallet, type Tone, type LucideIcon } from "@mossa/ui";
 import { api } from "../api.js";
+import { useCan } from "../FeatureLock.js";
 
 const TONE_LABEL: Record<string, string> = {
   professional: "Professional", motivating: "Motivating", friendly: "Friendly", direct: "Direct", funny: "Funny", "tough-love": "Tough love",
@@ -44,6 +45,11 @@ const exampleMod = (key: string) => EXAMPLE_MODS[key] ?? "e.g. add a house rule 
 export function AiConfigSection() {
   const [data, setData] = useState<AiSettingsPayload | null>(null);
   const [config, setConfig] = useState<TenantAiConfig>({});
+  // The coach voice exists only to narrate BODY-SCAN cues, and every route behind
+  // it (`/body-scan/voice-preview`, `/body-scan/voice-pack`) is gated on
+  // `bfCamera`. Without the entitlement the card was a live control that 403'd —
+  // and "Generate voice pack" spends credits, so it read as a billing failure.
+  const canBodyScan = useCan("bodyScan");
 
   useEffect(() => {
     void api.get<AiSettingsPayload>("/api/settings/ai").then((r) => { setData(r); setConfig(r.config ?? {}); }).catch(() => setData(null));
@@ -178,6 +184,7 @@ export function AiConfigSection() {
                 </div>
               </Card>
 
+              {canBodyScan && (
               <Card className="mt-2 space-y-3">
                 <div className="flex items-center gap-2.5">
                   <IconBadge icon={Camera} tone="primary" size="sm" />
@@ -218,6 +225,7 @@ export function AiConfigSection() {
                   </div>
                 </div>
               </Card>
+              )}
 
               <Card className="mt-2 space-y-3">
                 <div className="flex items-center gap-2.5">

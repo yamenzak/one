@@ -8,9 +8,35 @@
  */
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { FEATURE_META, type Entitlements } from "@mossa/domain";
+import { FEATURE_META, gateSpecOf, featureEnabled, type Entitlements, type FeatureKey } from "@mossa/domain";
 import { Card, IconBadge, Button, Lock } from "@mossa/ui";
 import { useSession } from "./session.js";
+
+/**
+ * THE read-model capability check for the app — the mirror of the API's
+ * `gateFeature`, resolved from the SAME `FEATURES` record so a screen can never
+ * offer a control a route will 403. Composes the tenant's platform entitlement
+ * with (for the client persona only) the client's package flag, exactly as
+ * `gateFeature` → `requireClientFlag` does: staff are never bounded by what a
+ * client bought, so their `clientFlags` half is passed as null.
+ *
+ * Use this instead of reading `ctx.entitlements.features.x` by hand — that form
+ * silently skips the client-flag half and re-derives plan logic in the app.
+ */
+export function useCan(feature: FeatureKey): boolean {
+  const { ctx } = useSession();
+  const features = ctx?.entitlements?.features;
+  // No context yet ⇒ fail CLOSED. Returning true while the bootstrap is in
+  // flight is what makes a locked control flash into view and then 403.
+  if (!features) return false;
+  const isClient = ctx?.active?.role === "client";
+  return featureEnabled(feature, { features, clientFlags: isClient ? ctx?.clientFlags : null });
+}
+
+/** The entitlement a feature needs, for pairing `useCan` with a `FeatureLock`. */
+export function entitlementOf(feature: FeatureKey): keyof Entitlements["features"] | undefined {
+  return gateSpecOf(feature).entitlement;
+}
 
 export function FeatureLock({
   feature,

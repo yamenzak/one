@@ -106,6 +106,23 @@ export interface ClientFlagMeta {
    *  the covering budget lapses, the flag is forced off (SSOT for budget gating;
    *  the resolver derives its gate lists from this, mirroring requiresFeature). */
   budgetGate?: BudgetFeature;
+  /**
+   * DECLARED but backed by nothing: no route enforces it and no screen offers
+   * it, so selling it would be selling a capability that does not exist. Mirrors
+   * `FEATURE_META.reserved` for platform entitlements — the package builder hides
+   * it, and the conformance test in `features.test.ts` permits it to have no
+   * FeatureSpec. Resolution still honours a stored value, so a package that
+   * already carries the flag keeps exactly what it was sold.
+   */
+  reserved?: boolean;
+  /**
+   * Shapes a FORM rather than granting a capability: it decides which fields the
+   * check-in composer renders, not whether a route may be called. These have no
+   * FeatureSpec on purpose — there is nothing to 403, and rejecting a check-in
+   * because it carried one extra field would lose the client's data. Enforced in
+   * the UI composer only.
+   */
+  formOnly?: boolean;
 }
 
 /** Metadata that drives the tenant's package builder: every flag auto-appears
@@ -119,7 +136,9 @@ export const CLIENT_FLAG_META: Record<keyof ClientFlags, ClientFlagMeta> = {
   showMacroBreakdown: { label: "Macro breakdown", hint: "See per-meal macro detail", category: "nutrition" },
   showNutritionReports: { label: "Nutrition reports", hint: "Nutrition trends & adherence", category: "nutrition" },
   canRequestExerciseSwap: { label: "Request swaps", hint: "Ask the coach to swap an exercise", category: "exercise", budgetGate: "workout" },
-  canReorderExercises: { label: "Reorder exercises", hint: "Reorder within a session", category: "exercise", budgetGate: "workout" },
+  // Reserved: there is no reorder affordance in the workout player and no route
+  // that reorders a session, so this toggle sold nothing. Audit round-6.
+  canReorderExercises: { label: "Reorder exercises", hint: "Reorder within a session", category: "exercise", budgetGate: "workout", reserved: true },
   canLogExtraWorkouts: { label: "Log extra workouts", hint: "Log sessions beyond the plan", category: "exercise" },
   canViewBodyMetricsReport: { label: "Body-metrics report", hint: "Weight/body-fat trends", category: "reporting" },
   canViewExerciseReport: { label: "Strength report", hint: "Lift progression & PRs", category: "reporting", budgetGate: "workout" },
@@ -129,12 +148,13 @@ export const CLIENT_FLAG_META: Record<keyof ClientFlags, ClientFlagMeta> = {
   canLogMeasurements: { label: "Log measurements", hint: "Body measurements", category: "wellness" },
   canTrackFasting: { label: "Fasting timer", hint: "Intermittent-fasting tracker", category: "wellness" },
   canUseBodyScan: { label: "Body scan", hint: "Camera body-fat estimator", category: "wellness", requiresFeature: "bfCamera" },
-  checkInRequired: { label: "Require check-ins", hint: "Client must submit check-ins", category: "checkin" },
-  checkInIncludesMood: { label: "Check-in: mood", hint: "Mood in the check-in form", category: "checkin" },
-  checkInIncludesSleep: { label: "Check-in: sleep", hint: "Sleep in the check-in form", category: "checkin" },
-  checkInIncludesStress: { label: "Check-in: stress", hint: "Stress in the check-in form", category: "checkin" },
-  checkInIncludesMeasurements: { label: "Check-in: measurements", hint: "Measurements in the check-in form", category: "checkin" },
-  checkInIncludesPhotos: { label: "Check-in: photos", hint: "Progress photos in the check-in form", category: "checkin" },
+  // Reserved: nothing requires, nags or blocks on a missing check-in.
+  checkInRequired: { label: "Require check-ins", hint: "Client must submit check-ins", category: "checkin", reserved: true },
+  checkInIncludesMood: { label: "Check-in: mood", hint: "Mood in the check-in form", category: "checkin", formOnly: true },
+  checkInIncludesSleep: { label: "Check-in: sleep", hint: "Sleep in the check-in form", category: "checkin", formOnly: true },
+  checkInIncludesStress: { label: "Check-in: stress", hint: "Stress in the check-in form", category: "checkin", formOnly: true },
+  checkInIncludesMeasurements: { label: "Check-in: measurements", hint: "Measurements in the check-in form", category: "checkin", formOnly: true },
+  checkInIncludesPhotos: { label: "Check-in: photos", hint: "Progress photos in the check-in form", category: "checkin", formOnly: true },
   canUseAi: { label: "AI (all)", hint: "Master switch for client AI features", category: "ai", requiresFeature: "aiSuite" },
   aiMealTools: { label: "AI food tools", hint: "Snap-a-Meal, Label Reader, AI recipes", category: "ai", requiresFeature: "aiSuite" },
   aiCoachInsights: { label: "AI insights", hint: "AI coach notes & progress narratives", category: "ai", requiresFeature: "aiSuite" },
@@ -142,6 +162,15 @@ export const CLIENT_FLAG_META: Record<keyof ClientFlags, ClientFlagMeta> = {
 
 /** All flag keys, derived from the defaults (new keys auto-appear). */
 export const CLIENT_FLAG_KEYS = Object.keys(DEFAULT_CLIENT_FLAGS) as (keyof ClientFlags)[];
+
+/** Flags that grant nothing today — hidden from the package builder so a tenant
+ *  cannot sell a capability the product does not have (audit round-6). */
+export const RESERVED_CLIENT_FLAGS = CLIENT_FLAG_KEYS.filter((k) => CLIENT_FLAG_META[k].reserved);
+/** Flags that compose the check-in FORM rather than gating a route. */
+export const FORM_ONLY_CLIENT_FLAGS = CLIENT_FLAG_KEYS.filter((k) => CLIENT_FLAG_META[k].formOnly);
+
+/** The flags a tenant may put on a package: everything with a real surface. */
+export const SELLABLE_CLIENT_FLAG_KEYS = CLIENT_FLAG_KEYS.filter((k) => !CLIENT_FLAG_META[k].reserved);
 
 function applyPartial(base: ClientFlags, partial: Partial<ClientFlags> | null | undefined): ClientFlags {
   // Always return a fresh object — the resolver mutates the result in place

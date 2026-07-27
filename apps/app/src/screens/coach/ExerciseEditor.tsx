@@ -16,8 +16,8 @@ import { motion } from "motion/react";
 import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Globe, PencilLine, ArrowLeft, ArrowRight, Search, Plus, Trash2, Check, toneSoft, cn, type Tone } from "@mossa/ui";
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@mossa/protocol";
 import { api, ApiError, uploadMedia } from "../../api.js";
+import { useCan } from "../../FeatureLock.js";
 import { AiAvatar } from "../../AiAvatar.js";
-import { useSession } from "../../session.js";
 import { AiImageField } from "../../AiImageField.js";
 import { splitWideImageToHalves } from "../../imageSplit.js";
 import { ModeRow, StepFade } from "../../composer.js";
@@ -99,8 +99,12 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
   onClose: () => void;
   onSaved: (id?: string) => void;
 }) {
-  const { ctx } = useSession();
-  const canAi = !!ctx?.entitlements?.features?.aiSuite;
+  // Read both capabilities through the registry mirror of `gateFeature`, not raw
+  // entitlement fields: `/api/exercises/search-external` is gated on
+  // `externalSearch`, so promoting the web-search hero when THAT is off too just
+  // moved the 403 to the most prominent control on the screen.
+  const canAi = useCan("aiSuite");
+  const canWeb = useCan("externalExerciseSearch");
   const startAtChoose = !exerciseId;
 
   const [step, setStep] = useState<"choose" | "review">(exerciseId ? "review" : "choose");
@@ -233,16 +237,18 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
             <div className="space-y-2.5">
               {canAi ? (
                 <HeroChoice icon={AiAvatar} tone="primary" badge="AI" title="Create with AI" subtitle="Name it — AI fills the muscles, equipment, how-to guide & start/end demo frames." busy={autoBusy} disabled={name.trim().length < 2} onClick={() => void startWithAi()} />
-              ) : (
+              ) : canWeb ? (
                 <HeroChoice icon={Globe} tone="cardio" title="Search exercise libraries" subtitle="Import a ready-made exercise — muscles, images & instructions — from wger, free-exercise-db & more." active={webMode} onClick={() => setWebMode((v) => !v)} />
+              ) : (
+                <HeroChoice icon={PencilLine} tone="neutral" title="Enter it manually" subtitle="Fill in the name, muscles, equipment and how-to yourself." disabled={name.trim().length < 2} onClick={() => setStep("review")} />
               )}
               <div className="space-y-2">
-                {canAi && <ModeRow icon={Globe} tone="cardio" label="Web search" hint="Import from wger, free-exercise-db & more" active={webMode} onClick={() => setWebMode((v) => !v)} />}
-                <ModeRow icon={PencilLine} tone="neutral" label="Enter it manually" hint="Fill in the details yourself" disabled={name.trim().length < 2} onClick={() => setStep("review")} />
+                {canAi && canWeb && <ModeRow icon={Globe} tone="cardio" label="Web search" hint="Import from wger, free-exercise-db & more" active={webMode} onClick={() => setWebMode((v) => !v)} />}
+                {(canAi || canWeb) && <ModeRow icon={PencilLine} tone="neutral" label="Enter it manually" hint="Fill in the details yourself" disabled={name.trim().length < 2} onClick={() => setStep("review")} />}
               </div>
             </div>
 
-            {webMode && (
+            {webMode && canWeb && (
               <div className="space-y-2 rounded-2xl border border-border/50 p-3">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground [&_svg]:size-3.5"><Search /> Results for “{name.trim() || "…"}” from wger, free-exercise-db…</div>
                 <div className="max-h-72 space-y-1 overflow-y-auto">

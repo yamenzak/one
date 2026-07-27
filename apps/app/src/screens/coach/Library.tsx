@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, cn, Reveal, SkeletonRow, SkeletonLine, MacroInline, Avatar, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, List, PencilLine, ArrowLeftRight, Ellipsis, Send, History } from "@mossa/ui";
 import { api } from "../../api.js";
+import { useCan } from "../../FeatureLock.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { AiErrorBox } from "../../AiError.js";
 import { FoodEditor } from "../client/FoodEditor.js";
@@ -463,6 +464,8 @@ function ArticleEditor({ id, clients, onClose, onSaved }: { id?: string; clients
   const [coverBusy, setCoverBusy] = useState(false);
   const [aiTopic, setAiTopic] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  // `/api/ai/article` + `/api/ai/cover-image` are gated on aiSuite.
+  const canAi = useCan("aiSuite");
   const [err, setErr] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
 
@@ -503,7 +506,7 @@ function ArticleEditor({ id, clients, onClose, onSaved }: { id?: string; clients
       }>
         {!loading && (
         <div className="space-y-4">
-          {!id && (
+          {!id && canAi && (
             <div className="space-y-2 rounded-2xl bg-primary/10 p-3">
               <div className="flex items-center gap-2 text-sm font-medium text-primary"><AiAvatar className="size-6" /> Draft with AI</div>
               <div className="flex gap-2">
@@ -521,7 +524,7 @@ function ArticleEditor({ id, clients, onClose, onSaved }: { id?: string; clients
           </div>
           <div className="space-y-2">
             {coverUrl && <img src={coverUrl} alt="Cover" className="h-32 w-full rounded-xl object-cover" />}
-            <Button size="sm" variant="secondary" className="w-full" disabled={coverBusy || (!title && !aiTopic)} onClick={() => void genCover()}><AiAvatar className="size-5" /> {coverBusy ? "Generating…" : coverUrl ? "Regenerate cover" : "Generate cover image"}</Button>
+            {canAi && <Button size="sm" variant="secondary" className="w-full" disabled={coverBusy || (!title && !aiTopic)} onClick={() => void genCover()}><AiAvatar className="size-5" /> {coverBusy ? "Generating…" : coverUrl ? "Regenerate cover" : "Generate cover image"}</Button>}
           </div>
           <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Body (markdown — supports tables)</label><Textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} /></div>
           <div className="space-y-1.5">

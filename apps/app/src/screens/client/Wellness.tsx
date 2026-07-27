@@ -28,6 +28,7 @@ const POSTURE_TONE = POSTURE_SEVERITY_TONE;
 const capp = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 import { api, todayLocal, shiftDay, uploadMedia, isQueued, errorText } from "../../api.js";
 import { QueuedNotice } from "../../notices.js";
+import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
 import { scanProfile, modelSilhouette } from "./bodyscan/model.js";
 import { PostureFigure } from "./bodyscan/PostureFigure.js";
@@ -101,6 +102,16 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
   const [params, setParams] = useSearchParams();
   const date = todayLocal();
   const waterPresets = units.volume === "oz" ? [8, 12, 16] : [250, 500, 750];
+  // What this client's plan + package actually includes. A capability the client
+  // doesn't hold is omitted from this tab entirely — they can't buy their
+  // studio's plan, so a locked card here would be pure noise.
+  const canFasting = useCan("fastingTimer");
+  const canWater = useCan("waterLogging");
+  const canSleep = useCan("sleepLogging");
+  const canMood = useCan("moodLogging");
+  const canBodyScan = useCan("bodyScan");
+  const canSupplementsLabs = useCan("supplementsLabs");
+  const canSessions = useCan("sessions");
 
   const load = useCallback(async () => {
     setLoadError(false);
@@ -110,16 +121,21 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
     // on its skeleton forever, with no error and no retry. (Supplements/labs 403'd
     // for the client persona for a while, so that was the everyday outcome.) Now a
     // failed read degrades its own section and the rest of the tab still renders.
+    //
+    // A read whose SECTION isn't offered is skipped rather than fired-and-403'd:
+    // the supplements/labs pair 403s for every tenant without the module, and
+    // those two rejections used to surface as "couldn't load" notes on sections
+    // the client was never sold. Positions are held with resolved stubs.
     const [s, sl, l, f, sess, ci, td, sc, bs] = await Promise.allSettled([
-      api.get<{ supplements: Supplement[] }>(`/api/supplements?clientId=${clientId}`),
-      api.get<{ taken: { supplement_id: string; slot: string }[] }>(`/api/supplements/logs?clientId=${clientId}&date=${date}`),
-      api.get<{ labs: LabFull[] }>(`/api/labs?clientId=${clientId}`),
-      api.get<Fast>(`/api/fasting?clientId=${clientId}`),
-      api.get<{ sessions: Session[] }>(`/api/sessions?clientId=${clientId}`).catch(() => ({ sessions: [] })),
+      canSupplementsLabs ? api.get<{ supplements: Supplement[] }>(`/api/supplements?clientId=${clientId}`) : Promise.resolve({ supplements: [] as Supplement[] }),
+      canSupplementsLabs ? api.get<{ taken: { supplement_id: string; slot: string }[] }>(`/api/supplements/logs?clientId=${clientId}&date=${date}`) : Promise.resolve({ taken: [] as { supplement_id: string; slot: string }[] }),
+      canSupplementsLabs ? api.get<{ labs: LabFull[] }>(`/api/labs?clientId=${clientId}`) : Promise.resolve({ labs: [] as LabFull[] }),
+      canFasting ? api.get<Fast>(`/api/fasting?clientId=${clientId}`) : Promise.resolve<Fast | null>(null),
+      canSessions ? api.get<{ sessions: Session[] }>(`/api/sessions?clientId=${clientId}`).catch(() => ({ sessions: [] })) : Promise.resolve({ sessions: [] as Session[] }),
       api.get<{ checkIns: CheckInFull[] }>(`/api/check-ins?clientId=${clientId}`),
       api.get<Today>(`/api/today?clientId=${clientId}&date=${date}`),
       api.get<WellnessScoreResult>(`/api/wellness/score?clientId=${clientId}&today=${date}`).catch(() => null),
-      api.get<{ scans: PostureScan[] }>(`/api/body-scans?clientId=${clientId}`).catch(() => ({ scans: [] })),
+      canBodyScan ? api.get<{ scans: PostureScan[] }>(`/api/body-scans?clientId=${clientId}`).catch(() => ({ scans: [] })) : Promise.resolve({ scans: [] as PostureScan[] }),
     ]);
     const bad = new Set<string>();
     if (s.status === "fulfilled") setSupps(s.value.supplements); else bad.add("supps");
@@ -135,7 +151,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
     // failure blocks the screen (with an error + retry, never a silent skeleton).
     if (td.status === "fulfilled") setToday(td.value); else setLoadError(true);
     setLoading(false);
-  }, [clientId, date]);
+  }, [clientId, date, canSupplementsLabs, canFasting, canSessions, canBodyScan]);
   useEffect(() => void load(), [load, reloadKey]);
   const retry = () => { setLoading(true); setReloadKey((k) => k + 1); };
 
@@ -278,15 +294,16 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
       {/* Wellness Score hero */}
       <Stagger data-tour="wellness-hero">{score ? <WellnessScoreCard result={score} /> : <WellnessScoreCardSkeleton />}</Stagger>
 
-      {/* Quick-log chips */}
+      {/* Quick-log chips — one per capability this client actually holds. */}
       <Stagger className="flex flex-wrap gap-2">
         <Chip icon={ClipboardList} selected onClick={() => setLogKind("checkin")}>Check in</Chip>
-        <Chip icon={METRICS.sleep.icon} onClick={() => setLogKind("sleep")}>Log sleep</Chip>
-        <Chip icon={METRICS.mood.icon} onClick={() => setLogKind("mood")}>Log mood</Chip>
-        <Chip icon={Timer} onClick={() => void toggleFast()}>{fast?.activeFast ? "End fast" : "Start fast"}</Chip>
+        {canSleep && <Chip icon={METRICS.sleep.icon} onClick={() => setLogKind("sleep")}>Log sleep</Chip>}
+        {canMood && <Chip icon={METRICS.mood.icon} onClick={() => setLogKind("mood")}>Log mood</Chip>}
+        {canFasting && <Chip icon={Timer} onClick={() => void toggleFast()}>{fast?.activeFast ? "End fast" : "Start fast"}</Chip>}
       </Stagger>
 
-      {/* Hydration — slim daily control */}
+      {/* Hydration — slim daily control (`waterLogging`) */}
+      {canWater && (
       <Stagger>
         <Card className="relative overflow-hidden">
           <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-hydration/10 blur-2xl" />
@@ -300,8 +317,10 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
           </div>
         </Card>
       </Stagger>
+      )}
 
-      {/* Fasting — start/stop with a metabolic-zone timeline */}
+      {/* Fasting — start/stop with a metabolic-zone timeline (`fastingTimer`) */}
+      {canFasting && (
       <Stagger>
         <Card className="relative space-y-4 overflow-hidden">
           {fast?.activeFast && <div className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full blur-3xl" style={{ backgroundColor: `color-mix(in oklch, ${toneVar[zone.tone]} 18%, transparent)` }} />}
@@ -340,9 +359,10 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
           )}
         </Card>
       </Stagger>
+      )}
 
-      {/* Posture screen from the latest body scan — side figure + alignment */}
-      {(() => {
+      {/* Posture screen from the latest body scan — side figure + alignment (`bodyScan`) */}
+      {canBodyScan && (() => {
         const withPosture = scans.filter((s) => s.posture); // newest-first
         const scan = withPosture[0];
         const latest = scan?.posture ?? null;
@@ -381,14 +401,15 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         <Stagger className="grid grid-cols-2 gap-3">
           <StatCard stack label="Check-in streak" value={week.streak} unit={week.streak === 1 ? "day" : "days"} icon={ClipboardList} tone="nutrition"
             chart={<WeekDots days={week.present} todayIndex={6} tone="nutrition" fill />} />
-          <StatCard stack label="Avg sleep" value={week.avgSleep != null ? week.avgSleep.toFixed(1) : "—"} unit={week.avgSleep != null ? "h" : undefined} icon={METRICS.sleep.icon} tone={METRICS.sleep.tone}
-            chart={week.sleepSeries.length >= 2 ? <Sparkline values={week.sleepSeries} tone={METRICS.sleep.tone} width={132} /> : undefined} />
-          <StatCard stack label="Avg mood" value={week.avgMood != null ? week.avgMood.toFixed(1) : "—"} unit={week.avgMood != null ? "/ 5" : undefined} icon={METRICS.mood.icon} tone={METRICS.mood.tone}
-            chart={week.moodSeries.length >= 2 ? <Sparkline values={week.moodSeries} tone={METRICS.mood.tone} width={132} /> : undefined} />
-          <StatCard stack label="Fasts done" value={week.fastsDone} icon={Timer} tone="activity"
-            chart={week.fastHoursSeries.length >= 2 ? <MiniBars values={week.fastHoursSeries} tone="activity" width={132} target={16} /> : undefined} />
-          <StatCard stack label="Supplements" value={week.suppSlots ? `${week.suppTaken}/${week.suppSlots}` : "—"} unit={week.suppSlots ? "today" : undefined} icon={Pill} tone="supplement" />
-          <StatCard stack label="Sessions" value={week.sessionsWeek} unit="this wk" icon={Calendar} tone="cardio" />
+          {/* Each stat follows its capability — no stat for a surface we hid. */}
+          {canSleep && <StatCard stack label="Avg sleep" value={week.avgSleep != null ? week.avgSleep.toFixed(1) : "—"} unit={week.avgSleep != null ? "h" : undefined} icon={METRICS.sleep.icon} tone={METRICS.sleep.tone}
+            chart={week.sleepSeries.length >= 2 ? <Sparkline values={week.sleepSeries} tone={METRICS.sleep.tone} width={132} /> : undefined} />}
+          {canMood && <StatCard stack label="Avg mood" value={week.avgMood != null ? week.avgMood.toFixed(1) : "—"} unit={week.avgMood != null ? "/ 5" : undefined} icon={METRICS.mood.icon} tone={METRICS.mood.tone}
+            chart={week.moodSeries.length >= 2 ? <Sparkline values={week.moodSeries} tone={METRICS.mood.tone} width={132} /> : undefined} />}
+          {canFasting && <StatCard stack label="Fasts done" value={week.fastsDone} icon={Timer} tone="activity"
+            chart={week.fastHoursSeries.length >= 2 ? <MiniBars values={week.fastHoursSeries} tone="activity" width={132} target={16} /> : undefined} />}
+          {canSupplementsLabs && <StatCard stack label="Supplements" value={week.suppSlots ? `${week.suppTaken}/${week.suppSlots}` : "—"} unit={week.suppSlots ? "today" : undefined} icon={Pill} tone="supplement" />}
+          {canSessions && <StatCard stack label="Sessions" value={week.sessionsWeek} unit="this wk" icon={Calendar} tone="cardio" />}
         </Stagger>
       </section>
 
@@ -425,9 +446,10 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         )}
       </section>
 
-      {/* Supplements — a clear tap-to-log checklist. An empty list and a failed
-          read look identical to the client, so name the difference. */}
-      {failed.has("supps") ? (
+      {/* Supplements — a clear tap-to-log checklist (`supplementsLabs`). An empty
+          list and a failed read look identical to the client, so name the
+          difference; a tenant without the module gets neither. */}
+      {!canSupplementsLabs ? null : failed.has("supps") ? (
         <section className="space-y-2">
           <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Supplements</h3>
           <SectionNote text="Couldn't load your supplements or today's doses." onRetry={retry} />
@@ -446,8 +468,8 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         </section>
       )}
 
-      {/* Labs */}
-      {failed.has("labs") ? (
+      {/* Labs (`supplementsLabs`) */}
+      {!canSupplementsLabs ? null : failed.has("labs") ? (
         <section className="space-y-2">
           <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lab tests</h3>
           <SectionNote text="Couldn't load your lab tests." onRetry={retry} />
@@ -461,8 +483,8 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         </section>
       )}
 
-      {/* Sessions */}
-      {sessions.length > 0 && (
+      {/* Sessions (`sessions` — the frontDesk entitlement) */}
+      {canSessions && sessions.length > 0 && (
         <section className="space-y-2">
           <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sessions</h3>
           <Stagger>

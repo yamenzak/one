@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNod
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
-  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, Palette, Bell, KeyRound, ImageIcon, RefreshCw, toneVar, type TabDef, type Tone,
+  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Sparkles, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, Palette, Bell, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, toneVar, type TabDef, type Tone,
 } from "@mossa/ui";
 import { useSession, useActiveClientId } from "./session.js";
 import { useTheme } from "./theme.js";
@@ -326,6 +326,11 @@ function TabLayout() {
         }
       />
 
+      {/* Unsubscribed-owner notice. Directly under the app bar, above every coach
+          screen — an owner cannot reach any part of their studio without passing
+          it, and it is structurally invisible to clients (see BillingNotice). */}
+      {!clientSurface && active.role === "owner" && <BillingNotice />}
+
       {/* Remount the routed content when the APP tour toggles, so screens refetch
           through the (mock ↔ live) api interceptor. The workout/meal tours annotate
           the real screen in place, so they must NOT remount it. */}
@@ -334,6 +339,113 @@ function TabLayout() {
 
       <BottomTabs tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} tinted={tintedNav} />
       <NavRail tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} tinted={tintedNav} brand={ctx!.branding?.iconUrl ? <img src={ctx!.branding.iconUrl} alt={active.tenantName} className="size-full object-cover" /> : active.tenantName.charAt(0).toUpperCase()} />
+    </div>
+  );
+}
+
+/**
+ * "This studio isn't paying for anything" — the missing half of the trial bug.
+ *
+ * An owner whose card confirmation failed used to land in a studio that looked
+ * fully paid for, with no signal anywhere that they had no subscription. This is
+ * that signal, and it is deliberately:
+ *
+ *  • **Owner-only and coach-surface-only.** Rendered from TabLayout behind
+ *    `active.role === "owner" && !clientSurface`, and `GET /api/billing` is
+ *    `billing:["read"]`, which `intersectGrant` makes structurally owner-only —
+ *    so a client can neither see this nor fetch what feeds it. An owner in Train
+ *    mode is on the client surface and doesn't see it either: that surface is
+ *    their client-facing view, and a billing bar has no business in it.
+ *  • **Not dismissible.** Dismissal is what the reported bug already did for
+ *    free: the studio ran for 30 days looking healthy and then Stripe cancelled
+ *    it. This is not a notice about an event, it is a description of the studio's
+ *    current state, and it disappears the moment that state is fixed — so there
+ *    is nothing to dismiss, only something to do.
+ *  • **Specific about the cost.** The locked-feature count, client ceiling and
+ *    credit grant come from the server's effective entitlements, so the copy
+ *    cannot drift from what's actually enforced.
+ */
+function BillingNotice() {
+  const nav = useNavigate();
+  const loc = useLocation();
+  const [state, setState] = useState<{
+    billingState: string;
+    pendingPlanName: string | null;
+    lockedFeatures: string[];
+    activeClientLimit: number;
+    monthlyCredits: number;
+  } | null>(null);
+  // Once billing is healthy we stop asking (`ok`), so a paying tenant pays for
+  // exactly one request per session. While it is NOT healthy we re-check on each
+  // navigation, so the bar clears itself the moment the owner finishes paying.
+  const [ok, setOk] = useState(false);
+  useEffect(() => {
+    if (ok) return;
+    let alive = true;
+    api
+      .get<{
+        subscription: { billingState?: string; pendingPlanName?: string | null };
+        baseline?: { lockedFeatures?: string[]; activeClientLimit?: number; monthlyCredits?: number };
+      }>("/api/billing")
+      .then((b) => {
+        if (!alive) return;
+        const bs = b.subscription?.billingState;
+        // Anything other than the two unpaid states is healthy enough that this
+        // bar is not the right surface — a past-due tenant DOES have a
+        // subscription and gets the dunning banner on Business instead.
+        if (bs !== "pending" && bs !== "none") { setOk(true); setState(null); return; }
+        setState({
+          billingState: bs,
+          pendingPlanName: b.subscription.pendingPlanName ?? null,
+          lockedFeatures: b.baseline?.lockedFeatures ?? [],
+          activeClientLimit: b.baseline?.activeClientLimit ?? 0,
+          monthlyCredits: b.baseline?.monthlyCredits ?? 0,
+        });
+      })
+      // A failed probe shows nothing rather than crying wolf about billing.
+      .catch(() => { if (alive) setState(null); });
+    return () => { alive = false; };
+  }, [ok, loc.pathname]);
+
+  if (!state) return null;
+  const pending = state.billingState === "pending";
+  const locked = state.lockedFeatures;
+  const lockedText =
+    locked.length === 0
+      ? null
+      : `${locked.slice(0, 3).join(", ")}${locked.length > 3 ? ` and ${locked.length - 3} more` : ""} ${locked.length === 1 ? "is" : "are"} off`;
+  const limits = [
+    state.activeClientLimit >= 0 ? `${state.activeClientLimit} active client${state.activeClientLimit === 1 ? "" : "s"} max` : null,
+    state.monthlyCredits > 0 ? `${state.monthlyCredits.toLocaleString()} AI credits a month` : "no AI credits",
+    lockedText,
+  ].filter(Boolean) as string[];
+
+  return (
+    <div role="status" className="px-4 pt-3">
+      <div className="relative overflow-hidden rounded-2xl border border-danger/30 bg-surface-1 p-3.5">
+        <div className="pointer-events-none absolute -right-10 -top-12 size-40 rounded-full blur-3xl" style={{ backgroundColor: `color-mix(in oklch, ${toneVar.danger} 16%, transparent)` }} />
+        <div className="relative flex flex-wrap items-start gap-3">
+          <div className="grid size-10 shrink-0 place-items-center rounded-2xl [&_svg]:size-[1.2rem]" style={{ backgroundColor: `color-mix(in oklch, ${toneVar.danger} 15%, transparent)`, color: toneVar.danger }}>
+            <AlertTriangle />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-semibold tracking-tight" style={{ color: toneVar.danger }}>
+              {pending
+                ? `Your ${state.pendingPlanName ?? "plan"} subscription was never activated`
+                : "This studio has no subscription"}
+            </h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {pending
+                ? "The card step didn't complete, so nothing is being billed and you're running on Mossa's free baseline"
+                : "You're running on Mossa's free baseline"}
+              {limits.length > 0 ? `: ${limits.join(" · ")}.` : "."}
+            </p>
+          </div>
+          <Button size="sm" className="shrink-0" style={{ backgroundColor: toneVar.danger }} onClick={() => nav("/business")}>
+            {pending ? "Finish setup" : "Choose a plan"} <ArrowRight />
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

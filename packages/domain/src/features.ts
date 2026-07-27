@@ -70,8 +70,26 @@ export const FEATURES = {
     clientFlag: "canLogOwnFood", permission: "tracking",
     metrics: ["calories", "protein", "carbs", "fat", "fiber"],
   },
+  mealPlanEditing: {
+    key: "mealPlanEditing", label: "Meal-option swaps",
+    clientFlag: "canEditMealPlan", permission: "tracking",
+  },
+  macroBreakdown: {
+    key: "macroBreakdown", label: "Macro breakdown",
+    clientFlag: "showMacroBreakdown", permission: "tracking",
+    metrics: ["protein", "carbs", "fat"],
+  },
+  nutritionReports: {
+    key: "nutritionReports", label: "Nutrition reports",
+    clientFlag: "showNutritionReports", permission: "tracking",
+    metrics: ["calories", "protein"],
+  },
   externalFoodSearch: {
     key: "externalFoodSearch", label: "External food search",
+    entitlement: "externalSearch", permission: "library",
+  },
+  externalExerciseSearch: {
+    key: "externalExerciseSearch", label: "External exercise search",
     entitlement: "externalSearch", permission: "library",
   },
   checkIns: {
@@ -88,14 +106,47 @@ export const FEATURES = {
     clientFlag: "canViewBodyMetricsReport", permission: "tracking",
     metrics: ["weight", "bodyFat", "waist", "chest", "hips", "leanMass", "fatMass"],
   },
+  exerciseReport: {
+    key: "exerciseReport", label: "Strength report",
+    clientFlag: "canViewExerciseReport", permission: "tracking",
+    metrics: ["sets", "weight"],
+  },
   bodyScan: {
     key: "bodyScan", label: "Body scan",
     entitlement: "bfCamera", clientFlag: "canUseBodyScan", permission: "tracking",
     notifTypes: ["body_fat_logged"], metrics: ["bodyFat"],
   },
+  // `wellnessLogging` is the AREA (nav/section level, on every plan); the five
+  // specs below are the individual capabilities a package sells inside it, each
+  // pinned to its own client flag so a route and the UI gate on the same record.
   wellnessLogging: {
     key: "wellnessLogging", label: "Wellness logging",
     permission: "tracking", metrics: ["sleep", "mood", "water", "fasting"],
+  },
+  sleepLogging: {
+    key: "sleepLogging", label: "Sleep logging",
+    clientFlag: "canLogSleep", permission: "tracking", metrics: ["sleep"],
+  },
+  moodLogging: {
+    key: "moodLogging", label: "Mood logging",
+    clientFlag: "canLogMood", permission: "tracking", metrics: ["mood"],
+  },
+  waterLogging: {
+    key: "waterLogging", label: "Hydration logging",
+    clientFlag: "canLogWater", permission: "tracking", metrics: ["water"],
+  },
+  measurementLogging: {
+    key: "measurementLogging", label: "Body measurements",
+    clientFlag: "canLogMeasurements", permission: "tracking",
+    metrics: ["weight", "waist", "chest", "hips"],
+  },
+  fastingTimer: {
+    key: "fastingTimer", label: "Fasting timer",
+    clientFlag: "canTrackFasting", permission: "tracking", metrics: ["fasting"],
+  },
+  extraWorkouts: {
+    key: "extraWorkouts", label: "Extra workouts & activities",
+    clientFlag: "canLogExtraWorkouts", permission: "tracking",
   },
   supplementsLabs: {
     key: "supplementsLabs", label: "Supplements & labs",
@@ -124,6 +175,13 @@ export const FEATURES = {
     key: "aiSuite", label: "AI suite",
     entitlement: "aiSuite", permission: "ai",
   },
+  /** The client-facing AI master switch — `canUseAi` is the kill switch every
+   *  other AI flag cascades from (clientFlags.ts), so it gets its own record
+   *  rather than being hand-paired at the one route that used it. */
+  clientAi: {
+    key: "clientAi", label: "Client AI access",
+    entitlement: "aiSuite", clientFlag: "canUseAi", permission: "ai",
+  },
   aiMealTools: {
     key: "aiMealTools", label: "AI food tools",
     entitlement: "aiSuite", clientFlag: "aiMealTools", permission: "ai",
@@ -139,6 +197,29 @@ export const FEATURES = {
 } satisfies Record<string, FeatureSpec>;
 
 export type FeatureKey = keyof typeof FEATURES;
+
+export const FEATURE_REGISTRY_KEYS = Object.keys(FEATURES) as FeatureKey[];
+
+/**
+ * Reverse index: which feature record(s) gate on a given platform entitlement.
+ * Lets a conformance test prove that every non-reserved entitlement is actually
+ * reachable through the registry (and therefore through `gateFeature`), and that
+ * every RESERVED one is reachable through nothing at all.
+ */
+export function featuresForEntitlement(ent: keyof Entitlements["features"]): FeatureKey[] {
+  return FEATURE_REGISTRY_KEYS.filter((k) => (FEATURES[k] as FeatureSpec).entitlement === ent);
+}
+
+/**
+ * Reverse index: the feature record that owns a client capability flag, or
+ * `undefined` when the flag has no record. A flag with no record cannot be
+ * gated by `gateFeature`/`featureEnabled`, so it is either presentation-only or
+ * dead — `clientFlags.ts` marks the latter `reserved` and the conformance test
+ * in `features.test.ts` holds the line.
+ */
+export function featureForClientFlag(flag: keyof ClientFlags): FeatureKey | undefined {
+  return FEATURE_REGISTRY_KEYS.find((k) => (FEATURES[k] as FeatureSpec).clientFlag === flag);
+}
 
 /** The enforcement pairing a route needs to gate a feature: the entitlement the
  *  tenant must hold and/or the client flag the client must hold. Derived from the

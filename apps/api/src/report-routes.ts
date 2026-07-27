@@ -19,6 +19,7 @@ import {
 } from "@mossa/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess, visibleClientIds } from "./clients.js";
+import { gateFeature } from "./client-flags.js";
 import { parseJson } from "./db.js";
 import { loadGoalTimeline, dayCalorieTarget } from "./goals.js";
 
@@ -38,6 +39,10 @@ export const reportRoutes = new Hono<AppEnv>()
   .get("/reports/client/:clientId", async (c) => {
     const access = await requireClientAccess(c, c.req.param("clientId"));
     if ("response" in access) return access.response;
+    // The compiled body/strength report — `canViewBodyMetricsReport`. No-op for
+    // staff (requireClientFlag exempts them); it only bounds a CLIENT reading
+    // their own report on a package that didn't include it.
+    { const g = await gateFeature(c, "bodyMetrics", access.client.id); if (g) return g; }
     const range = (c.req.query("range") as "7d" | "30d" | "90d") ?? "30d";
     // "today" comes from the caller's tz; validate the LocalDate shape (it feeds
     // presetRange → addDays, which throws on an unparseable date) and fall back.
