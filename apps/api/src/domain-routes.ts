@@ -20,6 +20,7 @@ import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostna
 import { hostnameOf, isPlatformHost, invalidateHostCache, resolveTenantDoor } from "./host-context.js";
 import { nowIso } from "./ids.js";
 import { parseJson } from "./db.js";
+import { caaFixFromErrors } from "@mossa/domain";
 
 const HOSTNAME = z
   .string()
@@ -30,7 +31,7 @@ const HOSTNAME = z
 
 interface DomainRow {
   hostname: string; tenant_id: string; cf_hostname_id: string | null; cf_route_id: string | null;
-  status: string; ssl_status: string | null; verify_name: string | null; verify_value: string | null; verify_json: string | null; cname_target: string | null;
+  status: string; ssl_status: string | null; verify_name: string | null; verify_value: string | null; verify_json: string | null; cf_errors: string | null; cname_target: string | null;
 }
 
 /** Shape returned to the owner UI. */
@@ -51,6 +52,14 @@ function present(row: DomainRow) {
       if (kept.length) return kept;
       return row.verify_name && row.verify_value ? [{ name: row.verify_name, value: row.verify_value }] : [];
     })(),
+    // Cloudflare's own words. It names the exact obstacle — a CAA allow-list that
+    // omits its CA, a hostname that does not CNAME here, a DCV mismatch — and we
+    // used to discard all of it, leaving the owner staring at a correct-looking
+    // list of records with no idea why nothing was happening.
+    errors: parseJson<string[]>(row.cf_errors, []).filter((e) => typeof e === "string" && e.trim()),
+    // When the obstacle is CAA, the record that clears it. Derived from what
+    // Cloudflare named rather than a hardcoded CA list (see caaFixFromErrors).
+    caa: caaFixFromErrors(row.hostname, parseJson<string[]>(row.cf_errors, [])),
   };
 }
 
@@ -58,8 +67,8 @@ function present(row: DomainRow) {
 async function syncStatus(env: { DB: D1Database; CACHE?: KVNamespace }, row: DomainRow, ch: CustomHostname): Promise<string> {
   const status = ch.status === "active" && ch.sslStatus === "active" ? "active" : ch.errors.length ? "error" : "pending";
   await env.DB
-    .prepare("UPDATE tenant_domains SET status = ?, ssl_status = ?, verify_name = ?, verify_value = ?, verify_json = ?, updated_at = ? WHERE hostname = ?")
-    .bind(status, ch.sslStatus, ch.verify.name ?? row.verify_name, ch.verify.value ?? row.verify_value, ch.verifyAll.length ? JSON.stringify(ch.verifyAll) : row.verify_json, nowIso(), row.hostname)
+    .prepare("UPDATE tenant_domains SET status = ?, ssl_status = ?, verify_name = ?, verify_value = ?, verify_json = ?, cf_errors = ?, updated_at = ? WHERE hostname = ?")
+    .bind(status, ch.sslStatus, ch.verify.name ?? row.verify_name, ch.verify.value ?? row.verify_value, ch.verifyAll.length ? JSON.stringify(ch.verifyAll) : row.verify_json, JSON.stringify(ch.errors), nowIso(), row.hostname)
     .run();
   // A status flip (esp. active→pending/error) must not linger in the host cache.
   await invalidateHostCache(env, row.hostname);
@@ -157,9 +166,9 @@ export const domainRoutes = new Hono<AppEnv>()
     }
 
     await c.env.DB.prepare(
-      "INSERT INTO tenant_domains (hostname, tenant_id, cf_hostname_id, cf_route_id, status, ssl_status, verify_name, verify_value, verify_json, cname_target, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO tenant_domains (hostname, tenant_id, cf_hostname_id, cf_route_id, status, ssl_status, verify_name, verify_value, verify_json, cf_errors, cname_target, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
-      .bind(hostname, who.tenantId, ch.id, routeId, status, ch.sslStatus, ch.verify.name ?? null, ch.verify.value ?? null, JSON.stringify(ch.verifyAll), cfg.cnameTarget, who.userId, nowIso(), nowIso())
+      .bind(hostname, who.tenantId, ch.id, routeId, status, ch.sslStatus, ch.verify.name ?? null, ch.verify.value ?? null, JSON.stringify(ch.verifyAll), JSON.stringify(ch.errors), cfg.cnameTarget, who.userId, nowIso(), nowIso())
       .run();
     const row = await c.env.DB.prepare("SELECT * FROM tenant_domains WHERE hostname = ?").bind(hostname).first<DomainRow>();
     return c.json({ domain: present(row!) }, 201);

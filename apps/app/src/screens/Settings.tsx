@@ -1146,6 +1146,10 @@ interface DomainInfo {
    *  TXTs at one name and issues the certificate only once BOTH exist. Showing
    *  one left owners waiting on a cert that could never come. */
   txts?: { name: string; value: string }[];
+  /** Cloudflare's own validation errors — it names the exact obstacle. */
+  errors?: string[];
+  /** When that obstacle is a CAA allow-list, the record that clears it. */
+  caa?: { name: string; authority: string; value: string } | null;
 }
 
 /** A single copyable DNS field (label + monospace value + copy affordance). */
@@ -1236,12 +1240,43 @@ function DomainSection() {
             </div>
             {d.status !== "active" && (
               <div className="space-y-3">
+                {/* What is ACTUALLY blocking it, in Cloudflare's words.
+                    These were fetched and discarded, so a domain refused over a
+                    CAA allow-list showed a correct-looking list of records and no
+                    hint that anything was wrong — the only way to the truth was a
+                    Cloudflare dashboard the owner has no access to. The CAA case
+                    also gets a ready-to-add record above; anything else at least
+                    gets named. "does not CNAME to this zone" is filtered while the
+                    CNAME is still propagating, because it is the normal state for
+                    the first few minutes and reads as a failure. */}
+                {(() => {
+                  const shown = (d.errors ?? []).filter((e) => !/does not CNAME to this zone/i.test(e));
+                  if (!shown.length) return null;
+                  return (
+                    <div className="flex gap-2.5 rounded-xl bg-warning/10 p-3" role="status">
+                      <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+                      <div className="min-w-0 space-y-1">
+                        <div className="text-sm font-medium text-warning">Cloudflare is refusing the certificate</div>
+                        {shown.map((e) => <p key={e} className="text-xs text-muted-foreground">{e}</p>)}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Step 1 — add the records. */}
                 <div className="flex gap-2.5">
                   <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary">1</span>
                   <div className="min-w-0 space-y-2">
                     <p className="text-sm">In your domain&rsquo;s DNS settings (GoDaddy, Namecheap, Cloudflare…), add {(d.txts?.length ?? (d.txt ? 1 : 0)) > 0 ? "these records" : "this record"}:</p>
                     {d.cname.target && <DnsRecord type="CNAME" name={d.cname.name} value={d.cname.target} hint="Routes your domain to the app" />}
+                    {d.caa && (
+                      <DnsRecord
+                        type="CAA"
+                        name={d.caa.name}
+                        value={d.caa.value}
+                        hint={`Your domain has CAA records that only let certain certificate authorities issue for it, and ${d.caa.authority} isn't on the list — so the certificate is being refused. Add this at your domain's ROOT (${d.caa.name}); it can't go on ${d.hostname}, because DNS won't allow a CAA record alongside a CNAME. This adds ${d.caa.authority} to the list rather than replacing anything.`}
+                      />
+                    )}
                     {(d.txts?.length ? d.txts : d.txt ? [d.txt] : []).map((t, i, arr) => (
                       <DnsRecord
                         key={`${t.name}:${t.value}`}

@@ -611,6 +611,45 @@ and bills per hostname beyond it. Check the current figure on Cloudflare's prici
 page before you promise custom domains on a plan tier — this doc deliberately does
 not quote a number that will go stale.
 
+### What a tenant hits, and what the screen now tells them
+
+Three obstacles account for nearly every domain stuck at "Pending". The app
+surfaces Cloudflare's own error text plus a ready-to-add record for the CAA case,
+so an owner should not need this section — it is here for when they ask you.
+
+**1. The host field got the full hostname.** Most registrars append the zone, so
+`coaching.byshujaa.com` in Namecheap's Host field creates
+`coaching.byshujaa.com.byshujaa.com`. The record exists, just not where anyone is
+looking. Enter the relative name: `coaching`, `_acme-challenge.coaching`.
+
+**2. Only one `_acme-challenge` TXT was added.** Cloudflare can require TWO — same
+name, different values — when it is issuing more than one certificate, and NONE of
+them validate until ALL are present. DNS allows multiple TXT records at one name;
+they go in as separate rows, not one replacing the other. (The app used to show
+only the first — fixed; it now labels them "record 1 of 2".)
+
+**3. A CAA allow-list blocks Cloudflare's CA.** If the tenant's domain has CAA
+records naming specific authorities, and Cloudflare's is not among them, issuance
+is refused outright:
+
+> CAA records block issuance. Please remove all CAA records or add records for
+> this authority (ssl.com)
+
+The fix is a CAA record at the tenant's **domain root**, adding that authority to
+the list:
+
+| Type | Host | Flags | Tag | Value |
+|------|------|-------|-----|-------|
+| CAA | `@` | `0` | `issue` | `ssl.com` (whatever Cloudflare named) |
+
+It **cannot** go on the custom hostname itself: that name is a CNAME, and DNS
+forbids other records alongside a CNAME. It has to be the apex.
+
+Do not hardcode the authority — Cloudflare has used Let's Encrypt, Google Trust
+Services and SSL.com for different certificate packs at different times. The app
+reads it out of Cloudflare's message and renders the exact record, which is why
+this stays correct when Cloudflare changes CA.
+
 **Per-tenant flow (self-serve):** owner → Settings → **Custom domain** → enter
 hostname → the app registers a CF custom hostname and shows the **CNAME** +
 **DCV TXT** records → owner adds them at their DNS → "Check now" polls until the
