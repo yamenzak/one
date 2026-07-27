@@ -32,12 +32,12 @@ function BootSplash() {
       <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(58% 46% at 50% 42%, color-mix(in oklch, var(--primary) 16%, transparent), transparent 72%)" }} />
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className="relative flex flex-col items-center gap-7">
         <div className="relative grid size-24 place-items-center">
-          <motion.span aria-hidden className="absolute inset-0 rounded-[2rem]" style={{ boxShadow: "inset 0 0 0 1px color-mix(in oklch, var(--primary) 22%, transparent)" }} animate={{ rotate: 360 }} transition={{ duration: 9, repeat: Infinity, ease: "linear" }} />
+          <motion.span aria-hidden className="absolute inset-0 rounded-3xl ring-1 ring-primary/20" animate={{ rotate: 360 }} transition={{ duration: 9, repeat: Infinity, ease: "linear" }} />
           <motion.div
             initial={{ scale: 0.82, opacity: 0, y: 4 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className="grid size-20 place-items-center overflow-hidden rounded-[1.6rem] bg-primary text-primary-foreground shadow-[0_16px_50px_-12px_color-mix(in_oklch,var(--primary)_65%,transparent)]"
+            className="grid size-20 place-items-center overflow-hidden rounded-2xl bg-primary text-primary-foreground shadow-glow"
           >
             {logo ? <img src={logo} alt="" className="size-full object-cover" /> : <span className="text-3xl font-black tracking-tight">{(name?.[0] ?? "M").toUpperCase()}</span>}
           </motion.div>

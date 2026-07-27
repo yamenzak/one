@@ -317,6 +317,7 @@ export function CalendarHeatmap({ days, today, tone = "activity", weeks = 16, ma
       {legend && (
         <div className="mt-1 flex items-center justify-end gap-1 text-xs text-muted-foreground">
           Less
+          {/* design-tokens-exempt: a 10px heatmap legend swatch. Every --radius step is wider than the swatch itself, so a token would render it a circle and destroy the scale it is illustrating. */}
           {[0, 1, 2, 3, 4].map((lv) => <span key={lv} className="inline-block size-2.5 rounded-[3px]" style={{ background: fill(lv) }} />)}
           More
         </div>

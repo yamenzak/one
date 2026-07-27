@@ -64,6 +64,11 @@ export const settingsRoutes = new Hono<AppEnv>()
             primary: z.string().max(120).nullish(),
             primaryForeground: z.string().max(120).nullish(),
             radius: z.number().min(0.2).max(2).nullish(),
+            // Elevation preset (scales every --shadow-* token) and the hairline
+            // colour. An enum, not free-form CSS: a mistyped box-shadow reaching
+            // `applyBranding` would inject broken CSS into every page.
+            shadow: z.enum(["none", "subtle", "soft", "dramatic"]).nullish(),
+            borderColor: z.string().max(120).nullish(),
             defaultMode: z.enum(["dark", "light"]).nullish(),
             logoUrl: z.string().max(500).nullish(),
             iconUrl: z.string().max(500).nullish(),

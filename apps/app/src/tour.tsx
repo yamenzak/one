@@ -216,8 +216,9 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
             aria-hidden
             className="pointer-events-none absolute rounded-2xl"
             initial={{ opacity: 0 }}
-            animate={step.action && !done ? { opacity: 1, boxShadow: [`0 0 0 2px ${accent}, 0 0 0 4px color-mix(in oklch, ${accent} 35%, transparent)`, `0 0 0 2px ${accent}, 0 0 0 12px color-mix(in oklch, ${accent} 0%, transparent)`] } : { opacity: 1 }}
-            transition={step.action && !done ? { boxShadow: { duration: 1.4, repeat: Infinity, ease: "easeOut" }, opacity: { duration: 0.2 } } : { duration: 0.2 }}
+            animate={/* design-tokens-exempt: an ANIMATED spotlight ring measured from the target element at runtime — no utility class can express it, and it is already brand-derived (`accent` is the primary token). */ step.action && !done ? { opacity: 1, boxShadow: [`0 0 0 2px ${accent}, 0 0 0 4px color-mix(in oklch, ${accent} 35%, transparent)`, `0 0 0 2px ${accent}, 0 0 0 12px color-mix(in oklch, ${accent} 0%, transparent)`] } : { opacity: 1 }}
+            transition={/* design-tokens-exempt: the timing for the animated ring above. */ step.action && !done ? { boxShadow: { duration: 1.4, repeat: Infinity, ease: "easeOut" }, opacity: { duration: 0.2 } } : { duration: 0.2 }}
+            /* design-tokens-exempt: the ring's resting state, same runtime geometry as the animation above. */
             style={{ top: rect.top - PAD, left: rect.left - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2, boxShadow: `0 0 0 2px ${accent}, 0 0 0 6px color-mix(in oklch, ${accent} 30%, transparent)` }}
           />
         </>
@@ -236,7 +237,7 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
             tabIndex={-1}
             initial={{ opacity: 0, y: below ? -8 : 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="pointer-events-auto mx-auto max-w-md rounded-3xl border border-border/50 bg-card p-5 shadow-[0_24px_60px_-20px_oklch(0_0_0/0.6)] outline-none"
+            className="pointer-events-auto mx-auto max-w-md rounded-3xl border border-border/50 bg-card p-5 shadow-lg outline-none"
           >
             <div className="flex items-start gap-3">
               <div className="grid size-9 shrink-0 place-items-center rounded-xl [&_svg]:size-[1.1rem]" style={{ backgroundColor: `color-mix(in oklch, ${accent} 16%, transparent)`, color: accent }}>{done ? <CircleCheck /> : step.action ? <Hand /> : <Sparkles />}</div>

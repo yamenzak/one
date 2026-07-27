@@ -54,7 +54,9 @@ export function BarcodeScanner({ onDetected, onClose }: { onDetected: (code: str
         {status !== "denied" && (
           <div className="relative overflow-hidden rounded-2xl bg-black">
             <video ref={videoRef} playsInline muted className="aspect-square w-full object-cover" />
+            {/* design-tokens-exempt: a scan-line glow drawn over live camera video — the halo geometry is fixed so the line stays visible against any frame. It already tracks the brand via var(--color-primary). */}
             <div className="pointer-events-none absolute inset-x-8 top-1/2 h-0.5 -translate-y-1/2 bg-primary/80 shadow-[0_0_12px_2px_var(--color-primary)]" />
+            {/* design-tokens-exempt: viewfinder frame over arbitrary camera video — it must read against whatever is on camera, not against a theme surface, so white is the intent. */}
             <div className="pointer-events-none absolute inset-6 rounded-xl border-2 border-white/30" />
           </div>
         )}

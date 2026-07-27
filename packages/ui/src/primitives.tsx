@@ -285,7 +285,7 @@ export function IconBadge({ icon: Icon, tone = "primary", className, size = "md"
     <span
       className={cn(
         "grid shrink-0 place-items-center rounded-2xl",
-        size === "sm" ? "size-9 [&_svg]:size-4" : size === "lg" ? "size-14 [&_svg]:size-6 rounded-[1.1rem]" : "size-11 [&_svg]:size-[1.15rem]",
+        size === "sm" ? "size-9 [&_svg]:size-4" : size === "lg" ? "size-14 [&_svg]:size-6 rounded-xl" : "size-11 [&_svg]:size-[1.15rem]",
         toneSoft[tone],
         className,
       )}

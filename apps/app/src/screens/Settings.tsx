@@ -7,9 +7,9 @@ import { Fragment, useCallback, useEffect, useState, type ReactNode } from "reac
 import { motion } from "motion/react";
 import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger, ConfirmDialog,
-  BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
+  BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, Input, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
   KeyRound, Moon, Sun, LogOut, Palette, Sparkles, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
-  personaLabel, personaTone, type Branding, type BrandTokens, type NeutralTint, type LucideIcon,
+  ActionResult, TabIntro, cn, toneText, personaLabel, personaTone, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon,
 } from "@mossa/ui";
 import type { LoginBranding, TenantBranding } from "@mossa/protocol";
 import { resolveUnits, cmToFeetInches, feetInchesToCm, STUDIO_SETTINGS_SECTIONS, settingsSectionVisible } from "@mossa/domain";
@@ -28,11 +28,22 @@ type Scope = "tenant";
 function ScopeTag() {
   return <Badge tone="primary"><Building2 /> Studio</Badge>;
 }
-/** Section header with an optional studio-scope badge. */
-function SectionHead({ title, scope }: { title: string; scope?: Scope }) {
+/**
+ * Section header with an optional studio-scope badge.
+ *
+ * Carries an icon like the platform console's `SectionHeader` does — a settings
+ * page is a long vertical list of near-identical cards, and the icon is what lets
+ * an owner find the one they came for by scanning rather than reading. The scope
+ * badge stays, because "is this MY setting or the STUDIO's?" is a question the
+ * admin console never has to answer.
+ */
+function SectionHead({ title, icon: Icon, tone = "primary", scope }: { title: string; icon?: LucideIcon; tone?: Tone; scope?: Scope }) {
   return (
     <div className="mb-2 flex items-center justify-between gap-2 px-1">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
+      <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {Icon && <Icon className={cn("size-3.5", toneText[tone])} aria-hidden />}
+        {title}
+      </h3>
       {scope && <ScopeTag />}
     </div>
   );
@@ -45,12 +56,18 @@ function SectionHead({ title, scope }: { title: string; scope?: Scope }) {
  * one shared "it broke, here's the way out" card, so one dead endpoint costs the
  * owner one section instead of the whole screen.
  */
-function LoadError({ label, onRetry }: { label: string; onRetry: () => void }) {
+function LoadError({ label, error, onRetry }: { label: string; error?: string | null; onRetry: () => void }) {
   return (
     <Card className="flex items-center justify-between gap-3">
       <div className="flex min-w-0 items-start gap-2.5">
-        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
-        <p className="text-sm text-muted-foreground">Couldn't load {label}. Check your connection and try again.</p>
+        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+        <div className="min-w-0">
+          <p className="text-sm">Couldn't load {label}.</p>
+          {/* The server's reason, when there is one. "Check your connection" is a
+              guess, and it is the wrong guess for a 403 or a 500 — an owner who
+              cannot see the real reason cannot tell you what broke. */}
+          <p className="text-xs leading-snug text-muted-foreground">{error || "Check your connection and try again."}</p>
+        </div>
       </div>
       <Button size="sm" variant="secondary" className="shrink-0" onClick={onRetry}>Try again</Button>
     </Card>
@@ -147,6 +164,18 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
   const groups = STUDIO_SETTINGS_SECTIONS
     .filter((s) => (!features || settingsSectionVisible(s, features)) && render[s.key])
     .map((s) => ({ value: s.key, label: s.label, render: render[s.key]! }));
+
+  // What each sub-tab is for, in one line. The platform console leads every tab
+  // with this and the studio settings did not — an owner landing on "Messaging"
+  // had to open three cards to find out what it governed.
+  const INTRO: Record<string, string> = {
+    brand: "Your colours, corners, elevation and marks. Every screen your clients see follows this — the whole app is themed from these tokens, not from per-screen styling.",
+    signin: "The front door: your login link, the copy on it, and whether passkeys are offered.",
+    ai: "Which model answers each AI action, what it costs your balance, and the house voice it writes in.",
+    messaging: "How email leaves your studio — who sends it, which categories are allowed, and what the templates say.",
+    marketplace: "Your public storefront: whether it's open, and whether clients can sign themselves up.",
+    integrations: "Outside data sources you connect, and the keys they use.",
+  };
   const [sub, setSub] = useState<string>(groups[0]?.value ?? "signin");
   const active = groups.find((g) => g.value === sub) ?? groups[0];
 
@@ -157,6 +186,7 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
         <SegmentedControl options={groups.map((g) => ({ value: g.value, label: g.label }))} value={active?.value ?? ""} onChange={setSub} />
       </div>
       <motion.div key={active?.value} variants={stagger} initial="hidden" animate="show" className="space-y-6">
+        {active && INTRO[active.value] && <TabIntro>{INTRO[active.value]}</TabIntro>}
         {active?.render()}
       </motion.div>
       <CloseStudioSection />
@@ -194,7 +224,7 @@ function CloseStudioSection() {
 
   return (
     <Stagger>
-      <SectionHead title="Danger zone" scope="tenant" />
+      <SectionHead title="Danger zone" icon={AlertTriangle} tone="danger" scope="tenant" />
       {status?.closing ? (
         <Card className="space-y-2.5">
           <div className="flex items-center gap-2 font-medium text-danger"><AlertTriangle className="size-4" /> Studio scheduled for deletion</div>
@@ -213,14 +243,14 @@ function CloseStudioSection() {
         {stage === "intro" ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">This cancels billing immediately and schedules your studio for permanent deletion in 7 days. We'll email you a confirmation code first.</p>
-            {err && <p className="text-sm text-danger">{err}</p>}
+            <ActionResult msg={null} err={err} />
             <Button className="w-full" disabled={busy} onClick={() => void sendCode()}>{busy ? <><Spinner /> Sending…</> : "Email me a confirmation code"}</Button>
           </div>
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">Enter the 6-digit code we emailed you to schedule the closure.</p>
             <Field label="Confirmation code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} placeholder="000000" autoFocus />
-            {err && <p className="text-sm text-danger">{err}</p>}
+            <ActionResult msg={null} err={err} />
             <Button className="w-full border-danger/40 text-danger" variant="outline" disabled={busy || code.length < 6} onClick={() => void confirmClose()}>{busy ? <><Spinner /> …</> : <><Trash2 /> Schedule studio deletion</>}</Button>
           </div>
         )}
@@ -258,7 +288,7 @@ function LoginLinkCard({ slug }: { slug: string | null }) {
   const copy = () => void navigator.clipboard?.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); });
   return (
     <section>
-      <SectionHead title="Login link" scope="tenant" />
+      <SectionHead title="Login link" icon={LogIn} scope="tenant" />
       <Card className="space-y-3">
         <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><LogIn /></div><div><div className="font-medium">Your sign-in link</div><div className="text-sm text-muted-foreground">Share this with clients — it opens a sign-in screen wearing your brand.</div></div></div>
         <div className="flex items-center gap-2 rounded-xl bg-surface-2 p-2 pl-3.5">
@@ -311,7 +341,7 @@ function LoginCustomizeSection({ initial, logoUrl, onSaved }: { initial: LoginBr
 
   return (
     <section>
-      <SectionHead title="Sign-in screen" scope="tenant" />
+      <SectionHead title="Sign-in screen" icon={Palette} scope="tenant" />
       <Card className="space-y-5">
         <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Palette /></div><div><div className="font-medium">Make it yours</div><div className="text-sm text-muted-foreground">Your words and your image on the screen clients land on.</div></div></div>
 
@@ -341,7 +371,7 @@ function LoginCustomizeSection({ initial, logoUrl, onSaved }: { initial: LoginBr
 
         <ToggleRow icon={KeyRound} title="Passkey shortcut" desc="Show the one-tap “Sign in with a passkey” option." checked={showPasskey} onChange={setShowPasskey} />
 
-        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+        <ActionResult msg={msg} err={null} />
         <Button className="w-full" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save sign-in screen"}</Button>
       </Card>
     </section>
@@ -404,7 +434,7 @@ function SecuritySection() {
   const fmtAdded = (iso: string) => { const d = new Date(iso); return isNaN(+d) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); };
   return (
     <section>
-      <SectionHead title="Security" />
+      <SectionHead title="Security" icon={KeyRound} />
       <Card className="space-y-3">
         <div className="flex items-center justify-between">
           <div><div className="font-medium">Passkeys</div><div className="text-sm text-muted-foreground">One-tap sign-in with Face ID / fingerprint.</div></div>
@@ -421,7 +451,7 @@ function SecuritySection() {
           </div>
         ))}
         {passkeySupported() ? <Button variant="tonal" className="w-full" disabled={enrolling} onClick={() => void addPasskey()}><KeyRound /> {enrolling ? "Waiting for your device…" : passkeys.length ? "Add another passkey" : "Add a passkey"}</Button> : <p className="text-sm text-muted-foreground">This device doesn't support passkeys — you'll keep using email codes.</p>}
-        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+        <ActionResult msg={msg} err={null} />
       </Card>
 
       <ConfirmDialog
@@ -442,7 +472,7 @@ function AppearanceSection() {
   const { mode, toggleMode, tintedNav, setTintedNav, ambient, setAmbient } = useTheme();
   return (
     <section>
-      <SectionHead title="Appearance" />
+      <SectionHead title="Appearance" icon={Moon} />
       <Card className="divide-y divide-border/50 p-0">
         <ToggleRow icon={mode === "dark" ? Moon : Sun} title="Dark mode" desc="Switch the whole app between light and dark." checked={mode === "dark"} onChange={() => toggleMode()} />
         <ToggleRow icon={Palette} title="Colorful tab bar" desc="Tint the active tab by section — Train green, Eat amber, and so on." checked={tintedNav} onChange={setTintedNav} />
@@ -480,8 +510,8 @@ function NotificationsSection() {
   };
   return (
     <section>
-      <SectionHead title="Notifications" />
-      {error && !data ? <LoadError label="your notification settings" onRetry={() => void load()} /> : (
+      <SectionHead title="Notifications" icon={Bell} />
+      {error && !data ? <LoadError label="your notification settings" error={typeof error === "string" ? error : null} onRetry={() => void load()} /> : (
       <Card className="divide-y divide-border/50 p-0">
         <div className="flex items-center justify-end gap-6 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <span className="inline-flex items-center gap-1"><Bell className="size-3.5" /> App</span>
@@ -536,7 +566,7 @@ function EmailTemplatesSection() {
 
   return (
     <section className="space-y-3">
-      <SectionHead title="Email templates" scope="tenant" />
+      <SectionHead title="Email templates" icon={Mail} scope="tenant" />
       <Card className="space-y-2">
         <div className="text-sm font-medium">Signature</div>
         <p className="text-xs text-muted-foreground">Appended to the footer of every email your studio sends.</p>
@@ -546,7 +576,7 @@ function EmailTemplatesSection() {
       </Card>
 
       {error && !templates ? (
-        <LoadError label="your email templates" onRetry={() => void load()} />
+        <LoadError label="your email templates" error={typeof error === "string" ? error : null} onRetry={() => void load()} />
       ) : !templates ? (
         <SkeletonLine w="10rem" h="text" />
       ) : (
@@ -619,8 +649,8 @@ function NotificationPolicySection() {
   const isStaff = (roles: string[]) => roles.some((r) => r !== "client");
   return (
     <section>
-      <SectionHead title="Email notifications policy" scope="tenant" />
-      {error && !data ? <LoadError label="your email policy" onRetry={() => void load()} /> : (
+      <SectionHead title="Email notifications policy" icon={Bell} scope="tenant" />
+      {error && !data ? <LoadError label="your email policy" error={typeof error === "string" ? error : null} onRetry={() => void load()} /> : (
       <Card className="p-0">
         <p className="px-4 pt-4 text-sm text-muted-foreground">Choose which notifications may be emailed — separately for your clients and your staff. Turning one off keeps it in the in-app inbox but never emails it; people still tune their own preferences within what you allow here.</p>
         <div className="mt-2 flex items-center justify-end gap-6 px-4 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -666,8 +696,8 @@ function EmailSection() {
   // a broken load from a section they'd never been given.
   if (error && !cfg) return (
     <section>
-      <SectionHead title="Email delivery" scope="tenant" />
-      <LoadError label="your email delivery settings" onRetry={() => void load()} />
+      <SectionHead title="Email delivery" icon={Mail} scope="tenant" />
+      <LoadError label="your email delivery settings" error={typeof error === "string" ? error : null} onRetry={() => void load()} />
     </section>
   );
   if (!cfg) return null;
@@ -680,7 +710,7 @@ function EmailSection() {
   };
   return (
     <section>
-      <SectionHead title="Email delivery" scope="tenant" />
+      <SectionHead title="Email delivery" icon={Mail} scope="tenant" />
       <Card className="space-y-3">
         <SegmentedControl
           options={[{ value: "platform", label: "Mossa" }, { value: "brevo", label: "Brevo" }, { value: "off", label: "Off" }]}
@@ -747,7 +777,7 @@ function DeleteAccountSection() {
 
   return (
     <Stagger>
-      <SectionHead title="Danger zone" />
+      <SectionHead title="Danger zone" icon={AlertTriangle} tone="danger" />
       <Card className="space-y-2.5">
         <div className="flex items-center gap-2 font-medium text-danger"><AlertTriangle className="size-4" /> Delete my account</div>
         <p className="text-sm text-muted-foreground">Permanently erase your account and everything in it — photos, logs, measurements, messages. This can't be undone.</p>
@@ -762,14 +792,14 @@ function DeleteAccountSection() {
         {stage === "intro" ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">We'll email a confirmation code to <span className="font-medium text-foreground">{ctx?.user.email}</span>. Entering it permanently erases your account and all your data. There's no undo.</p>
-            {err && <p className="text-sm text-danger">{err}</p>}
+            <ActionResult msg={null} err={err} />
             <Button className="w-full" disabled={busy} onClick={() => void sendCode()}>{busy ? <><Spinner /> Sending…</> : "Email me a confirmation code"}</Button>
           </div>
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">Enter the 6-digit code we emailed you, then confirm. This erases everything.</p>
             <Field label="Confirmation code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} placeholder="000000" autoFocus />
-            {err && <p className="text-sm text-danger">{err}</p>}
+            <ActionResult msg={null} err={err} />
             <Button className="w-full border-danger/40 text-danger" variant="outline" disabled={busy || code.length < 6} onClick={() => void confirmDelete()}>{busy ? <><Spinner /> Deleting…</> : <><Trash2 /> Permanently delete my account</>}</Button>
             <button className="w-full text-center text-xs text-muted-foreground hover:underline" onClick={() => void sendCode()} disabled={busy}>Resend code</button>
           </div>
@@ -825,7 +855,7 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
   return (
     <section>
       <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Profile</h3>
-      {error && !p ? <LoadError label="your profile" onRetry={() => setReloadKey((k) => k + 1)} /> : (
+      {error && !p ? <LoadError label="your profile" error={typeof error === "string" ? error : null} onRetry={() => setReloadKey((k) => k + 1)} /> : (
       <Reveal loading={!p} skeleton={
         <Card className="space-y-4">
           <div className="flex items-center gap-3"><SkeletonCircle size={64} /><Skeleton className="h-9 w-32 rounded-full" /></div>
@@ -869,7 +899,7 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
         </div>
         <Field label="Contact number" type="tel" inputMode="tel" value={p.phone ?? ""} onChange={(e) => set({ phone: e.target.value || null })} placeholder="+1 555 000 0000" />
         <Button size="lg" className="w-full" disabled={saving || p.displayName.trim().length < 1} onClick={() => void save()}>{saving ? "Saving…" : "Save profile"}</Button>
-        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+        <ActionResult msg={msg} err={null} />
       </Card>
         )}
       </Reveal>
@@ -962,8 +992,8 @@ function MarketplaceSection() {
 
   return (
     <section>
-      <SectionHead title="Marketplace" scope="tenant" />
-      {error && !loaded ? <LoadError label="your storefront settings" onRetry={() => void load()} /> : (
+      <SectionHead title="Marketplace" icon={Store} scope="tenant" />
+      {error && !loaded ? <LoadError label="your storefront settings" error={typeof error === "string" ? error : null} onRetry={() => void load()} /> : (
       <Reveal loading={!loaded} className="space-y-3" skeleton={
         <Card className="space-y-3">
           <div className="flex items-center gap-2.5"><Skeleton className="size-9 rounded-xl" /><div className="flex-1 space-y-1.5"><SkeletonLine w="45%" h="text" /><SkeletonLine w="70%" h="xs" /></div></div>
@@ -1077,8 +1107,8 @@ function DomainSection() {
 
   return (
     <section>
-      <SectionHead title="Custom domain" scope="tenant" />
-      {loadFailed && !domains ? <LoadError label="your custom domains" onRetry={() => void load()} /> : (
+      <SectionHead title="Custom domain" icon={Globe} scope="tenant" />
+      {loadFailed && !domains ? <LoadError label="your custom domains" error={typeof loadFailed === "string" ? loadFailed : null} onRetry={() => void load()} /> : (
       <Reveal loading={!domains} skeleton={
         <Card className="space-y-4">
           <div className="flex items-center gap-2.5"><Skeleton className="size-9 rounded-xl" /><div className="flex-1 space-y-1.5"><SkeletonLine w="45%" h="text" /><SkeletonLine w="70%" h="xs" /></div></div>
@@ -1136,7 +1166,7 @@ function DomainSection() {
           />
           <Button size="sm" disabled={busy || !hostname.includes(".")} onClick={() => void add()}><Plus /> Add</Button>
         </div>
-        {err && <p className="text-sm text-danger">{err}</p>}
+        <ActionResult msg={null} err={err} />
         <p className="text-xs text-muted-foreground">Use a subdomain you own, like <span className="font-mono">app.yourgym.com</span> — we'll show the exact DNS records to add. You'll sign in with a passkey again on the new domain (each keeps its own secure sign-in).</p>
       </Card>
         )}
@@ -1200,8 +1230,8 @@ function IntegrationsSection() {
 
   return (
     <section>
-      <SectionHead title="Integrations" scope="tenant" />
-      {error && !providers ? <LoadError label="your data providers" onRetry={() => void load()} /> : (
+      <SectionHead title="Integrations" icon={Plug} scope="tenant" />
+      {error && !providers ? <LoadError label="your data providers" error={typeof error === "string" ? error : null} onRetry={() => void load()} /> : (
       <Reveal loading={!providers} skeleton={
         <Card className="space-y-4">
           <div className="flex items-center gap-2.5"><Skeleton className="size-9 rounded-xl" /><div className="flex-1 space-y-1.5"><SkeletonLine w="40%" h="text" /><SkeletonLine w="70%" h="xs" /></div></div>
@@ -1258,7 +1288,7 @@ function IntegrationsSection() {
             })}
           </div>
         ))}
-        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+        <ActionResult msg={msg} err={null} />
       </Card>
         )}
       </Reveal>
@@ -1274,6 +1304,11 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
   const [seed, setSeed] = useState<string>(seedFrom(initial));
   const [neutral, setNeutral] = useState<NeutralTint>("brand");
   const [radius, setRadius] = useState(initial?.radius ?? 0.95);
+  const [shadow, setShadow] = useState<ShadowPreset>(initial?.shadow ?? "soft");
+  // Hairline colour. Empty = the shipped per-mode default, which is the right
+  // answer for most studios (dark needs a light translucent edge, light a dark
+  // one); a single custom colour applies to BOTH modes, so it is opt-in.
+  const [borderColor, setBorderColor] = useState<string>(initial?.borderColor ?? "");
   const [logoUrl, setLogoUrl] = useState<string | null>(initial?.logoUrl ?? null);
   const [iconUrl, setIconUrl] = useState<string | null>(initial?.iconUrl ?? null);
   const [aiAvatarUrl, setAiAvatarUrl] = useState<string | null>(initial?.aiAvatarUrl ?? null);
@@ -1284,7 +1319,7 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
   const [msg, setMsg] = useState<string | null>(null);
 
   // Live-preview whenever the tokens or radius change (logo isn't a token).
-  useEffect(() => { onPreview({ tokens, radius, logoUrl, iconUrl }); }, [JSON.stringify(tokens), radius]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { onPreview({ tokens, radius, shadow, borderColor: borderColor || null, logoUrl, iconUrl }); }, [JSON.stringify(tokens), radius, shadow, borderColor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Generate a full palette from one color (the smart path).
   const generate = (color: string, tint: NeutralTint = neutral) => { setSeed(color); setNeutral(tint); setTokens(deriveTokens({ primary: color, neutral: tint })); };
@@ -1325,7 +1360,7 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
   const save = async () => {
     setSaving(true);
     // Tokens carry everything now — null out legacy preset/primary fields.
-    try { await api.patch("/api/settings", { branding: { tokens, radius, logoUrl, iconUrl, aiAvatarUrl, aiName: aiName.trim() || null, preset: null, primary: null, primaryForeground: null } }); onSaved(); setMsg("Branding saved."); }
+    try { await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, logoUrl, iconUrl, aiAvatarUrl, aiName: aiName.trim() || null, preset: null, primary: null, primaryForeground: null } }); onSaved(); setMsg("Branding saved."); }
     finally { setSaving(false); }
   };
 
@@ -1333,7 +1368,7 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
 
   return (
     <section>
-      <SectionHead title="Branding" scope="tenant" />
+      <SectionHead title="Branding" icon={Palette} scope="tenant" />
       <Card className="space-y-5">
         <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Palette /></div><div><div className="font-medium">Theme</div><div className="text-sm text-muted-foreground">Pick one color — the whole app themes itself, light and dark.</div></div></div>
 
@@ -1426,6 +1461,45 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
           <input type="range" min={0.4} max={1.4} step={0.05} value={radius} onChange={(e) => setRadius(Number(e.target.value))} className="w-full accent-primary" />
         </div>
 
+        {/* Elevation. One preset drives --shadow-sm/md/lg, so every raised
+            surface in the app moves together — enforced by the design-token
+            lint, which refuses a hard-coded box-shadow anywhere. */}
+        <div className="space-y-1.5">
+          <span className="text-sm text-muted-foreground">Elevation</span>
+          <div className="flex flex-wrap gap-2">
+            {SHADOW_PRESETS.map((p) => <Chip key={p.id} selected={shadow === p.id} onClick={() => setShadow(p.id)}>{p.label}</Chip>)}
+          </div>
+          <p className="text-xs text-muted-foreground">{SHADOW_PRESETS.find((p) => p.id === shadow)?.hint}</p>
+        </div>
+
+        {/* Hairline colour. Blank keeps the per-mode defaults, which is usually
+            what you want; a single colour is applied to both modes. */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Border colour</span>
+            {borderColor && <button onClick={() => setBorderColor("")} className="text-xs font-medium text-primary">Reset</button>}
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              aria-label="Border colour"
+              value={/^#[0-9a-f]{6}$/i.test(borderColor) ? borderColor : "#3a3a42"}
+              onChange={(e) => setBorderColor(e.target.value)}
+              className="size-10 shrink-0 cursor-pointer rounded-xl border border-border bg-surface-2 p-1"
+            />
+            <Input
+              value={borderColor}
+              onChange={(e) => setBorderColor(e.target.value)}
+              placeholder="Default (tuned per light / dark)"
+              className="min-w-0 flex-1 font-mono text-xs"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Every divider and card edge in the app. Leave it blank unless you need a specific hairline — the default is tuned
+            separately for light and dark, and one colour has to serve both. Fine-tune per mode below.
+          </p>
+        </div>
+
         {/* Advanced */}
         <button onClick={() => setAdvanced((a) => !a)} className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground">
           <span>Fine-tune tokens</span>
@@ -1447,7 +1521,7 @@ function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | n
           </div>
         )}
 
-        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+        <ActionResult msg={msg} err={null} />
         <Button className="w-full" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save branding"}</Button>
       </Card>
     </section>

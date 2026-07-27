@@ -421,7 +421,8 @@ function CaptureStep({ phase, cue, onCaptured, onFallback }: {
         <video ref={videoRef} playsInline muted className="size-full -scale-x-100 object-cover" />
         <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 size-full -scale-x-100" />
         {/* Framing guide */}
-        <div className={cn("pointer-events-none absolute inset-x-[22%] inset-y-[6%] rounded-[999px] border-2 border-dashed transition-colors", ready ? "border-success/80" : "border-white/25")} />
+        {/* design-tokens-exempt: body-position guide drawn over live camera video — the idle state must read against any background, so white is the intent; it turns to the success token once aligned. */}
+        <div className={cn("pointer-events-none absolute inset-x-[22%] inset-y-[6%] rounded-full border-2 border-dashed transition-colors", ready ? "border-success/80" : "border-white/25")} />
         {state === "loading" && (
           <div className="absolute inset-0 grid place-items-center bg-black/60">
             <div className="flex flex-col items-center gap-2 text-white/80"><Spinner /> <span className="text-sm">Starting private on-device scan…</span></div>

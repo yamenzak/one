@@ -42,6 +42,11 @@ export interface Branding {
   primaryForeground?: string | null;
   /** Radius in rem (0.4–1.4). */
   radius?: number | null;
+  /** Elevation preset — scales every `--shadow-*` token together. */
+  shadow?: ShadowPreset | null;
+  /** Hairline colour (`--border` + `--input`). Applied to BOTH modes; the
+   *  advanced token editor can still set a different one per mode. */
+  borderColor?: string | null;
   /** Tenant's default mode; the user can still toggle. */
   defaultMode?: ThemeMode | null;
   /** Wide wordmark/logo (app bar). */
@@ -55,6 +60,46 @@ export interface Branding {
   /** Granular token overrides (e.g. from a pasted shadcn theme). */
   tokens?: BrandTokens | null;
 }
+
+/**
+ * Elevation presets. Shadows are a brand decision — a clinical studio wants
+ * hairlines and a boutique one wants depth — so they are configurable rather
+ * than baked in, and they are PRESETS rather than free-form CSS: a mistyped
+ * box-shadow is a broken app, and there is no useful middle ground between
+ * "flat" and "dramatic" that a customer needs to dial in by hand.
+ *
+ * `soft` reproduces the shipped `tokens.css` values exactly, so a tenant that
+ * never touches this setting is unaffected.
+ */
+export type ShadowPreset = "none" | "subtle" | "soft" | "dramatic";
+
+export const SHADOW_PRESETS: { id: ShadowPreset; label: string; hint: string }[] = [
+  { id: "none", label: "Flat", hint: "No shadows at all — hairlines carry the layering." },
+  { id: "subtle", label: "Subtle", hint: "Barely-there lift. Clean and clinical." },
+  { id: "soft", label: "Soft", hint: "The Mossa default — grounded but quiet." },
+  { id: "dramatic", label: "Dramatic", hint: "Deep, high-contrast elevation." },
+];
+
+/** The three elevation steps for each preset, in `--shadow-sm/md/lg` order. */
+const SHADOW_SCALE: Record<ShadowPreset, [string, string, string]> = {
+  none: ["none", "none", "none"],
+  subtle: [
+    "0 1px 1px 0 oklch(0 0 0 / 0.16)",
+    "0 2px 8px -3px oklch(0 0 0 / 0.22)",
+    "0 6px 20px -6px oklch(0 0 0 / 0.28)",
+  ],
+  // Verbatim from tokens.css — the shipped look, so an untouched tenant sees no change.
+  soft: [
+    "0 1px 2px 0 oklch(0 0 0 / 0.3)",
+    "0 4px 16px -4px oklch(0 0 0 / 0.4)",
+    "0 12px 40px -8px oklch(0 0 0 / 0.5)",
+  ],
+  dramatic: [
+    "0 2px 4px 0 oklch(0 0 0 / 0.45)",
+    "0 8px 28px -4px oklch(0 0 0 / 0.6)",
+    "0 24px 64px -12px oklch(0 0 0 / 0.72)",
+  ],
+};
 
 /** Every themeable token, grouped for the advanced editor (bare names). */
 export const THEME_TOKEN_GROUPS: { label: string; tokens: string[] }[] = [
@@ -187,10 +232,21 @@ export function applyBranding(branding: Branding | null | undefined): void {
     light["--primary"] = primaryLight; light["--ring"] = primaryLight;
   }
   if (primaryFg) { dark["--primary-foreground"] = primaryFg; light["--primary-foreground"] = primaryFg; }
+  // Hairline colour is a single choice applied to both modes (a per-mode value is
+  // still reachable through the advanced token editor, and wins because the
+  // spread below lands after this).
+  if (branding?.borderColor) {
+    for (const bag of [dark, light]) { bag["--border"] = branding.borderColor; bag["--input"] = branding.borderColor; }
+  }
   Object.assign(dark, branding?.tokens?.dark ?? {});
   Object.assign(light, branding?.tokens?.light ?? {});
 
-  const rootExtra = branding?.radius != null ? `--radius:${branding.radius}rem;` : "";
+  let rootExtra = branding?.radius != null ? `--radius:${branding.radius}rem;` : "";
+  // Elevation: one preset drives all three steps, so `shadow-sm/md/lg` anywhere
+  // in the app scales together. `--shadow-glow` is deliberately untouched — it is
+  // derived from the brand primary and is an accent, not an elevation step.
+  const scale = branding?.shadow ? SHADOW_SCALE[branding.shadow] : undefined;
+  if (scale) rootExtra += `--shadow-sm:${scale[0]};--shadow-md:${scale[1]};--shadow-lg:${scale[2]};`;
   const css =
     `:root{${rootExtra}${cssBlock(dark)}}` +
     `:root[data-theme="light"]{${cssBlock(light)}}`;

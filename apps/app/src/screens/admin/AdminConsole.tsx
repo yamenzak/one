@@ -25,6 +25,7 @@ import {
   ConfirmDialog, CreditCard, EmptyState, Eyebrow, Field, Gift, GlanceStrip, Globe, IconBadge, Info, Input, KeyRound,
   LayoutGrid, Page, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, Sheet, ShieldCheck,
   Skeleton, SkeletonLine, Sparkles, Spinner, Stagger, Switch, Tag, Trash2, Wallet, cn, toneText, type Tone,
+  ActionResult, ConfigRow, Group, LoadError, TabIntro, useLoad, useAction as useActionBase,
 } from "@mossa/ui";
 import { api, errorText } from "../../api.js";
 import { fmtPrice } from "../../money.js";
@@ -75,99 +76,12 @@ export function AdminConsole({ onBack }: { onBack: () => void }) {
  *  `useCallback`-stable loader. `loading` is only true before the first settle,
  *  so a retry (or a post-mutation refresh) never flashes the skeleton back over
  *  content that already arrived. */
-function useAdminLoad<T>(load: () => Promise<T>, what: string) {
-  const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [nonce, setNonce] = useState(0);
-  useEffect(() => {
-    let alive = true;
-    setError(null);
-    load()
-      .then((d) => { if (alive) setData(d); })
-      .catch((e) => { if (alive) setError(errorText(e, `Couldn't load ${what}.`)); });
-    return () => { alive = false; };
-  }, [load, nonce, what]);
-  const reload = useCallback(() => setNonce((n) => n + 1), []);
-  return { data, error, loading: data === null && error === null, reload };
-}
-
-/** The load-failure surface every tab owes the operator: what broke, what the
- *  server said, and a way out. */
-function LoadError({ what, error, onRetry }: { what: string; error: string; onRetry: () => void }) {
-  return (
-    <EmptyState
-      icon={AlertTriangle}
-      title={`Couldn't load ${what}`}
-      description={error}
-      action={<Button className="min-h-12" onClick={onRetry}><RefreshCw /> Try again</Button>}
-    />
-  );
-}
-
-/** One in-flight key + one result + one error, shared by a group of mutating
- *  controls. `run` can't leave a rejection unhandled or a button stuck busy. */
-function useAction() {
-  const [busy, setBusy] = useState<string | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const run = useCallback(
-    async (key: string, fn: () => Promise<string | void>, fallback = "That didn't go through — nothing was changed.") => {
-      setBusy(key);
-      setMsg(null);
-      setErr(null);
-      try {
-        const result = await fn();
-        if (typeof result === "string") setMsg(result);
-      } catch (e) {
-        setErr(errorText(e, fallback));
-      } finally {
-        setBusy(null);
-      }
-    },
-    [],
-  );
-  const fail = useCallback((text: string) => { setMsg(null); setErr(text); }, []);
-  return { busy, msg, err, run, fail };
-}
-
-/** The outcome of the last action in a section — announced, never silent. */
-function ActionResult({ msg, err }: { msg: string | null; err: string | null }) {
-  if (err) return <Callout tone="danger" icon={AlertTriangle} live="alert">{err}</Callout>;
-  if (msg) return <Callout tone="success" icon={CircleCheck} live="status">{msg}</Callout>;
-  return null;
-}
-
-/** A configuration checklist row: state is shown, not implied. */
-function ConfigRow({ label, ok, detail, okLabel = "Set", missingLabel = "Not set" }: { label: string; ok: boolean; detail?: ReactNode; okLabel?: string; missingLabel?: string }) {
-  return (
-    <div className="flex items-start gap-2.5">
-      {ok
-        ? <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
-        : <CircleAlert className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />}
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium">{label}</div>
-        {detail && <div className="text-xs leading-snug text-muted-foreground">{detail}</div>}
-      </div>
-      <span className={cn("shrink-0 text-xs font-semibold", ok ? "text-success" : "text-muted-foreground")}>{ok ? okLabel : missingLabel}</span>
-    </div>
-  );
-}
-
-/** A tab's one-line "what this is for". */
-function TabIntro({ children }: { children: ReactNode }) {
-  return <p className="px-1 text-xs leading-relaxed text-muted-foreground">{children}</p>;
-}
-
-/** A labelled group inside a card: eyebrow + optional explanation + content. */
-function Group({ title, hint, children, className }: { title: string; hint?: ReactNode; children: ReactNode; className?: string }) {
-  return (
-    <section className={cn("space-y-2.5", className)}>
-      <Eyebrow className="px-0">{title}</Eyebrow>
-      {hint && <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>}
-      {children}
-    </section>
-  );
-}
+// The console patterns (useLoad/useAction, LoadError, ActionResult, ConfigRow,
+// TabIntro, Group) now live in @mossa/ui so the STUDIO settings render the same
+// shapes from the same code rather than a drifting copy. `errorText` is passed in
+// because the design system holds no opinion about the app's HTTP error shape.
+const useAdminLoad = <T,>(load: () => Promise<T>, what: string) => useLoad(load, what, errorText);
+const useAction = () => useActionBase(errorText);
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 /** Plan prices arrive as whole/decimal USD per month; render them like every
