@@ -154,7 +154,13 @@ export function Login() {
               {showPasskey && passkeySupported() && (
                 <button
                   className="flex w-full items-center justify-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-                  onClick={async () => { setError(null); try { await signInWithPasskey(); await refresh(); } catch { setError("No passkey found on this device."); } }}
+                  // A passkey is bound to the DOMAIN it was created on (WebAuthn
+                  // rpID = this origin), not to your account or your studio. So
+                  // "no passkey on this device" is wrong and misleading on a
+                  // studio's custom domain: you may well have one, just registered
+                  // at a different address. Say what is actually true, and point at
+                  // the way in that always works.
+                  onClick={async () => { setError(null); try { await signInWithPasskey(); await refresh(); } catch { setError(`No passkey saved for ${location.hostname}. Passkeys are tied to the address you set them up on — sign in with an email code, then add one here.`); } }}
                 >
                   <KeyRound className="size-4" /> Sign in with a passkey
                 </button>

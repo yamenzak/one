@@ -16,6 +16,7 @@ import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
 import { PreferencesEditorCard } from "../PreferencesEditor.js";
 import { checkInPhotos } from "../client/WellnessDetails.js";
 import { AiAvatar } from "../../AiAvatar.js";
+import { InsightFeedback } from "../client/InsightFeedback.js";
 import { Markdown } from "../../Markdown.js";
 import { AiErrorBox } from "../../AiError.js";
 
@@ -718,7 +719,12 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
       <Stagger>
       <Card className="space-y-3">
       {err ? <AiErrorBox error={err} /> : null}
-      {summary && <SubCard className="flex items-start gap-2.5 text-sm"><AiAvatar className="size-7" /><Markdown className="min-w-0 flex-1">{summary}</Markdown></SubCard>}
+      {summary && (
+        <SubCard className="space-y-2 text-sm">
+          <div className="flex items-start gap-2.5"><AiAvatar className="size-7" /><Markdown className="min-w-0 flex-1">{summary}</Markdown></div>
+          <InsightFeedback insightType="checkin-reply" insightRef={clientId} />
+        </SubCard>
+      )}
       {checkIns.length === 0 ? <p className="text-sm text-muted-foreground">No check-ins yet.</p> : checkIns.slice(0, 5).map((c) => {
         const photos = checkInPhotos(c.photos_json);
         const meta = [c.mood != null ? `mood ${c.mood}/5` : null, c.energy != null ? `energy ${c.energy}/5` : null, c.sleep_hours ? `${c.sleep_hours}h sleep` : null, c.steps_count ? `${c.steps_count.toLocaleString()} steps` : null].filter(Boolean).join(" · ");
@@ -820,6 +826,9 @@ function SuggestSuppSheet({ clientId, onClose, onPrescribed }: { clientId: strin
           </Reveal>
         )}
         {note && <SubCard className="flex items-start gap-2 text-xs text-muted-foreground"><AiAvatar className="mt-0.5 size-4 shrink-0" /><Markdown className="min-w-0 flex-1">{note}</Markdown></SubCard>}
+        {/* Rate the SET of suggestions, once, rather than each row — the useful
+            signal is whether this feature's output was worth reading. */}
+        {recos && recos.length > 0 && <InsightFeedback insightType="supplement-reco" insightRef={clientId} />}
       </div>
     </Sheet>
   );

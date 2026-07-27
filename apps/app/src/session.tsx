@@ -10,18 +10,35 @@ import type { SessionContext, TenantBranding } from "@mossa/protocol";
 import { api, isOffline, setUnauthorizedHandler } from "./api.js";
 
 /**
- * Display preferences that are NOT identifying and carry no account data — just
- * the chosen light/dark theme. Sign-out used to wipe every `mossa`-prefixed key,
- * so a light-theme user signed back in to a dark app and had to re-set it every
- * time. Anything that could leak between accounts (session cache, per-plan
- * shopping lists) must stay OUT of here.
+ * The door you came in through: the slug of the last studio this device had an
+ * active session in. NOT identifying (a public slug, no account data) and the
+ * one thing sign-out must NOT forget, because it is what sign-out navigates to.
+ */
+export const LAST_DOOR_KEY = "mossa:last-door";
+
+export function rememberDoor(slug: string | null | undefined): void {
+  if (!slug) return;
+  try { localStorage.setItem(LAST_DOOR_KEY, slug); } catch { /* private mode */ }
+}
+
+/** The studio door to return to when signed out, if this device knows one. */
+export function lastDoor(): string | null {
+  try { return localStorage.getItem(LAST_DOOR_KEY) || null; } catch { return null; }
+}
+
+/**
+ * Display preferences that are NOT identifying and carry no account data — the
+ * chosen light/dark theme, and the studio door to come back to. Sign-out used to
+ * wipe every `mossa`-prefixed key, so a light-theme user signed back in to a dark
+ * app and had to re-set it every time. Anything that could leak between accounts
+ * (session cache, per-plan shopping lists) must stay OUT of here.
  *
  * The tinted nav and ambient wash used to be listed here too. They now live in
  * the tenant's branding rather than on the device, so there is nothing local to
  * preserve — and leaving the dead keys behind would have quietly restored one
  * studio's chrome after signing into another.
  */
-const KEEP_ON_SIGN_OUT = new Set(["mossa-theme"]);
+const KEEP_ON_SIGN_OUT = new Set(["mossa-theme", LAST_DOOR_KEY]);
 
 /** Remove the app's own localStorage keys (mode, cached session, per-plan
  *  shopping lists) — all `mossa`-prefixed — so nothing leaks across accounts. */
@@ -103,11 +120,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     localStorage.getItem("mossa-mode") === "train" ? "train" : "coach",
   );
 
+  // Is this the neutral platform host, or a tenant's own domain? Decides whether
+  // sign-out needs an explicit `/t/<slug>` to reach the studio door, or whether
+  // `/` already is it. Unresolved (null) counts as platform: a `/t/<slug>` on a
+  // custom domain still resolves that tenant, so the fallback is never wrong.
+  const hostIsPlatform = host?.platform !== false;
+
   const refresh = useCallback(async () => {
     try {
       const data = await api.get<SessionContext>("/api/context");
       setCtx(data);
       writeCachedCtx(data);
+      // Remember which studio door this device belongs to, for sign-out and for
+      // `/` on the platform host. Written on every context read, so switching
+      // studios moves the door with you.
+      rememberDoor(data.active?.tenantSlug);
       setDegraded(false);
     } catch (e) {
       // A NETWORK failure is not a sign-out. Restore the last known session so a
@@ -128,12 +155,33 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Resolve which tenant brands this login, once, in parallel. A custom domain
-  // pins it via the Host header; on the platform host a `/t/<slug>` entry passes
-  // the slug so the same branded login works before a domain is bought.
+  /**
+   * Resolve which tenant brands this login, once, in parallel.
+   *
+   * Three ways to know the door, most explicit first — a custom domain pins it
+   * via the Host header, so this only matters on the platform host:
+   *
+   *  1. `/t/<slug>` — the branded entry a studio hands out before it buys a domain.
+   *  2. `?t=<tenantId>` — the hint every emailed CTA already carries. This used
+   *     to be read ONLY after the session resolved, so a signed-out recipient
+   *     clicked a link that named their studio and still got a studio-less login.
+   *  3. The remembered door — this device had a session in that studio, so that
+   *     is whose login it should show, not Mossa's.
+   *
+   * All three brand WITHOUT pinning: cross-tenant switching after sign-in is
+   * unaffected, and the origin never changes, so a passkey registered here keeps
+   * working whichever door is showing.
+   */
   useEffect(() => {
-    const m = /^\/t\/([^/?#]+)/.exec(location.pathname);
-    const q = m ? `?slug=${encodeURIComponent(decodeURIComponent(m[1]!))}` : "";
+    const slug = /^\/t\/([^/?#]+)/.exec(location.pathname)?.[1];
+    const hinted = new URLSearchParams(location.search).get("t");
+    const q = slug
+      ? `?slug=${encodeURIComponent(decodeURIComponent(slug))}`
+      : hinted
+        ? `?t=${encodeURIComponent(hinted)}`
+        : lastDoor()
+          ? `?slug=${encodeURIComponent(lastDoor()!)}`
+          : "";
     void api.get<HostInfo>(`/api/host${q}`).then(setHost).catch(() => setHost({ platform: true, tenant: null }));
   }, []);
 
@@ -211,9 +259,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } finally {
       clearAppStorage();
       setCtx(null);
-      location.assign("/");
+      // Back to the STUDIO door, not Mossa's.
+      //
+      // This used to be a flat `/`, which on a tenant's custom domain is the
+      // branded login (fine) but on the platform host is the Mossa gate — so a
+      // coach signing out of their own studio was handed a page about what Mossa
+      // is, with no way back in and no passkey affordance. Worse for passkeys
+      // specifically: the credential is registered against this ORIGIN, and the
+      // gate is the one screen on it that never offers to use it.
+      //
+      // `/t/<slug>` keeps the origin identical, so the passkey still resolves; it
+      // only changes which brand the login wears. On a custom domain `/` already
+      // IS that studio's door, so nothing changes there.
+      const door = lastDoor();
+      location.assign(door && hostIsPlatform ? `/t/${encodeURIComponent(door)}` : "/");
     }
-  }, []);
+  }, [hostIsPlatform]);
 
   const value = useMemo(
     () => ({ loading, ctx, host, online, degraded, mode, setMode, refresh, switchTenant, signOut }),

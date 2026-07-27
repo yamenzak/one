@@ -38,14 +38,34 @@ export function hostnameOf(url: string): string {
  * unknown slug.
  */
 export async function resolveSlugTenant(db: D1Database, slug: string): Promise<HostTenant | null> {
-  const s = slug.trim().toLowerCase();
-  if (!s) return null;
+  return resolveTenantDoor(db, { slug });
+}
+
+/**
+ * Resolve the tenant whose BRANDED DOOR this is, by slug or by id.
+ *
+ * The id lane exists for links we mailed. Every notification CTA carries
+ * `?t=<tenantId>`, and that hint used to be consumed only AFTER the session
+ * resolved — so a recipient who was signed out clicked a link that named their
+ * studio explicitly and still got an unbranded, studio-less login. The tenant
+ * is right there in the URL; there is no reason to ask them which door they
+ * came through.
+ *
+ * Like the slug lane this does NOT pin the tenant — the platform host still
+ * allows cross-tenant switching after auth. It only tells the pre-auth Login
+ * screen whose brand to wear.
+ */
+export async function resolveTenantDoor(db: D1Database, by: { slug?: string; tenantId?: string }): Promise<HostTenant | null> {
+  const slug = by.slug?.trim().toLowerCase();
+  const tenantId = by.tenantId?.trim();
+  if (!slug && !tenantId) return null;
   const row = await db
     .prepare(
       'SELECT o.id AS tenant_id, o.name AS name, o.slug AS slug, ts.branding_json AS branding_json, ts.marketplace_json AS marketplace_json ' +
-        'FROM "organization" o LEFT JOIN tenant_settings ts ON ts.tenant_id = o.id WHERE o.slug = ?',
+        'FROM "organization" o LEFT JOIN tenant_settings ts ON ts.tenant_id = o.id WHERE ' +
+        (slug ? "o.slug = ?" : "o.id = ?"),
     )
-    .bind(s)
+    .bind(slug ?? tenantId)
     .first<{ tenant_id: string; name: string; slug: string; branding_json: string | null; marketplace_json: string | null }>()
     .catch(() => null);
   if (!row) return null;

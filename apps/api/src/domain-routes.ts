@@ -17,7 +17,7 @@ import { setConfig, getConfig } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
 import { turnstileConfig } from "./turnstile.js";
 import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostname, type CustomHostname } from "./cloudflare.js";
-import { hostnameOf, isPlatformHost, invalidateHostCache, resolveSlugTenant } from "./host-context.js";
+import { hostnameOf, isPlatformHost, invalidateHostCache, resolveTenantDoor } from "./host-context.js";
 import { nowIso } from "./ids.js";
 
 const HOSTNAME = z
@@ -70,9 +70,15 @@ export const domainRoutes = new Hono<AppEnv>()
         turnstile: await turnstileConfig(c.env.DB),
       });
     }
+    // Which door is this? `slug` comes from a `/t/<slug>` entry; `t` from the
+    // tenant hint every emailed CTA already carries, so a signed-out recipient
+    // of a notification lands on THEIR studio's branded login rather than a
+    // generic one. Neither pins the tenant — the platform host still allows
+    // cross-tenant switching after auth; this only decides whose brand shows.
     const slug = c.req.query("slug");
-    if (platform && slug) {
-      const st = await resolveSlugTenant(c.env.DB, slug);
+    const hintedTenant = c.req.query("t");
+    if (platform && (slug || hintedTenant)) {
+      const st = await resolveTenantDoor(c.env.DB, { slug: slug ?? undefined, tenantId: hintedTenant ?? undefined });
       if (st) return c.json({ platform: true, tenant: { tenantId: st.tenantId, name: st.name, slug: st.slug, branding: st.branding, allowSignup: st.allowSignup }, turnstile: await turnstileConfig(c.env.DB) });
     }
     return c.json({ platform, tenant: null, turnstile: await turnstileConfig(c.env.DB) });

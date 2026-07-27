@@ -17,6 +17,7 @@ import { api, errorText, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
 import { AiAvatar, useAiIdentity } from "../../AiAvatar.js";
+import { InsightFeedback } from "../client/InsightFeedback.js";
 import { Markdown } from "../../Markdown.js";
 import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
 
@@ -85,7 +86,12 @@ export function ClientReport({ clientId }: { clientId: string }) {
           {summaryBusy ? (
             <p className="text-sm text-muted-foreground">Reading this client's context…</p>
           ) : summary ? (
-            <div className="flex items-start gap-3"><AiAvatar className="mt-0.5 size-8 shrink-0" /><Markdown className="min-w-0 flex-1 text-sm text-foreground/85">{summary}</Markdown></div>
+            <div className="space-y-2">
+              <div className="flex items-start gap-3"><AiAvatar className="mt-0.5 size-8 shrink-0" /><Markdown className="min-w-0 flex-1 text-sm text-foreground/85">{summary}</Markdown></div>
+              {/* No `onMute` on a coach surface: the coach asked for this by
+                  pressing Generate, so there is nothing to mute — only to rate. */}
+              <InsightFeedback insightType="client-summary" insightRef={clientId} />
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">Generate a coach-facing read: current phase, adherence, trajectory, and the single most important thing to address next.</p>
           )}

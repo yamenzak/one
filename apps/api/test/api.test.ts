@@ -1938,6 +1938,27 @@ describe("custom domains (SPEC §14.1) — Host pins the tenant", () => {
     expect(unknown.platform).toBe(true);
     expect(unknown.tenant).toBe(null);
   });
+
+  it("an emailed link's ?t= hint brands the login BEFORE sign-in", async () => {
+    // Every notification CTA carries `?t=<tenantId>`. That hint used to be read
+    // only AFTER the session resolved, so a signed-out recipient clicked a link
+    // that named their studio explicitly and still got a studio-less Mossa login
+    // — the screen their passkey and their coach's brand are not on.
+    const ctx = (await (await SELF.fetch("http://localhost:8787/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string; tenantSlug: string } };
+    const byId = (await (await SELF.fetch(`http://localhost:8787/api/host?t=${encodeURIComponent(ctx.active.tenantId)}`)).json()) as {
+      platform: boolean; tenant: { tenantId: string; slug: string } | null;
+    };
+    expect(byId.tenant?.tenantId).toBe(ctx.active.tenantId);
+    expect(byId.tenant?.slug).toBe(ctx.active.tenantSlug);
+    // Branding the door must NOT pin the tenant — cross-tenant switching after
+    // sign-in depends on the platform host staying platform.
+    expect(byId.platform).toBe(true);
+
+    // A bogus id is not a way to enumerate studios, and not a crash either.
+    const bogus = (await (await SELF.fetch("http://localhost:8787/api/host?t=org_does_not_exist")).json()) as { platform: boolean; tenant: unknown };
+    expect(bogus.platform).toBe(true);
+    expect(bogus.tenant).toBe(null);
+  });
 });
 
 describe("OTP-send gate — sign-up eligibility + cooldown", () => {
