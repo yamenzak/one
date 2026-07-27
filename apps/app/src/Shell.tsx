@@ -96,9 +96,11 @@ export function Shell() {
         membership: ctx!.clientAccess.archived ? "archived" : "active",
         accessActive: ctx!.clientAccess.active,
         accessRequired: ctx!.clientAccess.required,
-        // The client's own view of a delinquent studio: they keep reading and
-        // logging. Entitlements degrade the STUDIO's paid features separately.
-        studioDelinquent: false,
+        // The client's own view: a suspended studio has already lost its paid
+        // features through the entitlement clamp, which the client inherits via
+        // `entitlements ∩ clientFlags`. What is left — their own record and
+        // logbook — stays theirs, so this axis has nothing to add here.
+        studio: "ok",
       })
     : null;
   if (active.role === "client" && active.clientId && standing?.lockedToStorefront) {

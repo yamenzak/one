@@ -20,12 +20,14 @@
  *                 archived        off the roster; the studio ended it
  *   access      whether a live plan/package covers them, and whether this
  *               studio requires one at all
- *   studio      the STUDIO's own standing with Mossa (paid, or delinquent)
+ *   studio      the STUDIO's own standing with Mossa (ok / grace / suspended)
  *
  * ── The rules, in precedence order ──────────────────────────────────────────
  *
- * 1. A DELINQUENT STUDIO degrades its own paid features, never a person's access
- *    to their data. The studio owes Mossa money; the client did nothing.
+ * 1. A SUSPENDED STUDIO loses what Mossa sells — for itself AND its clients, via
+ *    the entitlement clamp — but never a person's access to their own data. The
+ *    studio owes Mossa; the client did nothing. Grace (`past_due`) is full
+ *    service by definition and changes nothing for anyone but the owner.
  * 2. ARCHIVED outranks access. The relationship is over, so there is nothing to
  *    sell and nothing to unlock — read your history, write nothing.
  * 3. GATED ACCESS with no live plan locks to the storefront, and ONLY then.
@@ -40,6 +42,28 @@
  * property that makes multi-studio identity safe, so it is asserted directly.
  */
 
+/**
+ * The STUDIO's own standing with Mossa. Three states, not two, because the
+ * lifecycle has a grace window and collapsing it loses the whole point of one:
+ *
+ *   ok         paid up.
+ *   grace      a payment failed and dunning is running (`past_due`). GRACE_DAYS
+ *              of FULL service — that is what a grace window is for. The owner is
+ *              notified; the client is not affected at all and must not be.
+ *   suspended  grace expired (`suspended`/`canceled`/`unpaid`). Entitlements are
+ *              clamped to free by `clampEntitlementsForStatus`, and because a
+ *              client's capability is `entitlements ∩ clientFlags`, that passes
+ *              through with no per-client bookkeeping: their AI, commerce, body
+ *              scan and external search all stop. What survives is logging their
+ *              own data, which costs the studio nothing and is theirs anyway.
+ *
+ * So a suspended studio's clients do NOT carry on "as if nothing" — they lose
+ * every paid feature. They keep their own record and their own logbook, which is
+ * the line this module draws: Mossa withholds what Mossa sells, and does not hold
+ * a client's own history hostage over their coach's invoice.
+ */
+export type StudioStanding = "ok" | "grace" | "suspended";
+
 /** The client record's status in this tenancy. */
 export type Membership = "none" | "pending_signup" | "active" | "archived";
 
@@ -49,8 +73,8 @@ export interface StandingFacts {
   accessActive: boolean;
   /** This studio requires a live plan/package to use the app at all. */
   accessRequired: boolean;
-  /** The STUDIO's subscription with Mossa has lapsed. */
-  studioDelinquent: boolean;
+  /** The STUDIO's standing with Mossa: paid, in dunning grace, or suspended. */
+  studio: StudioStanding;
 }
 
 export interface Standing {
@@ -69,7 +93,7 @@ export interface Standing {
     | "unclaimed"
     | "archived"
     | "needs_access"
-    | "studio_delinquent";
+    | "studio_suspended";
 }
 
 /**
@@ -98,13 +122,20 @@ export function resolveStanding(f: StandingFacts): Standing {
     return { canRead: true, canWrite: false, canPurchase: false, lockedToStorefront: false, reason: "archived" };
   }
 
-  // The studio owes MOSSA money. That is between the studio and us: it degrades
-  // the studio's paid features (enforced by entitlements, elsewhere), but the
-  // client keeps their own data and keeps logging. Never punish a client for
-  // their coach's unpaid invoice — and never lock them to a storefront over it,
-  // since buying more access would not fix the studio's subscription.
-  if (f.studioDelinquent) {
-    return { canRead: true, canWrite: true, canPurchase: false, lockedToStorefront: false, reason: "studio_delinquent" };
+  // Grace is deliberately invisible here: `past_due` means dunning is running and
+  // the studio still has full service, so there is nothing for the client to see
+  // or lose. Only the owner is told (billing_past_due). Falling through to the
+  // normal rules below is the correct behaviour, not an omission.
+
+  // Grace expired. Paid features are already gone — `clampEntitlementsForStatus`
+  // drops the tenant to free and the client inherits that through
+  // `entitlements ∩ clientFlags`, so AI, commerce, body scan and search stop
+  // without any per-client work. What is left to decide here is the client's own
+  // data, and that stays theirs: read it, keep logging to it. Purchasing is off
+  // because the storefront is a paid feature the studio no longer has, and no
+  // amount of buying would fix the studio's own subscription anyway.
+  if (f.studio === "suspended") {
+    return { canRead: true, canWrite: true, canPurchase: false, lockedToStorefront: false, reason: "studio_suspended" };
   }
 
   // Gated studio, no live access → the storefront, which they CAN buy from.
@@ -120,5 +151,5 @@ export const STANDING_AXES = {
   membership: ["none", "pending_signup", "active", "archived"] as Membership[],
   accessActive: [true, false],
   accessRequired: [true, false],
-  studioDelinquent: [true, false],
+  studio: ["ok", "grace", "suspended"] as StudioStanding[],
 };

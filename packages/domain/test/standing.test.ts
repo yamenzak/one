@@ -1,7 +1,7 @@
 /**
  * The standing matrix, enumerated.
  *
- * Every combination of the four axes is generated and asserted — 32 cells — so
+ * Every combination of the four axes is generated and asserted — 48 cells — so
  * the policy is documented by execution rather than by a comment that drifts.
  * The reason each cell holds is spelled out where it is not obvious, because the
  * non-obvious ones are the bugs this file exists to prevent: asking an archived
@@ -12,25 +12,25 @@
 import { describe, expect, it } from "vitest";
 import { resolveStanding, STANDING_AXES, type StandingFacts, type Membership } from "../src/standing.js";
 
-/** All 32 cells. */
+/** All 48 cells. */
 function everyCell(): StandingFacts[] {
   const out: StandingFacts[] = [];
   for (const membership of STANDING_AXES.membership)
     for (const accessActive of STANDING_AXES.accessActive)
       for (const accessRequired of STANDING_AXES.accessRequired)
-        for (const studioDelinquent of STANDING_AXES.studioDelinquent)
-          out.push({ membership, accessActive, accessRequired, studioDelinquent });
+        for (const studio of STANDING_AXES.studio)
+          out.push({ membership, accessActive, accessRequired, studio });
   return out;
 }
 
 const facts = (m: Membership, over: Partial<StandingFacts> = {}): StandingFacts => ({
-  membership: m, accessActive: true, accessRequired: false, studioDelinquent: false, ...over,
+  membership: m, accessActive: true, accessRequired: false, studio: "ok", ...over,
 });
 
 describe("standing — the matrix is total", () => {
-  it("covers all 32 combinations and never throws", () => {
+  it("covers all 48 combinations and never throws", () => {
     const cells = everyCell();
-    expect(cells.length).toBe(32);
+    expect(cells.length).toBe(48); // 4 membership × 2 × 2 × 3 studio states
     for (const f of cells) {
       const s = resolveStanding(f);
       expect(typeof s.reason, JSON.stringify(f)).toBe("string");
@@ -76,36 +76,67 @@ describe("standing — archived", () => {
     }
   });
 
-  it("stays read-only even while the studio is delinquent", () => {
-    const s = resolveStanding(facts("archived", { studioDelinquent: true }));
+  it("stays read-only even while the studio is suspended", () => {
+    const s = resolveStanding(facts("archived", { studio: "suspended" }));
     expect(s.reason).toBe("archived"); // archived is the more specific truth
     expect(s.canRead).toBe(true);
     expect(s.canWrite).toBe(false);
   });
 });
 
-describe("standing — a studio that stops paying", () => {
-  it("never costs the CLIENT their data or their logging", () => {
-    // The studio owes Mossa; the client owes nobody. Degrading the studio's paid
-    // features is correct (entitlements do that); locking a client out of their own
-    // history because their coach's card failed is not.
-    const s = resolveStanding(facts("active", { studioDelinquent: true }));
+describe("standing — a studio that stops paying Mossa", () => {
+  /**
+   * The lifecycle is two-staged and the stages differ, which is the whole reason
+   * `studio` is three states rather than a `delinquent` boolean:
+   *
+   *   payment fails → `past_due` + GRACE_DAYS (7) of FULL service, owner dunned
+   *   grace expires → `suspended`, entitlements clamped to free, owner told that
+   *                   "paid features are paused for you and your clients"
+   *   +DELETE_DAYS (30) → data wipe
+   */
+  it("GRACE changes nothing for the client — that is what a grace window is", () => {
+    // Only the owner is notified during dunning. A client whose coach's card
+    // failed this morning must not see a degraded app.
+    expect(resolveStanding(facts("active", { studio: "grace" })))
+      .toEqual(resolveStanding(facts("active", { studio: "ok" })));
+  });
+
+  it("grace still locks a gated client with no plan — for the usual reason, not the studio's", () => {
+    // Grace must not accidentally become a bypass for the CLIENT-side gate.
+    const s = resolveStanding(facts("active", { studio: "grace", accessRequired: true, accessActive: false }));
+    expect(s.reason).toBe("needs_access");
+    expect(s.lockedToStorefront).toBe(true);
+  });
+
+  it("SUSPENDED is not 'as if nothing' — paid features are gone", () => {
+    // The teeth are in `clampEntitlementsForStatus`, which drops the tenant to
+    // FREE_ENTITLEMENTS; because client capability is `entitlements ∩ clientFlags`,
+    // the client loses AI, commerce, body scan and external search with no
+    // per-client bookkeeping. What this module decides is the remainder: their own
+    // record and their own logbook.
+    const s = resolveStanding(facts("active", { studio: "suspended" }));
+    expect(s.reason).toBe("studio_suspended");
+    expect(s.canPurchase).toBe(false); // the storefront IS a paid feature
+  });
+
+  it("but it never takes a client's own data or their logbook", () => {
+    // Mossa withholds what Mossa sells. It does not hold a client's history
+    // hostage over their coach's invoice — the client owes nobody.
+    const s = resolveStanding(facts("active", { studio: "suspended" }));
     expect(s.canRead).toBe(true);
     expect(s.canWrite).toBe(true);
-    expect(s.reason).toBe("studio_delinquent");
   });
 
-  it("does not lock them to a storefront — buying could not fix it anyway", () => {
+  it("suspension outranks the access gate rather than stacking with it", () => {
+    // A storefront would be a dead end: the studio has lost `commerce`, and no
+    // purchase a client makes would fix the studio's own subscription.
     for (const accessRequired of [true, false]) {
       for (const accessActive of [true, false]) {
-        const s = resolveStanding(facts("active", { studioDelinquent: true, accessRequired, accessActive }));
-        expect(s.lockedToStorefront, `delinquent + required:${accessRequired}`).toBe(false);
+        const s = resolveStanding(facts("active", { studio: "suspended", accessRequired, accessActive }));
+        expect(s.lockedToStorefront, `suspended + required:${accessRequired}`).toBe(false);
+        expect(s.reason).toBe("studio_suspended");
       }
     }
-  });
-
-  it("suspends purchasing, because the studio's own rail is not in good standing", () => {
-    expect(resolveStanding(facts("active", { studioDelinquent: true })).canPurchase).toBe(false);
   });
 });
 
@@ -160,10 +191,10 @@ describe("standing — multi-studio isolation", () => {
     expect(atC.lockedToStorefront).toBe(false);
   });
 
-  it("a delinquent studio does not reach the studios that are paid up", () => {
-    const atDelinquent = resolveStanding(facts("active", { studioDelinquent: true }));
+  it("a suspended studio does not reach the studios that are paid up", () => {
+    const atSuspended = resolveStanding(facts("active", { studio: "suspended" }));
     const atHealthy = resolveStanding(facts("active"));
-    expect(atDelinquent.reason).toBe("studio_delinquent");
+    expect(atSuspended.reason).toBe("studio_suspended");
     expect(atHealthy.reason).toBe("ok");
     expect(atHealthy.canPurchase).toBe(true); // unaffected by the other studio
   });

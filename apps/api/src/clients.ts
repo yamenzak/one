@@ -192,7 +192,7 @@ export async function requireClientAccess(
       // axes are passed as satisfied and cannot mask an archived record.
       accessActive: true,
       accessRequired: false,
-      studioDelinquent: false,
+      studio: "ok",
     });
     const writing = c.req.method !== "GET";
     if (writing && !standing.canWrite) {
