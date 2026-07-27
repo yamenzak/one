@@ -16,7 +16,7 @@ import { organization, emailOTP } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import type { Env } from "./env.js";
 import { ac, roles } from "./access.js";
-import { withinQuota } from "./billing-store.js";
+import { withinQuota, hasFeature } from "./billing-store.js";
 import { sendEmail, emailShell, emailButton, escapeHtml, MOSSA_BRAND } from "./mailer.js";
 import { sendTenantEmail } from "./email-provider.js";
 import { tenantBrandKit } from "./notify.js";
@@ -245,6 +245,17 @@ export function createAuth(env: Env, origin?: string) {
           // invitation is a reserved seat, so it counts toward the ceiling.
           beforeCreateInvitation: async ({ invitation, organization: org }) => {
             if (invitation.role === "client") return; // client invites aren't staff seats
+            // The assistant ROLE is half of what `frontDesk` sells (SPEC §5), so a
+            // tenant without it may not invite one. Gated here as well as on the
+            // role-change route (`member-routes.ts`) because these are two
+            // independent doors to the same seat, and closing only one leaves the
+            // capability purchasable by the other.
+            if (invitation.role === "assistant" && !(await hasFeature(env.DB, org.id, "frontDesk"))) {
+              throw new APIError("FORBIDDEN", {
+                message: "The front-desk assistant role isn't included in this plan. Upgrade to invite an assistant, or invite them as a coach instead.",
+                code: "FEATURE_NOT_IN_PLAN",
+              });
+            }
             const seat = await checkStaffSeat(env.DB, org.id, { countPending: true });
             if (!seat.ok) throw seatError(seat);
           },

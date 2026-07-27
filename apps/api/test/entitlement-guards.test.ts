@@ -355,12 +355,67 @@ describe("staffSeats ceiling holds on every path that claims a seat", () => {
 
     // …and a sideways staff→staff move is never seat-checked, so a studio sitting
     // exactly on its ceiling can still reshuffle roles.
-    await setPlan(tenantId, "free", owner);
+    //
+    // The sideways target is deliberately NOT `assistant`: that role is half of
+    // what `frontDesk` sells, so it is now feature-gated and would 403 on `free`
+    // for a reason that has nothing to do with seats. Using a role the plan always
+    // includes keeps this assertion about the seat ceiling, which is its point.
+    await setPlan(tenantId, "pro", owner);
     expect((await promote("assistant")).status).toBe(200);
     expect(await memberRole(db, tenantId, "seat3-client@test.dev")).toBe("assistant");
+    await setPlan(tenantId, "free", owner);
+    expect((await promote("trainer")).status).toBe(200);
+    expect(await memberRole(db, tenantId, "seat3-client@test.dev")).toBe("trainer");
     // Demoting to client frees the seat — also never blocked.
     expect((await promote("client")).status).toBe(200);
     expect(await memberRole(db, tenantId, "seat3-client@test.dev")).toBe("client");
+  }, 40_000);
+
+  it("the assistant ROLE needs frontDesk — both the promotion route and the invite path", async () => {
+    // The assistant seat is the other half of what `frontDesk` sells (SPEC §5:
+    // "Assistant role + sessions/booking"). Only the sessions half used to be
+    // gated, so a tenant on a plan without frontDesk could mint assistants and
+    // access.ts hands that role real powers — whole-roster read and the entire
+    // scheduling surface. Two independent doors, so both are asserted: closing one
+    // would just move the purchase to the other.
+    const { db, owner, tenantId } = await studio("assist", "light"); // no frontDesk
+    const clientCookie = await signIn("assist-client@test.dev");
+    void clientCookie;
+    const userId = (await db.prepare('SELECT id FROM "user" WHERE email = ?').bind("assist-client@test.dev").first<{ id: string }>())!.id;
+    await db
+      .prepare('INSERT INTO "member" (id, organizationId, userId, role, createdAt) VALUES (?, ?, ?, ?, ?)')
+      .bind("mbr_assist_client", tenantId, userId, "client", "2026-01-01")
+      .run();
+    const setRole = (role: string) =>
+      SELF.fetch(`${B}/api/members/${userId}/role`, { method: "PATCH", headers: J(owner), body: JSON.stringify({ role }) });
+    const invite = (role: string) =>
+      SELF.fetch(`${B}/api/auth/organization/invite-member`, {
+        method: "POST",
+        headers: J(owner),
+        body: JSON.stringify({ email: `assist-invite-${role}@test.dev`, role, organizationId: tenantId }),
+      });
+
+    // Door 1: the promotion route, refused on a plan without frontDesk. Assert it
+    // is the FEATURE gate and not the seat ceiling: every plan lacking frontDesk
+    // also has staffSeats 1 (the owner fills it), so a bare 403 here would be
+    // ambiguous. requireFeature names the feature; the seat refusal carries
+    // `quota: "staffSeats"` instead.
+    const denied = await setRole("assistant");
+    expect(denied.status).toBe(403);
+    const deniedBody = (await denied.json()) as { error: string; feature?: string; quota?: string };
+    expect(deniedBody.feature).toBe("frontDesk");
+    expect(deniedBody.quota).toBeUndefined();
+    expect(await memberRole(db, tenantId, "assist-client@test.dev")).toBe("client");
+
+    // Door 2: the invitation path, which Better Auth serves through its own lane
+    // (so it needs its own hook — the route gate above cannot see it).
+    expect((await invite("assistant")).status).toBeGreaterThanOrEqual(400);
+
+    // Upgrade to a plan that includes frontDesk and both doors open.
+    await setPlan(tenantId, "pro", owner);
+    expect((await setRole("assistant")).status).toBe(200);
+    expect(await memberRole(db, tenantId, "assist-client@test.dev")).toBe("assistant");
+    expect((await invite("assistant")).status).toBeLessThan(300);
   }, 40_000);
 
   it("the email-matched auto-accept in /api/context shares the same check", async () => {

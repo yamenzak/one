@@ -10,6 +10,7 @@ import { z } from "zod";
 import { sanitizePermissions } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { checkStaffSeat } from "./auth.js";
+import { gateFeature } from "./client-flags.js";
 import { j, parseJson } from "./db.js";
 
 const ROLES = ["owner", "trainer", "assistant", "client"] as const;
@@ -46,17 +47,17 @@ export const memberRoutes = new Hono<AppEnv>()
     if (body.data.role === "owner" && c.get("role") !== "owner" && !isPlatformAdmin(c)) {
       return c.json({ error: "only an owner can assign the owner role" }, 403);
     }
-    // AUDIT FINDING, NOT FIXED HERE — the assistant seat is the OTHER half of
-    // what `frontDesk` sells (SPEC §5: "Assistant role + sessions/booking"), and
-    // only the sessions half is gated: a tenant on a plan without frontDesk can
-    // still mint assistants, and `access.ts` grants that role real powers. The
-    // gate belongs right here (`gateFeature(c, "sessions")` when
-    // `body.data.role === "assistant"`, plus `beforeCreateInvitation` in auth.ts
-    // for the invite path), but landing it flips
-    // `test/entitlement-guards.test.ts` "role promotion (client → staff) is
-    // counted against the ceiling", which asserts trainer→assistant returns 200
-    // on the `free` plan to prove sideways moves aren't seat-checked. That test
-    // needs its sideways-move target changed off `assistant` in the same commit.
+    // The assistant seat is the OTHER half of what `frontDesk` sells (SPEC §5:
+    // "Assistant role + sessions/booking"). Only the sessions half used to be
+    // gated, so a tenant on a plan without frontDesk could still mint assistants —
+    // and `access.ts` grants that role real powers (whole-roster read, the whole
+    // scheduling surface). Gating the role itself closes the paid capability at
+    // both ends. The invite path is gated in `auth.ts`'s `beforeCreateInvitation`,
+    // so neither door is left open.
+    if (body.data.role === "assistant") {
+      const gate = await gateFeature(c, "sessions");
+      if (gate) return gate;
+    }
     const target = await c.env.DB.prepare(
       'SELECT role FROM "member" WHERE organizationId = ? AND userId = ?',
     )
