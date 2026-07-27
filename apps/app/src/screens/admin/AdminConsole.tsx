@@ -1258,7 +1258,7 @@ const FAILURE_LABEL: Record<string, string> = {
   insufficient_credits: "the studio is out of credits",
   transport: "the call never completed (timeout / network)",
   provider: "the provider returned an error",
-  empty: "a 200 with an empty body",
+  empty: "the model answered with nothing (no credits charged)",
   unparseable_json: "the answer was not JSON the product can read",
   schema: "valid JSON, wrong shape for this feature",
 };

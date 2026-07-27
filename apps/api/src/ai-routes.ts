@@ -1722,6 +1722,10 @@ function classifyUnavailable(detail: string): { failure: SelfTestFailure; status
   if (d.includes("is turned off in ai settings")) return { failure: "feature_off", status: "blocked" };
   if (d.includes("provider not configured") || d.includes("no enabled model")) return { failure: "not_configured", status: "blocked" };
   if (d.includes("timeout")) return { failure: "transport", status: "fail" };
+  // `generate()` now throws on an empty body instead of settling credits for
+  // nothing, so this arrives as a refusal. Keep the precise operator-facing
+  // cause rather than flattening it into the generic "provider error".
+  if (d.includes("empty model response")) return { failure: "empty", status: "fail" };
   return { failure: "provider", status: "fail" };
 }
 
