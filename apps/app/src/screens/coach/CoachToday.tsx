@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fmtWeight, type AttentionType } from "@kova/domain";
-import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, Avatar, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, CountUp, cn, type Tone, type LucideIcon } from "@kova/ui";
+import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, Avatar, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, CountUp, TierAnchor, ActionCluster, UserPlus, cn, type Tone, type LucideIcon } from "@kova/ui";
 import { attentionCoding, SEVERITY_TONE } from "../../attention-ui.js";
 import type { WidgetItem } from "@kova/protocol";
 import { api, todayLocal, shiftDay } from "../../api.js";
@@ -84,10 +84,7 @@ export function CoachToday() {
 
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
-      <div className="flex items-center justify-between px-1">
-        <h1 className="text-2xl font-bold tracking-tight">Today</h1>
-        <Button size="sm" variant="secondary" onClick={() => setWidgetsOpen(true)}><Sliders /> Customize</Button>
-      </div>
+
       <Reveal loading={!clients || !notifications} className="space-y-5" skeleton={
         <>
           <SkeletonHero height={150} />
@@ -113,8 +110,39 @@ export function CoachToday() {
           logsToday: activity.filter((e) => e.date === today).length,
           labsToReview: attention.totals.lab_review ?? 0,
         };
+        // The one number this screen is about (§1). A coach's Today is a TRIAGE
+        // surface, not a dashboard: the question on arrival is "does anything
+        // need me", and it deserves an answer in one glance rather than four
+        // tiles that each hold part of it. Zero is a real and good answer, so it
+        // gets its own wording instead of a bare "0".
+        const needsMe = widgetData.swaps + widgetData.atRisk + widgetData.unreadCheckins + widgetData.labsToReview;
         return (
           <>
+            <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
+              <p className="text-caption text-muted-foreground">
+                {clients.length === 0 ? "Your roster" : needsMe > 0 ? "Needs you today" : "Your roster"}
+              </p>
+              <p className="numeral text-display">
+                <CountUp value={needsMe > 0 ? needsMe : clients.length} />
+              </p>
+              <p className="text-caption text-muted-foreground">
+                {needsMe > 0
+                  ? `${needsMe === 1 ? "thing" : "things"} to look at`
+                  : clients.length === 0
+                    ? "No clients yet"
+                    : `${clients.length === 1 ? "client" : "clients"} · all clear`}
+              </p>
+            </TierAnchor>
+
+            <ActionCluster
+              items={[
+                { icon: UserPlus, label: "Add client", onClick: () => nav("/clients?new=1") },
+                { icon: Dumbbell, label: "New plan", onClick: () => nav("/library") },
+                { icon: Bell, label: "Inbox", onClick: () => nav("/inbox") },
+                { icon: Sliders, label: "Customise", onClick: () => setWidgetsOpen(true) },
+              ]}
+            />
+
             <Stagger>
               <WidgetCarousel catalog={widgetCatalog} items={widgetItems} defaults={DEFAULT_COACH_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
             </Stagger>

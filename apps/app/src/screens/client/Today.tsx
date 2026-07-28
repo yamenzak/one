@@ -308,7 +308,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
                       <div className="grid size-12 shrink-0 place-items-center rounded-2xl [&_svg]:size-6" style={{ backgroundColor: `color-mix(in oklch, ${tint} 15%, transparent)`, color: tint }}><notice.icon /></div>
                       <div className="min-w-0 flex-1">
                         <div className="text-xs font-medium uppercase tracking-wide" style={{ color: tint }}>{notice.eyebrow}</div>
-                        <h3 className="mt-0.5 text-lg font-semibold tracking-tight">{notice.title}</h3>
+                        <h3 className="mt-0.5 text-body-lg">{notice.title}</h3>
                         <p className="mt-0.5 text-sm text-muted-foreground">{notice.body}</p>
                       </div>
                       {tappable && <ChevronRight className="size-5 shrink-0 self-center text-muted-foreground" />}
@@ -339,7 +339,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
                       <ProgressRing size={66} strokeWidth={7} tone="primary" progress={pct || 0.001} value={<span className="text-sm font-bold">{done}/{total}</span>} softTrack tintValue />
                       <div className="min-w-0 flex-1">
                         <div className="text-xs font-medium uppercase tracking-wide text-primary">{ownView ? "Finish setting up" : "Profile incomplete"}</div>
-                        <h3 className="mt-0.5 text-lg font-semibold tracking-tight">{ownView ? dest.label : "Complete your profile"}</h3>
+                        <h3 className="mt-0.5 text-body-lg">{ownView ? dest.label : "Complete your profile"}</h3>
                         <p className="mt-0.5 text-sm text-muted-foreground">{ownView ? "A few details let your coach tailor your plans and targets to you." : "Ask this client to finish their profile for accurate targets."}</p>
                       </div>
                       {ownView && <ChevronRight className="size-5 shrink-0 self-center text-muted-foreground" />}

@@ -48,7 +48,7 @@ export function Explore({ clientId, onBack }: { clientId: string; onBack: () => 
       <div className="flex items-center gap-3">
         <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">Explore</h1>
+          <h1 className="text-title-2">Explore</h1>
           <p className="text-sm text-muted-foreground">Guides &amp; recipes from your coach</p>
         </div>
       </div>

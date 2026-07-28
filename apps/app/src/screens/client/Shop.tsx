@@ -127,7 +127,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
           <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
         )}
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">Shop</h1>
+          <h1 className="text-title-2">Shop</h1>
           <p className="truncate text-xs text-muted-foreground">Plans &amp; packages{studio ? ` from ${studio}` : ""}</p>
         </div>
         {locked && <Button size="sm" variant="ghost" onClick={() => void signOut()}><LogOut /> Sign out</Button>}

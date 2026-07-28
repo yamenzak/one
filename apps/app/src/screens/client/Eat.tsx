@@ -6,6 +6,7 @@ import {
   Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MetricChip, MetricPill, ProgressRing, METRICS, toneSoft, Eyebrow, Page, Stagger, EmptyState, motion, ConfirmDialog,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
   Plus, Utensils, Croissant, Soup, Apple, Dumbbell, Trash2, AlertTriangle, type LucideIcon,
+  TierAnchor, CountUp,
 } from "@kova/ui";
 import type { UnitPrefs } from "@kova/domain";
 import { api, errorText, isQueued, todayLocal } from "../../api.js";
@@ -158,7 +159,20 @@ export function Eat({ clientId }: { clientId: string }) {
 
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
-      <h1 className="text-2xl font-bold tracking-tight">Eat</h1>
+      {/* T1 (§1). Nobody opens Eat to read the word "Eat" — they open it to find
+          out how much room is left. With no target there is no "left", so the
+          anchor shows what has been eaten instead of inventing a denominator. */}
+      <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
+        <p className="text-caption text-muted-foreground">{calTarget > 0 ? "Left today" : "Eaten today"}</p>
+        <p className="numeral text-display">
+          <CountUp value={kcalToDisplay(calTarget > 0 ? Math.max(0, remaining) : total, units)} />
+        </p>
+        <p className="text-caption text-muted-foreground">
+          {calTarget > 0
+            ? `of ${kcalToDisplay(calTarget, units).toLocaleString()} ${units.energy === "kJ" ? "kJ" : "kcal"}`
+            : units.energy === "kJ" ? "kJ" : "kcal"}
+        </p>
+      </TierAnchor>
 
       {error && !entries ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load your day" description="Something went wrong loading your diary. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
@@ -194,7 +208,7 @@ export function Eat({ clientId }: { clientId: string }) {
               <div className="relative flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-xs font-medium uppercase tracking-wide text-nutrition">Your meal plan</div>
-                  <h2 className="mt-0.5 truncate text-xl font-semibold tracking-tight">{mealPlan.name}</h2>
+                  <h2 className="mt-0.5 truncate text-title-3">{mealPlan.name}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">{mealPlan.meals} meal{mealPlan.meals === 1 ? "" : "s"} · {mealPlan.options} options to choose from</p>
                 </div>
                 <div className="grid size-12 shrink-0 place-items-center rounded-full bg-nutrition-soft text-nutrition [&_svg]:size-6"><Utensils /></div>

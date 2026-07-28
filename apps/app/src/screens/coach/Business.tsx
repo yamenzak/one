@@ -212,7 +212,7 @@ function Overview() {
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
-      <h1 className="text-2xl font-bold tracking-tight">Business</h1>
+      <h1 className="text-title-2">Business</h1>
 
       {error && !billing ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load your business" description="Something went wrong. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />

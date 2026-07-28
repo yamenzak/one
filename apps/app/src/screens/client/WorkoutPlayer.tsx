@@ -218,7 +218,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
             <div className="pointer-events-none absolute -right-10 -top-10 size-36 rounded-full bg-primary/10 blur-2xl" />
             <div className="relative">
               <div className={cn("text-xs font-medium uppercase tracking-wide", isPast ? "text-muted-foreground" : "text-activity")}>{isPast ? "Past plan" : "Your plan"}</div>
-              <h2 className="mt-0.5 text-xl font-semibold tracking-tight">{active?.name}</h2>
+              <h2 className="mt-0.5 text-title-3">{active?.name}</h2>
               <p className="mt-1 text-sm text-muted-foreground">{trainingDays} training day{trainingDays === 1 ? "" : "s"}{active?.publishedAt ? ` · ${new Date(active.publishedAt).toLocaleDateString()}` : ""}</p>
               {isPast ? (
                 <button onClick={() => pickPlan(null)} className="mt-3 inline-flex items-center gap-1 rounded-full bg-activity-soft px-3 py-1 text-xs font-semibold text-activity [&_svg]:size-3.5"><ArrowLeft /> Back to current plan</button>
