@@ -231,13 +231,18 @@ function TabLayout() {
     : undefined;
 
   return (
-    <div className="min-h-dvh pb-20 md:pb-0 md:pl-24">
+    <div className="relative min-h-dvh pb-20 md:pb-0 md:pl-24">
       {/* Ambient hero wash — each section's domain token bleeds from the top and
-          fades into the background, crossfading as you move between pages. */}
+          fades into the background, crossfading as you move between pages.
+          This is the Shell's `Atmosphere` (UI-LANGUAGE §3), and it is `absolute`
+          rather than `fixed` for the reason the language gives: a wash pinned to
+          the VIEWPORT is a wallpaper that follows you down the page, while one
+          pinned to the SCROLL CONTAINER is the top of a space and scrolls away.
+          The difference is most of why the reference apps feel like places. */}
       {ambient && (
         <div
           aria-hidden
-          className="pointer-events-none fixed inset-x-0 top-0 z-0 h-[52vh] transition-[background-color] duration-500 ease-out md:left-24"
+          className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[52vh] transition-[background-color] duration-500 ease-out md:left-24"
           style={{
             backgroundColor: `color-mix(in oklch, ${ambientColor} 24%, transparent)`,
             maskImage: "linear-gradient(to bottom, black 0%, black 6%, transparent 100%)",
@@ -385,7 +390,27 @@ function TabLayout() {
       {/* Remount the routed content when the APP tour toggles, so screens refetch
           through the (mock ↔ live) api interceptor. The workout/meal tours annotate
           the real screen in place, so they must NOT remount it. */}
-      <main key={activeTour === "app" ? "tour" : "live"}><ErrorBoundary resetKey={loc.pathname}><Outlet /></ErrorBoundary></main>
+      {/*
+        THE CONTENT COLUMN — UI-LANGUAGE §2, §11.
+
+        Every screen renders inside one centred column that stops growing at
+        720px. Without it, desktop was the anti-pattern the language names
+        explicitly: a row stretched to 1400px with its value floating in the
+        void, a banner spanning the whole viewport, and a hero whose two halves
+        drifted apart until they stopped reading as one object.
+
+        Wider viewports get MORE COLUMNS, never a wider one — which is also why
+        every card in the product can be designed once and be pixel-correct at
+        any width: it is never asked to be a different shape.
+
+        Applied here, once, rather than in ~40 screens that would each have to
+        remember. Screens that genuinely need the full width (a plan builder
+        canvas, a two-pane roster) opt out with `data-fullbleed` on their own
+        root, which the negative margins below release.
+      */}
+      <main key={activeTour === "app" ? "tour" : "live"} className="mx-auto w-full max-w-[640px] lg:max-w-[720px] [&>[data-fullbleed]]:max-w-none">
+        <ErrorBoundary resetKey={loc.pathname}><Outlet /></ErrorBoundary>
+      </main>
       </div>
 
       <BottomTabs tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} tinted={tintedNav} />
