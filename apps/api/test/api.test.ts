@@ -14,7 +14,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@kova/protocol";
 import { ensureSchema } from "../src/db.js";
 import { clientDigestHtml, coachDigestHtml } from "../src/digest.js";
-import { emailBar, emailBars, emailSparkline, emailRing, emailStatRow, emailListRow, KOVA_BRAND } from "../src/mailer.js";
+import { emailBar, emailBars, emailSparkline, emailRing, emailStatRow, emailListRow, KOVA_BRAND, PLATFORM_FROM_DEFAULT } from "../src/mailer.js";
 import { purgeClient, purgeTenant } from "../src/purge.js";
 import { verifyActionOtp } from "../src/action-otp.js";
 
@@ -430,7 +430,10 @@ describe("notifications — email provider + per-user preferences", () => {
     expect(settings.email.brevoKeySet).toBe(true); // masked — the key itself never returns
     expect(settings.email.ready).toBe(true);
     expect(settings.email.senderEmail).toBe("coach@studio.com");
-    expect(settings.emailPlatformFrom).toContain("fourdegreelabs.com");
+    // The platform sender, which three call sites used to inline separately.
+    // Asserted against the exported constant so a future change moves in one
+    // place instead of leaving `GET /admin/email` and the actual send disagreeing.
+    expect(settings.emailPlatformFrom).toBe(PLATFORM_FROM_DEFAULT);
 
     // Notification preferences: categories scoped to the owner role + defaults.
     const prefs0 = (await (await SELF.fetch(`${ORIGIN}/api/notification-prefs`, { headers: auth(ownerCookie) })).json()) as { categories: { key: string }[]; prefs: Record<string, { inbox: boolean; email: boolean }> };

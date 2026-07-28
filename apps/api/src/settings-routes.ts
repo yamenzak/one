@@ -17,6 +17,7 @@ import { parseJson, j } from "./db.js";
 import { invalidateTenantHosts } from "./host-context.js";
 import { PROVIDERS, resolveIntegrations, maskIntegrations } from "./integrations.js";
 import { resolveEmailConfig, maskEmailConfig } from "./email-provider.js";
+import { PLATFORM_FROM_DEFAULT } from "./mailer.js";
 
 const notifRole = (r: string | null | undefined): NotifRole => (r === "owner" || r === "trainer" || r === "assistant" || r === "client" ? r : "member");
 import { AI_FEATURES } from "./ai-features.js";
@@ -29,7 +30,7 @@ export const settingsRoutes = new Hono<AppEnv>()
       .bind(who.tenantId)
       .first<{ branding_json: string | null; ai_toggles_json: string | null; marketplace_json: string | null; integrations_json: string | null; email_config_json: string | null; notif_policy_json: string | null; stripe_account_id: string | null }>();
     const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    const platformFrom = (await getConfig(c.env.DB))["email.platform_from"] || "Kova <noreply@fourdegreelabs.com>";
+    const platformFrom = (await getConfig(c.env.DB))["email.platform_from"] || PLATFORM_FROM_DEFAULT;
     return c.json({
       branding: parseJson(row?.branding_json, { accent: null, logoUrl: null, welcome: null }),
       aiToggles: parseJson(row?.ai_toggles_json, {}),

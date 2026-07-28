@@ -16,6 +16,18 @@ export interface SendResult {
   error?: string;
 }
 
+/**
+ * The PLATFORM sender — the address Kova's own mail (and any tenant on the
+ * platform lane) goes out as. One constant because three call sites used to
+ * inline it and drifted at the rename, so `GET /admin/email` could report one
+ * default while `email-provider.ts` sent with another.
+ *
+ * Only the default. A stored `email.platform_from` always wins, and the address
+ * must be onboarded + verified under Cloudflare → Email → Email Sending before
+ * anything actually delivers.
+ */
+export const PLATFORM_FROM_DEFAULT = "Kova <noreply@kova.4dl.app>";
+
 async function getEmailConfig(db: D1Database): Promise<{ provider: string; from: string }> {
   try {
     const rows = await db
