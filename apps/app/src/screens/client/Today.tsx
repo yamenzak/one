@@ -7,7 +7,7 @@ import { fmtVolume, fmtEnergy, fmtWeight, featureEnabled, type UnitPrefs } from 
 import {
   Button, Card, Skeleton, MacroBar, IconBadge, Sheet, EmptyState, ProgressRing,
   Reveal, SkeletonHero, SkeletonList, SkeletonHeader,
-  Page, Stagger, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
+  Page, Stagger, TierAnchor, ActionCluster, CountUp, Unit, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
   Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Send, Info, Utensils, Croissant, Soup, Apple,
   Store, Ticket, AlertTriangle, ShieldCheck, toneVar, ChevronLeft, ChevronRight, Target, ScanLine, Calendar, BookOpen, type Tone, type LucideIcon,
 } from "@kova/ui";
@@ -194,6 +194,32 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   const targets = data?.goal?.targets ?? null;
   const widgetData: ClientWidgetData | null = data ? { clientId, units, bundle: data } : null;
 
+  /**
+   * The anchor value: energy taken in, net of what was burned, against target.
+   *
+   * Rendered in the client's own unit (kcal or kJ) and, when a target exists,
+   * counting toward it — "1,840 of 2,200" is a sentence a person can act on;
+   * "1,840" alone is trivia. With no target set the sub-line says so rather than
+   * inventing a denominator, because a progress claim against a number nobody
+   * chose is worse than no claim.
+   */
+  const energyAnchor = useMemo(() => {
+    const label = units.energy === "kJ" ? "Energy today" : "Calories today";
+    if (!data) return { label, value: 0, unit: "", sub: "" };
+    const net = Math.max(0, data.nutrition.calories - data.burnedKcal);
+    const target = targets?.targetCalories ?? 0;
+    // `fmtEnergy` returns a formatted string with the unit; the anchor needs the
+    // number and the unit apart so the unit can be rendered subordinate (§5).
+    const shown = units.energy === "kJ" ? Math.round(net * 4.184) : Math.round(net);
+    const shownTarget = units.energy === "kJ" ? Math.round(target * 4.184) : Math.round(target);
+    return {
+      label,
+      value: shown,
+      unit: units.energy === "kJ" ? " kJ" : "",
+      sub: target > 0 ? `of ${shownTarget.toLocaleString()} target` : "No target set yet",
+    };
+  }, [data, targets, units.energy]);
+
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       {error && !data ? (
@@ -229,6 +255,44 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
               : <button onClick={() => setDate((d) => (d < today ? shiftDay(d, 1) : d))} aria-label="Next day" className="grid size-9 shrink-0 place-items-center rounded-full bg-background/25 text-muted-foreground backdrop-blur-md transition-colors hover:bg-background/40 hover:text-foreground [&_svg]:size-4"><ChevronRight /></button>}
           </Stagger>
           {!isToday && <button onClick={() => setDate(today)} className="mx-auto block text-xs font-medium text-primary">Jump to today</button>}
+
+          {/*
+            T1 — THE ANCHOR (UI-LANGUAGE §1).
+
+            This screen had no single largest thing: a customizable widget
+            carousel, a macro bar and a button row, all at comparable weight, so
+            the eye had nowhere to land and every visit began with a scan. The
+            day's energy is what Today is *about* — one noun, one number — so it
+            is now the anchor, and the carousel drops to T3 where it belongs as
+            supporting detail rather than a competing hero.
+
+            Net of what you burned, because that is the number a client acts on.
+          */}
+          <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
+            <p className="text-caption text-muted-foreground">{energyAnchor.label}</p>
+            <p className="numeral text-display">
+              <CountUp value={energyAnchor.value} />
+              {energyAnchor.unit && <Unit>{energyAnchor.unit}</Unit>}
+            </p>
+            <p className="text-caption text-muted-foreground">{energyAnchor.sub}</p>
+          </TierAnchor>
+
+          {/*
+            T2 — what you came here to DO. Circular icon + label, never a row of
+            text buttons: a circle reads as an action, and four of them read as a
+            set of choices rather than one shouted primary and its runners-up.
+          */}
+          {isToday && ownView && (
+            <ActionCluster
+              items={[
+                { icon: Plus, label: "Log", onClick: () => setLogOpen(true) },
+                { icon: Play, label: "Start", onClick: onStart, disabled: !data.publishedWorkoutPlan },
+                { icon: ClipboardList, label: "Check in", onClick: () => setCheckInOpen(true) },
+                { icon: PencilLine, label: "Customise", onClick: () => setWidgetsOpen(true) },
+              ]}
+            />
+          )}
+
 
           {isToday && (() => {
             const notice = accessNotice(data.access);
@@ -309,20 +373,6 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
               targets={targets ? { proteinG: targets.targetProteinG, carbsG: targets.targetCarbsG, fatG: targets.targetFatG } : null}
             />
           </Stagger>
-
-          {isToday && (
-          <Stagger className="flex items-center gap-2.5">
-            <Button size="lg" className="flex-1" data-tour="today-log" onClick={() => setLogOpen(true)}>
-              <Plus /> Log
-            </Button>
-            <Button size="lg" variant="tonal" className="flex-1" onClick={onStart} disabled={!data.publishedWorkoutPlan}>
-              <Play /> Start
-            </Button>
-            <Button size="icon" variant="secondary" aria-label="Customize widgets" onClick={() => setWidgetsOpen(true)}>
-              <PencilLine />
-            </Button>
-          </Stagger>
-          )}
 
           {isToday && (
           <Stagger data-tour="today-agenda">

@@ -35,7 +35,13 @@ work list for the rewrite:
 | Entrance has no tier ordering — chrome animates with content | §8 |
 | Desktop is "rail + max-w-3xl", not the three shapes | §11 |
 
-Follow the order in UI-LANGUAGE.md §13: tokens → `Row`/`Group` → `Atmosphere`/
+**Closed so far:** tokens (type scale, radius ladder, motion, atmosphere
+opacity), `lib/animation.ts`, the spine components, `Choice`, wizard chrome,
+overlay keyframes and radii, shell chrome + scroll-away wash + content column.
+Screens rebuilt: the four doorways, sign-in, the three-step studio wizard, and
+the client's Today anchor. See UI-LANGUAGE §13 for the component registry.
+
+Follow the order in UI-LANGUAGE.md §14: tokens → `Row`/`Group` → `Atmosphere`/
 `Anchor` → motion → screen by screen.
 
 ---
