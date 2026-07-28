@@ -217,7 +217,36 @@ export async function invalidateTenantHosts(
     .bind(tenantId)
     .all<{ hostname: string }>()
     .catch(() => ({ results: [] as { hostname: string }[] }))).results ?? [];
-  await Promise.all(rows.map((r) => invalidateHostCache(env, r.hostname)));
+  const hostnames = new Set(rows.map((r) => r.hostname));
+
+  /**
+   * Plus the subdomain DERIVED from the slug — which is not necessarily the one in
+   * `tenant_domains`, and is the one that actually serves requests.
+   *
+   * `resolveHost` resolves the subdomain lane by slug off the organization row, so
+   * the serving hostname is `<org.slug>.<root>` whether or not a provisioning row
+   * exists or agrees. Enumerating only the table therefore missed the live cache
+   * key in three real situations: provisioning failed, a slug moved and the row
+   * did not follow, or the configured root differs from the row's (which is every
+   * local and test run, where requests arrive on `<slug>.localhost` while the row
+   * says `<slug>.<ROOT_DOMAIN>`).
+   *
+   * The symptom was a 60-second stale read of exactly the fields owners change most
+   * — branding and marketplace self-registration — so turning self-signup on left
+   * the public door still refusing strangers, with nothing to explain why.
+   */
+  const org = await db
+    .prepare('SELECT slug FROM "organization" WHERE id = ?')
+    .bind(tenantId)
+    .first<{ slug: string | null }>()
+    .catch(() => null);
+  if (org?.slug) {
+    hostnames.add(tenantHostname(org.slug, rootDomain(env)));
+    // Dev and the integration suite serve every studio on `<slug>.localhost`.
+    hostnames.add(tenantHostname(org.slug, "localhost"));
+  }
+
+  await Promise.all([...hostnames].map((h) => invalidateHostCache(env, h)));
 }
 
 // ── The resolver ─────────────────────────────────────────────────────────────
@@ -261,6 +290,12 @@ export async function resolveHost(
   }
 
   if (!fromCache) {
+    // The subdomain lane resolves by SLUG off the organization row, not through
+    // `tenant_domains`. The org row is the authoritative answer to "what is this
+    // studio's slug", so a studio is reachable at its own address even if the
+    // provisioning row failed to write — one fewer way to have a studio that
+    // exists and cannot be reached. The `subdomain` row is for the domains
+    // listing and operator visibility; see `canonicalHost`.
     tenant =
       shape.role === "tenant" && shape.slug
         ? await resolveSlugTenant(db, shape.slug)
@@ -370,15 +405,25 @@ export async function moveSubdomain(
  * dead end that would serve them nothing.
  */
 export async function canonicalHost(env: HostEnv, db: D1Database, tenantId: string): Promise<string> {
-  const row = await db
-    .prepare(
-      "SELECT hostname FROM tenant_domains WHERE tenant_id = ? AND status = 'active' " +
-        // 'custom' sorts before 'subdomain' alphabetically, which is the order we
-        // want; being explicit rather than relying on that is cheaper than the bug.
-        "ORDER BY CASE kind WHEN 'custom' THEN 0 ELSE 1 END, created_at LIMIT 1",
-    )
+  const custom = await db
+    .prepare("SELECT hostname FROM tenant_domains WHERE tenant_id = ? AND kind = 'custom' AND status = 'active' ORDER BY created_at LIMIT 1")
     .bind(tenantId)
     .first<{ hostname: string }>()
     .catch(() => null);
-  return row?.hostname ?? rootDomain(env);
+  if (custom?.hostname) return custom.hostname;
+
+  // Derived from the ORG's slug, not from the `subdomain` row.
+  //
+  // Both would normally agree, but they have different failure modes and only one
+  // of them is authoritative. `resolveHost` resolves a subdomain by looking the
+  // slug up on the organization, so the org row is what actually decides where a
+  // studio answers; the `subdomain` row exists for the domains listing. Deriving
+  // here means a failed or half-applied `moveSubdomain` cannot send a studio's
+  // invite emails to an address that no longer resolves.
+  const org = await db
+    .prepare('SELECT slug FROM "organization" WHERE id = ?')
+    .bind(tenantId)
+    .first<{ slug: string | null }>()
+    .catch(() => null);
+  return org?.slug ? tenantHostname(org.slug, rootDomain(env)) : rootDomain(env);
 }

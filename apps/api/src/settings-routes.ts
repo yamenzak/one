@@ -14,7 +14,7 @@ import { tenantEntitlements, getConfig } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
 import { nowIso, periodKey } from "./ids.js";
 import { parseJson, j } from "./db.js";
-import { invalidateHostCache } from "./host-context.js";
+import { invalidateTenantHosts } from "./host-context.js";
 import { PROVIDERS, resolveIntegrations, maskIntegrations } from "./integrations.js";
 import { resolveEmailConfig, maskEmailConfig } from "./email-provider.js";
 
@@ -147,12 +147,17 @@ export const settingsRoutes = new Hono<AppEnv>()
       .bind(who.tenantId, j(branding), j(aiToggles), j(marketplace), j(integrations), nowIso(), j(branding), j(aiToggles), j(marketplace), j(integrations), nowIso())
       .run();
 
-    // Branding changed → drop cached host resolutions for this tenant's custom
-    // domains so white-label branding refreshes without waiting out the 60s TTL.
-    if (d.branding) {
-      const domains = await c.env.DB.prepare("SELECT hostname FROM tenant_domains WHERE tenant_id = ?").bind(who.tenantId).all<{ hostname: string }>().catch(() => ({ results: [] as { hostname: string }[] }));
-      for (const dom of domains.results ?? []) await invalidateHostCache(c.env, dom.hostname);
-    }
+    // Branding or marketplace changed → drop this tenant's cached host resolutions
+    // so the change shows without waiting out the 60s TTL.
+    //
+    // `invalidateTenantHosts` covers the DERIVED subdomain as well as the rows in
+    // `tenant_domains`, which is the part this used to miss: the subdomain lane
+    // resolves by slug, so the live cache key is `<slug>.<root>` whether or not a
+    // provisioning row exists for it. And `marketplace` matters as much as
+    // `branding` — `allowSignup` is cached in the same payload, so turning self
+    // sign-up on left the studio's public door still refusing strangers for a
+    // minute, with nothing to explain why.
+    if (d.branding || d.marketplace) await invalidateTenantHosts(c.env, c.env.DB, who.tenantId);
 
     // Email provider config, merged so a blank key doesn't wipe a set one unless
     // explicitly cleared (empty string clears; undefined keeps).

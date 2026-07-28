@@ -23,7 +23,7 @@ import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import { ensureSchema } from "../src/db.js";
 
-const ORIGIN = "http://localhost:8787"; // treated as local by createAuth (non-secure cookies)
+const ORIGIN = "http://setup.localhost:8787";
 let ownerCookie = "";
 let otherCookie = "";
 

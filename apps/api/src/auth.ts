@@ -14,7 +14,7 @@
 import { betterAuth, APIError } from "better-auth";
 import { organization, emailOTP } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
-import { cookieDomainFor, rpIdFor, type HostShape } from "@mossa/domain";
+import { cookieDomainFor, isDevRoot, rpIdFor, type HostShape } from "@mossa/domain";
 import type { Env } from "./env.js";
 import { ac, roles } from "./access.js";
 import { withinQuota, hasFeature } from "./billing-store.js";
@@ -153,9 +153,16 @@ function seatError(verdict: SeatVerdict): APIError {
  * which is what background jobs (no request) get.
  */
 export function createAuth(env: Env, origin?: string, shape?: HostShape) {
-  // Local dev always wins: a localhost origin overrides the prod var so
-  // cookies stay non-Secure and callbacks point at the dev server.
-  const isLocal = Boolean(origin && /^http:\/\/(localhost|127\.0\.0\.1)/.test(origin));
+  // Local dev always wins: a loopback origin overrides the prod var so cookies
+  // stay non-Secure and callbacks point at the dev server.
+  //
+  // Derived from the host SHAPE when we have one, not from a regex on the origin.
+  // The regex only matched a literal `localhost` / `127.0.0.1` prefix, so the
+  // moment dev moved onto the real topology (`setup.localhost`, `acme.localhost`)
+  // every request stopped being "local": secure cookies over http, and — because
+  // the dev-secret fallback is gated on the same flag — auth refusing to start at
+  // all. One predicate for both, so they cannot disagree again.
+  const isLocal = shape ? isDevRoot(shape) : Boolean(origin && /^http:\/\/(localhost|127\.0\.0\.1)/.test(origin));
   // The REQUEST origin drives baseURL — so on a studio's subdomain or its custom
   // domain, callbacks and emailed links point back at the door the user actually
   // came through. BETTER_AUTH_URL is only the fallback when there's no request

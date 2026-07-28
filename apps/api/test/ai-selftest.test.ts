@@ -46,7 +46,7 @@ import { seedAiModels } from "../src/ai.js";
 import { syncModelCatalog, evaluateSelfTestOutput, selfTestCheck, SELF_TEST_CHECKS, PRICING_SOURCES, type FetchedDoc } from "../src/ai-routes.js";
 import type { AiModelRow } from "../src/ai.js";
 
-const ORIGIN = "http://localhost:8787"; // treated as local by createAuth (non-secure cookies)
+const ORIGIN = "http://setup.localhost:8787";
 const OWNER_EMAIL = "selftest-owner@test.dev";
 
 let ownerCookie = "";

@@ -29,7 +29,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { FEATURE_KEYS, RESERVED_FEATURES, featuresForEntitlement, type ClientFlags } from "@mossa/domain";
 import { ensureSchema } from "../src/db.js";
 
-const B = "http://localhost:8787"; // treated as local by createAuth (non-secure cookies)
+const B = "http://setup.localhost:8787";
 
 function grabCookies(res: Response): string {
   const headers = res.headers as Headers & { getSetCookie?: () => string[] };

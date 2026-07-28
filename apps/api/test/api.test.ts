@@ -18,7 +18,13 @@ import { emailBar, emailBars, emailSparkline, emailRing, emailStatRow, emailList
 import { purgeClient, purgeTenant } from "../src/purge.js";
 import { verifyActionOtp } from "../src/action-otp.js";
 
-const ORIGIN = "http://localhost:8787"; // treated as local by createAuth (non-secure cookies)
+// The SETUP door. `*.localhost` resolves to loopback everywhere, so the suite runs
+// on the real host topology rather than a simulation of it: studios are created
+// here, session-scoped tenancy works here, and OTP send is allowed here — the ROOT
+// door (`localhost` alone) deliberately refuses to send a sign-in code, because no
+// studio lives there. Local, so createAuth keeps cookies non-Secure.
+// Tenant-DOOR behaviour (`<slug>.localhost`) is covered in hosts.test.ts.
+const ORIGIN = "http://setup.localhost:8787";
 let ownerCookie = "";
 let otherCookie = "";
 
@@ -1975,65 +1981,130 @@ describe("custom domains (SPEC §14.1) — Host pins the tenant", () => {
     expect(sw.status).toBe(409);
   });
 
-  it("platform host resolves no tenant", async () => {
-    const host = (await (await SELF.fetch("http://localhost:8787/api/host")).json()) as { platform: boolean; tenant: unknown };
+  it("the ROOT door resolves no tenant and is not an app", async () => {
+    const host = (await (await SELF.fetch("http://localhost:8787/api/host")).json()) as { role: string; platform: boolean; tenant: unknown };
+    expect(host.role).toBe("root");
     expect(host.platform).toBe(true);
     expect(host.tenant).toBe(null);
+
+    // And it serves nothing else. `kova.4dl.app` by itself is a signpost, so a
+    // tenant route there is a 404 rather than a session-scoped fallback.
+    const clients = await SELF.fetch("http://localhost:8787/api/clients", { headers: auth(ownerCookie) });
+    expect(clients.status).toBe(404);
   });
 
-  it("branded login: /t/<slug> resolves a tenant on the platform host without pinning it", async () => {
+  it("a studio's SUBDOMAIN pins its tenancy, with no domains row needed", async () => {
+    // Resolution goes through the organization's slug, not `tenant_domains` — so a
+    // studio answers at its own address even if provisioning never wrote a row.
+    const host = (await (await SELF.fetch("http://studio-one.localhost:8787/api/host")).json()) as {
+      role: string; platform: boolean; tenant: { slug: string; name: string } | null;
+    };
+    expect(host.role).toBe("tenant");
+    expect(host.platform).toBe(false);
+    expect(host.tenant?.slug).toBe("studio-one");
+    expect(host.tenant?.name).toBe("Studio One");
+
+    const member = (await (await SELF.fetch("http://studio-one.localhost:8787/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } | null; hostTenantId: string | null };
+    expect(member.hostTenantId).toBe(tenantId);
+    expect(member.active?.tenantId).toBe(tenantId);
+
+    // A stranger's session gets no scope here, exactly as on a custom domain.
+    const stranger = (await (await SELF.fetch("http://studio-one.localhost:8787/api/context", { headers: auth(otherCookie) })).json()) as { active: unknown };
+    expect(stranger.active).toBe(null);
+  });
+
+  it("a well-formed subdomain with NO studio is 'no studio', not a login", async () => {
+    const host = await SELF.fetch("http://nobody-here.localhost:8787/api/host");
+    const body = (await host.json()) as { role: string; tenant: unknown };
+    expect(body.role).toBe("tenant");
+    expect(body.tenant).toBe(null);
+    // Everything else on that host refuses, so nothing invites a sign-in to a
+    // studio that does not exist.
+    const ctx = await SELF.fetch("http://nobody-here.localhost:8787/api/context", { headers: auth(ownerCookie) });
+    expect(ctx.status).toBe(404);
+  });
+
+  it("a RESERVED label under the root serves nothing at all", async () => {
+    // Not a studio and not a candidate custom domain: if `api.<root>` fell through
+    // to the custom-domain lookup, whose key column an owner can write to, a tenant
+    // could claim an infrastructure host through the domains form.
+    // `setup` and `admin` are excluded on purpose: they ARE doors and answer here.
+    for (const label of ["api", "www", "mail", "billing", "login"]) {
+      const res = await SELF.fetch(`http://${label}.localhost:8787/api/host`);
+      expect(res.status, label).toBe(404);
+    }
+  });
+
+  it("the operator lane answers ONLY on the admin door in production shape", async () => {
+    // Dev has a single root and therefore no separate door, so the restriction
+    // stands down there (isDevRoot) — which is why this asserts the door is
+    // REACHABLE on localhost rather than asserting the negative it cannot show.
+    const ok = await SELF.fetch("http://admin.localhost:8787/api/admin/domains/config", { headers: auth(ownerCookie) });
+    expect([200, 403]).toContain(ok.status);
+  });
+
+  it("the studio's own door carries its login branding, pre-auth", async () => {
     // Owner customizes their sign-in screen; saved under branding.login.
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const saved = await SELF.fetch("http://localhost:8787/api/settings", {
+    const saved = await SELF.fetch("http://setup.localhost:8787/api/settings", {
       method: "PATCH", headers: H,
       body: JSON.stringify({ branding: { login: { tagline: "Train with us", headline: "Your journey starts here", showPasskey: false } } }),
     });
     expect(saved.status).toBe(200);
 
-    // The platform host + ?slug brands the login (Studio One → slug "studio-one")
-    // but stays platform:true so cross-tenant switching still works after sign-in.
-    const branded = (await (await SELF.fetch("http://localhost:8787/api/host?slug=studio-one")).json()) as {
+    // `/t/<slug>` and the `?slug=`/`?t=` hints are gone: there is no shared host
+    // left to disambiguate, so the hostname alone decides which brand shows AND
+    // which tenancy is in force. Those could only ever brand, never pin — the bug
+    // class this replaces is a login wearing studio B's brand over studio A's data.
+    const branded = (await (await SELF.fetch("http://studio-one.localhost:8787/api/host")).json()) as {
       platform: boolean; tenant: { name: string; slug: string; branding: { login?: { tagline?: string; showPasskey?: boolean } } } | null;
     };
-    expect(branded.platform).toBe(true);
+    expect(branded.platform).toBe(false);
     expect(branded.tenant?.slug).toBe("studio-one");
     expect(branded.tenant?.branding?.login?.tagline).toBe("Train with us");
     expect(branded.tenant?.branding?.login?.showPasskey).toBe(false);
-
-    // An unknown slug just falls back to the neutral platform entry.
-    const unknown = (await (await SELF.fetch("http://localhost:8787/api/host?slug=nope-not-real")).json()) as { platform: boolean; tenant: unknown };
-    expect(unknown.platform).toBe(true);
-    expect(unknown.tenant).toBe(null);
   });
 
-  it("an emailed link's ?t= hint brands the login BEFORE sign-in", async () => {
-    // Every notification CTA carries `?t=<tenantId>`. That hint used to be read
-    // only AFTER the session resolved, so a signed-out recipient clicked a link
-    // that named their studio explicitly and still got a studio-less Mossa login
-    // — the screen their passkey and their coach's brand are not on.
-    const ctx = (await (await SELF.fetch("http://localhost:8787/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string; tenantSlug: string } };
-    const byId = (await (await SELF.fetch(`http://localhost:8787/api/host?t=${encodeURIComponent(ctx.active.tenantId)}`)).json()) as {
-      platform: boolean; tenant: { tenantId: string; slug: string } | null;
-    };
-    expect(byId.tenant?.tenantId).toBe(ctx.active.tenantId);
-    expect(byId.tenant?.slug).toBe(ctx.active.tenantSlug);
-    // Branding the door must NOT pin the tenant — cross-tenant switching after
-    // sign-in depends on the platform host staying platform.
-    expect(byId.platform).toBe(true);
+  it("reports the studio's billing gate so the app can say 'paused' up front", async () => {
+    const db = env.DB as D1Database;
+    const before = (await (await SELF.fetch("http://studio-one.localhost:8787/api/host")).json()) as { gate: { readOnly: boolean; reason: string } | null };
+    expect(before.gate?.readOnly).toBe(false);
 
-    // A bogus id is not a way to enumerate studios, and not a crash either.
-    const bogus = (await (await SELF.fetch("http://localhost:8787/api/host?t=org_does_not_exist")).json()) as { platform: boolean; tenant: unknown };
-    expect(bogus.platform).toBe(true);
-    expect(bogus.tenant).toBe(null);
+    const prior = await db.prepare("SELECT status FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<{ status: string }>();
+    await db.prepare("UPDATE subscriptions SET status = 'suspended' WHERE tenant_id = ?").bind(tenantId).run();
+    try {
+      const paused = (await (await SELF.fetch("http://studio-one.localhost:8787/api/host")).json()) as { gate: { readOnly: boolean; reason: string } | null };
+      expect(paused.gate).toEqual({ readOnly: true, reason: "suspended" });
+
+      // The gate is not cached with the identity, so a suspension bites at once —
+      // and a payment lifts it at once, which is the direction that matters.
+      const write = await SELF.fetch("http://studio-one.localhost:8787/api/clients", {
+        method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) },
+        body: JSON.stringify({ displayName: "During suspension" }),
+      });
+      expect(write.status).toBe(402);
+      expect(((await write.json()) as { error: string }).error).toBe("studio_read_only");
+
+      // Reads are never gated: a person's own data is not collateral.
+      const read = await SELF.fetch("http://studio-one.localhost:8787/api/clients", { headers: auth(ownerCookie) });
+      expect(read.status).toBe(200);
+    } finally {
+      await db.prepare("UPDATE subscriptions SET status = ? WHERE tenant_id = ?").bind(prior?.status ?? "active", tenantId).run();
+    }
   });
 });
 
 describe("OTP-send gate — sign-up eligibility + cooldown", () => {
-  const SEND = "http://localhost:8787/api/auth/email-otp/send-verification-otp";
+  // The STUDIO's own door. Eligibility is a property of the studio being signed
+  // into, and the host is what names it — the `slug` in the body is accepted and
+  // ignored (an older cached SPA still sends it). The bodies below keep it for
+  // exactly that reason: it must not change the outcome.
+  const STUDIO = "http://studio-one.localhost:8787";
+  const SEND = `${STUDIO}/api/auth/email-otp/send-verification-otp`;
   const send = (body: Record<string, unknown>) =>
-    SELF.fetch(SEND, { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:8787" }, body: JSON.stringify(body) });
+    SELF.fetch(SEND, { method: "POST", headers: { "content-type": "application/json", origin: STUDIO }, body: JSON.stringify(body) });
   const setSelfRegister = (on: boolean) =>
-    SELF.fetch("http://localhost:8787/api/settings", { method: "PATCH", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ marketplace: { selfRegister: on } }) });
+    SELF.fetch(`${STUDIO}/api/settings`, { method: "PATCH", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ marketplace: { selfRegister: on } }) });
 
   it("invite-only studio turns a brand-new email away", async () => {
     await setSelfRegister(false);
@@ -2099,8 +2170,9 @@ describe("OTP-send gate — sign-up eligibility + cooldown", () => {
   }, 30_000);
 
   it("enforces a per-email cooldown between codes", async () => {
+    await setSelfRegister(true);
     const first = await send({ email: "cooldown-1@test.dev", type: "sign-in" });
-    expect(first.status).toBe(200); // platform host, no tenant → always allowed
+    expect(first.status).toBe(200);
     const second = await send({ email: "cooldown-1@test.dev", type: "sign-in" });
     expect(second.status).toBe(429);
     expect(((await second.json()) as { retryAfterSec: number }).retryAfterSec).toBeGreaterThan(0);
@@ -2124,7 +2196,7 @@ describe("OTP-send gate — sign-up eligibility + cooldown", () => {
 describe("passkey — Better Auth endpoint methods (regression)", () => {
   // The option endpoints are GETs; the client used to POST them and silently
   // 404'd, so passkey enroll + sign-in never worked. Lock the methods in.
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   it("register-options is GET (POST 404s); authenticate-options is GET and pre-auth", async () => {
     const getReg = await SELF.fetch(`${B}/api/auth/passkey/generate-register-options`, { headers: auth(ownerCookie) });
     expect(getReg.status).toBe(200);
@@ -2160,7 +2232,7 @@ describe("passkey — Better Auth endpoint methods (regression)", () => {
 });
 
 describe("white-label — public brand assets + per-tenant PWA manifest", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   it("brand assets read without auth; other media stays private", async () => {
     // Upload a brand asset through the API (as the owner), then read it back
     // with NO session — the login/favicon/PWA path.
@@ -2202,7 +2274,7 @@ describe("white-label — public brand assets + per-tenant PWA manifest", () => 
 });
 
 describe("access gate — clientAccess in context", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
   // OTP sign-in only (no org creation) — the invited-client path.
   const clientSignIn = async (email: string): Promise<string> => {
@@ -2247,7 +2319,7 @@ describe("access gate — clientAccess in context", () => {
 });
 
 describe("supplements — pausing hides from the client + blocks logging", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
   const clientSignIn = async (email: string): Promise<string> => {
     const db = env.DB as D1Database;
@@ -3164,7 +3236,7 @@ describe("email digest — data-viz primitives + rich builders (pure render)", (
 });
 
 describe("storage accounting + quota gate", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   it("records uploads in the ledger, meters usage, and blocks over quota", async () => {
     const db = env.DB as D1Database;
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
@@ -3202,7 +3274,7 @@ describe("storage accounting + quota gate", () => {
 });
 
 describe("media library — role-scoped list + delete", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   it("owner lists media, deletes it, and the delete tombstones + scrubs the reference", async () => {
     const db = env.DB as D1Database;
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
@@ -3237,7 +3309,7 @@ describe("media library — role-scoped list + delete", () => {
 });
 
 describe("GDPR — action OTP + cascade purge", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   const sha256Hex = async (s: string): Promise<string> => {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
     return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -3286,7 +3358,7 @@ describe("GDPR — action OTP + cascade purge", () => {
 });
 
 describe("studio close + tenant purge", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   const sha = async (s: string): Promise<string> => {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
     return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -3329,7 +3401,7 @@ describe("studio close + tenant purge", () => {
 });
 
 describe("platform nuclear reset — guards", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   it("refuses without the exact confirm phrase, and without a valid OTP", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     // Wrong phrase → 400 BEFORE anything is touched (the confirm gate is first).
@@ -3355,7 +3427,7 @@ describe("platform nuclear reset — guards", () => {
  * reads their own screens depend on.
  */
 describe("client persona — self-service writes pass the action gate", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
   const clientSignIn = async (email: string): Promise<string> => {
     const db = env.DB as D1Database;
@@ -3429,7 +3501,7 @@ describe("client persona — self-service writes pass the action gate", () => {
  * only layer that can still return a real status.
  */
 describe("OTP send — an undeliverable provider returns a real error, not a silent success", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
 
   it("503s with email_not_configured when the provider cannot deliver", async () => {
     const db = env.DB as D1Database;
@@ -3491,7 +3563,7 @@ describe("OTP send — an undeliverable provider returns a real error, not a sil
  * route-guard action-gate (RBAC) rejections.
  */
 describe("row-level scope on client-owned rows (round-4 audit)", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
 
   /** A studio, two clients (one assigned to a trainer, one not), a trainer session
    *  and a client-role session. Its own tenant so plan caps stay out of the way. */
@@ -3802,7 +3874,7 @@ describe("platform rail — refunds reverse credits proportionally + incremental
 });
 
 describe("client flags union across concurrent access rows", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
   const clientSignIn = async (email: string): Promise<string> => {
     const db = env.DB as D1Database;
@@ -3953,7 +4025,7 @@ describe("once_per_customer is enforced on paid checkout", () => {
  * /api/context/switch explicitly — these deliberately do NOT.
  */
 describe("invited members land in the studio without an explicit switch", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
   const signIn = async (email: string): Promise<string> => {
     const db = env.DB as D1Database;

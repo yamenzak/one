@@ -30,7 +30,7 @@ import {
 } from "../src/billing-store.js";
 import { resolveEntitlements, trialPeriodDays } from "@mossa/domain";
 
-const ORIGIN = "http://localhost:8787";
+const ORIGIN = "http://setup.localhost:8787";
 const db = () => env.DB as D1Database;
 
 function grabCookies(res: Response): string {

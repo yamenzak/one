@@ -32,7 +32,7 @@ import { ensureSchema } from "../src/db.js";
 import { buildClientContext } from "../src/ai-context.js";
 import type { KnowledgeClient } from "../src/client-knowledge.js";
 
-const ORIGIN = "http://localhost:8787"; // treated as local by createAuth (non-secure cookies)
+const ORIGIN = "http://setup.localhost:8787";
 const OWNER_EMAIL = "aiguard-owner@test.dev";
 
 let ownerCookie = "";

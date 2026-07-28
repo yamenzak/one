@@ -24,7 +24,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { ensureSchema } from "../src/db.js";
 import { seedBilling } from "../src/billing-store.js";
 
-const ORIGIN = "http://localhost:8787";
+const ORIGIN = "http://setup.localhost:8787";
 const SECRET = "whsec_trial_lifecycle";
 
 /** Stripe's `stripe-signature` scheme (t=timestamp,v1=HMAC-SHA256 of `t.body`). */

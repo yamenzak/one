@@ -77,7 +77,7 @@ import {
   type StripeEvent,
 } from "./stripe-live-helpers.js";
 
-const ORIGIN = "http://localhost:8787";
+const ORIGIN = "http://setup.localhost:8787";
 /** Signing secret for the CONSTRUCTED webhook signatures. Not a Stripe value. */
 const WEBHOOK_SECRET = "whsec_stripe_live_suite_local_only";
 
