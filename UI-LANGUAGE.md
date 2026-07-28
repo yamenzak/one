@@ -8,6 +8,11 @@
 >
 > This is the extraction target. Everything specified here belongs in the shared
 > UI package. Everything a product needs *beyond* here belongs to that product.
+>
+> **§13 is the component registry** — every component, what it is for, and what
+> it is not for. Check it before building anything; add to it in the same commit
+> that adds a component. It is also the fastest way back into this document after
+> a break.
 
 ---
 
@@ -509,7 +514,105 @@ Non-negotiable, checked on every screen:
 
 ---
 
-## 13. Extraction map
+## 13. The registry
+
+**Every component in `@kova/ui`, what it is for, and — more usefully — what it is
+NOT for.** This section is the working reference: check here before building
+anything, and add to it in the same commit that adds a component. A component
+that is not listed here does not exist as far as the next screen is concerned.
+
+Marked **✅** where the component is language-conformant today, **◻︎** where it
+works but predates the language and is still on the list (DESIGN.md tracks the
+deltas).
+
+### Spine — `layout.tsx`
+
+| Component | Use it when | Do NOT use it for | State |
+|---|---|---|---|
+| `Screen` | Every top-level screen. Owns the scroll container, safe areas, column and choreography. | Anything inside the app shell — the shell supplies the frame there. | ✅ |
+| `Atmosphere` | Automatic inside `Screen`. Place directly only on a surface that owns its own scroll. | A decorative gradient. It is identity, and there is exactly one per screen. | ✅ |
+| `Anchor` | The one thing a screen is about, at `display`. **Exactly one.** | A section heading, a card title, or any value that is not the screen's subject. | ✅ |
+| `Unit` | The unit beside an anchor value (`kJ`, `kg`, `%`). | Units inside rows — those are part of the value string. | ✅ |
+| `ActionCluster` | 3–5 primary verbs under the anchor. | Navigation. Circles are actions; nav lives in the chrome. | ✅ |
+| `Section` | A titled block with the standard rhythm. `action` is one quiet affordance. | Wrapping a single row — that is just a `Group`. | ✅ |
+| `Group` | The container rows live in. Rounded, inset hairlines, no padding of its own. | Free-form content. If it is not rows, it is a `Card`. | ✅ |
+| `Row` | Any scannable list line. Three heights by content. | Prose. A row truncates; a sentence in one is a bug (found the hard way on the doorway screens). | ✅ |
+| `Tile` | A browsable 2-up/3-up grid item. | A list. Tiles are browsed, rows are scanned — a list of tiles has no left edge to scan. | ✅ |
+| `TileGrid` | The grid `Tile` sits in. | — | ✅ |
+| `GroupNote` | One quiet line under a group. | Two sentences. That is a `Callout`. | ✅ |
+| `StepHeader` | A multi-step flow's header — progress track **and** sentence. | A page title. Wizards only. | ✅ |
+| `StepPanel` | One step's content. **Always** — it guarantees variant propagation. | Never hand-roll a keyed `motion.div` here; an object `animate` silently hides every variant-driven child beneath it. | ✅ |
+| `StepActions` | The sticky bar at the bottom of a flow. | A screen's primary action — that belongs in the flow, not floating. | ✅ |
+
+### Choice — `choice.tsx`
+
+| Component | Use it when | Do NOT use it for | State |
+|---|---|---|---|
+| `ChoiceGroup` + `Choice` | Pick exactly one from a small set: plans, units, delivery options. Real radios, arrow-key navigable, one tab stop. | Multi-select (use `Switch` rows) or navigation (use `Row`). | ✅ |
+
+**Always pass `Choice`'s `label`** when the option carries `tags`. Without it the
+accessible name is the title *plus* the badge *plus* the price *plus* every chip,
+and comparing two options by ear becomes impossible.
+
+### Motion — `lib/animation.ts`
+
+Never write a duration, curve or spring inline. If a value is missing here, add
+it here.
+
+| Export | Use it for |
+|---|---|
+| `DUR` / `EASE_OUT` / `EASE_IN_OUT` / `SPRING` | Any hand-rolled transition. |
+| `atmosphereIn` `anchorIn` `contentIn` `chromeIn` | The four-tier entrance, in that order. |
+| `contentStagger` | The spine container. No `delayChildren` — see the note in the file. |
+| `settle` | A card appearing in place. **Scales down from 1.04**, never up. |
+| `rowIn` / `rowStagger` | List rows: shorter rise, tighter stagger. |
+| `stepPanelVariants` | Flow steps — labelled variants, so propagation survives. |
+| `pressProps` / `pressPropsSubtle` | Press feedback. Subtle for large surfaces. |
+| `dialogVariants` / `scrimVariants` / `sheetTransition` | Overlays. |
+| `prefersReducedMotion()` | Anything rAF-driven that motion cannot see. |
+
+`popIn` is a deprecated alias of `settle`. It used to scale **up**; do not
+reintroduce that shape anywhere.
+
+### Overlays — `overlays.tsx`
+
+| Component | Use it when | Do NOT use it for | State |
+|---|---|---|---|
+| `Sheet` | **Doing** — anything with inputs. The mobile default. | A yes/no question. | ◻︎ |
+| `FixedDrawer` | A multi-step form where an accidental dismiss would lose input. | Anything dismissible. | ◻︎ |
+| `Dialog` / `ConfirmDialog` | **Deciding** — a confirmation, ≥`md`. | Forms. | ◻︎ |
+| `DropdownMenu` | A short list of actions on an element. | Navigation between sections. | ◻︎ |
+| `SegmentedControl` | 2–4 mutually exclusive views of the same data. | More than 4 — that is a `Select`. | ◻︎ |
+| `Select` · `Tooltip` · `Tabs` · `Avatar` | As named. | — | ◻︎ |
+
+### Chrome — `shell.tsx`
+
+| Component | Use it when | Do NOT use it for | State |
+|---|---|---|---|
+| `AppBar` | The top bar. `bare` lets an ambient wash bleed through it. | Carrying primary actions — chrome is recessive. | ✅ |
+| `BottomTabs` / `NavRail` | Top-level navigation, ≤5 items. Animates in **last**. | Actions. | ✅ |
+| `EmptyState` | A surface with nothing in it yet: one line of why, one action. | An error. Errors say what happened and what to do. | ◻︎ |
+| `SettingsList` · `InsightCard` · `WavyDivider` | As named. | — | ◻︎ |
+
+### Primitives, viz and the rest
+
+`Button` · `Card` · `Badge` · `Chip` · `Field` · `Input` · `Switch` · `Callout` ·
+`IconBadge` · `Spinner` · `Skeleton` · `Separator` · `SectionHeader` ·
+`FieldGroup` (form fields under a heading — **not** `Group`) · `ConfigRow`
+(status + detail + state, for setup screens) · `ProgressRing` · `TargetRing` ·
+`MetricPill` · `StatCard` · `Sparkline` · `MiniBars` · `WeekDots` · `MacroBar`.
+
+### When you need something that is not here
+
+1. **Compose first.** Most "new components" are a `Section` + `Group` + `Row`.
+2. **Build it in the product** if it names a domain noun.
+3. **Build it in the package** only on the second use, when you can see the diff
+   between the two — and add a row to this table in the same commit.
+
+
+---
+
+## 14. Extraction map
 
 What this language means for the packages, and the order to do it in.
 

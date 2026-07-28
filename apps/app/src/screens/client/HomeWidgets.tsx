@@ -14,7 +14,11 @@ import type { TodayBundle } from "./Today.js";
 export interface ClientWidgetData { clientId: string; units: UnitPrefs; bundle: TodayBundle }
 
 export const DEFAULT_CLIENT_WIDGETS: { id: string; size: WidgetSize }[] = [
-  { id: "calories", size: "big" },
+  // Calories is the screen's ANCHOR now (Today.tsx), so it is deliberately not
+  // the lead widget: repeating the same number at two weights in one viewport is
+  // the redundancy §1 forbids, and it made the carousel read as a louder copy of
+  // the thing above it. Anyone who already customised keeps their own layout.
+  { id: "protein", size: "big" },
   { id: "protein", size: "small" },
   { id: "water", size: "small" },
   { id: "burned", size: "small" },
