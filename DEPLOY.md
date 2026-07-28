@@ -96,6 +96,23 @@ third GitHub secret does nothing.
 
 ---
 
+
+The token needs **Edit** on everything the provisioning workflow touches, and a
+missing scope surfaces as `Authentication error [code: 10000]` on the *create*
+rather than on the read — so it is easy to misread as "the resource is broken":
+
+| Permission | Needed for |
+| --- | --- |
+| Account → Workers Scripts → **Edit** | deploy, and `wrangler secret put` |
+| Account → D1 → **Edit** | reading + creating the database |
+| Account → Workers KV Storage → **Edit** | reading + creating the namespace |
+| Account → Workers R2 Storage → **Edit** | creating `kova-media` |
+| Zone → Workers Routes → **Edit** (zone `4dl.app`) | tenant custom-domain routes |
+
+`wrangler whoami` reporting "Super Administrator — All Privileges" is about your
+USER's role on the account, not the token's scopes. A narrowly-scoped token on a
+super-admin account still fails.
+
 ## 4. Provision D1 / KV / R2 and paste the ids
 
 > **The D1 database is named `mossa`, and that is intentional.** The binding

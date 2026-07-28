@@ -1,13 +1,13 @@
 name: Provision Cloudflare resources
 
 # Creates any of the D1 database / KV namespace / R2 bucket the api worker binds
-# to that do not already exist, then prints their ids. Run it from the Actions tab
-# → "Provision Cloudflare resources" → Run workflow.
+# to that do not already exist, mints BETTER_AUTH_SECRET if the worker has none,
+# and prints the ids. Actions tab → "Provision Cloudflare resources" → Run workflow.
 #
-# It is genuinely idempotent: each resource is checked before it is created, so a
-# re-run on a provisioned account is a no-op that just re-prints the ids.
+# Genuinely idempotent: every action is guarded by an existence check, so a re-run
+# on a provisioned account is a no-op that just re-prints the ids.
 #
-# That check is not decoration, and the old `create … || true` version was unsafe:
+# Those checks are not decoration, and the original `create … || true` was unsafe:
 #   • `wrangler kv namespace create` does NOT dedupe by title, so a second run
 #     silently adds a SECOND namespace — and pasting its id into wrangler.jsonc
 #     points the worker at an empty cache.
@@ -44,28 +44,110 @@ jobs:
       - name: Create only what is missing
         working-directory: apps/api
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
-          if pnpm exec wrangler d1 list --json 2>/dev/null | jq -e --arg n "$D1_NAME" '.[]? | select(.name == $n)' >/dev/null; then
-            echo "D1 '$D1_NAME' already exists — skipping."
+          # Wrangler prints its version banner to STDOUT before the JSON payload, so
+          # `--json | jq` fails with "Invalid numeric literal at line 2". Drop
+          # everything before the first line that opens an array or object.
+          # Without this every existence check silently reports "missing" and the
+          # workflow tries to create resources that already exist.
+          json_only() { awk 'f || /^[[:space:]]*[[{]/ { f = 1; print }'; }
+
+          # A permissions failure and "not found" must not look alike. `list` failing
+          # means the token is missing a scope, and creating on that basis would
+          # either error confusingly or make a duplicate.
+          require_list() {
+            local what="$1"; shift
+            local out
+            if ! out=$("$@" 2>&1); then
+              echo "::error::Cannot list $what. The API token is missing a permission."
+              echo "$out" | tail -5
+              echo "Add the matching *:Edit scope at https://dash.cloudflare.com/profile/api-tokens"
+              return 1
+            fi
+            printf '%s' "$out" | json_only
+          }
+
+          fail=0
+
+          # ── D1 ────────────────────────────────────────────────────────────────
+          if d1=$(require_list "D1 databases" pnpm exec wrangler d1 list --json); then
+            if printf '%s' "$d1" | jq -e --arg n "$D1_NAME" '.[]? | select(.name == $n)' >/dev/null; then
+              echo "✓ D1 '$D1_NAME' exists."
+            else
+              echo "Creating D1 '$D1_NAME'…"
+              pnpm exec wrangler d1 create "$D1_NAME" || fail=1
+            fi
           else
-            echo "Creating D1 '$D1_NAME'…"
-            pnpm exec wrangler d1 create "$D1_NAME"
+            fail=1
           fi
 
+          # ── KV ────────────────────────────────────────────────────────────────
           # Wrangler titles the namespace "<worker>-<binding>", so match the suffix.
-          if pnpm exec wrangler kv namespace list 2>/dev/null | jq -e --arg t "$KV_TITLE" '.[]? | select(.title | endswith($t))' >/dev/null; then
-            echo "KV namespace ending in '$KV_TITLE' already exists — skipping."
+          if kv=$(require_list "KV namespaces" pnpm exec wrangler kv namespace list); then
+            if printf '%s' "$kv" | jq -e --arg t "$KV_TITLE" '.[]? | select(.title | endswith($t))' >/dev/null; then
+              echo "✓ KV namespace ending in '$KV_TITLE' exists."
+            else
+              echo "Creating KV namespace '$KV_TITLE'…"
+              pnpm exec wrangler kv namespace create "$KV_TITLE" || fail=1
+            fi
           else
-            echo "Creating KV namespace '$KV_TITLE'…"
-            pnpm exec wrangler kv namespace create "$KV_TITLE"
+            fail=1
           fi
 
-          # Bucket names ARE unique, so re-creating one is a harmless error.
+          # ── R2 ────────────────────────────────────────────────────────────────
+          # Bucket names are unique, so "already exists" is fine — but it must not be
+          # confused with a permissions error, which the old `|| true` swallowed.
           echo "Ensuring R2 bucket '$R2_BUCKET'…"
-          pnpm exec wrangler r2 bucket create "$R2_BUCKET" || echo "  (already exists)"
+          if out=$(pnpm exec wrangler r2 bucket create "$R2_BUCKET" 2>&1); then
+            echo "✓ Created R2 bucket '$R2_BUCKET'."
+          elif printf '%s' "$out" | grep -qiE "already (exists|owned)|10004"; then
+            echo "✓ R2 bucket '$R2_BUCKET' already exists."
+          else
+            echo "::error::Could not create R2 bucket '$R2_BUCKET'."
+            printf '%s' "$out" | tail -5
+            fail=1
+          fi
+
+          exit $fail
+
+      - name: Mint BETTER_AUTH_SECRET if the worker has none
+        working-directory: apps/api
+        run: |
+          set -uo pipefail
+          json_only() { awk 'f || /^[[:space:]]*[[{]/ { f = 1; print }'; }
+
+          # Set ONCE, never rotated. Re-putting this key re-signs every session
+          # cookie, so a careless `secret put` on each run would sign every user out
+          # — which is exactly why the Deploy workflow refuses to touch secrets at
+          # all. Here it is guarded three ways:
+          #
+          #   1. If listing fails, we do NOTHING. On a brand-new account the worker
+          #      does not exist yet, and a failed read must never be mistaken for
+          #      "no secret set" — that mistake rotates a live key.
+          #   2. If the secret is present, we leave it alone.
+          #   3. Only a confirmed-absent secret is minted.
+          #
+          # The value is random and never printed. It does not need to be known by
+          # anyone: nothing reads it but the worker itself.
+          if ! out=$(pnpm exec wrangler secret list --format json 2>&1); then
+            echo "⚠️  Could not read the worker's secrets — leaving BETTER_AUTH_SECRET alone."
+            echo "   Normal before the very first deploy. Re-run this workflow after deploying."
+            printf '%s' "$out" | tail -3
+            exit 0
+          fi
+
+          if printf '%s' "$out" | json_only | jq -e '.[]? | select(.name == "BETTER_AUTH_SECRET")' >/dev/null; then
+            echo "✓ BETTER_AUTH_SECRET is already set — not touching it (rotating it signs everyone out)."
+            exit 0
+          fi
+
+          echo "Minting BETTER_AUTH_SECRET…"
+          openssl rand -base64 32 | pnpm exec wrangler secret put BETTER_AUTH_SECRET
+          echo "✓ Set. The value is random and was never printed; nothing but the worker reads it."
 
       - name: Report the ids
+        if: always()
         working-directory: apps/api
         run: |
           {
