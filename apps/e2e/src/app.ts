@@ -105,15 +105,19 @@ export async function prepare(page: Page): Promise<void> {
  * appears a beat after the UI advances to the code screen.
  */
 export async function signInWithOtp(page: Page, email: string): Promise<void> {
-  await expect(page.getByRole("heading", { name: "Continue with email" })).toBeVisible();
+  // Anchored on the CONTROLS, not the headings. After the UI rewrite the sign-in
+  // screen's largest text is the studio's own name, so a heading assertion here
+  // would be asserting the tenant's branding rather than that the form arrived.
+  await expect(page.getByLabel("Email")).toBeVisible();
   await page.getByLabel("Email").fill(email);
-  await page.getByRole("button", { name: "Continue with email" }).click();
+  await page.getByRole("button", { name: /Email me a code/i }).click();
 
-  // A send failure must not be mistaken for a slow send: the app reports it here.
-  await expect(page.getByRole("heading", { name: "Enter your code" })).toBeVisible();
+  // A send failure must not be mistaken for a slow send: the code field only
+  // appears once the server accepted the send, so this is the real gate.
+  await expect(page.getByLabel("Your code")).toBeVisible();
 
   const otp = await pollForOtp(email);
-  await page.getByLabel("6-digit code").fill(otp);
+  await page.getByLabel("Your code").fill(otp);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 }
 
@@ -150,12 +154,23 @@ export const SIGN_IN_PATH = "/studio/sign-in";
  */
 export async function assertRootIsSignpost(page: Page): Promise<void> {
   await page.goto(`${ROOT_URL}/`);
-  await expect(page.getByRole("heading", { name: /Every studio has its own address/i })).toBeVisible();
-  // No signup surface: no OTP card, no email field, anywhere on the page.
-  await expect(page.getByRole("heading", { name: "Continue with email" })).toHaveCount(0);
+  // The screen's anchor is the ADDRESS — that is what it is about, and after the
+  // UI rewrite it is the largest thing on the page rather than a heading. Assert
+  // the explanation by text, not by role, so a future re-layout that keeps the
+  // meaning does not fail here for the wrong reason.
+  await expect(page.getByText(/Every studio has its own address/i)).toBeVisible();
+  // No signup surface: no email field and no way to request a code, anywhere on
+  // the page. Asserted on the CONTROLS rather than on a heading — the sign-in
+  // screen's headings have changed once already, and a copy-shaped assertion
+  // that silently stops discriminating is worse than no assertion.
   await expect(page.getByLabel("Email")).toHaveCount(0);
-  // The end-user redirect — the point of the whole screen.
-  await expect(page.getByText(/Use the link your coach sent you/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: /code/i })).toHaveCount(0);
+  // The end-user redirect — the point of the whole screen. Asserted on the row's
+  // own heading rather than its supporting line: the heading is the promise
+  // ("this screen has something for a client of a studio"), the sub-line is copy
+  // that will keep being tuned.
+  await expect(page.getByText(/Training with a coach\?/i)).toBeVisible();
+  await expect(page.getByText(/link they sent you/i)).toBeVisible();
   // …and the route for someone who wants to run a studio.
   await expect(page.getByRole("link", { name: /Set up your studio/i })).toBeVisible();
 }
@@ -163,7 +178,7 @@ export async function assertRootIsSignpost(page: Page): Promise<void> {
 /** Open the setup door's sign-in. */
 export async function toSetupSignIn(page: Page): Promise<void> {
   await page.goto(`${SETUP_URL}${SIGN_IN_PATH}`);
-  await expect(page.getByRole("heading", { name: "Continue with email" })).toBeVisible();
+  await expect(page.getByLabel("Email")).toBeVisible();
 }
 
 /**

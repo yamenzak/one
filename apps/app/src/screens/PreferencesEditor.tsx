@@ -11,7 +11,7 @@ import {
   PRIMARY_GOAL_LABELS, ACTIVITY_LEVEL_LABELS, DIETARY_APPROACH_LABELS, WORKOUT_LOCATION_LABELS,
   type ClientPreferences, type WorkoutLocation,
 } from "@kova/domain";
-import { Button, Card, Chip, Field, Select, Textarea, Reveal, Skeleton, SkeletonLine, Group, ActionResult, Target, Dumbbell, Utensils, MapPin, Activity } from "@kova/ui";
+import { Button, Card, Chip, Field, Select, Textarea, Reveal, Skeleton, SkeletonLine, FieldGroup, ActionResult, Target, Dumbbell, Utensils, MapPin, Activity } from "@kova/ui";
 import { api } from "../api.js";
 import { useUnits } from "../units.js";
 
@@ -70,15 +70,15 @@ export function PreferencesEditorCard({ clientId, includeProfile = false, onSave
           </>
         )}
 
-        <Group title="Goal" hint="What everything else is built to serve.">
+        <FieldGroup title="Goal" hint="What everything else is built to serve.">
         <div>
           <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-muted-foreground"><Target className="size-4" /> Primary goal</label>
           <Select value={p.primaryGoal ?? ""} onChange={(v) => setP({ primaryGoal: (v || null) as ClientPreferences["primaryGoal"] })} options={opts(PRIMARY_GOAL_LABELS)} />
         </div>
         <Field label={`Target weight (${weightLabel(units)})`} inputMode="decimal" value={tw != null ? String(tw) : ""} onChange={(e) => setP({ targetWeightKg: e.target.value ? displayToKg(Number(e.target.value.replace(/[^\d.]/g, "")), units) : null })} placeholder="Where they're headed" />
-        </Group>
+        </FieldGroup>
 
-        <Group title="Training" hint="How much, how often, and where.">
+        <FieldGroup title="Training" hint="How much, how often, and where.">
         <div>
           <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-muted-foreground"><Activity className="size-4" /> Activity level</label>
           <Select value={p.activityLevel ?? ""} onChange={(v) => setP({ activityLevel: (v || null) as ClientPreferences["activityLevel"] })} options={opts(ACTIVITY_LEVEL_LABELS)} />
@@ -92,9 +92,9 @@ export function PreferencesEditorCard({ clientId, includeProfile = false, onSave
           <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-muted-foreground"><MapPin className="size-4" /> Where they train</label>
           <div className="flex flex-wrap gap-2">{WORKOUT_LOCATIONS.map((loc) => <Chip key={loc} selected={p.workoutLocation === loc} onClick={() => setP({ workoutLocation: p.workoutLocation === loc ? null : loc })}>{WORKOUT_LOCATION_LABELS[loc]}</Chip>)}</div>
         </div>
-        </Group>
+        </FieldGroup>
 
-        <Group title="Food & limits" hint="What to plan around, and what to avoid.">
+        <FieldGroup title="Food & limits" hint="What to plan around, and what to avoid.">
         <div>
           <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Dietary approach</label>
           <Select value={p.dietaryApproach ?? ""} onChange={(v) => setP({ dietaryApproach: (v || null) as ClientPreferences["dietaryApproach"] })} options={opts(DIETARY_APPROACH_LABELS)} />
@@ -103,7 +103,7 @@ export function PreferencesEditorCard({ clientId, includeProfile = false, onSave
           <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Injuries or limitations</label>
           <Textarea value={p.limitations ?? ""} onChange={(e) => setP({ limitations: e.target.value || null })} placeholder="A bad knee, allergies, equipment they don't have…" rows={3} />
         </div>
-        </Group>
+        </FieldGroup>
 
         <Button size="lg" className="w-full" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save preferences"}</Button>
         {/* Announced, not whispered: this used to be a muted <p> a screen reader

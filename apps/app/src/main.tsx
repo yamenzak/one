@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
+import { Atmosphere, anchorIn, contentIn, contentStagger } from "@kova/ui";
 import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
 import { ThemeProvider } from "./theme.js";
@@ -17,11 +18,19 @@ import { PwaUpdatePrompt, UnhandledErrorToast } from "./notices.js";
 import { stripReloadParam } from "./hard-refresh.js";
 
 /**
- * Branded boot screen — the studio's logo on a soft brand glow with a gentle
- * reveal and shimmer, so the app feels premium from the first frame. On a
- * white-label tenant (custom domain / branded host) the uploaded logo/icon
+ * Branded boot screen — the very first frame of the product.
+ *
+ * On a white-label tenant (custom domain / branded host) the uploaded logo/icon
  * shows; otherwise the default Kova mark. Branding is applied before this
  * paints, so it already sits in the tenant's palette and mode.
+ *
+ * Design note (UI-LANGUAGE §8): the mark **settles down from 1.06**, it does not
+ * grow from 0.82. That inversion is the whole entrance language in one element,
+ * and the boot screen is where a user meets it first — so getting it right here
+ * sets the expectation every subsequent screen keeps. The old spinning ring is
+ * gone: an indefinite rotation is decoration that also implies work is happening
+ * at a rate it cannot know. The progress bar stays, because it is honest about
+ * being indeterminate.
  */
 function BootSplash() {
   const { host, ctx } = useSession();
@@ -30,27 +39,23 @@ function BootSplash() {
   const name = host?.tenant?.name ?? null;
   return (
     <div className="relative grid min-h-dvh place-items-center overflow-hidden bg-background">
-      <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(58% 46% at 50% 42%, color-mix(in oklch, var(--primary) 16%, transparent), transparent 72%)" }} />
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className="relative flex flex-col items-center gap-7">
-        <div className="relative grid size-24 place-items-center">
-          <motion.span aria-hidden className="absolute inset-0 rounded-3xl ring-1 ring-primary/20" animate={{ rotate: 360 }} transition={{ duration: 9, repeat: Infinity, ease: "linear" }} />
-          <motion.div
-            initial={{ scale: 0.82, opacity: 0, y: 4 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className="grid size-20 place-items-center overflow-hidden rounded-2xl bg-primary text-primary-foreground shadow-glow"
-          >
-            {logo ? <img src={logo} alt="" className="size-full object-cover" /> : <span className="text-3xl font-black tracking-tight">{(name?.[0] ?? "K").toUpperCase()}</span>}
-          </motion.div>
-        </div>
-        {name && (
-          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 0.5 }} className="text-[0.95rem] font-semibold tracking-tight text-foreground/85">
-            {name}
-          </motion.div>
-        )}
-        <div className="h-1 w-36 overflow-hidden rounded-full bg-surface-2">
+      <Atmosphere />
+      <motion.div
+        initial="hidden"
+        animate="show"
+        variants={contentStagger}
+        className="relative flex flex-col items-center gap-6"
+      >
+        <motion.div
+          variants={anchorIn}
+          className="grid size-20 place-items-center overflow-hidden rounded-2xl bg-primary text-primary-foreground shadow-glow"
+        >
+          {logo ? <img src={logo} alt="" className="size-full object-cover" /> : <span className="text-title-1 font-black">{(name?.[0] ?? "K").toUpperCase()}</span>}
+        </motion.div>
+        {name && <motion.div variants={contentIn} className="text-body-lg">{name}</motion.div>}
+        <motion.div variants={contentIn} className="h-1 w-32 overflow-hidden rounded-full bg-surface-2">
           <motion.div className="h-full w-1/3 rounded-full bg-primary" animate={{ x: ["-120%", "320%"] }} transition={{ duration: 1.15, repeat: Infinity, ease: "easeInOut" }} />
-        </div>
+        </motion.div>
       </motion.div>
     </div>
   );

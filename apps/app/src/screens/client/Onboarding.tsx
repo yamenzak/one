@@ -85,15 +85,15 @@ export function Onboarding({ clientId, displayName, onDone }: { clientId: string
           )}
           {step === 2 && (
             <Card className="space-y-4"><h2 className="text-xl font-semibold tracking-tight">Training context</h2>
-              <Group label="Where do you train?" options={["gym", "home", "outdoor"]} value={f.workoutLocation} onChange={(v) => set("workoutLocation", v)} />
-              <Group label="Experience" options={["beginner", "intermediate", "advanced"]} value={f.experienceLevel} onChange={(v) => set("experienceLevel", v)} />
+              <ChoiceRow label="Where do you train?" options={["gym", "home", "outdoor"]} value={f.workoutLocation} onChange={(v) => set("workoutLocation", v)} />
+              <ChoiceRow label="Experience" options={["beginner", "intermediate", "advanced"]} value={f.experienceLevel} onChange={(v) => set("experienceLevel", v)} />
               <div><div className="mb-2 text-sm text-muted-foreground">Available days</div><div className="flex flex-wrap gap-2">{DAYS.map((d) => <Chip key={d} selected={f.availableDays.includes(d)} onClick={() => toggleDay(d)}>{d}</Chip>)}</div></div>
             </Card>
           )}
           {step === 3 && (
             <Card className="space-y-4"><h2 className="text-xl font-semibold tracking-tight">Nutrition</h2>
-              <Group label="Activity level" options={["sedentary", "light", "moderate", "very_active"]} value={f.activityLevel} onChange={(v) => set("activityLevel", v)} format />
-              <Group label="Dietary approach" options={["balanced", "high_protein", "low_carb", "keto", "vegan", "vegetarian"]} value={f.dietaryApproach} onChange={(v) => set("dietaryApproach", v)} format />
+              <ChoiceRow label="Activity level" options={["sedentary", "light", "moderate", "very_active"]} value={f.activityLevel} onChange={(v) => set("activityLevel", v)} format />
+              <ChoiceRow label="Dietary approach" options={["balanced", "high_protein", "low_carb", "keto", "vegan", "vegetarian"]} value={f.dietaryApproach} onChange={(v) => set("dietaryApproach", v)} format />
             </Card>
           )}
           {step === 4 && (
@@ -114,7 +114,7 @@ export function Onboarding({ clientId, displayName, onDone }: { clientId: string
   );
 }
 
-function Group({ label, options, value, onChange, format }: { label: string; options: string[]; value: string; onChange: (v: string) => void; format?: boolean }) {
+function ChoiceRow({ label, options, value, onChange, format }: { label: string; options: string[]; value: string; onChange: (v: string) => void; format?: boolean }) {
   return (
     <div>
       <div className="mb-2 text-sm text-muted-foreground">{label}</div>

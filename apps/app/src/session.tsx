@@ -7,7 +7,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { SessionContext, TenantBranding } from "@kova/protocol";
-import { api, isOffline, setUnauthorizedHandler } from "./api.js";
+import { api, ApiError, isOffline, setUnauthorizedHandler } from "./api.js";
 
 /**
  * ── The door is the hostname now ────────────────────────────────────────────
@@ -183,16 +183,30 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    * Which door is this? One read, before anything renders.
    *
    * No query parameters any more: the Host header carries the answer, so there is
-   * nothing for the client to hint at. A failure falls back to the root role —
-   * the dead end — which is the safe default: it shows a signpost rather than
-   * inventing a login for a studio we could not confirm exists.
+   * nothing for the client to hint at.
+   *
+   * Two failure modes, and collapsing them was a real bug: a **404 is an answer**
+   * — the route guard returns it for a reserved or over-nested host, meaning "this
+   * door is not one of ours". Treating that like a network error and falling back
+   * to `root` rendered the signpost on `admin-ish.<root>` and friends, which both
+   * advertises the product on a host we deliberately serve nothing at and made
+   * `WrongDoor` unreachable in practice. Anything else (offline, 500, a proxy
+   * eating the request) is genuinely unknown, and there the conservative root
+   * fallback is still right: a signpost beats inventing a login for a studio we
+   * could not confirm exists.
    */
   useEffect(() => {
     void api
       .get<HostInfo>("/api/host")
       .then(setHost)
-      .catch(() =>
-        setHost({ role: "root", platform: true, rootDomain: location.hostname, setupUrl: "/", tenant: null }),
+      .catch((e: unknown) =>
+        setHost({
+          role: e instanceof ApiError && e.status === 404 ? "invalid" : "root",
+          platform: true,
+          rootDomain: location.hostname,
+          setupUrl: "/",
+          tenant: null,
+        }),
       );
   }, []);
 

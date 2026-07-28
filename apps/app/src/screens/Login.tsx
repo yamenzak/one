@@ -1,18 +1,44 @@
 /**
- * Sign in — 100% passwordless (email → OTP). Premium, animated. With OTP,
- * signing in and signing up are the same act (prove you own the email), so
- * there's one "Continue with email" — no login/signup mode. The real gate lives
+ * Sign in — 100% passwordless (email → OTP).
+ *
+ * With OTP, signing in and signing up are the same act (prove you own the
+ * email), so there's one "Continue" — no login/signup mode. The real gate lives
  * server-side: a studio that doesn't allow self sign-up turns a brand-new email
  * away (invite/existing only); here we just note that.
  *
  * Which studio this is for is decided entirely by the HOSTNAME. There is no slug
  * to send any more — the OTP-send gate reads the host tenant, so a code can only
  * ever be issued for the studio whose address the browser is actually on.
+ *
+ * ── Design notes (UI-LANGUAGE) ──────────────────────────────────────────────
+ *
+ * The anchor is the STUDIO, not the form. Someone arriving here has one question
+ * before any other — "am I in the right place?" — and the old screen answered it
+ * with a 16px logo above a card that shouted "Continue with email". Now the
+ * studio's name is the largest thing on the screen and the form is a quiet group
+ * beneath it, which is both the correct hierarchy and the correct reassurance.
+ *
+ * The two steps are one screen, not two: the anchor never moves between them, so
+ * entering a code feels like continuing rather than navigating. Only the group
+ * swaps, and it swaps by settling (§8) rather than sliding.
  */
 
 import { useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
-import { Button, Card, Field, Mail, KeyRound, ArrowRight } from "@kova/ui";
+import { AnimatePresence } from "motion/react";
+import {
+  ArrowRight,
+  Button,
+  Callout,
+  DUR,
+  EASE_OUT,
+  Field,
+  KeyRound,
+  Mail,
+  Screen,
+  TierAnchor,
+  TierContent,
+  motion,
+} from "@kova/ui";
 import { api, ApiError } from "../api.js";
 import { useSession } from "../session.js";
 import { passkeySupported, signInWithPasskey, conditionalPasskeyAvailable } from "../passkey.js";
@@ -43,8 +69,8 @@ export function Login() {
   const turnstile = host?.turnstile ?? null;
   const needsTurnstile = Boolean(turnstile?.enabled && turnstile.siteKey);
 
-  const tagline = login?.tagline?.trim() || "No passwords, ever";
-  const headline = login?.headline?.trim() || (tenant ? "Welcome back — sign in to continue." : "Coaching, organized.");
+  const tagline = login?.tagline?.trim() || null;
+  const headline = login?.headline?.trim() || (tenant ? "Sign in to continue" : "Coaching, organised");
   const subtext = login?.subtext?.trim() || null;
 
   // Passkey autofill (WebAuthn conditional UI): arm the browser to offer saved
@@ -111,79 +137,134 @@ export function Login() {
     }
   };
 
+  const canSend = email.includes("@") && !busy && cooldown === 0 && (!needsTurnstile || Boolean(tsToken));
+
   return (
-    <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-8 overflow-hidden px-6">
-      {/* Optional full-bleed hero image with a legibility scrim, behind the glow. */}
+    <Screen center width="narrow">
+      {/* Optional full-bleed hero image with a legibility scrim. Sits under the
+          atmosphere, which keeps the studio's brand colour present even when a
+          photograph is doing the talking. */}
       {bgImageUrl && (
         <>
-          <div className="pointer-events-none fixed inset-0 -z-10 bg-cover bg-center" style={{ backgroundImage: `url(${bgImageUrl})` }} />
-          <div className="pointer-events-none fixed inset-0 -z-10 bg-background/80 backdrop-blur-sm" />
+          <div aria-hidden className="pointer-events-none fixed inset-0 -z-20 bg-cover bg-center" style={{ backgroundImage: `url(${bgImageUrl})` }} />
+          <div aria-hidden className="pointer-events-none fixed inset-0 -z-20 bg-background/80 backdrop-blur-sm" />
         </>
       )}
-      {/* ambient brand glow */}
-      <div className={`pointer-events-none absolute -top-32 left-1/2 size-72 -translate-x-1/2 rounded-full bg-primary/25 blur-[100px] ${bgImageUrl ? "opacity-60" : ""}`} />
 
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="relative text-center">
+      {/* T1 — the studio. The first question anyone has here is "am I in the
+          right place", and the answer should be the biggest thing on screen. */}
+      <TierAnchor className="flex flex-col items-center gap-3 pb-8 text-center">
         {logoUrl ? (
-          <img src={logoUrl} alt={brandName} className="mx-auto mb-5 h-16 w-auto max-w-[70%] object-contain" />
+          <img src={logoUrl} alt={brandName} className="h-14 w-auto max-w-[70%] object-contain" />
         ) : (
-          <div className="mx-auto mb-5 grid size-16 place-items-center rounded-3xl bg-primary text-2xl font-black text-primary-foreground shadow-glow">{brandName.charAt(0).toUpperCase()}</div>
+          <span aria-hidden className="grid size-14 place-items-center rounded-xl bg-primary text-title-2 font-black text-primary-foreground shadow-glow">
+            {brandName.charAt(0).toUpperCase()}
+          </span>
         )}
-        <h1 className="text-3xl font-bold tracking-tight">{brandName}</h1>
-        <p className="mt-2 text-muted-foreground">{headline}</p>
-        {subtext && <p className="mt-1 text-sm text-muted-foreground/80">{subtext}</p>}
-      </motion.div>
+        <h1 className="text-title-1">{brandName}</h1>
+        {(headline || tagline) && <p className="text-body text-muted-foreground">{headline ?? tagline}</p>}
+        {subtext && <p className="text-caption text-muted-foreground/80">{subtext}</p>}
+      </TierAnchor>
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="relative">
-        <Card className="space-y-5 p-6">
+      {/* T3 — the form. One group, one primary action, everything else quiet.
+          `mode="wait"` so the two steps never overlap: a code field appearing
+          on top of an email field is the one transition here that reads as a
+          glitch rather than a change. */}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={step}
+          initial={{ opacity: 0, scale: 1.02 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.99 }}
+          transition={{ duration: DUR.base, ease: EASE_OUT }}
+          className="space-y-3"
+        >
           {step === "email" ? (
             <>
-              <div className="text-sm font-medium text-primary">{tagline}</div>
-              <div>
-                <h2 className="text-xl font-semibold tracking-tight">Continue with email</h2>
-                <p className="mt-1 text-sm text-muted-foreground">{canSignup ? "New or returning — we'll email you a 6-digit code." : "We'll email you a 6-digit code."}</p>
-              </div>
-              <Field label="Email" icon={Mail} type="email" autoComplete="email webauthn" value={email} placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && email.includes("@") && cooldown === 0 && (!needsTurnstile || tsToken) && void sendCode()} />
+              <Field
+                label="Email"
+                icon={Mail}
+                type="email"
+                autoComplete="email webauthn"
+                value={email}
+                placeholder="you@example.com"
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && canSend && void sendCode()}
+                hint={canSignup ? "New or returning — we'll email you a 6-digit code." : "We'll email you a 6-digit code."}
+              />
               {needsTurnstile && turnstile!.siteKey && <Turnstile siteKey={turnstile!.siteKey} onToken={setTsToken} />}
-              <Button size="lg" className="w-full" disabled={!email.includes("@") || busy || cooldown > 0 || (needsTurnstile && !tsToken)} onClick={() => void sendCode()}>
-                {busy ? "Sending…" : cooldown > 0 ? `Resend in ${cooldown}s` : "Continue with email"} {!busy && cooldown === 0 && <ArrowRight />}
+              <Button size="lg" className="w-full" disabled={!canSend} onClick={() => void sendCode()}>
+                {busy ? "Sending…" : cooldown > 0 ? `Resend in ${cooldown}s` : "Email me a code"}
+                {!busy && cooldown === 0 && <ArrowRight aria-hidden />}
               </Button>
-              {showPasskey && passkeySupported() && (
-                <button
-                  className="flex w-full items-center justify-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-                  // A passkey is bound to the DOMAIN it was created on (WebAuthn
-                  // rpID = this origin), not to your account or your studio. So
-                  // "no passkey on this device" is wrong and misleading on a
-                  // studio's custom domain: you may well have one, just registered
-                  // at a different address. Say what is actually true, and point at
-                  // the way in that always works.
-                  onClick={async () => { setError(null); try { await signInWithPasskey(); await refresh(); } catch { setError(`No passkey saved for ${location.hostname}. Passkeys are tied to the address you set them up on — sign in with an email code, then add one here.`); } }}
-                >
-                  <KeyRound className="size-4" /> Sign in with a passkey
-                </button>
-              )}
-              {tenant && !canSignup && (
-                <p className="text-center text-xs text-muted-foreground">New here? This studio is invite-only — ask your coach to add you.</p>
-              )}
             </>
           ) : (
             <>
-              <h2 className="text-xl font-semibold tracking-tight">Enter your code</h2>
-              <p className="text-sm text-muted-foreground">
-                Sent to <span className="font-medium text-foreground">{email}</span>. Expires in 10 min.
-              </p>
-              <Field ref={otpRef} label="6-digit code" icon={KeyRound} inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} className="[&_input]:text-center [&_input]:text-lg [&_input]:tracking-[0.5em]" onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} onKeyDown={(e) => e.key === "Enter" && otp.length === 6 && void verify()} />
+              <Field
+                ref={otpRef}
+                label="Your code"
+                icon={KeyRound}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                value={otp}
+                className="[&_input]:text-center [&_input]:text-title-3 [&_input]:tracking-[0.5em]"
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                onKeyDown={(e) => e.key === "Enter" && otp.length === 6 && void verify()}
+                hint={`Sent to ${email}. It expires in 10 minutes.`}
+              />
               <Button size="lg" className="w-full" disabled={otp.length !== 6 || busy} onClick={() => void verify()}>
                 {busy ? "Checking…" : "Continue"}
               </Button>
-              <button className="w-full text-sm text-muted-foreground transition-colors hover:text-foreground" onClick={() => (setStep("email"), setOtp(""))}>
+              <button
+                className="min-h-12 w-full text-caption text-muted-foreground transition-colors hover:text-foreground"
+                onClick={() => (setStep("email"), setOtp(""), setError(null))}
+              >
                 Use a different email
               </button>
             </>
           )}
-          {error && <p className="text-sm text-danger">{error}</p>}
-        </Card>
-      </motion.div>
-    </div>
+        </motion.div>
+      </AnimatePresence>
+
+      {error && (
+        <TierContent className="pt-3">
+          <Callout tone="danger" live="alert">{error}</Callout>
+        </TierContent>
+      )}
+
+      {step === "email" && showPasskey && passkeySupported() && (
+        <TierContent className="pt-2">
+          <button
+            className="flex min-h-12 w-full items-center justify-center gap-2 text-caption font-medium text-muted-foreground transition-colors hover:text-foreground"
+            // A passkey is bound to the DOMAIN it was created on (WebAuthn
+            // rpID = this origin), not to your account or your studio. So
+            // "no passkey on this device" is wrong and misleading on a
+            // studio's custom domain: you may well have one, just registered
+            // at a different address. Say what is actually true, and point at
+            // the way in that always works.
+            onClick={async () => {
+              setError(null);
+              try {
+                await signInWithPasskey();
+                await refresh();
+              } catch {
+                setError(`No passkey saved for ${location.hostname}. Passkeys are tied to the address you set them up on — sign in with an email code, then add one here.`);
+              }
+            }}
+          >
+            <KeyRound aria-hidden className="size-4" /> Use a passkey instead
+          </button>
+        </TierContent>
+      )}
+
+      {step === "email" && tenant && !canSignup && (
+        <TierContent>
+          <p className="pt-1 text-center text-caption text-muted-foreground">
+            New here? This studio is invite-only — ask your coach to add you.
+          </p>
+        </TierContent>
+      )}
+    </Screen>
   );
 }

@@ -68,15 +68,83 @@
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
 
-  --radius-xs: calc(var(--radius) - 6px);
+  /**
+   * Radius ladder — UI-LANGUAGE §6.
+   *
+   * Proportional to `--radius` so a tenant's radius slider moves the whole
+   * system coherently rather than only the cards. The distinction that matters:
+   * `radius-sm` is an IDENTITY container (a squircle icon — what a row is
+   * about); `radius-full` is an ACTION (something you press). Never mix them.
+   */
+  --radius-xs: calc(var(--radius) - 8px);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 10px);
-  --radius-3xl: calc(var(--radius) + 18px);
+  --radius-2xl: calc(var(--radius) + 12px);
+  --radius-3xl: calc(var(--radius) + 20px);
+  /* Sheets sit between 2xl and 3xl: big enough to read as a surface lifting off
+     the page, not so big it eats the first row of content. */
+  --radius-sheet: calc(var(--radius) + 16px);
 
   --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+
+  /**
+   * Type scale — UI-LANGUAGE §5.
+   *
+   * Eight roles, each carrying its own line-height, tracking AND weight, so
+   * `text-title-2` is the complete instruction and no screen has to remember
+   * that a title is also 600. Sizes are chosen, not derived from a ratio: the
+   * gap between `display` and `title-1` is deliberately enormous because the
+   * anchor must be unmistakably the largest thing on the page (§1).
+   */
+  --text-display: 3.5rem;
+  --text-display--line-height: 1;
+  --text-display--letter-spacing: -0.03em;
+  --text-display--font-weight: 700;
+
+  --text-title-1: 2.125rem;
+  --text-title-1--line-height: 1.1;
+  --text-title-1--letter-spacing: -0.02em;
+  --text-title-1--font-weight: 700;
+
+  --text-title-2: 1.5rem;
+  --text-title-2--line-height: 1.2;
+  --text-title-2--letter-spacing: -0.02em;
+  --text-title-2--font-weight: 600;
+
+  --text-title-3: 1.25rem;
+  --text-title-3--line-height: 1.25;
+  --text-title-3--letter-spacing: -0.015em;
+  --text-title-3--font-weight: 600;
+
+  --text-body-lg: 1.0625rem;
+  --text-body-lg--line-height: 1.4;
+  --text-body-lg--font-weight: 500;
+
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.45;
+
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.35;
+
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1.2;
+  --text-micro--letter-spacing: 0.02em;
+  --text-micro--font-weight: 600;
+
+  /**
+   * Motion — UI-LANGUAGE §8. Mirrored in lib/animation.ts for JS-driven motion;
+   * these exist so CSS transitions and keyframes use the same four durations
+   * and the same house curve. If the two ever disagree, animation.ts is the
+   * source and these are the copy.
+   */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-instant: 100ms;
+  --dur-fast: 160ms;
+  --dur-base: 240ms;
+  --dur-slow: 360ms;
 
   --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.3);
   --shadow-md: 0 4px 16px -4px oklch(0 0 0 / 0.4);
@@ -86,7 +154,12 @@
 
 :root {
   color-scheme: dark;
-  --radius: 0.95rem;
+  --radius: 1rem;
+
+  /* How present the brand wash is (layout.tsx `Atmosphere`). The same mix reads
+     roughly twice as heavy on a white page as on a black one, so light mode
+     halves it rather than the component branching on theme. */
+  --atmosphere-opacity: 1;
 
   --background: oklch(0.165 0.006 285);
   --foreground: oklch(0.975 0.003 285);
@@ -112,7 +185,7 @@
   --muted-foreground: oklch(0.7 0.012 285);
   --accent: oklch(0.275 0.008 285);
   --accent-foreground: oklch(0.975 0.003 285);
-  --destructive: oklch(0.62 0.2 24);
+  --destructive: oklch(0.575 0.2 24);
   --destructive-foreground: oklch(0.98 0.01 24);
 
   --border: oklch(0.3 0.008 285 / 0.55);
@@ -125,7 +198,7 @@
   --protein-soft: oklch(0.34 0.07 350);
   --carbs: oklch(0.82 0.15 90);
   --carbs-soft: oklch(0.36 0.06 90);
-  --fat: oklch(0.7 0.14 275);
+  --fat: oklch(0.715 0.14 275);
   --fat-soft: oklch(0.34 0.06 275);
 
   --activity: oklch(0.78 0.13 164);
@@ -147,12 +220,13 @@
   --success-soft: oklch(0.34 0.06 158);
   --warning: oklch(0.82 0.13 88);
   --warning-soft: oklch(0.36 0.06 88);
-  --danger: oklch(0.66 0.19 24);
+  --danger: oklch(0.745 0.19 24);
   --danger-soft: oklch(0.34 0.08 24);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
+  --atmosphere-opacity: 0.5;
 
   --background: oklch(0.985 0.002 285);
   --foreground: oklch(0.2 0.01 285);
@@ -165,7 +239,12 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.2 0.01 285);
 
-  --primary: oklch(0.62 0.14 164);
+  /* L is 0.52, not the 0.62 it was, because `--primary` is a BUTTON FILL and
+     white-on-0.62 measures 3.27:1 in a browser — a fail for 17px text, which is
+     "normal" under WCAG (large starts at 18.66px bold). 0.52 measures 4.80:1.
+     Darkening also sharpens `text-primary` accents on white. Verified by
+     resolving the oklch through a canvas rather than by eye. */
+  --primary: oklch(0.52 0.14 164);
   --primary-foreground: oklch(0.99 0.01 164);
   --tone-foreground: oklch(0.99 0.01 285); /* light UI → dark tones → near-white on-tone text */
   --secondary: oklch(0.955 0.004 285);
@@ -179,12 +258,12 @@
 
   --border: oklch(0.9 0.005 285);
   --input: oklch(0.9 0.005 285);
-  --ring: oklch(0.62 0.14 164);
+  --ring: oklch(0.52 0.14 164);
 
   /* Foreground tones are darkened for light mode so tone-colored text/icons on
      their own pale `-soft` tint clear WCAG AA (>=4.5:1) — the bright dark-mode
      values washed out on white. `-soft` backgrounds stay pale (unchanged). */
-  --calories: oklch(0.53 0.16 45);
+  --calories: oklch(0.525 0.16 45);
   --calories-soft: oklch(0.94 0.06 45);
   --protein: oklch(0.535 0.17 350);
   --protein-soft: oklch(0.94 0.05 350);
@@ -193,26 +272,26 @@
   --fat: oklch(0.53 0.17 275);
   --fat-soft: oklch(0.94 0.05 275);
 
-  --activity: oklch(0.5 0.14 164);
+  --activity: oklch(0.49 0.14 164);
   --activity-soft: oklch(0.93 0.05 164);
-  --nutrition: oklch(0.53 0.15 62);
+  --nutrition: oklch(0.525 0.15 62);
   --nutrition-soft: oklch(0.94 0.06 68);
   --sleep: oklch(0.535 0.16 300);
   --sleep-soft: oklch(0.94 0.05 300);
   --cardio: oklch(0.52 0.17 250);
   --cardio-soft: oklch(0.94 0.05 250);
-  --hydration: oklch(0.51 0.13 214);
+  --hydration: oklch(0.5 0.13 214);
   --hydration-soft: oklch(0.94 0.05 214);
   --supplement: oklch(0.5 0.11 190);
   --supplement-soft: oklch(0.93 0.05 190);
   --lab: oklch(0.535 0.16 322);
   --lab-soft: oklch(0.94 0.05 322);
 
-  --success: oklch(0.5 0.16 158);
+  --success: oklch(0.49 0.16 158);
   --success-soft: oklch(0.93 0.06 158);
   --warning: oklch(0.53 0.15 78);
   --warning-soft: oklch(0.95 0.08 88);
-  --danger: oklch(0.545 0.21 24);
+  --danger: oklch(0.535 0.21 24);
   --danger-soft: oklch(0.95 0.06 24);
 }
 
