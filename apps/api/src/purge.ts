@@ -112,6 +112,10 @@ function mediaKeyFromUrl(url: string | null | undefined, tenantId: string): stri
  *     at it. Now swept via the ledger, by key, wherever it lives.
  */
 export async function purgeClient(env: Env, tenantId: string, clientId: string): Promise<ClientPurgeResult> {
+  // Stop their card first. `client_subscriptions` rows are about to be deleted, so
+  // after this point there is nothing left that names the Stripe subscription and
+  // it would bill on forever, unreachable from any surface we own.
+  await cancelClientStripe(env, tenantId, clientId);
   const prefix = `t/${tenantId}/c/${clientId}/`;
   const row = await env.DB
     .prepare("SELECT user_id, avatar_url FROM clients WHERE id = ? AND tenant_id = ?")
@@ -190,6 +194,67 @@ async function cancelTenantStripe(env: Env, tenantId: string): Promise<void> {
   } catch { /* teardown proceeds even if Stripe is unreachable */ }
 }
 
+/**
+ * Cancel a tenant's CLIENTS' auto-renewing subscriptions — the Connect rail.
+ *
+ * These are separate Stripe objects on a separate account: the tenant's platform
+ * subscription bills the studio on OUR account, while each client's recurring
+ * package bills the client on the STUDIO's connected account. Cancelling the first
+ * does nothing to the second.
+ *
+ * Without this, deleting a tenant left every one of its clients' cards being
+ * charged on a schedule, for a studio that no longer existed, with no record on our
+ * side to reconcile against and no UI anywhere that could stop it — the client's
+ * only recourse would have been their bank. That made the nuclear reset an
+ * instrument for charging strangers money indefinitely.
+ *
+ * Returns a count of what it cancelled and what it could not, so the caller can
+ * report it rather than claiming a clean teardown it did not achieve.
+ */
+async function cancelClientStripe(env: Env, tenantId: string, clientId?: string): Promise<{ canceled: number; failed: number }> {
+  let canceled = 0;
+  let failed = 0;
+  try {
+    const acct = await env.DB
+      .prepare("SELECT stripe_account_id FROM tenant_settings WHERE tenant_id = ?")
+      .bind(tenantId)
+      .first<{ stripe_account_id: string | null }>()
+      .catch(() => null);
+    // No connected account means no Connect-rail subscription can exist.
+    if (!acct?.stripe_account_id) return { canceled, failed };
+    const cfg = await stripeConfig(env.DB);
+    if (!stripeEnabled(cfg)) return { canceled, failed };
+
+    const rows = (await env.DB
+      .prepare(
+        "SELECT id, stripe_sub_id FROM client_subscriptions WHERE tenant_id = ? AND stripe_sub_id IS NOT NULL" +
+          (clientId ? " AND client_id = ?" : ""),
+      )
+      .bind(...(clientId ? [tenantId, clientId] : [tenantId]))
+      .all<{ id: string; stripe_sub_id: string }>()
+      .catch(() => ({ results: [] as { id: string; stripe_sub_id: string }[] }))).results ?? [];
+
+    for (const r of rows) {
+      try {
+        await stripeCall(cfg.secretKey, `subscriptions/${r.stripe_sub_id}`, undefined, {
+          connectedAccount: acct.stripe_account_id,
+          method: "DELETE",
+        });
+        canceled++;
+      } catch (e) {
+        // Loud, and counted. A subscription we failed to cancel is a card that
+        // keeps getting charged, so this is the one failure in a purge that an
+        // operator genuinely has to know about and go fix by hand in Stripe.
+        failed++;
+        console.error(`[purge] could not cancel client subscription ${r.stripe_sub_id} on ${acct.stripe_account_id}:`, e);
+      }
+    }
+  } catch (e) {
+    console.error(`[purge] client-subscription teardown failed for tenant ${tenantId}:`, e);
+  }
+  return { canceled, failed };
+}
+
 export const TENANT_CLOSE_GRACE_DAYS = 7;
 
 /** Owner-initiated studio close: cancel billing NOW (charging stops immediately),
@@ -197,6 +262,10 @@ export const TENANT_CLOSE_GRACE_DAYS = 7;
  *  cron hard-purges it once the hold lapses. Returns the scheduled purge date. */
 export async function scheduleTenantClose(env: Env, tenantId: string): Promise<{ deleteAt: string }> {
   await cancelTenantStripe(env, tenantId);
+  // The studio is closing, so its clients must stop being charged for it NOW
+  // rather than at the end of the 7-day data hold. Billing someone for coaching
+  // that has already stopped is not something a grace window should cover.
+  await cancelClientStripe(env, tenantId);
   const deleteAt = new Date(Date.now() + TENANT_CLOSE_GRACE_DAYS * 86_400_000).toISOString();
   await env.DB
     .prepare("UPDATE subscriptions SET status = 'closing', suspend_at = ?, delete_at = ? WHERE tenant_id = ?")
@@ -236,8 +305,12 @@ async function purgeUserIdentity(env: Env, userId: string): Promise<void> {
  * every tenant-scoped row, the org/members/invitations, and — for members whose
  * ONLY studio was this one — their user identity. Idempotent.
  */
-export async function purgeTenant(env: Env, tenantId: string): Promise<void> {
+export async function purgeTenant(env: Env, tenantId: string): Promise<{ clientSubs: { canceled: number; failed: number } }> {
+  // Both rails, in this order. The studio stops being billed by us, and its
+  // clients stop being billed by it — the second is the one that used to be
+  // missed, and it is the one that charges real people for a deleted studio.
   await cancelTenantStripe(env, tenantId);
+  const clientSubs = await cancelClientStripe(env, tenantId);
   // Deregister CF custom hostnames + drop their host-cache KV entries BEFORE the
   // tenant_domains rows go, so nothing keeps routing to a deleted tenant.
   await purgeTenantDomains(env, tenantId);
@@ -264,6 +337,7 @@ export async function purgeTenant(env: Env, tenantId: string): Promise<void> {
     const other = await env.DB.prepare('SELECT 1 AS x FROM "member" WHERE userId = ? LIMIT 1').bind(m.userId).first().catch(() => null);
     if (!other) await purgeUserIdentity(env, m.userId);
   }
+  return { clientSubs };
 }
 
 /**
@@ -283,9 +357,19 @@ export async function isOwnerAnywhere(db: D1Database, userId: string): Promise<b
  * app_config incl. Stripe/AI keys, ai_models) are PRESERVED so the operator can
  * sign back in and start fresh. Irreversible; guarded by OTP + a typed phrase.
  */
-export async function purgeEverything(env: Env): Promise<{ tenants: number }> {
+export async function purgeEverything(env: Env): Promise<{ tenants: number; subsCanceled: number; subsFailed: number }> {
   const orgs = (await env.DB.prepare('SELECT id FROM "organization"').all<{ id: string }>().catch(() => ({ results: [] as { id: string }[] }))).results ?? [];
-  for (const o of orgs) await purgeTenant(env, o.id).catch(() => undefined);
+  // Tally the Connect-rail cancellations so the reset can REPORT them. A reset
+  // that silently failed to cancel a client's card is the one outcome an operator
+  // must not learn about from a chargeback, so the number is surfaced rather than
+  // swallowed — see `cancelClientStripe`.
+  let subsCanceled = 0;
+  let subsFailed = 0;
+  for (const o of orgs) {
+    const r = await purgeTenant(env, o.id).catch(() => null);
+    subsCanceled += r?.clientSubs.canceled ?? 0;
+    subsFailed += r?.clientSubs.failed ?? 0;
+  }
 
   // Sweep the ENTIRE media bucket (empty prefix) so any orphan escapes nothing.
   await purgePrefix(env, "");
@@ -313,7 +397,7 @@ export async function purgeEverything(env: Env): Promise<{ tenants: number }> {
   // The starter exercise library is platform content, not tenant data, so the
   // blanket `DELETE FROM exercises` above already took it. It only returns if an
   // admin installs it again — see `seedExercises`, which is no longer automatic.
-  return { tenants: orgs.length };
+  return { tenants: orgs.length, subsCanceled, subsFailed };
 }
 
 export async function purgeUser(env: Env, userId: string): Promise<void> {

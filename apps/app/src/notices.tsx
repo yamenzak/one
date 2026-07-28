@@ -1,12 +1,45 @@
 /**
- * App-level notices — the three things the user must be told about but that no
- * single screen owns: we lost the network, a new build is waiting, and something
- * failed with nobody catching it.
+ * App-level notices — the four things the user must be told about but that no
+ * single screen owns: we lost the network, this studio is paused, a new build is
+ * waiting, and something failed with nobody catching it.
  */
 
 import { useEffect, useState } from "react";
-import { CloudOff, RefreshCw, WifiOff, X, cn } from "@mossa/ui";
+import { CloudOff, Lock, RefreshCw, WifiOff, X, cn } from "@mossa/ui";
 import { useSession } from "./session.js";
+
+/**
+ * The studio is read-only, said out loud.
+ *
+ * A suspended or closing studio refuses every write at the edge (route-guard's
+ * host gate). Without this the app looks completely normal and each save fails
+ * one at a time with a 402 — the user's model becomes "the app is broken", which
+ * is both wrong and the version they will repeat to their coach. Naming the state
+ * once, up front, is the difference between a lock and a fault.
+ *
+ * Deliberately not dismissible: it is not a notification, it is the current state
+ * of the whole surface, and it stops being true only when the studio renews.
+ */
+export function StudioPausedBanner() {
+  const { host } = useSession();
+  const reason = host?.gate?.reason;
+  if (!host?.gate?.readOnly) return null;
+  const closing = reason === "closing";
+  return (
+    <div
+      role="status"
+      className="flex items-start gap-2 border-b border-warning/25 bg-warning/12 px-4 py-2.5 text-xs leading-relaxed text-warning"
+    >
+      <Lock aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+      <span>
+        <span className="font-semibold">{closing ? "This studio is closing." : "This studio is paused."}</span>{" "}
+        {closing
+          ? "Everything is readable, but nothing new can be saved. The owner can still cancel the closure from Billing."
+          : "Everything is readable, but nothing new can be saved until the studio renews."}
+      </span>
+    </div>
+  );
+}
 
 /**
  * Persistent app-bar indicator. Before this the app had no `navigator.onLine`

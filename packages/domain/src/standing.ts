@@ -20,14 +20,16 @@
  *                 archived        off the roster; the studio ended it
  *   access      whether a live plan/package covers them, and whether this
  *               studio requires one at all
- *   studio      the STUDIO's own standing with Mossa (ok / grace / suspended)
+ *   studio      the STUDIO's own standing with Kova (ok / grace / suspended)
  *
  * ── The rules, in precedence order ──────────────────────────────────────────
  *
- * 1. A SUSPENDED STUDIO loses what Mossa sells — for itself AND its clients, via
- *    the entitlement clamp — but never a person's access to their own data. The
- *    studio owes Mossa; the client did nothing. Grace (`past_due`) is full
- *    service by definition and changes nothing for anyone but the owner.
+ * 1. A SUSPENDED STUDIO is closed. Its whole subdomain drops to read-only — see
+ *    `resolveHostGate` below, which is where that is enforced once for every
+ *    route rather than re-derived per handler. Nobody loses sight of their own
+ *    data; nobody writes to a studio that is not paying to run. Grace
+ *    (`past_due`) is full service by definition and changes nothing for anyone
+ *    but the owner, who is being dunned.
  * 2. ARCHIVED outranks access. The relationship is over, so there is nothing to
  *    sell and nothing to unlock — read your history, write nothing.
  * 3. GATED ACCESS with no live plan locks to the storefront, and ONLY then.
@@ -127,15 +129,25 @@ export function resolveStanding(f: StandingFacts): Standing {
   // or lose. Only the owner is told (billing_past_due). Falling through to the
   // normal rules below is the correct behaviour, not an omission.
 
-  // Grace expired. Paid features are already gone — `clampEntitlementsForStatus`
-  // drops the tenant to free and the client inherits that through
-  // `entitlements ∩ clientFlags`, so AI, commerce, body scan and search stop
-  // without any per-client work. What is left to decide here is the client's own
-  // data, and that stays theirs: read it, keep logging to it. Purchasing is off
-  // because the storefront is a paid feature the studio no longer has, and no
-  // amount of buying would fix the studio's own subscription anyway.
+  // Grace expired: the studio is closed, and its whole subdomain is read-only.
+  //
+  // Paid features are already gone by a separate mechanism —
+  // `clampEntitlementsForStatus` drops the tenant to free and the client inherits
+  // that through `entitlements ∩ clientFlags`, so AI, commerce, body scan and
+  // search stop with no per-client work. What is decided HERE is the client's own
+  // data, and the line is: it stays readable, and it stops being writable.
+  //
+  // Writes are off because a write is the studio continuing to operate. Letting
+  // clients keep logging into a studio that stopped paying means the product runs
+  // indefinitely for free, and it also creates data the coach cannot act on (they
+  // are locked out of the same host). Reads stay on because a person's own
+  // training history is theirs and must never be held hostage over their coach's
+  // invoice — the same principle that governs `archived` above.
+  //
+  // Purchasing is off: the storefront is a paid feature the studio no longer has,
+  // and no amount of client spending would settle the studio's own bill.
   if (f.studio === "suspended") {
-    return { canRead: true, canWrite: true, canPurchase: false, lockedToStorefront: false, reason: "studio_suspended" };
+    return { canRead: true, canWrite: false, canPurchase: false, lockedToStorefront: false, reason: "studio_suspended" };
   }
 
   // Gated studio, no live access → the storefront, which they CAN buy from.
@@ -144,6 +156,108 @@ export function resolveStanding(f: StandingFacts): Standing {
   }
 
   return { canRead: true, canWrite: true, canPurchase: true, lockedToStorefront: false, reason: "ok" };
+}
+
+/**
+ * ── THE HOST GATE ───────────────────────────────────────────────────────────
+ *
+ * `resolveStanding` above answers "what may this PERSON do in this tenancy".
+ * This answers the question one level up: "does this STUDIO's host serve a
+ * working app at all". They are separate because they have different inputs and
+ * different blast radii — the host gate depends only on the studio's own
+ * subscription, applies identically to everyone who lands there, and is enforced
+ * once in the route guard rather than in each of ~200 handlers.
+ *
+ * Splitting it out is what makes "a suspended studio is closed" a real property
+ * instead of an aspiration. Previously the studio axis existed in `StandingFacts`
+ * and BOTH callers passed `studio: "ok"` — a hardcoded literal in `clients.ts`
+ * and in the app's `Shell` — so a suspended studio's clients were never actually
+ * treated as suspended by this module at all. The entitlement clamp was doing the
+ * entire job, which is why paid features stopped but ordinary logging did not.
+ */
+
+/** A studio's subscription state, as the billing tables record it. */
+export type SubscriptionStatus =
+  | "active" | "trialing" | "past_due" | "suspended" | "unpaid" | "canceled" | "closing";
+
+export type HostGateReason = "ok" | "grace" | "suspended" | "closing";
+
+export interface HostGate {
+  /** Every write on this host is refused. Reads are unaffected — always. */
+  readOnly: boolean;
+  /**
+   * The billing surface stays writable even while `readOnly`, so the one action
+   * that fixes the situation is reachable from inside it. Without this a lapsed
+   * studio would be locked out of paying, which is an unrecoverable state.
+   * Combine with a `billing:manage` permission check — this flag says the HOST
+   * permits it, not that the caller is entitled to it.
+   */
+  billingWritable: boolean;
+  /** Machine-readable, for API responses, copy and tests. */
+  reason: HostGateReason;
+}
+
+/**
+ * Map a subscription status onto the studio's standing.
+ *
+ * A MISSING subscription row resolves to `ok`, deliberately: a studio is created
+ * before its plan is chosen, and gating the host on a row that the onboarding
+ * wizard has not written yet would brick studio creation at step one. Onboarding
+ * enforces plan selection itself (a studio cannot leave the wizard without one);
+ * this function's job is the steady state.
+ */
+export function studioStandingOf(status: SubscriptionStatus | string | null | undefined): StudioStanding {
+  switch (status) {
+    case "past_due":
+      return "grace";
+    case "suspended":
+    case "unpaid":
+    case "canceled":
+    case "closing":
+      return "suspended";
+    default:
+      // active, trialing, missing, or anything a future Stripe status introduces.
+      return "ok";
+  }
+}
+
+/**
+ * Does this studio's host serve a working app?
+ *
+ * `closing` is reported separately from `suspended` even though both are
+ * read-only, because the copy has to differ: a suspended studio is told to pay,
+ * a closing one is told its data is scheduled for deletion and how to stop that.
+ * Passing the raw status rather than a `StudioStanding` is what preserves the
+ * distinction — `studioStandingOf` folds them together, and this must not.
+ */
+export function resolveHostGate(status: SubscriptionStatus | string | null | undefined): HostGate {
+  if (status === "closing") {
+    return { readOnly: true, billingWritable: true, reason: "closing" };
+  }
+  if (studioStandingOf(status) === "suspended") {
+    return { readOnly: true, billingWritable: true, reason: "suspended" };
+  }
+  if (status === "past_due") {
+    // Grace is FULL service. That is the entire purpose of a grace window: the
+    // owner gets dunning notices, and nothing about the studio changes for anyone
+    // until the window closes. Reported so the owner's UI can show the warning.
+    return { readOnly: false, billingWritable: true, reason: "grace" };
+  }
+  return { readOnly: false, billingWritable: true, reason: "ok" };
+}
+
+/**
+ * A gate reason back to a studio standing, for the app.
+ *
+ * The client never sees the raw subscription status — `/api/host` hands it the
+ * gate — so this is how the UI feeds the same studio axis into `resolveStanding`
+ * that the server feeds it from `subscriptions.status`. Both paths therefore agree
+ * by construction rather than by two hand-written mappings staying in step.
+ */
+export function studioStandingOfGate(reason: HostGateReason | null | undefined): StudioStanding {
+  if (reason === "suspended" || reason === "closing") return "suspended";
+  if (reason === "grace") return "grace";
+  return "ok";
 }
 
 /** Every axis value, for exhaustive enumeration in tests and docs. */

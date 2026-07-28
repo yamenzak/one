@@ -4,6 +4,10 @@
  * there's one "Continue with email" — no login/signup mode. The real gate lives
  * server-side: a studio that doesn't allow self sign-up turns a brand-new email
  * away (invite/existing only); here we just note that.
+ *
+ * Which studio this is for is decided entirely by the HOSTNAME. There is no slug
+ * to send any more — the OTP-send gate reads the host tenant, so a code can only
+ * ever be issued for the studio whose address the browser is actually on.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -13,13 +17,6 @@ import { api, ApiError } from "../api.js";
 import { useSession } from "../session.js";
 import { passkeySupported, signInWithPasskey, conditionalPasskeyAvailable } from "../passkey.js";
 import { Turnstile } from "../Turnstile.js";
-
-/** The `/t/<slug>` this login was opened on, if any — carried to the OTP-send
- *  gate so it can brand + scope eligibility to that tenant. */
-function pathSlug(): string | null {
-  const m = /^\/t\/([^/?#]+)/.exec(location.pathname);
-  return m ? decodeURIComponent(m[1]!) : null;
-}
 
 export function Login() {
   const { refresh, host } = useSession();
@@ -75,7 +72,7 @@ export function Login() {
     setBusy(true);
     setError(null);
     try {
-      await api.post("/api/auth/email-otp/send-verification-otp", { email, type: "sign-in", slug: pathSlug(), turnstileToken: tsToken });
+      await api.post("/api/auth/email-otp/send-verification-otp", { email, type: "sign-in", turnstileToken: tsToken });
       setStep("otp");
       setTimeout(() => otpRef.current?.focus(), 100);
     } catch (e) {

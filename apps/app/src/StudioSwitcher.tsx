@@ -13,9 +13,21 @@
  * "who am I here". Switching is a real decision with real consequences — it
  * changes whose data you are looking at — so it gets a sheet, not a menu row.
  *
- * Only rendered when there is genuinely a choice: two or more personas, and not
- * on a custom domain (where `context/switch` refuses by design — the host pins
- * the tenant, so the studio you are on is the only one that page can ever show).
+ * Only rendered when there is genuinely a choice: two or more personas.
+ *
+ * ── Switching is now a NAVIGATION ───────────────────────────────────────────
+ *
+ * Every studio has its own hostname, and the server pins the tenancy from it — so
+ * `context/switch` cannot move you between studios on a studio host, and this
+ * control has to cross origins instead. It targets the other studio's SUBDOMAIN
+ * (never its custom domain, even if it has one) because the session cookie is
+ * issued for the platform root: a subdomain hop carries the session and lands you
+ * signed in, while a custom domain is a separate cookie jar and would ask you to
+ * sign in again. `switchTenant` in session.tsx does the routing.
+ *
+ * This also fixes the guard. It used to hide whenever `ctx.hostTenantId` was set,
+ * which was true only on a custom domain — under the subdomain model that is true
+ * on EVERY studio host, so the switcher would have disappeared entirely.
  */
 
 import { useState } from "react";
@@ -85,9 +97,9 @@ export function StudioSwitcher() {
   const active = ctx?.active;
   const personas = ctx?.personas ?? [];
 
-  // No choice to offer ⇒ no control. On a custom domain the host pins the tenant
-  // and `context/switch` 409s, so a switcher there would be a button that fails.
-  if (!active || personas.length < 2 || ctx?.hostTenantId) return null;
+  // No choice to offer ⇒ no control. Nothing else disqualifies it: on a studio
+  // host `switchTenant` navigates rather than calling the refusing endpoint.
+  if (!active || personas.length < 2) return null;
 
   const pick = async (tenantId: string) => {
     if (tenantId === active.tenantId) return setOpen(false);
@@ -153,7 +165,7 @@ export function StudioSwitcher() {
  */
 export function StudioListCard() {
   const { ctx } = useSession();
-  if ((ctx?.personas.length ?? 0) < 2 || ctx?.hostTenantId) return null;
+  if ((ctx?.personas.length ?? 0) < 2) return null;
   return (
     <Card className="space-y-2">
       <div className="text-sm font-medium">Your other studios</div>
@@ -171,7 +183,7 @@ export function StudioList({ onSwitched }: { onSwitched?: () => void }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const active = ctx?.active;
   const personas = ctx?.personas ?? [];
-  if (!active || personas.length < 2 || ctx?.hostTenantId) return null;
+  if (!active || personas.length < 2) return null;
   return (
     <div className="space-y-1">
       {personas.map((p) => (

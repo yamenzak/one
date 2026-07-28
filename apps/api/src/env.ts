@@ -27,8 +27,24 @@ export interface Env {
    *  or a localhost origin); anywhere else `createAuth` fails CLOSED when it is
    *  unset rather than signing sessions with a repo-public fallback. */
   BETTER_AUTH_SECRET?: string;
-  /** Public origin (e.g. https://mossa.4dl.app); falls back to request origin. */
+  /** Public origin of the ROOT door (e.g. https://kova.4dl.app); falls back to the
+   *  request origin. Better Auth's baseURL is per-request, so this is only the
+   *  advertised canonical origin, not what signs cookies. */
   BETTER_AUTH_URL?: string;
+  /**
+   * The apex we serve studios under: `kova.4dl.app`. Every hostname is classified
+   * against it (`@mossa/domain` `classifyHost`), it is the WebAuthn RP ID and the
+   * session cookie's `Domain` for every door beneath it, and `<slug>.<ROOT_DOMAIN>`
+   * is a studio's address.
+   *
+   * Set it explicitly rather than deriving it from BETTER_AUTH_URL: the two are
+   * different things the moment the root door redirects somewhere else, and
+   * getting the root wrong silently reclassifies every tenant subdomain as a
+   * foreign custom domain — which fails closed (no tenant resolves) but presents
+   * as "every studio 404s", with nothing pointing at the cause. Falls back to the
+   * BETTER_AUTH_URL hostname, then to `kova.4dl.app`.
+   */
+  ROOT_DOMAIN?: string;
 
   /** Cloudflare Email Sending binding; mailer mocks when absent. */
   EMAIL?: SendEmailBinding;

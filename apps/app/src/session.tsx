@@ -10,57 +10,35 @@ import type { SessionContext, TenantBranding } from "@mossa/protocol";
 import { api, isOffline, setUnauthorizedHandler } from "./api.js";
 
 /**
- * The door you came in through: the slug of the last studio this device had an
- * active session in. NOT identifying (a public slug, no account data) and the
- * one thing sign-out must NOT forget, because it is what sign-out navigates to.
- */
-/**
- * The door in the URL THE APP WAS OPENED WITH, captured once at module load.
+ * ── The door is the hostname now ────────────────────────────────────────────
  *
- * This has to be read before React renders anything, because `/t/<slug>` is an
- * ENTRY path, not a route: nothing in the Shell matches it, so the catch-all
- * `<Route path="*" element={<Navigate to="/today" replace />} />` rewrites the
- * URL the instant a session resolves. And `Navigate` is a descendant of this
- * provider, so its effect runs BEFORE ours — an effect here that read
- * `location.pathname` would find `/today` and conclude there was no door.
+ * There used to be a `/t/<slug>` ENTRY path here, plus a remembered "last door"
+ * in localStorage, plus an effect that switched tenants after the session
+ * resolved — three mechanisms to answer "which studio is this?" on a single
+ * shared host, none of which could actually pin a tenancy (only brand it).
  *
- * (That rewrite is the right behaviour and answers the obvious question: the
- * `/t/<slug>` prefix is not sticky. Once you are in, the app runs on clean paths
- * — /today, /train, /clients/… — on whichever hostname served it.)
+ * All of it is gone. `acme.kova.4dl.app` IS Acme: the server resolves the tenant
+ * from the Host header before any of this code runs, sign-out returns to `/` on
+ * whatever host you are on, and switching studios is a NAVIGATION to the other
+ * studio's hostname rather than a state change on this one. That removes the
+ * entire class of bug where the brand and the tenancy disagreed.
+ *
+ * The `?t=<tenantId>` hint on emailed links is kept, but its job has shrunk: a
+ * link built by `canonicalHost` already points at the right host, so the hint is
+ * now only a redirect safety-net for older mail that pointed somewhere generic.
  */
-// Guarded because this runs at IMPORT time: any module that transitively pulls
-// in this file — including a unit test in a node environment — would otherwise
-// throw `window is not defined` before a single test ran.
-const ENTRY = {
-  slug: typeof window === "undefined" ? null : /^\/t\/([^/?#]+)/.exec(window.location.pathname)?.[1] ?? null,
-  tenantHint: typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("t"),
-};
-
-export const LAST_DOOR_KEY = "mossa:last-door";
-
-export function rememberDoor(slug: string | null | undefined): void {
-  if (!slug) return;
-  try { localStorage.setItem(LAST_DOOR_KEY, slug); } catch { /* private mode */ }
-}
-
-/** The studio door to return to when signed out, if this device knows one. */
-export function lastDoor(): string | null {
-  try { return localStorage.getItem(LAST_DOOR_KEY) || null; } catch { return null; }
-}
 
 /**
  * Display preferences that are NOT identifying and carry no account data — the
- * chosen light/dark theme, and the studio door to come back to. Sign-out used to
- * wipe every `mossa`-prefixed key, so a light-theme user signed back in to a dark
- * app and had to re-set it every time. Anything that could leak between accounts
- * (session cache, per-plan shopping lists) must stay OUT of here.
+ * chosen light/dark theme. Sign-out used to wipe every `mossa`-prefixed key, so a
+ * light-theme user signed back in to a dark app and had to re-set it every time.
+ * Anything that could leak between accounts (session cache, per-plan shopping
+ * lists) must stay OUT of here.
  *
- * The tinted nav and ambient wash used to be listed here too. They now live in
- * the tenant's branding rather than on the device, so there is nothing local to
- * preserve — and leaving the dead keys behind would have quietly restored one
- * studio's chrome after signing into another.
+ * The remembered door used to be here too. It no longer exists: the hostname is
+ * the door, so there is nothing for the device to remember.
  */
-const KEEP_ON_SIGN_OUT = new Set(["mossa-theme", LAST_DOOR_KEY]);
+const KEEP_ON_SIGN_OUT = new Set(["mossa-theme"]);
 
 /** Remove the app's own localStorage keys (mode, cached session, per-plan
  *  shopping lists) — all `mossa`-prefixed — so nothing leaks across accounts. */
@@ -101,13 +79,42 @@ function writeCachedCtx(data: SessionContext | null): void {
 
 type Mode = "coach" | "train";
 
-/** Which tenant (if any) owns the domain the app is served on (SPEC §14.1). */
+/** Which door the app is being served on — see `@mossa/domain` `classifyHost`. */
+export type HostRole = "root" | "setup" | "admin" | "tenant" | "custom" | "invalid";
+
+/** Which door this is, and whose (SPEC §14.1). Resolved pre-auth from /api/host. */
 export interface HostInfo {
+  role: HostRole;
+  /** True on our own doors (root / setup / admin); false when a studio resolved. */
   platform: boolean;
+  /** The apex studios live under, e.g. `kova.4dl.app`. Used to build the URL of
+   *  another studio when switching, so the switcher can cross hostnames. */
+  rootDomain: string;
+  /** Absolute URL of the setup door — the only place a studio is created. */
+  setupUrl: string;
+  /**
+   * The studio this host belongs to. `null` while `role === "tenant"` is
+   * meaningful and must not be treated as "platform": it is a well-formed studio
+   * address with no studio behind it, and the app renders "no studio here".
+   */
   tenant: { tenantId: string; name: string; slug: string; branding: TenantBranding | null; allowSignup: boolean } | null;
+  /** The studio's billing gate. `readOnly` means every write on this host refuses,
+   *  so the app says so up front rather than on the first failed save. */
+  gate?: { readOnly: boolean; reason: "ok" | "grace" | "suspended" | "closing" } | null;
   /** Cloudflare Turnstile — the login renders the widget when a site key is set
    *  and `enabled` (a server secret is configured, so codes are gated on it). */
   turnstile?: { siteKey: string | null; enabled: boolean } | null;
+}
+
+/** The URL of a studio, by slug, on the platform root.
+ *
+ *  Always the SUBDOMAIN, never the studio's custom domain — even when it has one.
+ *  The session cookie is issued for the root, so a subdomain hop carries the
+ *  session and switches instantly, while a custom domain is a separate origin with
+ *  its own cookie jar and would demand a fresh sign-in. The custom domain is for
+ *  that studio's own clients arriving cold, not for crossing between studios. */
+export function studioUrl(slug: string, rootDomain: string): string {
+  return `${location.protocol}//${slug}.${rootDomain}/`;
 }
 
 interface Session {
@@ -142,21 +149,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     localStorage.getItem("mossa-mode") === "train" ? "train" : "coach",
   );
 
-  // Is this the neutral platform host, or a tenant's own domain? Decides whether
-  // sign-out needs an explicit `/t/<slug>` to reach the studio door, or whether
-  // `/` already is it. Unresolved (null) counts as platform: a `/t/<slug>` on a
-  // custom domain still resolves that tenant, so the fallback is never wrong.
-  const hostIsPlatform = host?.platform !== false;
-
   const refresh = useCallback(async () => {
     try {
       const data = await api.get<SessionContext>("/api/context");
       setCtx(data);
       writeCachedCtx(data);
-      // Remember which studio door this device belongs to, for sign-out and for
-      // `/` on the platform host. Written on every context read, so switching
-      // studios moves the door with you.
-      rememberDoor(data.active?.tenantSlug);
       setDegraded(false);
     } catch (e) {
       // A NETWORK failure is not a sign-out. Restore the last known session so a
@@ -178,33 +175,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * Resolve which tenant brands this login, once, in parallel.
+   * Which door is this? One read, before anything renders.
    *
-   * Three ways to know the door, most explicit first — a custom domain pins it
-   * via the Host header, so this only matters on the platform host:
-   *
-   *  1. `/t/<slug>` — the branded entry a studio hands out before it buys a domain.
-   *  2. `?t=<tenantId>` — the hint every emailed CTA already carries. This used
-   *     to be read ONLY after the session resolved, so a signed-out recipient
-   *     clicked a link that named their studio and still got a studio-less login.
-   *  3. The remembered door — this device had a session in that studio, so that
-   *     is whose login it should show, not Mossa's.
-   *
-   * All three brand WITHOUT pinning: cross-tenant switching after sign-in is
-   * unaffected, and the origin never changes, so a passkey registered here keeps
-   * working whichever door is showing.
+   * No query parameters any more: the Host header carries the answer, so there is
+   * nothing for the client to hint at. A failure falls back to the root role —
+   * the dead end — which is the safe default: it shows a signpost rather than
+   * inventing a login for a studio we could not confirm exists.
    */
   useEffect(() => {
-    const slug = ENTRY.slug;
-    const hinted = ENTRY.tenantHint;
-    const q = slug
-      ? `?slug=${encodeURIComponent(decodeURIComponent(slug))}`
-      : hinted
-        ? `?t=${encodeURIComponent(hinted)}`
-        : lastDoor()
-          ? `?slug=${encodeURIComponent(lastDoor()!)}`
-          : "";
-    void api.get<HostInfo>(`/api/host${q}`).then(setHost).catch(() => setHost({ platform: true, tenant: null }));
+    void api
+      .get<HostInfo>("/api/host")
+      .then(setHost)
+      .catch(() =>
+        setHost({ role: "root", platform: true, rootDomain: location.hostname, setupUrl: "/", tenant: null }),
+      );
   }, []);
 
   useEffect(() => {
@@ -241,12 +225,28 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("mossa-mode", m);
   }, []);
 
+  /**
+   * Switch studios.
+   *
+   * On our own doors (setup/admin/root) this is still a session change, because
+   * those hosts have no tenancy of their own and `activeOrganizationId` is what
+   * decides scope there. On a STUDIO host it cannot be: the server pins the tenant
+   * from the hostname and refuses a switch by design, so the only way to reach
+   * another studio is to go to its address. `studioUrl` targets the subdomain so
+   * the shared cookie carries the session across with no re-authentication.
+   */
   const switchTenant = useCallback(
     async (tenantId: string) => {
+      const target = ctx?.personas.find((p) => p.tenantId === tenantId);
+      const root = host?.rootDomain;
+      if (target?.tenantSlug && root && host?.platform === false) {
+        location.assign(studioUrl(target.tenantSlug, root));
+        return;
+      }
       await api.post("/api/context/switch", { tenantId });
       await refresh();
     },
-    [refresh],
+    [ctx, host, refresh],
   );
 
   // Tenant hint from an email deep-link (`?t=<tenantId>`): a link opened in a
@@ -266,33 +266,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (t !== ctx.active.tenantId) void switchTenant(t).catch(() => undefined);
   }, [loading, ctx, params, setParams, switchTenant]);
 
-  /**
-   * A `/t/<slug>` door must also LAND you in that studio, not just brand itself.
-   *
-   * On the platform host nothing pins the tenant — `activeOrganizationId` decides
-   * every API call, and it is stamped once at session CREATE to the user's OLDEST
-   * membership (`ORDER BY createdAt ASC LIMIT 1`). So a user who belongs to two
-   * studios and signed in through `/t/studio-b` landed in studio-a: right brand
-   * on the login, wrong tenancy behind it, every subsequent API call scoped to
-   * the wrong studio. The `?t=` email hint already handled this; the door did not.
-   *
-   * A custom domain is unaffected — there `hostTenant` pins the tenant server-side
-   * (`auth-context.ts`), which is exactly why domains are the stronger mechanism.
-   * The server validates membership on switch, so an unknown slug or a studio the
-   * user has no persona in is a no-op rather than an escalation.
-   */
-  const doorSwitchDone = useRef(false);
-  useEffect(() => {
-    if (loading || !ctx?.active || doorSwitchDone.current) return;
-    const slug = ENTRY.slug;
-    if (!slug) return;
-    doorSwitchDone.current = true;
-    const want = decodeURIComponent(slug).toLowerCase();
-    if (ctx.active.tenantSlug?.toLowerCase() === want) return;
-    const persona = ctx.personas.find((p) => p.tenantSlug?.toLowerCase() === want);
-    if (persona) void switchTenant(persona.tenantId).catch(() => undefined);
-  }, [loading, ctx, switchTenant]);
-
   const signOut = useCallback(async () => {
     // The session cookie is HttpOnly — ONLY the server can clear it — so the
     // sign-out request must actually reach the server and succeed. Send a
@@ -308,22 +281,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } finally {
       clearAppStorage();
       setCtx(null);
-      // Back to the STUDIO door, not Mossa's.
+      // `/` on THIS host, which is already the right door.
       //
-      // This used to be a flat `/`, which on a tenant's custom domain is the
-      // branded login (fine) but on the platform host is the Mossa gate — so a
-      // coach signing out of their own studio was handed a page about what Mossa
-      // is, with no way back in and no passkey affordance. Worse for passkeys
-      // specifically: the credential is registered against this ORIGIN, and the
-      // gate is the one screen on it that never offers to use it.
-      //
-      // `/t/<slug>` keeps the origin identical, so the passkey still resolves; it
-      // only changes which brand the login wears. On a custom domain `/` already
-      // IS that studio's door, so nothing changes there.
-      const door = lastDoor();
-      location.assign(door && hostIsPlatform ? `/t/${encodeURIComponent(door)}` : "/");
+      // That is the whole payoff of resolving the tenant from the hostname: signing
+      // out of `acme.kova.4dl.app` lands on Acme's branded login, with Acme's
+      // passkey affordance, because the origin never changed. The old code had to
+      // reconstruct a `/t/<slug>` path from localStorage to achieve the same thing,
+      // and got it wrong whenever that memory was missing — handing a coach a
+      // generic page about the product with no way back into their own studio.
+      location.assign("/");
     }
-  }, [hostIsPlatform]);
+  }, []);
 
   const value = useMemo(
     () => ({ loading, ctx, host, online, degraded, mode, setMode, refresh, switchTenant, signOut }),

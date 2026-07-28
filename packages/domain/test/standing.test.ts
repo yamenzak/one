@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { resolveStanding, STANDING_AXES, type StandingFacts, type Membership } from "../src/standing.js";
+import { resolveHostGate, resolveStanding, studioStandingOf, STANDING_AXES, type StandingFacts, type Membership } from "../src/standing.js";
 
 /** All 48 cells. */
 function everyCell(): StandingFacts[] {
@@ -119,12 +119,21 @@ describe("standing — a studio that stops paying Mossa", () => {
     expect(s.canPurchase).toBe(false); // the storefront IS a paid feature
   });
 
-  it("but it never takes a client's own data or their logbook", () => {
-    // Mossa withholds what Mossa sells. It does not hold a client's history
-    // hostage over their coach's invoice — the client owes nobody.
+  it("closes the studio: read your history, write nothing", () => {
+    // A suspended studio is CLOSED, and the whole subdomain goes read-only —
+    // enforced once by `resolveHostGate` in the route guard rather than re-derived
+    // per handler. Writes are the studio operating, and a studio that stopped
+    // paying does not keep operating.
+    const s = resolveStanding(facts("active", { studio: "suspended" }));
+    expect(s.canWrite).toBe(false);
+  });
+
+  it("but it never takes away a client's own data", () => {
+    // The line this module draws: Kova withholds what Kova sells and closes the
+    // studio, but it does not hold a client's training history hostage over their
+    // coach's invoice — the client owes nobody. Same principle as `archived`.
     const s = resolveStanding(facts("active", { studio: "suspended" }));
     expect(s.canRead).toBe(true);
-    expect(s.canWrite).toBe(true);
   });
 
   it("suspension outranks the access gate rather than stacking with it", () => {
@@ -204,5 +213,69 @@ describe("standing — multi-studio isolation", () => {
     for (const f of everyCell()) {
       expect(resolveStanding(f)).toEqual(resolveStanding({ ...f }));
     }
+  });
+});
+
+/**
+ * The HOST gate — one level up from a person's standing: does this studio's
+ * subdomain serve a working app at all.
+ */
+describe("host gate — a suspended studio's subdomain is read-only", () => {
+  it("maps every subscription status onto a studio standing", () => {
+    expect(studioStandingOf("active")).toBe("ok");
+    expect(studioStandingOf("trialing")).toBe("ok");
+    expect(studioStandingOf("past_due")).toBe("grace");
+    for (const s of ["suspended", "unpaid", "canceled", "closing"]) {
+      expect(studioStandingOf(s), s).toBe("suspended");
+    }
+  });
+
+  it("treats a MISSING subscription row as ok, so studio creation is not bricked", () => {
+    // A studio exists before its plan is chosen. Gating the host on a row the
+    // onboarding wizard has not written yet would fail at step one, and the wizard
+    // enforces plan selection itself.
+    expect(studioStandingOf(null)).toBe("ok");
+    expect(studioStandingOf(undefined)).toBe("ok");
+    expect(resolveHostGate(null).readOnly).toBe(false);
+  });
+
+  it("treats an unknown future Stripe status as ok rather than locking everyone out", () => {
+    // Failing OPEN is right here and failing closed is not: a status Stripe adds
+    // later must not silently take every studio on the platform offline.
+    expect(resolveHostGate("some_status_stripe_invents_in_2027").readOnly).toBe(false);
+  });
+
+  it("grace is FULL service — that is what a grace window is", () => {
+    const g = resolveHostGate("past_due");
+    expect(g.readOnly).toBe(false);
+    expect(g.reason).toBe("grace");
+  });
+
+  it("suspended and closing are both read-only, but report differently", () => {
+    // Both lock writes; the copy has to differ, because one is asked to pay and the
+    // other is told its data is scheduled for deletion.
+    expect(resolveHostGate("suspended")).toEqual({ readOnly: true, billingWritable: true, reason: "suspended" });
+    expect(resolveHostGate("closing")).toEqual({ readOnly: true, billingWritable: true, reason: "closing" });
+  });
+
+  it("always leaves billing writable, so a lapsed studio can pay its way out", () => {
+    // Without this, suspension is unrecoverable from inside the app.
+    for (const s of ["suspended", "closing", "unpaid", "canceled"]) {
+      expect(resolveHostGate(s).billingWritable, s).toBe(true);
+    }
+  });
+
+  it("never gates reads — the gate only ever concerns writes", () => {
+    // Asserted structurally: `HostGate` has no read flag to get wrong.
+    for (const s of ["active", "past_due", "suspended", "closing", null]) {
+      expect(Object.keys(resolveHostGate(s)).sort()).toEqual(["billingWritable", "readOnly", "reason"]);
+    }
+  });
+
+  it("agrees with the client-side standing: suspended means no writes in both", () => {
+    // The two live in one file precisely so they cannot drift. If a future edit
+    // makes a suspended studio writable in one and not the other, this fails.
+    expect(resolveHostGate("suspended").readOnly).toBe(true);
+    expect(resolveStanding(facts("active", { studio: "suspended" })).canWrite).toBe(false);
   });
 });

@@ -12,7 +12,7 @@ import type { Env } from "./env.js";
 import type { RoleName } from "./access.js";
 import { createAuth, type Auth } from "./auth.js";
 import { ensureSchema } from "./db.js";
-import { hostnameOf, resolveHostTenant, type HostTenant } from "./host-context.js";
+import { hostnameOf, resolveHost, shapeOf, type HostContext, type HostTenant } from "./host-context.js";
 
 export interface AuthUser {
   id: string;
@@ -28,12 +28,18 @@ export interface AuthVars {
   role: RoleName | null;
   perms: Grant | null;
   /**
-   * The tenant this custom domain belongs to (SPEC §14.1), or null on the
-   * neutral platform host. When set, it — not the session — pins the tenant:
-   * only members of it get `tenantId`/role, so a stranger can't reach another
-   * tenant's data by pointing a session at the wrong domain.
+   * The tenant this HOST belongs to — its subdomain or its custom domain — or
+   * null on the root / setup / admin doors. When set, it (not the session) pins
+   * the tenant: only members of it get `tenantId`/role, so a stranger cannot
+   * reach another tenant's data by pointing a session at the wrong host.
    */
   hostTenant: HostTenant | null;
+  /**
+   * The full host resolution: which door, which studio, and that studio's gate.
+   * Every route that needs to know *where* it was called gets it from here rather
+   * than re-parsing the URL, so classification happens exactly once per request.
+   */
+  host: HostContext;
 }
 
 export type AppEnv = { Bindings: Env; Variables: AuthVars };
@@ -41,8 +47,7 @@ export type AppContext = Context<AppEnv>;
 
 /** Populate `auth`, `user`, `tenantId`, `role`, `perms` from the session cookie. */
 export const sessionMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
-  const auth = createAuth(c.env, new URL(c.req.url).origin);
-  c.set("auth", auth);
+  const hostname = hostnameOf(c.req.url);
   c.set("user", null);
   c.set("tenantId", null);
   c.set("role", null);
@@ -52,19 +57,28 @@ export const sessionMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   // is idempotent + cached per isolate.
   await ensureSchema(c.env.DB).catch(() => undefined);
 
-  // Host → tenant (custom domain). On the platform host this is null and the
-  // tenant comes from the session, exactly as before.
-  const hostTenant = await resolveHostTenant(c.env.DB, hostnameOf(c.req.url), c.env).catch(() => null);
-  c.set("hostTenant", hostTenant);
+  // Where did this request arrive? One classification per request; everything
+  // downstream reads it off the context instead of re-parsing the URL.
+  const host = await resolveHost(c.env.DB, hostname, c.env).catch(
+    () => ({ hostname, shape: shapeOf(hostname, c.env), tenant: null, gate: null }) as HostContext,
+  );
+  c.set("host", host);
+  c.set("hostTenant", host.tenant);
+
+  // Better Auth is constructed with the resolved host so the passkey RP ID and the
+  // session cookie's Domain follow the door — one credential and one session
+  // across every studio under our root, host-scoped on a custom domain.
+  const auth = createAuth(c.env, new URL(c.req.url).origin, host.shape);
+  c.set("auth", auth);
 
   try {
     const s = await auth.api.getSession({ headers: c.req.raw.headers });
     if (s?.user) {
       c.set("user", { id: s.user.id, email: s.user.email, name: s.user.name, image: s.user.image });
-      // On a custom domain the Host pins the tenant; elsewhere the session's
-      // active org decides. A stranger to the host tenant gets no tenant scope.
+      // On any tenant host the Host pins the tenant; on the platform doors the
+      // session's active org decides. A stranger to the host tenant gets no scope.
       const sessionOrg = (s.session as { activeOrganizationId?: string }).activeOrganizationId ?? null;
-      const orgId = hostTenant ? hostTenant.tenantId : sessionOrg;
+      const orgId = host.tenant ? host.tenant.tenantId : sessionOrg;
       if (orgId) {
         const row = await c.env.DB.prepare(
           'SELECT role, permissions_json FROM "member" WHERE organizationId = ? AND userId = ?',

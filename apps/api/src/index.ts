@@ -45,6 +45,7 @@ import { sessionRoutes, promoRoutes } from "./session-routes.js";
 import { domainRoutes, domainAdminRoutes } from "./domain-routes.js";
 import { onboardingRoutes } from "./onboarding-routes.js";
 import { otpSendGuard } from "./otp-guard.js";
+import { orgCreateGuard, orgUpdateGuard } from "./org-guard.js";
 import { buildManifest } from "./manifest.js";
 import type { Env } from "./env.js";
 
@@ -83,6 +84,13 @@ app.use("*", routeGuard);
 // eligibility), then forwards to Better Auth. Registered before the catch-all
 // so this exact path lands here, not on the generic handler.
 app.post("/api/auth/email-otp/send-verification-otp", otpSendGuard);
+
+// A studio's slug is its HOSTNAME, so it cannot be whatever the client posted.
+// These validate it against the reserved-label list and DNS label rules, then
+// provision (or move) the studio's `<slug>.<root>` address. Registered before the
+// catch-all so these exact paths land here first — see org-guard.ts.
+app.post("/api/auth/organization/create", orgCreateGuard);
+app.post("/api/auth/organization/update", orgUpdateGuard);
 
 // Close the two sibling endpoints the emailOTP plugin registers unconditionally.
 // Both call the same sendVerificationOTP callback directly, so they are a way

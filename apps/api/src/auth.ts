@@ -14,6 +14,7 @@
 import { betterAuth, APIError } from "better-auth";
 import { organization, emailOTP } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
+import { cookieDomainFor, rpIdFor, type HostShape } from "@mossa/domain";
 import type { Env } from "./env.js";
 import { ac, roles } from "./access.js";
 import { withinQuota, hasFeature } from "./billing-store.js";
@@ -133,15 +134,32 @@ function seatError(verdict: SeatVerdict): APIError {
   return new APIError("FORBIDDEN", { code: "STAFF_SEATS_EXCEEDED", message: verdict.message, quota: "staffSeats", used: verdict.used, limit: verdict.max });
 }
 
-export function createAuth(env: Env, origin?: string) {
+/**
+ * Build the per-request auth instance.
+ *
+ * `shape` is the request's host classification (`@mossa/domain` `classifyHost`),
+ * and it decides the two things that make cross-tenant identity work:
+ *
+ *  • **rpID** — every door under our root shares `rpID = <root>`, so ONE passkey
+ *    works at `setup.`, at `admin.` and at every studio a person belongs to. A
+ *    custom domain has no suffix relationship with our root, so WebAuthn requires
+ *    it to be its own RP with its own credential. See `rpIdFor`.
+ *  • **cookie Domain** — widened to the root under our subtree, so one sign-in
+ *    covers every studio and the switcher moves between subdomains without
+ *    re-authenticating. Host-only on a custom domain and on `localhost`. See
+ *    `cookieDomainFor`.
+ *
+ * Omitting `shape` falls back to host-only behaviour derived from the origin,
+ * which is what background jobs (no request) get.
+ */
+export function createAuth(env: Env, origin?: string, shape?: HostShape) {
   // Local dev always wins: a localhost origin overrides the prod var so
   // cookies stay non-Secure and callbacks point at the dev server.
   const isLocal = Boolean(origin && /^http:\/\/(localhost|127\.0\.0\.1)/.test(origin));
-  // Model A (SPEC §14.1): the REQUEST origin drives baseURL — so on a tenant's
-  // custom domain the passkey RP id + cookies bind to that domain (each domain
-  // is its own WebAuthn RP). BETTER_AUTH_URL is only the fallback when there's
-  // no request context (e.g. background jobs). On the platform host the request
-  // origin equals BETTER_AUTH_URL, so nothing changes there.
+  // The REQUEST origin drives baseURL — so on a studio's subdomain or its custom
+  // domain, callbacks and emailed links point back at the door the user actually
+  // came through. BETTER_AUTH_URL is only the fallback when there's no request
+  // context (e.g. background jobs).
   const baseURL = origin || env.BETTER_AUTH_URL || "http://localhost:8787";
 
   // CSRF: Better Auth rejects POSTs whose Origin isn't trusted.
@@ -369,8 +387,10 @@ export function createAuth(env: Env, origin?: string) {
       // One-tap re-auth once enrolled; multiple passkeys per user.
       passkey({
         rpName: "Mossa",
-        // rpID must match the serving origin's registrable domain.
-        rpID: baseURL.startsWith("https") ? new URL(baseURL).hostname : "localhost",
+        // One credential for every door under our root; host-scoped elsewhere.
+        // `rpIdFor` returns "localhost" for every loopback host, which is what
+        // keeps dev and the E2E suite (on `*.localhost`) enrolling passkeys.
+        rpID: shape ? rpIdFor(shape) : baseURL.startsWith("https") ? new URL(baseURL).hostname : "localhost",
         // WebAuthn verifies the ceremony's origin against this. In local dev the
         // page runs on Vite (:5173) while this worker is :8787, so pin BOTH (same
         // set as trustedOrigins) or registration fails with an origin mismatch.
@@ -380,7 +400,25 @@ export function createAuth(env: Env, origin?: string) {
     ],
 
     // App + API share one origin; secure cookies only on https (local dev is http).
-    advanced: { cookiePrefix: "mossa", useSecureCookies: baseURL.startsWith("https") },
+    //
+    // `crossSubDomainCookies` is what makes one sign-in cover every studio: the
+    // session cookie is issued for `.kova.4dl.app`, so `acme.kova.4dl.app` and
+    // `bolt.kova.4dl.app` are the same session and the studio switcher is a
+    // navigation rather than a re-authentication. It is NOT sent to
+    // `otherapp.4dl.app` — a Domain of `kova.4dl.app` matches that name and its
+    // subdomains only — so unrelated apps in the same zone are unaffected.
+    //
+    // Left off (host-only cookies) for custom domains, which have no shared parent
+    // to widen to, and for `localhost`, which browsers reject a Domain attribute
+    // for. The latter means dev keeps a separate session per `*.localhost` host;
+    // that is a dev-only difference from production, called out in `cookieDomainFor`.
+    advanced: {
+      cookiePrefix: "mossa",
+      useSecureCookies: baseURL.startsWith("https"),
+      ...(shape && cookieDomainFor(shape)
+        ? { crossSubDomainCookies: { enabled: true, domain: `.${cookieDomainFor(shape)}` } }
+        : {}),
+    },
   });
 }
 

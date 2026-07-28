@@ -212,10 +212,24 @@ async function applySchema(db: D1Database): Promise<void> {
           // ── Tenant settings (branding, AI toggles, marketplace, Connect) ───
           "CREATE TABLE IF NOT EXISTS tenant_settings (tenant_id TEXT PRIMARY KEY, branding_json TEXT, ai_toggles_json TEXT, marketplace_json TEXT, integrations_json TEXT, stripe_account_id TEXT, updated_at TEXT);",
 
-          // ── Custom domains (SPEC §14.1) — Cloudflare for SaaS white-label.
-          // Keyed by hostname for the Host→tenant lookup on every request. One
-          // row per tenant hostname; status/ssl mirror the CF custom hostname.
-          "CREATE TABLE IF NOT EXISTS tenant_domains (hostname TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, cf_hostname_id TEXT, cf_route_id TEXT, status TEXT DEFAULT 'pending', ssl_status TEXT, verify_name TEXT, verify_value TEXT, verify_json TEXT, cf_errors TEXT, cname_target TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
+          // ── Tenant hostnames — the Host→tenant table (SPEC §14.1) ──────────
+          // Keyed by hostname because that is the lookup on every single request.
+          //
+          // TWO KINDS of row live here, and the distinction is load-bearing:
+          //
+          //  'subdomain'  `<slug>.kova.4dl.app`. Created with the studio, always
+          //               `active`, no Cloudflare call and no DCV — the wildcard
+          //               certificate, wildcard DNS record and wildcard worker
+          //               route already cover it. System-owned: it is not listed
+          //               in the owner's domains UI and cannot be deleted there,
+          //               because deleting it would make the studio unreachable.
+          //  'custom'     a domain the tenant owns. Provisioned through
+          //               Cloudflare for SaaS; carries cf ids, DCV records and
+          //               validation errors.
+          //
+          // `kind` defaults to 'custom' so pre-existing rows (all of which were
+          // custom domains) keep their meaning without a data migration.
+          "CREATE TABLE IF NOT EXISTS tenant_domains (hostname TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, kind TEXT DEFAULT 'custom', cf_hostname_id TEXT, cf_route_id TEXT, status TEXT DEFAULT 'pending', ssl_status TEXT, verify_name TEXT, verify_value TEXT, verify_json TEXT, cf_errors TEXT, cname_target TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
           "CREATE INDEX IF NOT EXISTS idx_tenant_domains_tenant ON tenant_domains(tenant_id);",
 
           // ── Coach-action audit log (SPEC §9; REGISTRY-PLAN Phase 3) ────────
@@ -276,6 +290,11 @@ async function applySchema(db: D1Database): Promise<void> {
           // no hint that DNS was refusing to let the certificate issue — the
           // owner's only route to the truth was a dashboard they cannot see.
           "ALTER TABLE tenant_domains ADD COLUMN cf_errors TEXT",
+          // 'subdomain' | 'custom'. Defaults to 'custom' precisely so existing
+          // rows — which are all custom domains — need no backfill. The studio's
+          // own `<slug>.<root>` row is inserted with kind='subdomain' and is
+          // system-owned; see the CREATE TABLE comment.
+          "ALTER TABLE tenant_domains ADD COLUMN kind TEXT DEFAULT 'custom'",
           "ALTER TABLE clients ADD COLUMN avatar_url TEXT",
           "ALTER TABLE clients ADD COLUMN avatar_seed TEXT",
           // Rich micronutrients on foods (ByShujaa parity).

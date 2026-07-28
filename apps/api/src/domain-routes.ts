@@ -1,13 +1,29 @@
 /**
  * Custom domains (SPEC §14.1) — Cloudflare for SaaS white-label.
  *
- * Owner flow: add a hostname → we register a CF custom hostname and hand back
- * the CNAME target + DCV TXT record → owner sets DNS → we poll until CF reports
- * the cert active → the hostname routes to this worker and `resolveHostTenant`
- * scopes every request on it to this tenant.
+ * ── What changed, and why this file got simpler ──────────────────────────────
  *
- * `/api/host` is the ONE public read the pre-auth app uses to brand the login
- * screen for whichever tenant owns the domain the browser is on.
+ * Every studio is now reachable at `<slug>.kova.4dl.app` from the moment it is
+ * created (`provisionSubdomain` in clients.ts), which turns a custom domain from
+ * *the* white-label mechanism into a purely additive one. Three consequences:
+ *
+ *  • **A half-provisioned domain is no longer an outage.** The studio keeps
+ *    working at its subdomain the entire time DNS is propagating, so the flow can
+ *    take as long as it takes.
+ *  • **There is always somewhere to fall back to.** `canonicalHost` prefers an
+ *    active custom domain and drops to the subdomain otherwise, so a domain that
+ *    breaks degrades instead of stranding the tenant.
+ *  • **Adding a domain has one job:** register the hostname, expose exactly what
+ *    DNS needs (CNAME + every DCV TXT + the CAA fix when that is the obstacle),
+ *    and route it. No platform-host special cases.
+ *
+ * Owner flow: add a hostname → we register a CF custom hostname and a worker
+ * route → the owner sets DNS → we poll until CF reports the cert active → the
+ * hostname resolves to this tenant (`resolveHost`) and scopes every request on it.
+ *
+ * `/api/host` is the ONE public read the pre-auth app uses to learn which DOOR it
+ * is on: the root dead end, the setup wizard, the operator console, a studio's
+ * subdomain, or a studio's own domain — plus that studio's brand and gate.
  */
 
 import { Hono } from "hono";
@@ -17,10 +33,10 @@ import { setConfig, getConfig } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
 import { turnstileConfig } from "./turnstile.js";
 import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostname, createWorkerRoute, deleteWorkerRoute, type CustomHostname } from "./cloudflare.js";
-import { hostnameOf, isPlatformHost, invalidateHostCache, resolveTenantDoor } from "./host-context.js";
+import { canonicalHost, invalidateHostCache, isPlatformDoor, rootDomain, shapeOf } from "./host-context.js";
 import { nowIso } from "./ids.js";
 import { parseJson } from "./db.js";
-import { caaFixFromErrors } from "@mossa/domain";
+import { caaFixFromErrors, setupHostname } from "@mossa/domain";
 
 const HOSTNAME = z
   .string()
@@ -76,40 +92,55 @@ async function syncStatus(env: { DB: D1Database; CACHE?: KVNamespace }, row: Dom
 }
 
 export const domainRoutes = new Hono<AppEnv>()
-  // Public: the pre-auth app asks "whose domain am I on?" to brand the login.
-  // A custom domain pins the tenant (platform:false). On the neutral platform
-  // host, a `?slug=` (from the `/t/<slug>` entry) brands the login WITHOUT
-  // pinning — the app still allows cross-tenant switching after sign-in.
+  /**
+   * Public: "which door am I, and whose?"
+   *
+   * The single pre-auth read the app boots on. It answers three things the client
+   * cannot work out for itself:
+   *
+   *  1. **The role** — root / setup / admin / tenant / custom. This decides which
+   *     top-level screen renders, and it has to come from the server because only
+   *     the server knows the configured root domain.
+   *  2. **The studio** — brand, slug, and whether strangers may self-register, so
+   *     the login wears the right identity before anyone signs in.
+   *  3. **The gate** — whether this studio is read-only, so the app can say so
+   *     up front instead of discovering it on the first refused write.
+   *
+   * `tenant: null` on a `tenant` role is meaningful: a well-formed subdomain with
+   * no studio behind it. The app must render "no studio here", never a login.
+   */
   .get("/host", async (c) => {
-    const ht = c.get("hostTenant");
-    const platform = isPlatformHost(hostnameOf(c.req.url), c.env);
-    if (ht) {
-      return c.json({
-        platform: false,
-        tenant: { tenantId: ht.tenantId, name: ht.name, slug: ht.slug, branding: ht.branding, allowSignup: ht.allowSignup },
-        turnstile: await turnstileConfig(c.env.DB),
-      });
-    }
-    // Which door is this? `slug` comes from a `/t/<slug>` entry; `t` from the
-    // tenant hint every emailed CTA already carries, so a signed-out recipient
-    // of a notification lands on THEIR studio's branded login rather than a
-    // generic one. Neither pins the tenant — the platform host still allows
-    // cross-tenant switching after auth; this only decides whose brand shows.
-    const slug = c.req.query("slug");
-    const hintedTenant = c.req.query("t");
-    if (platform && (slug || hintedTenant)) {
-      const st = await resolveTenantDoor(c.env.DB, { slug: slug ?? undefined, tenantId: hintedTenant ?? undefined });
-      if (st) return c.json({ platform: true, tenant: { tenantId: st.tenantId, name: st.name, slug: st.slug, branding: st.branding, allowSignup: st.allowSignup }, turnstile: await turnstileConfig(c.env.DB) });
-    }
-    return c.json({ platform, tenant: null, turnstile: await turnstileConfig(c.env.DB) });
+    const host = c.get("host");
+    const t = host.tenant;
+    const root = rootDomain(c.env);
+    return c.json({
+      role: host.shape.role,
+      // Retained for the app's existing branching: true on our own doors, false on
+      // anything that resolves a studio by hostname.
+      platform: isPlatformDoor(host.shape),
+      rootDomain: root,
+      setupUrl: `${new URL(c.req.url).protocol}//${setupHostname(root)}`,
+      tenant: t
+        ? { tenantId: t.tenantId, name: t.name, slug: t.slug, branding: t.branding, allowSignup: t.allowSignup }
+        : null,
+      gate: host.gate ? { readOnly: host.gate.readOnly, reason: host.gate.reason } : null,
+      turnstile: await turnstileConfig(c.env.DB),
+    });
   })
 
-  // List this tenant's domains, refreshing live status from Cloudflare.
+  /**
+   * This tenant's domains, with live Cloudflare status.
+   *
+   * Only `kind = 'custom'` rows are listed. The studio's own subdomain is reported
+   * separately as `subdomain` — it is not a row the owner manages, it has no DNS
+   * for them to set and no status to poll, and putting it in the same list gave it
+   * a Remove button that would have made the studio unreachable.
+   */
   .get("/domains", async (c) => {
     const guard = requirePermission(c, { settings: ["manage"] });
     if (guard) return guard;
     const who = requireTenant(c)!;
-    const rows = (await c.env.DB.prepare("SELECT * FROM tenant_domains WHERE tenant_id = ? ORDER BY created_at").bind(who.tenantId).all<DomainRow>()).results ?? [];
+    const rows = (await c.env.DB.prepare("SELECT * FROM tenant_domains WHERE tenant_id = ? AND kind = 'custom' ORDER BY created_at").bind(who.tenantId).all<DomainRow>()).results ?? [];
     const cfg = await saasConfig(c.env.DB);
     const out = [];
     for (const row of rows) {
@@ -119,7 +150,17 @@ export const domainRoutes = new Hono<AppEnv>()
       }
       out.push(present(row));
     }
-    return c.json({ domains: out, configured: !!cfg });
+    const sub = await c.env.DB
+      .prepare("SELECT hostname FROM tenant_domains WHERE tenant_id = ? AND kind = 'subdomain' LIMIT 1")
+      .bind(who.tenantId)
+      .first<{ hostname: string }>()
+      .catch(() => null);
+    return c.json({
+      domains: out,
+      subdomain: sub?.hostname ?? null,
+      canonical: await canonicalHost(c.env, c.env.DB, who.tenantId),
+      configured: !!cfg,
+    });
   })
 
   // Register a custom hostname for this tenant.
@@ -131,7 +172,22 @@ export const domainRoutes = new Hono<AppEnv>()
     const parsed = HOSTNAME.safeParse((await c.req.json().catch(() => ({})) as { hostname?: string }).hostname);
     if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "invalid hostname" }, 400);
     const hostname = parsed.data;
-    if (isPlatformHost(hostname, c.env)) return c.json({ error: "that's the platform domain" }, 400);
+
+    // Nothing under our own root may be added as a "custom" domain.
+    //
+    // This is the check that keeps the domains form from being a takeover
+    // primitive. Without it an owner could type `admin.kova.4dl.app` — or another
+    // studio's `bolt.kova.4dl.app` — and, because a custom-domain row is looked up
+    // by hostname and pins the tenancy, have our own infrastructure host or a
+    // competitor's studio resolve to THEM. The old check compared against the
+    // single platform hostname only, which stopped exactly one of these.
+    //
+    // Their own subdomain is not an exception: it already exists, provisioned at
+    // studio creation, and re-adding it through this route would replace a
+    // system-owned row with a tenant-managed one.
+    if (shapeOf(hostname, c.env).underRoot) {
+      return c.json({ error: `${hostname} belongs to the platform. Add a domain you own, e.g. train.yourgym.com.` }, 400);
+    }
 
     const cfg = await saasConfig(c.env.DB);
     if (!cfg) return c.json({ error: "custom domains aren't enabled on this platform yet" }, 503);
@@ -194,7 +250,10 @@ export const domainRoutes = new Hono<AppEnv>()
     const guard = requirePermission(c, { settings: ["manage"] });
     if (guard) return guard;
     const who = requireTenant(c)!;
-    const row = await c.env.DB.prepare("SELECT * FROM tenant_domains WHERE hostname = ? AND tenant_id = ?").bind(c.req.param("hostname").toLowerCase(), who.tenantId).first<DomainRow>();
+    const row = await c.env.DB.prepare("SELECT * FROM tenant_domains WHERE hostname = ? AND tenant_id = ? AND kind = 'custom'").bind(c.req.param("hostname").toLowerCase(), who.tenantId).first<DomainRow>();
+    // A missing row and the studio's own subdomain are both 404 here: the
+    // subdomain is not a custom domain, and it is the address the studio is
+    // reachable at, so this route must never be able to remove it.
     if (!row) return c.json({ error: "not found" }, 404);
     const cfg = await saasConfig(c.env.DB);
     // Both sides, or the zone accumulates routes pointing at hostnames nobody

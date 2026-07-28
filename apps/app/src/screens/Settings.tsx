@@ -303,9 +303,9 @@ function CloseStudioSection() {
 }
 
 /**
- * Sign-in — the tenant's front door. Shows the shareable login link (their
- * custom domain if live, else the branded `/t/<slug>` path), the login-screen
- * customization (copy, hero image, passkey), and the custom-domain setup.
+ * Sign-in — the tenant's front door. Shows the shareable login link (their custom
+ * domain if live, else their own subdomain), the login-screen customization (copy,
+ * hero image, passkey), and the custom-domain setup.
  */
 function SignInSettings({ canBrand, branding, slug, onSaved }: { canBrand: boolean; branding: TenantBranding | null; slug: string | null; onSaved: () => void }) {
   return (
@@ -319,14 +319,25 @@ function SignInSettings({ canBrand, branding, slug, onSaved }: { canBrand: boole
   );
 }
 
-/** The shareable login link — a custom domain when one is live, otherwise the
- *  branded `/t/<slug>` entry on the platform host. Copy + open. */
+/**
+ * The shareable login link.
+ *
+ * The server decides which hostname is canonical — an active custom domain,
+ * otherwise the studio's own subdomain — and hands it back as `canonical`, so this
+ * card and every emailed invite quote the SAME address. It used to build
+ * `${location.origin}/t/${slug}`, which is now a dead end: the platform root
+ * serves a signpost, so that link would have sent a studio's clients nowhere.
+ */
 function LoginLinkCard({ slug }: { slug: string | null }) {
-  const [domains, setDomains] = useState<DomainInfo[] | null>(null);
+  const [canonical, setCanonical] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  useEffect(() => { void api.get<{ domains: DomainInfo[] }>("/api/domains").then((r) => setDomains(r.domains)).catch(() => setDomains([])); }, []);
-  const liveDomain = domains?.find((d) => d.status === "active") ?? null;
-  const link = liveDomain ? `https://${liveDomain.hostname}` : slug ? `${location.origin}/t/${slug}` : location.origin;
+  useEffect(() => {
+    void api
+      .get<{ canonical: string | null }>("/api/domains")
+      .then((r) => setCanonical(r.canonical))
+      .catch(() => setCanonical(null));
+  }, []);
+  const link = canonical ? `https://${canonical}` : slug ? `${location.protocol}//${location.host}` : location.origin;
   const pretty = link.replace(/^https?:\/\//, "");
   const copy = () => void navigator.clipboard?.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); });
   return (
@@ -340,9 +351,9 @@ function LoginLinkCard({ slug }: { slug: string | null }) {
           <Button size="sm" variant={copied ? "tonal" : "secondary"} onClick={copy}>{copied ? <><Check /> Copied</> : <><Copy /> Copy</>}</Button>
           <Button size="icon" variant="secondary" aria-label="Open login link" onClick={() => window.open(link, "_blank")}><ExternalLink /></Button>
         </div>
-        {liveDomain
-          ? <p className="text-xs text-muted-foreground">Served on your live domain <span className="font-medium text-foreground">{liveDomain.hostname}</span>.</p>
-          : <p className="text-xs text-muted-foreground">This branded path works today. Connect a custom domain below for a link on your own address.</p>}
+        {canonical && !canonical.startsWith(`${slug ?? ""}.`)
+          ? <p className="text-xs text-muted-foreground">Served on your live domain <span className="font-medium text-foreground">{canonical}</span>.</p>
+          : <p className="text-xs text-muted-foreground">Your studio&rsquo;s own address, live from the moment you created it. Connect a custom domain below for a link on a domain you own.</p>}
       </Card>
     </section>
   );
@@ -350,7 +361,7 @@ function LoginLinkCard({ slug }: { slug: string | null }) {
 
 /**
  * Login-screen customization — the copy + affordances shown on the tenant's
- * branded sign-in (custom domain or `/t/<slug>`). A live mini-preview mirrors
+ * branded sign-in (their subdomain or their custom domain). A live mini-preview mirrors
  * the current theme (so it wears the tenant's brand) as the owner edits.
  */
 function LoginCustomizeSection({ initial, logoUrl, onSaved }: { initial: LoginBranding | null; logoUrl: string | null; onSaved: () => void }) {

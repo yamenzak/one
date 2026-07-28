@@ -1,10 +1,12 @@
 /**
- * Central request guard (SPEC §4) — the auth boundary. Three lanes:
+ * Central request guard (SPEC §4) — the auth boundary. Four gates, in order:
  *
- *   • PUBLIC routes                → pass through (own auth or none)
- *   • /api/admin/*                 → platform super-admin only
- *   • every other /api/* route     → authenticated member of an active tenant,
- *                                    gated by permissionFor(method, path)
+ *   1. HOST      → is this door allowed to answer this route at all?
+ *   2. PUBLIC    → pass through (own auth or none)
+ *   3. ADMIN     → platform super-admin, on the operator door only
+ *   4. MEMBER    → authenticated member of the host's tenant, gated by
+ *                  permissionFor(method, path)
+ *   5. STANDING  → is the studio paid up, or is its subdomain read-only?
  *
  * Row-level checks (trainer → assigned clients, client → own record) happen
  * in the handlers via requireClientAccess — this guard is the action-level
@@ -12,6 +14,7 @@
  * lesson, SPEC §11).
  */
 import type { MiddlewareHandler } from "hono";
+import { isDevRoot, type HostRole } from "@mossa/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin, can } from "./auth-context.js";
 
 /** Routes reachable without a tenant session. */
@@ -165,14 +168,97 @@ export function permissionFor(method: string, path: string): Record<string, stri
   return null; // /api/context, /api/notifications, etc. — any member
 }
 
+/**
+ * Routes that must keep working on the ROOT door — the dead end.
+ *
+ * The root serves no app, but a signed-in visitor who lands there (a bookmark, a
+ * stale link, an installed PWA whose start_url predates the move) should be shown
+ * the way to their studios rather than a blank wall. That signpost needs its
+ * identity and its studio list, and nothing else — so `/api/context` is allowed
+ * and every other tenant route is not.
+ */
+function allowedOnRoot(path: string): boolean {
+  return (
+    path === "/api/me" ||
+    path === "/api/context" ||
+    path === "/api/host" ||
+    path.startsWith("/api/auth/") ||
+    path === "/health"
+  );
+}
+
+/**
+ * Writes that must survive a read-only (suspended / closing) studio.
+ *
+ * The critical one is the STRIPE WEBHOOKS. A suspended studio is un-suspended by
+ * a successful payment, and Stripe tells us about that with a POST — so blocking
+ * webhooks on a read-only host would make suspension permanent and unrecoverable,
+ * the single worst bug this gate could have. They are signature-verified in their
+ * handlers and carry no session, so letting them through costs nothing.
+ *
+ * The rest is the minimum needed to get out of the state or leave: sign in/out,
+ * the studio switcher (you must be able to walk away to another studio), and
+ * personal, non-tenant surfaces like notification read-receipts.
+ */
+function allowedWhileReadOnly(path: string): boolean {
+  return (
+    path.startsWith("/api/auth/") ||
+    path === "/api/stripe/webhook" ||
+    path === "/api/connect/webhook" ||
+    path === "/api/context/switch" ||
+    path.startsWith("/api/me/") ||
+    path.startsWith("/api/inbox/")
+  );
+}
+
+/** Billing surfaces the owner of a lapsed studio may still write to, so the one
+ *  action that fixes the situation is reachable from inside the lock. */
+function isBillingWrite(path: string): boolean {
+  return path.startsWith("/api/billing") || path.startsWith("/api/stripe/") || path === "/api/connect/onboard";
+}
+
+const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
 export const routeGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
   const path = c.req.path;
   if (!path.startsWith("/api/") && path !== "/health") return next();
 
   const method = c.req.method;
-  if (method === "OPTIONS" || isPublic(method, path)) return next();
+  if (method === "OPTIONS") return next();
 
+  const host = c.get("host");
+  const role: HostRole = host.shape.role;
+
+  // ── 1. The host gate ──────────────────────────────────────────────────────
+  //
+  // A hostname under our root that we do not serve (a reserved label, or nested
+  // deeper than the wildcard certificate covers) answers nothing. Fail closed and
+  // do not leak that the platform is here.
+  if (role === "invalid") return c.json({ error: "not_found" }, 404);
+
+  // The root is a signpost, not an app.
+  if (role === "root" && !allowedOnRoot(path)) return c.json({ error: "wrong_door" }, 404);
+
+  // A well-formed subdomain with no studio behind it. `/api/host` still answers
+  // (that is how the app learns to render "no studio here"); nothing else does.
+  if (role === "tenant" && !host.tenant && path !== "/api/host" && path !== "/health") {
+    return c.json({ error: "no_studio" }, 404);
+  }
+
+  if (method !== "OPTIONS" && isPublic(method, path)) return next();
+
+  // ── 2. The operator console ───────────────────────────────────────────────
+  //
+  // Restricted to the admin door, so a studio's subdomain cannot reach platform
+  // administration even when the caller genuinely IS a platform admin with a live
+  // cookie. That closes a real path: our cookie is now valid across every host
+  // under the root, so without this an operator's session would carry full
+  // platform powers onto every tenant subdomain they happened to visit.
+  //
+  // Dev has only one root and therefore no separate door, so the restriction
+  // cannot apply there — see `isDevRoot`.
   if (path.startsWith("/api/admin/")) {
+    if (role !== "admin" && !isDevRoot(host.shape)) return c.json({ error: "wrong_door" }, 404);
     if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
     return next();
   }
@@ -190,6 +276,29 @@ export const routeGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
   const perm = permissionFor(method, path);
   if (perm && !isPlatformAdmin(c) && !can(c, perm)) {
     return c.json({ error: "forbidden" }, 403);
+  }
+
+  // ── 5. The studio's standing ───────────────────────────────────────────────
+  //
+  // A suspended or closing studio is read-only for EVERYONE on its host — owner,
+  // coaches and clients alike. This is the one place it is enforced, which is the
+  // point: before this the studio axis existed in `resolveStanding` and both
+  // callers passed a hardcoded `studio: "ok"`, so nothing anywhere actually
+  // stopped a write to a lapsed studio.
+  //
+  // Reads are never gated. A person's own training history is theirs and is not
+  // collateral for their coach's invoice — the same principle that lets an
+  // archived client keep reading their record.
+  //
+  // 402 rather than 403: this is not an authorization failure, it is a billing
+  // state, and the app has to tell them apart to know whether to show "you don't
+  // have permission" or "this studio needs to renew".
+  const gate = c.get("host").gate;
+  if (gate?.readOnly && WRITE_METHODS.has(method) && !allowedWhileReadOnly(path)) {
+    const payingOwner = gate.billingWritable && isBillingWrite(path) && can(c, { billing: ["manage"] });
+    if (!payingOwner) {
+      return c.json({ error: "studio_read_only", reason: gate.reason, readOnly: true }, 402);
+    }
   }
   return next();
 };
