@@ -117,11 +117,11 @@ export function Markdown({ children, className }: { children: string; className?
       const level = heading[1]!.length;
       const content = renderInline(heading[2]!, `h${key}`);
       if (level <= 1) {
-        blocks.push(<h1 key={key++} className="mb-3 mt-6 text-2xl font-bold tracking-tight text-foreground">{content}</h1>);
+        blocks.push(<h1 key={key++} className="mb-3 mt-6 text-title-2 text-foreground">{content}</h1>);
       } else if (level === 2) {
         // Brand-accented section header — a primary tick + tight heading.
         blocks.push(
-          <h2 key={key++} className="mb-3 mt-7 flex items-center gap-2.5 text-lg font-semibold tracking-tight text-foreground">
+          <h2 key={key++} className="mb-3 mt-7 flex items-center gap-2.5 text-body-lg text-foreground">
             <span className="h-[1.05em] w-1 shrink-0 rounded-full bg-primary" aria-hidden />
             <span className="min-w-0">{content}</span>
           </h2>,

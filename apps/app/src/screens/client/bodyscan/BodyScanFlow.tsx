@@ -215,7 +215,7 @@ function Intro({ voiceReady, onStartCamera, onManual }: { voiceReady: boolean; o
     <div className="mx-auto max-w-md space-y-5 px-5 py-4">
       <div className="space-y-2 text-center">
         <div className="mx-auto grid size-16 place-items-center rounded-3xl bg-sleep/15"><Camera className="size-8" style={{ color: toneVar.sleep }} /></div>
-        <h1 className="text-2xl font-bold tracking-tight">Scan your body composition</h1>
+        <h1 className="text-title-2">Scan your body composition</h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
           Stand in front of your camera for three quick poses: facing forward with your arms out, facing forward with your arms down, then side-on. We estimate your body-fat percentage from your proportions and build a silhouette you can rotate in 3-D. We'll guide you by voice.
         </p>

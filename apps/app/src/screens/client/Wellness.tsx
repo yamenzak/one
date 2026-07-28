@@ -267,7 +267,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
       <div className="flex items-center gap-3">
         {onBack && <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>}
-        <h1 className={onBack ? "text-xl font-bold tracking-tight" : "text-2xl font-bold tracking-tight"}>Wellness</h1>
+        <h1 className={onBack ? "text-xl font-bold tracking-tight" : "text-title-2"}>Wellness</h1>
       </div>
 
       {/* Write feedback for the tap-logging controls — one spot, always visible. */}

@@ -62,7 +62,7 @@ export function Onboarding({ clientId, displayName, onDone }: { clientId: string
         <motion.div key={step} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
           {step === 0 && (
             <Card className="space-y-4">
-              <div><h2 className="text-xl font-semibold tracking-tight">Hi {displayName}</h2><p className="mt-1 text-sm text-muted-foreground">A few basics so your coach can tailor everything.</p></div>
+              <div><h2 className="text-title-3">Hi {displayName}</h2><p className="mt-1 text-sm text-muted-foreground">A few basics so your coach can tailor everything.</p></div>
               <div className="flex gap-2">{(["male", "female"] as const).map((g) => <Chip key={g} className="capitalize" selected={f.gender === g} onClick={() => set("gender", g)}>{g}</Chip>)}</div>
               <Field label="Date of birth" icon={Calendar} type="date" value={f.dateOfBirth} onChange={(e) => set("dateOfBirth", e.target.value)} />
               {units.height === "ft_in" ? (
@@ -77,21 +77,21 @@ export function Onboarding({ clientId, displayName, onDone }: { clientId: string
             </Card>
           )}
           {step === 1 && (
-            <Card className="space-y-2.5"><h2 className="text-xl font-semibold tracking-tight">Your goal</h2>
+            <Card className="space-y-2.5"><h2 className="text-title-3">Your goal</h2>
               {([["lose_weight", "Lose weight"], ["build_muscle", "Build muscle"], ["maintain", "Maintain"], ["improve_fitness", "Improve fitness"]] as const).map(([v, label]) => (
                 <button key={v} onClick={() => set("primaryGoal", v)} className={`w-full rounded-xl px-4 py-3.5 text-left font-medium transition-all active:scale-[0.98] ${f.primaryGoal === v ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>{label}</button>
               ))}
             </Card>
           )}
           {step === 2 && (
-            <Card className="space-y-4"><h2 className="text-xl font-semibold tracking-tight">Training context</h2>
+            <Card className="space-y-4"><h2 className="text-title-3">Training context</h2>
               <ChoiceRow label="Where do you train?" options={["gym", "home", "outdoor"]} value={f.workoutLocation} onChange={(v) => set("workoutLocation", v)} />
               <ChoiceRow label="Experience" options={["beginner", "intermediate", "advanced"]} value={f.experienceLevel} onChange={(v) => set("experienceLevel", v)} />
               <div><div className="mb-2 text-sm text-muted-foreground">Available days</div><div className="flex flex-wrap gap-2">{DAYS.map((d) => <Chip key={d} selected={f.availableDays.includes(d)} onClick={() => toggleDay(d)}>{d}</Chip>)}</div></div>
             </Card>
           )}
           {step === 3 && (
-            <Card className="space-y-4"><h2 className="text-xl font-semibold tracking-tight">Nutrition</h2>
+            <Card className="space-y-4"><h2 className="text-title-3">Nutrition</h2>
               <ChoiceRow label="Activity level" options={["sedentary", "light", "moderate", "very_active"]} value={f.activityLevel} onChange={(v) => set("activityLevel", v)} format />
               <ChoiceRow label="Dietary approach" options={["balanced", "high_protein", "low_carb", "keto", "vegan", "vegetarian"]} value={f.dietaryApproach} onChange={(v) => set("dietaryApproach", v)} format />
             </Card>
@@ -99,7 +99,7 @@ export function Onboarding({ clientId, displayName, onDone }: { clientId: string
           {step === 4 && (
             <Card className="space-y-3 text-center">
               <div className="mx-auto grid size-16 place-items-center rounded-3xl bg-primary/15 text-primary [&_svg]:size-8"><Trophy /></div>
-              <h2 className="text-xl font-semibold tracking-tight">You're all set</h2>
+              <h2 className="text-title-3">You're all set</h2>
               <p className="text-sm text-muted-foreground">Your coach now has what they need to build your plan.</p>
             </Card>
           )}

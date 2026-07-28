@@ -105,7 +105,7 @@ export function Progress({ clientId }: { clientId: string }) {
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
-      <h1 className="text-2xl font-bold tracking-tight">Progress</h1>
+      <h1 className="text-title-2">Progress</h1>
       {/* Lens tabs collapse to icons (active one keeps its label, navbar-style)
           so the whole row — tabs + range — fits the Progress column. "Custom"
           is a calendar icon; picking it reveals the start→end pickers below. */}

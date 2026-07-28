@@ -29,7 +29,7 @@ export function AdminDoor() {
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-4 px-6 py-12">
         <Card className="space-y-3 p-6 text-center">
-          <h1 className="text-lg font-semibold tracking-tight">Not an operator account</h1>
+          <h1 className="text-body-lg">Not an operator account</h1>
           <p className="text-sm leading-relaxed text-muted-foreground">
             You&rsquo;re signed in, but this address is the platform console. Your studio is at its own address.
           </p>

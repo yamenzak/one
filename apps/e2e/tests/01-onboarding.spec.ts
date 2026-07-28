@@ -75,7 +75,11 @@ test("owner onboards, invites a client, and the client signs in and completes in
     slug = await createStudio(coach, studio);
     // The coach surface, not the client one: the owner's own dashboard, under
     // the studio they just named.
-    await expect(coach.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
+    // "Which screen am I on" asserted from the NAV, not from a page heading. The
+    // coach Today's heading became an anchor in the UI rewrite, and a heading
+    // assertion had already survived one redesign by accident — the nav's
+    // `aria-current` is the durable signal and it is what a screen reader uses.
+    await expect(tab(coach, "Today")).toHaveAttribute("aria-current", "page");
     await expect(coach.getByText(studio)).toBeVisible();
     await expect(tab(coach, "Clients")).toBeVisible();
   });
@@ -98,17 +102,19 @@ test("owner onboards, invites a client, and the client signs in and completes in
 
   await test.step("owner invites a client by email", async () => {
     await tab(coach, "Clients").click();
-    await expect(coach.getByRole("heading", { name: "Clients", exact: true })).toBeVisible();
+    await expect(tab(coach, "Clients")).toHaveAttribute("aria-current", "page");
     await expect(coach.getByText("No clients yet")).toBeVisible();
 
-    // The header "New" rather than the empty-state "Add client": the create sheet
-    // has its own "Add client" submit, so opening from the header keeps that name
-    // unambiguous.
-    await coach.getByRole("button", { name: "New", exact: true }).click();
+    // "Add client" is now unambiguous by design: it names the action cluster's
+    // opener, and the sheet's submit is "Send invite" — which is also the truer
+    // verb, since it creates the client AND emails them a sign-in link. Two
+    // controls sharing one accessible name is obvious by eye and ambiguous by
+    // ear, so the rename fixed the product, not the test.
+    await coach.getByRole("button", { name: "Add client", exact: true }).click();
     const form = sheet(coach, "New client");
     await form.getByLabel("Email").fill(clientEmail);
     await form.getByLabel("Name (optional)").fill(clientName);
-    await form.getByRole("button", { name: "Add client" }).click();
+    await form.getByRole("button", { name: "Send invite" }).click();
 
     // The invite sheet proves the server built the branded deep-link.
     //

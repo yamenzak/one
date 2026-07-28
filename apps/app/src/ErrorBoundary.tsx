@@ -37,7 +37,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="grid min-h-dvh place-items-center p-8">
           <div className="max-w-sm text-center">
-            <div className="text-lg font-semibold tracking-tight">Something went wrong</div>
+            <div className="text-body-lg">Something went wrong</div>
             <p className="mt-1 text-sm text-muted-foreground">This screen hit an unexpected error. You can try again or head back home.</p>
             <div className="mt-4 flex items-center justify-center gap-2">
               <Button variant="secondary" onClick={() => this.setState({ error: null })}>Try again</Button>

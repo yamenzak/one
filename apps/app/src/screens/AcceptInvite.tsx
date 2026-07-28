@@ -129,7 +129,7 @@ export function AcceptInvite() {
               <>
                 <div className="mx-auto grid size-14 place-items-center rounded-full bg-success-soft text-success [&_svg]:size-7"><Check /></div>
                 <div>
-                  <h2 className="text-xl font-semibold tracking-tight">You're in</h2>
+                  <h2 className="text-title-3">You're in</h2>
                   <p className="mt-1 text-sm text-muted-foreground">Your invitation to {brandName} is accepted.</p>
                 </div>
                 <Button size="lg" className="w-full" onClick={() => window.location.assign("/")}>
@@ -163,7 +163,7 @@ export function AcceptInvite() {
           {step === "email" ? (
             <>
               <div>
-                <h2 className="text-xl font-semibold tracking-tight">Continue with email</h2>
+                <h2 className="text-title-3">Continue with email</h2>
                 <p className="mt-1 text-sm text-muted-foreground">We'll email you a 6-digit code — no password to create.</p>
               </div>
               <Field label="Email" icon={Mail} type="email" autoComplete="email" value={email} placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && email.includes("@") && cooldown === 0 && (!needsTurnstile || tsToken) && void sendCode()} />
@@ -175,7 +175,7 @@ export function AcceptInvite() {
             </>
           ) : (
             <>
-              <h2 className="text-xl font-semibold tracking-tight">Enter your code</h2>
+              <h2 className="text-title-3">Enter your code</h2>
               <p className="text-sm text-muted-foreground">
                 Sent to <span className="font-medium text-foreground">{email}</span>. Expires in 10 min.
               </p>

@@ -14,6 +14,7 @@ import {
   Card, Badge, Button, Chip, Field, Skeleton, Page, Stagger, EmptyState, StatCard, WeekDots, Sparkline, MiniBars, IconBadge, Sheet,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
   Dumbbell, Play, Moon, ChevronRight, Plus, Footprints, Flame, TrendingUp, Trophy, Activity, AlertTriangle, Search,
+  TierAnchor, CountUp,
 } from "@kova/ui";
 import { api, todayLocal, shiftDay } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
@@ -172,7 +173,14 @@ export function Train({ clientId }: { clientId: string }) {
 
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
-      <h1 className="text-2xl font-bold tracking-tight">Train</h1>
+      {/* T1 (§1). The question Train answers on arrival is "am I keeping up this
+          week", and days trained is the honest version of that — tonnage is a
+          number only some clients read, and a plan name is not a measure. */}
+      <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
+        <p className="text-caption text-muted-foreground">Trained this week</p>
+        <p className="numeral text-display"><CountUp value={week.activeCount} /></p>
+        <p className="text-caption text-muted-foreground">{week.activeCount === 1 ? "day" : "days"}</p>
+      </TierAnchor>
 
       {error && !plans ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load your training" description="Something went wrong. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
@@ -206,7 +214,7 @@ export function Train({ clientId }: { clientId: string }) {
               <div className="relative flex items-center justify-between">
                 <div>
                   <div className="text-xs font-medium uppercase tracking-wide text-activity">Active plan</div>
-                  <h2 className="mt-0.5 text-xl font-semibold tracking-tight">{published.name}</h2>
+                  <h2 className="mt-0.5 text-title-3">{published.name}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">{published.body.days.filter((d) => !d.isRestDay).length} training days</p>
                 </div>
                 <div className="grid size-12 place-items-center rounded-full bg-activity-soft text-activity [&_svg]:size-5"><Play /></div>

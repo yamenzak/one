@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Sheet, Avatar, SegmentedControl, Page, Stagger, EmptyState, Reveal, SkeletonList, ConfirmDialog, toneVar, Users, Mail, User, ArrowLeft, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle } from "@kova/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, SegmentedControl, Page, Stagger, EmptyState, Reveal, SkeletonList, ConfirmDialog, toneVar, Users, Mail, User, ArrowLeft, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle , TierAnchor, ActionCluster, CountUp, Group, Row } from "@kova/ui";
 import type { AttentionSeverity } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -32,6 +32,10 @@ export function Clients() {
   // so the owner can clear seats here instead of opening each client in turn.
   const [params, setParams] = useSearchParams();
   const freeTarget = Math.max(0, Math.min(999, Number(params.get("free") ?? 0) || 0));
+  // `?new=1` opens the create sheet — the coach Today's "Add client" action is a
+  // deep link rather than a duplicate of this screen's own sheet, so there is one
+  // implementation of adding a client and one place its copy lives.
+  const wantsNew = params.get("new") === "1";
   const freeing = isOwner && freeTarget > 0;
   const [freedCount, setFreedCount] = useState(0);
   const [toArchive, setToArchive] = useState<ClientSummary | null>(null);
@@ -101,12 +105,28 @@ export function Clients() {
   };
   const stillNeeded = Math.max(0, freeTarget - freedCount);
 
+  // Consume the deep link once, then strip it, so a back-navigation or a reload
+  // does not re-open the sheet over whatever the coach moved on to.
+  useEffect(() => {
+    if (!wantsNew) return;
+    setCreateOpen(true);
+    setParams((q) => { q.delete("new"); return q; }, { replace: true });
+  }, [wantsNew, setParams]);
+
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Clients</h1>
-        <Button onClick={() => setCreateOpen(true)}><Plus /> New</Button>
-      </div>
+      {/* T1 (§1). The roster IS the screen, so the anchor is its size — and the
+          sub-line carries the only fact a coach scans for on arrival: how many
+          of them want something. */}
+      <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
+        <p className="text-caption text-muted-foreground">Clients</p>
+        <p className="numeral text-display"><CountUp value={clients?.length ?? 0} /></p>
+        <p className="text-caption text-muted-foreground">
+          {att.size > 0 ? `${att.size} need${att.size === 1 ? "s" : ""} a look` : clients?.length ? "All caught up" : "None yet"}
+        </p>
+      </TierAnchor>
+
+      <ActionCluster items={[{ icon: Plus, label: "Add client", onClick: () => setCreateOpen(true) }]} />
 
       {freeing && (
         <Card className="space-y-2.5 border border-primary/25" role="status" aria-live="polite">
@@ -129,31 +149,34 @@ export function Clients() {
       ) : (
       <Reveal loading={!clients} skeleton={<SkeletonList card rows={6} thumb={44} />}>
         {clients && (clients.length === 0 ? (
-          <EmptyState icon={Users} title="No clients yet" description="Add your first client. With an email set, they sign in the moment you do — no codes, no passwords." action={<Button onClick={() => setCreateOpen(true)}><Plus /> Add client</Button>} />
+          <EmptyState icon={Users} title="No clients yet" description="Add your first client. With an email set, they sign in the moment you do — no codes, no passwords." action={<Button onClick={() => setCreateOpen(true)}><Plus /> Add your first client</Button>} />
         ) : (
-          <Stagger className="space-y-2">
+          <Group>
             {clients.map((c) => (
-              <Card key={c.id} interactive onClick={() => nav(`/clients/${c.id}/today`)} className="flex items-center gap-3.5 py-3.5">
-                <Avatar name={c.displayName} src={c.avatarUrl} seed={c.avatarSeed ?? c.id} className="size-11" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 truncate font-semibold">{c.displayName}{att.has(c.id) && <span className="size-2 shrink-0 rounded-full" style={{ background: toneVar[SEVERITY_TONE[att.get(c.id)!.severity]] }} title="Needs attention" />}</div>
-                  <div className="truncate text-sm text-muted-foreground">{c.email ?? "no email"}</div>
-                </div>
-                {freeing ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    disabled={archiveBusy}
-                    aria-label={`Archive ${c.displayName}`}
-                    onClick={(e) => { e.stopPropagation(); setArchiveErr(null); setToArchive(c); }}
-                  ><Archive /> Archive</Button>
-                ) : att.has(c.id)
-                  ? <Badge tone={SEVERITY_TONE[att.get(c.id)!.severity]}>{att.get(c.id)!.label}{att.get(c.id)!.count > 1 ? ` +${att.get(c.id)!.count - 1}` : ""}</Badge>
-                  : c.hasLogin ? <Badge tone="success">Active</Badge> : <Badge tone="neutral">Invited</Badge>}
-              </Card>
+              <Row
+                key={c.id}
+                onClick={() => nav(`/clients/${c.id}/today`)}
+                sub={c.email ?? "no email"}
+                leading={<Avatar name={c.displayName} src={c.avatarUrl} seed={c.avatarSeed ?? c.id} className="size-10" />}
+                trailing={
+                  freeing ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      disabled={archiveBusy}
+                      aria-label={`Archive ${c.displayName}`}
+                      onClick={(e) => { e.stopPropagation(); setArchiveErr(null); setToArchive(c); }}
+                    ><Archive /> Archive</Button>
+                  ) : att.has(c.id) ? (
+                    <Badge tone={SEVERITY_TONE[att.get(c.id)!.severity]}>{att.get(c.id)!.label}{att.get(c.id)!.count > 1 ? ` +${att.get(c.id)!.count - 1}` : ""}</Badge>
+                  ) : c.hasLogin ? <Badge tone="success">Active</Badge> : <Badge tone="neutral">Invited</Badge>
+                }
+              >
+                {c.displayName}
+              </Row>
             ))}
-          </Stagger>
+          </Group>
         ))}
       </Reveal>
       )}
@@ -162,7 +185,7 @@ export function Clients() {
         <div className="space-y-4">
           <Field label="Email" icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} hint="This is the invite — they sign in with a code and their space links automatically." />
           <Field label="Name (optional)" icon={User} value={name} onChange={(e) => setName(e.target.value)} hint="Leave blank and they'll add it on their profile." />
-          <Button size="lg" className="w-full" disabled={!emailValid || busy} onClick={() => void create()}>{busy ? "Creating…" : "Add client"}</Button>
+          <Button size="lg" className="w-full" disabled={!emailValid || busy} onClick={() => void create()}>{busy ? "Sending…" : "Send invite"}</Button>
           {createErr && <p className="text-sm text-warning" role="alert">{createErr}</p>}
         </div>
       </Sheet>
