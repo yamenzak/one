@@ -111,7 +111,16 @@
   "d1_databases": [
     // Everything relational: Better Auth, tenants' coaching data, billing
     // mirrors. Local wrangler dev simulates this.
-    { "binding": "DB", "database_name": "kova", "database_id": "7705a554-6bde-4223-83d4-f9b8de5bb223" }
+    //
+    // ⚠️ `database_name` is still `mossa` and that is CORRECT, not a missed rename.
+    // The binding resolves by `database_id`, so the name is only what the `wrangler
+    // d1` CLI looks the database up by — and D1 has no rename, so the database this
+    // id points at is still called `mossa` in the account. Writing `kova` here would
+    // be cosmetic and would break every `wrangler d1 execute <name>` in DEPLOY.md.
+    // Keeping the id is deliberate: it carries the platform config (Gemini key,
+    // email provider, Cloudflare-for-SaaS token, Turnstile keys) that a nuclear
+    // reset preserves and a fresh database would not.
+    { "binding": "DB", "database_name": "mossa", "database_id": "7705a554-6bde-4223-83d4-f9b8de5bb223" }
   ],
 
   "r2_buckets": [
