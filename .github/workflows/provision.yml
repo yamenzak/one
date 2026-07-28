@@ -15,10 +15,15 @@ name: Provision Cloudflare resources
 #     whose `database_name` had drifted from the real database would quietly
 #     create a second, empty one and invite a paste of the wrong id.
 #
-# ⚠️ The D1 database is named `mossa`, not `kova`. The binding resolves by
-# `database_id` and D1 has no rename, so the name is historical — see the comment
-# on `d1_databases` in apps/api/wrangler.jsonc. The R2 bucket IS `kova-media`,
-# because R2 binds by NAME and so had to be created fresh at the rename.
+# ⚠️ D1 is checked by **id**, not by name. D1 has no rename API, so a database
+# keeps whatever name it was created under — which on an account that predates
+# the product rename is not `kova`. Matching on a name would therefore report
+# "missing" on a perfectly good database and create a second, empty one. The id
+# in `apps/api/wrangler.jsonc` is what the worker actually binds, so that is what
+# gets verified, and `database_name` is omitted there for the same reason. KV is
+# still matched by TITLE (wrangler names the namespace `<worker>-<binding>` and
+# the config carries only an id, so there is no name to drift). R2 is matched by
+# name because R2 genuinely binds by name.
 on:
   workflow_dispatch:
 
@@ -28,7 +33,10 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      D1_NAME: mossa
+      # Created on a fresh account only. An account that already has a database
+      # keeps that database under whatever name it was created with — the check
+      # below is by id, so the name here is never used to look anything up.
+      D1_NEW_NAME: kova
       KV_TITLE: CACHE
       R2_BUCKET: kova-media
     steps:
@@ -71,12 +79,33 @@ jobs:
           fail=0
 
           # ── D1 ────────────────────────────────────────────────────────────────
+          # Match on the CONFIGURED ID, not a name. `wrangler.jsonc` deliberately
+          # omits `database_name` (D1 has no rename, so a name outlives whatever
+          # the product is called), and the id is what the worker binds anyway —
+          # so this check also proves the configured id is real, which a name
+          # check never did.
+          # `.uuid` is what Cloudflare's D1 list returns; `.id` is accepted as a
+          # fallback so a field rename in the API or in wrangler's passthrough
+          # cannot turn this into a silent "missing" that creates a duplicate.
+          want_id=$(grep -oE '"database_id"[[:space:]]*:[[:space:]]*"[0-9a-fA-F-]{36}"' wrangler.jsonc | head -1 | grep -oiE '[0-9a-f-]{36}')
+
           if d1=$(require_list "D1 databases" pnpm exec wrangler d1 list --json); then
-            if printf '%s' "$d1" | jq -e --arg n "$D1_NAME" '.[]? | select(.name == $n)' >/dev/null; then
-              echo "✓ D1 '$D1_NAME' exists."
+            if [ -n "$want_id" ] && printf '%s' "$d1" | jq -e --arg id "$want_id" '.[]? | select((.uuid // .id) == $id)' >/dev/null; then
+              name=$(printf '%s' "$d1" | jq -r --arg id "$want_id" '.[]? | select((.uuid // .id) == $id) | .name')
+              echo "✓ D1 '$name' ($want_id) exists and is what wrangler.jsonc binds."
+            elif [ -n "$want_id" ]; then
+              # A configured id that the account does not have is NOT a fresh
+              # account — it is a config pointing at someone else's database (or a
+              # deleted one). Creating a new one here would hide that behind a
+              # green run and leave the worker still bound to the dead id.
+              echo "::error::wrangler.jsonc binds D1 id $want_id, which this account does not have."
+              echo "Either you are on the wrong account, or the database was deleted."
+              echo "Create one with: pnpm exec wrangler d1 create $D1_NEW_NAME — then paste its id into wrangler.jsonc."
+              fail=1
             else
-              echo "Creating D1 '$D1_NAME'…"
-              pnpm exec wrangler d1 create "$D1_NAME" || fail=1
+              echo "No database_id in wrangler.jsonc — creating D1 '$D1_NEW_NAME'…"
+              pnpm exec wrangler d1 create "$D1_NEW_NAME" || fail=1
+              echo "::notice::Paste the database_id above into apps/api/wrangler.jsonc."
             fi
           else
             fail=1
@@ -154,7 +183,8 @@ jobs:
             echo "## Resource ids"
             echo ""
             echo "Paste into \`apps/api/wrangler.jsonc\` only if something here is NEW."
-            echo "The D1 database is \`$D1_NAME\` by design — see the config comment."
+            echo "Match D1 on the \`uuid\`, not the name: the config binds by id and"
+            echo "carries no \`database_name\` — see the comment on \`d1_databases\`."
             echo ""
             echo '### D1'
             echo '```json'

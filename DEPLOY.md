@@ -85,9 +85,10 @@ template, then add: **D1 Edit**, **Workers KV Storage Edit**, **Workers R2
 Storage Edit**. Scope it to your account.
 
 ```sh
-# NB: the GitHub REPOSITORY is still `mossa` — the product rename did not move it.
-gh secret set CLOUDFLARE_API_TOKEN  --repo <owner>/mossa
-gh secret set CLOUDFLARE_ACCOUNT_ID --repo <owner>/mossa
+# `<owner>/<repo>` is whatever this checkout's remote points at — the product
+# rename did not move the repository, so it may still carry the old name.
+gh secret set CLOUDFLARE_API_TOKEN  --repo <owner>/<repo>
+gh secret set CLOUDFLARE_ACCOUNT_ID --repo <owner>/<repo>
 ```
 
 **Exactly two repo secrets.** `BETTER_AUTH_SECRET` is deliberately *not* a repo
@@ -115,17 +116,21 @@ super-admin account still fails.
 
 ## 4. Provision D1 / KV / R2 and paste the ids
 
-> **The D1 database is named `mossa`, and that is intentional.** The binding
-> resolves by `database_id`, so the name only matters to the `wrangler d1` CLI —
-> and D1 has no rename, so every `wrangler d1 …` command below uses `mossa`. The
-> R2 bucket IS `kova-media`: R2 binds by NAME, so it had to be created fresh.
+> **Every `wrangler d1 …` command in this guide targets the BINDING, `DB`, not a
+> database name.** D1 has no rename API, so a database keeps whatever name it was
+> created under forever — and on an account that predates the rename that name is
+> not `kova`. Addressing the binding sidesteps the whole question: wrangler reads
+> `database_id` out of `wrangler.jsonc`, so the commands below are correct no
+> matter what the database is called. `wrangler.jsonc` omits `database_name` for
+> the same reason. (KV binds by id too; R2 binds by NAME, which is why the bucket
+> had to be created fresh as `kova-media`.)
 
 GitHub → **Actions → "Provision Cloudflare resources" → Run workflow** (or run
 the same three commands locally):
 
 ```sh
 cd apps/api
-pnpm exec wrangler d1 create mossa
+pnpm exec wrangler d1 create kova     # on a fresh account; an existing database keeps its name
 pnpm exec wrangler kv namespace create CACHE
 pnpm exec wrangler r2 bucket create kova-media
 ```
@@ -190,7 +195,7 @@ never touched:
 
 ```sh
 cd apps/api
-pnpm exec wrangler d1 execute mossa --remote --command "
+pnpm exec wrangler d1 execute DB --remote --command "
 CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT);
 INSERT INTO app_config (key, value) VALUES
   ('email.provider', 'cloudflare'),
@@ -209,7 +214,7 @@ almost certainly do not own).
 Verify:
 
 ```sh
-pnpm exec wrangler d1 execute mossa --remote \
+pnpm exec wrangler d1 execute DB --remote \
   --command "SELECT key, value FROM app_config WHERE key LIKE 'email.%';"
 ```
 
@@ -835,7 +840,7 @@ What rollback does **not** undo:
   tables/columns stay. Rolling code back is safe *only* while the older code
   tolerates the newer schema (added columns are additive, so usually yes). A
   destructive schema change would need a hand-written repair — take a backup
-  first: `pnpm exec wrangler d1 export mossa --remote --output kova.sql`.
+  first: `pnpm exec wrangler d1 export DB --remote --output kova.sql`.
 - **Durable Object migrations** (`migrations` in `wrangler.jsonc`) do not
   reverse. Never delete a `new_sqlite_classes` tag that has shipped.
 - **`app_config` values, R2 objects and Stripe state** are untouched by a
