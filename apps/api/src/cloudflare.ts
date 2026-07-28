@@ -22,6 +22,26 @@ import { getConfig } from "./billing-store.js";
 
 const API = "https://api.cloudflare.com/client/v4";
 
+/**
+ * The worker script name custom-hostname routes point at when nothing is stored.
+ *
+ * It must match `name` in apps/api/wrangler.jsonc. A stored override that names a
+ * script which no longer exists is the worst failure mode this module has: the
+ * route is created successfully, the certificate issues, the domain reports
+ * ACTIVE — and every request to it reaches a script that is not there. Nothing
+ * about the tenant's screen suggests a problem. That is why the value is
+ * surfaced and editable in the admin console (`/admin/domains/config`) rather
+ * than being a D1 row only a query can see.
+ */
+export const DEFAULT_WORKER_NAME = "kova";
+
+/**
+ * Cloudflare worker script names: lowercase alphanumerics, `-` and `_`. Checked
+ * before storing, because an invalid name is only discovered at the moment a
+ * tenant binds a domain — by which point they are staring at a failure we caused.
+ */
+export const WORKER_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,62}$/;
+
 export interface SaasConfig {
   apiToken: string;
   zoneId: string;
@@ -39,7 +59,7 @@ export async function saasConfig(db: D1Database): Promise<SaasConfig | null> {
   const zoneId = cfg["cf.saas.zone_id"];
   const cnameTarget = cfg["cf.saas.cname_target"];
   if (!apiToken || !zoneId || !cnameTarget) return null;
-  return { apiToken, zoneId, cnameTarget, workerName: cfg["cf.saas.worker_name"] || "kova" };
+  return { apiToken, zoneId, cnameTarget, workerName: cfg["cf.saas.worker_name"] || DEFAULT_WORKER_NAME };
 }
 
 /** A normalized DCV/ownership record the tenant must add at their DNS. */

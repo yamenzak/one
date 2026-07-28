@@ -2053,6 +2053,46 @@ describe("custom domains (SPEC §14.1) — Host pins the tenant", () => {
     expect([200, 403]).toContain(ok.status);
   });
 
+  it("the custom-domain worker script is readable and clearable from the console", async () => {
+    // The worker name a custom hostname's route points at used to be a D1 row and
+    // nothing else: not in the GET payload, not in the console, settable only by a
+    // hand-written SQL statement. That is the one setting here whose wrong value
+    // fails SILENTLY — the route is created, the certificate issues, the domain
+    // reports active, and every request lands on a script that isn't there. A
+    // worker rename leaves exactly that stale value behind, so it has to be
+    // visible and it has to be resettable without a database console.
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const read = async () =>
+      (await (await SELF.fetch(`${ADMIN}/api/admin/domains/config`, { headers: auth(ownerCookie) })).json()) as {
+        workerName: string | null; workerNameDefault: string;
+      };
+
+    // Unset ⇒ null, and the payload still says what is actually in force.
+    const before = await read();
+    expect(before.workerName).toBeNull();
+    expect(before.workerNameDefault).toBe("kova");
+
+    // Stored and echoed back. Note this round-trips WITHOUT the token/zone/CNAME
+    // triple being complete — reading it must not depend on `saasConfig`, which
+    // returns null until then.
+    const set = await SELF.fetch(`${ADMIN}/api/admin/domains/config`, { method: "POST", headers: H, body: JSON.stringify({ workerName: "Kova-Old " }) });
+    expect(set.status).toBe(200);
+    expect((await read()).workerName).toBe("kova-old"); // trimmed + lowercased
+
+    // A name Cloudflare would reject is refused HERE, not at the moment a tenant
+    // binds a domain and watches it fail for reasons we caused.
+    const bad = await SELF.fetch(`${ADMIN}/api/admin/domains/config`, { method: "POST", headers: H, body: JSON.stringify({ workerName: "not a script name" }) });
+    expect(bad.status).toBe(400);
+    expect((await read()).workerName).toBe("kova-old"); // and the good value survives
+
+    // Empty CLEARS, restoring the default. This is the recovery path from a stale
+    // name, so it must be expressible — unlike the other fields, where blank
+    // deliberately means "keep what's stored".
+    const cleared = await SELF.fetch(`${ADMIN}/api/admin/domains/config`, { method: "POST", headers: H, body: JSON.stringify({ workerName: "" }) });
+    expect(cleared.status).toBe(200);
+    expect((await read()).workerName).toBeNull();
+  });
+
   it("the studio's own door carries its login branding, pre-auth", async () => {
     // Owner customizes their sign-in screen; saved under branding.login.
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
