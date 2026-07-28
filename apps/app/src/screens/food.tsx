@@ -11,8 +11,8 @@
  */
 
 import type { ReactNode } from "react";
-import { fmtEnergy } from "@mossa/domain";
-import { MacroInline, cn, Utensils } from "@mossa/ui";
+import { fmtEnergy } from "@kova/domain";
+import { MacroInline, cn, Utensils } from "@kova/ui";
 import { useUnits } from "../units.js";
 
 /** The canonical, casing-agnostic shape a food row renders from. */

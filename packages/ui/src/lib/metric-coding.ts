@@ -14,7 +14,7 @@ import {
   Moon, Smile, Zap, Activity, Dumbbell, Timer, Ruler, HeartPulse, type LucideIcon,
 } from "./icons.js";
 
-/** The unit dimension a metric is stored/converted in (matches @mossa/domain
+/** The unit dimension a metric is stored/converted in (matches @kova/domain
  *  units). Absent ⇒ the value is dimensionless or a fixed unit (see noConvert). */
 export type UnitDimension = "weight" | "height" | "length" | "volume" | "distance" | "energy";
 

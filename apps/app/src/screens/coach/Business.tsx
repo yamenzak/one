@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Badge, SegmentedControl, Field, Sheet, SubCard, Page, Stagger, ChartCard, SectionHeader, Eyebrow, GlanceStrip, IconBadge, EmptyState, Spinner, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Wallet, Gauge, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, TrendingDown, CheckCheck, Check, Lock, Tag } from "@mossa/ui";
-import { FEATURE_KEYS, FEATURE_META, QUOTA_KEYS, QUOTA_META, type Entitlements } from "@mossa/domain";
+import { Button, Card, Badge, SegmentedControl, Field, Sheet, SubCard, Page, Stagger, ChartCard, SectionHeader, Eyebrow, GlanceStrip, IconBadge, EmptyState, Spinner, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Wallet, Gauge, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, TrendingDown, CheckCheck, Check, Lock, Tag } from "@kova/ui";
+import { FEATURE_KEYS, FEATURE_META, QUOTA_KEYS, QUOTA_META, type Entitlements } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
 import { fmtPrice } from "../../money.js";
@@ -246,7 +246,7 @@ function Overview() {
                       {isPending
                         ? `You picked ${pendingName} but the card step never completed, so nothing is being billed.`
                         : "Nothing is being billed for this studio."}
-                      {" "}You're on Mossa's free baseline{baselineText ? `: ${baselineText}.` : "."}
+                      {" "}You're on Kova's free baseline{baselineText ? `: ${baselineText}.` : "."}
                     </p>
                     {isOwner && billing.stripeEnabled && isPending && pendingPlanId && (
                       <Button size="sm" className="mt-3" style={{ backgroundColor: toneVar.danger }} disabled={busy === `plan_${pendingPlanId}`} onClick={() => void startInline("/api/billing/plan-intent", { planId: pendingPlanId }, `Activate ${pendingName}`, () => `Subscribe · ${fmtPrice(usdToCents(pendingPlan?.priceUsdMonth ?? 0))}/mo`, `plan_${pendingPlanId}`)}>

@@ -11,7 +11,7 @@
  *
  * This module owns only the JOIN across atoms; the atoms themselves stay in
  * their own files (entitlements, clientFlags, perms, notifications) and the
- * presentation atoms (metrics, tones) stay in @mossa/ui. A conformance test
+ * presentation atoms (metrics, tones) stay in @kova/ui. A conformance test
  * validates every reference points at a real atom, so a feature can never name a
  * flag/entitlement/notif/permission that doesn't exist.
  */
@@ -22,7 +22,7 @@ import type { NotifType } from "./notifications.js";
 
 /** A permission resource key (see perms.ts PERMISSION_CATALOG). */
 export type PermissionResource = string;
-/** A metric key (see @mossa/ui metric-coding METRICS) — validated UI-side. */
+/** A metric key (see @kova/ui metric-coding METRICS) — validated UI-side. */
 export type MetricRef = string;
 
 export interface FeatureSpec {
@@ -30,7 +30,7 @@ export interface FeatureSpec {
   key: string;
   /** Human label (coach/owner-facing). */
   label: string;
-  /** Platform entitlement the TENANT must hold (bought from Mossa). Absent ⇒
+  /** Platform entitlement the TENANT must hold (bought from Kova). Absent ⇒
    *  the feature isn't platform-gated (available on every plan). */
   entitlement?: keyof Entitlements["features"];
   /** Client capability flag the CLIENT must hold (bought from the tenant). Absent
@@ -40,7 +40,7 @@ export interface FeatureSpec {
   permission?: PermissionResource;
   /** Notification types this feature emits (keys into NOTIF_TYPES). */
   notifTypes?: NotifType[];
-  /** Metric keys this feature surfaces (keys into @mossa/ui METRICS). */
+  /** Metric keys this feature surfaces (keys into @kova/ui METRICS). */
   metrics?: MetricRef[];
 }
 

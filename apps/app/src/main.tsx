@@ -20,7 +20,7 @@ import { stripReloadParam } from "./hard-refresh.js";
  * Branded boot screen — the studio's logo on a soft brand glow with a gentle
  * reveal and shimmer, so the app feels premium from the first frame. On a
  * white-label tenant (custom domain / branded host) the uploaded logo/icon
- * shows; otherwise the default Mossa mark. Branding is applied before this
+ * shows; otherwise the default Kova mark. Branding is applied before this
  * paints, so it already sits in the tenant's palette and mode.
  */
 function BootSplash() {
@@ -40,7 +40,7 @@ function BootSplash() {
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             className="grid size-20 place-items-center overflow-hidden rounded-2xl bg-primary text-primary-foreground shadow-glow"
           >
-            {logo ? <img src={logo} alt="" className="size-full object-cover" /> : <span className="text-3xl font-black tracking-tight">{(name?.[0] ?? "M").toUpperCase()}</span>}
+            {logo ? <img src={logo} alt="" className="size-full object-cover" /> : <span className="text-3xl font-black tracking-tight">{(name?.[0] ?? "K").toUpperCase()}</span>}
           </motion.div>
         </div>
         {name && (

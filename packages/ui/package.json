@@ -1,9 +1,9 @@
 {
-  "name": "@mossa/ui",
+  "name": "@kova/ui",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The Mossa design system (DESIGN.md): tonal tokens + identity components — rings, metric pills, stat cards, chips, sheets, week dots, timeline feed.",
+  "description": "The Kova design system (DESIGN.md): tonal tokens + identity components — rings, metric pills, stat cards, chips, sheets, week dots, timeline feed.",
   "exports": {
     ".": "./src/index.ts",
     "./tokens.css": "./src/tokens.css"

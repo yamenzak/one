@@ -3,7 +3,7 @@
  * from: who am I, which tenant, which persona, what am I entitled to.
  */
 
-import type { ClientFlags, Entitlements, Grant, TenantRole, UnitPrefs } from "@mossa/domain";
+import type { ClientFlags, Entitlements, Grant, TenantRole, UnitPrefs } from "@kova/domain";
 
 export interface PersonaRef {
   tenantId: string;
@@ -65,7 +65,7 @@ export interface TenantBranding {
 
 /** The tenant's sign-in screen — copy, an optional hero image, and which
  *  affordances show. Applied only on the branded entry (custom domain or the
- *  `/t/<slug>` path); the neutral platform host stays generic Mossa. */
+ *  `/t/<slug>` path); the neutral platform host stays generic Kova. */
 export interface LoginBranding {
   /** Small accent line above the form (default "No passwords, ever"). */
   tagline?: string | null;

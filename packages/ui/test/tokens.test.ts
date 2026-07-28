@@ -2,7 +2,7 @@
  * The token generator's reach.
  *
  * `deriveTokens` is the whole of "pick one colour and the app re-skins". If it
- * silently stops writing a surface, that surface keeps the shipped Mossa grey
+ * silently stops writing a surface, that surface keeps the shipped Kova grey
  * while everything around it moves — which reads as a rendering bug, not as a
  * missing token, and is exactly the kind of thing nobody notices until a customer
  * screenshots it.

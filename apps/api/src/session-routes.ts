@@ -28,7 +28,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { remainingAddOnQuantity, type AddOnBalance } from "@mossa/domain";
+import { remainingAddOnQuantity, type AddOnBalance } from "@kova/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { gateFeature, LIVE_ACCESS_STATUSES } from "./client-flags.js";
 import { requireClientAccess, visibleClientIds } from "./clients.js";

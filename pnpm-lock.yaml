@@ -23,10 +23,10 @@ importers:
       '@better-auth/passkey':
         specifier: 1.6.23
         version: 1.6.23(@better-auth/core@1.6.23(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20260702.1)(better-call@1.3.7(zod@4.4.3))(jose@6.2.3)(kysely@0.29.3)(nanostores@1.4.0))(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-auth@1.6.23(@cloudflare/workers-types@4.20260702.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)))(better-call@1.3.7(zod@4.4.3))(nanostores@1.4.0)
-      '@mossa/domain':
+      '@kova/domain':
         specifier: workspace:*
         version: link:../../packages/domain
-      '@mossa/protocol':
+      '@kova/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
       better-auth:
@@ -63,18 +63,18 @@ importers:
       '@fontsource/figtree':
         specifier: ^5.2.8
         version: 5.2.10
+      '@kova/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@kova/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@kova/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@mediapipe/tasks-vision':
         specifier: ^0.10.35
         version: 0.10.35
-      '@mossa/domain':
-        specifier: workspace:*
-        version: link:../../packages/domain
-      '@mossa/protocol':
-        specifier: workspace:*
-        version: link:../../packages/protocol
-      '@mossa/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
       '@simplewebauthn/browser':
         specifier: ^13.3.0
         version: 13.3.0
@@ -163,7 +163,7 @@ importers:
 
   packages/protocol:
     dependencies:
-      '@mossa/domain':
+      '@kova/domain':
         specifier: workspace:*
         version: link:../domain
       zod:

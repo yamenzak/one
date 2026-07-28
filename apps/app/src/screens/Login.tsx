@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { Button, Card, Field, Mail, KeyRound, ArrowRight } from "@mossa/ui";
+import { Button, Card, Field, Mail, KeyRound, ArrowRight } from "@kova/ui";
 import { api, ApiError } from "../api.js";
 import { useSession } from "../session.js";
 import { passkeySupported, signInWithPasskey, conditionalPasskeyAvailable } from "../passkey.js";
@@ -21,7 +21,7 @@ import { Turnstile } from "../Turnstile.js";
 export function Login() {
   const { refresh, host } = useSession();
   const tenant = host?.tenant ?? null;
-  const brandName = tenant?.name ?? "Mossa";
+  const brandName = tenant?.name ?? "Kova";
   const logoUrl = tenant?.branding?.logoUrl ?? null;
   const login = tenant?.branding?.login ?? null;
   const bgImageUrl = login?.bgImageUrl || null;

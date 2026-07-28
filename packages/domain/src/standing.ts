@@ -45,7 +45,7 @@
  */
 
 /**
- * The STUDIO's own standing with Mossa. Three states, not two, because the
+ * The STUDIO's own standing with Kova. Three states, not two, because the
  * lifecycle has a grace window and collapsing it loses the whole point of one:
  *
  *   ok         paid up.
@@ -61,7 +61,7 @@
  *
  * So a suspended studio's clients do NOT carry on "as if nothing" — they lose
  * every paid feature. They keep their own record and their own logbook, which is
- * the line this module draws: Mossa withholds what Mossa sells, and does not hold
+ * the line this module draws: Kova withholds what Kova sells, and does not hold
  * a client's own history hostage over their coach's invoice.
  */
 export type StudioStanding = "ok" | "grace" | "suspended";
@@ -75,7 +75,7 @@ export interface StandingFacts {
   accessActive: boolean;
   /** This studio requires a live plan/package to use the app at all. */
   accessRequired: boolean;
-  /** The STUDIO's standing with Mossa: paid, in dunning grace, or suspended. */
+  /** The STUDIO's standing with Kova: paid, in dunning grace, or suspended. */
   studio: StudioStanding;
 }
 

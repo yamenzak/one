@@ -6,9 +6,9 @@
  */
 
 import { useRef, useState, type ReactNode } from "react";
-import { Sheet, Button, IconBadge, MetricPill, ProgressRing, cn, ChevronDown, X, LayoutGrid, type Tone, type LucideIcon } from "@mossa/ui";
-import type { FeatureKey } from "@mossa/domain";
-import type { WidgetItem } from "@mossa/protocol";
+import { Sheet, Button, IconBadge, MetricPill, ProgressRing, cn, ChevronDown, X, LayoutGrid, type Tone, type LucideIcon } from "@kova/ui";
+import type { FeatureKey } from "@kova/domain";
+import type { WidgetItem } from "@kova/protocol";
 
 export type { WidgetItem };
 export type WidgetSize = "big" | "small";

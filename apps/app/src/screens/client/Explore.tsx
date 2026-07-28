@@ -3,7 +3,7 @@
  *  fresh article cards, and an immersive reader with a cover-bleed header. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Card, Badge, Chip, Field, Button, Page, Stagger, EmptyState, motion, cn, ArrowLeft, Search, Clock, BookOpen, Utensils, Dumbbell, AlertTriangle, Reveal, SkeletonHero, SkeletonList } from "@mossa/ui";
+import { Card, Badge, Chip, Field, Button, Page, Stagger, EmptyState, motion, cn, ArrowLeft, Search, Clock, BookOpen, Utensils, Dumbbell, AlertTriangle, Reveal, SkeletonHero, SkeletonList } from "@kova/ui";
 import { api } from "../../api.js";
 import { Markdown } from "../../Markdown.js";
 

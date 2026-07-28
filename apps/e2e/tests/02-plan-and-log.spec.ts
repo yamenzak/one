@@ -14,22 +14,30 @@
  * person just never sees it. Only a two-persona test catches that.
  */
 
+// Navigations are ABSOLUTE against the studio's own origin (`studio.base` /
+// `client.base`), not relative against `baseURL`. `baseURL` is the setup door,
+// which has no tenancy of its own — the studio's hostname is what pins it, so a
+// relative `/clients/...` here would exercise session-scoped fallback instead of
+// the path that ships.
 import { test, expect } from "@playwright/test";
 import { sheet, tab } from "../src/app.js";
-import { provisionClient, provisionStudio, teardown, type Client, type Studio } from "../src/provision.js";
+import { provisionClient, provisionStudio, seedExercise, teardown, type Client, type Studio } from "../src/provision.js";
 
 const EXERCISE = "Barbell Back Squat";
 
 test("coach publishes a workout plan, the client logs a set, and the coach sees it", async ({ browser }) => {
   const studio: Studio = await provisionStudio(browser, "E2E Barbell Club");
   const client: Client = await provisionClient(browser, studio, "Rowan Lifter");
+  // The studio's OWN exercise. The platform starter library is opt-in, so a clean
+  // checkout has none — see `seedExercise`.
+  await seedExercise(studio, EXERCISE);
   const coach = studio.page;
   const planName = `PPL ${Date.now().toString(36)}`;
 
   await test.step("coach opens the client's Plans tab", async () => {
     // Deep-link: the plan builder and the client sub-tabs are real routes
     // (Shell.tsx), so this is the same destination the segmented control reaches.
-    await coach.goto(`/clients/${client.id}/plans`);
+    await coach.goto(`${studio.base}/clients/${client.id}/plans`);
     await expect(coach.getByText("Coach view")).toBeVisible();
     await expect(coach.getByText("No workout plans")).toBeVisible();
   });
@@ -69,7 +77,7 @@ test("coach publishes a workout plan, the client logs a set, and the coach sees 
   });
 
   await test.step("the client sees the published plan on Train", async () => {
-    await client.page.goto("/train");
+    await client.page.goto(`${client.base}/train`);
     await expect(tab(client.page, "Train")).toBeVisible({ timeout: 30_000 });
     await expect(client.page.getByText("Active plan")).toBeVisible({ timeout: 30_000 });
     await expect(client.page.getByRole("heading", { name: planName })).toBeVisible();
@@ -96,7 +104,7 @@ test("coach publishes a workout plan, the client logs a set, and the coach sees 
   });
 
   await test.step("the coach sees the logged set on the client's day", async () => {
-    await coach.goto(`/clients/${client.id}/today`);
+    await coach.goto(`${studio.base}/clients/${client.id}/today`);
     await expect(coach.getByText("Coach view")).toBeVisible();
     // The day's activity timeline. Anchored to the start of the accessible name
     // ("Workout · 1 set · <time>") so it can't be satisfied by the agenda card

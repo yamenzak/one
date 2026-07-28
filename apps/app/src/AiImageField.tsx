@@ -11,7 +11,7 @@
  */
 
 import { useState, type CSSProperties } from "react";
-import { Button, cn, Camera, ImageIcon } from "@mossa/ui";
+import { Button, cn, Camera, ImageIcon } from "@kova/ui";
 import { api, ApiError, uploadMedia } from "./api.js";
 import { AiAvatar } from "./AiAvatar.js";
 

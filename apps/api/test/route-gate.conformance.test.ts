@@ -15,7 +15,7 @@
  * bypass, no way to be silently satisfied.
  */
 import { describe, it, expect } from "vitest";
-import { ROLE_PRESETS, PERMISSION_CATALOG, grantSatisfies } from "@mossa/domain";
+import { ROLE_PRESETS, PERMISSION_CATALOG, grantSatisfies } from "@kova/domain";
 import { permissionFor } from "../src/route-guard.js";
 
 /** Would `role` clear the action gate for this request? */

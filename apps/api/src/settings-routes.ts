@@ -7,8 +7,8 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { AI_TONES, TTS_VOICES, TTS_VOICE_IDS } from "@mossa/protocol";
-import { categoriesForRole, resolveAllChannels, parseNotifPrefs, NOTIF_CATEGORIES, parseNotifPolicy, resolveEmailPolicy, sanitizeEmailPolicy, NOTIF_TYPES, notifTemplateOf, notifVarsOf, notifCategoryOf, notifTitleOf, type NotifRole, type NotifType, type StoredNotifPrefs } from "@mossa/domain";
+import { AI_TONES, TTS_VOICES, TTS_VOICE_IDS } from "@kova/protocol";
+import { categoriesForRole, resolveAllChannels, parseNotifPrefs, NOTIF_CATEGORIES, parseNotifPolicy, resolveEmailPolicy, sanitizeEmailPolicy, NOTIF_TYPES, notifTemplateOf, notifVarsOf, notifCategoryOf, notifTitleOf, type NotifRole, type NotifType, type StoredNotifPrefs } from "@kova/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { tenantEntitlements, getConfig } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
@@ -29,7 +29,7 @@ export const settingsRoutes = new Hono<AppEnv>()
       .bind(who.tenantId)
       .first<{ branding_json: string | null; ai_toggles_json: string | null; marketplace_json: string | null; integrations_json: string | null; email_config_json: string | null; notif_policy_json: string | null; stripe_account_id: string | null }>();
     const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    const platformFrom = (await getConfig(c.env.DB))["email.platform_from"] || "Mossa <noreply@fourdegreelabs.com>";
+    const platformFrom = (await getConfig(c.env.DB))["email.platform_from"] || "Kova <noreply@fourdegreelabs.com>";
     return c.json({
       branding: parseJson(row?.branding_json, { accent: null, logoUrl: null, welcome: null }),
       aiToggles: parseJson(row?.ai_toggles_json, {}),
@@ -38,7 +38,7 @@ export const settingsRoutes = new Hono<AppEnv>()
       integrationProviders: PROVIDERS,
       email: maskEmailConfig(resolveEmailConfig(parseJson(row?.email_config_json ?? null, {}))),
       emailPlatformFrom: platformFrom,
-      // What ONE email costs on the Mossa lane. Brevo is the studio's own
+      // What ONE email costs on the Kova lane. Brevo is the studio's own
       // account and costs them nothing here, so the number is only meaningful
       // for the platform provider — the UI shows it only there.
       emailCreditsEach: Number((await getConfig(c.env.DB))["email.credits_per_email"] ?? "1"),

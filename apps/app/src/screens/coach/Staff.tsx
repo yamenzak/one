@@ -8,8 +8,8 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { PERMISSION_CATALOG } from "@mossa/domain";
-import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, Plus, personaLabel, personaTone } from "@mossa/ui";
+import { PERMISSION_CATALOG } from "@kova/domain";
+import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, Plus, personaLabel, personaTone } from "@kova/ui";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useCan } from "../../FeatureLock.js";

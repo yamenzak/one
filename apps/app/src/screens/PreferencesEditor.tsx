@@ -10,8 +10,8 @@ import {
   kgToDisplay, displayToKg, weightLabel, cmToFeetInches, feetInchesToCm,
   PRIMARY_GOAL_LABELS, ACTIVITY_LEVEL_LABELS, DIETARY_APPROACH_LABELS, WORKOUT_LOCATION_LABELS,
   type ClientPreferences, type WorkoutLocation,
-} from "@mossa/domain";
-import { Button, Card, Chip, Field, Select, Textarea, Reveal, Skeleton, SkeletonLine, Group, ActionResult, Target, Dumbbell, Utensils, MapPin, Activity } from "@mossa/ui";
+} from "@kova/domain";
+import { Button, Card, Chip, Field, Select, Textarea, Reveal, Skeleton, SkeletonLine, Group, ActionResult, Target, Dumbbell, Utensils, MapPin, Activity } from "@kova/ui";
 import { api } from "../api.js";
 import { useUnits } from "../units.js";
 

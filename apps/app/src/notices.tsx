@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { CloudOff, Lock, RefreshCw, WifiOff, X, cn } from "@mossa/ui";
+import { CloudOff, Lock, RefreshCw, WifiOff, X, cn } from "@kova/ui";
 import { useSession } from "./session.js";
 
 /**

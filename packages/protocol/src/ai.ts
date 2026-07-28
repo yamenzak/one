@@ -56,7 +56,7 @@ export interface AiModelMeta {
    * Credits a TYPICAL request costs on this model, keyed by lane ("text",
    * "text-small", "vision", "image", "speech") — the only cost figure a studio
    * owner can act on, since credits are what they buy and spend. Computed
-   * server-side from the reference workload in `@mossa/domain` so the neuron
+   * server-side from the reference workload in `@kova/domain` so the neuron
    * rate card and the platform markup stay on the server: a tenant is told the
    * price they pay, never the platform's cost basis or its margin.
    *

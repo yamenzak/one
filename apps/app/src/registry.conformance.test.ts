@@ -1,12 +1,12 @@
 /**
- * Cross-package registry conformance. The feature spine lives in @mossa/domain
- * (logic) and can't import the presentation atoms in @mossa/ui, so the join it
+ * Cross-package registry conformance. The feature spine lives in @kova/domain
+ * (logic) and can't import the presentation atoms in @kova/ui, so the join it
  * can't check itself — every metric a FeatureSpec surfaces must be a real METRICS
  * key — is validated here, where the app already depends on both.
  */
 import { describe, expect, it } from "vitest";
-import { FEATURES, TENANT_ROLES, FEATURE_KEYS, STUDIO_SETTINGS_SECTIONS, settingsSectionVisible, FREE_ENTITLEMENTS, type FeatureSpec } from "@mossa/domain";
-import { METRICS, personaLabel, PERSONA_LABELS } from "@mossa/ui";
+import { FEATURES, TENANT_ROLES, FEATURE_KEYS, STUDIO_SETTINGS_SECTIONS, settingsSectionVisible, FREE_ENTITLEMENTS, type FeatureSpec } from "@kova/domain";
+import { METRICS, personaLabel, PERSONA_LABELS } from "@kova/ui";
 
 describe("feature ↔ metric registry join", () => {
   it("every metric a feature surfaces is a real METRICS key", () => {

@@ -14,7 +14,7 @@
  * lesson, SPEC §11).
  */
 import type { MiddlewareHandler } from "hono";
-import { isDevRoot, type HostRole } from "@mossa/domain";
+import { isDevRoot, type HostRole } from "@kova/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin, can } from "./auth-context.js";
 
 /** Routes reachable without a tenant session. */

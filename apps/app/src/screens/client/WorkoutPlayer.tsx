@@ -5,13 +5,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, Fragment, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet } from "@mossa/protocol";
-import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, computePlates, type ExerciseBests, type PlateBreakdown, type UnitPrefs } from "@mossa/domain";
+import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet } from "@kova/protocol";
+import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, computePlates, type ExerciseBests, type PlateBreakdown, type UnitPrefs } from "@kova/domain";
 import {
   Button, Card, Badge, Field, Input, Label, Sheet, SubCard, ProgressRing, EmptyState,
   Reveal, Skeleton, SkeletonLine, SkeletonList, useModalOverlay,
   AlertTriangle, ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, LifeBuoy, Plus, Minus, RotateCcw, cn,
-} from "@mossa/ui";
+} from "@kova/ui";
 import { api, todayLocal, errorText } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";

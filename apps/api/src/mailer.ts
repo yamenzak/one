@@ -24,10 +24,10 @@ async function getEmailConfig(db: D1Database): Promise<{ provider: string; from:
     const cfg = Object.fromEntries((rows.results ?? []).map((r) => [r.key, r.value]));
     return {
       provider: cfg["email.provider"] ?? "mock",
-      from: cfg["email.from"] ?? "Mossa <noreply@mossa.local>",
+      from: cfg["email.from"] ?? "Kova <noreply@kova.local>",
     };
   } catch {
-    return { provider: "mock", from: "Mossa <noreply@mossa.local>" };
+    return { provider: "mock", from: "Kova <noreply@kova.local>" };
   }
 }
 
@@ -124,7 +124,7 @@ function base64Utf8(s: string): string {
  */
 function buildMime(m: { from: string; to: string; subject: string; html?: string; text?: string }): string {
   const date = new Date().toUTCString();
-  const domain = bareAddress(m.from).split("@")[1] ?? "mossa";
+  const domain = bareAddress(m.from).split("@")[1] ?? "kova";
   const messageId = `<${crypto.randomUUID()}@${domain}>`;
   const base = [
     `From: ${m.from}`,
@@ -188,8 +188,8 @@ export interface BrandKit {
   logoUrl: string | null;
 }
 
-/** Mossa's own identity — platform emails (sign-in codes, receipts). */
-export const MOSSA_BRAND: BrandKit = { name: "Mossa", accent: "#a8c7fa", accentFg: "#0b1220", logoUrl: null };
+/** Kova's own identity — platform emails (sign-in codes, receipts). */
+export const KOVA_BRAND: BrandKit = { name: "Kova", accent: "#a8c7fa", accentFg: "#0b1220", logoUrl: null };
 
 /** Whitelist a CSS color before it lands in an inline `style` (tenant-supplied —
  *  must not be able to inject `;`/`}`/quotes/`url(`). Falls back when unsafe. */
@@ -213,7 +213,7 @@ const EMAIL_FONT = "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,H
 
 /** A restrained, brand-accented CTA — softly rounded, left-aligned to sit in the
  *  message flow (not a centered candy pill). */
-export function emailButton(label: string, href: string, brand: BrandKit = MOSSA_BRAND): string {
+export function emailButton(label: string, href: string, brand: BrandKit = KOVA_BRAND): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:26px 0 2px"><tr><td style="border-radius:12px;background:${brand.accent}">
     <a href="${encodeURI(href)}" style="display:inline-block;padding:13px 24px;font-family:${EMAIL_FONT};font-size:15px;font-weight:600;line-height:1;color:${brand.accentFg};text-decoration:none;border-radius:12px">${escapeHtml(label)}</a>
   </td></tr></table>`;
@@ -229,7 +229,7 @@ export function emailShell(
   bodyHtml: string,
   opts: { brand?: BrandKit; preheader?: string; footnote?: string; eyebrow?: string; manageUrl?: string } = {},
 ): string {
-  const brand = opts.brand ?? MOSSA_BRAND;
+  const brand = opts.brand ?? KOVA_BRAND;
   const font = EMAIL_FONT;
   // Wordmark: the tenant's public logo, else the studio name set clean in the
   // foreground — a quiet, confident mark, not a coloured chip.
@@ -237,12 +237,12 @@ export function emailShell(
     ? `<img src="${encodeURI(brand.logoUrl)}" alt="${escapeHtml(brand.name)}" height="26" style="height:26px;max-height:26px;width:auto;border:0;display:block">`
     : `<span style="font-size:17px;font-weight:600;letter-spacing:-0.01em;color:${T.fg}">${escapeHtml(brand.name)}</span>`;
   const preheader = opts.preheader ?? heading;
-  const isMossa = brand.name === MOSSA_BRAND.name;
+  const isKova = brand.name === KOVA_BRAND.name;
   // The footer told people to "manage notifications in your account settings"
   // and gave them no way to get there — a dead instruction in every email, and
   // the one thing a recipient reaches for when they want fewer of them. When the
   // caller knows the app's origin it becomes a real link.
-  const footnote = opts.footnote ?? (isMossa ? "Mossa · coaching, organized." : `Sent by ${escapeHtml(brand.name)}.`);
+  const footnote = opts.footnote ?? (isKova ? "Kova · coaching, organized." : `Sent by ${escapeHtml(brand.name)}.`);
   const manage = opts.manageUrl
     ? `<a href="${encodeURI(opts.manageUrl)}" style="color:${T.muted};text-decoration:underline">Manage notifications</a>`
     : "";
@@ -289,7 +289,7 @@ export const EMAIL_TONE = { good: "#7fd6a2", warn: "#f2c56b", bad: "#f28b82", ne
 export type EmailTone = keyof typeof EMAIL_TONE;
 
 const clamp01 = (n: number) => (Number.isFinite(n) ? (n < 0 ? 0 : n > 1 ? 1 : n) : 0);
-const brandAccent = (brand?: BrandKit) => brand?.accent ?? MOSSA_BRAND.accent;
+const brandAccent = (brand?: BrandKit) => brand?.accent ?? KOVA_BRAND.accent;
 const toneOrAccent = (opts: { brand?: BrandKit; tone?: EmailTone }) =>
   opts.tone ? EMAIL_TONE[opts.tone] : brandAccent(opts.brand);
 

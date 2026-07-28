@@ -18,7 +18,7 @@
  * to render for someone who is signed in but not an operator.
  */
 
-import { Button, Card } from "@mossa/ui";
+import { Button, Card } from "@kova/ui";
 import { AdminConsole } from "./admin/AdminConsole.js";
 import { useSession } from "../session.js";
 

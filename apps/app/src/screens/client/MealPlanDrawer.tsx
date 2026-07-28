@@ -7,10 +7,10 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { MealBody, MealOption } from "@mossa/protocol";
-import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
-import { fmtEnergy, kcalToDisplay, featureEnabled } from "@mossa/domain";
-import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, ConfirmDialog, useModalOverlay, Utensils, ShoppingCart, Plus, Minus, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw } from "@mossa/ui";
+import type { MealBody, MealOption } from "@kova/protocol";
+import { optionMacroTotals, type FoodLike } from "@kova/protocol";
+import { fmtEnergy, kcalToDisplay, featureEnabled } from "@kova/domain";
+import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, ConfirmDialog, useModalOverlay, Utensils, ShoppingCart, Plus, Minus, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw } from "@kova/ui";
 import { api, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
@@ -76,7 +76,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   // switching to one) can never overwrite the current plan's saved list.
   const active = (viewId ? allPlans.find((p) => p.id === viewId) : plan) ?? plan ?? null;
   const isPast = !!active && !!plan && active.id !== plan.id;
-  const shopKey = active ? `mossa.shop.${active.id}` : null;
+  const shopKey = active ? `kova.shop.${active.id}` : null;
   const shopReady = useRef<string | null>(null);
 
   // First time a client opens their meal plan, walk them through it.

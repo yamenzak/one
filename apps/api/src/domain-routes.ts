@@ -36,7 +36,7 @@ import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostna
 import { canonicalHost, invalidateHostCache, isPlatformDoor, rootDomain, shapeOf } from "./host-context.js";
 import { nowIso } from "./ids.js";
 import { parseJson } from "./db.js";
-import { caaFixFromErrors, setupHostname } from "@mossa/domain";
+import { caaFixFromErrors, setupHostname } from "@kova/domain";
 
 const HOSTNAME = z
   .string()
@@ -112,14 +112,30 @@ export const domainRoutes = new Hono<AppEnv>()
   .get("/host", async (c) => {
     const host = c.get("host");
     const t = host.tenant;
-    const root = rootDomain(c.env);
+    /**
+     * The root this request was CLASSIFIED against — `host.shape.root`, not the
+     * configured `ROOT_DOMAIN`.
+     *
+     * They differ on loopback, where `classifyHost` always classifies against
+     * `localhost` so dev and the E2E suite get the real topology. Reporting the
+     * configured value there sent the app to `https://<slug>.kova.4dl.app` the
+     * moment anything built a studio URL — a real external domain, from localhost,
+     * which lands on a blank page. Anything the CLIENT builds has to agree with what
+     * the SERVER resolves, so it has to be the same value.
+     *
+     * The port comes from the request URL for the same reason: dev is on :8787, and
+     * a hostname without it resolves to a port nothing is listening on.
+     */
+    const here = new URL(c.req.url);
+    const root = host.shape.root;
+    const port = here.port ? `:${here.port}` : "";
     return c.json({
       role: host.shape.role,
       // Retained for the app's existing branching: true on our own doors, false on
       // anything that resolves a studio by hostname.
       platform: isPlatformDoor(host.shape),
       rootDomain: root,
-      setupUrl: `${new URL(c.req.url).protocol}//${setupHostname(root)}`,
+      setupUrl: `${here.protocol}//${setupHostname(root)}${port}`,
       tenant: t
         ? { tenantId: t.tenantId, name: t.name, slug: t.slug, branding: t.branding, allowSignup: t.allowSignup }
         : null,

@@ -26,9 +26,9 @@ jobs:
       - name: Create resources (ignore "already exists")
         working-directory: apps/api
         run: |
-          pnpm exec wrangler d1 create mossa || true
+          pnpm exec wrangler d1 create kova || true
           pnpm exec wrangler kv namespace create CACHE || true
-          pnpm exec wrangler r2 bucket create mossa-media || true
+          pnpm exec wrangler r2 bucket create kova-media || true
       - name: List ids to paste into wrangler.jsonc
         working-directory: apps/api
         run: |

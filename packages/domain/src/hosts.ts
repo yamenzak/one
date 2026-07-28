@@ -92,7 +92,7 @@ export const RESERVED_LABELS: ReadonlySet<string> = new Set([
   // The other doors. Claiming one of these is a takeover, not a name clash.
   SETUP_LABEL, ADMIN_LABEL, "administrator", "console", "operator", "platform", "root", "system",
   // The product and the company, in every form we might publish under.
-  "kova", "mossa", "fourdegrees", "fourdegreelabs", "4dl", "labs",
+  "kova", "kova", "fourdegrees", "fourdegreelabs", "4dl", "labs",
   // Web infrastructure conventions.
   "www", "www1", "www2", "web", "api", "apis", "app", "apps", "cdn", "cdn-cgi", "static",
   "assets", "media", "img", "images", "files", "file", "download", "downloads", "upload",

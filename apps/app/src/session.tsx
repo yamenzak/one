@@ -6,7 +6,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { SessionContext, TenantBranding } from "@mossa/protocol";
+import type { SessionContext, TenantBranding } from "@kova/protocol";
 import { api, isOffline, setUnauthorizedHandler } from "./api.js";
 
 /**
@@ -30,7 +30,7 @@ import { api, isOffline, setUnauthorizedHandler } from "./api.js";
 
 /**
  * Display preferences that are NOT identifying and carry no account data — the
- * chosen light/dark theme. Sign-out used to wipe every `mossa`-prefixed key, so a
+ * chosen light/dark theme. Sign-out used to wipe every `kova`-prefixed key, so a
  * light-theme user signed back in to a dark app and had to re-set it every time.
  * Anything that could leak between accounts (session cache, per-plan shopping
  * lists) must stay OUT of here.
@@ -38,14 +38,14 @@ import { api, isOffline, setUnauthorizedHandler } from "./api.js";
  * The remembered door used to be here too. It no longer exists: the hostname is
  * the door, so there is nothing for the device to remember.
  */
-const KEEP_ON_SIGN_OUT = new Set(["mossa-theme"]);
+const KEEP_ON_SIGN_OUT = new Set(["kova-theme"]);
 
 /** Remove the app's own localStorage keys (mode, cached session, per-plan
- *  shopping lists) — all `mossa`-prefixed — so nothing leaks across accounts. */
+ *  shopping lists) — all `kova`-prefixed — so nothing leaks across accounts. */
 function clearAppStorage(): void {
   try {
     for (const k of Object.keys(localStorage)) {
-      if (k.startsWith("mossa") && !KEEP_ON_SIGN_OUT.has(k)) localStorage.removeItem(k);
+      if (k.startsWith("kova") && !KEEP_ON_SIGN_OUT.has(k)) localStorage.removeItem(k);
     }
   } catch { /* private mode */ }
 }
@@ -63,7 +63,7 @@ function clearAppStorage(): void {
  * cookie is HttpOnly and every read/write is still authorized server-side, so a
  * restored payload cannot grant access to anything. A real 401 clears it.
  */
-const CTX_CACHE_KEY = "mossa:ctx-cache";
+const CTX_CACHE_KEY = "kova:ctx-cache";
 function readCachedCtx(): SessionContext | null {
   try {
     const raw = localStorage.getItem(CTX_CACHE_KEY);
@@ -79,7 +79,7 @@ function writeCachedCtx(data: SessionContext | null): void {
 
 type Mode = "coach" | "train";
 
-/** Which door the app is being served on — see `@mossa/domain` `classifyHost`. */
+/** Which door the app is being served on — see `@kova/domain` `classifyHost`. */
 export type HostRole = "root" | "setup" | "admin" | "tenant" | "custom" | "invalid";
 
 /** Which door this is, and whose (SPEC §14.1). Resolved pre-auth from /api/host. */
@@ -114,7 +114,12 @@ export interface HostInfo {
  *  its own cookie jar and would demand a fresh sign-in. The custom domain is for
  *  that studio's own clients arriving cold, not for crossing between studios. */
 export function studioUrl(slug: string, rootDomain: string): string {
-  return `${location.protocol}//${slug}.${rootDomain}/`;
+  // The PORT has to come along. Dev serves on :8787, and a bare hostname points at
+  // :80 — where nothing is listening — so dropping it turns every studio hop into a
+  // blank page locally while working fine in production. Protocol likewise follows
+  // the current page rather than being hardcoded to https.
+  const port = location.port ? `:${location.port}` : "";
+  return `${location.protocol}//${slug}.${rootDomain}${port}/`;
 }
 
 interface Session {
@@ -146,7 +151,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // failed context read as offline too (below).
   const [online, setOnline] = useState(() => navigator.onLine !== false);
   const [mode, setModeState] = useState<Mode>(() =>
-    localStorage.getItem("mossa-mode") === "train" ? "train" : "coach",
+    localStorage.getItem("kova-mode") === "train" ? "train" : "coach",
   );
 
   const refresh = useCallback(async () => {
@@ -222,7 +227,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const setMode = useCallback((m: Mode) => {
     setModeState(m);
-    localStorage.setItem("mossa-mode", m);
+    localStorage.setItem("kova-mode", m);
   }, []);
 
   /**

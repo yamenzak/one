@@ -1,9 +1,9 @@
 {
-  "name": "@mossa/www",
+  "name": "@kova/www",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Mossa marketing site — a dependency-free static generator, deployed as a Cloudflare Worker with the static-assets binding.",
+  "description": "Kova marketing site — a dependency-free static generator, deployed as a Cloudflare Worker with the static-assets binding.",
   "scripts": {
     "build": "node build.mjs",
     "dev": "node build.mjs && cd dist && python3 -m http.server 4321",

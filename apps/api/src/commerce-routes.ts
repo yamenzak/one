@@ -15,7 +15,7 @@ import {
   overallDaysRemaining,
   BUDGET_FEATURES,
   type Budget,
-} from "@mossa/domain";
+} from "@kova/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { gateFeature } from "./client-flags.js";
 import { requireClientAccess } from "./clients.js";

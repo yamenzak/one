@@ -7,7 +7,7 @@
  * clear picture of the trend, not a medical measurement.
  */
 
-import type { Pt } from "@mossa/domain";
+import type { Pt } from "@kova/domain";
 
 type Severity = "good" | "mild" | "moderate" | "severe";
 const TONE: Record<Severity, string> = { good: "var(--success)", mild: "var(--warning)", moderate: "var(--warning)", severe: "var(--danger)" };

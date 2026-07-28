@@ -15,7 +15,7 @@ your requirements into a concrete build.
 
 ## 0. What exists today (ground truth)
 
-### Platform rail — Mossa → tenant (`billing-store.ts`, `billing-do.ts`, `stripe-routes.ts`)
+### Platform rail — Kova → tenant (`billing-store.ts`, `billing-do.ts`, `stripe-routes.ts`)
 
 - **Plans**: `plans` table, one `subscriptions` row per tenant (PK `tenant_id`),
   statuses `active/trialing/past_due/suspended/canceled/unpaid`. Dunning sweep in
@@ -100,7 +100,7 @@ without changing the merchant-of-record / liability model. Add `@stripe/stripe-j
 
 ### Platform rail (our own account)
 - **Credit pack** → create a **PaymentIntent** (`amount`, metadata
-  `mossa_tenant/pack/credits`), return `client_secret`, confirm inline with Payment
+  `kova_tenant/pack/credits`), return `client_secret`, confirm inline with Payment
   Element. Webhook `payment_intent.succeeded` → `topUp(purchased)`.
 - **Plan subscription** → create Subscription `payment_behavior:
   default_incomplete`, expand `latest_invoice.payment_intent`, return its
@@ -128,7 +128,7 @@ without changing the merchant-of-record / liability model. Add `@stripe/stripe-j
 exclusive to a **specific client** and/or a **specific package**, on both rails.
 
 - **Schema**: reuse `promo_codes`; add `restricted_client_id`; add a rail
-  discriminator (a platform promo has `tenant_id = NULL`, meaning Mossa→tenant).
+  discriminator (a platform promo has `tenant_id = NULL`, meaning Kova→tenant).
   `discount_type/percent_off/amount_off_cents/restricted_package_id/max_redemptions`
   already exist — wire the create route to actually persist package + client scope.
 - **Apply (pure domain fn)** `applyPromo(amountCents, promo, ctx)`:
@@ -175,7 +175,7 @@ Keep the atomic engine as-is; extend scoping:
   features). Both optional; null = unrestricted.
 - `target_feature`, `max_uses`, one-per-client, `expires_at` stay.
 - Redemption codes remain a **tenant→client** primitive (they add *days*; the
-  platform rail deals in *credits*, so a Mossa→tenant redemption code is out of scope).
+  platform rail deals in *credits*, so a Kova→tenant redemption code is out of scope).
 
 ---
 

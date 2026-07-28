@@ -1,9 +1,9 @@
 {
-  // Mossa marketing site — static assets served by a Worker.
+  // Kova marketing site — static assets served by a Worker.
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "mossa-www",
+  "name": "kova-www",
   "compatibility_date": "2025-07-01",
   "assets": { "directory": "./dist", "not_found_handling": "404-page" },
-  "routes": [{ "pattern": "getmossa.4dl.app", "custom_domain": true }],
+  "routes": [{ "pattern": "getkova.4dl.app", "custom_domain": true }],
   "observability": { "enabled": true }
 }

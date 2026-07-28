@@ -1,4 +1,4 @@
-# Mossa — Full Application Audit
+# Kova — Full Application Audit
 
 A whole-app audit across security, domain correctness, API/data-integrity,
 frontend/accessibility, performance/scalability, and testing/quality, followed
@@ -37,7 +37,7 @@ Status legend: **✅ fixed** · **◑ hardened (residual noted)** · **⊘ accep
 | H13 | Frontend | No global 401 handling — an expired cookie silently produced blank screens and failed saves. | ✅ `setUnauthorizedHandler`/`onUnauthorized` in `api.ts`; `SessionProvider` clears session → Login. |
 | H14 | a11y | `Field` derived input `id` from label text → duplicate DOM ids in superset/circuit rounds. | ✅ Fallback id from `useId()`. `primitives.tsx`. |
 | H15 | Tests | The trainer/client lanes of `requireClientAccess` (the security invariant) had zero integration coverage. | ✅ New test: trainer assigned→200, unassigned same-tenant→403, roster scope. `api.test.ts`. |
-| H16 | Tests | The API Miniflare suite silently ran 0 tests without a prior SPA build. | ✅ `@mossa/api#test` turbo-depends on `@mossa/app#build`; prerequisite documented in CLAUDE.md. |
+| H16 | Tests | The API Miniflare suite silently ran 0 tests without a prior SPA build. | ✅ `@kova/api#test` turbo-depends on `@kova/app#build`; prerequisite documented in CLAUDE.md. |
 
 ## Medium
 

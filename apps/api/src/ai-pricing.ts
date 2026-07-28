@@ -20,12 +20,12 @@
  * an operator sees the gap instead of a silently short catalog.
  */
 
-import { NEURON_COST_USD } from "@mossa/domain";
+import { NEURON_COST_USD } from "@kova/domain";
 
 /**
  * A catalog lane. The first five are lanes the product can actually execute
  * (`ai.ts` generate / generateImage / generateSpeech); the rest are priced,
- * discovered, and inert — nothing in Mossa runs an embedding, a transcription,
+ * discovered, and inert — nothing in Kova runs an embedding, a transcription,
  * a Workers AI TTS voice or a classifier, so they land in the catalog disabled
  * rather than offered to a tenant as a pickable model that fails at call time.
  */
@@ -134,7 +134,7 @@ export function parseWorkersAiCatalog(md: string): ParsedCatalog {
     }
     if (inp && !outp) {
       // Input-token-only: an embedding model, a reranker or a classifier. Exact
-      // to price, but no Mossa lane calls one, so it is catalog-only.
+      // to price, but no Kova lane calls one, so it is catalog-only.
       const inputRate = num(inp[1]!);
       if (!(inputRate > 0)) { seen.add(id); skipped.push({ id, reason: "input rate parsed as zero" }); continue; }
       seen.add(id);
@@ -170,7 +170,7 @@ function workersSkipReason(neuronCol: string): string {
     return "priced per megapixel across first / subsequent / input tiers; ai_models holds one unit rate";
   }
   if (/per\s+M\s+images/i.test(neuronCol)) {
-    return "priced per million images (image classification); no Mossa lane runs it";
+    return "priced per million images (image classification); no Kova lane runs it";
   }
   return `unrecognised neuron unit: ${neuronCol.slice(0, 120) || "(empty)"}`;
 }
@@ -188,10 +188,10 @@ export function parseWorkersAiPricing(md: string): ModelSeed[] {
 
 const firstUsd = (s: string): number | null => { const m = /\$([0-9]+(?:\.[0-9]+)?)/.exec(s); return m ? Number(m[1]) : null; };
 
-/** Which Mossa lane a Gemini id belongs to, or a refusal reason. */
+/** Which Kova lane a Gemini id belongs to, or a refusal reason. */
 function geminiLane(id: string): { task: SeedTask } | { skip: string } {
   if (/^(imagen|veo|lyria)/i.test(id)) return { skip: "a different Google API surface (predict / long-running ops); the app's generateContent path cannot drive it" };
-  if (/\blive\b|native-audio/i.test(id)) return { skip: "Live API (bidirectional audio streaming); no Mossa lane speaks that protocol" };
+  if (/\blive\b|native-audio/i.test(id)) return { skip: "Live API (bidirectional audio streaming); no Kova lane speaks that protocol" };
   if (/tts/i.test(id)) return { task: "speech" };
   if (/embedding/i.test(id)) return { task: "embedding" };
   if (/image/i.test(id)) return { task: "image" };

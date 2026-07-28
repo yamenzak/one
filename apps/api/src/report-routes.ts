@@ -1,7 +1,7 @@
 /**
  * Reports (SPEC §8.7, §8.11) — the trainer per-client report and the
  * roster-level Retention Radar (at-risk clients by engagement heuristics).
- * All aggregate math is the pure @mossa/domain functions; this layer just
+ * All aggregate math is the pure @kova/domain functions; this layer just
  * gathers rows and buckets them by the client's local day.
  */
 
@@ -16,7 +16,7 @@ import {
   presetRange,
   sessionTonnage,
   type LoggedSetLike,
-} from "@mossa/domain";
+} from "@kova/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess, visibleClientIds } from "./clients.js";
 import { gateFeature } from "./client-flags.js";

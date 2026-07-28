@@ -31,11 +31,11 @@
  */
 
 import { useState } from "react";
-import type { PersonaRef } from "@mossa/protocol";
+import type { PersonaRef } from "@kova/protocol";
 import {
   Badge, Button, Card, Sheet, Check, ChevronsUpDown, Store, Spinner, cn,
   personaLabel, personaTone,
-} from "@mossa/ui";
+} from "@kova/ui";
 import { useSession } from "./session.js";
 
 /** The mark for a studio: its uploaded icon, else its initial on its own colour. */

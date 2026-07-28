@@ -5,7 +5,7 @@
  */
 
 import { motion, AnimatePresence } from "motion/react";
-import { cn, toneSoft, Check, ChevronRight, type Tone } from "@mossa/ui";
+import { cn, toneSoft, Check, ChevronRight, type Tone } from "@kova/ui";
 import type { ReactNode } from "react";
 
 /**

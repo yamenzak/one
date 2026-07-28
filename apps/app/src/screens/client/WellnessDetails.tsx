@@ -6,13 +6,13 @@
  * Reused by the Wellness page and by activity-feed deep-links.
  */
 
-import { fmtWeight, fmtVolume } from "@mossa/domain";
+import { fmtWeight, fmtVolume } from "@kova/domain";
 import {
   Sheet, SubCard, Badge, IconBadge, PhotoGrid, cn, toneVar, METRICS, type Photo, type Tone, type LucideIcon,
   ImageIcon, FlaskConical, ClipboardList, Calendar, Camera, HeartPulse,
-} from "@mossa/ui";
+} from "@kova/ui";
 import { useUnits } from "../../units.js";
-import type { UnitPrefs } from "@mossa/domain";
+import type { UnitPrefs } from "@kova/domain";
 
 export interface CheckInFull {
   id: string; date_local: string;

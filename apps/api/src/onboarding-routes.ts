@@ -30,7 +30,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { FEATURE_KEYS, FEATURE_META, resolveEntitlements } from "@mossa/domain";
+import { FEATURE_KEYS, FEATURE_META, resolveEntitlements } from "@kova/domain";
 import { type AppEnv, isPlatformAdmin, requireTenant } from "./auth-context.js";
 import { getSubscription, listPlans, seedBilling, type PlanRow } from "./billing-store.js";
 import { stripeConfig, stripeEnabled } from "./stripe.js";

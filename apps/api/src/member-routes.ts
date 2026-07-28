@@ -7,7 +7,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { sanitizePermissions } from "@mossa/domain";
+import { sanitizePermissions } from "@kova/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { checkStaffSeat } from "./auth.js";
 import { gateFeature } from "./client-flags.js";

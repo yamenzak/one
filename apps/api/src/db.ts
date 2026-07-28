@@ -6,11 +6,11 @@
  * TEXT columns; day-bucketed rows carry the CLIENT'S local date as
  * `date_local` (YYYY-MM-DD — the app computes it device-side, SPEC §8.6);
  * deep structures (plan bodies, budgets, targets) are JSON columns validated
- * by @mossa/protocol schemas at the route boundary.
+ * by @kova/protocol schemas at the route boundary.
  *
  * Better Auth's tables are mirrored 1:1 from its SQLite schema (string→TEXT,
  * boolean→INTEGER, date→DATE) so its adapter reads/writes them natively. An
- * `organization` IS a Mossa tenant.
+ * `organization` IS a Kova tenant.
  */
 
 let schemaReady: Promise<void> | null = null;
@@ -234,7 +234,7 @@ async function applySchema(db: D1Database): Promise<void> {
 
           // ── Coach-action audit log (SPEC §9; REGISTRY-PLAN Phase 3) ────────
           // Durable, queryable record of STAFF actions on a client's record. The
-          // action id keys into @mossa/domain AUDIT_ACTIONS; summary is a short
+          // action id keys into @kova/domain AUDIT_ACTIONS; summary is a short
           // human line; ref points at the affected row. Listed newest-first per
           // client, so the index is (client_id, at DESC).
           "CREATE TABLE IF NOT EXISTS audit_log (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, actor_user_id TEXT, action TEXT, summary TEXT, ref TEXT, at INTEGER);",
@@ -352,7 +352,7 @@ async function applySchema(db: D1Database): Promise<void> {
           "ALTER TABLE body_scans ADD COLUMN posture_severity TEXT",
           "ALTER TABLE body_scans ADD COLUMN somatotype TEXT",
           // Promo codes (billing centralization): per-client exclusivity + a
-          // rail discriminator ('tenant' = tenant→client, 'platform' = Mossa→tenant).
+          // rail discriminator ('tenant' = tenant→client, 'platform' = Kova→tenant).
           "ALTER TABLE promo_codes ADD COLUMN restricted_client_id TEXT",
           "ALTER TABLE promo_codes ADD COLUMN scope TEXT DEFAULT 'tenant'",
           // Redemption codes: optional per-package + per-client scoping.

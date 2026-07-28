@@ -15,7 +15,7 @@
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { NOTIF_TYPES, UNIVERSAL_NOTIF_VARS, notifTemplateOf, notifVarsOf, renderTemplate, type NotifType } from "@mossa/domain";
+import { NOTIF_TYPES, UNIVERSAL_NOTIF_VARS, notifTemplateOf, notifVarsOf, renderTemplate, type NotifType } from "@kova/domain";
 
 const TYPES = Object.keys(NOTIF_TYPES) as NotifType[];
 const varsIn = (s: string): string[] => [...s.matchAll(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g)].map((m) => m[1]!);

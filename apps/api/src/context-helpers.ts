@@ -3,5 +3,5 @@ export {
   resolveClientFlags,
   parseFlagsJson,
   type Budget,
-} from "@mossa/domain";
+} from "@kova/domain";
 export type PersonaRefRole = "owner" | "trainer" | "assistant" | "client";

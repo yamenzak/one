@@ -3,7 +3,7 @@
  *
  * Kova is subdomain-first: `acme.kova.4dl.app` IS Acme's studio, `coaching.acme.com`
  * is the same studio on its own domain, and `kova.4dl.app` by itself is nothing.
- * `@mossa/domain` `classifyHost` decides which of the five doors a hostname is,
+ * `@kova/domain` `classifyHost` decides which of the five doors a hostname is,
  * purely and testably; this module does the two D1 lookups that turn a `tenant`
  * or `custom` classification into an actual studio, and attaches that studio's
  * host gate (`resolveHostGate` — is this studio paid up, or is its whole
@@ -20,8 +20,8 @@
  * the caller is a member of the host's tenant.
  */
 
-import type { SessionContext } from "@mossa/protocol";
-import { classifyHost, resolveHostGate, tenantHostname, type HostGate, type HostShape } from "@mossa/domain";
+import type { SessionContext } from "@kova/protocol";
+import { classifyHost, resolveHostGate, tenantHostname, type HostGate, type HostShape } from "@kova/domain";
 import { parseJson } from "./db.js";
 
 export interface HostTenant {
@@ -404,7 +404,24 @@ export async function moveSubdomain(
  * custom domain got links pointing at the shared platform host, which is now a
  * dead end that would serve them nothing.
  */
-export async function canonicalHost(env: HostEnv, db: D1Database, tenantId: string): Promise<string> {
+export async function canonicalHost(
+  env: HostEnv,
+  db: D1Database,
+  tenantId: string,
+  /**
+   * The root to derive the subdomain against, when the caller knows the one this
+   * REQUEST was classified against (`c.get("host").shape.root`).
+   *
+   * It differs from the configured `ROOT_DOMAIN` on loopback, where `classifyHost`
+   * always uses `localhost` so dev and E2E run the real topology. Without the
+   * override, an invite emailed from `pnpm dev` carried a link to
+   * `https://<slug>.kova.4dl.app` — a real external domain, unreachable from the
+   * machine that generated it, and impossible to notice until someone clicked it.
+   * Omitted by background jobs (a cron has no request), which correctly fall back
+   * to the configured root.
+   */
+  rootOverride?: string,
+): Promise<string> {
   const custom = await db
     .prepare("SELECT hostname FROM tenant_domains WHERE tenant_id = ? AND kind = 'custom' AND status = 'active' ORDER BY created_at LIMIT 1")
     .bind(tenantId)
@@ -425,5 +442,6 @@ export async function canonicalHost(env: HostEnv, db: D1Database, tenantId: stri
     .bind(tenantId)
     .first<{ slug: string | null }>()
     .catch(() => null);
-  return org?.slug ? tenantHostname(org.slug, rootDomain(env)) : rootDomain(env);
+  const root = rootOverride || rootDomain(env);
+  return org?.slug ? tenantHostname(org.slug, root) : root;
 }

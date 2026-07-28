@@ -4,7 +4,7 @@
  *
  * Cloudflare bindings are request-scoped, so `betterAuth()` cannot live at
  * module scope; build it per request with `createAuth(env, origin)` and cache
- * it on the Hono context. An **organization = a Mossa tenant**; the session's
+ * it on the Hono context. An **organization = a Kova tenant**; the session's
  * `activeOrganizationId` is the tenant id threaded through every route.
  *
  * Flow (every role): email → 6-digit OTP → in. After first sign-in the app
@@ -14,11 +14,11 @@
 import { betterAuth, APIError } from "better-auth";
 import { organization, emailOTP } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
-import { cookieDomainFor, isDevRoot, rpIdFor, type HostShape } from "@mossa/domain";
+import { cookieDomainFor, isDevRoot, rpIdFor, type HostShape } from "@kova/domain";
 import type { Env } from "./env.js";
 import { ac, roles } from "./access.js";
 import { withinQuota, hasFeature } from "./billing-store.js";
-import { sendEmail, emailShell, emailButton, escapeHtml, MOSSA_BRAND } from "./mailer.js";
+import { sendEmail, emailShell, emailButton, escapeHtml, KOVA_BRAND } from "./mailer.js";
 import { sendTenantEmail } from "./email-provider.js";
 import { tenantBrandKit } from "./notify.js";
 import { newId, nowMs } from "./ids.js";
@@ -59,7 +59,7 @@ const OTP_MAX_PER_HOUR = 6;
 //
 // A staff seat is a `member` row whose role is not `client` — **the owner
 // included**, because the quota's own label is "Owner + trainers + assistants"
-// (`@mossa/domain` entitlements.ts) and `checkDowngrade` counts it the same way.
+// (`@kova/domain` entitlements.ts) and `checkDowngrade` counts it the same way.
 // So Free/Solo (`staffSeats: 1`) is a one-coach studio by design: the owner fills
 // it and cannot add staff without upgrading. That is the ceiling, not a lockout —
 // nothing here runs when a workspace is CREATED, when a client links, or when a
@@ -137,7 +137,7 @@ function seatError(verdict: SeatVerdict): APIError {
 /**
  * Build the per-request auth instance.
  *
- * `shape` is the request's host classification (`@mossa/domain` `classifyHost`),
+ * `shape` is the request's host classification (`@kova/domain` `classifyHost`),
  * and it decides the two things that make cross-tenant identity work:
  *
  *  • **rpID** — every door under our root shares `rpID = <root>`, so ONE passkey
@@ -200,7 +200,7 @@ export function createAuth(env: Env, origin?: string, shape?: HostShape) {
   // the ADMIN_EMAILS and mock-mailer hardening. In production the missing secret
   // must refuse to boot auth, not silently serve on a forgeable key.
   const devLane = env.ENVIRONMENT === "development" || isLocal;
-  const secret = env.BETTER_AUTH_SECRET || (devLane ? "mossa-dev-insecure-secret-change-me" : "");
+  const secret = env.BETTER_AUTH_SECRET || (devLane ? "kova-dev-insecure-secret-change-me" : "");
   if (!secret) {
     throw new Error(
       "BETTER_AUTH_SECRET is not set — refusing to start auth on an insecure fallback key outside development. Set it with `wrangler secret put BETTER_AUTH_SECRET`.",
@@ -315,7 +315,7 @@ export function createAuth(env: Env, origin?: string, shape?: HostShape) {
         // the deep link is lost. Without this the invite silently dead-ended.
         async sendInvitationEmail(data) {
           const acceptUrl = `${baseURL.replace(/\/$/, "")}/accept-invitation/${data.id}`;
-          const brand = await tenantBrandKit(env.DB, data.organization.id).catch(() => MOSSA_BRAND);
+          const brand = await tenantBrandKit(env.DB, data.organization.id).catch(() => KOVA_BRAND);
           const inviter = data.inviter.user.name || data.inviter.user.email || "Your studio";
           const roleLabel = data.role === "assistant" ? "an assistant" : "a coach";
           const html = emailShell(
@@ -324,7 +324,7 @@ export function createAuth(env: Env, origin?: string, shape?: HostShape) {
              <p style="margin:0">Accept to set up your account — you'll sign in with a one-time code, no password to create.</p>
              ${emailButton("Accept invitation", acceptUrl, brand)}
              <p style="margin:18px 0 0;color:#8b9099;font-size:13px;line-height:1.6">If you weren't expecting this, you can safely ignore this email.</p>`,
-            { brand, preheader: `Join ${brand.name} on Mossa`, eyebrow: "Staff invitation" },
+            { brand, preheader: `Join ${brand.name} on Kova`, eyebrow: "Staff invitation" },
           );
           const text = `${inviter} invited you to join ${data.organization.name} as ${roleLabel}. Accept your invitation: ${acceptUrl}`;
           await sendTenantEmail(env, data.organization.id, {
@@ -368,7 +368,7 @@ export function createAuth(env: Env, origin?: string, shape?: HostShape) {
             env.DB,
             {
               to: email,
-              subject: `${otp} is your Mossa code`,
+              subject: `${otp} is your Kova code`,
               html: emailShell(
                 "Your sign-in code",
                 `<p style="margin:0 0 20px">Enter this code to finish signing in. It expires in 10 minutes and works once.</p>
@@ -376,9 +376,9 @@ export function createAuth(env: Env, origin?: string, shape?: HostShape) {
                    <div style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:34px;font-weight:800;letter-spacing:10px;color:#e8eaed;padding-left:10px">${otp}</div>
                  </td></tr></table>
                  <p style="margin:20px 0 0;color:#8b9099;font-size:13px;line-height:1.6">If you didn't request this, you can safely ignore it — no changes will be made.</p>`,
-                { brand: MOSSA_BRAND, preheader: `${otp} is your Mossa sign-in code (expires in 10 minutes).` },
+                { brand: KOVA_BRAND, preheader: `${otp} is your Kova sign-in code (expires in 10 minutes).` },
               ),
-              text: `Your Mossa code is ${otp} (expires in 10 minutes).`,
+              text: `Your Kova code is ${otp} (expires in 10 minutes).`,
             },
             env.EMAIL,
             undefined,
@@ -393,7 +393,7 @@ export function createAuth(env: Env, origin?: string, shape?: HostShape) {
       }),
       // One-tap re-auth once enrolled; multiple passkeys per user.
       passkey({
-        rpName: "Mossa",
+        rpName: "Kova",
         // One credential for every door under our root; host-scoped elsewhere.
         // `rpIdFor` returns "localhost" for every loopback host, which is what
         // keeps dev and the E2E suite (on `*.localhost`) enrolling passkeys.
@@ -420,7 +420,7 @@ export function createAuth(env: Env, origin?: string, shape?: HostShape) {
     // for. The latter means dev keeps a separate session per `*.localhost` host;
     // that is a dev-only difference from production, called out in `cookieDomainFor`.
     advanced: {
-      cookiePrefix: "mossa",
+      cookiePrefix: "kova",
       useSecureCookies: baseURL.startsWith("https"),
       ...(shape && cookieDomainFor(shape)
         ? { crossSubDomainCookies: { enabled: true, domain: `.${cookieDomainFor(shape)}` } }

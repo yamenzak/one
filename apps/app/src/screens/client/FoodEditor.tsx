@@ -12,8 +12,8 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { kcalToDisplay, displayToKcal, energyLabel, featureEnabled, type UnitPrefs } from "@mossa/domain";
-import { FixedDrawer, Button, Field, Chip, SegmentedControl, cn, toneSoft, METRICS, Utensils, Barcode, ChevronDown, Globe, PencilLine, ScanLine, Search, Plus, X, ArrowLeft } from "@mossa/ui";
+import { kcalToDisplay, displayToKcal, energyLabel, featureEnabled, type UnitPrefs } from "@kova/domain";
+import { FixedDrawer, Button, Field, Chip, SegmentedControl, cn, toneSoft, METRICS, Utensils, Barcode, ChevronDown, Globe, PencilLine, ScanLine, Search, Plus, X, ArrowLeft } from "@kova/ui";
 import { AiAvatar } from "../../AiAvatar.js";
 import { api, uploadMedia } from "../../api.js";
 import { useSession } from "../../session.js";

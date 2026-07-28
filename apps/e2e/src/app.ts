@@ -21,12 +21,36 @@
 
 import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { latestSignInOtp } from "./d1.js";
+import { ROOT_DOMAIN, ROOT_URL, SETUP_URL, studioUrl } from "./env.js";
+
+/**
+ * Carry the SAME session cookie onto another `*.localhost` host.
+ *
+ * Not a synthesised session and not a stubbed auth: it is the exact cookie the
+ * server issued, re-scoped. It exists to reproduce in dev what production does by
+ * itself — there the cookie's `Domain` is the platform root, so one sign-in covers
+ * `setup.kova.4dl.app` and every `<slug>.kova.4dl.app`. Locally that is impossible:
+ * a `Domain` with no embedded dot is rejected by browsers (Chromium requires an
+ * exact host match for dot-less domains), so `cookieDomainFor` returns null for
+ * loopback and each `*.localhost` gets its own jar.
+ *
+ * Without this the suite would have to sign the same address in twice within
+ * seconds, which `otpSendGuard`'s 30-second per-address cooldown correctly refuses
+ * with a 429 — the rate limit doing its job, not a bug to work around by weakening
+ * it. Copying the cookie keeps the control intact and still proves sign-in works,
+ * because the cookie being copied was minted by a real OTP ceremony.
+ */
+export async function carrySessionTo(context: BrowserContext, fromUrl: string, toHost: string): Promise<void> {
+  const cookies = await context.cookies(fromUrl);
+  if (!cookies.length) throw new Error(`no cookies on ${fromUrl} to carry to ${toHost}`);
+  await context.addCookies(cookies.map((c) => ({ ...c, domain: toHost })));
+}
 
 /** A run-unique email so specs never collide and can be re-run without a reset.
  *  (`otpSendGuard` also enforces a 30s per-address cooldown — reusing an address
  *  across runs would 429 rather than fail loudly.) */
 export function uniqueEmail(role: string): string {
-  return `e2e-${role}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}@mossa.test`;
+  return `e2e-${role}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}@kova.test`;
 }
 
 /**
@@ -58,7 +82,7 @@ export async function prepare(page: Page): Promise<void> {
     // 1. Tours: already seen. Keys come from tour.tsx's `doneKey`.
     for (const id of ["app", "workout", "meal"]) {
       try {
-        localStorage.setItem(`mossa.tour.v1.${id}.done`, "1");
+        localStorage.setItem(`kova.tour.v1.${id}.done`, "1");
       } catch {
         /* storage unavailable — the app treats that as "seen" anyway */
       }
@@ -106,32 +130,39 @@ async function pollForOtp(email: string): Promise<string> {
 }
 
 /**
- * Mossa's own sign-in. It is NOT `/` any more: on the platform host `/` is an
- * explanatory gate (see `PlatformGate.tsx`), because a client of a studio who
- * landed there used to sign up under Mossa instead of under their coach. Keep this
- * in lockstep with `SIGN_IN_PATH` in the app and `APP_SIGNIN_URL` in `apps/www`.
+ * The owner sign-in path, on the SETUP door.
+ *
+ * `setup.<root>` is the only place a studio is created, so it is also where an
+ * owner signs in to create or resume one. Kept as a constant because it is a public
+ * URL in shipped marketing HTML — keep it in lockstep with `SIGN_IN_PATH` in the
+ * app and `APP_SIGNIN_URL` in `apps/www`.
  */
 export const SIGN_IN_PATH = "/studio/sign-in";
 
 /**
- * Enter through the platform host's front door and click through to sign-in.
+ * The ROOT door is a signpost — not an app, and not a signup surface.
  *
- * This is the gate's regression guard, and it guards two opposite failures at
- * once: the gate must NOT offer a signup form (the whole reason it exists), and it
- * must still let staff in (the installed PWA's `start_url` is `/`, so a signed-out
- * owner lands here — no visible way through would be a launch-blocking lockout).
+ * This guards the property the whole host taxonomy exists for. A client of a studio
+ * who lands on the bare root used to be shown the same OTP form as everyone else
+ * and signed up under *Kova* rather than under their coach: an orphan account, in no
+ * tenancy, with nothing to tell them anything had gone wrong. So the assertion is
+ * two-sided — the root must explain where to go, and must offer no way to sign in.
  */
-export async function throughPlatformGate(page: Page): Promise<void> {
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: /platform coaches run their business on/i })).toBeVisible();
-  // No signup surface: no OTP card, no email field.
+export async function assertRootIsSignpost(page: Page): Promise<void> {
+  await page.goto(`${ROOT_URL}/`);
+  await expect(page.getByRole("heading", { name: /Every studio has its own address/i })).toBeVisible();
+  // No signup surface: no OTP card, no email field, anywhere on the page.
   await expect(page.getByRole("heading", { name: "Continue with email" })).toHaveCount(0);
   await expect(page.getByLabel("Email")).toHaveCount(0);
   // The end-user redirect — the point of the whole screen.
   await expect(page.getByText(/Use the link your coach sent you/i)).toBeVisible();
-  // …and the staff escape hatch.
-  await page.getByRole("link", { name: /^Sign in/ }).click();
-  await expect(page).toHaveURL(new RegExp(`${SIGN_IN_PATH}$`));
+  // …and the route for someone who wants to run a studio.
+  await expect(page.getByRole("link", { name: /Set up your studio/i })).toBeVisible();
+}
+
+/** Open the setup door's sign-in. */
+export async function toSetupSignIn(page: Page): Promise<void> {
+  await page.goto(`${SETUP_URL}${SIGN_IN_PATH}`);
   await expect(page.getByRole("heading", { name: "Continue with email" })).toBeVisible();
 }
 
@@ -144,7 +175,7 @@ export async function throughPlatformGate(page: Page): Promise<void> {
  * hard-blocks there, nobody can create a studio on a fresh deploy, which is the
  * same class of bootstrap deadlock as the OTP one.
  */
-export async function createStudio(page: Page, name: string, plan = "Light"): Promise<void> {
+export async function createStudio(page: Page, name: string, plan = "Light"): Promise<string> {
   await expect(page.getByRole("heading", { name: "Your studio", exact: true })).toBeVisible({ timeout: 30_000 });
   await page.getByLabel("Business name").fill(name);
   await page.getByRole("button", { name: "Continue" }).click();
@@ -165,16 +196,36 @@ export async function createStudio(page: Page, name: string, plan = "Light"): Pr
   await expect(page.getByRole("heading", { name: "Start your plan", exact: true })).toBeVisible();
   await expect(page.getByText(/Billing isn.t ready yet/i)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/Nothing has been charged/i)).toBeVisible();
+
+  // "Go to my studio" hands the owner their studio's own ADDRESS, so the session has
+  // to exist there before the click. In production it already does — one cookie for
+  // the whole root. In dev it cannot, so carry it across first; see `carrySessionTo`.
+  const created = await page.evaluate(async () => {
+    const res = await fetch("/api/context");
+    return (await res.json()) as { active: { tenantSlug: string } | null };
+  });
+  const createdSlug = created.active?.tenantSlug;
+  if (!createdSlug) throw new Error("the studio was created but /api/context reports no active tenancy");
+  await carrySessionTo(page.context(), SETUP_URL, `${createdSlug}.${ROOT_DOMAIN}`);
+
   await page.getByRole("button", { name: /Go to my studio/ }).click();
 
-  // The studio name lands in the app bar once the context refreshes.
+  // Finishing hands the owner their studio's own ADDRESS, not `/` on the setup
+  // door — that is a cross-origin navigation to `<slug>.<root>`, and it is the
+  // thing an owner bookmarks and hands to clients. Asserting the hostname here is
+  // what would catch a regression back to an in-app `nav("/")`, which would leave
+  // the owner on the one host where their studio is not pinned.
+  await expect(page).toHaveURL(new RegExp(`^http://[a-z0-9-]+\\.${ROOT_DOMAIN}:`), { timeout: 30_000 });
   await expect(page.getByRole("button", { name: "Account" })).toBeVisible({ timeout: 30_000 });
+  const slug = new URL(page.url()).hostname.split(".")[0]!;
+  expect(slug, "the studio landed on a real subdomain").not.toBe("setup");
+  return slug;
 }
 
-// (There is deliberately no `signUpOwner` wrapper any more. The owner path is now
-// three distinct things worth seeing separately in a failure report — the platform
-// gate, the OTP sign-in, and the three-step onboarding — so spec 01 composes
-// `throughPlatformGate` + `signInWithOtp` + `createStudio` as its own test.steps.)
+// (There is deliberately no `signUpOwner` wrapper. The owner path is four distinct
+// things worth seeing separately in a failure report — the root signpost, the setup
+// door's sign-in, the OTP ceremony and the three-step onboarding — so spec 01
+// composes them as its own test.steps.)
 
 /**
  * A bottom-tab-bar button.

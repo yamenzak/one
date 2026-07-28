@@ -8,8 +8,8 @@
  */
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { FEATURE_META, gateSpecOf, featureEnabled, type Entitlements, type FeatureKey } from "@mossa/domain";
-import { Card, IconBadge, Button, Lock } from "@mossa/ui";
+import { FEATURE_META, gateSpecOf, featureEnabled, type Entitlements, type FeatureKey } from "@kova/domain";
+import { Card, IconBadge, Button, Lock } from "@kova/ui";
 import { useSession } from "./session.js";
 
 /**

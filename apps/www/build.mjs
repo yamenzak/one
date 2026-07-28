@@ -1,8 +1,9 @@
 /**
- * Mossa marketing site generator — dependency-free. Emits an SEO-complete
+ * Kova marketing site generator — dependency-free. Emits an SEO-complete
  * landing page + the legal pages (rendered from docs/legal/*.md by the tiny
  * markdown subset renderer below), matching DESIGN.md's tonal dark aesthetic.
- * Content lives inline; the app lives at mossa.4dl.app.
+ * Content lives inline; studios live at `<slug>.kova.4dl.app`, and a new one is
+ * created at `setup.kova.4dl.app`.
  *
  * Claims here are public and paid-for: only advertise what actually ships. A
  * line item on a priced plan is a contractual statement, not marketing copy.
@@ -16,20 +17,20 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const dist = join(__dirname, "dist");
 mkdirSync(dist, { recursive: true });
 
-const APP_URL = "https://mossa.4dl.app";
+const ROOT_DOMAIN = "kova.4dl.app";
+/** The SETUP door — where a studio is created, and the only host this site links
+ *  a human to. The root (`kova.4dl.app`) is a signpost, not an app: a client of a
+ *  studio who landed there used to sign up under *Kova* instead of under their
+ *  coach, so it now serves no signup form at all and refuses to send a sign-in
+ *  code. Studios live at `<slug>.kova.4dl.app`. */
+const SETUP_URL = `https://setup.${ROOT_DOMAIN}`;
 /**
- * Mossa's OWN sign-in, and the ONLY link this site points a human at.
+ * The owner sign-in, and the ONLY link this site points a human at.
  *
- * `APP_URL` itself (`/`) is no longer a signup surface: on the platform host an
- * unauthenticated visitor there gets an explanatory gate, because a client of a
- * studio who landed on it used to sign up under *Mossa* instead of under their
- * coach. The gate deliberately makes the coach/studio door a deep route, and this
- * site is where you come from to reach it — so every CTA below uses this constant.
- *
- * It must stay in lockstep with `SIGN_IN_PATH` in
+ * Must stay in lockstep with `SIGN_IN_PATH` in
  * `apps/app/src/screens/onboarding/paths.ts`.
  */
-const APP_SIGNIN_URL = `${APP_URL}/studio/sign-in`;
+const APP_SIGNIN_URL = `${SETUP_URL}/studio/sign-in`;
 
 const FEATURES = [
   ["🗂️", "One roster, real scope", "Owners see everything; trainers see only their assigned clients. Multi-trainer, multi-tenant, and secure by construction."],
@@ -50,7 +51,7 @@ const FEATURES = [
 //
 // "API + exports" is deliberately absent: there is no export route, no CSV
 // serializer, no tenant API-key issuance and no webhook dispatcher — the backing
-// `integrations` entitlement is flagged `reserved: true` in @mossa/domain. Same
+// `integrations` entitlement is flagged `reserved: true` in @kova/domain. Same
 // for client chat (`chat`, also reserved). Do not advertise either until it ships.
 //
 // The free tier is retired; the two 30-day trials replaced it. Note that a trial
@@ -126,9 +127,9 @@ const feature = ([ico, h, p]) => `<div class="card"><div class="ico">${ico}</div
 const plan = ([name, price, items, trial], feat) =>
   `<div class="plan${feat ? " feat" : ""}"><h3>${name}</h3><div class="price">${price}</div>${trial ? `<div class="trial">${trial}</div>` : ""}<ul>${items.map((i) => `<li>${i}</li>`).join("")}</ul><a class="btn${feat ? "" : " ghost"}" href="${APP_SIGNIN_URL}">${trial ? "Start free trial" : "Get started"}</a></div>`;
 
-// Mossa collects email, body measurements, progress photos and lab/medical
+// Kova collects email, body measurements, progress photos and lab/medical
 // files, so the legal pages are not optional furniture — every page links them.
-const footer = `<footer><div class="wrap">Mossa · Built on Cloudflare<span class="sep">·</span><a href="${APP_SIGNIN_URL}">app</a><span class="sep">·</span><a href="/privacy">Privacy</a><span class="sep">·</span><a href="/terms">Terms</a></div></footer>`;
+const footer = `<footer><div class="wrap">Kova · Built on Cloudflare<span class="sep">·</span><a href="${APP_SIGNIN_URL}">app</a><span class="sep">·</span><a href="/privacy">Privacy</a><span class="sep">·</span><a href="/terms">Terms</a></div></footer>`;
 
 /** The shared document shell — one head, one header, one footer, every page. */
 const page = ({ title, description, body, ogTitle, ogDescription }) => `<!doctype html>
@@ -143,7 +144,7 @@ const page = ({ title, description, body, ogTitle, ogDescription }) => `<!doctyp
 <style>${css}</style>
 </head><body>
 <header><div class="wrap">
-  <div class="logo"><a href="/" style="display:flex;align-items:center;gap:10px"><span class="m">M</span> Mossa</a></div>
+  <div class="logo"><a href="/" style="display:flex;align-items:center;gap:10px"><span class="m">K</span> Kova</a></div>
   <div><a class="btn ghost" href="${APP_SIGNIN_URL}">Sign in</a></div>
 </div></header>
 ${body}
@@ -151,10 +152,10 @@ ${footer}
 </body></html>`;
 
 const html = page({
-  title: "Mossa — coaching software for personal trainers &amp; studios",
+  title: "Kova — coaching software for personal trainers &amp; studios",
   description:
-    "Mossa is the all-in-one platform for personal trainers and studios: build workout &amp; meal plans, track clients, sell packages on your own Stripe, and use an AI coaching suite. Multi-trainer, multi-tenant, mobile-first.",
-  ogTitle: "Mossa — coaching, organized",
+    "Kova is the all-in-one platform for personal trainers and studios: build workout &amp; meal plans, track clients, sell packages on your own Stripe, and use an AI coaching suite. Multi-trainer, multi-tenant, mobile-first.",
+  ogTitle: "Kova — coaching, organized",
   ogDescription:
     "Build plans, track clients, sell packages, and use AI — all in one clean app your clients will actually use.",
   body: `<main>
@@ -185,7 +186,7 @@ const html = page({
 });
 
 writeFileSync(join(dist, "index.html"), html);
-writeFileSync(join(dist, "404.html"), html.replace("<title>Mossa", "<title>Not found — Mossa"));
+writeFileSync(join(dist, "404.html"), html.replace("<title>Kova", "<title>Not found — Kova"));
 
 // ── Legal pages ──────────────────────────────────────────────────────────────
 // Rendered from docs/legal/*.md so there is exactly ONE copy of the text and it
@@ -302,8 +303,8 @@ function renderMarkdown(src) {
 }
 
 const legal = [
-  ["privacy", "PRIVACY.md", "Privacy Policy — Mossa", "How Mossa and the studios using it handle your personal data."],
-  ["terms", "TERMS.md", "Terms of Service — Mossa", "The terms that govern use of the Mossa platform."],
+  ["privacy", "PRIVACY.md", "Privacy Policy — Kova", "How Kova and the studios using it handle your personal data."],
+  ["terms", "TERMS.md", "Terms of Service — Kova", "The terms that govern use of the Kova platform."],
 ];
 
 for (const [slug, file, title, description] of legal) {

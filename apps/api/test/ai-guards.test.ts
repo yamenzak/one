@@ -26,7 +26,7 @@
 
 import { createExecutionContext, env, SELF, waitOnExecutionContext } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
-import { DEFAULT_WEEKLY_LOAD_TARGET, resolveUnits } from "@mossa/domain";
+import { DEFAULT_WEEKLY_LOAD_TARGET, resolveUnits } from "@kova/domain";
 import worker from "../src/index.js";
 import { ensureSchema } from "../src/db.js";
 import { buildClientContext } from "../src/ai-context.js";

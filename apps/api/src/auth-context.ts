@@ -7,7 +7,7 @@
  * axis (`isPlatformAdmin`, ADMIN_EMAILS).
  */
 import type { Context, MiddlewareHandler } from "hono";
-import { resolvePermissions, grantSatisfies, type Grant } from "@mossa/domain";
+import { resolvePermissions, grantSatisfies, type Grant } from "@kova/domain";
 import type { Env } from "./env.js";
 import type { RoleName } from "./access.js";
 import { createAuth, type Auth } from "./auth.js";

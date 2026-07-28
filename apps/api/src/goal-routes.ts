@@ -14,7 +14,7 @@ import {
   type DietaryApproach,
   type Gender,
   type PrimaryGoal,
-} from "@mossa/domain";
+} from "@kova/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { notify } from "./notify.js";
@@ -154,7 +154,7 @@ export const goalRoutes = new Hono<AppEnv>()
     // consumers (wellness score, /today, the AI coach-note prompt) read the
     // column — and used to read a hardcoded 300 while the coach saw their own
     // number. Both stores are written from the same value here, so they can
-    // never disagree again. The default lives in @mossa/domain, not here.
+    // never disagree again. The default lives in @kova/domain, not here.
     const weeklyLoadTarget = resolveWeeklyLoadTarget(targets, d.weeklyLoadTarget);
     // Fold a body-level `weeklyLoadTarget` into the authoritative store so the
     // JSON is complete even for callers using the legacy field.

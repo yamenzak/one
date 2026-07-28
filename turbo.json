@@ -13,23 +13,23 @@
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
     },
-    "@mossa/api#test": {
-      "dependsOn": ["^build", "@mossa/app#build"],
+    "@kova/api#test": {
+      "dependsOn": ["^build", "@kova/app#build"],
       "outputs": ["coverage/**"]
     },
     "e2e": {
       // The worker serves apps/app/dist, so the SPA must be built first — same
       // ordering the api integration suite needs.
-      "dependsOn": ["@mossa/app#build"],
+      "dependsOn": ["@kova/app#build"],
       "cache": false,
       // Turbo filters the environment. Playwright locates its browsers through
       // PLAYWRIGHT_BROWSERS_PATH (pre-set on CI images and sandboxes); stripped,
       // it reports "please run playwright install" and every spec fails.
       "passThroughEnv": ["PLAYWRIGHT_*", "CI", "E2E_SERVER_LOGS", "NODE_OPTIONS"]
     },
-    "@mossa/domain#build": { "outputs": [] },
-    "@mossa/protocol#build": { "outputs": [] },
-    "@mossa/ui#build": { "outputs": [] },
+    "@kova/domain#build": { "outputs": [] },
+    "@kova/protocol#build": { "outputs": [] },
+    "@kova/ui#build": { "outputs": [] },
     "lint": {},
     "dev": {
       "cache": false,

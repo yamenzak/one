@@ -19,7 +19,7 @@
 import { env } from "cloudflare:test";
 import { STRIPE_API_VERSION } from "../src/stripe.js";
 
-/** The pin `stripe.ts` puts on every request Mossa makes. */
+/** The pin `stripe.ts` puts on every request Kova makes. */
 export const PINNED_VERSION = STRIPE_API_VERSION;
 
 /** The secret key, or "" when the suite should skip. Never log this. */

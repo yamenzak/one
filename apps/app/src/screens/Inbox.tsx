@@ -3,8 +3,8 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Page, Stagger, SectionHeader, IconBadge, EmptyState, Reveal, SkeletonList, AlertTriangle, Bell, CheckCheck, ArrowLeft } from "@mossa/ui";
-import { notifVisibleInSurface, unreadInSurface, type NotifType, type NotifSurface } from "@mossa/domain";
+import { Button, Card, Page, Stagger, SectionHeader, IconBadge, EmptyState, Reveal, SkeletonList, AlertTriangle, Bell, CheckCheck, ArrowLeft } from "@kova/ui";
+import { notifVisibleInSurface, unreadInSurface, type NotifType, type NotifSurface } from "@kova/domain";
 import { api } from "../api.js";
 import { useSession } from "../session.js";
 import { notifCoding } from "../notif-ui.js";

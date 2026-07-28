@@ -1,6 +1,6 @@
 /**
  * Studio close + wipe (owner, `/api/tenant/close`). An OTP emailed to the owner
- * confirms it; on verify we cancel the Mossa subscription immediately (charging
+ * confirms it; on verify we cancel the Kova subscription immediately (charging
  * stops) and mark the studio for deletion in 7 days. The daily cron hard-purges
  * it (R2 + D1 + billing DO + member identities) once the hold lapses; the owner
  * can undo within the window.

@@ -84,7 +84,7 @@ describe("standing — archived", () => {
   });
 });
 
-describe("standing — a studio that stops paying Mossa", () => {
+describe("standing — a studio that stops paying Kova", () => {
   /**
    * The lifecycle is two-staged and the stages differ, which is the whole reason
    * `studio` is three states rather than a `delinquent` boolean:

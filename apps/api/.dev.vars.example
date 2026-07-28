@@ -64,7 +64,7 @@ ENVIRONMENT=development
 # during a normal `pnpm test` and in CI. Export it for the run you want:
 #
 #   export STRIPE_TEST_SECRET_KEY=sk_test_…
-#   pnpm --filter @mossa/api exec vitest run test/stripe-live.test.ts
+#   pnpm --filter @kova/api exec vitest run test/stripe-live.test.ts
 #
 # See DEPLOY.md §10c.
 # STRIPE_TEST_SECRET_KEY=

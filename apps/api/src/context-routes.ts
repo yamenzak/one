@@ -9,9 +9,10 @@ import { z } from "zod";
 import {
   type PersonaRefRole,
 } from "./context-helpers.js";
-import type { PersonaRef, SessionContext } from "@mossa/protocol";
-import { resolveUnits, overallDaysRemaining, NOTIF_TYPES, notifVisibleInSurface, type UnitPrefs, type NotifType } from "@mossa/domain";
+import type { PersonaRef, SessionContext } from "@kova/protocol";
+import { resolvePermissions, resolveUnits, overallDaysRemaining, NOTIF_TYPES, notifVisibleInSurface, type UnitPrefs, type NotifType } from "@kova/domain";
 import { type AppEnv, isPlatformAdmin, requireTenant } from "./auth-context.js";
+import type { RoleName } from "./access.js";
 import { clientForUser, countClientSeats, PENDING_SIGNUP } from "./clients.js";
 import { resolveClientFlagsFor, loadClientAccessRows, accessBudgetsOf } from "./client-flags.js";
 import { tenantEntitlements, seedBilling, withinQuota } from "./billing-store.js";
@@ -174,11 +175,45 @@ export const contextRoutes = new Hono<AppEnv>()
     // with several memberships, picking one for the user would be a guess, and
     // the studio switcher is the right answer.
     let tenantId = c.get("tenantId");
-    // NEVER adopt on a tenant's custom domain. There the Host pins the tenant
+
+    /**
+     * On a HOST-PINNED request, re-resolve against the memberships we just minted.
+     *
+     * `sessionMiddleware` resolved `tenantId` from the `member` table before this
+     * handler ran — which is before the auto-link and the invitation auto-accept
+     * above created anything. On the platform doors the adoption below covered that
+     * gap; on a studio host adoption is (correctly) forbidden, so nothing did.
+     *
+     * The consequence was the worst possible first impression: an invited client
+     * clicks the link their coach mailed them, signs in with their code, and their
+     * very first context read says "you're not a member of <studio>" — on that
+     * studio's own address, from a record that studio created for them. It clears on
+     * a reload, which makes it look like flakiness rather than a bug.
+     *
+     * This is NOT a weakening of the isolation invariant: it re-reads the same
+     * `member` table for the same host tenant. Someone with no membership still
+     * resolves to null, which is exactly what a stranger on a studio's door must get.
+     */
+    const hostTenantId = c.get("hostTenant")?.tenantId ?? null;
+    if (!tenantId && hostTenantId && personas.some((p) => p.tenantId === hostTenantId)) {
+      tenantId = hostTenantId;
+      c.set("tenantId", hostTenantId);
+      const row = await c.env.DB
+        .prepare('SELECT role, permissions_json FROM "member" WHERE organizationId = ? AND userId = ?')
+        .bind(hostTenantId, user.id)
+        .first<{ role: string | null; permissions_json: string | null }>()
+        .catch(() => null);
+      if (row) {
+        c.set("role", (row.role as RoleName) ?? null);
+        c.set("perms", resolvePermissions(row.role, row.permissions_json));
+      }
+    }
+
+    // NEVER adopt on a tenant's own host. There the Host pins the tenant
     // (auth-context.ts), and a non-member must keep resolving to null — that is
     // the §14.1 isolation invariant, and adopting the user's own unrelated studio
     // here would hand them an active persona on someone else's branded domain.
-    const hostPinned = Boolean(c.get("hostTenant"));
+    const hostPinned = Boolean(hostTenantId);
     if (!tenantId && !hostPinned && personas.length === 1) {
       const adopted = personas[0]!.tenantId;
       await c.env.DB

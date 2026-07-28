@@ -1,7 +1,7 @@
-# Deploying Mossa
+# Deploying Kova
 
-One worker (`mossa`) serves the API **and** the app SPA; a second worker
-(`mossa-www`) serves the marketing site. CI/CD is wired: every push to `main`
+One worker (`kova`) serves the API **and** the app SPA; a second worker
+(`kova-www`) serves the marketing site. CI/CD is wired: every push to `main`
 runs typecheck + tests, builds the SPA, and deploys both
 (`.github/workflows/deploy.yml`). Pull requests are validated by
 `.github/workflows/ci.yml` and deploy nothing.
@@ -66,13 +66,13 @@ and must be changed:
 
 | Line | Field | What is there now | What you need |
 | --- | --- | --- | --- |
-| ~25 | `routes[0].pattern` | `mossa.4dl.app` (a `custom_domain` route) | a hostname on a zone **you** control. The deploy fails if the zone isn't on your account |
+| ~25 | `routes[0].pattern` | `kova.4dl.app` (a `custom_domain` route) | a hostname on a zone **you** control. The deploy fails if the zone isn't on your account |
 | ~34 | `vars.ADMIN_EMAILS` | `zakhouryamen@gmail.com` | your platform-admin email(s), comma-separated. This is the platform super-admin allowlist — get it right before the first sign-in |
-| ~36 | `vars.BETTER_AUTH_URL` | `https://mossa.4dl.app` | `https://<your route hostname>` |
+| ~36 | `vars.BETTER_AUTH_URL` | `https://kova.4dl.app` | `https://<your route hostname>` |
 | ~58 / ~64 | `kv_namespaces[0].id`, `d1_databases[0].database_id` | **real live ids** belonging to the original account | your own ids, from step 4 |
 
 Also review `apps/www/wrangler.jsonc` (`routes[0].pattern` =
-`getmossa.4dl.app`).
+`getkova.4dl.app`).
 
 `ENVIRONMENT` must **not** appear in the `vars` block — see step 8.
 
@@ -85,6 +85,7 @@ template, then add: **D1 Edit**, **Workers KV Storage Edit**, **Workers R2
 Storage Edit**. Scope it to your account.
 
 ```sh
+# NB: the GitHub REPOSITORY is still `mossa` — the product rename did not move it.
 gh secret set CLOUDFLARE_API_TOKEN  --repo <owner>/mossa
 gh secret set CLOUDFLARE_ACCOUNT_ID --repo <owner>/mossa
 ```
@@ -102,9 +103,9 @@ the same three commands locally):
 
 ```sh
 cd apps/api
-pnpm exec wrangler d1 create mossa
+pnpm exec wrangler d1 create kova
 pnpm exec wrangler kv namespace create CACHE
-pnpm exec wrangler r2 bucket create mossa-media
+pnpm exec wrangler r2 bucket create kova-media
 ```
 
 Paste `database_id` and the KV `id` into `apps/api/wrangler.jsonc`, commit, push.
@@ -123,7 +124,7 @@ exist**, so the first deploy comes first.
 
 ```sh
 # 5a. Deploy (or just push to main and let the Deploy workflow do it)
-pnpm --filter @mossa/app build
+pnpm --filter @kova/app build
 cd apps/api && pnpm exec wrangler deploy
 ```
 
@@ -167,26 +168,26 @@ never touched:
 
 ```sh
 cd apps/api
-pnpm exec wrangler d1 execute mossa --remote --command "
+pnpm exec wrangler d1 execute kova --remote --command "
 CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT);
 INSERT INTO app_config (key, value) VALUES
   ('email.provider', 'cloudflare'),
-  ('email.from', 'Mossa <noreply@yourdomain.com>'),
-  ('email.platform_from', 'Mossa <billing@yourdomain.com>')
+  ('email.from', 'Kova <noreply@yourdomain.com>'),
+  ('email.platform_from', 'Kova <billing@yourdomain.com>')
 ON CONFLICT(key) DO UPDATE SET value = excluded.value;
 "
 ```
 
 Replace both addresses with senders you have **onboarded and verified** in
 Cloudflare → Email → Email Sending. The defaults are useless in production:
-`email.from` defaults to `Mossa <noreply@mossa.local>` (an invalid domain) and
-`email.platform_from` to `Mossa <noreply@fourdegreelabs.com>` (a domain you
+`email.from` defaults to `Kova <noreply@kova.local>` (an invalid domain) and
+`email.platform_from` to `Kova <noreply@fourdegreelabs.com>` (a domain you
 almost certainly do not own).
 
 Verify:
 
 ```sh
-pnpm exec wrangler d1 execute mossa --remote \
+pnpm exec wrangler d1 execute kova --remote \
   --command "SELECT key, value FROM app_config WHERE key LIKE 'email.%';"
 ```
 
@@ -238,7 +239,7 @@ versions). Per provider, **independently**:
 
 | It does | Detail |
 | --- | --- |
-| **Discover** | Any model on the page that is not in the catalog is added. Generation lanes (text / text-small / vision / image / speech) arrive **enabled**; embedding / transcription / TTS / classifier models arrive **disabled** — they are priced and listed, but nothing in Mossa can call one |
+| **Discover** | Any model on the page that is not in the catalog is added. Generation lanes (text / text-small / vision / image / speech) arrive **enabled**; embedding / transcription / TTS / classifier models arrive **disabled** — they are priced and listed, but nothing in Kova can call one |
 | **Re-price** | Existing rows get the page's current rates and label. Your **task routing, enable/default and markup are preserved** — a sync never re-routes a lane behind you |
 | **Reconcile** | A model that has **disappeared** from its provider's page is switched **off** (`enabled = 0`, and it loses any default flag). It is never deleted: a studio's saved per-feature model may still name it, and the `ai_generations` history has to stay readable. Re-enable it by hand if it comes back |
 | **Report** | Per provider: parsed / new / re-priced / switched-off counts, the ids switched off, and every row on the page it **could not** price, with the reason |
@@ -301,8 +302,8 @@ section 6.
 | Key | Default | If unset | Where to set it |
 | --- | --- | --- | --- |
 | `email.provider` | `mock` | **Nobody can sign in.** Mock fails closed outside dev: no send, no log | ⚠️ no UI — D1 (section 6) |
-| `email.from` | `Mossa <noreply@mossa.local>` | Sends from an invalid domain → bounces/rejects | ⚠️ no UI — D1 |
-| `email.platform_from` | `Mossa <noreply@fourdegreelabs.com>` | Platform/billing email sends from a domain you don't own | ⚠️ no UI — D1 |
+| `email.from` | `Kova <noreply@kova.local>` | Sends from an invalid domain → bounces/rejects | ⚠️ no UI — D1 |
+| `email.platform_from` | `Kova <noreply@fourdegreelabs.com>` | Platform/billing email sends from a domain you don't own | ⚠️ no UI — D1 |
 | `email.credits_per_email` | `1` | Tenants are charged 1 credit per metered email — fine, but set it deliberately | ⚠️ no UI — D1 |
 | `google.gemini_key` | *(empty)* | **The whole vision suite is unavailable**: Snap-a-Meal, Label Reader, lab-extract, image generation, body-scan voice. Every `task: "vision"` model in the seed catalog is provider `google` | Platform admin → **AI** |
 | `ai.mock` | `auto` | `auto` only falls back to the mock on the dev lane; `on` forces the mock (and bills for it) — never set `on` in production | Platform admin → **AI** |
@@ -320,7 +321,7 @@ section 6.
 | `cf.saas.api_token` | *(empty)* | Tenant custom domains can't be registered | Platform admin → **Domains** |
 | `cf.saas.zone_id` | *(empty)* | Same | Platform admin → **Domains** |
 | `cf.saas.cname_target` | *(empty)* | Tenants get no CNAME to point at | Platform admin → **Domains** |
-| `cf.saas.worker_name` | `mossa` | Per-hostname routes point at a missing script | Only if the worker is renamed |
+| `cf.saas.worker_name` | `kova` | Per-hostname routes point at a missing script | Only if the worker is renamed |
 
 Worker-level config that is **not** in `app_config`: `BETTER_AUTH_SECRET`
 (wrangler secret, step 5b), `ADMIN_EMAILS` and `BETTER_AUTH_URL`
@@ -389,7 +390,7 @@ toggle on a live studio.
 
 Stripe Dashboard → Developers → Webhooks → **Add endpoint**, twice.
 
-**1. Platform rail** — Mossa's own revenue (tenant subscriptions, credit packs).
+**1. Platform rail** — Kova's own revenue (tenant subscriptions, credit packs).
 
 - URL: `https://<your host>/api/stripe/webhook`
 - Events:
@@ -423,7 +424,7 @@ now measured rather than assumed — `apps/api/test/stripe-live.test.ts` observe
 of it against real Stripe:
 
 - A webhook payload is rendered at the **endpoint's** version (or, with none set,
-  the **account default**) — never at the version of the requests Mossa makes.
+  the **account default**) — never at the version of the requests Kova makes.
   On a sandbox created recently the account default is already `2025-11-17.clover`,
   four+ releases past the pin.
 - At that default, `invoice.subscription` **does not exist**. The id lives under
@@ -465,8 +466,8 @@ Run it:
 
 ```sh
 export STRIPE_TEST_SECRET_KEY=sk_test_…      # test mode ONLY; never commit it
-pnpm --filter @mossa/app build               # Miniflare needs apps/app/dist
-pnpm --filter @mossa/api exec vitest run test/stripe-live.test.ts
+pnpm --filter @kova/app build               # Miniflare needs apps/app/dist
+pnpm --filter @kova/api exec vitest run test/stripe-live.test.ts
 ```
 
 - **~110 s, 39 tests, and it costs nothing** (test mode). It creates real objects
@@ -498,14 +499,118 @@ bodies instead), and completing Connect onboarding.
 
 ---
 
-## 11. Custom domains (Cloudflare for SaaS) — tenant white-label
+## 11. Studio addresses — the wildcard subdomain tier (**REQUIRED**)
+
+Every studio is reachable at `<slug>.kova.4dl.app` from the moment it is created.
+This is not optional and it is not the same thing as §11b: without the two pieces
+below, **every studio on the platform is unreachable** while the deploy itself
+reports success.
+
+Why it can fail silently: the worker route `*.kova.4dl.app/*` is live as soon as
+you deploy, but TLS is terminated *before* the worker runs. A missing certificate
+means the handshake fails and nothing in your logs, your health check or your
+deploy output says a word about it.
+
+**Step A — Advanced Certificate Manager on the `4dl.app` zone.**
+Universal SSL covers `4dl.app` and `*.4dl.app` — **one level only**, so it does
+NOT cover `acme.kova.4dl.app`. You need an advanced certificate that includes the
+second-level wildcard.
+
+- Dashboard → the `4dl.app` zone → **SSL/TLS → Edge Certificates → Order Advanced
+  Certificate**.
+- Hosts: add **`*.kova.4dl.app`** and **`kova.4dl.app`**.
+- Validation: TXT. Certificate authority: leave as offered.
+- ~$10/month for the zone. One certificate can carry the wildcards for *every*
+  product you later put on this zone (`*.otherapp.4dl.app`, …), so this is a
+  one-time cost, not a per-product one.
+
+**Check:** `curl -sI https://anything.kova.4dl.app/health` completes the TLS
+handshake (any HTTP status is fine — a certificate error is not). Until the cert
+shows **Active** you will get `SSL_ERROR_*` / `curl: (35)`.
+
+**Step B — a proxied wildcard DNS record.**
+Dashboard → `4dl.app` → **DNS → Records → Add record**:
+
+| Type | Name | Target | Proxy |
+| --- | --- | --- | --- |
+| `AAAA` | `*.kova` | `100::` | **Proxied** (orange cloud) |
+| `AAAA` | `kova` | `100::` | **Proxied** (orange cloud) |
+
+`100::` is the IPv6 discard prefix — the standard "originless" target for a
+hostname served entirely by a Worker. The record exists only so the name resolves
+through Cloudflare and the route can fire; nothing is ever sent to that address.
+
+**Check:** `dig +short AAAA acme.kova.4dl.app` returns Cloudflare anycast
+addresses (not `100::` — the proxy replaces it).
+
+> If your plan refuses a **proxied** wildcard record, fall back to creating one
+> proxied `AAAA <slug>.kova → 100::` per studio via the Cloudflare API at studio
+> creation. `apps/api/src/cloudflare.ts` already holds an authenticated API client
+> you can extend; the wildcard is simply the version with no per-tenant work.
+
+**Step C — the two Worker routes.**
+Dashboard → **Workers & Pages → kova → Settings → Domains & Routes → Add route**:
+
+| Route | Zone |
+| --- | --- |
+| `kova.4dl.app/*` | `4dl.app` |
+| `*.kova.4dl.app/*` | `4dl.app` |
+
+These are **not** in `wrangler.jsonc`, deliberately — declaring them there makes
+`wrangler dev` discard the incoming `Host` and rewrite every request to the route's
+hostname, which collapses every door onto the root and makes local development and
+the E2E suite unable to reach a studio subdomain at all. The header block in
+`apps/api/wrangler.jsonc` explains it in full. `wrangler deploy` never removes
+routes it does not declare, so once these exist every deploy keeps them.
+
+Create them **after** Steps A and B. A route without the certificate is worse than
+no route: it is live immediately and every studio subdomain then fails the TLS
+handshake before the worker runs.
+
+**Check:** `curl -s https://kova.4dl.app/health` returns `{"ok":true,...}`, and so
+does `curl -s https://anything.kova.4dl.app/health`.
+
+**Step D — three vars, one of them easy to miss.**
+`wrangler.jsonc` sets `ROOT_DOMAIN` and `BETTER_AUTH_URL`. If you serve under a
+different apex, change **both**, and change the two `routes` patterns to match.
+Getting `ROOT_DOMAIN` wrong does not error — it reclassifies every studio
+subdomain as a foreign custom domain, so each one resolves no tenant and answers
+404. The symptom is "all studios 404, the root works fine".
+
+**Check, end to end:** create a studio at `https://setup.kova.4dl.app`, then open
+`https://<its-slug>.kova.4dl.app` — you should get that studio's branded login.
+`https://kova.4dl.app` should show the signpost, and
+`https://nothing-here.kova.4dl.app` should say there is no studio at that address.
+
+### What the doors are
+
+| Host | Serves |
+| --- | --- |
+| `kova.4dl.app` | a signpost. Not an app, and it refuses to send a sign-in code. |
+| `setup.kova.4dl.app` | the only place a studio is created. |
+| `admin.kova.4dl.app` | the operator console. `/api/admin/*` answers **here only**. |
+| `<slug>.kova.4dl.app` | a studio. |
+| a tenant's own domain | the same studio (§11b). |
+| anything else under the root | nothing — reserved labels and deeper nesting 404. |
+
+Studio slugs become DNS labels, so they are validated server-side against a
+reserved-label list (`@kova/domain` `RESERVED_LABELS`). Adding a label to that
+list is cheap; removing one later changes a live studio's URL and breaks every
+link its clients hold — so it errs toward reserving.
+
+## 11b. Custom domains (Cloudflare for SaaS) — tenant white-label
 
 Tenants can run the app on **their own domain** (e.g. `train.byshujaa.com`).
 Auth is per-domain (Model A, SPEC §14.1): each domain is its own WebAuthn RP and
 cookie jar, the `Host` header pins the tenant, and only members of that tenant
-get scope on it. The platform host stays the neutral entry + `/t/<slug>`
-fallback + platform admin. No code change is needed to add a tenant — it is all
-runtime config + DNS.
+get scope on it. No code change is needed to add a tenant — it is all runtime
+config + DNS.
+
+This tier is **additive**. Every studio already answers at its subdomain (§11), so
+a custom domain that is half-provisioned, mis-CNAMEd or stuck behind a CAA record
+is an inconvenience rather than an outage — the studio keeps working at
+`<slug>.kova.4dl.app` throughout, and `canonicalHost` falls back to it for every
+emailed link.
 
 ### One-time platform setup — first time through
 
@@ -513,25 +618,25 @@ Do these in order; each step's "check" tells you it worked before you move on.
 Budget ~30 minutes, most of it waiting for a status to flip.
 
 **Step 0 — know your zone.** Everything below happens on the zone that serves the
-platform host. For `mossa.4dl.app` that zone is **`4dl.app`**. Your marketing site
+platform host. For `kova.4dl.app` that zone is **`4dl.app`**. Your marketing site
 is a different zone and is not involved.
 
 **Step 1 — nothing to do; the routing is automatic.**
 
 Worth understanding, because it is the part that silently breaks otherwise. A
 Cloudflare route is matched by hostname, and a tenant's domain is not in your
-zone — so the worker's own `custom_domain` route (`mossa.4dl.app`) never matches
-`train.byshujaa.com`. Without a route the certificate issues, the DNS resolves,
+zone — so the worker's own routes (`kova.4dl.app/*`, `*.kova.4dl.app/*`) never
+match `train.byshujaa.com`. Without a route the certificate issues, the DNS resolves,
 and every request still dies: the worker never runs, and the fallback origin is
 originless by design.
 
 Cloudflare documents a zone-wide `*/*` route for this. **We deliberately do not
 use it**: this zone hosts unrelated apps, and `*/*` would route every one of them
-into Mossa. Excluding them by hand is worse — a new app on the zone starts serving
-Mossa the day someone forgets an exclusion, and the blast radius is another
+into Kova. Excluding them by hand is worse — a new app on the zone starts serving
+Kova the day someone forgets an exclusion, and the blast radius is another
 product.
 
-Instead Mossa creates **one worker route per registered hostname** and deletes it
+Instead Kova creates **one worker route per registered hostname** and deletes it
 with the domain (`createWorkerRoute` / `deleteWorkerRoute` in `cloudflare.ts`).
 Nothing on the zone is touched that a tenant did not explicitly bring, and the
 route's lifetime is exactly the domain's. This is why the token in Step 5 needs a
@@ -581,7 +686,7 @@ key, and do not reuse it elsewhere.
 
 *Check:* Cloudflare shows the token once. Copy it now; you cannot read it again.
 
-**Step 6 — enter the three values in Mossa.** Platform admin → **Domains**:
+**Step 6 — enter the three values in Kova.** Platform admin → **Domains**:
 
 | Field | Value | Where it came from |
 |-------|-------|--------------------|
@@ -590,7 +695,7 @@ key, and do not reuse it elsewhere.
 | CNAME target | e.g. `saas.4dl.app` | your choice in Step 4 |
 
 Optional: `cf.saas.worker_name` overrides which worker script the per-hostname
-routes point at. It defaults to `mossa`, matching `wrangler.jsonc`'s `name` — set
+routes point at. It defaults to `kova`, matching `wrangler.jsonc`'s `name` — set
 it only if you rename the worker, otherwise every newly added domain would route
 at a script that no longer exists.
 
@@ -657,7 +762,7 @@ cert issues → status flips to **Live**. Removing the domain deregisters it.
 
 Notes: the worker is host-agnostic (`host-context.ts` reads `Host`), so no code
 changes per tenant — but each hostname DOES need its own worker route, which
-Mossa creates and removes for you (Step 1). `BETTER_AUTH_URL` stays the platform origin; the
+Kova creates and removes for you (Step 1). `BETTER_AUTH_URL` stays the platform origin; the
 request origin drives auth on custom domains. Because passkeys are origin-bound,
 a user in more than one tenancy enrolls a passkey per domain (OTP is always the
 bootstrap).
@@ -700,7 +805,7 @@ What rollback does **not** undo:
   tables/columns stay. Rolling code back is safe *only* while the older code
   tolerates the newer schema (added columns are additive, so usually yes). A
   destructive schema change would need a hand-written repair — take a backup
-  first: `pnpm exec wrangler d1 export mossa --remote --output mossa.sql`.
+  first: `pnpm exec wrangler d1 export kova --remote --output kova.sql`.
 - **Durable Object migrations** (`migrations` in `wrangler.jsonc`) do not
   reverse. Never delete a `new_sqlite_classes` tag that has shipped.
 - **`app_config` values, R2 objects and Stripe state** are untouched by a

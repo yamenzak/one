@@ -25,7 +25,7 @@
  */
 
 import type { MiddlewareHandler } from "hono";
-import { checkSlug, slugRejectionMessage, type SlugRejection } from "@mossa/domain";
+import { checkSlug, slugRejectionMessage, type SlugRejection } from "@kova/domain";
 import type { AppEnv } from "./auth-context.js";
 import { moveSubdomain, provisionSubdomain } from "./host-context.js";
 

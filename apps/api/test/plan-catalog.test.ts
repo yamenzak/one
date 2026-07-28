@@ -28,7 +28,7 @@ import {
   tenantEntitlements,
   withinQuota,
 } from "../src/billing-store.js";
-import { resolveEntitlements, trialPeriodDays } from "@mossa/domain";
+import { resolveEntitlements, trialPeriodDays } from "@kova/domain";
 
 const ORIGIN = "http://setup.localhost:8787";
 const db = () => env.DB as D1Database;
@@ -433,7 +433,7 @@ describe("plan-intent sends trial_period_days — and confirms the right intent 
     expect(form.get("payment_behavior")).toBe("default_incomplete");
     // The plan must ride on the SUBSCRIPTION metadata — session metadata is not
     // copied down, and the webhook resolves the plan from it.
-    expect(form.get("metadata[mossa_plan]")).toBe("solo");
+    expect(form.get("metadata[kova_plan]")).toBe("solo");
     // A trial has no PaymentIntent to confirm: the client must confirm the
     // SetupIntent instead, which is what `mode` tells it to do.
     expect(body.mode).toBe("setup");
@@ -471,7 +471,7 @@ describe("plan-intent sends trial_period_days — and confirms the right intent 
     }
     const form = new URLSearchParams(calls.find((c) => c.path === "checkout/sessions")!.body);
     expect(form.get("subscription_data[trial_period_days]")).toBe("30");
-    expect(form.get("subscription_data[metadata][mossa_plan]")).toBe("solo");
+    expect(form.get("subscription_data[metadata][kova_plan]")).toBe("solo");
   });
 });
 
@@ -512,7 +512,7 @@ describe("trial lifecycle — the webhook events that drive it", () => {
     const payload = JSON.stringify({
       id: `evt_trial_a_${Date.now()}`,
       type: "customer.subscription.created",
-      data: { object: { id: "sub_trial_a", status: "trialing", customer: "cus_trial_a", default_payment_method: "pm_trial_a", pending_setup_intent: null, current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400, metadata: { mossa_tenant: tid, mossa_plan: "light" } } },
+      data: { object: { id: "sub_trial_a", status: "trialing", customer: "cus_trial_a", default_payment_method: "pm_trial_a", pending_setup_intent: null, current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400, metadata: { kova_tenant: tid, kova_plan: "light" } } },
     });
     expect((await post(payload)).status).toBe(200);
 
@@ -534,7 +534,7 @@ describe("trial lifecycle — the webhook events that drive it", () => {
   it("trial → active: the same event with status=active keeps the plan and clears the trial flag", async () => {
     const tid = await trialTenant("b");
     const mk = (status: string, id: string) =>
-      JSON.stringify({ id, type: "customer.subscription.updated", data: { object: { id: "sub_trial_b", status, customer: "cus_trial_b", default_payment_method: "pm_trial_b", pending_setup_intent: null, metadata: { mossa_tenant: tid, mossa_plan: "solo" } } } });
+      JSON.stringify({ id, type: "customer.subscription.updated", data: { object: { id: "sub_trial_b", status, customer: "cus_trial_b", default_payment_method: "pm_trial_b", pending_setup_intent: null, metadata: { kova_tenant: tid, kova_plan: "solo" } } } });
     expect((await post(mk("trialing", `evt_trial_b1_${Date.now()}`))).status).toBe(200);
     expect((await subRow(tid))!.status).toBe("trialing");
     // Trial end, card charged → Stripe flips the same subscription to `active`.
@@ -546,7 +546,7 @@ describe("trial lifecycle — the webhook events that drive it", () => {
 
   it("trial → past_due → canceled: a card that fails at trial end lapses, and the plan falls back to free", async () => {
     const tid = await trialTenant("c");
-    await post(JSON.stringify({ id: `evt_trial_c1_${Date.now()}`, type: "customer.subscription.updated", data: { object: { id: "sub_trial_c", status: "trialing", customer: "cus_trial_c", default_payment_method: "pm_trial_c", pending_setup_intent: null, metadata: { mossa_tenant: tid, mossa_plan: "light" } } } }));
+    await post(JSON.stringify({ id: `evt_trial_c1_${Date.now()}`, type: "customer.subscription.updated", data: { object: { id: "sub_trial_c", status: "trialing", customer: "cus_trial_c", default_payment_method: "pm_trial_c", pending_setup_intent: null, metadata: { kova_tenant: tid, kova_plan: "light" } } } }));
     expect((await subRow(tid))!.status).toBe("trialing");
 
     // The first real invoice fails → grace window opens (dunning cron escalates).

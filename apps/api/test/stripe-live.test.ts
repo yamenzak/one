@@ -22,8 +22,8 @@
  *
  * ── Running it ─────────────────────────────────────────────────────────────
  *   export STRIPE_TEST_SECRET_KEY=sk_test_…        # never commit this
- *   pnpm --filter @mossa/app build                 # Miniflare needs apps/app/dist
- *   pnpm --filter @mossa/api exec vitest run test/stripe-live.test.ts
+ *   pnpm --filter @kova/app build                 # Miniflare needs apps/app/dist
+ *   pnpm --filter @kova/api exec vitest run test/stripe-live.test.ts
  *
  * With the variable unset — CI, an offline checkout, a normal `pnpm test` — every
  * describe below SKIPS. `vitest.config.ts` threads the binding from the shell and
@@ -52,7 +52,7 @@
 
 import { env, SELF } from "cloudflare:test";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { resolveEntitlements, trialPeriodDays } from "@mossa/domain";
+import { resolveEntitlements, trialPeriodDays } from "@kova/domain";
 import { ensureSchema } from "../src/db.js";
 import { seedBilling, setConfig } from "../src/billing-store.js";
 import { STRIPE_API_VERSION, stripeCall, syncCatalog, verifyWebhook } from "../src/stripe.js";
@@ -199,7 +199,7 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
         expect(price.active).toBe(true);
         expect(price.product).toBe(row.product);
         const product = await must<{ name: string; metadata?: Record<string, string> }>(`products/${row.product}`);
-        expect(product.metadata?.mossa_plan).toBe(planId);
+        expect(product.metadata?.kova_plan).toBe(planId);
       }
     }, 120_000);
 
@@ -216,7 +216,7 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
         expect(price.recurring, "a credit pack must not be a recurring price").toBeNull();
         expect(price.type).toBe("one_time");
         const product = await must<{ metadata?: Record<string, string> }>(`products/${row.product}`);
-        expect(product.metadata?.mossa_pack).toBe(packId);
+        expect(product.metadata?.kova_pack).toBe(packId);
       }
     }, 120_000);
 
@@ -237,7 +237,7 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
       const row = await env.DB.prepare("SELECT entitlements_json FROM plans WHERE id = 'pro'").first<{ entitlements_json: string | null }>();
       expect(trialPeriodDays(resolveEntitlements(row?.entitlements_json)), "Pro must not carry a trial").toBeNull();
 
-      const cust = await must<{ id: string }>("customers", { body: { email: `mossa-live-pro-${Date.now()}@example.com`, "metadata[mossa_tenant]": "t_live_pro" } });
+      const cust = await must<{ id: string }>("customers", { body: { email: `kova-live-pro-${Date.now()}@example.com`, "metadata[kova_tenant]": "t_live_pro" } });
       customerId = cust.id;
       trackJunk({ kind: "customer", id: customerId });
       // Byte-for-byte the request `/billing/plan-intent` makes for a no-trial plan.
@@ -248,8 +248,8 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
         "payment_settings[save_default_payment_method]": "on_subscription",
         "expand[0]": "latest_invoice.payment_intent",
         "expand[1]": "pending_setup_intent",
-        "metadata[mossa_tenant]": "t_live_pro",
-        "metadata[mossa_plan]": "pro",
+        "metadata[kova_tenant]": "t_live_pro",
+        "metadata[kova_plan]": "pro",
       });
       subId = created.id as string;
       trackJunk({ kind: "subscription", id: subId });
@@ -300,7 +300,7 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
       const row = await env.DB.prepare("SELECT entitlements_json FROM plans WHERE id = 'light'").first<{ entitlements_json: string | null }>();
       expect(trialPeriodDays(resolveEntitlements(row?.entitlements_json)), "Light must carry a 30-day trial").toBe(30);
 
-      const cust = await must<{ id: string }>("customers", { body: { email: `mossa-live-trial-${Date.now()}@example.com` } });
+      const cust = await must<{ id: string }>("customers", { body: { email: `kova-live-trial-${Date.now()}@example.com` } });
       trackJunk({ kind: "customer", id: cust.id });
       created = await stripeCall<Record<string, unknown>>(LIVE_KEY, "subscriptions", {
         customer: cust.id,
@@ -309,8 +309,8 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
         "payment_settings[save_default_payment_method]": "on_subscription",
         "expand[0]": "latest_invoice.payment_intent",
         "expand[1]": "pending_setup_intent",
-        "metadata[mossa_tenant]": "t_live_trial",
-        "metadata[mossa_plan]": "light",
+        "metadata[kova_tenant]": "t_live_trial",
+        "metadata[kova_plan]": "light",
         trial_period_days: 30,
         "trial_settings[end_behavior][missing_payment_method]": "cancel",
       });
@@ -396,7 +396,7 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
       // The returning-owner case `hasPaymentMethod`'s doc block claims. If this
       // ever stopped holding, a returning owner's trial would activate with no
       // card attached to the subscription.
-      const cust = await must<{ id: string }>("customers", { body: { email: `mossa-live-returning-${Date.now()}@example.com` } });
+      const cust = await must<{ id: string }>("customers", { body: { email: `kova-live-returning-${Date.now()}@example.com` } });
       trackJunk({ kind: "customer", id: cust.id });
       const pm = await testCardPm();
       await must(`payment_methods/${pm}/attach`, { body: { customer: cust.id } });
@@ -444,9 +444,9 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
     async function buildScenario(kind: "nocard" | "carded"): Promise<Scenario> {
       const tenantId = `t_live_${kind}_${NOW}`;
       // A tenant row the webhook handlers can resolve, keyed to the real customer.
-      const clock = await must<{ id: string }>("test_helpers/test_clocks", { body: { frozen_time: NOW, name: `mossa-live-${kind}` } });
+      const clock = await must<{ id: string }>("test_helpers/test_clocks", { body: { frozen_time: NOW, name: `kova-live-${kind}` } });
       trackJunk({ kind: "test_clock", id: clock.id });
-      const cust = await must<{ id: string }>("customers", { body: { email: `mossa-live-${kind}-${NOW}@example.com`, test_clock: clock.id } });
+      const cust = await must<{ id: string }>("customers", { body: { email: `kova-live-${kind}-${NOW}@example.com`, test_clock: clock.id } });
       await env.DB.prepare(
         "INSERT INTO subscriptions (tenant_id, plan_id, status, comp, stripe_customer_id, updated_at) VALUES (?, 'free', 'none', 0, ?, ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_customer_id = ?",
       )
@@ -461,8 +461,8 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
         "expand[0]": "pending_setup_intent",
         trial_period_days: TRIAL_DAYS,
         "trial_settings[end_behavior][missing_payment_method]": "cancel",
-        "metadata[mossa_tenant]": tenantId,
-        "metadata[mossa_plan]": "light",
+        "metadata[kova_tenant]": tenantId,
+        "metadata[kova_plan]": "light",
       });
       const subId = sub.id as string;
 
@@ -723,7 +723,7 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
     const PACK = { id: "pack_25k", credits: 30_000, minor: 2500 };
 
     beforeAll(async () => {
-      const cust = await must<{ id: string }>("customers", { body: { email: `mossa-live-pack-${Date.now()}@example.com`, "metadata[mossa_tenant]": "t_live_pack" } });
+      const cust = await must<{ id: string }>("customers", { body: { email: `kova-live-pack-${Date.now()}@example.com`, "metadata[kova_tenant]": "t_live_pack" } });
       trackJunk({ kind: "customer", id: cust.id });
       // The exact shape `/billing/pack-intent` creates.
       const pi = await stripeCall<{ id: string; client_secret: string; amount: number; status: string; metadata: Record<string, string> }>(LIVE_KEY, "payment_intents", {
@@ -731,17 +731,17 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
         currency: "usd",
         customer: cust.id,
         "automatic_payment_methods[enabled]": "true",
-        "metadata[mossa_tenant]": "t_live_pack",
-        "metadata[mossa_pack]": PACK.id,
-        "metadata[mossa_credits]": PACK.credits,
+        "metadata[kova_tenant]": "t_live_pack",
+        "metadata[kova_pack]": PACK.id,
+        "metadata[kova_credits]": PACK.credits,
       });
       piId = pi.id;
       expect(pi.client_secret).toMatch(/^pi_.*_secret_/);
       expect(pi.amount).toBe(PACK.minor);
       expect(pi.status).toBe("requires_payment_method");
-      // Metadata comes back as STRINGS — `Number(meta.mossa_credits)` is required.
-      expect(pi.metadata.mossa_credits).toBe("30000");
-      expect(pi.metadata.mossa_pack).toBe(PACK.id);
+      // Metadata comes back as STRINGS — `Number(meta.kova_credits)` is required.
+      expect(pi.metadata.kova_credits).toBe("30000");
+      expect(pi.metadata.kova_pack).toBe(PACK.id);
 
       const confirmed = await must<{ status: string; latest_charge: string }>(`payment_intents/${piId}/confirm`, {
         body: { payment_method: await testCardPm(), return_url: `${ORIGIN}/billing` },
@@ -760,16 +760,16 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
       expect(ch.amount_refunded).toBe(0);
       // NOT obvious, and load-bearing: PaymentIntent metadata IS inherited by the
       // Charge, so `charge.refunded` can compute the proportional reversal at all.
-      expect(ch.metadata.mossa_credits).toBe("30000");
-      expect(ch.metadata.mossa_tenant).toBe("t_live_pack");
+      expect(ch.metadata.kova_credits).toBe("30000");
+      expect(ch.metadata.kova_tenant).toBe("t_live_pack");
       expect(ch.customer).toMatch(/^cus_/);
     }, 60_000);
 
     it("emits `payment_intent.succeeded` with the credits on the event's own metadata", async () => {
       const ev = await waitForEvent((e) => e.data.object.id === piId, { types: ["payment_intent.succeeded"] });
-      expect((ev.data.object.metadata as Record<string, string>).mossa_credits).toBe("30000");
-      expect((ev.data.object.metadata as Record<string, string>).mossa_pack).toBe(PACK.id);
-      expect((ev.data.object.metadata as Record<string, string>).mossa_tenant).toBe("t_live_pack");
+      expect((ev.data.object.metadata as Record<string, string>).kova_credits).toBe("30000");
+      expect((ev.data.object.metadata as Record<string, string>).kova_pack).toBe(PACK.id);
+      expect((ev.data.object.metadata as Record<string, string>).kova_tenant).toBe("t_live_pack");
     }, 180_000);
 
     describe("refunds", () => {
@@ -798,7 +798,7 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
 
     describe("disputes", () => {
       it("delivers a DISPUTE with no `customer` and empty metadata — the shape that made the branch dead code", async () => {
-        const cust = await must<{ id: string }>("customers", { body: { email: `mossa-live-dispute-${Date.now()}@example.com`, "metadata[mossa_tenant]": "t_live_pack" } });
+        const cust = await must<{ id: string }>("customers", { body: { email: `kova-live-dispute-${Date.now()}@example.com`, "metadata[kova_tenant]": "t_live_pack" } });
         trackJunk({ kind: "customer", id: cust.id });
         const pi = await must<{ id: string; status: string; latest_charge: string }>("payment_intents", {
           body: {
@@ -809,9 +809,9 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
             confirm: "true",
             "automatic_payment_methods[enabled]": "true",
             "automatic_payment_methods[allow_redirects]": "never",
-            "metadata[mossa_tenant]": "t_live_pack",
-            "metadata[mossa_pack]": "pack_25k",
-            "metadata[mossa_credits]": 30_000,
+            "metadata[kova_tenant]": "t_live_pack",
+            "metadata[kova_pack]": "pack_25k",
+            "metadata[kova_credits]": 30_000,
           },
         });
         expect(pi.status).toBe("succeeded");
@@ -830,7 +830,7 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
 
         // …and resolving the underlying Charge does recover tenant + credits.
         const ch = await must<{ amount: number; amount_refunded: number; metadata: Record<string, string>; customer: string }>(`charges/${d.charge as string}`);
-        expect(ch.metadata.mossa_credits).toBe("30000");
+        expect(ch.metadata.kova_credits).toBe("30000");
         expect(ch.customer).toBe(cust.id);
         expect(Math.min(ch.amount, (d.amount as number) + ch.amount_refunded)).toBe(2500);
       }, 300_000);
@@ -847,7 +847,7 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
 
     beforeAll(async () => {
       // Exactly what `/connect/onboard` creates.
-      const acct = await stripeCall<{ id: string; default_currency?: string }>(LIVE_KEY, "accounts", { type: "standard", "metadata[mossa_tenant]": "t_live_connect" });
+      const acct = await stripeCall<{ id: string; default_currency?: string }>(LIVE_KEY, "accounts", { type: "standard", "metadata[kova_tenant]": "t_live_connect" });
       acctId = acct.id;
       acctCurrency = acct.default_currency ?? "usd";
       trackJunk({ kind: "account", id: acctId });
@@ -856,7 +856,7 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
     it("creates a `standard` account that cannot sell yet — the three flags /connect/checkout gates on", async () => {
       const a = await must<{ type: string; charges_enabled: boolean; payouts_enabled: boolean; details_submitted: boolean; metadata: Record<string, string> }>(`accounts/${acctId}`);
       expect(a.type).toBe("standard");
-      expect(a.metadata.mossa_tenant).toBe("t_live_connect");
+      expect(a.metadata.kova_tenant).toBe("t_live_connect");
       // `syncConnectAccount` mirrors these three; all false until onboarding.
       expect(a.charges_enabled).toBe(false);
       expect(a.payouts_enabled).toBe(false);
@@ -874,7 +874,7 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
     }, 60_000);
 
     it("scopes every object to the account named by the `Stripe-Account` header", async () => {
-      const onAcct = await must<{ id: string }>("customers", { body: { email: `mossa-live-scoped-${Date.now()}@example.com` }, account: acctId });
+      const onAcct = await must<{ id: string }>("customers", { body: { email: `kova-live-scoped-${Date.now()}@example.com` }, account: acctId });
       // Without the header the platform cannot even see it. This is why every
       // Connect-rail call in stripe-routes.ts passes `connectedAccount`.
       expect((await rawStripe(`customers/${onAcct.id}`)).status).toBe(404);
@@ -888,7 +888,7 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
       // application does not have the required permissions for the parameter
       // 'business_profile'"), which is itself worth knowing: nothing in
       // stripe-routes.ts writes a connected account's profile, and it must not.
-      const nudge = await rawStripe(`accounts/${acctId}`, { body: { "metadata[mossa_probe]": String(Date.now()) } });
+      const nudge = await rawStripe(`accounts/${acctId}`, { body: { "metadata[kova_probe]": String(Date.now()) } });
       expect(nudge.status, nudge.json.error?.message).toBe(200);
       // Connect events are NOT in the platform's own /v1/events list — they are
       // account-scoped over the API, and carry `event.account` on delivery.
@@ -902,13 +902,13 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
         expect(a, `account.updated must carry ${k}`).toHaveProperty(k);
         expect(typeof a[k]).toBe("boolean");
       }
-      expect((a.metadata as Record<string, string>).mossa_tenant).toBe("t_live_connect");
+      expect((a.metadata as Record<string, string>).kova_tenant).toBe("t_live_connect");
     }, 240_000);
 
     it("takes a direct charge with an application_fee_amount, routed by Stripe-Account", async () => {
       const pm = await testCardPm("tok_visa", acctId);
       // The `/connect/pay-intent` shape: direct charge on the connected account,
-      // application fee to the platform, mossa ids on the metadata.
+      // application fee to the platform, kova ids on the metadata.
       const pi = await stripeCall<{ id: string; status: string; application_fee_amount: number; latest_charge: string; metadata: Record<string, string> }>(
         LIVE_KEY,
         "payment_intents",
@@ -920,23 +920,23 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
           "automatic_payment_methods[enabled]": "true",
           "automatic_payment_methods[allow_redirects]": "never",
           application_fee_amount: 1_000,
-          "metadata[mossa_tenant]": "t_live_connect",
-          "metadata[mossa_client]": "cl_live_1",
-          "metadata[mossa_package]": "pkg_live_1",
+          "metadata[kova_tenant]": "t_live_connect",
+          "metadata[kova_client]": "cl_live_1",
+          "metadata[kova_package]": "pkg_live_1",
         },
         { connectedAccount: acctId },
       );
       expect(pi.status).toBe("succeeded");
       expect(pi.application_fee_amount).toBe(1_000);
-      expect(pi.metadata.mossa_client).toBe("cl_live_1");
+      expect(pi.metadata.kova_client).toBe("cl_live_1");
 
       const ch = await must<{ amount: number; application_fee_amount: number; metadata: Record<string, string>; captured: boolean }>(`charges/${pi.latest_charge}`, { account: acctId });
       expect(ch.amount).toBe(20_000);
       expect(ch.application_fee_amount).toBe(1_000);
       expect(ch.captured).toBe(true);
       // The Connect webhook's `payment_intent.succeeded` branch reads these.
-      expect(ch.metadata.mossa_tenant).toBe("t_live_connect");
-      expect(ch.metadata.mossa_package).toBe("pkg_live_1");
+      expect(ch.metadata.kova_tenant).toBe("t_live_connect");
+      expect(ch.metadata.kova_package).toBe("pkg_live_1");
       // Invisible to the platform without the header, on the charge too.
       expect((await rawStripe(`charges/${pi.latest_charge}`)).status).toBe(404);
 
@@ -995,7 +995,7 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
     let subId = "";
 
     beforeAll(async () => {
-      const cust = await must<{ id: string }>("customers", { body: { email: `mossa-live-drift-${Date.now()}@example.com` } });
+      const cust = await must<{ id: string }>("customers", { body: { email: `kova-live-drift-${Date.now()}@example.com` } });
       trackJunk({ kind: "customer", id: cust.id });
       const sub = await must<{ id: string; latest_invoice: { id: string } }>("subscriptions", {
         body: {
@@ -1004,8 +1004,8 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
           payment_behavior: "default_incomplete",
           "payment_settings[save_default_payment_method]": "on_subscription",
           "expand[0]": "latest_invoice",
-          "metadata[mossa_tenant]": "t_live_drift",
-          "metadata[mossa_plan]": "pro",
+          "metadata[kova_tenant]": "t_live_drift",
+          "metadata[kova_plan]": "pro",
         },
       });
       subId = sub.id;
@@ -1033,7 +1033,7 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
         "payment_settings[save_default_payment_method]": "on_subscription",
         "expand[0]": "latest_invoice.payment_intent",
       };
-      const cust = await must<{ id: string }>("customers", { body: { email: `mossa-live-expand-${Date.now()}@example.com` } });
+      const cust = await must<{ id: string }>("customers", { body: { email: `kova-live-expand-${Date.now()}@example.com` } });
       trackJunk({ kind: "customer", id: cust.id });
 
       const pinned = await rawStripe<{ id: string; latest_invoice?: { payment_intent?: { client_secret?: string } } }>("subscriptions", { body: { customer: cust.id, ...body }, version: PINNED_VERSION });

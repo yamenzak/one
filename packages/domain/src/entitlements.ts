@@ -7,7 +7,7 @@
  * and inline in feature routes (`if (!ent.features.aiSuite) 403`).
  *
  * Two flag systems, deliberately distinct (SPEC §5): these platform
- * entitlements are what the TENANT bought from Mossa. Per-package client flags
+ * entitlements are what the TENANT bought from Kova. Per-package client flags
  * (clientFlags.ts) are what a CLIENT bought from the tenant. Client capability
  * = entitlements ∩ resolved client flags.
  *

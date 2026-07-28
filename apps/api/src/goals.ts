@@ -4,10 +4,10 @@
  * becomes a per-day targets resolver so any chart/metric can grade each logged
  * day against the goal that was actually in force THEN, not whatever goal is
  * active now. One query, reused by progress/report/health. Pure timeline math
- * lives in `@mossa/domain` (`resolveGoalTimeline`); this layer just loads rows.
+ * lives in `@kova/domain` (`resolveGoalTimeline`); this layer just loads rows.
  */
 
-import { resolveGoalTimeline, type GoalPeriod } from "@mossa/domain";
+import { resolveGoalTimeline, type GoalPeriod } from "@kova/domain";
 import { parseJson } from "./db.js";
 
 export interface GoalTargets {

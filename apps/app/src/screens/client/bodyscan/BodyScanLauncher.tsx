@@ -15,7 +15,7 @@
 
 import { Suspense, lazy, useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Spinner } from "@mossa/ui";
+import { Spinner } from "@kova/ui";
 import { api } from "../../../api.js";
 import { useSession } from "../../../session.js";
 import { useUnits } from "../../../units.js";

@@ -1,4 +1,4 @@
-# Mossa — Privacy Policy
+# Kova — Privacy Policy
 
 
 **Effective date:** 26 July 2026
@@ -8,19 +8,19 @@
 
 This Privacy Policy explains how **Four Degree Labs LLC** ("**we**", "**us**",
 "**our**"), a limited liability company licensed in mainland Abu Dhabi, United Arab
-Emirates, and the operator of the **Mossa** platform ("**Platform**"), collects,
+Emirates, and the operator of the **Kova** platform ("**Platform**"), collects,
 uses, shares, and protects personal data. It applies to the Platform at
-`mossa.4dl.app`, any Studio custom domains, our marketing site, and related
+`kova.4dl.app`, any Studio custom domains, our marketing site, and related
 services.
 
-Mossa is a multi-tenant platform for personal-training businesses. Because of this,
+Kova is a multi-tenant platform for personal-training businesses. Because of this,
 we act in two different capacities:
 
 - **As a data controller** — for the personal data we collect to run, secure, and
   improve the Platform: account and authentication data, billing data, and usage and
   device data.
 - **As a data processor** — for the personal data a **Studio** (a gym, studio, or
-  coach that subscribes to Mossa) submits or generates about its **Clients** and
+  coach that subscribes to Kova) submits or generates about its **Clients** and
   **Staff**. In that case, the **Studio is the controller** and decides why and how
   that data is used; we process it on the Studio's behalf and under its
   instructions. If you are a Client, your primary point of contact for your rights
@@ -38,7 +38,7 @@ the PDPL.
 ## 3. The personal data we collect
 
 **a. Account & authentication data.** Your name, email address, role, the Studio you
-belong to, and authentication material. **Mossa is passwordless** — we do **not**
+belong to, and authentication material. **Kova is passwordless** — we do **not**
 store passwords. We store one-time email codes for a short period and, if you enrol
 one, passkey (WebAuthn) public-key credentials and related metadata (device type,
 credential identifiers). We do not receive your device's biometric data; that stays
@@ -67,7 +67,7 @@ obtained by the Studio** (see §5 and §7).
 **e. Communications.** Notifications we send (email and in-app), and messages or
 support requests you send us.
 
-**f. Usage, device & log data** (Mossa is controller). Information generated when you
+**f. Usage, device & log data** (Kova is controller). Information generated when you
 use the Platform: IP address, device and browser type, pages and features used,
 timestamps, diagnostic and error logs, and information from our bot-protection
 (Cloudflare Turnstile) used to tell humans from automated abuse.
@@ -230,7 +230,7 @@ appropriate safeguards.
 - **If you are a Client or Staff member of a Studio**, that Studio is the controller
   of your coaching data — direct your request to the Studio in the first instance. We
   will assist the Studio in responding as its processor.
-- **For data where Mossa is the controller** (account, billing, usage), contact us at
+- **For data where Kova is the controller** (account, billing, usage), contact us at
   `info@fourdegreelabs.com`. We may need to verify your identity, and we will respond within
   the timeframe required by law.
 

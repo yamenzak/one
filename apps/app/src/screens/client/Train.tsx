@@ -8,13 +8,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { prescribedSetsForDay, type WorkoutBody } from "@mossa/protocol";
-import { sessionTonnage, sessionLoad, epley1Rm, DEFAULT_WEEKLY_LOAD_TARGET, activityByKey, fmtEnergy, fmtWeight, kgToDisplay, weightLabel } from "@mossa/domain";
+import { prescribedSetsForDay, type WorkoutBody } from "@kova/protocol";
+import { sessionTonnage, sessionLoad, epley1Rm, DEFAULT_WEEKLY_LOAD_TARGET, activityByKey, fmtEnergy, fmtWeight, kgToDisplay, weightLabel } from "@kova/domain";
 import {
   Card, Badge, Button, Chip, Field, Skeleton, Page, Stagger, EmptyState, StatCard, WeekDots, Sparkline, MiniBars, IconBadge, Sheet,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
   Dumbbell, Play, Moon, ChevronRight, Plus, Footprints, Flame, TrendingUp, Trophy, Activity, AlertTriangle, Search,
-} from "@mossa/ui";
+} from "@kova/ui";
 import { api, todayLocal, shiftDay } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { activityIcon } from "./activityIcons.js";

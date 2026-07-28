@@ -1,4 +1,4 @@
-# Mossa
+# Kova
 
 Multi-tenant, multi-trainer platform for personal-training businesses — studios, gyms,
 and independent coaches manage their clients, run staff trainers with scoped rosters,

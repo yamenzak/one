@@ -19,9 +19,9 @@ import { sendTenantEmail } from "./email-provider.js";
 import { emailShell, emailButton, escapeHtml } from "./mailer.js";
 import { newId, nowIso } from "./ids.js";
 import { recordAudit } from "./audit.js";
-import { canonicalHost } from "./host-context.js";
+import { canonicalHost, shapeOf } from "./host-context.js";
 import { parseJson, j } from "./db.js";
-import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps, rangeStatus, auditLabel, canAccessClient, seesWholeRoster, resolveStanding, studioStandingOf } from "@mossa/domain";
+import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps, rangeStatus, auditLabel, canAccessClient, seesWholeRoster, resolveStanding, studioStandingOf } from "@kova/domain";
 
 export interface ClientRow {
   id: string;
@@ -182,7 +182,7 @@ export async function requireClientAccess(
    * record (that is how you'd correct or restore one).
    */
   //
-  // Decided by `resolveStanding` (@mossa/domain), the ONE definition of what a
+  // Decided by `resolveStanding` (@kova/domain), the ONE definition of what a
   // person may do in a tenancy — the same function the Shell renders from, so the
   // gate and the UI cannot disagree about who is read-only.
   if (role === "client") {
@@ -368,7 +368,7 @@ function b64url(bytes: Uint8Array): string {
 async function signInviteToken(env: Env, payload: { c: string; t: string; e: string }): Promise<string> {
   const enc = new TextEncoder();
   const body = b64url(enc.encode(JSON.stringify(payload)));
-  const secret = env.BETTER_AUTH_SECRET || "mossa-dev-insecure-secret-change-me";
+  const secret = env.BETTER_AUTH_SECRET || "kova-dev-insecure-secret-change-me";
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const sig = await crypto.subtle.sign("HMAC", key, enc.encode(body));
   return `${body}.${b64url(new Uint8Array(sig))}`;
@@ -383,15 +383,27 @@ async function signInviteToken(env: Env, payload: { c: string; t: string; e: str
  * so every invite email sent by a studio without a custom domain would have landed
  * its clients on a signpost instead of a login.
  */
-async function tenantLoginUrl(env: Env, tenantId: string): Promise<string> {
-  return `https://${await canonicalHost(env, env.DB, tenantId)}`;
+async function tenantLoginUrl(env: Env, tenantId: string, from?: string): Promise<string> {
+  // `from` is the request URL when there is one. It supplies three things the
+  // configured root cannot: the root this request was actually classified against
+  // (`localhost` on loopback), the protocol, and the PORT. Without it a link emailed
+  // from `pnpm dev` pointed at `https://<slug>.kova.4dl.app` — a live external
+  // domain, from a machine that cannot reach it.
+  const here = from ? new URL(from) : null;
+  const shape = here ? shapeOf(here.hostname, env) : null;
+  const host = await canonicalHost(env, env.DB, tenantId, shape?.root);
+  // A CUSTOM domain is already absolute and always https; only a subdomain of our
+  // own root inherits the request's protocol and port.
+  const ours = shape ? host.endsWith(`.${shape.root}`) : false;
+  if (!here || !ours) return `https://${host}`;
+  return `${here.protocol}//${host}${here.port ? `:${here.port}` : ""}`;
 }
 
 /** Build the invite deep-link + opaque token, and send the branded invite email
  *  (SPEC §4, §8.1). Best-effort: a mail failure never fails client creation, and
  *  the returned QR data still lets the coach show the in-gym invite. */
-async function buildClientInvite(env: Env, tenantId: string, clientId: string, email: string): Promise<{ url: string; token: string; email: string; delivery: InviteDelivery }> {
-  const loginUrl = await tenantLoginUrl(env, tenantId);
+async function buildClientInvite(env: Env, tenantId: string, clientId: string, email: string, from?: string): Promise<{ url: string; token: string; email: string; delivery: InviteDelivery }> {
+  const loginUrl = await tenantLoginUrl(env, tenantId, from);
   const token = await signInviteToken(env, { c: clientId, t: tenantId, e: email });
   const url = `${loginUrl}${loginUrl.includes("?") ? "&" : "?"}invite=${encodeURIComponent(token)}`;
   const brand = await tenantBrandKit(env.DB, tenantId).catch(() => null);
@@ -498,7 +510,7 @@ export const clientRoutes = new Hono<AppEnv>()
     // the coach can show as an in-gym QR. Best-effort — never fails creation.
     let invite: { url: string; token: string; email: string; delivery: InviteDelivery } | null = null;
     if (body.data.email) {
-      invite = await buildClientInvite(c.env, who.tenantId, id, body.data.email).catch(() => null);
+      invite = await buildClientInvite(c.env, who.tenantId, id, body.data.email, c.req.url).catch(() => null);
     }
     const row = await getClient(c.env.DB, who.tenantId, id);
     return c.json({ client: clientView(row!), invite }, 201);

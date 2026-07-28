@@ -9,9 +9,9 @@
 
 import { useState } from "react";
 import { api } from "../../api.js";
-import { ThumbsUp, ThumbsDown, Check, cn } from "@mossa/ui";
+import { ThumbsUp, ThumbsDown, Check, cn } from "@kova/ui";
 
-const MUTE_PREFIX = "mossa:insight-muted:";
+const MUTE_PREFIX = "kova:insight-muted:";
 
 /** Human labels for the mutable insight types, for the un-mute list. A type with
  *  no entry still un-mutes; it just shows its raw key. */

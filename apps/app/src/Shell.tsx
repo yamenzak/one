@@ -10,8 +10,8 @@ import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } 
 import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
   Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Hand, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, toneVar, type TabDef, type Tone,
-} from "@mossa/ui";
-import { resolveStanding, studioStandingOfGate } from "@mossa/domain";
+} from "@kova/ui";
+import { resolveStanding, studioStandingOfGate } from "@kova/domain";
 import { useSession, useActiveClientId } from "./session.js";
 import { useTheme } from "./theme.js";
 import { api } from "./api.js";
@@ -487,8 +487,8 @@ function BillingNotice() {
             </h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
               {pending
-                ? "The card step didn't complete, so nothing is being billed and you're running on Mossa's free baseline"
-                : "You're running on Mossa's free baseline"}
+                ? "The card step didn't complete, so nothing is being billed and you're running on Kova's free baseline"
+                : "You're running on Kova's free baseline"}
               {limits.length > 0 ? `: ${limits.join(" · ")}.` : "."}
             </p>
           </div>

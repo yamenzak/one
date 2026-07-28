@@ -8,7 +8,7 @@
 
 import type { Tone } from "../primitives.js";
 
-/** The internal role ids (match @mossa/domain TENANT_ROLES + Better Auth). */
+/** The internal role ids (match @kova/domain TENANT_ROLES + Better Auth). */
 export type PersonaRole = "owner" | "trainer" | "assistant" | "client" | "member";
 
 /** Role id → the term shown to users. `trainer` is surfaced as "Coach". */

@@ -11,7 +11,7 @@
  * is discarded by the caller the instant this returns.
  */
 
-import { ellipseCircumference, pixelScaleFromHeight } from "@mossa/domain";
+import { ellipseCircumference, pixelScaleFromHeight } from "@kova/domain";
 
 /** A MediaPipe normalized landmark (x,y,z in 0..1 of the frame; visibility 0..1). */
 export interface NormLandmark {

@@ -1,7 +1,7 @@
 import type { TenantBillingDO } from "./billing-do.js";
 import type { InboxDO } from "./inbox-do.js";
 
-/** Cloudflare bindings for the Mossa API Worker (SPEC §3). */
+/** Cloudflare bindings for the Kova API Worker (SPEC §3). */
 export interface Env {
   /** One Durable Object per tenant — the single-threaded credit authority. */
   BILLING: DurableObjectNamespace<TenantBillingDO>;
@@ -33,7 +33,7 @@ export interface Env {
   BETTER_AUTH_URL?: string;
   /**
    * The apex we serve studios under: `kova.4dl.app`. Every hostname is classified
-   * against it (`@mossa/domain` `classifyHost`), it is the WebAuthn RP ID and the
+   * against it (`@kova/domain` `classifyHost`), it is the WebAuthn RP ID and the
    * session cookie's `Domain` for every door beneath it, and `<slug>.<ROOT_DOMAIN>`
    * is a studio's address.
    *

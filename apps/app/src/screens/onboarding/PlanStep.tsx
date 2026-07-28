@@ -13,8 +13,8 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Badge, Button, Card, Callout, Reveal, SkeletonList, AlertTriangle, Check, Gift, Users } from "@mossa/ui";
-import { FEATURE_META } from "@mossa/domain";
+import { Badge, Button, Card, Callout, Reveal, SkeletonList, AlertTriangle, Check, Gift, Users } from "@kova/ui";
+import { FEATURE_META } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { fmtPrice } from "../../money.js";
 

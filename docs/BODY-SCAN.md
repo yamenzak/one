@@ -77,7 +77,7 @@ wide band. Circumferences come from front+side silhouette widths via
 
 ## Gating
 
-`bfCamera` platform entitlement (tenant bought from Mossa) ∩ the per-package
+`bfCamera` platform entitlement (tenant bought from Kova) ∩ the per-package
 `canUseBodyScan` client flag (`requiresFeature: "bfCamera"`, enforced by the
 `resolveClientFlags` intersection). Free plan has no `bfCamera`; Solo/Studio/Team
 do.

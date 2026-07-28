@@ -21,7 +21,7 @@ greenfield piece (templates/variables), not a rebuild.
 | **Prefs** | `user_prefs.notif_json` per-**user** (not per-tenant): `category → {inbox?, email?}`. Two channels only (**no push**). `NotificationsSection` in Settings, role-scoped (doubles as the client screen). |
 | **Owner policy** | `tenant_settings.notif_policy_json` = an **email allow-list by category** only. Can't target audience, can't gate inbox, no per-type. |
 | **Persona/mode** | `personas[]` + `active` (role, clientId) from server. `mode: coach\|train` is a **client-only localStorage toggle**; `useClientSurface()` derives the surface. **Nothing in the notification path consumes mode.** |
-| **Email** | Two rails: platform (`mailer.ts`, Mossa OTP) + tenant (`email-provider.ts`: platform-metered \| brevo \| off). A **real branded HTML shell already exists** (`emailShell`/`emailButton`, dark-first, inlined CSS, tenant logo+accent) — but **every type reuses one generic card**. **No template store, no `{{variable}}` engine** — copy is hardcoded/interpolated at call sites. Sender identity + visual branding per tenant already exist. |
+| **Email** | Two rails: platform (`mailer.ts`, Kova OTP) + tenant (`email-provider.ts`: platform-metered \| brevo \| off). A **real branded HTML shell already exists** (`emailShell`/`emailButton`, dark-first, inlined CSS, tenant logo+accent) — but **every type reuses one generic card**. **No template store, no `{{variable}}` engine** — copy is hardcoded/interpolated at call sites. Sender identity + visual branding per tenant already exist. |
 
 **The three real gaps** vs your ask: (1) audience/mode never filters what a user
 sees; (2) in-app notifications don't click through and look identical; (3) no
@@ -55,7 +55,7 @@ editor's variable list) reads from here — no drift.
   by the **current surface** (`useClientSurface()`) against each type's
   `audience`: train mode → `client` items; coach mode → `staff` + `owner` items.
   The unread badge reflects the current surface. This is **pure client-side**
-  using the shared `@mossa/domain` registry — **no schema change, no new server
+  using the shared `@kova/domain` registry — **no schema change, no new server
   signal** (mode already lives on the client).
   - *Emails follow role, not mode:* a coach still receives coach emails even
     while browsing in train mode — mode is a transient view state, email is not.
@@ -72,7 +72,7 @@ editor's variable list) reads from here — no drift.
 - **What a surface shows** becomes audience-filtered (§2): the client surface
   shows `client` notifications; the staff surface shows `staff` + `owner`. Coach
   vs assistant is already separated by recipient targeting.
-- **Platform admin (Mossa) stream** — optional; you're the only super-admin and
+- **Platform admin (Kova) stream** — optional; you're the only super-admin and
   the AdminConsole covers it. Deferred unless you want it (see decisions).
 
 ---
@@ -94,9 +94,9 @@ editor's variable list) reads from here — no drift.
   already exist in `mailer.ts`.)
 - **Global white-label** — editable header/footer/signature + reply-to, layered
   over the branded shell.
-- **Correctness fix folded in:** Mossa→tenant **billing** emails currently send
+- **Correctness fix folded in:** Kova→tenant **billing** emails currently send
   via the *tenant* rail (branded as the tenant, metered to the tenant's credits).
-  Route those via the **platform rail** with Mossa's identity, unmetered — a
+  Route those via the **platform rail** with Kova's identity, unmetered — a
   studio's own suspension notice shouldn't cost the studio a credit.
 
 ---
@@ -123,7 +123,7 @@ editor's variable list) reads from here — no drift.
    switch), mode-aware surface filter, Inbox page, mark-all-read.
 3. **Email engine** — `NotifVars` context at call sites, registry default
    templates, safe substitution renderer, per-type branded layouts, the
-   Mossa-billing-rail fix.
+   Kova-billing-rail fix.
 4. **Tenant template store + editor** — `email_templates` table, CRUD, owner
    editor UI with live variable list + preview + reset-to-default, header/footer.
 5. **Settings** — client notification screen, owner audience-split policy,
@@ -145,5 +145,5 @@ conventions.
    rich detail pages deferred.
 3. **Owner control granularity** — ✅ **audience-split category policy** (email
    clients vs staff about category X). Per-type toggles deferred.
-4. **Platform-admin (Mossa) stream** — ✅ **out of scope** for now (AdminConsole
+4. **Platform-admin (Kova) stream** — ✅ **out of scope** for now (AdminConsole
    covers it).

@@ -26,7 +26,7 @@
 
 import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
-import { FEATURE_KEYS, RESERVED_FEATURES, featuresForEntitlement, type ClientFlags } from "@mossa/domain";
+import { FEATURE_KEYS, RESERVED_FEATURES, featuresForEntitlement, type ClientFlags } from "@kova/domain";
 import { ensureSchema } from "../src/db.js";
 
 const B = "http://setup.localhost:8787";
@@ -146,7 +146,7 @@ beforeAll(async () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1 — PLATFORM ENTITLEMENTS: what the TENANT bought from Mossa
+// 1 — PLATFORM ENTITLEMENTS: what the TENANT bought from Kova
 // ─────────────────────────────────────────────────────────────────────────────
 describe("platform entitlements are enforced per route", () => {
   /** Every non-reserved entitlement, the route that requires it, and a request
@@ -381,7 +381,7 @@ describe("client capability is the intersection, in both directions", () => {
   });
 
   it("tenant LACKS bfCamera but package HAS canUseBodyScan → refused (the entitlement half)", async () => {
-    // `solo` has aiSuite but no bfCamera. The tenant cannot sell what Mossa
+    // `solo` has aiSuite but no bfCamera. The tenant cannot sell what Kova
     // didn't sell them, no matter what the package says.
     const { owner, clientId, client, tenantId } = await studioWithClient("ix2", "pro");
     await grantPackage(owner, clientId, "ix2", { canUseBodyScan: true });

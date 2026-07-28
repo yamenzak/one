@@ -50,10 +50,10 @@ import {
   Info,
   Mail,
   Store,
-} from "@mossa/ui";
+} from "@kova/ui";
 import { api, errorText, isOffline } from "../../api.js";
 import { fmtPrice } from "../../money.js";
-import { useSession } from "../../session.js";
+import { studioUrl, useSession } from "../../session.js";
 import { PaymentSheet, type CheckoutIntent } from "../../PaymentSheet.js";
 import { PlanStep, type PlansFeed } from "./PlanStep.js";
 import { ONBOARDING_PATH } from "./paths.js";
@@ -102,6 +102,9 @@ export function StudioOnboarding() {
   // returns to a summary they can re-launch, rather than a dead screen).
   const [sheetOpen, setSheetOpen] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  // The slug the SERVER stored — the studio's address, which `done()` sends the
+  // owner to. Not the one we proposed: the retry path can land on a different one.
+  const [studioSlug, setStudioSlug] = useState<string | null>(ctx?.active?.tenantSlug ?? null);
 
   // Resuming: the server tells us where this studio left off, so a reloaded
   // onboarding comes back with the plan already chosen rather than blank.
@@ -113,23 +116,40 @@ export function StudioOnboarding() {
 
   const plan = feed?.plans.find((p) => p.id === planId) ?? null;
 
-  /** Create the studio if it doesn't exist yet. Idempotent within this flow. */
+  /**
+   * Create the studio if it doesn't exist yet. Idempotent within this flow.
+   *
+   * The slug is now the studio's ADDRESS (`<slug>.<root>`), so two things changed:
+   * the server validates it against DNS-label rules and a reserved-label list
+   * (`org-guard.ts`), and we keep the slug the server actually stored rather than
+   * the one we proposed — the retry path below can end up with a different one, and
+   * `done()` navigates to it.
+   */
   const ensureStudio = useCallback(async (): Promise<void> => {
     if (tenantReady) return;
     const base = slugify(name) || `studio-${Date.now().toString(36)}`;
-    const create = (slug: string) => api.post("/api/auth/organization/create", { name: name.trim(), slug });
+    const create = (slug: string) =>
+      api.post<{ id?: string; slug?: string }>("/api/auth/organization/create", { name: name.trim(), slug });
+    // A random suffix also rescues a REJECTED slug, not just a colliding one: a
+    // studio literally named "API" or "Admin" slugifies onto a reserved label, and
+    // `<base>-a1b2` clears it without interrogating the owner about DNS.
+    let stored: string | null = null;
     try {
-      await create(base);
+      stored = (await create(base))?.slug ?? base;
     } catch (e) {
       // The slug is unique platform-wide, so a common studio name collides. Before
       // retrying, check whether the studio actually landed — re-posting a create
       // that succeeded would give this owner two studios.
-      const probe = await api.get<{ active: { tenantId: string } | null }>("/api/context").catch(() => null);
-      if (!probe?.active) {
+      const probe = await api.get<{ active: { tenantId: string; tenantSlug: string } | null }>("/api/context").catch(() => null);
+      if (probe?.active) {
+        stored = probe.active.tenantSlug;
+      } else {
         if (isOffline(e)) throw e;
-        await create(`${base}-${Math.random().toString(36).slice(2, 6)}`);
+        const retry = `${base}-${Math.random().toString(36).slice(2, 6)}`;
+        stored = (await create(retry))?.slug ?? retry;
       }
     }
+    setStudioSlug(stored);
     setTenantReady(true);
     // From here on the studio EXISTS, so a reload must resume the wizard rather
     // than dropping into a studio with no plan. main.tsx keeps rendering this
@@ -214,15 +234,34 @@ export function StudioOnboarding() {
 
   /** Into the app. `refresh()` is what flips `ctx.active` on, and the navigate
    *  drops the `/studio/setup` path so main.tsx renders the Shell. */
+  /**
+   * Finish: hand the owner their studio's own ADDRESS, not `/` on the setup door.
+   *
+   * The wizard runs on `setup.<root>`, which is a platform door with no tenancy of
+   * its own — so an in-app `nav("/")` would leave the owner on the one host where
+   * their studio is not pinned, reading a signpost instead of their app. The studio
+   * lives at `<slug>.<root>`, the session cookie is issued for the root so the hop
+   * carries it, and the address is what they should bookmark and hand to clients.
+   *
+   * Falls back to an in-app navigation when the slug or root is somehow unknown
+   * (offline `refresh`, a host probe that failed), because being left on a working
+   * screen beats being sent to a URL we had to guess.
+   */
   const done = useCallback(async () => {
     setFinishing(true);
     try {
       await refresh();
     } finally {
+      const slug = studioSlug;
+      const root = host?.rootDomain;
+      if (slug && root) {
+        location.assign(studioUrl(slug, root));
+        return; // navigating away; leave `finishing` set so the button stays busy
+      }
       setFinishing(false);
       nav("/", { replace: true });
     }
-  }, [refresh, nav]);
+  }, [refresh, nav, studioSlug, host]);
 
   if (strandedOnTenantDomain) {
     return (
@@ -341,7 +380,7 @@ export function StudioOnboarding() {
                   <Button size="lg" className="w-full" onClick={() => setSheetOpen(true)}>
                     {pay.label} <ArrowRight />
                   </Button>
-                  <p className="text-xs text-muted-foreground">Card details go straight to Stripe — Mossa never sees them.</p>
+                  <p className="text-xs text-muted-foreground">Card details go straight to Stripe — Kova never sees them.</p>
                 </>
               )}
 
@@ -350,14 +389,14 @@ export function StudioOnboarding() {
                   <Callout tone="warning" icon={Info} live="status">
                     <span className="font-semibold">Billing isn't ready yet — your studio is.</span>{" "}
                     {pay.unconfigured
-                      ? "Card payments aren't switched on for this Mossa installation, so we can't start your subscription right now."
+                      ? "Card payments aren't switched on for this Kova installation, so we can't start your subscription right now."
                       : "We couldn't start the subscription just now."}
                   </Callout>
                   <Card className="space-y-2 p-5">
                     <p className="text-sm leading-relaxed text-muted-foreground">
                       Nothing has been charged. We've recorded that you chose <span className="text-foreground">{plan?.name}</span>, and
                       until payment is completed your studio runs on the free starter limits — 3 clients, no AI suite, no selling. Every
-                      other part of Mossa works normally.
+                      other part of Kova works normally.
                     </p>
                     <p className="text-sm leading-relaxed text-muted-foreground">
                       You can finish it any time from <span className="text-foreground">Business → Overview</span>; your plan switches on

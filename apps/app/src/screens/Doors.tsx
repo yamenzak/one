@@ -17,7 +17,7 @@
  */
 
 import { motion } from "motion/react";
-import { ArrowRight, Building2, Card, IconBadge, MapPin, Store } from "@mossa/ui";
+import { ArrowRight, Building2, Card, IconBadge, MapPin, Store } from "@kova/ui";
 import { studioUrl, useSession } from "../session.js";
 
 /** Shared frame: centred column, soft brand glow, one gentle reveal. */
@@ -49,7 +49,7 @@ export function RootSignpost() {
   return (
     <Doorway>
       <header className="text-center">
-        <div className="mx-auto mb-5 grid size-16 place-items-center rounded-3xl bg-primary text-2xl font-black text-primary-foreground shadow-glow">M</div>
+        <div className="mx-auto mb-5 grid size-16 place-items-center rounded-3xl bg-primary text-2xl font-black text-primary-foreground shadow-glow">K</div>
         <h1 className="text-[1.75rem] font-bold leading-tight tracking-tight">Every studio has its own address</h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
           There&rsquo;s no app at <span className="text-foreground">{root}</span> itself. Your studio lives at its own

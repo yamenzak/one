@@ -81,7 +81,7 @@ function subEvent(opts: { id: string; type: "created" | "updated"; tenantId: str
         default_source: null,
         pending_setup_intent: opts.card ? null : "seti_trial_pending",
         trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
-        metadata: { mossa_tenant: opts.tenantId, mossa_plan: opts.plan ?? "light" },
+        metadata: { kova_tenant: opts.tenantId, kova_plan: opts.plan ?? "light" },
       },
     },
   });
@@ -169,7 +169,7 @@ describe("trial lifecycle — a trial grants nothing until a card is attached", 
     const payload = JSON.stringify({
       id: "evt_trial_active",
       type: "customer.subscription.updated",
-      data: { object: { id: "sub_trial_active", status: "active", customer: "cus_trial_active", current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400, metadata: { mossa_tenant: tenantId, mossa_plan: "light" } } },
+      data: { object: { id: "sub_trial_active", status: "active", customer: "cus_trial_active", current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400, metadata: { kova_tenant: tenantId, kova_plan: "light" } } },
     });
     expect((await post(payload)).status).toBe(200);
     const row = await subRow(tenantId);
@@ -200,7 +200,7 @@ describe("trial lifecycle — a trial grants nothing until a card is attached", 
           status: "active",
           customer: "cus_trial_basil",
           items: { data: [{ current_period_end: periodEnd }] },
-          metadata: { mossa_tenant: tenantId, mossa_plan: "light" },
+          metadata: { kova_tenant: tenantId, kova_plan: "light" },
         },
       },
     });

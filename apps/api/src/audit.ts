@@ -2,12 +2,12 @@
  * Coach-action audit — the one write path for the audit log. Every staff action
  * that changes a client-facing record funnels a recordAudit() call here, so the
  * client (and an owner reviewing a coach) gets a durable, queryable history. The
- * action id is validated against @mossa/domain AUDIT_ACTIONS; best-effort like
+ * action id is validated against @kova/domain AUDIT_ACTIONS; best-effort like
  * notify() — an audit write must NEVER reject its caller (the mutation already
  * committed), so everything is swallowed.
  */
 
-import { isAuditAction, type AuditAction } from "@mossa/domain";
+import { isAuditAction, type AuditAction } from "@kova/domain";
 import type { Env } from "./env.js";
 import { newId, nowMs } from "./ids.js";
 

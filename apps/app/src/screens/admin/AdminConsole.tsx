@@ -26,7 +26,7 @@ import {
   Dumbbell, LayoutGrid, Page, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, Sheet, ShieldCheck,
   Skeleton, SkeletonLine, Play, Plug, Spinner, Stagger, Switch, Tag, Trash2, Wallet, cn, toneText, type Tone,
   ActionResult, ConfigRow, Group, LoadError, TabIntro, useLoad, useAction as useActionBase,
-} from "@mossa/ui";
+} from "@kova/ui";
 import { api, errorText } from "../../api.js";
 import { fmtPrice } from "../../money.js";
 
@@ -53,7 +53,7 @@ export function AdminConsole({ onBack }: { onBack: () => void }) {
             <ShieldCheck className="size-5 shrink-0 text-primary" aria-hidden />
             <h1 className="truncate text-xl font-bold tracking-tight">Platform admin</h1>
           </div>
-          <p className="truncate text-xs text-muted-foreground">Mossa itself — every studio, plan, key and switch.</p>
+          <p className="truncate text-xs text-muted-foreground">Kova itself — every studio, plan, key and switch.</p>
         </div>
       </div>
       <div className="overflow-x-auto no-scrollbar">
@@ -77,7 +77,7 @@ export function AdminConsole({ onBack }: { onBack: () => void }) {
  *  so a retry (or a post-mutation refresh) never flashes the skeleton back over
  *  content that already arrived. */
 // The console patterns (useLoad/useAction, LoadError, ActionResult, ConfigRow,
-// TabIntro, Group) now live in @mossa/ui so the STUDIO settings render the same
+// TabIntro, Group) now live in @kova/ui so the STUDIO settings render the same
 // shapes from the same code rather than a drifting copy. `errorText` is passed in
 // because the design system holds no opinion about the app's HTTP error shape.
 const useAdminLoad = <T,>(load: () => Promise<T>, what: string) => useLoad(load, what, errorText);
@@ -1635,7 +1635,7 @@ function DomainsConfig() {
 
             <Group title="One-time Cloudflare setup" hint="These two steps can't be done from here — do them in the Cloudflare dashboard first. Full walkthrough in DEPLOY.md.">
               <ol className="space-y-1.5 rounded-xl bg-surface-2 p-3 text-xs leading-relaxed text-muted-foreground">
-                <li><span className="font-medium text-foreground">1.</span> On the serving zone → SSL/TLS → Custom Hostnames → <span className="font-medium">Enable</span>, and set a Fallback Origin (e.g. <code className="rounded bg-surface-3 px-1">ssl.mossa.4dl.app</code> → CNAME <code className="rounded bg-surface-3 px-1">mossa.4dl.app</code>, proxied).</li>
+                <li><span className="font-medium text-foreground">1.</span> On the serving zone → SSL/TLS → Custom Hostnames → <span className="font-medium">Enable</span>, and set a Fallback Origin (e.g. <code className="rounded bg-surface-3 px-1">ssl.kova.4dl.app</code> → CNAME <code className="rounded bg-surface-3 px-1">kova.4dl.app</code>, proxied).</li>
                 <li><span className="font-medium text-foreground">2.</span> Create an API token scoped to that zone with <span className="font-medium">SSL and Certificates · Edit</span>.</li>
               </ol>
             </Group>
@@ -1649,7 +1649,7 @@ function DomainsConfig() {
                 onChange={(e) => setApiToken(e.target.value)}
               />
               <Field label="Zone id" value={zoneId} onChange={(e) => setZoneId(e.target.value)} />
-              <Field label="CNAME target" icon={Globe} value={cnameTarget} onChange={(e) => setCnameTarget(e.target.value)} placeholder="ssl.mossa.4dl.app" />
+              <Field label="CNAME target" icon={Globe} value={cnameTarget} onChange={(e) => setCnameTarget(e.target.value)} placeholder="ssl.kova.4dl.app" />
               <Button className="min-h-12 w-full" disabled={act.busy !== null || (!apiToken && !zoneId && !cnameTarget)} onClick={() => void save()}>
                 {act.busy === "save" ? <><Spinner className="size-4" /> Saving…</> : "Save"}
               </Button>
@@ -2141,7 +2141,7 @@ function StripeConfig() {
   return (
     <>
       <Stagger className="space-y-3">
-        <TabIntro>Both payment rails: studios paying Mossa, and clients paying their studio through Connect.</TabIntro>
+        <TabIntro>Both payment rails: studios paying Kova, and clients paying their studio through Connect.</TabIntro>
 
         <Reveal
           loading={!status}
@@ -2270,7 +2270,7 @@ function StripeConfig() {
                       <div className="space-y-2 rounded-2xl bg-surface-2 p-3">
                         <div className="text-[13px] font-medium">Webhook signing secrets ({lane})</div>
                         <p className="text-[13px] text-muted-foreground">
-                          Two endpoints, two secrets, <b>and a separate pair per lane</b>. <span className="font-medium text-foreground">Platform</span> is <code>/api/stripe/webhook</code> (studios paying Mossa).
+                          Two endpoints, two secrets, <b>and a separate pair per lane</b>. <span className="font-medium text-foreground">Platform</span> is <code>/api/stripe/webhook</code> (studios paying Kova).
                           {" "}<span className="font-medium text-foreground">Connect</span> is <code>/api/connect/webhook</code> (clients paying their coach) and needs “Listen to events on connected accounts” enabled.
                           Without the Connect secret, a client&apos;s payment succeeds and no access is granted.
                         </p>
@@ -2321,7 +2321,7 @@ function StripeConfig() {
                   </div>
                 </Group>
 
-                <Group title="Platform fee" hint="Mossa's cut of each client→studio Connect payment, in basis points (100 = 1%). 0 means studios keep everything. Saved by the button below.">
+                <Group title="Platform fee" hint="Kova's cut of each client→studio Connect payment, in basis points (100 = 1%). 0 means studios keep everything. Saved by the button below.">
                   <Field
                     label="Platform fee (basis points)"
                     icon={Percent}
@@ -2366,7 +2366,7 @@ function StripeConfig() {
   );
 }
 
-// ── Platform promo codes (Mossa → tenant): website-native discounts on a
+// ── Platform promo codes (Kova → tenant): website-native discounts on a
 //    tenant's credit-pack purchase. Percentage or fixed, optional max uses. ─────
 
 interface PPromo {
@@ -2407,7 +2407,7 @@ function PlatformPromos() {
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
             <h2 className="font-semibold">Platform promo codes</h2>
-            <p className="text-xs leading-relaxed text-muted-foreground">Mossa → studio: a discount on a studio&apos;s credit-pack purchase.</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">Kova → studio: a discount on a studio&apos;s credit-pack purchase.</p>
           </div>
           <Button size="sm" className="min-h-12 shrink-0 rounded-xl" onClick={() => setOpen(true)}><Plus /> New</Button>
         </div>

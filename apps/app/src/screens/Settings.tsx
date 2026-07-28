@@ -10,9 +10,9 @@ import {
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
   KeyRound, Moon, Sun, LogOut, Palette, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
   ActionResult, ConfigRow, TabIntro, cn, toneText, personaLabel, personaTone, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon,
-} from "@mossa/ui";
-import type { LoginBranding, TenantBranding } from "@mossa/protocol";
-import { resolveUnits, cmToFeetInches, feetInchesToCm, STUDIO_SETTINGS_SECTIONS, settingsSectionVisible } from "@mossa/domain";
+} from "@kova/ui";
+import type { LoginBranding, TenantBranding } from "@kova/protocol";
+import { resolveUnits, cmToFeetInches, feetInchesToCm, STUDIO_SETTINGS_SECTIONS, settingsSectionVisible } from "@kova/domain";
 import { useUnits } from "../units.js";
 import { useSession } from "../session.js";
 import { PreferencesEditorCard } from "./PreferencesEditor.js";
@@ -277,7 +277,7 @@ function CloseStudioSection() {
       ) : (
         <Card className="space-y-2.5">
           <div className="flex items-center gap-2 font-medium text-danger"><AlertTriangle className="size-4" /> Close this studio</div>
-          <p className="text-sm text-muted-foreground">Cancels your Mossa subscription, then permanently deletes the studio and everything in it — every client, plan, log and file — after a 7-day grace period. This can't be undone once the grace period passes.</p>
+          <p className="text-sm text-muted-foreground">Cancels your Kova subscription, then permanently deletes the studio and everything in it — every client, plan, log and file — after a 7-day grace period. This can't be undone once the grace period passes.</p>
           <Button variant="outline" className="w-full border-danger/40 text-danger" onClick={() => { setStage("intro"); setCode(""); setErr(null); setOpen(true); }}><Trash2 /> Close my studio…</Button>
         </Card>
       )}
@@ -798,7 +798,7 @@ function EmailSection() {
       <SectionHead title="Email delivery" icon={Mail} scope="tenant" />
       <Card className="space-y-3">
         <SegmentedControl
-          options={[{ value: "platform", label: "Mossa" }, { value: "brevo", label: "Brevo" }, { value: "off", label: "Off" }]}
+          options={[{ value: "platform", label: "Kova" }, { value: "brevo", label: "Brevo" }, { value: "off", label: "Off" }]}
           value={provider}
           onChange={(v) => void setProvider(v)}
         />
@@ -1466,7 +1466,7 @@ function IntegrationsSection() {
  * `primary` and `preset` are deliberately nulled on save — the generated token
  * set is authoritative, so a second copy of the seed could only ever disagree
  * with it. That means the seed has to be READ BACK OUT of the tokens, or the
- * picker reverts to Mossa green on every reload even though the app around it is
+ * picker reverts to Kova green on every reload even though the app around it is
  * correctly themed. Dark is the canonical set; light is derived from it.
  */
 const seedFrom = (b: Branding | null): string =>
@@ -1615,7 +1615,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
           <div className="text-sm font-medium">AI coach <span className="font-normal text-muted-foreground">— its face + name across every AI surface</span></div>
           <div className="flex items-center gap-3">
             <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full border border-border/60 bg-surface-2">
-              <img src={aiAvatarUrl ?? dicebearUrl(`${ctx?.active?.tenantSlug ?? "mossa"}-ai-coach`, "bottts")} alt="AI coach" className="size-full object-cover" />
+              <img src={aiAvatarUrl ?? dicebearUrl(`${ctx?.active?.tenantSlug ?? "kova"}-ai-coach`, "bottts")} alt="AI coach" className="size-full object-cover" />
             </div>
             <div className="flex flex-1 flex-col gap-2">
               <input value={aiName} onChange={(e) => setAiName(e.target.value)} maxLength={40} placeholder="AI name (e.g. Nova, Coach K) — defaults to “Coach”" className="h-9 w-full rounded-full border border-border/60 bg-surface-2 px-3.5 text-sm outline-none focus:border-primary" />

@@ -2,12 +2,12 @@
  * GOLDEN PATH 1 — the front door.
  *
  *   an unauthenticated visitor at the platform host `/` gets the GATE, not a
- *   signup form → clicks through to Mossa's own deep sign-in
+ *   signup form → clicks through to Kova's own deep sign-in
  *     → owner signs in → names their studio → picks a plan (mandatory)
  *     → billing degrades cleanly (no Stripe in this stack) → studio is live
  *     → invites a client by email
- *     → the client opens the studio's own branded door (`/t/<slug>`, straight out
- *       of the invite link the server built) and signs in with their emailed code
+ *     → the client opens the studio's own branded door (`<slug>.<root>`, straight
+ *       out of the invite link the server built) and signs in with their code
  *     → auto-links to the invited record
  *     → completes the 5-step intake wizard
  *     → lands in the client app
@@ -33,7 +33,7 @@
  *
  * The front half now also guards the entry rework, and both halves of it matter:
  *  • `/` on the platform host must NOT offer a signup form (that is how clients
- *    ended up as orphan accounts under Mossa instead of under their coach), and
+ *    ended up as orphan accounts under Kova instead of under their coach), and
  *  • it must still let staff through, because the installed PWA's `start_url` is
  *    `/` and a signed-out owner opening their app lands exactly there.
  * Plus: the mandatory plan step must DEGRADE when Stripe is unconfigured. If it
@@ -42,33 +42,37 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import { createStudio, newParty, prepare, sheet, signInWithOtp, tab, throughPlatformGate, uniqueEmail } from "../src/app.js";
+import { assertRootIsSignpost, createStudio, newParty, prepare, sheet, signInWithOtp, tab, toSetupSignIn, uniqueEmail } from "../src/app.js";
 
 test("owner onboards, invites a client, and the client signs in and completes intake", async ({ browser }) => {
   const ownerEmail = uniqueEmail("owner");
   const clientEmail = uniqueEmail("client");
   const studio = `E2E Studio ${Date.now().toString(36)}`;
   const clientName = "Dana Test";
-  /** The studio's own branded door, lifted out of the invite link the server built
-   *  — that is the path a real invited client arrives on, and it is deliberately
-   *  NOT the platform host's `/`, which is now a gate. */
-  let invitePath = "";
+  /** The studio's own address, lifted out of the invite link the server built —
+   *  that is where a real invited client arrives, and it is deliberately NOT the
+   *  root host, which is a signpost. Set once the studio exists. */
+  let inviteUrl = "";
+  /** The studio's DNS label, returned by `createStudio` from the host it landed on. */
+  let slug = "";
 
   const coachCtx = await newParty(browser);
   const coach = await coachCtx.newPage();
 
-  await test.step("the platform host's front door is a gate, not a signup form", async () => {
+  await test.step("the ROOT host is a signpost, not a signup form", async () => {
     await prepare(coach);
-    // Asserts both halves: no OTP form / no email field, the end-user redirect
-    // copy is present, and the low-emphasis staff link still reaches sign-in.
-    await throughPlatformGate(coach);
+    // Asserts both halves: no OTP form / no email field anywhere, and the end-user
+    // redirect copy plus the route for someone who does want to run a studio.
+    await assertRootIsSignpost(coach);
   });
 
   await test.step("owner signs in and completes the three-step studio onboarding", async () => {
+    await toSetupSignIn(coach);
     await signInWithOtp(coach, ownerEmail);
-    // Names the studio, picks Light off the LIVE plan catalog, and asserts the
-    // Stripe-unconfigured degrade path lets them through with billing pending.
-    await createStudio(coach, studio);
+    // Names the studio, picks Light off the LIVE plan catalog, asserts the
+    // Stripe-unconfigured degrade path lets them through with billing pending, and
+    // returns the slug of the host it landed on — the studio's own address.
+    slug = await createStudio(coach, studio);
     // The coach surface, not the client one: the owner's own dashboard, under
     // the studio they just named.
     await expect(coach.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
@@ -80,9 +84,14 @@ test("owner onboards, invites a client, and the client signs in and completes in
     // The safety property behind the degrade path: an owner who never entered a
     // card must NOT be holding the plan they picked. `GET /api/billing` is the
     // authority — the studio sits on the free baseline with Light pending.
-    const billing = await coach.request.get("/api/billing", { headers: { origin: new URL(coach.url()).origin } });
-    expect(billing.ok()).toBe(true);
-    const body = (await billing.json()) as { subscription: { planId: string; pendingPlanId: string | null } };
+    // Read it the way the app does: a same-origin fetch from the studio's own page.
+    // `page.request` would resolve DNS in Playwright's driver process, which cannot
+    // see `.localhost` on every host — see src/provision.ts.
+    const body = await coach.evaluate(async () => {
+      const res = await fetch("/api/billing");
+      if (!res.ok) throw new Error(`GET /api/billing -> ${res.status}`);
+      return (await res.json()) as { subscription: { planId: string; pendingPlanId: string | null } };
+    });
     expect(body.subscription.pendingPlanId).toBe("light");
     expect(body.subscription.planId).toBe("free");
   });
@@ -101,17 +110,34 @@ test("owner onboards, invites a client, and the client signs in and completes in
     await form.getByLabel("Name (optional)").fill(clientName);
     await form.getByRole("button", { name: "Add client" }).click();
 
-    // The invite sheet proves the server built + emailed the branded deep-link.
+    // The invite sheet proves the server built the branded deep-link.
+    //
+    // It must NOT assert that the email went out, and that is not a compromise —
+    // this spec deliberately walks the Stripe-unconfigured degrade path, so its
+    // studio sits on the free baseline, and the free baseline grants zero credits
+    // (`FREE_ENTITLEMENTS.aiCredits.monthlyGrant`). An email costs one
+    // (`email.credits_per_email`), so the send is refused with `no_credits` and the
+    // sheet shows its recovery instead: the link, for the coach to hand over.
+    //
+    // Asserting that recovery is the stronger test. It pins the contract that
+    // matters — a studio that cannot email must still be able to onboard a client —
+    // and it is the state a real owner is in between creating a studio and finishing
+    // billing. (Worth knowing as a product fact, not just a test detail: no invite
+    // email leaves a studio until its subscription is live.)
     const invited = sheet(coach, "Client invited");
     await expect(invited).toBeVisible();
-    await expect(invited.getByText(clientEmail)).toBeVisible();
+    await expect(invited.getByText(/invite email didn.t go out|out of credits/i)).toBeVisible();
     const link = invited.getByText(/\?invite=/);
     await expect(link).toBeVisible();
-    // The link is absolute against the deployed host; drive its path locally. It
-    // must be the tenant's own `/t/<slug>` surface — the branded end-user door.
+    // The link the server built must point at the STUDIO'S OWN HOST — that is the
+    // whole white-label promise, and the regression it guards is a link back to the
+    // shared root, which is now a signpost that would serve an invited client
+    // nothing. The hostname is asserted; the origin is rewritten to the local port
+    // because the server builds an https link against the deployed root.
     const url = new URL((await link.textContent())!.trim());
-    expect(url.pathname).toMatch(/^\/t\/[^/]+$/);
-    invitePath = `${url.pathname}${url.search}`;
+    expect(url.hostname.split(".")[0]).toBe(slug);
+    expect(url.pathname).toBe("/");
+    inviteUrl = `http://${slug}.localhost:8787/${url.search}`;
     await invited.getByRole("button", { name: "Go to client" }).click();
 
     // Coach view of the new client.
@@ -133,10 +159,10 @@ test("owner onboards, invites a client, and the client signs in and completes in
 
   await test.step("the invited client opens their studio's branded door and signs in", async () => {
     await prepare(client);
-    // Straight from the invite link. Tenant surfaces are untouched by the platform
-    // gate — `/t/<slug>` still renders the studio's own login, which is the end-user
-    // door the gate redirects people to.
-    await client.goto(invitePath);
+    // Straight from the invite link, onto the studio's own hostname. The tenancy is
+    // pinned by that host, so the branded login below is not merely wearing the
+    // studio's brand — it can only ever sign this person into THIS studio.
+    await client.goto(inviteUrl);
     await expect(client.getByRole("heading", { name: studio, exact: true })).toBeVisible();
     await signInWithOtp(client, clientEmail);
   });

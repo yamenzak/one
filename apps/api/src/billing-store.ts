@@ -4,7 +4,7 @@
  * admin-editable at runtime; these are the ship defaults.
  */
 
-import { resolveEntitlements, mergeOverrides, clampEntitlementsForStatus, type Entitlements } from "@mossa/domain";
+import { resolveEntitlements, mergeOverrides, clampEntitlementsForStatus, type Entitlements } from "@kova/domain";
 import { newId, nowIso, nowMs } from "./ids.js";
 import { j } from "./db.js";
 

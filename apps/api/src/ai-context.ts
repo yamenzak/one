@@ -8,7 +8,7 @@
  * only want the one-line body-composition summary.
  */
 
-import { classifyBodyFat, bodyComposition, type BodyFatCategory, type UnitPrefs } from "@mossa/domain";
+import { classifyBodyFat, bodyComposition, type BodyFatCategory, type UnitPrefs } from "@kova/domain";
 import type { Env } from "./env.js";
 import { loadClientKnowledge, renderKnowledge, partOfDay, shortHash, type ClientKnowledge, type KnowledgeClient, type KnowledgeSection } from "./client-knowledge.js";
 

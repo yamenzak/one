@@ -51,7 +51,7 @@ import {
   type ActivityLevel,
   type DietaryApproach,
   type WorkoutLocation,
-} from "@mossa/domain";
+} from "@kova/domain";
 import type { Env } from "./env.js";
 import { parseJson } from "./db.js";
 import { loadGoalTimeline } from "./goals.js";
@@ -328,7 +328,7 @@ export async function loadClientKnowledge(
     ranges: goalTimeline.ranges,
     // ONE resolver, shared with the wellness score and /today: the coach's
     // targets_json value wins, the column is only a mirror, the default lives in
-    // @mossa/domain. Reading the column's hardcoded 300 here is what told the
+    // @kova/domain. Reading the column's hardcoded 300 here is what told the
     // model "training load 620/300" and had it congratulate a client who was
     // actually short of the 900 their coach set.
     weeklyLoadTarget: resolveWeeklyLoadTarget(t, goalTimeline.weeklyLoadTarget),

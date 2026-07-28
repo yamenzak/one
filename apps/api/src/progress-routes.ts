@@ -3,7 +3,7 @@
  * powers the Progress page's charts. Groups every tracked signal by the
  * client's local day over a range and returns tidy per-day series plus the
  * derived summaries (deltas, weekly training buckets, a wellness radar, a
- * consistency heatmap, PRs). All math is the pure @mossa/domain functions.
+ * consistency heatmap, PRs). All math is the pure @kova/domain functions.
  */
 
 import { Hono } from "hono";
@@ -25,7 +25,7 @@ import {
   sessionLoad,
   bodyComposition,
   type LoggedSetLike,
-} from "@mossa/domain";
+} from "@kova/domain";
 import { type AppEnv } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { parseJson } from "./db.js";

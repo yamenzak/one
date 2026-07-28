@@ -16,12 +16,12 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   estimateBodyFat, classifyBodyFat, bodyComposition, posturalMetrics, classifySomatotype, POSTURE_GUIDANCE, type BodyFatEstimate, type BodyFatCategory, type PostureResult,
   displayToKg, kgToDisplay, lengthDisplayToCm, cmToLengthDisplay, weightLabel, lengthLabel, type UnitPrefs,
-} from "@mossa/domain";
+} from "@kova/domain";
 import {
   Button, Field, Switch, Badge, IconBadge, Spinner, cn, toneVar, useModalOverlay,
   Camera, ScanLine, ShieldCheck, Ruler, User, Check, RotateCcw, X, AlertTriangle, ArrowRight, Percent,
   motion, stagger, popIn, CountUp,
-} from "@mossa/ui";
+} from "@kova/ui";
 import { api, todayLocal } from "../../../api.js";
 import { AiAvatar } from "../../../AiAvatar.js";
 import { loadScanner, analyzeAlignment, type Scanner, type ScanPhase, type Alignment } from "./pipeline.js";

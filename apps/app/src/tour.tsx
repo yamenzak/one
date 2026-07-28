@@ -14,13 +14,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { Button, ArrowRight, ArrowLeft, X, Info, Hand, CircleCheck, toneVar, type Tone } from "@mossa/ui";
+import { Button, ArrowRight, ArrowLeft, X, Info, Hand, CircleCheck, toneVar, type Tone } from "@kova/ui";
 import { setApiInterceptor } from "./api.js";
 import { tourInterceptor } from "./tour-mock.js";
 
 export type TourId = "app" | "workout" | "meal";
 
-const doneKey = (id: TourId) => `mossa.tour.v1.${id}.done`;
+const doneKey = (id: TourId) => `kova.tour.v1.${id}.done`;
 export const tourSeen = (id: TourId): boolean => { try { return localStorage.getItem(doneKey(id)) === "1"; } catch { return true; } };
 const markSeen = (id: TourId): void => { try { localStorage.setItem(doneKey(id), "1"); } catch { /* private mode */ } };
 
