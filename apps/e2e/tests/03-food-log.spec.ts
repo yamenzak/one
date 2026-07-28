@@ -16,6 +16,11 @@
  * logs a meal, sees it on their own screen, and the coach's day never shows it.
  */
 
+// Navigations are ABSOLUTE against the studio's own origin (`studio.base` /
+// `client.base`), not relative against `baseURL`. `baseURL` is the setup door,
+// which has no tenancy of its own — the studio's hostname is what pins it, so a
+// relative `/clients/...` here would exercise session-scoped fallback instead of
+// the path that ships.
 import { test, expect } from "@playwright/test";
 import { sheet, tab } from "../src/app.js";
 import { provisionClient, provisionStudio, teardown, type Client, type Studio } from "../src/provision.js";
@@ -31,7 +36,7 @@ test("client logs a meal and the coach sees it on the client's day", async ({ br
   const coach = studio.page;
 
   await test.step("the client's diary starts empty", async () => {
-    await eater.goto("/eat");
+    await eater.goto(`${client.base}/eat`);
     await expect(tab(eater, "Eat")).toBeVisible({ timeout: 30_000 });
     await expect(eater.getByText("Nothing logged today")).toBeVisible({ timeout: 30_000 });
   });
@@ -73,7 +78,7 @@ test("client logs a meal and the coach sees it on the client's day", async ({ br
   });
 
   await test.step("the coach sees the snack on the client's day", async () => {
-    await coach.goto(`/clients/${client.id}/today`);
+    await coach.goto(`${studio.base}/clients/${client.id}/today`);
     await expect(coach.getByText("Coach view")).toBeVisible();
     // Feed rows are "<meal> · <n items> · <kcal> · <time>". Anchored to the start
     // of the accessible name so nothing above the timeline can satisfy it.

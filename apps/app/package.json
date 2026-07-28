@@ -1,9 +1,9 @@
 {
-  "name": "@mossa/app",
+  "name": "@kova/app",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The Mossa app — ONE role-adaptive PWA for clients, trainers, owners, and platform admin (DESIGN.md §5).",
+  "description": "The Kova app — ONE role-adaptive PWA for clients, trainers, owners, and platform admin (DESIGN.md §5).",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -15,9 +15,9 @@
   "dependencies": {
     "@fontsource/figtree": "^5.2.8",
     "@mediapipe/tasks-vision": "^0.10.35",
-    "@mossa/domain": "workspace:*",
-    "@mossa/protocol": "workspace:*",
-    "@mossa/ui": "workspace:*",
+    "@kova/domain": "workspace:*",
+    "@kova/protocol": "workspace:*",
+    "@kova/ui": "workspace:*",
     "@simplewebauthn/browser": "^13.3.0",
     "@zxing/browser": "^0.2.1",
     "@zxing/library": "^0.23.0",

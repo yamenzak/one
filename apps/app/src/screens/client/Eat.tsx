@@ -1,13 +1,13 @@
 /** Eat tab — the nutrition diary: intake vs target, meals, per-entry macros. */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fmtEnergy, fmtVolume, volumeDisplayToMl, kcalToDisplay } from "@mossa/domain";
+import { fmtEnergy, fmtVolume, volumeDisplayToMl, kcalToDisplay } from "@kova/domain";
 import {
   Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MetricChip, MetricPill, ProgressRing, METRICS, toneSoft, Eyebrow, Page, Stagger, EmptyState, motion, ConfirmDialog,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
   Plus, Utensils, Croissant, Soup, Apple, Dumbbell, Trash2, AlertTriangle, type LucideIcon,
-} from "@mossa/ui";
-import type { UnitPrefs } from "@mossa/domain";
+} from "@kova/ui";
+import type { UnitPrefs } from "@kova/domain";
 import { api, errorText, isQueued, todayLocal } from "../../api.js";
 import { QueuedNotice } from "../../notices.js";
 import { useCan } from "../../FeatureLock.js";

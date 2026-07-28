@@ -37,7 +37,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { checkDowngrade, resolveEntitlements, mergeOverrides, type Entitlements, type TenantUsage, type Violation, type Budget, isFullyExpired } from "@mossa/domain";
+import { checkDowngrade, resolveEntitlements, mergeOverrides, type Entitlements, type TenantUsage, type Violation, type Budget, isFullyExpired } from "@kova/domain";
 import { type AppEnv, type AppContext, requireTenant } from "./auth-context.js";
 import { getSubscription, listPlans, seedBilling, tenantEntitlements, type PlanRow } from "./billing-store.js";
 import { staffSeatsUsed } from "./auth.js";
@@ -192,7 +192,7 @@ async function currentPlanRow(db: D1Database, active: PlanRow[], planId: string)
 }
 
 /** Build the full report for a target plan. Pure-ish: all the maths is
- *  `checkDowngrade` from @mossa/domain; this only measures and annotates. */
+ *  `checkDowngrade` from @kova/domain; this only measures and annotates. */
 async function report(c: AppContext, tenantId: string, targetPlanId: string): Promise<{ report: DowngradeReport } | { response: Response }> {
   await seedBilling(c.env.DB);
   const plans = await listPlans(c.env.DB);

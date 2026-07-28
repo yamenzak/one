@@ -14,7 +14,7 @@
  * archived client can log again, or worse, a coach can write to a client who
  * isn't theirs.
  *
- * This lives in @mossa/domain rather than apps/api because the api suite runs in
+ * This lives in @kova/domain rather than apps/api because the api suite runs in
  * workerd, which has no `node:fs` — and because domain owns the policy whose
  * chokepoint this is.
  *

@@ -13,8 +13,8 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Globe, PencilLine, ArrowLeft, ArrowRight, Search, Plus, Trash2, Check, toneSoft, cn, type Tone } from "@mossa/ui";
-import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@mossa/protocol";
+import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Globe, PencilLine, ArrowLeft, ArrowRight, Search, Plus, Trash2, Check, toneSoft, cn, type Tone } from "@kova/ui";
+import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@kova/protocol";
 import { api, ApiError, uploadMedia } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { AiAvatar } from "../../AiAvatar.js";

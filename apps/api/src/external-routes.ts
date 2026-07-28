@@ -17,7 +17,7 @@ import { newId, nowIso } from "./ids.js";
 
 const CACHE_TTL = 60 * 60 * 24; // 1 day
 const CV = "v2"; // cache-key version — bump to invalidate poisoned entries
-const UA = "Mossa/1.0 (https://mossa.4dl.app; coaching platform)";
+const UA = "Kova/1.0 (https://kova.4dl.app; coaching platform)";
 const r1 = (n: unknown): number => (typeof n === "number" && isFinite(n) ? Math.round(n * 10) / 10 : 0);
 
 /** Fetch with a hard timeout so a slow/hanging upstream provider degrades to an

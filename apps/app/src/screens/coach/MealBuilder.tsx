@@ -1,10 +1,10 @@
 /** Meal plan builder — bank-of-options with live macro totals + free meals. */
 
 import { useCallback, useEffect, useState } from "react";
-import type { MealBody, MealOption, MealFood } from "@mossa/protocol";
-import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
-import { fmtEnergy, scaleFood, servingsToQuantity, SERVING_PRESETS } from "@mossa/domain";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, MacroBar, ProgressRing, Eyebrow, Chip, IconBadge, ConfirmDialog, EmptyState, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, AlertTriangle, ArrowLeft, Plus, PencilLine, Utensils, Flame, History, LayoutGrid, ChevronRight, Trash2, X } from "@mossa/ui";
+import type { MealBody, MealOption, MealFood } from "@kova/protocol";
+import { optionMacroTotals, type FoodLike } from "@kova/protocol";
+import { fmtEnergy, scaleFood, servingsToQuantity, SERVING_PRESETS } from "@kova/domain";
+import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, MacroInline, MacroBar, ProgressRing, Eyebrow, Chip, IconBadge, ConfirmDialog, EmptyState, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, AlertTriangle, ArrowLeft, Plus, PencilLine, Utensils, Flame, History, LayoutGrid, ChevronRight, Trash2, X } from "@kova/ui";
 import { api, ApiError, errorText } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { AiAvatar } from "../../AiAvatar.js";

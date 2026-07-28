@@ -6,11 +6,11 @@
  * TEXT columns; day-bucketed rows carry the CLIENT'S local date as
  * `date_local` (YYYY-MM-DD — the app computes it device-side, SPEC §8.6);
  * deep structures (plan bodies, budgets, targets) are JSON columns validated
- * by @mossa/protocol schemas at the route boundary.
+ * by @kova/protocol schemas at the route boundary.
  *
  * Better Auth's tables are mirrored 1:1 from its SQLite schema (string→TEXT,
  * boolean→INTEGER, date→DATE) so its adapter reads/writes them natively. An
- * `organization` IS a Mossa tenant.
+ * `organization` IS a Kova tenant.
  */
 
 let schemaReady: Promise<void> | null = null;
@@ -212,15 +212,29 @@ async function applySchema(db: D1Database): Promise<void> {
           // ── Tenant settings (branding, AI toggles, marketplace, Connect) ───
           "CREATE TABLE IF NOT EXISTS tenant_settings (tenant_id TEXT PRIMARY KEY, branding_json TEXT, ai_toggles_json TEXT, marketplace_json TEXT, integrations_json TEXT, stripe_account_id TEXT, updated_at TEXT);",
 
-          // ── Custom domains (SPEC §14.1) — Cloudflare for SaaS white-label.
-          // Keyed by hostname for the Host→tenant lookup on every request. One
-          // row per tenant hostname; status/ssl mirror the CF custom hostname.
-          "CREATE TABLE IF NOT EXISTS tenant_domains (hostname TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, cf_hostname_id TEXT, cf_route_id TEXT, status TEXT DEFAULT 'pending', ssl_status TEXT, verify_name TEXT, verify_value TEXT, verify_json TEXT, cf_errors TEXT, cname_target TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
+          // ── Tenant hostnames — the Host→tenant table (SPEC §14.1) ──────────
+          // Keyed by hostname because that is the lookup on every single request.
+          //
+          // TWO KINDS of row live here, and the distinction is load-bearing:
+          //
+          //  'subdomain'  `<slug>.kova.4dl.app`. Created with the studio, always
+          //               `active`, no Cloudflare call and no DCV — the wildcard
+          //               certificate, wildcard DNS record and wildcard worker
+          //               route already cover it. System-owned: it is not listed
+          //               in the owner's domains UI and cannot be deleted there,
+          //               because deleting it would make the studio unreachable.
+          //  'custom'     a domain the tenant owns. Provisioned through
+          //               Cloudflare for SaaS; carries cf ids, DCV records and
+          //               validation errors.
+          //
+          // `kind` defaults to 'custom' so pre-existing rows (all of which were
+          // custom domains) keep their meaning without a data migration.
+          "CREATE TABLE IF NOT EXISTS tenant_domains (hostname TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, kind TEXT DEFAULT 'custom', cf_hostname_id TEXT, cf_route_id TEXT, status TEXT DEFAULT 'pending', ssl_status TEXT, verify_name TEXT, verify_value TEXT, verify_json TEXT, cf_errors TEXT, cname_target TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
           "CREATE INDEX IF NOT EXISTS idx_tenant_domains_tenant ON tenant_domains(tenant_id);",
 
           // ── Coach-action audit log (SPEC §9; REGISTRY-PLAN Phase 3) ────────
           // Durable, queryable record of STAFF actions on a client's record. The
-          // action id keys into @mossa/domain AUDIT_ACTIONS; summary is a short
+          // action id keys into @kova/domain AUDIT_ACTIONS; summary is a short
           // human line; ref points at the affected row. Listed newest-first per
           // client, so the index is (client_id, at DESC).
           "CREATE TABLE IF NOT EXISTS audit_log (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, actor_user_id TEXT, action TEXT, summary TEXT, ref TEXT, at INTEGER);",
@@ -276,6 +290,11 @@ async function applySchema(db: D1Database): Promise<void> {
           // no hint that DNS was refusing to let the certificate issue — the
           // owner's only route to the truth was a dashboard they cannot see.
           "ALTER TABLE tenant_domains ADD COLUMN cf_errors TEXT",
+          // 'subdomain' | 'custom'. Defaults to 'custom' precisely so existing
+          // rows — which are all custom domains — need no backfill. The studio's
+          // own `<slug>.<root>` row is inserted with kind='subdomain' and is
+          // system-owned; see the CREATE TABLE comment.
+          "ALTER TABLE tenant_domains ADD COLUMN kind TEXT DEFAULT 'custom'",
           "ALTER TABLE clients ADD COLUMN avatar_url TEXT",
           "ALTER TABLE clients ADD COLUMN avatar_seed TEXT",
           // Rich micronutrients on foods (ByShujaa parity).
@@ -333,7 +352,7 @@ async function applySchema(db: D1Database): Promise<void> {
           "ALTER TABLE body_scans ADD COLUMN posture_severity TEXT",
           "ALTER TABLE body_scans ADD COLUMN somatotype TEXT",
           // Promo codes (billing centralization): per-client exclusivity + a
-          // rail discriminator ('tenant' = tenant→client, 'platform' = Mossa→tenant).
+          // rail discriminator ('tenant' = tenant→client, 'platform' = Kova→tenant).
           "ALTER TABLE promo_codes ADD COLUMN restricted_client_id TEXT",
           "ALTER TABLE promo_codes ADD COLUMN scope TEXT DEFAULT 'tenant'",
           // Redemption codes: optional per-package + per-client scoping.

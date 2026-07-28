@@ -10,8 +10,8 @@ import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } 
 import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
   Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Hand, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, toneVar, type TabDef, type Tone,
-} from "@mossa/ui";
-import { resolveStanding } from "@mossa/domain";
+} from "@kova/ui";
+import { resolveStanding, studioStandingOfGate } from "@kova/domain";
 import { useSession, useActiveClientId } from "./session.js";
 import { useTheme } from "./theme.js";
 import { api } from "./api.js";
@@ -38,7 +38,7 @@ import { Explore } from "./screens/client/Explore.js";
 import { AdminConsole } from "./screens/admin/AdminConsole.js";
 import { AcceptInvite } from "./screens/AcceptInvite.js";
 import { NotificationBell } from "./NotificationBell.js";
-import { OfflinePill } from "./notices.js";
+import { OfflinePill, StudioPausedBanner } from "./notices.js";
 import { StudioSwitcher } from "./StudioSwitcher.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { TourProvider, useTour, type TourId } from "./tour.js";
@@ -66,7 +66,7 @@ function useClientSurface(): boolean {
 }
 
 export function Shell() {
-  const { ctx } = useSession();
+  const { ctx, host } = useSession();
   const active = ctx!.active!;
   const loc = useLocation();
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
@@ -96,11 +96,11 @@ export function Shell() {
         membership: ctx!.clientAccess.archived ? "archived" : "active",
         accessActive: ctx!.clientAccess.active,
         accessRequired: ctx!.clientAccess.required,
-        // The client's own view: a suspended studio has already lost its paid
-        // features through the entitlement clamp, which the client inherits via
-        // `entitlements ∩ clientFlags`. What is left — their own record and
-        // logbook — stays theirs, so this axis has nothing to add here.
-        studio: "ok",
+        // The STUDIO's real standing, from the host gate. This was a hardcoded
+        // "ok" — here and in `requireClientAccess`, the only two callers — which
+        // made the axis dead in practice: a client at a suspended studio was told
+        // everything was fine right up until a save failed.
+        studio: studioStandingOfGate(host?.gate?.reason),
       })
     : null;
   if (active.role === "client" && active.clientId && standing?.lockedToStorefront) {
@@ -246,6 +246,9 @@ function TabLayout() {
         />
       )}
       <div className="relative z-10 transition-colors duration-500" style={pageVars}>
+      {/* Above the bar, not inside it: a read-only studio is the state of the whole
+          surface, not one more indicator competing for space in the trailing row. */}
+      <StudioPausedBanner />
       <AppBar
         bare={ambient}
         scrolled={scrolled}
@@ -484,8 +487,8 @@ function BillingNotice() {
             </h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
               {pending
-                ? "The card step didn't complete, so nothing is being billed and you're running on Mossa's free baseline"
-                : "You're running on Mossa's free baseline"}
+                ? "The card step didn't complete, so nothing is being billed and you're running on Kova's free baseline"
+                : "You're running on Kova's free baseline"}
               {limits.length > 0 ? `: ${limits.join(" · ")}.` : "."}
             </p>
           </div>

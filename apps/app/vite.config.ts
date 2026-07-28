@@ -35,7 +35,7 @@ function mediapipeWasm(): Plugin {
   }
   const PREFIX = "/mediapipe/wasm/";
   return {
-    name: "mossa-mediapipe-wasm",
+    name: "kova-mediapipe-wasm",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const url = req.url ?? "";
@@ -147,7 +147,7 @@ export default defineConfig({
             method: "POST",
             options: {
               backgroundSync: {
-                name: "mossa-log-writes",
+                name: "kova-log-writes",
                 options: { maxRetentionTime: 24 * 60 },
               },
             },

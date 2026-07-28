@@ -8,7 +8,7 @@
  */
 
 import { useState } from "react";
-import { Button, cn, CircleAlert, Copy, Check } from "@mossa/ui";
+import { Button, cn, CircleAlert, Copy, Check } from "@kova/ui";
 import { ApiError } from "./api.js";
 
 export function aiErrorText(error: unknown): { message: string; raw: string | null; status: number | null } {

@@ -1,7 +1,7 @@
 /**
  * Coach attention — one roster rollup of everything across a coach's visible
  * clients that needs their eyes (SPEC §8.11 generalized). The catalog of types
- * + severity lives in `@mossa/domain` (`ATTENTION_TYPES`); this fills each with
+ * + severity lives in `@kova/domain` (`ATTENTION_TYPES`); this fills each with
  * real data. `rollupAttention` is the shared computation — the route serves it
  * to the app, and the weekly digest reuses it so email + in-app never drift.
  */
@@ -10,7 +10,7 @@ import { Hono } from "hono";
 import {
   ATTENTION_TYPES, SEVERITY_RANK, rankByAttention, goalStaleness, calculateBMR, ageFromDob, profileGaps, rangeStatus,
   overallDaysRemaining, isFullyExpired, addDays, type AttentionType, type AttentionSeverity, type Budget, type ClientPreferences,
-} from "@mossa/domain";
+} from "@kova/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { REPORTED_ACCESS_STATUSES } from "./client-flags.js";
 import { visibleClientIds } from "./clients.js";

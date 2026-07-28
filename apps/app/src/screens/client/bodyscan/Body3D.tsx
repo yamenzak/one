@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useMemo, useRef } from "react";
-import type { BodySlice, BodyProfile } from "@mossa/domain";
+import type { BodySlice, BodyProfile } from "@kova/domain";
 
 type Pt = [number, number];
 interface Vert { x: number; y: number; z: number }

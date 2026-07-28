@@ -7,7 +7,7 @@
  *   permissive defaults -> package defaults -> subscription overrides
  *   -> budget gating (feature off when its budget lapsed)
  *   -> ∩ tenant plan entitlements (a tenant below Studio can't sell what
- *      Mossa didn't sell them)
+ *      Kova didn't sell them)
  */
 
 import type { Budget, BudgetFeature } from "./budgets.js";
@@ -255,7 +255,7 @@ export function resolveClientFlags(input: ResolveFlagsInput): ClientFlags {
     }
   }
 
-  // ∩ tenant entitlements — the tenant can't grant a client capability Mossa
+  // ∩ tenant entitlements — the tenant can't grant a client capability Kova
   // didn't sell them. Driven by each flag's declared `requiresFeature` (not a
   // single hardcoded aiSuite check), so any new gated flag is enforced
   // automatically instead of silently slipping through.

@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { profileGaps } from "@mossa/domain";
+import { profileGaps } from "@kova/domain";
 import { PROFILE_GAPS, gapDestination } from "./screens/client/Today.js";
 
 /** Nothing filled in — the state a freshly invited client is actually in. */

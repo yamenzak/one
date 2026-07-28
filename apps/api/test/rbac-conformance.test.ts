@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { statement, roles } from "../src/access.js";
-import { PERMISSION_CATALOG, ROLE_PRESETS, TENANT_ROLES } from "@mossa/domain";
+import { PERMISSION_CATALOG, ROLE_PRESETS, TENANT_ROLES } from "@kova/domain";
 
 // `member` is governed by Better Auth's own organization statements, not our
 // catalog, so it's intentionally absent from access.ts's custom statement.

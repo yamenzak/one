@@ -1,7 +1,7 @@
 /**
  * Stripe (SPEC §7) — SDK-less, raw fetch against api.stripe.com/v1 with Web
  * Crypto webhook verification. Two rails:
- *   • Platform rail (Mossa ↔ tenant): plan subs + credit packs.
+ *   • Platform rail (Kova ↔ tenant): plan subs + credit packs.
  *   • Connect rail (tenant ↔ client): checkout on the connected account with
  *     NO application fee. Onboarding via Connect account links.
  *
@@ -179,7 +179,7 @@ const scopeValues = (raw: Record<string, string | undefined>, key: (cred: Stripe
 };
 
 /**
- * The safe answer to "what is Mossa actually on right now?" — presence,
+ * The safe answer to "what is Kova actually on right now?" — presence,
  * provenance and the derived key lane, with NO secret material: booleans, a
  * last-4 hint, and the lane a prefix implies. Never a key, never a `whsec_`.
  */
@@ -301,7 +301,7 @@ export async function ensureCustomer(db: D1Database, secretKey: string, tenantId
   if (row?.stripe_customer_id) return row.stripe_customer_id;
   const customer = await stripeCall<{ id: string }>(secretKey, "customers", {
     email,
-    "metadata[mossa_tenant]": tenantId,
+    "metadata[kova_tenant]": tenantId,
   });
   await db.prepare("UPDATE subscriptions SET stripe_customer_id = ? WHERE tenant_id = ?").bind(customer.id, tenantId).run();
   return customer.id;
@@ -377,7 +377,7 @@ export async function syncCatalog(db: D1Database, secretKey: string): Promise<{ 
   let planCount = 0;
   for (const p of plans.results ?? []) {
     if (p.stripe_price_id) continue;
-    const product = await stripeCall<{ id: string }>(secretKey, "products", { name: `Mossa ${p.name}`, "metadata[mossa_plan]": p.id });
+    const product = await stripeCall<{ id: string }>(secretKey, "products", { name: `Kova ${p.name}`, "metadata[kova_plan]": p.id });
     const price = await stripeCall<{ id: string }>(secretKey, "prices", {
       product: product.id,
       unit_amount: Math.round(p.price_usd_month * 100),
@@ -391,7 +391,7 @@ export async function syncCatalog(db: D1Database, secretKey: string): Promise<{ 
   let packCount = 0;
   for (const p of packs.results ?? []) {
     if (p.stripe_price_id) continue;
-    const product = await stripeCall<{ id: string }>(secretKey, "products", { name: `Mossa — ${p.name}`, "metadata[mossa_pack]": p.id });
+    const product = await stripeCall<{ id: string }>(secretKey, "products", { name: `Kova — ${p.name}`, "metadata[kova_pack]": p.id });
     const price = await stripeCall<{ id: string }>(secretKey, "prices", { product: product.id, unit_amount: Math.round(p.price_usd * 100), currency: "usd" });
     await db.prepare("UPDATE credit_packs SET stripe_product_id = ?, stripe_price_id = ? WHERE id = ?").bind(product.id, price.id, p.id).run();
     packCount++;

@@ -4,7 +4,7 @@
  *
  * Cloudflare bindings are request-scoped, so `betterAuth()` cannot live at
  * module scope; build it per request with `createAuth(env, origin)` and cache
- * it on the Hono context. An **organization = a Mossa tenant**; the session's
+ * it on the Hono context. An **organization = a Kova tenant**; the session's
  * `activeOrganizationId` is the tenant id threaded through every route.
  *
  * Flow (every role): email → 6-digit OTP → in. After first sign-in the app
@@ -14,10 +14,11 @@
 import { betterAuth, APIError } from "better-auth";
 import { organization, emailOTP } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
+import { cookieDomainFor, isDevRoot, rpIdFor, type HostShape } from "@kova/domain";
 import type { Env } from "./env.js";
 import { ac, roles } from "./access.js";
 import { withinQuota, hasFeature } from "./billing-store.js";
-import { sendEmail, emailShell, emailButton, escapeHtml, MOSSA_BRAND } from "./mailer.js";
+import { sendEmail, emailShell, emailButton, escapeHtml, KOVA_BRAND } from "./mailer.js";
 import { sendTenantEmail } from "./email-provider.js";
 import { tenantBrandKit } from "./notify.js";
 import { newId, nowMs } from "./ids.js";
@@ -58,7 +59,7 @@ const OTP_MAX_PER_HOUR = 6;
 //
 // A staff seat is a `member` row whose role is not `client` — **the owner
 // included**, because the quota's own label is "Owner + trainers + assistants"
-// (`@mossa/domain` entitlements.ts) and `checkDowngrade` counts it the same way.
+// (`@kova/domain` entitlements.ts) and `checkDowngrade` counts it the same way.
 // So Free/Solo (`staffSeats: 1`) is a one-coach studio by design: the owner fills
 // it and cannot add staff without upgrading. That is the ceiling, not a lockout —
 // nothing here runs when a workspace is CREATED, when a client links, or when a
@@ -133,15 +134,39 @@ function seatError(verdict: SeatVerdict): APIError {
   return new APIError("FORBIDDEN", { code: "STAFF_SEATS_EXCEEDED", message: verdict.message, quota: "staffSeats", used: verdict.used, limit: verdict.max });
 }
 
-export function createAuth(env: Env, origin?: string) {
-  // Local dev always wins: a localhost origin overrides the prod var so
-  // cookies stay non-Secure and callbacks point at the dev server.
-  const isLocal = Boolean(origin && /^http:\/\/(localhost|127\.0\.0\.1)/.test(origin));
-  // Model A (SPEC §14.1): the REQUEST origin drives baseURL — so on a tenant's
-  // custom domain the passkey RP id + cookies bind to that domain (each domain
-  // is its own WebAuthn RP). BETTER_AUTH_URL is only the fallback when there's
-  // no request context (e.g. background jobs). On the platform host the request
-  // origin equals BETTER_AUTH_URL, so nothing changes there.
+/**
+ * Build the per-request auth instance.
+ *
+ * `shape` is the request's host classification (`@kova/domain` `classifyHost`),
+ * and it decides the two things that make cross-tenant identity work:
+ *
+ *  • **rpID** — every door under our root shares `rpID = <root>`, so ONE passkey
+ *    works at `setup.`, at `admin.` and at every studio a person belongs to. A
+ *    custom domain has no suffix relationship with our root, so WebAuthn requires
+ *    it to be its own RP with its own credential. See `rpIdFor`.
+ *  • **cookie Domain** — widened to the root under our subtree, so one sign-in
+ *    covers every studio and the switcher moves between subdomains without
+ *    re-authenticating. Host-only on a custom domain and on `localhost`. See
+ *    `cookieDomainFor`.
+ *
+ * Omitting `shape` falls back to host-only behaviour derived from the origin,
+ * which is what background jobs (no request) get.
+ */
+export function createAuth(env: Env, origin?: string, shape?: HostShape) {
+  // Local dev always wins: a loopback origin overrides the prod var so cookies
+  // stay non-Secure and callbacks point at the dev server.
+  //
+  // Derived from the host SHAPE when we have one, not from a regex on the origin.
+  // The regex only matched a literal `localhost` / `127.0.0.1` prefix, so the
+  // moment dev moved onto the real topology (`setup.localhost`, `acme.localhost`)
+  // every request stopped being "local": secure cookies over http, and — because
+  // the dev-secret fallback is gated on the same flag — auth refusing to start at
+  // all. One predicate for both, so they cannot disagree again.
+  const isLocal = shape ? isDevRoot(shape) : Boolean(origin && /^http:\/\/(localhost|127\.0\.0\.1)/.test(origin));
+  // The REQUEST origin drives baseURL — so on a studio's subdomain or its custom
+  // domain, callbacks and emailed links point back at the door the user actually
+  // came through. BETTER_AUTH_URL is only the fallback when there's no request
+  // context (e.g. background jobs).
   const baseURL = origin || env.BETTER_AUTH_URL || "http://localhost:8787";
 
   // CSRF: Better Auth rejects POSTs whose Origin isn't trusted.
@@ -175,7 +200,7 @@ export function createAuth(env: Env, origin?: string) {
   // the ADMIN_EMAILS and mock-mailer hardening. In production the missing secret
   // must refuse to boot auth, not silently serve on a forgeable key.
   const devLane = env.ENVIRONMENT === "development" || isLocal;
-  const secret = env.BETTER_AUTH_SECRET || (devLane ? "mossa-dev-insecure-secret-change-me" : "");
+  const secret = env.BETTER_AUTH_SECRET || (devLane ? "kova-dev-insecure-secret-change-me" : "");
   if (!secret) {
     throw new Error(
       "BETTER_AUTH_SECRET is not set — refusing to start auth on an insecure fallback key outside development. Set it with `wrangler secret put BETTER_AUTH_SECRET`.",
@@ -290,7 +315,7 @@ export function createAuth(env: Env, origin?: string) {
         // the deep link is lost. Without this the invite silently dead-ended.
         async sendInvitationEmail(data) {
           const acceptUrl = `${baseURL.replace(/\/$/, "")}/accept-invitation/${data.id}`;
-          const brand = await tenantBrandKit(env.DB, data.organization.id).catch(() => MOSSA_BRAND);
+          const brand = await tenantBrandKit(env.DB, data.organization.id).catch(() => KOVA_BRAND);
           const inviter = data.inviter.user.name || data.inviter.user.email || "Your studio";
           const roleLabel = data.role === "assistant" ? "an assistant" : "a coach";
           const html = emailShell(
@@ -299,7 +324,7 @@ export function createAuth(env: Env, origin?: string) {
              <p style="margin:0">Accept to set up your account — you'll sign in with a one-time code, no password to create.</p>
              ${emailButton("Accept invitation", acceptUrl, brand)}
              <p style="margin:18px 0 0;color:#8b9099;font-size:13px;line-height:1.6">If you weren't expecting this, you can safely ignore this email.</p>`,
-            { brand, preheader: `Join ${brand.name} on Mossa`, eyebrow: "Staff invitation" },
+            { brand, preheader: `Join ${brand.name} on Kova`, eyebrow: "Staff invitation" },
           );
           const text = `${inviter} invited you to join ${data.organization.name} as ${roleLabel}. Accept your invitation: ${acceptUrl}`;
           await sendTenantEmail(env, data.organization.id, {
@@ -343,7 +368,7 @@ export function createAuth(env: Env, origin?: string) {
             env.DB,
             {
               to: email,
-              subject: `${otp} is your Mossa code`,
+              subject: `${otp} is your Kova code`,
               html: emailShell(
                 "Your sign-in code",
                 `<p style="margin:0 0 20px">Enter this code to finish signing in. It expires in 10 minutes and works once.</p>
@@ -351,9 +376,9 @@ export function createAuth(env: Env, origin?: string) {
                    <div style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:34px;font-weight:800;letter-spacing:10px;color:#e8eaed;padding-left:10px">${otp}</div>
                  </td></tr></table>
                  <p style="margin:20px 0 0;color:#8b9099;font-size:13px;line-height:1.6">If you didn't request this, you can safely ignore it — no changes will be made.</p>`,
-                { brand: MOSSA_BRAND, preheader: `${otp} is your Mossa sign-in code (expires in 10 minutes).` },
+                { brand: KOVA_BRAND, preheader: `${otp} is your Kova sign-in code (expires in 10 minutes).` },
               ),
-              text: `Your Mossa code is ${otp} (expires in 10 minutes).`,
+              text: `Your Kova code is ${otp} (expires in 10 minutes).`,
             },
             env.EMAIL,
             undefined,
@@ -368,9 +393,11 @@ export function createAuth(env: Env, origin?: string) {
       }),
       // One-tap re-auth once enrolled; multiple passkeys per user.
       passkey({
-        rpName: "Mossa",
-        // rpID must match the serving origin's registrable domain.
-        rpID: baseURL.startsWith("https") ? new URL(baseURL).hostname : "localhost",
+        rpName: "Kova",
+        // One credential for every door under our root; host-scoped elsewhere.
+        // `rpIdFor` returns "localhost" for every loopback host, which is what
+        // keeps dev and the E2E suite (on `*.localhost`) enrolling passkeys.
+        rpID: shape ? rpIdFor(shape) : baseURL.startsWith("https") ? new URL(baseURL).hostname : "localhost",
         // WebAuthn verifies the ceremony's origin against this. In local dev the
         // page runs on Vite (:5173) while this worker is :8787, so pin BOTH (same
         // set as trustedOrigins) or registration fails with an origin mismatch.
@@ -380,7 +407,25 @@ export function createAuth(env: Env, origin?: string) {
     ],
 
     // App + API share one origin; secure cookies only on https (local dev is http).
-    advanced: { cookiePrefix: "mossa", useSecureCookies: baseURL.startsWith("https") },
+    //
+    // `crossSubDomainCookies` is what makes one sign-in cover every studio: the
+    // session cookie is issued for `.kova.4dl.app`, so `acme.kova.4dl.app` and
+    // `bolt.kova.4dl.app` are the same session and the studio switcher is a
+    // navigation rather than a re-authentication. It is NOT sent to
+    // `otherapp.4dl.app` — a Domain of `kova.4dl.app` matches that name and its
+    // subdomains only — so unrelated apps in the same zone are unaffected.
+    //
+    // Left off (host-only cookies) for custom domains, which have no shared parent
+    // to widen to, and for `localhost`, which browsers reject a Domain attribute
+    // for. The latter means dev keeps a separate session per `*.localhost` host;
+    // that is a dev-only difference from production, called out in `cookieDomainFor`.
+    advanced: {
+      cookiePrefix: "kova",
+      useSecureCookies: baseURL.startsWith("https"),
+      ...(shape && cookieDomainFor(shape)
+        ? { crossSubDomainCookies: { enabled: true, domain: `.${cookieDomainFor(shape)}` } }
+        : {}),
+    },
   });
 }
 

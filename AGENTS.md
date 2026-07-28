@@ -43,7 +43,7 @@ Break any of these and you ship a security hole, a money bug, or a dead screen.
    computed from.
 
 6. **Two flag systems, never merged.** Platform entitlements (the tenant bought
-   from Mossa, `entitlements.ts`) vs per-package client flags (the client bought
+   from Kova, `entitlements.ts`) vs per-package client flags (the client bought
    from the tenant, `clientFlags.ts`). A client's capability is the *intersection*.
 
 7. **Access economy: budgets carry `expiresAt`, days derive at read time,
@@ -218,7 +218,7 @@ if (!ok) throw new Error("runway_cas_failed");
   safe to re-run**, and nothing that can throw may run *after* a non-idempotent
   grant. Never `.catch(() => undefined)` a grant.
 - On the Connect endpoint, resolve `accountTenantId` from `event.account` and
-  assert `metadata.mossa_tenant === accountTenantId` in every branch that grants
+  assert `metadata.kova_tenant === accountTenantId` in every branch that grants
   value. A connected Standard account is controlled by its tenant; metadata is
   attacker-supplied. Scope every lookup with `AND tenant_id = ?`.
 - **Know your event object.** `charge.refunded` → Charge. `charge.dispute.created`
@@ -228,7 +228,7 @@ if (!ok) throw new Error("runway_cas_failed");
   value to `.bind()`.
 - **Read subscription ids defensively:** `inv.subscription ??
   inv.parent?.subscription_details?.subscription ?? inv.lines?.data?.[0]?.subscription`.
-  The API-version pin in `stripe.ts` covers requests Mossa *makes*; webhook
+  The API-version pin in `stripe.ts` covers requests Kova *makes*; webhook
   payload shape follows the endpoint's dashboard config, which nothing in the repo
   sets. Getting this wrong charges the card monthly and tops up nothing, silently,
   returning 200.
@@ -395,10 +395,10 @@ stored `date_local` with `new Date(\`${d}T00:00:00\`)`; a bare
 `new Date("2026-08-01")` parses as UTC and displays the previous day across the
 Americas. This applies to every date-only column, including `lab_tests.due_by`.
 
-**Units.** Store metric, convert at display via `@mossa/domain` `units.ts` and the
+**Units.** Store metric, convert at display via `@kova/domain` `units.ts` and the
 `useUnits()` hook. Never post a display-unit number.
 
-**Design system.** Use `@mossa/ui` primitives, never raw palette classes. **Text
+**Design system.** Use `@kova/ui` primitives, never raw palette classes. **Text
 or icons on a solid domain tone must be `text-[var(--tone-foreground)]`, never
 `text-white`** — tones invert per mode, so white-on-tone is ~1.9:1 in dark. Never
 add `[color-scheme:dark]` to an element; `tokens.css` owns it at the root.
@@ -439,15 +439,15 @@ pnpm install --frozen-lockfile   # always; a bare install can drift the lockfile
 pnpm dev                         # api :8787 + app :5173 (develop against 5173)
 pnpm typecheck                   # 9 turbo tasks
 pnpm test                        # builds the SPA first, then every suite
-pnpm --filter @mossa/domain test # pure math, fast — run this constantly
-pnpm --filter @mossa/api test    # Miniflare integration
+pnpm --filter @kova/domain test # pure math, fast — run this constantly
+pnpm --filter @kova/api test    # Miniflare integration
 pnpm e2e                         # Playwright, 3 golden paths, ~35s. Builds the
                                  # SPA and boots the worker itself; stop any
                                  # `wrangler dev` first (shared .wrangler state)
 
 # The real-Stripe billing suite — opt-in, ~110s, NOT part of `pnpm test`
 export STRIPE_TEST_SECRET_KEY=sk_test_…   # test mode ONLY; never commit a key
-pnpm --filter @mossa/api exec vitest run test/stripe-live.test.ts
+pnpm --filter @kova/api exec vitest run test/stripe-live.test.ts
 cd apps/api && npx wrangler deploy --dry-run --outdir /tmp/x   # validates bindings
 ```
 
@@ -455,7 +455,7 @@ cd apps/api && npx wrangler deploy --dry-run --outdir /tmp/x   # validates bindi
   your change. Use `--force` when you need real evidence.
 - **The API suite needs `apps/app/dist` to exist.** Without it Miniflare aborts
   and reports **"no tests"** rather than failing — a silent green. `pnpm test`
-  handles the ordering; a direct `--filter @mossa/api test` does not.
+  handles the ordering; a direct `--filter @kova/api test` does not.
 - **Stop `wrangler dev` before running tests** — they share `.wrangler` state.
 - **`test/stripe-live.test.ts` skips unless `STRIPE_TEST_SECRET_KEY` is exported.**
   Putting it in `apps/api/.dev.vars` is deliberately not enough: `vitest.config.ts`
@@ -467,7 +467,7 @@ cd apps/api && npx wrangler deploy --dry-run --outdir /tmp/x   # validates bindi
   after every `it`.** A test that needs a previous test's rows must redo them
   itself; suite fixtures go in `beforeAll`. This is silent — it looks like a
   handler bug.
-- Don't append `--force` to `pnpm --filter @mossa/app build`; pnpm forwards it to
+- Don't append `--force` to `pnpm --filter @kova/app build`; pnpm forwards it to
   vite, which dies with `CACError`.
 - **There is no linter.** `turbo.json` declares a `lint` task no package
   implements. Match surrounding style by hand.

@@ -5,12 +5,12 @@
  */
 
 import { useState } from "react";
-import { ACTIVITIES, activitiesByCategory, activityTrack, weightLabel, lengthLabel, volumeLabel, energyLabel, displayToKg, lengthDisplayToCm, volumeDisplayToMl, displayToKcal, kcalToDisplay } from "@mossa/domain";
+import { ACTIVITIES, activitiesByCategory, activityTrack, weightLabel, lengthLabel, volumeLabel, energyLabel, displayToKg, lengthDisplayToCm, volumeDisplayToMl, displayToKcal, kcalToDisplay } from "@kova/domain";
 import {
   Button, Field, Textarea, Sheet, Chip, IconBadge, Switch,
   Utensils, Footprints, Droplet, Weight, Ruler, Moon, Smile, ClipboardList, Camera, Angry, Frown, Meh, Laugh, Search, Timer, HeartPulse, MapPin, Flame, Dumbbell,
   cn, toneVar, type LucideIcon, type Tone,
-} from "@mossa/ui";
+} from "@kova/ui";
 import { api, errorText, isQueued, todayLocal, uploadMedia } from "../../api.js";
 import { QueuedNotice } from "../../notices.js";
 import { useCan } from "../../FeatureLock.js";
@@ -173,7 +173,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
       if (track !== "reps" && !num("duration")) { setErr("Enter a duration."); return; }
     }
     // Water and Sleep post a REQUIRED positive number (LogWater.amountMl and
-    // LogSleep.durationMinutes are both `int().positive()` in @mossa/protocol).
+    // LogSleep.durationMinutes are both `int().positive()` in @kova/protocol).
     // A blank amount sent `undefined`, and 0 hours sent durationMinutes: 0 —
     // both 400 at the route, which with no catch below read as a Save button
     // that does nothing, forever. Catch it here where we can say why.

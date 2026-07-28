@@ -3,12 +3,12 @@
  * implementation parameterized by kind, since both share the same lifecycle:
  * draft → published (snapshots the active goal, supersedes the previous
  * published plan) → superseded/archived. Bodies are validated by
- * @mossa/protocol schemas and stored as JSON.
+ * @kova/protocol schemas and stored as JSON.
  */
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { WorkoutBody, MealBody, stripBodyForTemplate } from "@mossa/protocol";
+import { WorkoutBody, MealBody, stripBodyForTemplate } from "@kova/protocol";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { withinQuota } from "./billing-store.js";

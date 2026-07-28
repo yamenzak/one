@@ -1,5 +1,5 @@
 /**
- * Mossa API worker (SPEC §3) — Hono router. One origin serves the app SPA
+ * Kova API worker (SPEC §3) — Hono router. One origin serves the app SPA
  * (assets binding, SPA fallback) and this API (`run_worker_first`).
  *
  * Middleware order: session (per-request Better Auth + identity) → route
@@ -12,7 +12,7 @@ import { sessionMiddleware, type AppEnv } from "./auth-context.js";
 import { routeGuard } from "./route-guard.js";
 import { ensureSchema, parseJson } from "./db.js";
 import { seedBilling, listPlans, getSubscription } from "./billing-store.js";
-import { resolveEntitlements, type NotifType } from "@mossa/domain";
+import { resolveEntitlements, type NotifType } from "@kova/domain";
 import { periodKey } from "./ids.js";
 import { contextRoutes } from "./context-routes.js";
 import { billingRoutes, adminRoutes } from "./billing-routes.js";
@@ -45,6 +45,7 @@ import { sessionRoutes, promoRoutes } from "./session-routes.js";
 import { domainRoutes, domainAdminRoutes } from "./domain-routes.js";
 import { onboardingRoutes } from "./onboarding-routes.js";
 import { otpSendGuard } from "./otp-guard.js";
+import { orgCreateGuard, orgUpdateGuard } from "./org-guard.js";
 import { buildManifest } from "./manifest.js";
 import type { Env } from "./env.js";
 
@@ -57,7 +58,7 @@ export { InboxDO } from "./inbox-do.js";
 const app = new Hono<AppEnv>();
 
 // Liveness: the worker is up. Deliberately trivial and dependency-free.
-app.get("/health", (c) => c.json({ ok: true, service: "mossa-api" }));
+app.get("/health", (c) => c.json({ ok: true, service: "kova-api" }));
 
 // Readiness: point an external uptime monitor HERE, not at /health. A worker that
 // boots while D1 is unreachable answers /health with 200 and 500s every real
@@ -73,7 +74,7 @@ app.get("/ready", async (c) => {
     c.env.CACHE.get("__ready_probe").then(() => { checks.kv = true; }, () => { checks.kv = false; }),
   ]);
   const ok = Object.values(checks).every(Boolean);
-  return c.json({ ok, checks, service: "mossa-api" }, ok ? 200 : 503);
+  return c.json({ ok, checks, service: "kova-api" }, ok ? 200 : 503);
 });
 
 app.use("*", sessionMiddleware);
@@ -83,6 +84,13 @@ app.use("*", routeGuard);
 // eligibility), then forwards to Better Auth. Registered before the catch-all
 // so this exact path lands here, not on the generic handler.
 app.post("/api/auth/email-otp/send-verification-otp", otpSendGuard);
+
+// A studio's slug is its HOSTNAME, so it cannot be whatever the client posted.
+// These validate it against the reserved-label list and DNS label rules, then
+// provision (or move) the studio's `<slug>.<root>` address. Registered before the
+// catch-all so these exact paths land here first — see org-guard.ts.
+app.post("/api/auth/organization/create", orgCreateGuard);
+app.post("/api/auth/organization/update", orgUpdateGuard);
 
 // Close the two sibling endpoints the emailOTP plugin registers unconditionally.
 // Both call the same sendVerificationOTP callback directly, so they are a way
@@ -215,7 +223,7 @@ async function dailySweep(env: Env): Promise<void> {
   for (const s of toSuspend.results ?? []) {
     await notifyOwners(env, s.tenant_id, {
       type: "billing_suspended",
-      message: "Your Mossa subscription lapsed, so paid features are paused for you and your clients. Update your payment to restore everything.",
+      message: "Your Kova subscription lapsed, so paid features are paused for you and your clients. Update your payment to restore everything.",
       dedupeKey: `susp_${s.tenant_id}`,
     });
   }

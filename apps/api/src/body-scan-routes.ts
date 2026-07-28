@@ -11,8 +11,8 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { estimateBodyFat, ageFromDob, bodyComposition, classifySomatotype, type Gender } from "@mossa/domain";
-import { SubmitBodyScan, TTS_VOICE_IDS } from "@mossa/protocol";
+import { estimateBodyFat, ageFromDob, bodyComposition, classifySomatotype, type Gender } from "@kova/domain";
+import { SubmitBodyScan, TTS_VOICE_IDS } from "@kova/protocol";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess } from "./clients.js";
 import { gateFeature } from "./client-flags.js";

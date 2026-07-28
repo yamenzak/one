@@ -98,9 +98,9 @@ export async function sendTenantEmail(env: Env, tenantId: string, msg: EmailMsg)
     const charged = await dobj.charge(perEmail, "email.send", tenantId);
     if (!charged.ok) return { ok: false, skipped: "no_credits" };
   }
-  const platformFrom = conf["email.platform_from"] || "Mossa <noreply@fourdegreelabs.com>";
+  const platformFrom = conf["email.platform_from"] || "Kova <noreply@fourdegreelabs.com>";
   // The From display name. `senderName` used to be honoured on the Brevo lane
-  // ONLY, so a studio that set it and left the provider on Mossa saw no effect at
+  // ONLY, so a studio that set it and left the provider on Kova saw no effect at
   // all — the field silently did nothing for the default configuration. The
   // address still has to be the platform's (it is the domain that is
   // authenticated), but the name is the studio's to choose.

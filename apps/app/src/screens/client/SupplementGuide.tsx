@@ -8,8 +8,8 @@
 
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Button } from "@mossa/ui";
-import { featureEnabled } from "@mossa/domain";
+import { Button } from "@kova/ui";
+import { featureEnabled } from "@kova/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { AiAvatar } from "../../AiAvatar.js";

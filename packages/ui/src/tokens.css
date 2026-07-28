@@ -1,5 +1,5 @@
 /**
- * Mossa design tokens — a premium, shadcn-compatible system in oklch.
+ * Kova design tokens — a premium, shadcn-compatible system in oklch.
  *
  * Dark-first (`:root`), with a light theme under `:root[data-theme="light"]`.
  * The brand primary + radius are runtime-overridable so each tenant can theme

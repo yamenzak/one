@@ -28,7 +28,7 @@ import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import { ensureSchema } from "../src/db.js";
 
-const B = "http://localhost:8787";
+const B = "http://setup.localhost:8787";
 
 function grabCookies(res: Response): string {
   const headers = res.headers as Headers & { getSetCookie?: () => string[] };

@@ -7,7 +7,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { resolveEntitlements, trialPeriodDays, buildBudgetsForPurchase, mergeAddOnBalances, type Budget, type AddOnBalance } from "@mossa/domain";
+import { resolveEntitlements, trialPeriodDays, buildBudgetsForPurchase, mergeAddOnBalances, type Budget, type AddOnBalance } from "@kova/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { getSubscription, listPacks, listPlans, seedBilling, getConfig, getPlan } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
@@ -84,14 +84,14 @@ export const stripeRoutes = new Hono<AppEnv>()
       "line_items[0][quantity]": 1,
       success_url: `${body.data.returnUrl}?checkout=success`,
       cancel_url: `${body.data.returnUrl}?checkout=cancel`,
-      "metadata[mossa_tenant]": who.tenantId,
-      "metadata[mossa_plan]": plan.id,
+      "metadata[kova_tenant]": who.tenantId,
+      "metadata[kova_plan]": plan.id,
       // Mirror the metadata onto the SUBSCRIPTION as well. Session metadata is
       // not copied down (AGENTS.md §5), so without this the `trialing`
       // subscription's own events can't name the plan and have to fall back to
       // customer lookup.
-      "subscription_data[metadata][mossa_tenant]": who.tenantId,
-      "subscription_data[metadata][mossa_plan]": plan.id,
+      "subscription_data[metadata][kova_tenant]": who.tenantId,
+      "subscription_data[metadata][kova_plan]": plan.id,
       ...(trialDays ? { "subscription_data[trial_period_days]": trialDays } : {}),
     });
     return c.json({ url: session.url, trialDays: trialDays ?? 0 });
@@ -115,9 +115,9 @@ export const stripeRoutes = new Hono<AppEnv>()
       "line_items[0][quantity]": 1,
       success_url: `${body.data.returnUrl}?pack=success`,
       cancel_url: `${body.data.returnUrl}?pack=cancel`,
-      "metadata[mossa_tenant]": who.tenantId,
-      "metadata[mossa_pack]": pack.id,
-      "metadata[mossa_credits]": pack.credits,
+      "metadata[kova_tenant]": who.tenantId,
+      "metadata[kova_pack]": pack.id,
+      "metadata[kova_credits]": pack.credits,
     });
     return c.json({ url: session.url });
   })
@@ -175,10 +175,10 @@ export const stripeRoutes = new Hono<AppEnv>()
         currency: "usd",
         customer,
         "automatic_payment_methods[enabled]": "true",
-        "metadata[mossa_tenant]": who.tenantId,
-        "metadata[mossa_pack]": pack.id,
-        "metadata[mossa_credits]": pack.credits,
-        ...(promoId ? { "metadata[mossa_promo]": promoId } : {}),
+        "metadata[kova_tenant]": who.tenantId,
+        "metadata[kova_pack]": pack.id,
+        "metadata[kova_credits]": pack.credits,
+        ...(promoId ? { "metadata[kova_promo]": promoId } : {}),
       });
       return c.json({ clientSecret: pi.client_secret, publishableKey: cfg.publishableKey, amountCents: amount, discountCents, credits: pack.credits });
     } catch {
@@ -229,8 +229,8 @@ export const stripeRoutes = new Hono<AppEnv>()
       "payment_settings[save_default_payment_method]": "on_subscription",
       "expand[0]": "latest_invoice.payment_intent",
       "expand[1]": "pending_setup_intent",
-      "metadata[mossa_tenant]": who.tenantId,
-      "metadata[mossa_plan]": plan.id,
+      "metadata[kova_tenant]": who.tenantId,
+      "metadata[kova_plan]": plan.id,
       ...(trialDays
         ? {
             trial_period_days: trialDays,
@@ -290,7 +290,7 @@ export const stripeRoutes = new Hono<AppEnv>()
     if (!accountId) {
       const account = await stripeCall<{ id: string }>(cfg.secretKey, "accounts", {
         type: "standard",
-        "metadata[mossa_tenant]": who.tenantId,
+        "metadata[kova_tenant]": who.tenantId,
       });
       accountId = account.id;
       await c.env.DB.prepare(
@@ -346,10 +346,10 @@ export const stripeRoutes = new Hono<AppEnv>()
     // connected account, so the fee routes to the platform on this payment.
     const feeBps = Number((await getConfig(c.env.DB))["stripe.platform_fee_bps"] ?? "0");
     const meta: Record<string, string | number> = {
-      "metadata[mossa_tenant]": who.tenantId,
-      "metadata[mossa_client]": access.client.id,
-      "metadata[mossa_package]": pkg.id,
-      ...(installN ? { "metadata[mossa_installments]": installN } : {}),
+      "metadata[kova_tenant]": who.tenantId,
+      "metadata[kova_client]": access.client.id,
+      "metadata[kova_package]": pkg.id,
+      ...(installN ? { "metadata[kova_installments]": installN } : {}),
     };
     const priceData = {
       "line_items[0][price_data][currency]": pkg.currency || "usd",
@@ -364,10 +364,10 @@ export const stripeRoutes = new Hono<AppEnv>()
           "line_items[0][price_data][recurring][interval]": "month",
           ...(feeBps > 0 ? { "subscription_data[application_fee_percent]": feeBps / 100 } : {}),
           // Carry the mapping on the subscription too, so renewals resolve it.
-          "subscription_data[metadata][mossa_tenant]": who.tenantId,
-          "subscription_data[metadata][mossa_client]": access.client.id,
-          "subscription_data[metadata][mossa_package]": pkg.id,
-          ...(installN ? { "subscription_data[metadata][mossa_installments]": installN } : {}),
+          "subscription_data[metadata][kova_tenant]": who.tenantId,
+          "subscription_data[metadata][kova_client]": access.client.id,
+          "subscription_data[metadata][kova_package]": pkg.id,
+          ...(installN ? { "subscription_data[metadata][kova_installments]": installN } : {}),
           success_url: `${body.data.returnUrl}?purchase=success`,
           cancel_url: `${body.data.returnUrl}?purchase=cancel`,
           ...meta,
@@ -442,7 +442,7 @@ export const stripeRoutes = new Hono<AppEnv>()
     // does not: verified in test mode, `application_fee_amount` equal to AND greater
     // than the charge amount were both accepted and both succeeded. This clamp is
     // the only thing standing between a mis-set `platform_fee_bps` (say someone
-    // types 10000 meaning "100 bps") and Mossa taking the tenant's entire payment.
+    // types 10000 meaning "100 bps") and Kova taking the tenant's entire payment.
     // Do not remove it believing Stripe will catch it.
     const fee = feeBps > 0 ? Math.min(Math.round((amount * feeBps) / 10000), Math.max(0, amount - 1)) : 0;
     try {
@@ -454,10 +454,10 @@ export const stripeRoutes = new Hono<AppEnv>()
           currency: pkg.currency || "usd",
           "automatic_payment_methods[enabled]": "true",
           ...(fee > 0 ? { application_fee_amount: fee } : {}),
-          "metadata[mossa_tenant]": who.tenantId,
-          "metadata[mossa_client]": access.client.id,
-          "metadata[mossa_package]": pkg.id,
-          ...(promoId ? { "metadata[mossa_promo]": promoId } : {}),
+          "metadata[kova_tenant]": who.tenantId,
+          "metadata[kova_client]": access.client.id,
+          "metadata[kova_package]": pkg.id,
+          ...(promoId ? { "metadata[kova_promo]": promoId } : {}),
         },
         { connectedAccount: settings.stripe_account_id },
       );
@@ -546,12 +546,12 @@ export const stripeRoutes = new Hono<AppEnv>()
     if (event.type === "checkout.session.completed") {
       const s = event.data.object as { id?: string; mode?: string; subscription?: string; metadata?: Record<string, string> };
       const m = s.metadata ?? {};
-      if (m.mossa_client && m.mossa_package && m.mossa_tenant && m.mossa_tenant === accountTenantId) {
+      if (m.kova_client && m.kova_package && m.kova_tenant && m.kova_tenant === accountTenantId) {
         // First period for one-time, recurring, and installments; for the last
         // two we pin the Stripe subscription id so later invoices renew this row.
-        // `mossa_installments` (N) marks a limited-term plan → per-cycle unlock.
-        const installN = m.mossa_installments ? Number(m.mossa_installments) : null;
-        await grantClientPackage(c.env.DB, accountTenantId, m.mossa_client, m.mossa_package, s.id ?? null, s.mode === "subscription" ? s.subscription ?? null : null, installN);
+        // `kova_installments` (N) marks a limited-term plan → per-cycle unlock.
+        const installN = m.kova_installments ? Number(m.kova_installments) : null;
+        await grantClientPackage(c.env.DB, accountTenantId, m.kova_client, m.kova_package, s.id ?? null, s.mode === "subscription" ? s.subscription ?? null : null, installN);
       }
     } else if (event.type === "payment_intent.succeeded") {
       // Inline one-time purchase (Payment Element on the connected account).
@@ -559,9 +559,9 @@ export const stripeRoutes = new Hono<AppEnv>()
       // this and checkout.session.completed never both grant the same purchase.
       const pi = event.data.object as { id?: string; metadata?: Record<string, string> };
       const m = pi.metadata ?? {};
-      if (m.mossa_client && m.mossa_package && m.mossa_tenant && m.mossa_tenant === accountTenantId) {
-        await grantClientPackage(c.env.DB, accountTenantId, m.mossa_client, m.mossa_package, pi.id ?? null, null);
-        if (m.mossa_promo) await bumpPromoRedemption(c.env.DB, m.mossa_promo);
+      if (m.kova_client && m.kova_package && m.kova_tenant && m.kova_tenant === accountTenantId) {
+        await grantClientPackage(c.env.DB, accountTenantId, m.kova_client, m.kova_package, pi.id ?? null, null);
+        if (m.kova_promo) await bumpPromoRedemption(c.env.DB, m.kova_promo);
       }
     } else if (event.type === "invoice.paid") {
       // Renewal cycles top up the budget; the first invoice (subscription_create)
@@ -811,7 +811,7 @@ export const stripeAdminRoutes = new Hono<AppEnv>()
     return c.json({ ok: true, cleared, clearedPacks, ...result });
   })
 
-  /** "What is Mossa actually on right now?" — presence + provenance + the lane
+  /** "What is Kova actually on right now?" — presence + provenance + the lane
    *  the active key really belongs to. No secret material is ever returned:
    *  booleans, a last-4 hint, and prefix-derived lanes only. */
   .get("/admin/stripe/status", async (c) => {
@@ -831,18 +831,18 @@ async function handlePlatformEvent(
   const meta = (obj.metadata as Record<string, string> | undefined) ?? {};
   switch (event.type) {
     case "checkout.session.completed": {
-      if (meta.mossa_pack && meta.mossa_credits && meta.mossa_tenant) {
-        const dobj = billing.get(billing.idFromName(meta.mossa_tenant));
-        await dobj.bind(meta.mossa_tenant);
-        await dobj.topUp(Number(meta.mossa_credits), "pack.purchase", meta.mossa_pack);
+      if (meta.kova_pack && meta.kova_credits && meta.kova_tenant) {
+        const dobj = billing.get(billing.idFromName(meta.kova_tenant));
+        await dobj.bind(meta.kova_tenant);
+        await dobj.topUp(Number(meta.kova_credits), "pack.purchase", meta.kova_pack);
       }
-      if (meta.mossa_plan && meta.mossa_tenant) {
-        await activatePlan(db, billing, meta.mossa_tenant, meta.mossa_plan);
+      if (meta.kova_plan && meta.kova_tenant) {
+        await activatePlan(db, billing, meta.kova_tenant, meta.kova_plan);
         if (typeof obj.subscription === "string") {
           // Adopt this sub as the tenant's CURRENT one; a plan upgrade creates a
           // second Stripe sub, so cancel the old one here (checkout completed ⇒
           // the new sub is paid + active) to stop the tenant being double-billed.
-          await supersedePlatformSub(db, secretKey, meta.mossa_tenant, obj.subscription);
+          await supersedePlatformSub(db, secretKey, meta.kova_tenant, obj.subscription);
         }
       }
       break;
@@ -851,16 +851,16 @@ async function handlePlatformEvent(
       // Inline credit-pack purchase (Payment Element). Credits ride on the PI
       // metadata; the hosted checkout path keeps them on the session, so this
       // and checkout.session.completed never both fire for the same purchase.
-      if (meta.mossa_pack && meta.mossa_credits && meta.mossa_tenant) {
-        const dobj = billing.get(billing.idFromName(meta.mossa_tenant));
-        await dobj.bind(meta.mossa_tenant);
-        await dobj.topUp(Number(meta.mossa_credits), "pack.purchase", meta.mossa_pack);
-        if (meta.mossa_promo) await bumpPromoRedemption(db, meta.mossa_promo);
+      if (meta.kova_pack && meta.kova_credits && meta.kova_tenant) {
+        const dobj = billing.get(billing.idFromName(meta.kova_tenant));
+        await dobj.bind(meta.kova_tenant);
+        await dobj.topUp(Number(meta.kova_credits), "pack.purchase", meta.kova_pack);
+        if (meta.kova_promo) await bumpPromoRedemption(db, meta.kova_promo);
       }
       break;
     }
     case "invoice.paid": {
-      const tenantId = meta.mossa_tenant ?? (await tenantByCustomer(db, obj.customer));
+      const tenantId = meta.kova_tenant ?? (await tenantByCustomer(db, obj.customer));
       const planId = await planForTenant(db, tenantId);
       // ⚠️ A TRIAL'S FIRST INVOICE IS $0 AND AUTO-PAID THE INSTANT THE
       // SUBSCRIPTION IS CREATED — before any card exists. Verified against live
@@ -903,7 +903,7 @@ async function handlePlatformEvent(
       break;
     }
     case "invoice.payment_failed": {
-      const tenantId = meta.mossa_tenant ?? (await tenantByCustomer(db, obj.customer));
+      const tenantId = meta.kova_tenant ?? (await tenantByCustomer(db, obj.customer));
       // Seed the grace window; never clobber a later suspend/cancel.
       if (tenantId) {
         await db.prepare("UPDATE subscriptions SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?) WHERE tenant_id = ? AND status NOT IN ('suspended','canceled')").bind(nowIso(), tenantId).run();
@@ -923,9 +923,9 @@ async function handlePlatformEvent(
       // actually bill stamps `plan_id` and grants credits.
       const status = obj.status as string;
       const subId = typeof obj.id === "string" ? obj.id : null;
-      if (meta.mossa_plan && meta.mossa_tenant) {
-        await getSubscription(db, meta.mossa_tenant);
-        const cur = await db.prepare("SELECT stripe_sub_id FROM subscriptions WHERE tenant_id = ?").bind(meta.mossa_tenant).first<{ stripe_sub_id: string | null }>();
+      if (meta.kova_plan && meta.kova_tenant) {
+        await getSubscription(db, meta.kova_tenant);
+        const cur = await db.prepare("SELECT stripe_sub_id FROM subscriptions WHERE tenant_id = ?").bind(meta.kova_tenant).first<{ stripe_sub_id: string | null }>();
         // `trialing` alone is NOT a paid-for plan — see hasPaymentMethod. This is
         // the reported bug: `/billing/plan-intent` creates the subscription with
         // `trial_period_days` and hands the client a SetupIntent to confirm, so
@@ -938,7 +938,7 @@ async function handlePlatformEvent(
         // DIFFERENT sub (a mid-month upgrade creates a second Stripe sub), cancel
         // the old one and adopt this id as current, so no double-billing and so
         // syncStripeSubscription's stale-sub guard below lets this event through.
-        if (activating) await supersedePlatformSub(db, secretKey, meta.mossa_tenant, subId!);
+        if (activating) await supersedePlatformSub(db, secretKey, meta.kova_tenant, subId!);
         // Only touch the plan when this event's sub is the tenant's CURRENT one
         // (just adopted, already current, or none stored yet). A stale sub's
         // events — e.g. the OLD sub's incomplete/canceled updates that still
@@ -947,12 +947,12 @@ async function handlePlatformEvent(
         if (isCurrent) {
           if (activating) {
             // activatePlan stamps plan_id and clears pending_plan_id.
-            await activatePlan(db, billing, meta.mossa_tenant, meta.mossa_plan);
+            await activatePlan(db, billing, meta.kova_tenant, meta.kova_plan);
           } else {
             // Not payable yet (incomplete, or a card-less trial). Record what they
             // picked so `GET /billing` can tell the owner their setup never
             // completed — never `plan_id`, which IS the entitlement.
-            await db.prepare("UPDATE subscriptions SET pending_plan_id = ?, updated_at = ? WHERE tenant_id = ?").bind(meta.mossa_plan, nowIso(), meta.mossa_tenant).run();
+            await db.prepare("UPDATE subscriptions SET pending_plan_id = ?, updated_at = ? WHERE tenant_id = ?").bind(meta.kova_plan, nowIso(), meta.kova_tenant).run();
           }
         }
       }
@@ -1213,7 +1213,7 @@ function invoiceSubscriptionId(inv: Record<string, unknown>): string | null {
  * `charge.refunded` delivers the Charge itself. `charge.dispute.created`
  * delivers a **Dispute**: it carries `charge` / `payment_intent`, its own
  * `amount` (the disputed portion), an EMPTY `metadata` and **no `customer`** —
- * so reading `metadata.mossa_tenant` / `obj.customer` off it (what this handler
+ * so reading `metadata.kova_tenant` / `obj.customer` off it (what this handler
  * used to do) always came up empty. The dispute branch was therefore dead code:
  * a tenant could charge back a credit pack, we'd lose the money, the credits
  * stayed spendable and nobody was told. Resolve the underlying charge first.
@@ -1299,10 +1299,10 @@ async function reverseChargedCredits(
   const obj = event.data.object;
   const disputed = event.type === "charge.dispute.created";
   const r = await resolveReversal(obj, event.type, secretKey);
-  const tenantId = r.meta.mossa_tenant ?? (await tenantByCustomer(db, r.customer));
+  const tenantId = r.meta.kova_tenant ?? (await tenantByCustomer(db, r.customer));
   if (!tenantId) return;
 
-  const packCredits = Number(r.meta.mossa_credits ?? 0);
+  const packCredits = Number(r.meta.kova_credits ?? 0);
   if (Number.isFinite(packCredits) && packCredits > 0 && r.amountCents > 0) {
     // Proportional, clamped to the pack. A FULL refund (reversed === amount)
     // reverses exactly `packCredits`.
@@ -1321,8 +1321,8 @@ async function reverseChargedCredits(
   await notifyOwners(env, tenantId, {
     type: disputed ? "payment_disputed" : "payment_refunded",
     message: disputed
-      ? "A payment on your Mossa account was disputed. Any credits it granted may be reversed — review your balance."
-      : "A payment on your Mossa account was refunded. Credits from a refunded pack were reversed from your balance.",
+      ? "A payment on your Kova account was disputed. Any credits it granted may be reversed — review your balance."
+      : "A payment on your Kova account was refunded. Credits from a refunded pack were reversed from your balance.",
     dedupeKey: typeof obj.id === "string" ? `${event.type}_${obj.id}` : event.id,
   });
 }

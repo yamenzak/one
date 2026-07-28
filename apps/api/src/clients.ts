@@ -19,8 +19,9 @@ import { sendTenantEmail } from "./email-provider.js";
 import { emailShell, emailButton, escapeHtml } from "./mailer.js";
 import { newId, nowIso } from "./ids.js";
 import { recordAudit } from "./audit.js";
+import { canonicalHost, shapeOf } from "./host-context.js";
 import { parseJson, j } from "./db.js";
-import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps, rangeStatus, auditLabel, canAccessClient, seesWholeRoster, resolveStanding } from "@mossa/domain";
+import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps, rangeStatus, auditLabel, canAccessClient, seesWholeRoster, resolveStanding, studioStandingOf } from "@kova/domain";
 
 export interface ClientRow {
   id: string;
@@ -181,27 +182,37 @@ export async function requireClientAccess(
    * record (that is how you'd correct or restore one).
    */
   //
-  // Decided by `resolveStanding` (@mossa/domain), the ONE definition of what a
+  // Decided by `resolveStanding` (@kova/domain), the ONE definition of what a
   // person may do in a tenancy — the same function the Shell renders from, so the
   // gate and the UI cannot disagree about who is read-only.
   if (role === "client") {
     const standing = resolveStanding({
       membership: client.status === "archived" ? "archived" : client.status === PENDING_SIGNUP ? "pending_signup" : "active",
-      // Access/delinquency are enforced by their own gates (client-flags,
-      // entitlements); this call is only about the membership half, so the other
-      // axes are passed as satisfied and cannot mask an archived record.
+      // Access is enforced by its own gate (client-flags, entitlements); this call
+      // is only about the membership half, so those axes are passed as satisfied
+      // and cannot mask an archived record.
       accessActive: true,
       accessRequired: false,
-      studio: "ok",
+      // The studio's REAL standing, resolved from the host. This used to be a
+      // hardcoded "ok" here and in the Shell — the only two callers — which meant
+      // the studio axis existed in the type and was dead in practice. The host gate
+      // in route-guard.ts is the outer wall for a suspended studio; passing the
+      // truth here keeps the two answers consistent, so a client's own persona
+      // reports "studio_suspended" rather than claiming everything is fine.
+      studio: studioStandingOf(c.get("host").tenant?.subscriptionStatus),
     });
     const writing = c.req.method !== "GET";
     if (writing && !standing.canWrite) {
-      return {
-        response: c.json(
-          { error: standing.reason, message: "Your record at this studio is archived — you can still read your history, but not add to it. Ask the studio to reactivate you." },
-          403,
-        ),
-      };
+      // Two different reasons reach here and they are not interchangeable: one is
+      // about this person's place on the roster, the other about the studio's bill.
+      // Telling an archived client "the studio needs to renew" would send them to
+      // their coach about the wrong thing entirely.
+      const message =
+        standing.reason === "studio_suspended"
+          ? "This studio is paused, so nothing new can be saved right now. You can still read everything on your record."
+          : "Your record at this studio is archived — you can still read your history, but not add to it. Ask the studio to reactivate you.";
+      // 402 for a billing state, 403 for a membership one — the app branches on it.
+      return { response: c.json({ error: standing.reason, message }, standing.reason === "studio_suspended" ? 402 : 403) };
     }
     if (!writing && !standing.canRead) return { response: c.json({ error: standing.reason }, 403) };
   }
@@ -357,31 +368,42 @@ function b64url(bytes: Uint8Array): string {
 async function signInviteToken(env: Env, payload: { c: string; t: string; e: string }): Promise<string> {
   const enc = new TextEncoder();
   const body = b64url(enc.encode(JSON.stringify(payload)));
-  const secret = env.BETTER_AUTH_SECRET || "mossa-dev-insecure-secret-change-me";
+  const secret = env.BETTER_AUTH_SECRET || "kova-dev-insecure-secret-change-me";
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const sig = await crypto.subtle.sign("HMAC", key, enc.encode(body));
   return `${body}.${b64url(new Uint8Array(sig))}`;
 }
 
-/** The tenant's canonical branded login URL: an active custom domain if one is
- *  live (white-label, SPEC §14.1), else the platform host's `/t/<slug>` path. */
-async function tenantLoginUrl(env: Env, tenantId: string): Promise<string> {
-  const base = (env.BETTER_AUTH_URL || "https://mossa.4dl.app").replace(/\/$/, "");
-  const dom = await env.DB
-    .prepare("SELECT hostname FROM tenant_domains WHERE tenant_id = ? AND status = 'active' ORDER BY created_at LIMIT 1")
-    .bind(tenantId)
-    .first<{ hostname: string }>()
-    .catch(() => null);
-  if (dom?.hostname) return `https://${dom.hostname}`;
-  const org = await env.DB.prepare('SELECT slug FROM "organization" WHERE id = ?').bind(tenantId).first<{ slug: string }>().catch(() => null);
-  return org?.slug ? `${base}/t/${org.slug}` : base;
+/**
+ * The tenant's canonical branded login URL — its own domain if one is live,
+ * otherwise its `<slug>.<root>` subdomain (SPEC §14.1).
+ *
+ * `canonicalHost` owns the preference order. This used to fall back to the shared
+ * platform host's `/t/<slug>` path, which is now a dead end that serves nothing —
+ * so every invite email sent by a studio without a custom domain would have landed
+ * its clients on a signpost instead of a login.
+ */
+async function tenantLoginUrl(env: Env, tenantId: string, from?: string): Promise<string> {
+  // `from` is the request URL when there is one. It supplies three things the
+  // configured root cannot: the root this request was actually classified against
+  // (`localhost` on loopback), the protocol, and the PORT. Without it a link emailed
+  // from `pnpm dev` pointed at `https://<slug>.kova.4dl.app` — a live external
+  // domain, from a machine that cannot reach it.
+  const here = from ? new URL(from) : null;
+  const shape = here ? shapeOf(here.hostname, env) : null;
+  const host = await canonicalHost(env, env.DB, tenantId, shape?.root);
+  // A CUSTOM domain is already absolute and always https; only a subdomain of our
+  // own root inherits the request's protocol and port.
+  const ours = shape ? host.endsWith(`.${shape.root}`) : false;
+  if (!here || !ours) return `https://${host}`;
+  return `${here.protocol}//${host}${here.port ? `:${here.port}` : ""}`;
 }
 
 /** Build the invite deep-link + opaque token, and send the branded invite email
  *  (SPEC §4, §8.1). Best-effort: a mail failure never fails client creation, and
  *  the returned QR data still lets the coach show the in-gym invite. */
-async function buildClientInvite(env: Env, tenantId: string, clientId: string, email: string): Promise<{ url: string; token: string; email: string; delivery: InviteDelivery }> {
-  const loginUrl = await tenantLoginUrl(env, tenantId);
+async function buildClientInvite(env: Env, tenantId: string, clientId: string, email: string, from?: string): Promise<{ url: string; token: string; email: string; delivery: InviteDelivery }> {
+  const loginUrl = await tenantLoginUrl(env, tenantId, from);
   const token = await signInviteToken(env, { c: clientId, t: tenantId, e: email });
   const url = `${loginUrl}${loginUrl.includes("?") ? "&" : "?"}invite=${encodeURIComponent(token)}`;
   const brand = await tenantBrandKit(env.DB, tenantId).catch(() => null);
@@ -488,7 +510,7 @@ export const clientRoutes = new Hono<AppEnv>()
     // the coach can show as an in-gym QR. Best-effort — never fails creation.
     let invite: { url: string; token: string; email: string; delivery: InviteDelivery } | null = null;
     if (body.data.email) {
-      invite = await buildClientInvite(c.env, who.tenantId, id, body.data.email).catch(() => null);
+      invite = await buildClientInvite(c.env, who.tenantId, id, body.data.email, c.req.url).catch(() => null);
     }
     const row = await getClient(c.env.DB, who.tenantId, id);
     return c.json({ client: clientView(row!), invite }, 201);

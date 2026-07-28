@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Button, Sheet } from "@mossa/ui";
+import { Button, Sheet } from "@kova/ui";
 import { loadStripe, type StripeElements, type StripeInstance } from "./stripe.js";
 
 export interface CheckoutIntent {
@@ -61,7 +61,7 @@ export function PaymentSheet({
         return;
       }
       stripeRef.current = stripe;
-      // Mossa is dark by DEFAULT and light is the opt-in: applyMode() sets
+      // Kova is dark by DEFAULT and light is the opt-in: applyMode() sets
       // data-theme="light" for light and DELETES the attribute for dark (there is
       // no `dark` class anywhere). Testing for "dark" therefore never matched, so
       // Stripe always got its light `stripe` theme — a white card form flashing

@@ -24,7 +24,7 @@ import { type AppEnv } from "./auth-context.js";
 import { logAuthEvent } from "./auth.js";
 import { withinQuota } from "./billing-store.js";
 import { countClientSeats, PENDING_SIGNUP } from "./clients.js";
-import { resolveSlugTenant, isPlatformHost, hostnameOf, type HostTenant } from "./host-context.js";
+import { hostnameOf, type HostTenant } from "./host-context.js";
 import { newId, nowIso, nowMs } from "./ids.js";
 import { emailDeliverable } from "./mailer.js";
 import { verifyTurnstile } from "./turnstile.js";
@@ -48,6 +48,10 @@ const OTP_COOLDOWN_MS = 30_000;
 const OTP_MAX_PER_IP_PER_HOUR = 20;
 const OTP_IP_WINDOW_MS = 60 * 60 * 1000;
 
+/** `slug` used to select the studio on the shared platform host. The host now
+ *  decides, so it is accepted and ignored rather than removed — an older cached
+ *  SPA still posts it, and rejecting the body would break sign-in for exactly the
+ *  users who have not reloaded yet. */
 interface SendBody { email?: unknown; type?: unknown; slug?: unknown; turnstileToken?: unknown }
 
 export const otpSendGuard: MiddlewareHandler<AppEnv> = async (c) => {
@@ -95,10 +99,22 @@ export const otpSendGuard: MiddlewareHandler<AppEnv> = async (c) => {
     await logAuthEvent(c.env.DB, "otp-ip", email, true, ip);
   }
 
-  // 3) Eligibility — only on a tenant login (branded domain or /t/<slug>).
-  const platform = isPlatformHost(hostname, c.env);
-  let tenant: HostTenant | null = c.get("hostTenant");
-  if (!tenant && platform && slug) tenant = await resolveSlugTenant(c.env.DB, slug);
+  // 3) Eligibility — the host decides which studio this sign-in is for.
+  //
+  // Under the subdomain model there is no ambiguity left to resolve: a studio's
+  // door IS its hostname, so `hostTenant` is the answer and the old `/t/<slug>`
+  // query fallback is gone. The two hosts with no tenant behave differently on
+  // purpose:
+  //
+  //  • `setup.` — no studio yet, so no eligibility to check. Anyone may request a
+  //    code; that is how a new studio owner gets in.
+  //  • the root — a dead end. There is no studio to sign in TO, so sending a code
+  //    from here would be a code with no destination. Point them at their own
+  //    studio's address instead of quietly signing them in somewhere generic.
+  const tenant: HostTenant | null = c.get("hostTenant");
+  if (!tenant && c.get("host").shape.role === "root") {
+    return c.json({ error: "wrong_door", detail: "Sign in at your studio's own address." }, 400);
+  }
 
   if (tenant) {
     const known = await isExistingOrInvited(c.env.DB, tenant.tenantId, email);

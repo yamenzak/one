@@ -4,8 +4,8 @@
  * catalog pure (no React) while giving each sport a recognizable face.
  */
 
-import { Footprints, Bike, Dumbbell, Trophy, Waves, HeartPulse, Zap, Snowflake, Activity, type LucideIcon } from "@mossa/ui";
-import { activityByKey, type ActivityCategory } from "@mossa/domain";
+import { Footprints, Bike, Dumbbell, Trophy, Waves, HeartPulse, Zap, Snowflake, Activity, type LucideIcon } from "@kova/ui";
+import { activityByKey, type ActivityCategory } from "@kova/domain";
 
 const CATEGORY_ICON: Record<ActivityCategory, LucideIcon> = {
   cardio: Footprints,

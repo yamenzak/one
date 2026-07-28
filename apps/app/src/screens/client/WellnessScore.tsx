@@ -5,7 +5,7 @@
  * what's lifting or dragging it. Theme-tokened; the ring uses the brand color.
  */
 
-import { ProgressRing, cn, toneVar, IconBadge, Dumbbell, Utensils, Bed, ListChecks, Droplet, Smile, Pill, Scale, HeartPulse, type Tone, type LucideIcon } from "@mossa/ui";
+import { ProgressRing, cn, toneVar, IconBadge, Dumbbell, Utensils, Bed, ListChecks, Droplet, Smile, Pill, Scale, HeartPulse, type Tone, type LucideIcon } from "@kova/ui";
 
 export interface WellnessPillar { key: string; label: string; score: number | null; weight: number; available: boolean }
 export interface WellnessScoreResult { score: number; band: "start" | "building" | "solid" | "strong" | "peak"; pillars: WellnessPillar[] }

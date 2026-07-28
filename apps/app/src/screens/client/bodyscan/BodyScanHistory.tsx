@@ -8,11 +8,11 @@
 
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { cmToLengthDisplay, lengthLabel, kgToDisplay, weightLabel, bodyComposition, type UnitPrefs } from "@mossa/domain";
+import { cmToLengthDisplay, lengthLabel, kgToDisplay, weightLabel, bodyComposition, type UnitPrefs } from "@kova/domain";
 import {
   Button, Badge, IconBadge, SegmentedControl, AreaChart, cn, toneVar, useModalOverlay, POSTURE_SEVERITY_TONE,
   ScanLine, X, Percent, RotateCcw, User, motion, stagger, popIn, CountUp,
-} from "@mossa/ui";
+} from "@kova/ui";
 import { Silhouette } from "./Silhouette.js";
 import { Body3D } from "./Body3D.js";
 import { scanProfile, modelSilhouette } from "./model.js";

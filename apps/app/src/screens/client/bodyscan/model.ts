@@ -7,7 +7,7 @@
  * callers then use the stored capture contour.
  */
 
-import { bodyProfile, humanoidSilhouette, type BodyProfile, type Pt } from "@mossa/domain";
+import { bodyProfile, humanoidSilhouette, type BodyProfile, type Pt } from "@kova/domain";
 
 type Num = number | null | undefined;
 export interface ScanShape {

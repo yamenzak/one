@@ -10,7 +10,7 @@ import {
   checkDowngrade, resolveEntitlements, mergeOverrides, snapshotDowngrade, raiseOverride,
   isFullyExpired, overallDaysRemaining,
   FEATURE_KEYS, QUOTA_KEYS, FEATURE_META, QUOTA_META, type Entitlements, type EntitlementGrants, type Budget,
-} from "@mossa/domain";
+} from "@kova/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { tenantStorageBytes } from "./storage.js";
 import { countClientSeats } from "./clients.js";
@@ -105,7 +105,7 @@ export const billingRoutes = new Hono<AppEnv>()
         currentPeriodEnd: sub.current_period_end,
         pendingPlanId: sub.pending_plan_id,
         pendingPlanName: pendingPlan?.name ?? sub.pending_plan_id,
-        /** True when Mossa is billing this tenant for a priced plan. */
+        /** True when Kova is billing this tenant for a priced plan. */
         paidPlan,
         /** The one honest name for the tenant's billing situation. */
         billingState,
@@ -351,7 +351,7 @@ export const adminRoutes = new Hono<AppEnv>()
     return c.json({ ok: true, effective: mergeOverrides(resolveEntitlements(plan?.entitlements_json), newOverride) });
   })
 
-  // Platform promo codes (Mossa → tenant) — website-native discounts on a
+  // Platform promo codes (Kova → tenant) — website-native discounts on a
   // tenant's credit-pack purchase. scope='platform', stored tenant_id ''. Applied
   // by billing/pack-intent. Percentage or fixed; optionally exclusive to a pack.
   .get("/admin/promo-codes", async (c) => {
@@ -386,8 +386,8 @@ export const adminRoutes = new Hono<AppEnv>()
     const cfg = await getConfig(c.env.DB);
     return c.json({
       provider: cfg["email.provider"] ?? "mock",
-      from: cfg["email.from"] ?? "Mossa <noreply@mossa.local>",
-      platformFrom: cfg["email.platform_from"] ?? "Mossa <noreply@fourdegreelabs.com>",
+      from: cfg["email.from"] ?? "Kova <noreply@kova.local>",
+      platformFrom: cfg["email.platform_from"] ?? "Kova <noreply@fourdegreelabs.com>",
       creditsPerEmail: Number(cfg["email.credits_per_email"] ?? "1"),
     });
   })

@@ -1,16 +1,16 @@
 /**
  * Notification visual coding — maps each notification TYPE to its icon + tone,
  * so the bell and the Inbox render a distinct, on-brand glyph per type instead of
- * one grey sparkle. This is the UI-layer twin of the pure `@mossa/domain`
+ * one grey sparkle. This is the UI-layer twin of the pure `@kova/domain`
  * registry (mirrors `metric-coding.ts`): domain owns audience/category/copy, the
  * app owns the visual identity. Unknown types fall back to a neutral default.
  */
 
-import type { NotifType } from "@mossa/domain";
+import type { NotifType } from "@kova/domain";
 import {
   ClipboardList, BadgeCheck, Scale, Target, FlaskConical, Pill, ArrowLeftRight,
   BookOpen, Calendar, CreditCard, AlertTriangle, Archive, Bell, Trophy, type LucideIcon, type Tone,
-} from "@mossa/ui";
+} from "@kova/ui";
 
 export interface NotifCoding { icon: LucideIcon; tone: Tone }
 

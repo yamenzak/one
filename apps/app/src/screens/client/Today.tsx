@@ -3,15 +3,15 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fmtVolume, fmtEnergy, fmtWeight, featureEnabled, type UnitPrefs } from "@mossa/domain";
+import { fmtVolume, fmtEnergy, fmtWeight, featureEnabled, type UnitPrefs } from "@kova/domain";
 import {
   Button, Card, Skeleton, MacroBar, IconBadge, Sheet, EmptyState, ProgressRing,
   Reveal, SkeletonHero, SkeletonList, SkeletonHeader,
   Page, Stagger, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
   Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Send, Info, Utensils, Croissant, Soup, Apple,
   Store, Ticket, AlertTriangle, ShieldCheck, toneVar, ChevronLeft, ChevronRight, Target, ScanLine, Calendar, BookOpen, type Tone, type LucideIcon,
-} from "@mossa/ui";
-import type { WidgetItem } from "@mossa/protocol";
+} from "@kova/ui";
+import type { WidgetItem } from "@kova/protocol";
 import { useNavigate } from "react-router-dom";
 import { api, todayLocal, shiftDay } from "../../api.js";
 import { useUnits } from "../../units.js";

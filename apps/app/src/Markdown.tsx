@@ -12,7 +12,7 @@
  */
 
 import { Fragment, type ReactNode } from "react";
-import { cn } from "@mossa/ui";
+import { cn } from "@kova/ui";
 
 /** Inline formatting: **bold**, *italic* / _italic_, `code`, [text](url). */
 function renderInline(text: string, keyBase: string): ReactNode[] {

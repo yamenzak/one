@@ -18,7 +18,17 @@ import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import { ensureSchema } from "../src/db.js";
 
-const ORIGIN = "http://localhost:8787"; // treated as local by createAuth (non-secure cookies)
+const ORIGIN = "http://setup.localhost:8787";
+/**
+ * The OPERATOR door. `/api/admin/*` answers here and nowhere else in production —
+ * a studio's subdomain must not reach platform administration even with a live
+ * operator cookie, because that cookie is now valid across every host under the
+ * root. Dev has a single root and therefore no separate door, so the restriction
+ * stands down on loopback (`isDevRoot`) — but the suite addresses the real door
+ * anyway, so a regression in that guard fails here rather than in production.
+ */
+const ADMIN = "http://admin.localhost:8787";
+
 let adminCookie = "";
 
 function grabCookies(res: Response): string {
@@ -97,9 +107,9 @@ interface StatusBody {
 }
 
 const getStatus = async (): Promise<StatusBody> =>
-  (await (await SELF.fetch("http://x/api/admin/stripe/status", { headers: auth(adminCookie) })).json()) as StatusBody;
+  (await (await SELF.fetch(`${ADMIN}/api/admin/stripe/status`, { headers: auth(adminCookie) })).json()) as StatusBody;
 
-const postConfig = async (body: unknown) => SELF.fetch("http://x/api/admin/stripe/config", { method: "POST", headers: jsonAuth(adminCookie), body: JSON.stringify(body) });
+const postConfig = async (body: unknown) => SELF.fetch(`${ADMIN}/api/admin/stripe/config`, { method: "POST", headers: jsonAuth(adminCookie), body: JSON.stringify(body) });
 
 beforeAll(async () => {
   await ensureSchema(env.DB as D1Database);
@@ -263,7 +273,7 @@ describe("stripe credential lanes — /admin/stripe/status is secret-free", () =
       "stripe.test.secret_key": "sk_test_lane_secret_value_wxyz",
       "stripe.platform_fee_bps": "250",
     });
-    const res = await SELF.fetch("http://x/api/admin/stripe/status", { headers: auth(adminCookie) });
+    const res = await SELF.fetch(`${ADMIN}/api/admin/stripe/status`, { headers: auth(adminCookie) });
     expect(res.status).toBe(200);
     const text = await res.text();
     for (const secret of [

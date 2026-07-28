@@ -9,8 +9,9 @@ import { Login } from "./screens/Login.js";
 import { Start } from "./screens/Start.js";
 import { Shell } from "./Shell.js";
 import { AcceptInvite } from "./screens/AcceptInvite.js";
-import { PlatformGate } from "./screens/onboarding/PlatformGate.js";
-import { ONBOARDING_PATH, SIGN_IN_PATH } from "./screens/onboarding/paths.js";
+import { NoStudio, RootSignpost, WrongDoor } from "./screens/Doors.js";
+import { AdminDoor } from "./screens/AdminDoor.js";
+import { ONBOARDING_PATH } from "./screens/onboarding/paths.js";
 import { PasskeyProvider } from "./PasskeyPrompt.js";
 import { PwaUpdatePrompt, UnhandledErrorToast } from "./notices.js";
 import { stripReloadParam } from "./hard-refresh.js";
@@ -19,7 +20,7 @@ import { stripReloadParam } from "./hard-refresh.js";
  * Branded boot screen — the studio's logo on a soft brand glow with a gentle
  * reveal and shimmer, so the app feels premium from the first frame. On a
  * white-label tenant (custom domain / branded host) the uploaded logo/icon
- * shows; otherwise the default Mossa mark. Branding is applied before this
+ * shows; otherwise the default Kova mark. Branding is applied before this
  * paints, so it already sits in the tenant's palette and mode.
  */
 function BootSplash() {
@@ -39,7 +40,7 @@ function BootSplash() {
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             className="grid size-20 place-items-center overflow-hidden rounded-2xl bg-primary text-primary-foreground shadow-glow"
           >
-            {logo ? <img src={logo} alt="" className="size-full object-cover" /> : <span className="text-3xl font-black tracking-tight">{(name?.[0] ?? "M").toUpperCase()}</span>}
+            {logo ? <img src={logo} alt="" className="size-full object-cover" /> : <span className="text-3xl font-black tracking-tight">{(name?.[0] ?? "K").toUpperCase()}</span>}
           </motion.div>
         </div>
         {name && (
@@ -55,55 +56,65 @@ function BootSplash() {
   );
 }
 
+export type Screen = "boot" | "login" | "signpost" | "nostudio" | "wrongdoor" | "start" | "shell" | "admin";
+
 /**
- * Which top-level screen this request gets.
+ * Which top-level screen this request gets — decided by WHICH DOOR the app is
+ * being served on, not by the path.
  *
- * ── The platform host is no longer an end-user signup surface ────────────────
+ * That inversion is the point of the whole host model. Previously one shared
+ * hostname served every purpose and this function had to infer intent from the
+ * URL path plus a `host.tenant` that only *branding* depended on. Now the
+ * hostname carries the answer, resolved server-side before any of this runs:
  *
- * `mossa.4dl.app/` used to render the same OTP form to everybody, so a client of
- * a studio who landed there signed up under *Mossa* instead of under their coach —
- * an orphan account in the wrong tenant, with nothing to tell them so. An
- * unauthenticated visitor at `/` on the platform host now gets `PlatformGate`,
- * which explains what Mossa is, points at the marketing site, and — the actual
- * point — tells an end user to use the link their coach sent them.
+ *   root      a signpost. Never an app, never a login — the server will not even
+ *             send a sign-in code here, so offering the form would be a lie.
+ *             Renders for signed-in visitors too, which is why `ctx` does not
+ *             short-circuit it: the root has no tenancy for a Shell to scope to.
+ *   setup     the studio wizard. Signed out → the owner sign-in.
+ *   admin     the operator console, standalone. It must not depend on the operator
+ *             owning a studio, so it does not go through the Shell's persona path.
+ *   tenant    a studio. No studio behind the name → `nostudio`, NOT a login:
+ *   custom    inviting someone to sign in somewhere that does not exist is worse
+ *             than telling them the address is wrong.
+ *   invalid   nothing.
  *
- * The four rules that keep that from locking anyone out:
- *
- *  1. **Tenant surfaces are untouched.** `host.tenant` is set by a custom domain
- *     or a `/t/<slug>` entry, and there the branded `Login` still renders at `/`.
- *     That IS the end-user door; the gate must never appear on it.
- *  2. **Mossa's own sign-in moved to `/studio/sign-in`** (`SIGN_IN_PATH`), linked
- *     from `apps/www` and from the gate's low-emphasis "Already have a Mossa
- *     account? Sign in" — so an installed PWA (whose `start_url` is `/`) opening
- *     signed-out still has a one-tap way in.
- *  3. **Deep links still sign in.** Only `/` is gated; any other unauthenticated
- *     platform path keeps rendering `Login`, so an emailed link like
- *     `/labs?lab=…` doesn't lose its destination behind an interstitial.
- *  4. **A signed-in user is unaffected** — `ctx` short-circuits everything above
- *     and the Shell renders exactly as before.
- *
- * `/studio/setup` renders the onboarding wizard even when a tenant already
- * exists: step 1 creates the studio mid-flow, so the path (not session state) is
- * what keeps the wizard mounted and makes a reload resume rather than restart.
+ * `/studio/setup` still renders the wizard even once a tenant exists: step 1
+ * creates the studio mid-flow, so the path (not session state) is what keeps the
+ * wizard mounted and makes a reload resume rather than restart.
  */
-function pickScreen(
+export function pickScreen(
   loading: boolean,
-  ctx: unknown,
-  hostResolved: boolean,
-  hostIsTenant: boolean,
+  ctx: { active: unknown } | null,
+  host: { role: string; tenant: unknown } | null,
   path: string,
-): "boot" | "login" | "gate" | "start" | "shell" {
-  if (loading) return "boot";
-  if (!ctx) {
-    // The host probe decides gate-vs-login; without it we'd flash the wrong one.
-    if (!hostResolved) return "boot";
-    if (hostIsTenant) return "login";
-    if (path === SIGN_IN_PATH) return "login";
-    return path === "/" ? "gate" : "login";
+): Screen {
+  // Both are needed before anything can be chosen, and guessing flashes the wrong
+  // screen — which on this set of doors means flashing a login at someone who has
+  // no studio to log in to.
+  if (loading || !host) return "boot";
+
+  switch (host.role) {
+    case "invalid":
+      return "wrongdoor";
+    case "root":
+      return "signpost";
+    case "admin":
+      return ctx ? "admin" : "login";
+    case "setup":
+      if (!ctx) return "login";
+      // A studio-less owner and a mid-wizard owner both belong in the wizard; an
+      // owner who has finished has no business on the setup door, and the wizard
+      // itself sends them on to their studio.
+      return "start";
+    default: {
+      // tenant | custom — a studio host.
+      if (!host.tenant) return "nostudio";
+      if (!ctx) return "login";
+      if (!ctx.active) return "start";
+      return path.startsWith(ONBOARDING_PATH) ? "start" : "shell";
+    }
   }
-  const active = (ctx as { active: unknown }).active;
-  if (!active) return "start";
-  return path.startsWith(ONBOARDING_PATH) ? "start" : "shell";
 }
 
 function App() {
@@ -119,15 +130,21 @@ function App() {
       </Routes>
     );
   }
-  const screen = pickScreen(loading, ctx, host !== null, Boolean(host?.tenant), location.pathname);
+  const screen = pickScreen(loading, ctx, host, location.pathname);
   return (
     <>
       <AnimatePresence mode="wait">
         <motion.div key={screen} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
           {screen === "boot" && <BootSplash />}
-          {screen === "gate" && <PlatformGate />}
+          {screen === "signpost" && <RootSignpost />}
+          {screen === "nostudio" && <NoStudio />}
+          {screen === "wrongdoor" && <WrongDoor />}
           {screen === "login" && <Login />}
           {screen === "start" && <Start />}
+          {/* The operator console, standalone. Outside the Shell on purpose: the
+              Shell scopes itself to an active persona, and a platform operator
+              need not own a studio at all. */}
+          {screen === "admin" && <AdminDoor />}
           {screen === "shell" && <PasskeyProvider><Shell /></PasskeyProvider>}
         </motion.div>
       </AnimatePresence>

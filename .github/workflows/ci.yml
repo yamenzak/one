@@ -34,7 +34,7 @@ jobs:
 
       # Build the SPA first: the api worker's assets dir is apps/app/dist, and
       # the Miniflare integration suite reports "no tests" without it.
-      - run: pnpm --filter @mossa/app build
+      - run: pnpm --filter @kova/app build
 
       - run: pnpm turbo run typecheck test
 
@@ -64,7 +64,7 @@ jobs:
 
       # Chromium only — the suite runs one project, and --with-deps pulls the
       # system libraries headless Chromium needs on a bare ubuntu runner.
-      - run: pnpm --filter @mossa/e2e exec playwright install --with-deps chromium
+      - run: pnpm --filter @kova/e2e exec playwright install --with-deps chromium
 
       # Boots the worker itself (webServer) after turbo builds the SPA it serves.
       - run: pnpm e2e

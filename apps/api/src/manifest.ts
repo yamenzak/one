@@ -1,7 +1,7 @@
 /**
  * Per-tenant PWA manifest (SPEC §14.1 white-label). On a tenant's custom domain
  * the installed app wears their name + icon + colors; on the neutral platform
- * host it's Mossa. Served dynamically by the worker (see index.ts) so a branding
+ * host it's Kova. Served dynamically by the worker (see index.ts) so a branding
  * change re-skins the installed app without a rebuild.
  *
  * Icons reference the tenant's uploaded square mark (public brand asset); we
@@ -51,7 +51,7 @@ function iconType(url: string): string {
 }
 
 export function buildManifest(ht: HostTenant | null): string {
-  const name = (ht?.name || "Mossa").slice(0, 45);
+  const name = (ht?.name || "Kova").slice(0, 45);
   const b = ht?.branding;
   const icon = b?.iconUrl || b?.logoUrl || null;
   const type = icon ? iconType(icon) : "image/svg+xml";

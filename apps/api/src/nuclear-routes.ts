@@ -11,7 +11,7 @@ import { z } from "zod";
 import { type AppEnv, isPlatformAdmin } from "./auth-context.js";
 import { sendActionOtp, verifyActionOtp } from "./action-otp.js";
 import { purgeEverything } from "./purge.js";
-import { MOSSA_BRAND } from "./mailer.js";
+import { KOVA_BRAND } from "./mailer.js";
 
 const PURPOSE = "nuclear_reset";
 const CONFIRM_PHRASE = "RESET EVERYTHING";
@@ -54,7 +54,7 @@ export const nuclearRoutes = new Hono<AppEnv>()
     if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
     const user = c.get("user");
     if (!user?.email) return c.json({ error: "no admin email" }, 400);
-    await sendActionOtp(c.env, { subject: `${PURPOSE}:${user.id}`, purpose: PURPOSE, email: user.email, actionLabel: "resetting the entire platform", brand: MOSSA_BRAND });
+    await sendActionOtp(c.env, { subject: `${PURPOSE}:${user.id}`, purpose: PURPOSE, email: user.email, actionLabel: "resetting the entire platform", brand: KOVA_BRAND });
     return c.json({ ok: true });
   })
 

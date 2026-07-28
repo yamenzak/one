@@ -1,4 +1,4 @@
-# Mossa — Terms of Service
+# Kova — Terms of Service
 
 
 **Effective date:** 26 July 2026
@@ -6,7 +6,7 @@
 
 ## 1. Who we are and what this covers
 
-Mossa (the "**Platform**", "**Service**", "**we**", "**us**", "**our**") is a
+Kova (the "**Platform**", "**Service**", "**we**", "**us**", "**our**") is a
 software-as-a-service platform for personal-training and coaching businesses,
 operated by **Four Degree Labs LLC**, a limited liability company licensed in
 mainland Abu Dhabi, United Arab Emirates. Our commercial licence number and
@@ -166,7 +166,7 @@ your data to train their general models except as stated in the Privacy Policy.
 
 ## 8. Roles and data-protection responsibilities
 
-8.1 **Studio as controller; Mossa as processor.** For personal data that a Studio
+8.1 **Studio as controller; Kova as processor.** For personal data that a Studio
 submits or generates about its Clients and Staff, the **Studio is the data
 controller** and **Four Degree Labs is a data processor** acting on the Studio's
 documented instructions (which include these Terms, the Privacy Policy, and the
@@ -174,7 +174,7 @@ Studio's use of the Service's features). The Studio is responsible for providing
 Clients with appropriate privacy notices and for obtaining any required consents,
 including explicit consent for health and fitness data.
 
-8.2 **Mossa as controller.** For account and billing data, authentication data, and
+8.2 **Kova as controller.** For account and billing data, authentication data, and
 usage and device data that we collect to operate, secure, and improve the Platform,
 Four Degree Labs is the controller. See the Privacy Policy.
 

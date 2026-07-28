@@ -18,7 +18,7 @@
  * vanished or we exhausted retries — the caller decides how to surface it).
  */
 
-import type { Budget, AddOnBalance } from "@mossa/domain";
+import type { Budget, AddOnBalance } from "@kova/domain";
 import { parseJson, j } from "./db.js";
 
 const MAX_ATTEMPTS = 5;

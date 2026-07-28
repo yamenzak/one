@@ -6,7 +6,7 @@
  * from this registry so the two never drift.
  */
 
-import type { AiFeatureMeta, AiTone } from "@mossa/protocol";
+import type { AiFeatureMeta, AiTone } from "@kova/protocol";
 
 /** House-tone guidance appended to a tonable feature's system prompt. */
 export const TONE_GUIDE: Record<AiTone, string> = {

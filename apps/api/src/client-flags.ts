@@ -10,7 +10,7 @@
  * by what a client bought (AI still meters against the tenant's own credits).
  */
 
-import { resolveClientFlags, unionClientFlags, parseFlagsJson, gateSpecOf, type Budget, type ClientFlags, type Entitlements, type FeatureKey } from "@mossa/domain";
+import { resolveClientFlags, unionClientFlags, parseFlagsJson, gateSpecOf, type Budget, type ClientFlags, type Entitlements, type FeatureKey } from "@kova/domain";
 import type { Context } from "hono";
 import type { AppEnv } from "./auth-context.js";
 import { tenantEntitlements, hasFeature } from "./billing-store.js";
@@ -127,7 +127,7 @@ export async function requireClientFlag(
 }
 
 /**
- * Gate a route on a PLATFORM entitlement (what the tenant bought from Mossa).
+ * Gate a route on a PLATFORM entitlement (what the tenant bought from Kova).
  * The single fetch-and-gate helper — resolves the tenant's entitlements (status-
  * clamped) and 403s with a uniform shape when the feature isn't in the plan.
  * Companion to `requireClientFlag`; replaces the hand-rolled

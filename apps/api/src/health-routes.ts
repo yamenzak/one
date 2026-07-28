@@ -10,7 +10,7 @@ import { z } from "zod";
 import {
   wellnessScore, sessionLoad, epley1Rm, activityByKey, presetRange, addDays,
   resolveWeeklyLoadTarget, type LoggedSetLike, type WellnessInput,
-} from "@mossa/domain";
+} from "@kova/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { gateFeature } from "./client-flags.js";
 import { requireClientAccess, visibleClientIds } from "./clients.js";

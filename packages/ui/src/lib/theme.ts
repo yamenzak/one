@@ -110,7 +110,7 @@ export const BORDER_WIDTHS: { value: number; label: string }[] = [
 export const SHADOW_PRESETS: { id: ShadowPreset; label: string; hint: string }[] = [
   { id: "none", label: "Flat", hint: "No shadows at all — hairlines carry the layering." },
   { id: "subtle", label: "Subtle", hint: "Barely-there lift. Clean and clinical." },
-  { id: "soft", label: "Soft", hint: "The Mossa default — grounded but quiet." },
+  { id: "soft", label: "Soft", hint: "The Kova default — grounded but quiet." },
   { id: "dramatic", label: "Dramatic", hint: "Deep, high-contrast elevation." },
 ];
 
@@ -300,15 +300,15 @@ export function brandingCss(branding: Branding | null | undefined): string {
 /** Apply a tenant's branding by injecting/refreshing the branding stylesheet. */
 export function applyBranding(branding: Branding | null | undefined): void {
   if (typeof document === "undefined") return;
-  let el = document.getElementById("mossa-branding") as HTMLStyleElement | null;
-  if (!el) { el = document.createElement("style"); el.id = "mossa-branding"; document.head.appendChild(el); }
+  let el = document.getElementById("kova-branding") as HTMLStyleElement | null;
+  if (!el) { el = document.createElement("style"); el.id = "kova-branding"; document.head.appendChild(el); }
   el.textContent = brandingCss(branding);
 }
 
 /** Read the user's mode preference (falls back to tenant default, else dark). */
 export function resolveMode(tenantDefault?: ThemeMode | null): ThemeMode {
   if (typeof localStorage !== "undefined") {
-    const saved = localStorage.getItem("mossa-theme");
+    const saved = localStorage.getItem("kova-theme");
     if (saved === "light" || saved === "dark") return saved;
   }
   return tenantDefault ?? "dark";
@@ -319,7 +319,7 @@ export function applyMode(mode: ThemeMode): void {
   if (mode === "light") document.documentElement.dataset.theme = "light";
   else delete document.documentElement.dataset.theme;
   try {
-    localStorage.setItem("mossa-theme", mode);
+    localStorage.setItem("kova-theme", mode);
   } catch {
     /* ignore */
   }
@@ -494,8 +494,8 @@ function neutralTint(kind: NeutralTint, brandHue: number): { hue: number; c: num
 }
 
 /**
- * Generate a full, coherent Mossa token set (light + dark) from one brand color.
- * The neutrals track Mossa's shipped lightness ramp, tinted toward the brand (or
+ * Generate a full, coherent Kova token set (light + dark) from one brand color.
+ * The neutrals track Kova's shipped lightness ramp, tinted toward the brand (or
  * a chosen neutral). The produced tokens are authoritative and stay editable —
  * this is a convenience generator, not a lock-in.
  */

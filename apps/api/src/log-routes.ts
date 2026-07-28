@@ -18,8 +18,8 @@ import {
   LogWorkoutSets,
   SubmitCheckIn,
   type LoggedSet,
-} from "@mossa/protocol";
-import { activityByKey, estimateBurnedCalories, resolveWeeklyLoadTarget, sessionTonnage, bodyComposition, calculateBMI, calculateBMR, ageFromDob, profileGaps, overallDaysRemaining, isFullyExpired, hasActiveBudget, epley1Rm, SUSPENDED_STATUSES, type ClientPreferences, type Budget } from "@mossa/domain";
+} from "@kova/protocol";
+import { activityByKey, estimateBurnedCalories, resolveWeeklyLoadTarget, sessionTonnage, bodyComposition, calculateBMI, calculateBMR, ageFromDob, profileGaps, overallDaysRemaining, isFullyExpired, hasActiveBudget, epley1Rm, SUSPENDED_STATUSES, type ClientPreferences, type Budget } from "@kova/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess, type ClientRow } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
@@ -1441,7 +1441,7 @@ export const logRoutes = new Hono<AppEnv>()
       workoutActive: !hasAccessSub || hasActiveBudget(accessBudgets, "workout", nowInstant),
       mealActive: !hasAccessSub || hasActiveBudget(accessBudgets, "meal", nowInstant),
       sellsPackages: (sells?.n ?? 0) > 0,
-      // Passthrough: when the tenant is suspended for non-payment to Mossa, the
+      // Passthrough: when the tenant is suspended for non-payment to Kova, the
       // client's tenant-derived paid features are already clamped off upstream —
       // this flag lets the app explain why, gently.
       tenantDelinquent: SUSPENDED_STATUSES.has(tenantSub?.status ?? "active"),
@@ -1468,7 +1468,7 @@ export const logRoutes = new Hono<AppEnv>()
       burnedKcal: sessionOverride > 0 ? sessionOverride : Math.round(activities?.burned ?? 0),
       workout: { loggedSets: workoutSets, sessions: workout.results ?? [] },
       checkedIn: Boolean(checkIn),
-      // weeklyLoadTarget resolves through @mossa/domain — targets_json (what the
+      // weeklyLoadTarget resolves through @kova/domain — targets_json (what the
       // coach set) wins over the mirrored column, default in exactly one place.
       goal: goal
         ? (() => {

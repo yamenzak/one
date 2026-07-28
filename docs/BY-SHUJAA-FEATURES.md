@@ -1,7 +1,7 @@
 # ByShujaa — Complete Feature & Implementation Reference
 
 > Full-app scan of https://github.com/yamenzak/by-shujaa (2026-07-10). Every subsystem below
-> was read at source level. This is the feature blueprint / raw material for **Mossa**.
+> was read at source level. This is the feature blueprint / raw material for **Kova**.
 >
 > **What it is:** a personal-trainer ↔ client SaaS. Trainers manage clients, build workout &
 > meal plans, prescribe supplements, request lab tests, and review check-ins. Clients log
@@ -85,7 +85,7 @@
 - ⚠️ Gaps found in the original: admin mutation routes (`create-trainer`, `change-role`,
   `assign-trainer`, `unassign-trainer`) have **no auth guard** (middleware skips `/api`);
   and the trainer client-detail page doesn't verify assignment — any trainer can open any
-  client by ID. Mossa should fix both.
+  client by ID. Kova should fix both.
 
 ### Onboarding
 
@@ -437,7 +437,7 @@ or **camera**.
   aggressive rounding, activity rings, full-bleed fade-mask heroes. Admin/trainer portals
   flagged for a future redesign pass.
 
-## 14. Patterns Worth Stealing for Mossa
+## 14. Patterns Worth Stealing for Kova
 
 1. **Cron-free time-based state** — derive from `expiresAt` at read time; reconcile lazily
    on read.
@@ -459,7 +459,7 @@ or **camera**.
     day bucketing.
 13. **Identity tokens + design lint** to keep a large UI coherent.
 
-## 15. Known Gaps / Issues in the Original (avoid or fix in Mossa)
+## 15. Known Gaps / Issues in the Original (avoid or fix in Kova)
 
 - **Security**: admin mutation API routes lack auth guards (create-trainer, change-role,
   assign/unassign-trainer); trainer client-detail page doesn't verify assignment.

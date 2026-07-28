@@ -11,7 +11,7 @@
  * with the model-catalog phase; the credit math is provider-agnostic already.
  *
  * The mock lane is DEVELOPMENT-ONLY, in every mode. `shouldUseMockLane`
- * (`@mossa/domain`) puts `env.ENVIRONMENT === "development"` on the outside, so
+ * (`@kova/domain`) puts `env.ENVIRONMENT === "development"` on the outside, so
  * a stored `ai.mock = "on"` — from the admin console, a hand-edited app_config
  * row, or a restored backup — cannot fabricate output in production. Fabricated
  * `lab-extract` markers would otherwise pre-fill a real client's chart, flow
@@ -19,8 +19,8 @@
  * tenant credits for the privilege. See AGENTS §6.
  */
 
-import { creditsForUsage, creditsPerMillionTokens, creditsPerUnit, referenceCredits, shouldUseMockLane, REFERENCE_USAGE, type ModelRate, type Usage } from "@mossa/domain";
-import type { TenantAiConfig, AiTone } from "@mossa/protocol";
+import { creditsForUsage, creditsPerMillionTokens, creditsPerUnit, referenceCredits, shouldUseMockLane, REFERENCE_USAGE, type ModelRate, type Usage } from "@kova/domain";
+import type { TenantAiConfig, AiTone } from "@kova/protocol";
 import type { Env } from "./env.js";
 import { newId, nowMs } from "./ids.js";
 import { getConfig } from "./billing-store.js";

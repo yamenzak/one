@@ -9,7 +9,7 @@
  */
 
 import type { Env } from "./env.js";
-import { sendEmail, emailShell, emailButton, escapeHtml, MOSSA_BRAND, type BrandKit } from "./mailer.js";
+import { sendEmail, emailShell, emailButton, escapeHtml, KOVA_BRAND, type BrandKit } from "./mailer.js";
 import { nowMs } from "./ids.js";
 
 const TTL_MS = 10 * 60 * 1000;
@@ -48,7 +48,7 @@ export async function sendActionOtp(
     .bind(opts.subject, opts.purpose, hash, now + TTL_MS, now)
     .run();
 
-  const brand = opts.brand ?? MOSSA_BRAND;
+  const brand = opts.brand ?? KOVA_BRAND;
   const html = emailShell(
     "Confirm this action",
     `<p style="margin:0 0 16px">To confirm <strong>${escapeHtml(opts.actionLabel)}</strong>, enter this code. It expires in 10 minutes and works once. If you didn't request this, ignore this email — nothing will change.</p>

@@ -2,8 +2,8 @@
  *  cards), Stripe Connect / inline buy, redeem codes. */
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Button, Card, Badge, Field, Sheet, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, EmptyState, toneVar, ArrowLeft, LogOut, Ticket, Store, Check, RotateCcw, Reveal, SkeletonLine, SkeletonList } from "@mossa/ui";
-import { CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "@mossa/domain";
+import { Button, Card, Badge, Field, Sheet, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, EmptyState, toneVar, ArrowLeft, LogOut, Ticket, Store, Check, RotateCcw, Reveal, SkeletonLine, SkeletonList } from "@kova/ui";
+import { CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "@kova/domain";
 import { api } from "../../api.js";
 import { StudioListCard } from "../../StudioSwitcher.js";
 import { useCan } from "../../FeatureLock.js";
@@ -39,7 +39,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
   const [busy, setBusy] = useState(false);
   const [buying, setBuying] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
-  // The studio has to have bought `commerce` from Mossa for any of this to
+  // The studio has to have bought `commerce` from Kova for any of this to
   // exist. Without it both reads below 403 — which left the storefront on its
   // skeleton forever — so skip them and say plainly that there's nothing to buy.
   // The redeem-a-code path stays live either way: for a client `Shell.tsx` has
@@ -317,7 +317,7 @@ function PackageCard({ p, tone, cta, hasActive }: { p: Pkg; tone: (typeof CARD_T
 /** "What your plan includes" — the client's own capabilities, grouped by
  *  category, rendered from CLIENT_FLAG_META + the resolved clientFlags in
  *  session context. The flags are already the intersection of what the coach
- *  enabled for this client AND what the studio bought from Mossa (∩ live
+ *  enabled for this client AND what the studio bought from Kova (∩ live
  *  budget), so this shows exactly what they can actually do. Positive framing:
  *  only included capabilities are listed. */
 const PLAN_PREVIEW = 5;

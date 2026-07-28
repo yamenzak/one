@@ -5,7 +5,7 @@
  * doesn't sink the sweep.
  */
 
-import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, ATTENTION_TYPES, currentStreak, wellnessIndex, averageRating, seriesDelta, type NotifRole, type AttentionType } from "@mossa/domain";
+import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, ATTENTION_TYPES, currentStreak, wellnessIndex, averageRating, seriesDelta, type NotifRole, type AttentionType } from "@kova/domain";
 import type { Env } from "./env.js";
 import { sendTenantEmail } from "./email-provider.js";
 import { emailShell, emailButton, escapeHtml, emailStatRow, emailBar, emailBars, emailSparkline, emailRing, emailPanel, emailDivider, emailListRow, type EmailStat, type EmailTone, type BrandKit } from "./mailer.js";

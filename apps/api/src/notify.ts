@@ -7,11 +7,11 @@
  * transactional (invites, receipts).
  */
 
-import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, audienceForRole, notifCategoryOf, notifTitleOf, notifLinkOf, notifTemplateOf, renderTemplate, NOTIF_CATEGORIES, type NotifType, type NotifRole, type NotifCategory } from "@mossa/domain";
+import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, audienceForRole, notifCategoryOf, notifTitleOf, notifLinkOf, notifTemplateOf, renderTemplate, NOTIF_CATEGORIES, type NotifType, type NotifRole, type NotifCategory } from "@kova/domain";
 import type { Env } from "./env.js";
 import { notifyUser } from "./inbox-do.js";
 import { sendTenantEmail } from "./email-provider.js";
-import { sendEmail, emailShell, emailButton, escapeHtml, safeColor, MOSSA_BRAND, type BrandKit } from "./mailer.js";
+import { sendEmail, emailShell, emailButton, escapeHtml, safeColor, KOVA_BRAND, type BrandKit } from "./mailer.js";
 import { nowIso } from "./ids.js";
 
 export interface NotifyInput {
@@ -51,18 +51,18 @@ async function userRole(db: D1Database, tenantId: string, userId: string): Promi
 export async function tenantBrandKit(db: D1Database, tenantId: string): Promise<BrandKit> {
   const row = await db.prepare("SELECT branding_json FROM tenant_settings WHERE tenant_id = ?").bind(tenantId).first<{ branding_json: string | null }>();
   let name: string | null = null;
-  let accent = MOSSA_BRAND.accent;
-  let accentFg = MOSSA_BRAND.accentFg;
+  let accent = KOVA_BRAND.accent;
+  let accentFg = KOVA_BRAND.accentFg;
   let logoUrl: string | null = null;
   try {
     const b = row?.branding_json ? (JSON.parse(row.branding_json) as { name?: string; primary?: string; primaryForeground?: string; logoUrl?: string }) : null;
     if (b?.name) name = b.name;
-    if (b?.primary) accent = safeColor(b.primary, MOSSA_BRAND.accent);
-    if (b?.primaryForeground) accentFg = safeColor(b.primaryForeground, MOSSA_BRAND.accentFg);
+    if (b?.primary) accent = safeColor(b.primary, KOVA_BRAND.accent);
+    if (b?.primaryForeground) accentFg = safeColor(b.primaryForeground, KOVA_BRAND.accentFg);
     // Only a public absolute URL renders in an email client (no session/cookies).
     if (b?.logoUrl && /^https?:\/\//i.test(b.logoUrl) && !b.logoUrl.includes("/api/media")) logoUrl = b.logoUrl;
   } catch { /* fall through to org name + defaults */ }
-  if (!name) name = (await db.prepare("SELECT name FROM organization WHERE id = ?").bind(tenantId).first<{ name: string }>())?.name ?? "Mossa";
+  if (!name) name = (await db.prepare("SELECT name FROM organization WHERE id = ?").bind(tenantId).first<{ name: string }>())?.name ?? "Kova";
   return { name, accent, accentFg, logoUrl };
 }
 
@@ -131,12 +131,12 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
   if (channels.email) {
     const user = await env.DB.prepare("SELECT email FROM \"user\" WHERE id = ?").bind(userId).first<{ email: string | null }>();
     if (user?.email) {
-      // Studio-billing (Mossa → tenant) emails send on the PLATFORM rail with
-      // Mossa's own identity, unmetered — a studio's suspension notice is from
-      // Mossa, not the studio, and shouldn't cost the studio a credit. Everything
+      // Studio-billing (Kova → tenant) emails send on the PLATFORM rail with
+      // Kova's own identity, unmetered — a studio's suspension notice is from
+      // Kova, not the studio, and shouldn't cost the studio a credit. Everything
       // else is the tenant's own message: tenant rail + tenant brand.
       const isPlatformBilling = category === "billing";
-      const brand = isPlatformBilling ? MOSSA_BRAND : await tenantBrandKit(env.DB, input.tenantId);
+      const brand = isPlatformBilling ? KOVA_BRAND : await tenantBrandKit(env.DB, input.tenantId);
       // Tenant white-label (tenant rail only): a per-type subject/body override
       // and a global signature. An override with enabled=0 mutes this email
       // entirely (the inbox row above still delivers).

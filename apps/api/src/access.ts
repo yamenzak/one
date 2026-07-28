@@ -2,11 +2,11 @@
  * RBAC access control (SPEC §4) — owner / trainer / assistant / client.
  *
  * Built on Better Auth's access-control primitive layered onto the
- * organization plugin: an **organization is a Mossa tenant**. Action-level
+ * organization plugin: an **organization is a Kova tenant**. Action-level
  * gates live here; ROW-LEVEL scoping (trainer → assigned clients only,
  * client → own record only) is enforced by the route layer via
  * requireClientAccess (clients.ts). The grantable catalog + presets mirror
- * @mossa/domain perms.ts — that module is the single source of truth for the
+ * @kova/domain perms.ts — that module is the single source of truth for the
  * permission editor; this file feeds Better Auth's org plugin.
  */
 import { createAccessControl } from "better-auth/plugins/access";
@@ -86,7 +86,7 @@ export const assistant = ac.newRole({
  *  no write action: prescribing, ordering labs, selling packages and booking are
  *  staff powers, and every read is still narrowed to the client's own rows by
  *  requireClientAccess in the handler. Must stay in lockstep with
- *  ROLE_PRESETS.client in @mossa/domain perms.ts (rbac-conformance enforces it). */
+ *  ROLE_PRESETS.client in @kova/domain perms.ts (rbac-conformance enforces it). */
 export const client = ac.newRole({
   tracking: ["create", "read", "update"],
   plan: ["read"],

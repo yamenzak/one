@@ -1,4 +1,4 @@
-# Mossa — Single-Source-of-Truth Registry Architecture
+# Kova — Single-Source-of-Truth Registry Architecture
 
 The app-wide passthrough: one record per feature that rules everything about it —
 feature flags, permissions, notifications, metrics/charts/widgets, units, colour
@@ -44,7 +44,7 @@ gate + task + cost + prompt; colour/icon/unit resolve through `metrics`/`tones`.
    within a role's preset but never exceed it; owner is the one unbounded role.
    (Implemented in `perms.ts resolvePermissions` via `intersectGrant`.)
 3. **Legal & privacy** — scaffold the registry facet + storage now; implement the
-   two-level (Mossa→tenant, tenant→client) consent flows in Phase 3.
+   two-level (Kova→tenant, tenant→client) consent flows in Phase 3.
 4. **Granularity** — one `*.feature.ts` per feature composing shared atoms.
 5. **Rollout** — phased, per-slice shippable PRs; each merges with tests green.
 6. **Home** — logic/specs in `packages/domain`, presentation atoms in

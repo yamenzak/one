@@ -5,14 +5,14 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { WorkoutBody, MealBody, MealOption } from "@mossa/protocol";
-import { optionMacroTotals, type FoodLike } from "@mossa/protocol";
-import { fmtEnergy } from "@mossa/domain";
+import type { WorkoutBody, MealBody, MealOption } from "@kova/protocol";
+import { optionMacroTotals, type FoodLike } from "@kova/protocol";
+import { fmtEnergy } from "@kova/domain";
 import {
   Sheet, Card, Badge, Button, EmptyState, MacroInline, cn,
   Reveal, SkeletonList,
   AlertTriangle, Dumbbell, Utensils, Moon, ChevronDown, History, type LucideIcon,
-} from "@mossa/ui";
+} from "@kova/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { ExerciseRow } from "../exercise.js";

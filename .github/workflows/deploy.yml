@@ -44,7 +44,7 @@ jobs:
 
       # Build the SPA first — the api worker serves apps/app/dist, and the
       # integration tests need it present for the assets binding.
-      - run: pnpm --filter @mossa/app build
+      - run: pnpm --filter @kova/app build
 
       - run: pnpm turbo run typecheck test
 

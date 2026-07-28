@@ -7,14 +7,14 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { AI_TONES, TTS_VOICES, TTS_VOICE_IDS } from "@mossa/protocol";
-import { categoriesForRole, resolveAllChannels, parseNotifPrefs, NOTIF_CATEGORIES, parseNotifPolicy, resolveEmailPolicy, sanitizeEmailPolicy, NOTIF_TYPES, notifTemplateOf, notifVarsOf, notifCategoryOf, notifTitleOf, type NotifRole, type NotifType, type StoredNotifPrefs } from "@mossa/domain";
+import { AI_TONES, TTS_VOICES, TTS_VOICE_IDS } from "@kova/protocol";
+import { categoriesForRole, resolveAllChannels, parseNotifPrefs, NOTIF_CATEGORIES, parseNotifPolicy, resolveEmailPolicy, sanitizeEmailPolicy, NOTIF_TYPES, notifTemplateOf, notifVarsOf, notifCategoryOf, notifTitleOf, type NotifRole, type NotifType, type StoredNotifPrefs } from "@kova/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { tenantEntitlements, getConfig } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
 import { nowIso, periodKey } from "./ids.js";
 import { parseJson, j } from "./db.js";
-import { invalidateHostCache } from "./host-context.js";
+import { invalidateTenantHosts } from "./host-context.js";
 import { PROVIDERS, resolveIntegrations, maskIntegrations } from "./integrations.js";
 import { resolveEmailConfig, maskEmailConfig } from "./email-provider.js";
 
@@ -29,7 +29,7 @@ export const settingsRoutes = new Hono<AppEnv>()
       .bind(who.tenantId)
       .first<{ branding_json: string | null; ai_toggles_json: string | null; marketplace_json: string | null; integrations_json: string | null; email_config_json: string | null; notif_policy_json: string | null; stripe_account_id: string | null }>();
     const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    const platformFrom = (await getConfig(c.env.DB))["email.platform_from"] || "Mossa <noreply@fourdegreelabs.com>";
+    const platformFrom = (await getConfig(c.env.DB))["email.platform_from"] || "Kova <noreply@fourdegreelabs.com>";
     return c.json({
       branding: parseJson(row?.branding_json, { accent: null, logoUrl: null, welcome: null }),
       aiToggles: parseJson(row?.ai_toggles_json, {}),
@@ -38,7 +38,7 @@ export const settingsRoutes = new Hono<AppEnv>()
       integrationProviders: PROVIDERS,
       email: maskEmailConfig(resolveEmailConfig(parseJson(row?.email_config_json ?? null, {}))),
       emailPlatformFrom: platformFrom,
-      // What ONE email costs on the Mossa lane. Brevo is the studio's own
+      // What ONE email costs on the Kova lane. Brevo is the studio's own
       // account and costs them nothing here, so the number is only meaningful
       // for the platform provider — the UI shows it only there.
       emailCreditsEach: Number((await getConfig(c.env.DB))["email.credits_per_email"] ?? "1"),
@@ -147,12 +147,17 @@ export const settingsRoutes = new Hono<AppEnv>()
       .bind(who.tenantId, j(branding), j(aiToggles), j(marketplace), j(integrations), nowIso(), j(branding), j(aiToggles), j(marketplace), j(integrations), nowIso())
       .run();
 
-    // Branding changed → drop cached host resolutions for this tenant's custom
-    // domains so white-label branding refreshes without waiting out the 60s TTL.
-    if (d.branding) {
-      const domains = await c.env.DB.prepare("SELECT hostname FROM tenant_domains WHERE tenant_id = ?").bind(who.tenantId).all<{ hostname: string }>().catch(() => ({ results: [] as { hostname: string }[] }));
-      for (const dom of domains.results ?? []) await invalidateHostCache(c.env, dom.hostname);
-    }
+    // Branding or marketplace changed → drop this tenant's cached host resolutions
+    // so the change shows without waiting out the 60s TTL.
+    //
+    // `invalidateTenantHosts` covers the DERIVED subdomain as well as the rows in
+    // `tenant_domains`, which is the part this used to miss: the subdomain lane
+    // resolves by slug, so the live cache key is `<slug>.<root>` whether or not a
+    // provisioning row exists for it. And `marketplace` matters as much as
+    // `branding` — `allowSignup` is cached in the same payload, so turning self
+    // sign-up on left the studio's public door still refusing strangers for a
+    // minute, with nothing to explain why.
+    if (d.branding || d.marketplace) await invalidateTenantHosts(c.env, c.env.DB, who.tenantId);
 
     // Email provider config, merged so a blank key doesn't wipe a set one unless
     // explicitly cleared (empty string clears; undefined keeps).

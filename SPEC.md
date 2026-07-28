@@ -1,13 +1,13 @@
-# MOSSA — Product & Technical Specification
+# KOVA — Product & Technical Specification
 
-> **Mossa** is a multi-tenant, multi-trainer platform for personal-training businesses:
+> **Kova** is a multi-tenant, multi-trainer platform for personal-training businesses:
 > studios, gyms, and independent coaches ("tenants") manage their clients, run staff
 > trainers with scoped client assignments, sell training packages through their own Stripe,
 > and use an AI suite (Workers AI + Google Gemini) metered against tenant credits.
 >
-> Mossa is the clean rebuild of ByShujaa (feature inventory: `docs/BY-SHUJAA-FEATURES.md`) on
+> Kova is the clean rebuild of ByShujaa (feature inventory: `docs/BY-SHUJAA-FEATURES.md`) on
 > the Scena platform stack. Scena proved the platform patterns; ByShujaa proved the domain.
-> Mossa = Scena's architecture × ByShujaa's domain, both improved.
+> Kova = Scena's architecture × ByShujaa's domain, both improved.
 >
 > Status: SPEC v1 — 2026-07-10. **Implementation: foundation → AI suite,
 > commerce, content, reports, and media all built and tested (64 tests green);
@@ -21,11 +21,11 @@
 - **Who uses it:** tenant **owners** (run the business), **trainers** (coach an assigned
   roster), and **clients** (train, eat, log, check in — mobile-first PWA).
 - **How money flows:**
-  1. **Platform rail** — tenants pay Mossa a plan subscription + buy AI credit packs.
+  1. **Platform rail** — tenants pay Kova a plan subscription + buy AI credit packs.
   2. **Tenant rail** — tenants sell packages to *their* clients via **Stripe Connect** on
-     the tenant's own Stripe account. **Mossa takes no markup/application fee** on this rail.
+     the tenant's own Stripe account. **Kova takes no markup/application fee** on this rail.
   3. **AI rail** — AI usage by anyone inside a tenancy (trainer or client) consumes the
-     **tenancy's credit balance**. Billing relationship is strictly Mossa ↔ tenant.
+     **tenancy's credit balance**. Billing relationship is strictly Kova ↔ tenant.
 - **What's different from ByShujaa:** true multi-tenancy, scoped trainer permissions,
   a real security model, platform plans + feature flags, an AI suite, email that actually
   sends, and a serverless edge stack with no Node server to babysit.
@@ -36,7 +36,7 @@
 
 ### Tenant
 
-A **Better Auth organization = one Mossa tenant** (Scena pattern). All domain data lives
+A **Better Auth organization = one Kova tenant** (Scena pattern). All domain data lives
 in D1 keyed by `tenant_id` with per-tenant indexes. One `TenantBillingDO` per tenant is
 the authoritative credit balance. No per-tenant databases in v1 (D1 10 GB budget is ample;
 revisit sharding only if a tenant's row counts demand it).
@@ -44,7 +44,7 @@ revisit sharding only if a tenant's row counts demand it).
 ### Personas (the ByShujaa "profiles" idea, re-grounded)
 
 **Decision: memberships + roles, not Netflix profiles.** ByShujaa's Profiles collection
-conflated identity, role, and body data. Mossa splits them:
+conflated identity, role, and body data. Kova splits them:
 
 - A **user** is a global Better Auth account (one credential, any number of tenancies).
 - A **membership** ties a user to a tenant with a **staff role** (`owner | trainer |
@@ -92,7 +92,7 @@ lane — plan/model/config editing, tenant support tools, comps, impersonation w
 ### Monorepo (pnpm workspaces + Turborepo, mirrors `~/scena`)
 
 ```
-mossa/
+kova/
   apps/
     api/         # THE worker: Hono router + DOs + D1/KV/R2/AI bindings.
                  # Serves the app SPA via assets binding (same-origin auth).
@@ -113,7 +113,7 @@ mossa/
 ### Cloudflare runtime (apps/api `wrangler.jsonc`)
 
 - **Worker**: Hono + Zod. `run_worker_first: ["/api/*", "/health"]`, SPA fallback for
-  the app. Route `mossa.4dl.app` (custom_domain, single-level for Universal SSL) —
+  the app. Route `kova.4dl.app` (custom_domain, single-level for Universal SSL) —
   **one origin serves every role** (client PWA, trainer, owner, admin); the Service
   Worker scopes offline caching to the app shell + client surfaces.
 - **D1** (`DB`): all authoring + logging data, Better Auth tables, billing mirrors.
@@ -195,7 +195,7 @@ bucketing — everywhere, including trainer reports (ByShujaa missed that one sp
   passkeys are WebAuthn origin-bound, so a single origin is what lets one passkey work
   across every tenancy a user belongs to (and survives tenant rebrands). But the *entry
   point* is skinned: `/t/<slug>` carries a Sign in that renders the OTP screen with the
-  tenant's logo/accent/welcome copy (`branding` entitlement; neutral Mossa styling
+  tenant's logo/accent/welcome copy (`branding` entitlement; neutral Kova styling
   below Studio). Invites and gym QRs always deep-link to the branded page, so clients
   effectively never see a generic screen. The neutral `/login` remains; after OTP,
   membership lookup routes anyone to the right tenant regardless of which door they
@@ -203,7 +203,7 @@ bucketing — everywhere, including trainer reports (ByShujaa missed that one sp
   install icon/name) is a parked enhancement. **Superseded for custom domains
   (§14.1, shipped):** a tenant on its own domain runs a per-domain auth origin
   (Model A) — the Host pins the tenant and passkeys enroll per domain. The
-  single-origin story above still describes `mossa.4dl.app` and the `/t/<slug>`
+  single-origin story above still describes `kova.4dl.app` and the `/t/<slug>`
   fallback, which remain for tenants without a custom domain.
 - **RBAC** (`perms.ts`, pure): `{resource: action[]}` grants; `PERMISSION_CATALOG` over
   resources `client, plan, nutrition, tracking, supplement, lab, resource, session,
@@ -231,7 +231,7 @@ stored as `entitlements_json` per plan row (admin-editable at runtime), deep-mer
 FREE baseline, per-tenant `overrides_json` for comps/gifts, `checkDowngrade()` compliance
 gate on downgrades.
 
-**Mossa ships 4 paid plans.** Tier names are generic on purpose — "Studio" is
+**Kova ships 4 paid plans.** Tier names are generic on purpose — "Studio" is
 business-side vocabulary for a tenant, never a plan name. There is no free tier; the two
 30-day trials replaced it.
 
@@ -283,7 +283,7 @@ routes (`if (!ent.features.aiSuite) 403`) and mirrored to the UI via `GET /api/b
 subscription creation, as Stripe's `trial_period_days`.
 
 **Two flag systems, deliberately distinct (don't merge them):**
-1. **Platform entitlements** — what the *tenant* bought from Mossa (above).
+1. **Platform entitlements** — what the *tenant* bought from Kova (above).
 2. **Package feature flags** — what a *client* bought from the tenant (§7). Client-side
    capability = `entitlements ∩ resolveClientFlags(subscription)`.
 
@@ -326,7 +326,7 @@ subscription creation, as Stripe's `trial_period_days`.
 - Prompt-hash **response cache** (`ai_cache`) — cache hits are free (release the hold).
 - 180 s per-call timeout; SSE streaming for text.
 
-### AI feature catalog (the Mossa AI Suite)
+### AI feature catalog (the Kova AI Suite)
 
 All gated by `aiSuite` + per-feature tenant toggles; all metered reserve→settle; every
 output lands as a **draft the human approves** — AI never silently mutates a plan.
@@ -371,7 +371,7 @@ post-launch with on-device pose only.)
 
 ### Two Stripe rails, cleanly separated
 
-- **Platform rail** (Mossa ↔ tenant): Scena's SDK-less `stripe.ts` — raw fetch + Web
+- **Platform rail** (Kova ↔ tenant): Scena's SDK-less `stripe.ts` — raw fetch + Web
   Crypto webhook verification; config in `app_config` (mode/keys, admin UI); catalog sync
   (plan products + recurring prices, pack products + one-time prices); checkout for plan
   changes and packs; webhooks drive activation, monthly grants, and the **dunning
@@ -379,7 +379,7 @@ post-launch with on-device pose only.)
   Comped tenants exempt. Suspension gates the coaching surfaces, never the billing page.
 - **Tenant rail** (tenant ↔ client): **Stripe Connect, Standard accounts** — the tenant
   owns the Stripe relationship, their statement descriptor, their payouts, their tax.
-  Mossa creates Checkout sessions **on the connected account** with **no
+  Kova creates Checkout sessions **on the connected account** with **no
   application_fee** (zero markup, as promised). Onboarding = Connect account link from
   tenant settings; `stripe_account_id` on the tenant row. Per-account webhooks
   (`/api/connect/webhook`) with the same event set ByShujaa handled: checkout completed,
@@ -405,7 +405,7 @@ client_specific`), once-per-customer, per-package client feature flags.
   defaults → subscription overrides → budget-gating → **∩ tenant plan entitlements**.
   UI and API only ever consume the resolved shape.
 - Tenant **marketplace page**: a public, tenant-branded package storefront
-  (`mossa.4dl.app/t/<slug>` or tenant custom domain later) — doubles as client
+  (`kova.4dl.app/t/<slug>` or tenant custom domain later) — doubles as client
   self-registration entry.
 
 ---
@@ -413,7 +413,7 @@ client_specific`), once-per-customer, per-package client feature flags.
 ## 8. Domain Feature Catalog (redesigned ByShujaa)
 
 Everything below is per-tenant. Libraries have three visibility levels: **platform seed**
-(global read-only content Mossa ships), **tenant** (shared inside the tenant), **private**
+(global read-only content Kova ships), **tenant** (shared inside the tenant), **private**
 (the authoring trainer). That replaces ByShujaa's flat `isPublic`.
 
 ### 8.1 Client management
@@ -671,13 +671,13 @@ referenced entities; `source`/`source_id` on imported library rows.
 
 ## 14. Open Questions (decide before the relevant phase)
 
-1. ~~Single origin `mossa.4dl.app` serves all roles; custom tenant domains
+1. ~~Single origin `kova.4dl.app` serves all roles; custom tenant domains
    need SaaS-for-domains; defer.~~ **Decided + shipped (Model A, white-label per
    domain):** tenants bring their own domain via **Cloudflare for SaaS** custom
    hostnames (owner self-serves in Settings; CNAME + DCV TXT; auto-provisioned
    cert). On a custom domain the **Host pins the tenant** (`host-context.ts`),
    auth is per-domain (each domain its own WebAuthn RP + cookie jar), and only
-   members of that tenant get scope on it. `mossa.4dl.app` stays the neutral
+   members of that tenant get scope on it. `kova.4dl.app` stays the neutral
    host: generic entry, the `/t/<slug>` subpath fallback, and platform admin.
    **Trade-off accepted:** because passkeys are origin-bound, one user in
    multiple tenancies enrolls a passkey per domain (OTP is the bootstrap); the

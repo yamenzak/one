@@ -4,13 +4,13 @@
  * consistency heatmap, calorie adherence), Body (weight / body-fat / waist
  * trends with moving-average lines + deltas), Training (weekly volume bars,
  * totals, a PR leaderboard) and Wellness (a mood/energy/sleep/calm/consistency
- * radar + per-day mood & sleep trends). Charts are the @mossa/ui chart set.
+ * radar + per-day mood & sleep trends). Charts are the @kova/ui chart set.
  */
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "motion/react";
-import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, fmtEnergy, kcalToDisplay, POSTURE_GUIDANCE, presetRange, type RangePreset, type SeriesDelta } from "@mossa/domain";
+import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, fmtEnergy, kcalToDisplay, POSTURE_GUIDANCE, presetRange, type RangePreset, type SeriesDelta } from "@kova/domain";
 
 const capp = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 import {
@@ -18,7 +18,7 @@ import {
   Reveal, SkeletonHero, SkeletonChart,
   AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, METRICS, POSTURE_SEVERITY_TONE, cn, toneVar,
   Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, Calendar, Scale, type Tone, type LucideIcon,
-} from "@mossa/ui";
+} from "@kova/ui";
 import { api, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";

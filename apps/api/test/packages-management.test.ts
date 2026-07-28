@@ -23,7 +23,17 @@ import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import { ensureSchema } from "../src/db.js";
 
-const ORIGIN = "http://localhost:8787"; // treated as local by createAuth (non-secure cookies)
+const ORIGIN = "http://setup.localhost:8787";
+/**
+ * The OPERATOR door. `/api/admin/*` answers here and nowhere else in production —
+ * a studio's subdomain must not reach platform administration even with a live
+ * operator cookie, because that cookie is now valid across every host under the
+ * root. Dev has a single root and therefore no separate door, so the restriction
+ * stands down on loopback (`isDevRoot`) — but the suite addresses the real door
+ * anyway, so a regression in that guard fails here rather than in production.
+ */
+const ADMIN = "http://admin.localhost:8787";
+
 let ownerCookie = "";
 let otherCookie = "";
 
@@ -126,7 +136,7 @@ beforeAll(async () => {
   otherCookie = await signInFlow("pkgrival@test.dev", "Rival Studio");
   // The `commerce` entitlement gates POST /packages; the top plan opens it.
   const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-  await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, {
+  await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, {
     method: "POST",
     headers: H(),
     body: JSON.stringify({ planId: "team" }),

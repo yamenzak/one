@@ -10,13 +10,13 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { fmtEnergy, fmtWeight, fmtVolume, lengthLabel, type UnitPrefs } from "@mossa/domain";
+import { fmtEnergy, fmtWeight, fmtVolume, lengthLabel, type UnitPrefs } from "@kova/domain";
 import {
   Sheet, Card, Badge, IconBadge, ChartCard, AreaChart, BarChart, MacroBar, GlanceStrip, ProgressRing, SectionHeader, Reveal, SkeletonHero, SkeletonChart, EmptyState, Stagger, stagger, METRICS, toneVar, cn,
   Flame, Weight, Droplet, MapPin, Timer, HeartPulse, Gauge, Smile, Ruler, Activity, TrendingUp, TrendingDown,
   Footprints, Dumbbell, ClipboardList, Moon, Pill, ScanLine, Target, Utensils, Croissant, Soup, Apple,
   type LucideIcon, type Tone,
-} from "@mossa/ui";
+} from "@kova/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { useActiveClientId } from "../../session.js";

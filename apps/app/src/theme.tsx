@@ -5,7 +5,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { applyBranding, applyMode, resolveMode, oklchStringToHex, type Branding, type ThemeMode } from "@mossa/ui";
+import { applyBranding, applyMode, resolveMode, oklchStringToHex, type Branding, type ThemeMode } from "@kova/ui";
 import { useSession } from "./session.js";
 
 interface ThemeCtx {

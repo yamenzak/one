@@ -1,4 +1,4 @@
-# Mossa — Guide for Coaches and Studio Owners
+# Kova — Guide for Coaches and Studio Owners
 
 Everything in this guide describes features that work today. Anything not yet
 usable is listed honestly at the end rather than quietly implied.
@@ -193,7 +193,7 @@ Today screen in an Explore rail and in a full Explore list.
 
 Owners on Light and above: **Business → Packages**. First connect Stripe from
 **Business → Overview** — checkouts are created on **your** Stripe account, with
-your statement descriptor, your payouts and your tax. Mossa takes no cut. Until
+your statement descriptor, your payouts and your tax. Kova takes no cut. Until
 Stripe onboarding is complete, clients see "checkout isn't available yet."
 
 A package has a one-time price and/or instalments, feature budgets (workout, meal,
@@ -230,7 +230,7 @@ every day they paid for.
 
 ### Refunds, disputes, cancellations
 
-Refunds are issued from your own Stripe dashboard. Mossa does **not**
+Refunds are issued from your own Stripe dashboard. Kova does **not**
 automatically remove access days when you refund — partial refunds and time
 already used make that guesswork, so you're notified and you decide. Same for
 chargebacks. A client can cancel auto-renew themselves; it stops future charges
@@ -358,7 +358,7 @@ Changing plans takes effect right away. Note that upgrading or downgrading start
 a fresh monthly charge and ends the old one, so time already paid on the old plan
 isn't credited back — change close to your renewal date if that matters.
 
-If a payment to Mossa fails you get a notice and a grace period. If it stays
+If a payment to Kova fails you get a notice and a grace period. If it stays
 unpaid, paid features pause for you *and* your clients; longer and your studio
 drops to free. Your coaching data stays put throughout, and updating your card
 restores everything.

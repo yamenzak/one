@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Card, Button, Badge, Spinner, IconBadge, EmptyState, SegmentedControl, cn, toneVar, POSTURE_SEVERITY_TONE,
   AreaChart, ScanLine, Camera, Percent, History, RotateCcw, ChevronRight,
-} from "@mossa/ui";
+} from "@kova/ui";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";

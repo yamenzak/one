@@ -6,7 +6,7 @@
  */
 
 import { useState } from "react";
-import { Chip, ArrowLeftRight } from "@mossa/ui";
+import { Chip, ArrowLeftRight } from "@kova/ui";
 import { api } from "../../api.js";
 
 export interface Lane { id: string; label: string; archived: boolean }

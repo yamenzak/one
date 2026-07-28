@@ -1,4 +1,4 @@
-# Mossa — Guide for Clients
+# Kova — Guide for Clients
 
 Everything here describes what the app does today. Things that aren't ready yet
 are listed at the end rather than hinted at.
@@ -21,7 +21,7 @@ available as a backup, so losing a phone never locks you out.
 
 **If your code doesn't arrive:**
 
-- Give it a minute, then check spam and junk. Search your mail for "Mossa code".
+- Give it a minute, then check spam and junk. Search your mail for "Kova code".
 - Make sure the address is spelled exactly right.
 - You can request a new code every 30 seconds. If you're on shared gym Wi-Fi,
   that network has an hourly limit for everyone on it — try mobile data.

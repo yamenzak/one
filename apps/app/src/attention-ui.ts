@@ -1,11 +1,11 @@
 /**
- * UI-layer twin of the pure `@mossa/domain` attention registry (mirrors
+ * UI-layer twin of the pure `@kova/domain` attention registry (mirrors
  * `notif-ui.ts` / `metric-coding.ts`): maps each attention type to an icon +
  * tone. Domain owns severity/permission/copy; presentation lives here.
  */
 
-import { Target, Moon, ClipboardList, FlaskConical, ArrowLeftRight, Clock, CircleAlert, CircleUser, Scale, Percent, Dumbbell, type LucideIcon, type Tone } from "@mossa/ui";
-import type { AttentionType, AttentionSeverity } from "@mossa/domain";
+import { Target, Moon, ClipboardList, FlaskConical, ArrowLeftRight, Clock, CircleAlert, CircleUser, Scale, Percent, Dumbbell, type LucideIcon, type Tone } from "@kova/ui";
+import type { AttentionType, AttentionSeverity } from "@kova/domain";
 
 export interface AttentionCoding { icon: LucideIcon; tone: Tone }
 

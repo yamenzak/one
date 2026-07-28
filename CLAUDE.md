@@ -4,9 +4,9 @@ Guidance for Claude Code working in this repository.
 
 ## Project
 
-**Mossa** — a multi-tenant, multi-trainer platform for personal-training
+**Kova** — a multi-tenant, multi-trainer platform for personal-training
 businesses. Product + technical spec in [SPEC.md](SPEC.md); UI design system in
-[DESIGN.md](DESIGN.md); the ByShujaa feature inventory Mossa is modeled on is in
+[DESIGN.md](DESIGN.md); the ByShujaa feature inventory Kova is modeled on is in
 [docs/BY-SHUJAA-FEATURES.md](docs/BY-SHUJAA-FEATURES.md).
 
 ## Stack
@@ -36,11 +36,11 @@ packages/
 
 - `pnpm dev` — turbo: api (`wrangler dev` on :8787) + app (vite on :5173, proxies /api)
 - `pnpm typecheck` / `pnpm test` — across the workspace
-- `pnpm --filter @mossa/api test` — the Miniflare integration suite. **Build the
-  SPA first** (`pnpm --filter @mossa/app build`) — the worker's `assets` dir is
+- `pnpm --filter @kova/api test` — the Miniflare integration suite. **Build the
+  SPA first** (`pnpm --filter @kova/app build`) — the worker's `assets` dir is
   `apps/app/dist`, and Miniflare aborts (reporting "no tests") without it. The
   root `pnpm test` handles this automatically (turbo builds the app first).
-- `pnpm --filter @mossa/app build` — build the SPA (the api worker serves `apps/app/dist`)
+- `pnpm --filter @kova/app build` — build the SPA (the api worker serves `apps/app/dist`)
 - `pnpm e2e` — the Playwright golden paths (`apps/e2e`). One command from a clean
   checkout: turbo builds the SPA, Playwright boots `wrangler dev --local` on :8787
   and drives **that** origin (not vite :5173 — see the config header for why), and
@@ -80,22 +80,44 @@ remote bindings without editing the config (this is what the E2E suite does).
   the security invariant; never bypass it.
 - **Credits**: `TenantBillingDO` (`billing-do.ts`) is the authoritative balance;
   AI goes through `ai.ts` `generate()` = reserve → run (Workers AI | mock) →
-  settle. Metering math is pure in `@mossa/domain` credits.ts.
-- **Access economy**: `commerce-routes.ts` + `@mossa/domain` budgets.ts —
+  settle. Metering math is pure in `@kova/domain` credits.ts.
+- **Access economy**: `commerce-routes.ts` + `@kova/domain` budgets.ts —
   budgets carry `expiresAt`, days derive at read time, purchases QUEUE not sum,
   status reconciles lazily on read. No domain cron.
 - **Two flag systems** (don't merge): platform entitlements (tenant bought from
-  Mossa, `entitlements.ts`) vs per-package client flags (client bought from the
+  Kova, `entitlements.ts`) vs per-package client flags (client bought from the
   tenant, `clientFlags.ts`). Client capability = the intersection.
+- **The host IS the tenancy** (read this before touching routing or auth).
+  `@kova/domain` `hosts.ts` classifies every hostname into five doors:
+  `kova.4dl.app` = a signpost (not an app, refuses to send a sign-in code),
+  `setup.` = the only place a studio is created, `admin.` = the operator console
+  (`/api/admin/*` answers there and nowhere else), `<slug>.` = a studio, a tenant's
+  own domain = the same studio. Anything else under the root 404s. `host-context.ts`
+  turns that into a tenant; `auth-context.ts` pins the tenancy from it, so a session
+  pointed at the wrong studio grants nothing. `/t/<slug>` is gone.
+  - Studio slugs are DNS LABELS: validated server-side in `org-guard.ts` against
+    `RESERVED_LABELS`, which is a security control (a studio at `admin.` or
+    `autodiscover.` would be a takeover). Adding a label is cheap; removing one
+    changes a live studio's URL.
+  - One passkey and one session across every door under the root (`rpIdFor`,
+    `cookieDomainFor`). A custom domain gets its own — WebAuthn allows nothing else.
+  - `wrangler.jsonc` declares NO `routes`, deliberately: declaring them makes
+    `wrangler dev` rewrite the incoming Host to the route's hostname, which collapses
+    every door onto the root. The two production routes are a dashboard step
+    (DEPLOY.md §11). Read the header comment before adding them back.
+- **Suspension closes a studio**: `resolveHostGate` (standing.ts) makes a
+  suspended/closing tenant's whole subdomain read-only, enforced once in
+  `route-guard.ts`. Stripe webhooks are explicitly exempt — blocking them would make
+  suspension unrecoverable. Reads are never gated.
 - **One UI, three roles**: `apps/app/src/Shell.tsx` swaps nav by persona + mode;
   the trainer's client-detail renders the *same* client surfaces scoped to that
   client. Role changes scope + powers + nav, never screens.
 
 ## Conventions
 
-- Store metric, convert at display (`@mossa/domain` units.ts). Day-bucketed
+- Store metric, convert at display (`@kova/domain` units.ts). Day-bucketed
   rows use the client's local date (`date_local`, YYYY-MM-DD) from the device.
-- Plan/meal bodies are JSON columns validated by `@mossa/protocol` at the route.
+- Plan/meal bodies are JSON columns validated by `@kova/protocol` at the route.
 - Pure domain logic gets unit tests; API flows get Miniflare integration tests.
   Run tests with the `wrangler dev` server stopped (they share `.wrangler` state).
 - Prettier-ish: no semicolons aren't enforced here — match surrounding style.
@@ -106,11 +128,11 @@ Be conservative here: this section is read as ground truth by future agents, so
 an over-claim costs more than an under-claim. Verify before editing it.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured most recently: **188 domain + ~208 API + 7 protocol + a small
-app suite**, four vitest projects total. The pricing and normalizer suites live
+moves. Measured most recently: **303 domain + 460 API + 7 protocol + 28 app + 9 ui**
+(807 total, 38 skipped). The pricing and normalizer suites live
 in `apps/api/test` and are already *inside* the API count — the older
 "protocol/pricing/normalizer" phrasing double-counted them. **E2E is separate**
-(`pnpm e2e`, not part of `pnpm test`): 3 Playwright specs, ~35 s all in.
+(`pnpm e2e`, not part of `pnpm test`): 3 Playwright specs, ~40 s all in, all green.
 
 **Built and tested:** foundation, auth (OTP + passkeys, incl. autofill /
 conditional UI), tenancy + row-level scope, the AI suite (credits reserve →
@@ -144,19 +166,32 @@ food/exercise search, notifications/inbox, staff invitations, custom domains, th
 offline lane (the config blocks the service worker on purpose), and anything
 desktop-width — the projects list is Chromium at a phone viewport only.
 
-⚠️ The E2E suite drives **:8787** (the worker serving the built SPA), not vite's
-:5173. That is not a preference: with the vite proxy the browser Origin is
-`localhost:5173` while the worker's is `localhost:8787`, and Better Auth 1.6.23
-ignores the `trustedOrigins` array `auth.ts` passes it — so every *cookie-bearing*
-Better Auth POST 403s `INVALID_ORIGIN`. Sign-in itself is cookieless and works,
-then **"Create workspace" fails on :5173**, i.e. an owner cannot create a studio
-in `pnpm dev`. Production is same-origin and unaffected. Not fixed here (it is
-`auth.ts`'s to fix); the suite avoids it by testing the shape that ships.
+⚠️ **Both suites run on the real host topology, via `*.localhost`.** `wrangler dev`
+and Miniflare preserve the Host, and browsers resolve `.localhost` to loopback, so
+the integration suite signs in on `setup.localhost:8787` and asserts tenant
+behaviour on `<slug>.localhost:8787`, and the E2E suite drives the same doors.
+`apps/e2e/src/resolve-localhost.ts` supplies `.localhost` resolution for Node,
+because some container images do not implement RFC 6761.
+
+Two honest dev-only differences from production, both documented where they bite:
+- **The session cookie is host-only locally.** `Domain=localhost` is rejected by
+  browsers, so `cookieDomainFor` returns null for loopback and each `*.localhost`
+  has its own jar. Production issues one cookie for the whole root, so one sign-in
+  covers every studio. The E2E fixtures carry the real cookie across hosts rather
+  than signing in twice (which the OTP cooldown would correctly refuse).
+- **The operator-door restriction stands down in dev** (`isDevRoot`), because dev has
+  a single root and therefore no separate door.
+
+⚠️ Still :8787 (the worker serving the built SPA), never vite's :5173: with the vite
+proxy the browser Origin is `localhost:5173` while the worker's is `localhost:8787`,
+and Better Auth 1.6.23 ignores the `trustedOrigins` array `auth.ts` passes it — so
+every *cookie-bearing* Better Auth POST 403s `INVALID_ORIGIN`. Production is
+same-origin and unaffected.
 
 **NOT built** (do not describe any of these as shipped):
 - **Wearable import** (Health Connect).
 - **Trainer ↔ client chat** — `chat` is `reserved: true` in
-  `@mossa/domain/entitlements.ts`. No plan in the current catalog (Solo/Light/Pro/
+  `@kova/domain/entitlements.ts`. No plan in the current catalog (Solo/Light/Pro/
   Max) enables it; the retired `studio`/`team` rows still carry `chat: true` in
   their stored D1 JSON, left untouched so a grandfathered tenant keeps exactly what
   it was sold. Inert either way — reserved features are unenforced by construction.

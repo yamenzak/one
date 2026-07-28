@@ -6,7 +6,7 @@
  * "bottts" robot seeded per studio, named "Coach".
  */
 
-import { dicebearUrl, cn } from "@mossa/ui";
+import { dicebearUrl, cn } from "@kova/ui";
 import { useSession } from "./session.js";
 
 export function aiAvatarSrc(uploaded: string | null | undefined, seed: string): string {
@@ -17,7 +17,7 @@ export function aiAvatarSrc(uploaded: string | null | undefined, seed: string): 
 export function useAiIdentity(): { name: string; src: string } {
   const { ctx, host } = useSession();
   const branding = ctx?.branding ?? host?.tenant?.branding;
-  const seed = ctx?.active?.tenantSlug ?? ctx?.active?.tenantId ?? host?.tenant?.slug ?? "mossa";
+  const seed = ctx?.active?.tenantSlug ?? ctx?.active?.tenantId ?? host?.tenant?.slug ?? "kova";
   return {
     name: (branding?.aiName || "").trim() || "Coach",
     src: aiAvatarSrc(branding?.aiAvatarUrl, seed),

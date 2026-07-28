@@ -1,11 +1,11 @@
 {
-  // Mossa edge API — Workers + TenantBillingDO. One worker serves the
+  // Kova edge API — Workers + TenantBillingDO. One worker serves the
   // role-adaptive app (static assets) AND the API at the same origin, so the
   // Better Auth session cookie is same-origin — no CORS/credentials juggling
   // (SPEC §3). KV/D1/R2 ids below are placeholders; local `wrangler dev`
   // simulates everything. Real ids only needed for a remote deploy.
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "mossa",
+  "name": "kova",
   "main": "src/index.ts",
   "compatibility_date": "2025-07-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -13,7 +13,7 @@
 
   // Serve the built app SPA from the edge; the Worker runs first for the API
   // surface, SPA fallback for client-side routes. Build the app before
-  // deploying: `pnpm --filter @mossa/app build`.
+  // deploying: `pnpm --filter @kova/app build`.
   "assets": {
     "directory": "../app/dist",
     "not_found_handling": "single-page-application",
@@ -30,9 +30,41 @@
     "run_worker_first": ["/api/*", "/health", "/manifest.webmanifest"]
   },
 
-  // Single-level host under 4dl.app → covered by the zone's *.4dl.app
-  // Universal SSL cert. One origin serves every role; passkeys are bound here.
-  "routes": [{ "pattern": "mossa.4dl.app", "custom_domain": true }],
+  /**
+   * NO `routes` HERE — on purpose, and this is load-bearing for local dev.
+   *
+   * The two patterns this worker needs are:
+   *
+   *   kova.4dl.app/*     the root (a signpost), `setup.`, `admin.`
+   *   *.kova.4dl.app/*   every studio's subdomain
+   *
+   * and they are created ONCE in the Cloudflare dashboard (DEPLOY.md §11 Step C),
+   * not from here. Two reasons:
+   *
+   *  1. **Declaring routes breaks `wrangler dev`.** With a `routes` entry, the dev
+   *     server discards the incoming Host and rewrites every request to the route's
+   *     hostname — verified: `Host: acme.localhost:8787` arrives at the worker as
+   *     `http://kova.4dl.app/…`, with `mf-original-hostname` rewritten too, so the
+   *     original is not recoverable. Kova resolves the TENANT from the Host, so that
+   *     collapses every door onto the root: `pnpm dev` serves a dead-end signpost
+   *     and no studio subdomain can be reached or tested. Removing the block
+   *     restores pass-through, and dev/E2E then exercise the shipped topology.
+   *  2. **A route alone is worse than no route.** `*.kova.4dl.app` is a
+   *     SECOND-level wildcard, which Universal SSL does not cover (it terminates
+   *     one level: `*.4dl.app`). It needs an ACM certificate and a proxied wildcard
+   *     DNS record, and if the route exists without them every studio subdomain
+   *     fails the TLS handshake before the worker runs — "all studios down" on a
+   *     green deploy. Keeping all three together in one dashboard checklist makes
+   *     that impossible to do by halves.
+   *
+   * Custom domains are unaffected: those routes are created per-hostname through
+   * the Cloudflare API at bind time (cloudflare.ts `createWorkerRoute`), because
+   * Cloudflare matches routes on the incoming Host and a tenant's own domain is not
+   * in this zone. Route management outside wrangler is already the pattern here.
+   *
+   * `wrangler deploy` does not remove routes it does not declare, so deploys are
+   * safe once the two above exist.
+   */
 
   // 15-min tick: reminder/notification sweeps. Daily 00:10 UTC: monthly credit
   // grants + platform dunning lifecycle (SPEC §3). No domain cron — client
@@ -42,8 +74,16 @@
   "vars": {
     // Platform super-admin allowlist (separate axis from tenant RBAC).
     "ADMIN_EMAILS": "zakhouryamen@gmail.com",
-    // Public origin Better Auth derives callbacks/cookies from (prod).
-    "BETTER_AUTH_URL": "https://mossa.4dl.app"
+    // Public origin of the ROOT door. Better Auth's baseURL is per-request (the
+    // hostname the user actually came through), so this is only the advertised
+    // canonical origin and the fallback for background jobs with no request.
+    "BETTER_AUTH_URL": "https://kova.4dl.app",
+    // The apex studios live under. Every hostname is classified against it, it is
+    // the WebAuthn RP ID and the session cookie's Domain for every door beneath it,
+    // and `<slug>.ROOT_DOMAIN` is a studio's address. Set explicitly: deriving it
+    // silently reclassifies every studio subdomain as a foreign custom domain,
+    // which fails closed as "every studio 404s" with nothing naming the cause.
+    "ROOT_DOMAIN": "kova.4dl.app"
     // BETTER_AUTH_SECRET is a wrangler secret (openssl rand -base64 32).
   },
 
@@ -71,13 +111,13 @@
   "d1_databases": [
     // Everything relational: Better Auth, tenants' coaching data, billing
     // mirrors. Local wrangler dev simulates this.
-    { "binding": "DB", "database_name": "mossa", "database_id": "7705a554-6bde-4223-83d4-f9b8de5bb223" }
+    { "binding": "DB", "database_name": "kova", "database_id": "7705a554-6bde-4223-83d4-f9b8de5bb223" }
   ],
 
   "r2_buckets": [
     // Media library: exercise media, food images, progress photos (private,
     // served via authed proxy), lab uploads, avatars, AI assets.
-    { "binding": "MEDIA", "bucket_name": "mossa-media" }
+    { "binding": "MEDIA", "bucket_name": "kova-media" }
   ],
 
   // Cloudflare Email Sending (transactional: OTP codes, invites, notices).

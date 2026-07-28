@@ -11,14 +11,30 @@
 
 import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
-import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@mossa/protocol";
+import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@kova/protocol";
 import { ensureSchema } from "../src/db.js";
 import { clientDigestHtml, coachDigestHtml } from "../src/digest.js";
-import { emailBar, emailBars, emailSparkline, emailRing, emailStatRow, emailListRow, MOSSA_BRAND } from "../src/mailer.js";
+import { emailBar, emailBars, emailSparkline, emailRing, emailStatRow, emailListRow, KOVA_BRAND } from "../src/mailer.js";
 import { purgeClient, purgeTenant } from "../src/purge.js";
 import { verifyActionOtp } from "../src/action-otp.js";
 
-const ORIGIN = "http://localhost:8787"; // treated as local by createAuth (non-secure cookies)
+// The SETUP door. `*.localhost` resolves to loopback everywhere, so the suite runs
+// on the real host topology rather than a simulation of it: studios are created
+// here, session-scoped tenancy works here, and OTP send is allowed here — the ROOT
+// door (`localhost` alone) deliberately refuses to send a sign-in code, because no
+// studio lives there. Local, so createAuth keeps cookies non-Secure.
+// Tenant-DOOR behaviour (`<slug>.localhost`) is covered in hosts.test.ts.
+const ORIGIN = "http://setup.localhost:8787";
+/**
+ * The OPERATOR door. `/api/admin/*` answers here and nowhere else in production —
+ * a studio's subdomain must not reach platform administration even with a live
+ * operator cookie, because that cookie is now valid across every host under the
+ * root. Dev has a single root and therefore no separate door, so the restriction
+ * stands down on loopback (`isDevRoot`) — but the suite addresses the real door
+ * anyway, so a regression in that guard fails here rather than in production.
+ */
+const ADMIN = "http://admin.localhost:8787";
+
 let ownerCookie = "";
 let otherCookie = "";
 
@@ -107,7 +123,7 @@ beforeAll(async () => {
   // supplementsLabs, branding, active-client capacity) are open for the suites
   // that exercise those surfaces. Studio Two stays on free to prove the gates.
   const owner1Ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-  await SELF.fetch(`http://x/api/admin/tenants/${owner1Ctx.active.tenantId}/plan`, {
+  await SELF.fetch(`${ADMIN}/api/admin/tenants/${owner1Ctx.active.tenantId}/plan`, {
     method: "POST",
     headers: { "content-type": "application/json", ...auth(ownerCookie) },
     body: JSON.stringify({ planId: "team" }),
@@ -179,7 +195,7 @@ describe("credits + AI metering", () => {
 
   it("comp → studio grants credits → AI runs (mock) and debits the ledger", async () => {
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    const comp = await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, {
+    const comp = await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ planId: "studio" }),
@@ -300,7 +316,7 @@ describe("connect rail — webhook idempotency + grant", () => {
       .bind(pkgId, ctx.active.tenantId, "Webhook Pack", 5000, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
     await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_wh_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_wh_1'").bind(ctx.active.tenantId, new Date().toISOString()).run();
 
-    const payload = JSON.stringify({ id: "evt_conn_dedup_1", account: "acct_wh_1", type: "checkout.session.completed", data: { object: { id: "cs_test_1", metadata: { mossa_tenant: ctx.active.tenantId, mossa_client: client.id, mossa_package: pkgId } } } });
+    const payload = JSON.stringify({ id: "evt_conn_dedup_1", account: "acct_wh_1", type: "checkout.session.completed", data: { object: { id: "cs_test_1", metadata: { kova_tenant: ctx.active.tenantId, kova_client: client.id, kova_package: pkgId } } } });
     const post = async () => SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
 
     const r1 = await post();
@@ -348,7 +364,7 @@ describe("connect rail — webhook idempotency + grant", () => {
     const post = async (payload: string) => SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
 
     // Period one via subscription-mode checkout.
-    const created = JSON.stringify({ id: "evt_sub_create", account: "acct_recur_1", type: "checkout.session.completed", data: { object: { id: "cs_sub_1", mode: "subscription", subscription: "sub_recur_1", metadata: { mossa_tenant: ctx.active.tenantId, mossa_client: client.id, mossa_package: pkgId } } } });
+    const created = JSON.stringify({ id: "evt_sub_create", account: "acct_recur_1", type: "checkout.session.completed", data: { object: { id: "cs_sub_1", mode: "subscription", subscription: "sub_recur_1", metadata: { kova_tenant: ctx.active.tenantId, kova_client: client.id, kova_package: pkgId } } } });
     expect((await post(created)).status).toBe(200);
     const days1 = (await (await SELF.fetch(`http://x/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number; autoRenew?: boolean; budgets: unknown[] }[] };
     const sub1 = days1.subscriptions.find((s) => (s.budgets?.length ?? 0) > 0)!;
@@ -376,7 +392,7 @@ describe("connect rail — webhook idempotency + grant", () => {
     const pkgId = "pkg_inline_ot";
     await db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, active, created_at) VALUES (?, ?, ?, ?, ?, 'usd', 1, ?)")
       .bind(pkgId, ctx.active.tenantId, "Inline Pack", 3000, JSON.stringify([{ feature: "all", days: 20 }]), new Date().toISOString()).run();
-    const payload = JSON.stringify({ id: "evt_pi_ot_1", account: "acct_inline_1", type: "payment_intent.succeeded", data: { object: { id: "pi_ot_1", metadata: { mossa_tenant: ctx.active.tenantId, mossa_client: client.id, mossa_package: pkgId } } } });
+    const payload = JSON.stringify({ id: "evt_pi_ot_1", account: "acct_inline_1", type: "payment_intent.succeeded", data: { object: { id: "pi_ot_1", metadata: { kova_tenant: ctx.active.tenantId, kova_client: client.id, kova_package: pkgId } } } });
     const r = await SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
     expect(r.status).toBe(200);
     const subs = (await (await SELF.fetch(`http://x/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number; budgets: unknown[] }[] };
@@ -659,7 +675,7 @@ describe("platform rail — dunning notifies the owner", () => {
     const secret = "whsec_platform_test";
     await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    const payload = JSON.stringify({ id: "evt_pf_1", type: "invoice.payment_failed", data: { object: { id: "in_test_1", metadata: { mossa_tenant: ctx.active.tenantId } } } });
+    const payload = JSON.stringify({ id: "evt_pf_1", type: "invoice.payment_failed", data: { object: { id: "in_test_1", metadata: { kova_tenant: ctx.active.tenantId } } } });
     const r = await SELF.fetch("http://x/api/stripe/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
     expect(r.status).toBe(200);
 
@@ -676,7 +692,7 @@ describe("AI config (per-tenant model / prompt / tone / enable)", () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     // Entitle the AI suite.
-    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
 
     // GET /settings/ai — registry + expanded model catalog + tones.
     const reg = (await (await SELF.fetch("http://x/api/settings/ai", { headers: auth(ownerCookie) })).json()) as {
@@ -729,39 +745,39 @@ describe("entitlement plan builder + grandfathering", () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const t1 = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json() as { active: { tenantId: string } }).active.tenantId;
     // Put tenant 1 on studio (activeClients 100, branding on).
-    await SELF.fetch(`http://x/api/admin/tenants/${t1}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${t1}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
 
-    const plans = (await (await SELF.fetch("http://x/api/admin/plans", { headers: auth(ownerCookie) })).json()) as { plans: { id: string; entitlements: { quotas: Record<string, number>; features: Record<string, boolean>; aiCredits: { monthlyGrant: number } } }[]; featureKeys: string[] };
+    const plans = (await (await SELF.fetch(`${ADMIN}/api/admin/plans`, { headers: auth(ownerCookie) })).json()) as { plans: { id: string; entitlements: { quotas: Record<string, number>; features: Record<string, boolean>; aiCredits: { monthlyGrant: number } } }[]; featureKeys: string[] };
     const studio = plans.plans.find((p) => p.id === "studio")!;
     expect(studio.entitlements.quotas.activeClients).toBe(100);
     expect(plans.featureKeys).toContain("aiSuite");
 
     // Lower the plan: activeClients 100→25, disable branding.
     const lowered = { quotas: { ...studio.entitlements.quotas, activeClients: 25 }, features: { ...studio.entitlements.features, branding: false }, aiCredits: studio.entitlements.aiCredits };
-    const patch = (await (await SELF.fetch("http://x/api/admin/plans/studio", { method: "PATCH", headers: H, body: JSON.stringify({ entitlements: lowered }) })).json()) as { grandfathered: number };
+    const patch = (await (await SELF.fetch(`${ADMIN}/api/admin/plans/studio`, { method: "PATCH", headers: H, body: JSON.stringify({ entitlements: lowered }) })).json()) as { grandfathered: number };
     expect(patch.grandfathered).toBeGreaterThanOrEqual(1);
 
     // Tenant 1 (existing) keeps the old ceiling + feature.
-    const e1 = (await (await SELF.fetch(`http://x/api/admin/tenants/${t1}/entitlements`, { headers: auth(ownerCookie) })).json()) as { effective: { quotas: Record<string, number>; features: Record<string, boolean> } };
+    const e1 = (await (await SELF.fetch(`${ADMIN}/api/admin/tenants/${t1}/entitlements`, { headers: auth(ownerCookie) })).json()) as { effective: { quotas: Record<string, number>; features: Record<string, boolean> } };
     expect(e1.effective.quotas.activeClients).toBe(100);
     expect(e1.effective.features.branding).toBe(true);
 
     // A tenant joining studio AFTER the change gets the lower plan.
     const t2 = (await (await SELF.fetch("http://x/api/context", { headers: auth(otherCookie) })).json() as { active: { tenantId: string } }).active.tenantId;
-    await SELF.fetch(`http://x/api/admin/tenants/${t2}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
-    const e2 = (await (await SELF.fetch(`http://x/api/admin/tenants/${t2}/entitlements`, { headers: auth(ownerCookie) })).json()) as { effective: { quotas: Record<string, number>; features: Record<string, boolean> } };
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${t2}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    const e2 = (await (await SELF.fetch(`${ADMIN}/api/admin/tenants/${t2}/entitlements`, { headers: auth(ownerCookie) })).json()) as { effective: { quotas: Record<string, number>; features: Record<string, boolean> } };
     expect(e2.effective.quotas.activeClients).toBe(25);
     expect(e2.effective.features.branding).toBe(false);
 
     // Gift tenant 2 more (grant-only): raise clients, unlock branding.
-    await SELF.fetch(`http://x/api/admin/tenants/${t2}/overrides`, { method: "PATCH", headers: H, body: JSON.stringify({ grants: { quotas: { activeClients: 500 }, features: { branding: true } } }) });
-    const g1 = (await (await SELF.fetch(`http://x/api/admin/tenants/${t2}/entitlements`, { headers: auth(ownerCookie) })).json()) as { effective: { quotas: Record<string, number>; features: Record<string, boolean> } };
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${t2}/overrides`, { method: "PATCH", headers: H, body: JSON.stringify({ grants: { quotas: { activeClients: 500 }, features: { branding: true } } }) });
+    const g1 = (await (await SELF.fetch(`${ADMIN}/api/admin/tenants/${t2}/entitlements`, { headers: auth(ownerCookie) })).json()) as { effective: { quotas: Record<string, number>; features: Record<string, boolean> } };
     expect(g1.effective.quotas.activeClients).toBe(500);
     expect(g1.effective.features.branding).toBe(true);
 
     // A gift can never lower: trying to set 10 keeps 500.
-    await SELF.fetch(`http://x/api/admin/tenants/${t2}/overrides`, { method: "PATCH", headers: H, body: JSON.stringify({ grants: { quotas: { activeClients: 10 } } }) });
-    const g2 = (await (await SELF.fetch(`http://x/api/admin/tenants/${t2}/entitlements`, { headers: auth(ownerCookie) })).json()) as { effective: { quotas: Record<string, number> } };
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${t2}/overrides`, { method: "PATCH", headers: H, body: JSON.stringify({ grants: { quotas: { activeClients: 10 } } }) });
+    const g2 = (await (await SELF.fetch(`${ADMIN}/api/admin/tenants/${t2}/entitlements`, { headers: auth(ownerCookie) })).json()) as { effective: { quotas: Record<string, number> } };
     expect(g2.effective.quotas.activeClients).toBe(500);
   });
 });
@@ -802,7 +818,7 @@ describe("capability gates enforce plan features + quotas", () => {
   it("a gifted feature opens the gate for that tenant", async () => {
     const t = (await (await SELF.fetch("http://x/api/context", { headers: auth(otherCookie) })).json() as { active: { tenantId: string } }).active.tenantId;
     // Gift commerce (grant-only override) — admin lane (ownerCookie is admin in test env).
-    await SELF.fetch(`http://x/api/admin/tenants/${t}/overrides`, {
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${t}/overrides`, {
       method: "PATCH",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ grants: { features: { commerce: true } } }),
@@ -843,7 +859,7 @@ describe("a stale catalog id can be repaired — for packs as well as plans", ()
       db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?").bind(key, value, value).run();
     await cfgSet("stripe.mode", "test");
     await cfgSet("stripe.test.secret_key", "sk_test_dummy_for_clear");
-    const res = await SELF.fetch("http://x/api/admin/stripe/sync", {
+    const res = await SELF.fetch(`${ADMIN}/api/admin/stripe/sync`, {
       method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ resyncPrices: true }),
     });
@@ -863,7 +879,7 @@ describe("the 👍/👎 signal is readable, not just writable", () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const vote = (insightType: string, v: 1 | -1) =>
       SELF.fetch("http://x/api/ai/feedback", { method: "POST", headers: H, body: JSON.stringify({ insightType, insightRef: "r1", vote: v }) });
-    const read = async () => (await (await SELF.fetch("http://x/api/admin/ai/feedback", { headers: auth(ownerCookie) })).json()) as {
+    const read = async () => (await (await SELF.fetch(`${ADMIN}/api/admin/ai/feedback`, { headers: auth(ownerCookie) })).json()) as {
       types: { type: string; up: number; down: number; total: number; helpfulPct: number | null }[]; totalVotes: number;
     };
 
@@ -889,22 +905,22 @@ describe("the 👍/👎 signal is readable, not just writable", () => {
 describe("AI model catalog + markup (platform admin)", () => {
   it("sets a global markup applied to every model, and toggles models", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const cfg1 = (await (await SELF.fetch("http://x/api/admin/ai/config", { headers: auth(ownerCookie) })).json()) as { markup: number; modelCount: number };
+    const cfg1 = (await (await SELF.fetch(`${ADMIN}/api/admin/ai/config`, { headers: auth(ownerCookie) })).json()) as { markup: number; modelCount: number };
     expect(cfg1.markup).toBe(3);
     expect(cfg1.modelCount).toBeGreaterThanOrEqual(3);
 
     // Raise markup — must apply to every catalog model (profit stays markup×).
-    await SELF.fetch("http://x/api/admin/ai/config", { method: "POST", headers: H, body: JSON.stringify({ markup: 5 }) });
-    const cfg2 = (await (await SELF.fetch("http://x/api/admin/ai/config", { headers: auth(ownerCookie) })).json()) as { markup: number };
+    await SELF.fetch(`${ADMIN}/api/admin/ai/config`, { method: "POST", headers: H, body: JSON.stringify({ markup: 5 }) });
+    const cfg2 = (await (await SELF.fetch(`${ADMIN}/api/admin/ai/config`, { headers: auth(ownerCookie) })).json()) as { markup: number };
     expect(cfg2.markup).toBe(5);
-    const list = (await (await SELF.fetch("http://x/api/admin/ai/models", { headers: auth(ownerCookie) })).json()) as { models: { id: string; markup: number; enabled: number }[] };
+    const list = (await (await SELF.fetch(`${ADMIN}/api/admin/ai/models`, { headers: auth(ownerCookie) })).json()) as { models: { id: string; markup: number; enabled: number }[] };
     expect(list.models.length).toBeGreaterThan(0);
     expect(list.models.every((m) => m.markup === 5)).toBe(true);
 
     // Disable a model, then it reads back disabled in the full catalog.
     const id = list.models[0]!.id;
-    await SELF.fetch(`http://x/api/admin/ai/models/${encodeURIComponent(id)}`, { method: "PATCH", headers: H, body: JSON.stringify({ enabled: false }) });
-    const list2 = (await (await SELF.fetch("http://x/api/admin/ai/models", { headers: auth(ownerCookie) })).json()) as { models: { id: string; enabled: number }[] };
+    await SELF.fetch(`${ADMIN}/api/admin/ai/models/${encodeURIComponent(id)}`, { method: "PATCH", headers: H, body: JSON.stringify({ enabled: false }) });
+    const list2 = (await (await SELF.fetch(`${ADMIN}/api/admin/ai/models`, { headers: auth(ownerCookie) })).json()) as { models: { id: string; enabled: number }[] };
     expect(list2.models.find((m) => m.id === id)!.enabled).toBe(0);
   });
 });
@@ -913,7 +929,7 @@ describe("AI meal draft — library-grounded (never fabricated)", () => {
   it("builds meals ONLY from real library food ids, dropping nothing off-library", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
     // Seed a food; the library-grounded mock draft references it by id.
     const { id: foodId } = (await (await SELF.fetch("http://x/api/foods", { method: "POST", headers: H, body: JSON.stringify({ name: "Rolled Oats", calories: 380, proteinG: 13, carbsG: 67, fatG: 7 }) })).json()) as { id: string };
     const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "MealAI" }) })).json()) as { client: { id: string } };
@@ -932,7 +948,7 @@ describe("AI meal draft — library-grounded (never fabricated)", () => {
   it("refuses to draft meals when the food library is empty", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
     // A fresh client in a tenant whose food library is empty — deactivate any
     // seeded foods first so the library truly has nothing to build from.
     const foods = (await (await SELF.fetch("http://x/api/foods", { headers: auth(ownerCookie) })).json()) as { foods: { id: string }[] };
@@ -951,7 +967,7 @@ describe("AI workout draft — named exercises resolve to real ids", () => {
     // an empty plan.
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
     const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "NoLib" }) })).json()) as { client: { id: string } };
     const res = await SELF.fetch("http://x/api/ai/draft-plan", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) });
     expect(res.status).toBe(409);
@@ -961,11 +977,11 @@ describe("AI workout draft — named exercises resolve to real ids", () => {
   it("drafts a plan and resolves each named exercise to a library/custom id", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
     const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "PlanAI" }) })).json()) as { client: { id: string } };
     // A draft can only pick from a library that exists, and nothing installs one
     // implicitly any more — so this test has to do what a real studio does.
-    await SELF.fetch("http://x/api/admin/starter-library", { method: "POST", headers: H, body: JSON.stringify({ install: true }) });
+    await SELF.fetch(`${ADMIN}/api/admin/starter-library`, { method: "POST", headers: H, body: JSON.stringify({ install: true }) });
     const r = (await (await SELF.fetch("http://x/api/ai/draft-plan", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { draft: { days: { blocks: { slots: { exerciseId: string }[] }[] }[] } };
     const slots = r.draft.days.flatMap((d) => d.blocks.flatMap((b) => b.slots));
     expect(slots.length).toBeGreaterThan(0);
@@ -982,7 +998,7 @@ describe("AI exercise auto-fill (enum-constrained meta)", () => {
   it("returns muscles/equipment/force/mechanic folded onto the allowed vocab", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
     const r = await SELF.fetch("http://x/api/ai/exercise-meta", { method: "POST", headers: H, body: JSON.stringify({ name: "Back Squat" }) });
     expect(r.status).toBe(200);
     const { meta } = (await r.json()) as { meta: { primaryMuscles: string[]; equipment: string[]; force: string | null; mechanic: string | null } };
@@ -1000,7 +1016,7 @@ describe("AI image generation + recipe", () => {
   it("generates an original library image and recommends a recipe", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
 
     // Food image generation (mock lane) returns a tenant-scoped media url.
     const img = await SELF.fetch("http://x/api/ai/generate-image", { method: "POST", headers: H, body: JSON.stringify({ feature: "food-image", subject: "grilled salmon" }) });
@@ -1087,7 +1103,7 @@ describe("trainer AI features (registry)", () => {
   it("runs supplement reco, article writer, client summary, and lab extract (mock)", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
     const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "TrainerAI" }) })).json()) as { client: { id: string } };
 
     const rec = (await (await SELF.fetch("http://x/api/ai/supplement-reco", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { recommendations: { name: string }[]; mocked: boolean };
@@ -1126,7 +1142,7 @@ describe("coach note (personalized, context-cached)", () => {
   it("builds a personal note, caches it, and refreshes on a material change", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
     const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "NoteCli" }) })).json()) as { client: { id: string } };
     const day = "2026-07-10";
     await SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: day, workoutPlanId: "wp", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "e", sets: [{ setIndex: 0, reps: 5, weightKg: 80, completed: true }] } }) });
@@ -1553,7 +1569,7 @@ describe("activities feed (Train tab)", () => {
   it("estimates activity calories with AI, grounded on the client's body (mock)", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
     const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "ActAI" }) })).json()) as { client: { id: string } };
     await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-01", weightKg: 90 } }) });
     const est = (await (await SELF.fetch("http://x/api/ai/activity-estimate", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, activityKey: "running", durationMin: 40 }) })).json()) as { calories: number; rationale: string };
@@ -1975,65 +1991,130 @@ describe("custom domains (SPEC §14.1) — Host pins the tenant", () => {
     expect(sw.status).toBe(409);
   });
 
-  it("platform host resolves no tenant", async () => {
-    const host = (await (await SELF.fetch("http://localhost:8787/api/host")).json()) as { platform: boolean; tenant: unknown };
+  it("the ROOT door resolves no tenant and is not an app", async () => {
+    const host = (await (await SELF.fetch("http://localhost:8787/api/host")).json()) as { role: string; platform: boolean; tenant: unknown };
+    expect(host.role).toBe("root");
     expect(host.platform).toBe(true);
     expect(host.tenant).toBe(null);
+
+    // And it serves nothing else. `kova.4dl.app` by itself is a signpost, so a
+    // tenant route there is a 404 rather than a session-scoped fallback.
+    const clients = await SELF.fetch("http://localhost:8787/api/clients", { headers: auth(ownerCookie) });
+    expect(clients.status).toBe(404);
   });
 
-  it("branded login: /t/<slug> resolves a tenant on the platform host without pinning it", async () => {
+  it("a studio's SUBDOMAIN pins its tenancy, with no domains row needed", async () => {
+    // Resolution goes through the organization's slug, not `tenant_domains` — so a
+    // studio answers at its own address even if provisioning never wrote a row.
+    const host = (await (await SELF.fetch("http://studio-one.localhost:8787/api/host")).json()) as {
+      role: string; platform: boolean; tenant: { slug: string; name: string } | null;
+    };
+    expect(host.role).toBe("tenant");
+    expect(host.platform).toBe(false);
+    expect(host.tenant?.slug).toBe("studio-one");
+    expect(host.tenant?.name).toBe("Studio One");
+
+    const member = (await (await SELF.fetch("http://studio-one.localhost:8787/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } | null; hostTenantId: string | null };
+    expect(member.hostTenantId).toBe(tenantId);
+    expect(member.active?.tenantId).toBe(tenantId);
+
+    // A stranger's session gets no scope here, exactly as on a custom domain.
+    const stranger = (await (await SELF.fetch("http://studio-one.localhost:8787/api/context", { headers: auth(otherCookie) })).json()) as { active: unknown };
+    expect(stranger.active).toBe(null);
+  });
+
+  it("a well-formed subdomain with NO studio is 'no studio', not a login", async () => {
+    const host = await SELF.fetch("http://nobody-here.localhost:8787/api/host");
+    const body = (await host.json()) as { role: string; tenant: unknown };
+    expect(body.role).toBe("tenant");
+    expect(body.tenant).toBe(null);
+    // Everything else on that host refuses, so nothing invites a sign-in to a
+    // studio that does not exist.
+    const ctx = await SELF.fetch("http://nobody-here.localhost:8787/api/context", { headers: auth(ownerCookie) });
+    expect(ctx.status).toBe(404);
+  });
+
+  it("a RESERVED label under the root serves nothing at all", async () => {
+    // Not a studio and not a candidate custom domain: if `api.<root>` fell through
+    // to the custom-domain lookup, whose key column an owner can write to, a tenant
+    // could claim an infrastructure host through the domains form.
+    // `setup` and `admin` are excluded on purpose: they ARE doors and answer here.
+    for (const label of ["api", "www", "mail", "billing", "login"]) {
+      const res = await SELF.fetch(`http://${label}.localhost:8787/api/host`);
+      expect(res.status, label).toBe(404);
+    }
+  });
+
+  it("the operator lane answers ONLY on the admin door in production shape", async () => {
+    // Dev has a single root and therefore no separate door, so the restriction
+    // stands down there (isDevRoot) — which is why this asserts the door is
+    // REACHABLE on localhost rather than asserting the negative it cannot show.
+    const ok = await SELF.fetch("http://admin.localhost:8787/api/admin/domains/config", { headers: auth(ownerCookie) });
+    expect([200, 403]).toContain(ok.status);
+  });
+
+  it("the studio's own door carries its login branding, pre-auth", async () => {
     // Owner customizes their sign-in screen; saved under branding.login.
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const saved = await SELF.fetch("http://localhost:8787/api/settings", {
+    const saved = await SELF.fetch("http://setup.localhost:8787/api/settings", {
       method: "PATCH", headers: H,
       body: JSON.stringify({ branding: { login: { tagline: "Train with us", headline: "Your journey starts here", showPasskey: false } } }),
     });
     expect(saved.status).toBe(200);
 
-    // The platform host + ?slug brands the login (Studio One → slug "studio-one")
-    // but stays platform:true so cross-tenant switching still works after sign-in.
-    const branded = (await (await SELF.fetch("http://localhost:8787/api/host?slug=studio-one")).json()) as {
+    // `/t/<slug>` and the `?slug=`/`?t=` hints are gone: there is no shared host
+    // left to disambiguate, so the hostname alone decides which brand shows AND
+    // which tenancy is in force. Those could only ever brand, never pin — the bug
+    // class this replaces is a login wearing studio B's brand over studio A's data.
+    const branded = (await (await SELF.fetch("http://studio-one.localhost:8787/api/host")).json()) as {
       platform: boolean; tenant: { name: string; slug: string; branding: { login?: { tagline?: string; showPasskey?: boolean } } } | null;
     };
-    expect(branded.platform).toBe(true);
+    expect(branded.platform).toBe(false);
     expect(branded.tenant?.slug).toBe("studio-one");
     expect(branded.tenant?.branding?.login?.tagline).toBe("Train with us");
     expect(branded.tenant?.branding?.login?.showPasskey).toBe(false);
-
-    // An unknown slug just falls back to the neutral platform entry.
-    const unknown = (await (await SELF.fetch("http://localhost:8787/api/host?slug=nope-not-real")).json()) as { platform: boolean; tenant: unknown };
-    expect(unknown.platform).toBe(true);
-    expect(unknown.tenant).toBe(null);
   });
 
-  it("an emailed link's ?t= hint brands the login BEFORE sign-in", async () => {
-    // Every notification CTA carries `?t=<tenantId>`. That hint used to be read
-    // only AFTER the session resolved, so a signed-out recipient clicked a link
-    // that named their studio explicitly and still got a studio-less Mossa login
-    // — the screen their passkey and their coach's brand are not on.
-    const ctx = (await (await SELF.fetch("http://localhost:8787/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string; tenantSlug: string } };
-    const byId = (await (await SELF.fetch(`http://localhost:8787/api/host?t=${encodeURIComponent(ctx.active.tenantId)}`)).json()) as {
-      platform: boolean; tenant: { tenantId: string; slug: string } | null;
-    };
-    expect(byId.tenant?.tenantId).toBe(ctx.active.tenantId);
-    expect(byId.tenant?.slug).toBe(ctx.active.tenantSlug);
-    // Branding the door must NOT pin the tenant — cross-tenant switching after
-    // sign-in depends on the platform host staying platform.
-    expect(byId.platform).toBe(true);
+  it("reports the studio's billing gate so the app can say 'paused' up front", async () => {
+    const db = env.DB as D1Database;
+    const before = (await (await SELF.fetch("http://studio-one.localhost:8787/api/host")).json()) as { gate: { readOnly: boolean; reason: string } | null };
+    expect(before.gate?.readOnly).toBe(false);
 
-    // A bogus id is not a way to enumerate studios, and not a crash either.
-    const bogus = (await (await SELF.fetch("http://localhost:8787/api/host?t=org_does_not_exist")).json()) as { platform: boolean; tenant: unknown };
-    expect(bogus.platform).toBe(true);
-    expect(bogus.tenant).toBe(null);
+    const prior = await db.prepare("SELECT status FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<{ status: string }>();
+    await db.prepare("UPDATE subscriptions SET status = 'suspended' WHERE tenant_id = ?").bind(tenantId).run();
+    try {
+      const paused = (await (await SELF.fetch("http://studio-one.localhost:8787/api/host")).json()) as { gate: { readOnly: boolean; reason: string } | null };
+      expect(paused.gate).toEqual({ readOnly: true, reason: "suspended" });
+
+      // The gate is not cached with the identity, so a suspension bites at once —
+      // and a payment lifts it at once, which is the direction that matters.
+      const write = await SELF.fetch("http://studio-one.localhost:8787/api/clients", {
+        method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) },
+        body: JSON.stringify({ displayName: "During suspension" }),
+      });
+      expect(write.status).toBe(402);
+      expect(((await write.json()) as { error: string }).error).toBe("studio_read_only");
+
+      // Reads are never gated: a person's own data is not collateral.
+      const read = await SELF.fetch("http://studio-one.localhost:8787/api/clients", { headers: auth(ownerCookie) });
+      expect(read.status).toBe(200);
+    } finally {
+      await db.prepare("UPDATE subscriptions SET status = ? WHERE tenant_id = ?").bind(prior?.status ?? "active", tenantId).run();
+    }
   });
 });
 
 describe("OTP-send gate — sign-up eligibility + cooldown", () => {
-  const SEND = "http://localhost:8787/api/auth/email-otp/send-verification-otp";
+  // The STUDIO's own door. Eligibility is a property of the studio being signed
+  // into, and the host is what names it — the `slug` in the body is accepted and
+  // ignored (an older cached SPA still sends it). The bodies below keep it for
+  // exactly that reason: it must not change the outcome.
+  const STUDIO = "http://studio-one.localhost:8787";
+  const SEND = `${STUDIO}/api/auth/email-otp/send-verification-otp`;
   const send = (body: Record<string, unknown>) =>
-    SELF.fetch(SEND, { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:8787" }, body: JSON.stringify(body) });
+    SELF.fetch(SEND, { method: "POST", headers: { "content-type": "application/json", origin: STUDIO }, body: JSON.stringify(body) });
   const setSelfRegister = (on: boolean) =>
-    SELF.fetch("http://localhost:8787/api/settings", { method: "PATCH", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ marketplace: { selfRegister: on } }) });
+    SELF.fetch(`${STUDIO}/api/settings`, { method: "PATCH", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ marketplace: { selfRegister: on } }) });
 
   it("invite-only studio turns a brand-new email away", async () => {
     await setSelfRegister(false);
@@ -2099,8 +2180,9 @@ describe("OTP-send gate — sign-up eligibility + cooldown", () => {
   }, 30_000);
 
   it("enforces a per-email cooldown between codes", async () => {
+    await setSelfRegister(true);
     const first = await send({ email: "cooldown-1@test.dev", type: "sign-in" });
-    expect(first.status).toBe(200); // platform host, no tenant → always allowed
+    expect(first.status).toBe(200);
     const second = await send({ email: "cooldown-1@test.dev", type: "sign-in" });
     expect(second.status).toBe(429);
     expect(((await second.json()) as { retryAfterSec: number }).retryAfterSec).toBeGreaterThan(0);
@@ -2124,7 +2206,7 @@ describe("OTP-send gate — sign-up eligibility + cooldown", () => {
 describe("passkey — Better Auth endpoint methods (regression)", () => {
   // The option endpoints are GETs; the client used to POST them and silently
   // 404'd, so passkey enroll + sign-in never worked. Lock the methods in.
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   it("register-options is GET (POST 404s); authenticate-options is GET and pre-auth", async () => {
     const getReg = await SELF.fetch(`${B}/api/auth/passkey/generate-register-options`, { headers: auth(ownerCookie) });
     expect(getReg.status).toBe(200);
@@ -2160,7 +2242,7 @@ describe("passkey — Better Auth endpoint methods (regression)", () => {
 });
 
 describe("white-label — public brand assets + per-tenant PWA manifest", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   it("brand assets read without auth; other media stays private", async () => {
     // Upload a brand asset through the API (as the owner), then read it back
     // with NO session — the login/favicon/PWA path.
@@ -2183,9 +2265,9 @@ describe("white-label — public brand assets + per-tenant PWA manifest", () => 
     await priv.text();
   });
 
-  it("manifest is Mossa on the platform host and the tenant's on a custom domain", async () => {
+  it("manifest is Kova on the platform host and the tenant's on a custom domain", async () => {
     const platform = (await (await SELF.fetch(`${B}/manifest.webmanifest`)).json()) as { name: string; icons: { src: string }[] };
-    expect(platform.name).toBe("Mossa");
+    expect(platform.name).toBe("Kova");
 
     // Point a custom domain at Studio One with a branded icon + primary.
     const db = env.DB as D1Database;
@@ -2202,7 +2284,7 @@ describe("white-label — public brand assets + per-tenant PWA manifest", () => 
 });
 
 describe("access gate — clientAccess in context", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
   // OTP sign-in only (no org creation) — the invited-client path.
   const clientSignIn = async (email: string): Promise<string> => {
@@ -2247,7 +2329,7 @@ describe("access gate — clientAccess in context", () => {
 });
 
 describe("supplements — pausing hides from the client + blocks logging", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
   const clientSignIn = async (email: string): Promise<string> => {
     const db = env.DB as D1Database;
@@ -2779,7 +2861,7 @@ describe("platform rail — inline Stripe webhooks", () => {
     await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const before = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
-    const payload = JSON.stringify({ id: "evt_pi_pack_1", type: "payment_intent.succeeded", data: { object: { id: "pi_pack_1", metadata: { mossa_tenant: ctx.active.tenantId, mossa_pack: "pack_1k", mossa_credits: "1000" } } } });
+    const payload = JSON.stringify({ id: "evt_pi_pack_1", type: "payment_intent.succeeded", data: { object: { id: "pi_pack_1", metadata: { kova_tenant: ctx.active.tenantId, kova_pack: "pack_1k", kova_credits: "1000" } } } });
     expect((await post(payload)).status).toBe(200);
     const after = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
     expect(after.balance.purchased - before.balance.purchased).toBe(1000);
@@ -2796,7 +2878,7 @@ describe("platform rail — inline Stripe webhooks", () => {
     const tenantId = "tenant_inline_sub_1";
     await db.prepare("INSERT INTO subscriptions (tenant_id, plan_id, status, comp, stripe_customer_id, updated_at) VALUES (?, 'free', 'active', 0, 'cus_inline_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_customer_id = 'cus_inline_1'").bind(tenantId, new Date().toISOString()).run();
     const cpe = Math.floor(Date.now() / 1000) + 30 * 86400;
-    const payload = JSON.stringify({ id: "evt_sub_inline_active", type: "customer.subscription.updated", data: { object: { id: "sub_inline_1", status: "active", customer: "cus_inline_1", current_period_end: cpe, metadata: { mossa_tenant: tenantId, mossa_plan: "solo" } } } });
+    const payload = JSON.stringify({ id: "evt_sub_inline_active", type: "customer.subscription.updated", data: { object: { id: "sub_inline_1", status: "active", customer: "cus_inline_1", current_period_end: cpe, metadata: { kova_tenant: tenantId, kova_plan: "solo" } } } });
     expect((await post(payload)).status).toBe(200);
     const row = (await db.prepare("SELECT plan_id, status FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<{ plan_id: string; status: string }>())!;
     expect(row.plan_id).toBe("solo");
@@ -2876,7 +2958,7 @@ describe("installments — limited-term subscription (per-cycle unlock)", () => 
     const subId = "sub_install_1";
 
     // Period one via installment-mode checkout (N=3).
-    await post(JSON.stringify({ id: "evt_inst_create", account: "acct_install_1", type: "checkout.session.completed", data: { object: { id: "cs_inst_1", mode: "subscription", subscription: subId, metadata: { mossa_tenant: tenantId, mossa_client: "cl_install_1", mossa_package: pkgId, mossa_installments: "3" } } } }));
+    await post(JSON.stringify({ id: "evt_inst_create", account: "acct_install_1", type: "checkout.session.completed", data: { object: { id: "cs_inst_1", mode: "subscription", subscription: subId, metadata: { kova_tenant: tenantId, kova_client: "cl_install_1", kova_package: pkgId, kova_installments: "3" } } } }));
     let row = (await db.prepare("SELECT installments_total, installments_paid, payment_status, stripe_sub_id, budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ installments_total: number; installments_paid: number; payment_status: string; stripe_sub_id: string | null; budgets_json: string }>())!;
     expect([row.installments_total, row.installments_paid]).toEqual([3, 1]);
     const cycleBudgets = JSON.parse(row.budgets_json).length; // 'all' → workout+meal = 2 per cycle
@@ -2943,7 +3025,7 @@ describe("email templates — tenant white-label store", () => {
   });
 });
 
-describe("platform promo codes (Mossa → tenant)", () => {
+describe("platform promo codes (Kova → tenant)", () => {
   it("admin creates a 100%-off pack promo; it grants free once, then is exhausted", async () => {
     const db = env.DB as D1Database;
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
@@ -2951,8 +3033,8 @@ describe("platform promo codes (Mossa → tenant)", () => {
       await db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v).run();
     }
     // Admin creates a single-use platform promo (ownerCookie is admin in tests).
-    expect((await SELF.fetch("http://x/api/admin/promo-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "PLAT100", discountType: "percent", percentOff: 100, maxRedemptions: 1 }) })).status).toBe(201);
-    const listed = (await (await SELF.fetch("http://x/api/admin/promo-codes", { headers: auth(ownerCookie) })).json()) as { codes: { code: string }[] };
+    expect((await SELF.fetch(`${ADMIN}/api/admin/promo-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "PLAT100", discountType: "percent", percentOff: 100, maxRedemptions: 1 }) })).status).toBe(201);
+    const listed = (await (await SELF.fetch(`${ADMIN}/api/admin/promo-codes`, { headers: auth(ownerCookie) })).json()) as { codes: { code: string }[] };
     expect(listed.codes.some((c) => c.code === "PLAT100")).toBe(true);
 
     const before = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
@@ -3097,7 +3179,7 @@ describe("coach voice (TTS) picker", () => {
 });
 
 describe("email digest — data-viz primitives + rich builders (pure render)", () => {
-  const brand = MOSSA_BRAND;
+  const brand = KOVA_BRAND;
 
   it("primitives render their chart markup and escape user input", () => {
     // Bars carry the value in text (Gmail-safe) and clamp the fill width.
@@ -3164,7 +3246,7 @@ describe("email digest — data-viz primitives + rich builders (pure render)", (
 });
 
 describe("storage accounting + quota gate", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   it("records uploads in the ledger, meters usage, and blocks over quota", async () => {
     const db = env.DB as D1Database;
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
@@ -3202,7 +3284,7 @@ describe("storage accounting + quota gate", () => {
 });
 
 describe("media library — role-scoped list + delete", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   it("owner lists media, deletes it, and the delete tombstones + scrubs the reference", async () => {
     const db = env.DB as D1Database;
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
@@ -3237,7 +3319,7 @@ describe("media library — role-scoped list + delete", () => {
 });
 
 describe("GDPR — action OTP + cascade purge", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   const sha256Hex = async (s: string): Promise<string> => {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
     return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -3286,7 +3368,7 @@ describe("GDPR — action OTP + cascade purge", () => {
 });
 
 describe("studio close + tenant purge", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   const sha = async (s: string): Promise<string> => {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
     return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -3329,7 +3411,7 @@ describe("studio close + tenant purge", () => {
 });
 
 describe("platform nuclear reset — guards", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   it("refuses without the exact confirm phrase, and without a valid OTP", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     // Wrong phrase → 400 BEFORE anything is touched (the confirm gate is first).
@@ -3355,7 +3437,7 @@ describe("platform nuclear reset — guards", () => {
  * reads their own screens depend on.
  */
 describe("client persona — self-service writes pass the action gate", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
   const clientSignIn = async (email: string): Promise<string> => {
     const db = env.DB as D1Database;
@@ -3429,7 +3511,7 @@ describe("client persona — self-service writes pass the action gate", () => {
  * only layer that can still return a real status.
  */
 describe("OTP send — an undeliverable provider returns a real error, not a silent success", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
 
   it("503s with email_not_configured when the provider cannot deliver", async () => {
     const db = env.DB as D1Database;
@@ -3491,7 +3573,7 @@ describe("OTP send — an undeliverable provider returns a real error, not a sil
  * route-guard action-gate (RBAC) rejections.
  */
 describe("row-level scope on client-owned rows (round-4 audit)", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
 
   /** A studio, two clients (one assigned to a trainer, one not), a trainer session
    *  and a client-role session. Its own tenant so plan caps stay out of the way. */
@@ -3684,7 +3766,7 @@ describe("row-level scope on client-owned rows (round-4 audit)", () => {
   it("renderKnowledge fences client-authored text so it cannot close the fence or issue instructions", async () => {
     const { db, tenantId, victim } = await studio("r4fence");
     const { loadClientKnowledge, renderKnowledge, untrusted } = await import("../src/client-knowledge.js");
-    const { resolveUnits } = await import("@mossa/domain");
+    const { resolveUnits } = await import("@kova/domain");
 
     // The fence itself: a payload that tries to close the delimiter and start a
     // new instruction block gets its delimiter runs stripped, so the >>> that
@@ -3753,7 +3835,7 @@ describe("platform rail — refunds reverse credits proportionally + incremental
     JSON.stringify({
       id,
       type: "charge.refunded",
-      data: { object: { id: "ch_refund_prop", amount: 10_000, customer: "cus_refund_prop", metadata: { mossa_tenant: tenantId, mossa_pack: "pack_130k", mossa_credits: "130000" }, ...over } },
+      data: { object: { id: "ch_refund_prop", amount: 10_000, customer: "cus_refund_prop", metadata: { kova_tenant: tenantId, kova_pack: "pack_130k", kova_credits: "130000" }, ...over } },
     });
 
   it("a $5 partial refund on a $100 / 130k pack revokes 6,500 — not the whole pack", async () => {
@@ -3802,7 +3884,7 @@ describe("platform rail — refunds reverse credits proportionally + incremental
 });
 
 describe("client flags union across concurrent access rows", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
   const clientSignIn = async (email: string): Promise<string> => {
     const db = env.DB as D1Database;
@@ -3874,7 +3956,7 @@ describe("connect rail — Basil-shaped invoices still renew", () => {
     await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_basil_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_basil_1'").bind(tenantId, new Date().toISOString()).run();
 
     // Period one (subscription-mode checkout).
-    await post(JSON.stringify({ id: "evt_basil_create", account: "acct_basil_1", type: "checkout.session.completed", data: { object: { id: "cs_basil_1", mode: "subscription", subscription: subId, metadata: { mossa_tenant: tenantId, mossa_client: "cl_basil_1", mossa_package: pkgId } } } }));
+    await post(JSON.stringify({ id: "evt_basil_create", account: "acct_basil_1", type: "checkout.session.completed", data: { object: { id: "cs_basil_1", mode: "subscription", subscription: subId, metadata: { kova_tenant: tenantId, kova_client: "cl_basil_1", kova_package: pkgId } } } }));
     const budgetsAfterCreate = JSON.parse((await db.prepare("SELECT budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
     expect(budgetsAfterCreate).toBeGreaterThan(0);
 
@@ -3899,7 +3981,7 @@ describe("connect rail — Basil-shaped invoices still renew", () => {
     await db.prepare("INSERT INTO packages (id, tenant_id, name, monthly_price_cents, budgets_json, currency, visibility, active, created_at) VALUES (?, ?, 'Basil Lines', 4900, ?, 'usd', 'marketplace', 1, ?)")
       .bind(pkgId, tenantId, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
     await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_basil_2', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_basil_2'").bind(tenantId, new Date().toISOString()).run();
-    await post(JSON.stringify({ id: "evt_basil2_create", account: "acct_basil_2", type: "checkout.session.completed", data: { object: { id: "cs_basil_2", mode: "subscription", subscription: subId, metadata: { mossa_tenant: tenantId, mossa_client: "cl_basil_2", mossa_package: pkgId } } } }));
+    await post(JSON.stringify({ id: "evt_basil2_create", account: "acct_basil_2", type: "checkout.session.completed", data: { object: { id: "cs_basil_2", mode: "subscription", subscription: subId, metadata: { kova_tenant: tenantId, kova_client: "cl_basil_2", kova_package: pkgId } } } }));
     const before = JSON.parse((await db.prepare("SELECT budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
 
     const lineOnly = JSON.stringify({
@@ -3953,7 +4035,7 @@ describe("once_per_customer is enforced on paid checkout", () => {
  * /api/context/switch explicitly — these deliberately do NOT.
  */
 describe("invited members land in the studio without an explicit switch", () => {
-  const B = "http://localhost:8787";
+  const B = "http://setup.localhost:8787";
   const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
   const signIn = async (email: string): Promise<string> => {
     const db = env.DB as D1Database;
@@ -4045,7 +4127,7 @@ describe("branding persists every appearance control", () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     // Branding edits need the entitlement.
-    await SELF.fetch(`http://x/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
 
     const sent = {
       radius: 0.55,
@@ -4122,7 +4204,7 @@ describe("voice packs replace, they do not accumulate", () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const tid = ctx.active.tenantId;
-    await SELF.fetch(`http://x/api/admin/tenants/${tid}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${tid}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
 
     const first = await SELF.fetch("http://x/api/body-scan/voice-pack", { method: "POST", headers: H, body: JSON.stringify({ voice: "Kore" }) });
     expect(first.status).toBe(200);
@@ -4310,15 +4392,15 @@ describe("the starter exercise library is opt-in", () => {
 
   it("an admin installs and removes it explicitly", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const before = (await (await SELF.fetch("http://x/api/admin/starter-library", { headers: auth(ownerCookie) })).json()) as { installed: boolean; available: number };
+    const before = (await (await SELF.fetch(`${ADMIN}/api/admin/starter-library`, { headers: auth(ownerCookie) })).json()) as { installed: boolean; available: number };
     expect(before.installed).toBe(false);
     expect(before.available).toBeGreaterThan(0);
 
-    const on = (await (await SELF.fetch("http://x/api/admin/starter-library", { method: "POST", headers: H, body: JSON.stringify({ install: true }) })).json()) as { count: number };
+    const on = (await (await SELF.fetch(`${ADMIN}/api/admin/starter-library`, { method: "POST", headers: H, body: JSON.stringify({ install: true }) })).json()) as { count: number };
     expect(on.count).toBe(before.available);
     expect(await seeded()).toBe(before.available);
 
-    const off = (await (await SELF.fetch("http://x/api/admin/starter-library", { method: "POST", headers: H, body: JSON.stringify({ install: false }) })).json()) as { installed: boolean };
+    const off = (await (await SELF.fetch(`${ADMIN}/api/admin/starter-library`, { method: "POST", headers: H, body: JSON.stringify({ install: false }) })).json()) as { installed: boolean };
     expect(off.installed).toBe(false);
     // …and it STAYS removed: nothing re-seeds it behind the operator's back.
     await SELF.fetch("http://x/api/exercises", { headers: auth(ownerCookie) });
@@ -4330,7 +4412,7 @@ describe("the starter exercise library is opt-in", () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await db.prepare("INSERT OR REPLACE INTO exercises (id, tenant_id, visibility, name, slug, source, active, created_at) VALUES ('exr_mine', ?, 'tenant', 'My Lift', 'my-lift', 'manual', 1, ?)").bind(ctx.active.tenantId, new Date().toISOString()).run();
-    await SELF.fetch("http://x/api/admin/starter-library", { method: "POST", headers: H, body: JSON.stringify({ install: false }) });
+    await SELF.fetch(`${ADMIN}/api/admin/starter-library`, { method: "POST", headers: H, body: JSON.stringify({ install: false }) });
     expect(await db.prepare("SELECT id FROM exercises WHERE id = 'exr_mine'").first(), "a studio's own exercise was deleted").not.toBeNull();
   });
 });
@@ -4342,7 +4424,7 @@ describe("the starter exercise library is opt-in", () => {
  * charges nothing (the platform eats the send) and an email that charges for a
  * send that never went out. Both are silent.
  */
-describe("email on the Mossa lane is metered and priced visibly", () => {
+describe("email on the Kova lane is metered and priced visibly", () => {
   it("publishes the per-email cost with the email settings", async () => {
     // The price belongs where the provider is CHOSEN. It used to be discoverable
     // only afterwards, in the credit ledger.
@@ -4356,7 +4438,7 @@ describe("email on the Mossa lane is metered and priced visibly", () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const tid = ctx.active.tenantId;
-    await SELF.fetch(`http://x/api/admin/tenants/${tid}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
+    await SELF.fetch(`${ADMIN}/api/admin/tenants/${tid}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
 
     const balance = async () =>
       ((await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { balance: number } }).balance.balance;

@@ -1,4 +1,4 @@
-# Mossa — Pre-Release Audit (Round 3)
+# Kova — Pre-Release Audit (Round 3)
 
 The final whole-app pass before the intended launch, run as six specialist
 auditors (security/tenancy/auth · money paths · AI suite + data integrity ·
@@ -106,7 +106,7 @@ everyone forever.
 **Money**
 
 - A **partial refund revoked the entire credit pack** — `charge.refunded` fires for
-  partial refunds and the handler read `meta.mossa_credits`, so a $5 goodwill
+  partial refunds and the handler read `meta.kova_credits`, so a $5 goodwill
   refund on a $100/130k pack revoked all 130,000. Now proportional and
   incremental, with per-charge cumulative tracking on the existing ledger `ref`.
 - **`charge.dispute.created` was dead code.** `event.data.object` is a *Dispute*,

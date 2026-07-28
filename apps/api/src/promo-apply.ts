@@ -1,13 +1,13 @@
 /**
  * Promo application (billing centralization) — resolve a website-native promo
  * code from D1 and apply it to a single-charge purchase. Shared by both rails:
- *   - platform (Mossa → tenant): scope='platform', tenant-agnostic (tenant_id '')
+ *   - platform (Kova → tenant): scope='platform', tenant-agnostic (tenant_id '')
  *   - tenant   (tenant → client): scope='tenant', scoped to the tenant
- * The discount math is pure (`applyPromo` in @mossa/domain); this layer only
+ * The discount math is pure (`applyPromo` in @kova/domain); this layer only
  * loads the row and, on a successful charge, bumps the redemption counter.
  */
 
-import { applyPromo, type PromoCode, type PromoResult } from "@mossa/domain";
+import { applyPromo, type PromoCode, type PromoResult } from "@kova/domain";
 
 interface PromoRow {
   id: string;

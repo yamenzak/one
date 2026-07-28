@@ -38,7 +38,7 @@
  */
 
 import { defineConfig, devices } from "@playwright/test";
-import { APP_PORT, APP_URL } from "./src/env.js";
+import { APP_PORT, ROOT_URL, SETUP_URL } from "./src/env.js";
 
 export default defineConfig({
   testDir: "./tests",
@@ -54,7 +54,9 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : [["list"]],
   use: {
-    baseURL: APP_URL,
+    // The SETUP door: where every spec starts. Specs navigate to a studio's own
+    // host (`<slug>.localhost:8787`) with absolute URLs once they know its slug.
+    baseURL: SETUP_URL,
     // Phone-shaped: the app is a mobile-first PWA and both the coach and client
     // surfaces render the bottom tab bar at this width. A desktop viewport swaps
     // in the nav rail — a different set of controls to drive.
@@ -62,6 +64,11 @@ export default defineConfig({
     // Real mouse events: touch emulation makes Radix dropdowns/drawers need
     // gesture sequences that add nothing to what these paths are checking.
     isMobile: false,
+    // Chromium resolves `.localhost` internally, but pin it anyway: the suite's
+    // whole topology is subdomains of it, and a browser build that decided
+    // otherwise would fail as an unexplained navigation error. Node's side of the
+    // same problem is handled in src/resolve-localhost.ts.
+    launchOptions: { args: ["--host-resolver-rules=MAP *.localhost 127.0.0.1"] },
     hasTouch: true,
     serviceWorkers: "block",
     trace: "retain-on-failure",
@@ -73,8 +80,11 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
   webServer: [
     {
-      command: `pnpm --filter @mossa/api exec wrangler dev --local --log-level ${process.env.E2E_SERVER_LOGS ? "info" : "warn"} --port ${APP_PORT}`,
-      url: `${APP_URL}/health`,
+      command: `pnpm --filter @kova/api exec wrangler dev --local --log-level ${process.env.E2E_SERVER_LOGS ? "info" : "warn"} --port ${APP_PORT}`,
+      // Readiness is checked on the ROOT host: `/health` is dependency-free and
+      // answers on every door, and the root is the one that exists before any
+      // studio does.
+      url: `${ROOT_URL}/health`,
       cwd: "../..",
       timeout: 180_000,
       // Locally, reuse whatever `wrangler dev` is already up. In CI always boot a

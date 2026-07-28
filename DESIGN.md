@@ -1,6 +1,6 @@
-# MOSSA DESIGN.md — UI System
+# KOVA DESIGN.md — UI System
 
-> Source of truth for Mossa's interface. One design system, one app, three roles
+> Source of truth for Kova's interface. One design system, one app, three roles
 > (client / trainer / owner+admin) — §5. The bar: *premium, alive, and a
 > 70-year-old can use it.*
 
@@ -63,7 +63,7 @@ below for reference.
 ### Color = meaning
 - **Each data domain owns an accent**, used as a *tonal pair* (Material 3 style:
   `container` background + `on-container` content):
-  - Activity/training → teal, Nutrition → amber-orange (Mossa; GH uses teal for cals),
+  - Activity/training → teal, Nutrition → amber-orange (Kova; GH uses teal for cals),
     Sleep/recovery → purple, Cardio/heart → blue/green, Hydration → cyan.
 - **Status is always a tonal chip with text**, never color alone: green `In range`,
   amber `Fair` / `Goal not met`, red `Out of range`. (Colorblind-safe by redundancy.)
