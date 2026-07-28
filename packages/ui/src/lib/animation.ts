@@ -160,6 +160,22 @@ export const rowStagger: Variants = {
   show: { transition: { staggerChildren: 0.03 } },
 };
 
+/**
+ * A wizard/flow step panel.
+ *
+ * Written as LABELLED variants rather than an object `animate` for a reason that
+ * costs an afternoon to rediscover: a motion component whose `animate` is an
+ * object stops propagating the variant label to its descendants. Anything below
+ * it that uses `variants` then inherits `initial="hidden"` and never receives
+ * `"show"` — it mounts invisible and stays invisible, while the wrapper itself
+ * animates perfectly. Keep this a label-driven variant, and `StepPanel` in
+ * layout.tsx is the component that guarantees it.
+ */
+export const stepPanelVariants: Variants = {
+  hidden: { opacity: 0, scale: 1.02 },
+  show: { opacity: 1, scale: 1, transition: { ...out(DUR.base), staggerChildren: 0.045 } },
+};
+
 /** @deprecated Use `settle`. Kept so in-flight screens keep compiling. */
 export const popIn = settle;
 

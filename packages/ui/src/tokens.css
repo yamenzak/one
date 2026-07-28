@@ -346,16 +346,31 @@ body {
     opacity: 0;
   }
 }
+/**
+ * Overlay entrances — UI-LANGUAGE §8: everything SETTLES DOWN.
+ *
+ * These scaled UP (0.97 → 1, 0.96 → 1), which is the same inversion `popIn` had
+ * in animation.ts and the same reason: growing reads as a thing being created,
+ * settling reads as a thing arriving. A dialog that grows at you is the single
+ * cheapest-looking moment an app can have, and it was in the CSS rather than the
+ * JS, so fixing the variants alone would have left every radix-driven surface
+ * doing the opposite of the language.
+ *
+ * The rise is retained and shortened to 6px: a settling surface that also travels
+ * 10px reads as two gestures.
+ */
 @keyframes content-in {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.97);
+    transform: translateY(6px) scale(1.03);
   }
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
 }
+/* Exit does not re-scale. Leaving is decisive (§8) — a surface that grows on the
+   way out looks like it changed its mind. */
 @keyframes content-out {
   from {
     opacity: 1;
@@ -363,13 +378,13 @@ body {
   }
   to {
     opacity: 0;
-    transform: translateY(10px) scale(0.97);
+    transform: translateY(4px) scale(0.995);
   }
 }
 @keyframes menu-in {
   from {
     opacity: 0;
-    transform: translateY(-4px) scale(0.96);
+    transform: translateY(-4px) scale(1.02);
   }
   to {
     opacity: 1;

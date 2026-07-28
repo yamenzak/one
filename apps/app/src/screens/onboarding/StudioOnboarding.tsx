@@ -34,19 +34,26 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AnimatePresence, motion } from "motion/react";
 import {
   Button,
-  Card,
   Callout,
   Field,
-  IconBadge,
+  Group,
+  GroupNote,
+  Row,
+  Screen,
+  Section,
+  StepActions,
+  StepHeader,
+  StepPanel,
+  TierAnchor,
+  TierContent,
   Spinner,
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
-  Building2,
   CreditCard,
+  Gift,
   Info,
   Mail,
   Store,
@@ -265,171 +272,203 @@ export function StudioOnboarding() {
 
   if (strandedOnTenantDomain) {
     return (
-      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-5 px-6 py-10">
-        <Card className="space-y-4 p-6">
-          <div className="flex items-center gap-2.5">
-            <IconBadge icon={Mail} tone="warning" size="sm" />
-            <h1 className="text-lg font-semibold tracking-tight">You're not a member of {host?.tenant?.name}</h1>
-          </div>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            You're signed in as <span className="text-foreground">{ctx?.user.email}</span>, but that email isn't on{" "}
-            {host?.tenant?.name}'s roster. Ask them to invite this address, then sign in again — or use the link they sent you.
-          </p>
+      <Screen center width="narrow" atmosphere="quiet">
+        <TierAnchor className="pb-6 text-center">
+          <p className="text-caption text-muted-foreground">Signed in as {ctx?.user.email}</p>
+          <h1 className="mt-2 text-title-1">You&rsquo;re not on {host?.tenant?.name}&rsquo;s roster</h1>
+        </TierAnchor>
+        <Section>
+          <Group>
+            <Row icon={Mail} sub="Then sign in again with this address">
+              Ask them to invite this email
+            </Row>
+            <Row icon={Store} sub="It opens the right studio for you">
+              Or use the link they sent you
+            </Row>
+          </Group>
+          <GroupNote>Nothing is wrong with your account — this address just isn&rsquo;t on this studio.</GroupNote>
+        </Section>
+        <TierContent className="space-y-1 pt-2">
           <Button size="lg" variant="secondary" className="w-full" onClick={() => void refresh()}>
             Check again
           </Button>
-          <button className="min-h-12 w-full text-sm text-muted-foreground transition-colors hover:text-foreground" onClick={() => void signOut()}>
+          <button className="min-h-12 w-full text-caption text-muted-foreground transition-colors hover:text-foreground" onClick={() => void signOut()}>
             Sign out
           </button>
-        </Card>
-      </div>
+        </TierContent>
+      </Screen>
     );
   }
 
   const canContinue = step === 0 ? name.trim().length >= 2 : step === 1 ? Boolean(planId) : false;
 
-  return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-5 px-6 py-10">
-      <header className="space-y-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Set up your business</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">{STEPS[step]}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Step {step + 1} of {STEPS.length}
-            {step < STEPS.length - 1 && <> · {STEPS.length - 1 - step} to go</>}
-          </p>
-        </div>
-        <div className="flex gap-1.5" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} aria-label={`Onboarding progress: step ${step + 1} of ${STEPS.length}`}>
-          {STEPS.map((s, i) => (
-            <div key={s} className={`h-1.5 flex-1 rounded-full transition-colors ${i <= step ? "bg-primary" : "bg-secondary"}`} />
-          ))}
-        </div>
-      </header>
+  // The address the studio will answer at, forming as they type. This is the
+  // single most important fact about the product's tenancy model and it used to
+  // be invisible until after the studio existed — so someone chose a name with
+  // no idea it was also choosing a URL, and met the slug for the first time in a
+  // confirmation screen. Showing it live makes the anchor (§1) genuinely the
+  // thing this step produces, and quietly teaches the model at the same time.
+  const previewSlug = slugify(name);
+  const root = host?.rootDomain ?? "kova.app";
 
-      <AnimatePresence mode="wait">
-        <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.22 }} className="flex-1">
+  return (
+    <Screen width="narrow">
+      <StepHeader steps={STEPS} current={step} eyebrow="Set up your business" />
+
+      <StepPanel step={step}>
           {step === 0 && (
-            <Card className="space-y-4 p-6">
-              <div className="flex items-center gap-2.5">
-                <IconBadge icon={Building2} tone="primary" size="sm" />
-                <h2 className="font-semibold tracking-tight">Name your studio</h2>
-              </div>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                This is what your clients see. You'll be its owner, and you can invite coaches and clients the moment it's live —
-                everything else is editable later in Settings.
-              </p>
-              <Field
-                label="Business name"
-                icon={Store}
-                value={name}
-                placeholder="FitLab Studio"
-                autoComplete="organization"
-                disabled={tenantReady}
-                onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && name.trim().length >= 2 && setStep(1)}
-              />
-              {tenantReady && <p className="text-xs text-muted-foreground">Your studio is already created — rename it any time in Settings.</p>}
-              <p className="text-xs text-muted-foreground">
-                Signed in as <span className="text-foreground">{ctx?.user.email}</span>
-              </p>
-            </Card>
+            <>
+              {/* T1 — the address taking shape. */}
+              <TierAnchor className="flex flex-col items-center gap-1.5 pb-7 pt-2 text-center">
+                <p className="text-caption text-muted-foreground">Your studio&rsquo;s address will be</p>
+                <p className="break-all text-title-1">
+                  <span className={previewSlug ? "text-foreground" : "text-muted-foreground/50"}>
+                    {previewSlug || "yourstudio"}
+                  </span>
+                  <span className="text-muted-foreground">.{root}</span>
+                </p>
+              </TierAnchor>
+
+              <Section>
+                <Field
+                  label="Business name"
+                  icon={Store}
+                  value={name}
+                  placeholder="FitLab Studio"
+                  autoComplete="organization"
+                  disabled={tenantReady}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && name.trim().length >= 2 && setStep(1)}
+                  hint={
+                    tenantReady
+                      ? "Your studio already exists — rename it any time in Settings."
+                      : "This is what your clients see. Everything else is editable later."
+                  }
+                />
+              </Section>
+
+              <TierContent>
+                <p className="text-center text-caption text-muted-foreground">
+                  Signed in as <span className="text-foreground">{ctx?.user.email}</span>
+                </p>
+              </TierContent>
+            </>
           )}
 
           {step === 1 && <PlanStep selected={planId} onSelect={setPlanId} onFeed={onFeed} />}
 
           {step === 2 && (
-            <div className="space-y-3">
-              <Card className="space-y-3 p-5">
-                <div className="flex items-center gap-2.5">
-                  <IconBadge icon={CreditCard} tone="primary" size="sm" />
-                  <h2 className="min-w-0 flex-1 truncate font-semibold tracking-tight">{plan?.name ?? "Your plan"}</h2>
-                  <span className="numeral shrink-0 text-sm text-muted-foreground">{plan ? `${fmtPrice(usdToCents(plan.priceUsdMonth))}/mo` : ""}</span>
-                </div>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {plan && plan.trialDays > 0 ? (
-                    <>
-                      {plan.trialDays} days free, then {fmtPrice(usdToCents(plan.priceUsdMonth))} a month. We save your card now and
-                      charge nothing today — cancel before the trial ends and you're not billed.
-                    </>
-                  ) : (
-                    <>Billed monthly. Plan credits refresh each period; unused plan credits don't roll over.</>
-                  )}
-                </p>
-              </Card>
+            <>
+              {/* T1 — what this costs and when. The number is the story (§0). */}
+              <TierAnchor className="flex flex-col items-center gap-1.5 pb-6 pt-2 text-center">
+                {plan && plan.trialDays > 0 ? (
+                  <>
+                    <p className="text-caption text-muted-foreground">{plan.name}</p>
+                    <p className="numeral text-display">{plan.trialDays}</p>
+                    <p className="text-body text-muted-foreground">
+                      days free, then {fmtPrice(usdToCents(plan.priceUsdMonth))} a month
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-caption text-muted-foreground">{plan?.name ?? "Your plan"}</p>
+                    <p className="numeral text-display">{plan ? fmtPrice(usdToCents(plan.priceUsdMonth)) : "—"}</p>
+                    <p className="text-body text-muted-foreground">per month</p>
+                  </>
+                )}
+              </TierAnchor>
+
+              {pay.k === "checkout" && (
+                <Section>
+                  <Group>
+                    <Row icon={Gift} sub={plan && plan.trialDays > 0 ? "Nothing is charged today" : "Billed monthly from today"}>
+                      {plan && plan.trialDays > 0 ? "We save your card now" : "Your first month"}
+                    </Row>
+                    <Row icon={CreditCard} sub="Card details go straight to Stripe — Kova never sees them">
+                      Paid securely
+                    </Row>
+                  </Group>
+                  <GroupNote>
+                    {plan && plan.trialDays > 0
+                      ? "Cancel any time before the trial ends and you're not billed."
+                      : "Plan credits refresh each period; unused plan credits don't roll over."}
+                  </GroupNote>
+                </Section>
+              )}
 
               {pay.k === "preparing" && (
-                <Card className="flex items-center gap-3 p-5" role="status" aria-live="polite">
+                <TierContent className="flex items-center justify-center gap-3 py-6" role="status" aria-live="polite">
                   <Spinner />
-                  <span className="text-sm text-muted-foreground">Setting up your studio…</span>
-                </Card>
+                  <span className="text-body text-muted-foreground">Setting up your studio…</span>
+                </TierContent>
               )}
 
               {pay.k === "error" && (
-                <div className="space-y-3">
-                  <Callout tone="danger" icon={AlertTriangle} live="alert">
-                    {pay.msg}
-                  </Callout>
+                <TierContent className="space-y-3">
+                  <Callout tone="danger" icon={AlertTriangle} live="alert">{pay.msg}</Callout>
                   <Button size="lg" variant="secondary" className="w-full" onClick={() => void prepare()}>
                     Try again
                   </Button>
-                </div>
-              )}
-
-              {pay.k === "checkout" && (
-                <>
-                  <Button size="lg" className="w-full" onClick={() => setSheetOpen(true)}>
-                    {pay.label} <ArrowRight />
-                  </Button>
-                  <p className="text-xs text-muted-foreground">Card details go straight to Stripe — Kova never sees them.</p>
-                </>
+                </TierContent>
               )}
 
               {pay.k === "pending" && (
-                <div className="space-y-3">
+                <Section>
                   <Callout tone="warning" icon={Info} live="status">
-                    <span className="font-semibold">Billing isn't ready yet — your studio is.</span>{" "}
+                    <span className="font-semibold">Billing isn&rsquo;t ready yet — your studio is.</span>{" "}
                     {pay.unconfigured
                       ? "Card payments aren't switched on for this Kova installation, so we can't start your subscription right now."
                       : "We couldn't start the subscription just now."}
                   </Callout>
-                  <Card className="space-y-2 p-5">
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      Nothing has been charged. We've recorded that you chose <span className="text-foreground">{plan?.name}</span>, and
-                      until payment is completed your studio runs on the free starter limits — 3 clients, no AI suite, no selling. Every
-                      other part of Kova works normally.
-                    </p>
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      You can finish it any time from <span className="text-foreground">Business → Overview</span>; your plan switches on
-                      the moment payment goes through.
-                    </p>
-                    {pay.detail && <p className="text-xs text-muted-foreground">Details: {pay.detail}</p>}
-                  </Card>
-                  <Button size="lg" className="w-full" disabled={finishing} onClick={() => void done()}>
-                    {finishing ? "Opening your studio…" : "Go to my studio"} {!finishing && <ArrowRight />}
-                  </Button>
-                </div>
+                  <Group className="mt-3">
+                    <Row icon={Store} sub="3 clients, no AI suite, no selling — everything else works">
+                      Running on starter limits
+                    </Row>
+                    <Row icon={CreditCard} sub={`We've recorded that you chose ${plan?.name ?? "a plan"}`}>
+                      Nothing has been charged
+                    </Row>
+                  </Group>
+                  <GroupNote>
+                    Finish it any time from Business → Overview; your plan switches on the moment payment goes through.
+                    {pay.detail ? ` (${pay.detail})` : ""}
+                  </GroupNote>
+                </Section>
               )}
-            </div>
+            </>
           )}
-        </motion.div>
-      </AnimatePresence>
+      </StepPanel>
 
-      <div className="flex gap-3">
-        {step > 0 && (
-          <Button variant="ghost" size="lg" aria-label="Back to the previous step" onClick={() => setStep((s) => Math.max(0, s - 1))}>
-            <ArrowLeft /> Back
+      <StepActions
+        back={
+          step > 0 ? (
+            <Button variant="ghost" size="lg" aria-label="Back to the previous step" onClick={() => setStep((s) => Math.max(0, s - 1))}>
+              <ArrowLeft aria-hidden /> Back
+            </Button>
+          ) : undefined
+        }
+      >
+        {step < 2 ? (
+          <Button size="lg" className="w-full" disabled={!canContinue} onClick={() => setStep((s) => s + 1)}>
+            Continue <ArrowRight aria-hidden />
           </Button>
-        )}
-        {step < 2 && (
-          <Button size="lg" className="flex-1" disabled={!canContinue} onClick={() => setStep((s) => s + 1)}>
-            Continue <ArrowRight />
+        ) : pay.k === "checkout" ? (
+          <Button size="lg" className="w-full" onClick={() => setSheetOpen(true)}>
+            {pay.label} <ArrowRight aria-hidden />
           </Button>
+        ) : pay.k === "pending" ? (
+          <Button size="lg" className="w-full" disabled={finishing} onClick={() => void done()}>
+            {finishing ? "Opening your studio…" : "Go to my studio"} {!finishing && <ArrowRight aria-hidden />}
+          </Button>
+        ) : (
+          <span />
         )}
-      </div>
+      </StepActions>
 
-      <button className="min-h-12 text-sm text-muted-foreground transition-colors hover:text-foreground" onClick={() => void signOut()}>
-        Sign out
-      </button>
+      <TierContent>
+        <button className="min-h-12 w-full text-caption text-muted-foreground transition-colors hover:text-foreground" onClick={() => void signOut()}>
+          Sign out
+        </button>
+      </TierContent>
 
       <PaymentSheet
         open={sheetOpen && pay.k === "checkout"}
@@ -439,6 +478,6 @@ export function StudioOnboarding() {
         submitLabel={pay.k === "checkout" ? pay.label : "Pay"}
         onSuccess={() => void done()}
       />
-    </div>
+    </Screen>
   );
 }

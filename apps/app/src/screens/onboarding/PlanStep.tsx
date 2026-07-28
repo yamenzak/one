@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Badge, Button, Card, Callout, Reveal, SkeletonList, AlertTriangle, Check, Gift, Users } from "@kova/ui";
+import { Badge, Button, Callout, Choice, ChoiceGroup, GroupNote, Reveal, SkeletonList, AlertTriangle, Gift } from "@kova/ui";
 import { FEATURE_META } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { fmtPrice } from "../../money.js";
@@ -112,56 +112,28 @@ export function PlanStep({
     <Reveal loading={!feed} className="space-y-3" skeleton={<SkeletonList card rows={4} thumb={0} />}>
       {feed && (
         <>
-          <div role="radiogroup" aria-label="Choose your plan" className="space-y-2.5">
-            {feed.plans.map((p) => {
-              const on = selected === p.id;
-              return (
-                <Card
-                  key={p.id}
-                  role="radio"
-                  aria-checked={on}
-                  aria-label={`${p.name}, ${fmtPrice(usdToCents(p.priceUsdMonth))} per month${p.trialDays > 0 ? `, ${p.trialDays} days free` : ""}`}
-                  onClick={() => onSelect(p.id)}
-                  className={`space-y-2.5 p-4 transition-colors ${on ? "bg-primary/10 ring-2 ring-primary" : "hover:bg-surface-2"}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold tracking-tight">{p.name}</span>
-                        {p.trialDays > 0 && (
-                          <Badge tone="success">
-                            <Gift aria-hidden /> {p.trialDays} days free
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="numeral mt-0.5 text-sm text-muted-foreground">
-                        {fmtPrice(usdToCents(p.priceUsdMonth))}/month
-                        {p.trialDays > 0 && <span> · after the trial</span>}
-                      </div>
-                    </div>
-                    <div
-                      aria-hidden
-                      className={`mt-0.5 grid size-6 shrink-0 place-items-center rounded-full [&_svg]:size-3.5 ${on ? "bg-primary text-primary-foreground" : "bg-secondary text-transparent"}`}
-                    >
-                      <Check />
-                    </div>
-                  </div>
-                  <ul className="flex flex-wrap gap-1.5">
-                    {highlights(p).map((h) => (
-                      <li key={h} className="rounded-full bg-secondary px-2.5 py-1 text-xs text-muted-foreground">
-                        {h}
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
-              );
-            })}
-          </div>
+          {/* A real radiogroup, arrow-key navigable, one tab stop — see
+              packages/ui/src/choice.tsx. Rows rather than cards on purpose: this
+              is a decision, and a decision wants one scannable left edge (§9),
+              not four browsable tiles. */}
+          <ChoiceGroup label="Choose your plan" value={selected} onChange={onSelect}>
+            {feed.plans.map((p) => (
+              <Choice
+                key={p.id}
+                value={p.id}
+                label={`${p.name}, ${fmtPrice(usdToCents(p.priceUsdMonth))} per month${p.trialDays > 0 ? `, ${p.trialDays} days free` : ""}`}
+                title={p.name}
+                badge={p.trialDays > 0 ? <Badge tone="success"><Gift aria-hidden /> {p.trialDays} days free</Badge> : undefined}
+                meta={fmtPrice(usdToCents(p.priceUsdMonth))}
+                metaSub={p.trialDays > 0 ? "/mo after" : "/month"}
+                tags={highlights(p)}
+              />
+            ))}
+          </ChoiceGroup>
 
-          <Callout tone="neutral" icon={Users}>
-            Changing or cancelling later is easy — plan changes and downgrades are self-serve under Business, and we tell you up front
-            if anything needs sorting out first.
-          </Callout>
+          <GroupNote>
+            Changing or cancelling later is self-serve under Business, and we tell you up front if anything needs sorting out first.
+          </GroupNote>
         </>
       )}
     </Reveal>

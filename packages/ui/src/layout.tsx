@@ -26,7 +26,7 @@
 import { forwardRef, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { cn } from "./lib/utils.js";
-import { anchorIn, atmosphereIn, contentIn, contentStagger, pressProps, rowIn, rowStagger } from "./lib/animation.js";
+import { anchorIn, atmosphereIn, contentIn, contentStagger, pressProps, rowIn, rowStagger, stepPanelVariants } from "./lib/animation.js";
 import { ChevronRight, type LucideIcon } from "./lib/icons.js";
 
 // ── T0 · Atmosphere ─────────────────────────────────────────────────────────
@@ -428,4 +428,113 @@ export function TileGrid({ children, className }: { children: ReactNode; classNa
  */
 export function GroupNote({ children, className }: { children: ReactNode; className?: string }) {
   return <motion.p variants={contentIn} className={cn("px-4 pt-3 text-center text-caption text-muted-foreground", className)}>{children}</motion.p>;
+}
+
+// ── Wizard chrome ───────────────────────────────────────────────────────────
+
+/**
+ * The header for a multi-step flow.
+ *
+ * Progress is a **track, not a badge**: "Step 2 of 3" tells you where you are,
+ * a filling bar tells you how much is left, and people read the bar. Both are
+ * present because the sentence is what a screen reader gets.
+ *
+ * Deliberately not an `Anchor` (§1): in a wizard the anchor is whatever the step
+ * is producing — the studio taking shape, the plan being chosen — and the step
+ * title is chrome around it. Making the title the anchor is the easy mistake,
+ * and it leaves the screen anchored on a piece of navigation.
+ */
+export function StepHeader({
+  steps,
+  current,
+  eyebrow,
+  className,
+}: {
+  steps: readonly string[];
+  /** Zero-based. */
+  current: number;
+  eyebrow?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <motion.header variants={contentIn} className={cn("space-y-3 pb-2", className)}>
+      <div className="flex items-baseline justify-between gap-3">
+        {eyebrow && <p className="text-micro uppercase text-primary">{eyebrow}</p>}
+        <p className="text-caption text-muted-foreground">
+          Step {current + 1} of {steps.length}
+        </p>
+      </div>
+      <h1 className="text-title-1">{steps[current]}</h1>
+      <div
+        className="flex gap-1.5"
+        role="progressbar"
+        aria-valuemin={1}
+        aria-valuemax={steps.length}
+        aria-valuenow={current + 1}
+        aria-label={`Step ${current + 1} of ${steps.length}: ${steps[current]}`}
+      >
+        {steps.map((s, i) => (
+          <span key={s} className={cn("h-1 flex-1 rounded-full transition-colors duration-300", i <= current ? "bg-primary" : "bg-surface-2")} />
+        ))}
+      </div>
+    </motion.header>
+  );
+}
+
+/**
+ * The action bar at the bottom of a flow — one primary, one quiet way back.
+ *
+ * Sticky, because a wizard step can be taller than the viewport and a Continue
+ * button you have to scroll to find is the most common reason people abandon
+ * one. The blur is what keeps it legible over content passing beneath it.
+ */
+export function StepActions({ back, children, className }: { back?: ReactNode; children: ReactNode; className?: string }) {
+  return (
+    <motion.div
+      variants={contentIn}
+      className={cn(
+        "sticky bottom-0 z-10 -mx-4 mt-6 flex items-center gap-3 border-t border-border/60 bg-background/85 px-4 pt-3 backdrop-blur-xl md:-mx-6 md:px-6",
+        className,
+      )}
+      style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+    >
+      {back}
+      <div className="flex-1">{children}</div>
+    </motion.div>
+  );
+}
+
+/**
+ * One step's content, keyed so it remounts and re-runs its entrance.
+ *
+ * ── Why this exists rather than a `motion.div` in the screen ─────────────────
+ *
+ * Variant propagation flows down through motion components by LABEL. The moment
+ * an intermediate component sets `animate` to an OBJECT instead of a label, the
+ * chain stops: descendants still inherit `initial="hidden"` from the `Screen`,
+ * but nothing ever hands them `"show"`, so they mount invisible and stay that
+ * way. The wrapper animates beautifully and its contents never appear.
+ *
+ * That is not a hypothetical — it silently hid the anchor on a wizard step while
+ * the rest of the step rendered, which is far worse than a whole blank screen
+ * because it looks deliberate. The fix is that the wrapper must animate with
+ * LABELS too, so the chain continues through it.
+ *
+ * Also deliberately not wrapped in `AnimatePresence`: `mode="wait"` holds the
+ * incoming step until the outgoing one reports finished, and any descendant with
+ * its own presence animation that never resolves leaves the flow on a blank
+ * screen with a working button bar. A step does not need a cross-fade.
+ */
+export function StepPanel({ step, children, className }: { step: string | number; children: ReactNode; className?: string }) {
+  return (
+    <motion.div
+      key={step}
+      initial="hidden"
+      animate="show"
+      variants={stepPanelVariants}
+      className={cn("flex-1 pb-6 pt-2", className)}
+    >
+      {children}
+    </motion.div>
+  );
 }
