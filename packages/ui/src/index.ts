@@ -5,6 +5,7 @@ export * from "./lib/metric-coding.js";
 export * from "./lib/persona.js";
 export * from "./lib/motion.js";
 export * from "./layout.js";
+export * from "./choice.js";
 export * from "./primitives.js";
 export * from "./skeleton.js";
 export * from "./overlays.js";
