@@ -1667,10 +1667,11 @@ function DomainsConfig() {
               </Callout>
             )}
 
-            <Group title="One-time Cloudflare setup" hint="These two steps can't be done from here — do them in the Cloudflare dashboard first. Full walkthrough in DEPLOY.md.">
+            <Group title="One-time Cloudflare setup" hint="These steps can't be done from here — do them in the Cloudflare dashboard first. Full walkthrough in DEPLOY.md §11b.">
               <ol className="space-y-1.5 rounded-xl bg-surface-2 p-3 text-xs leading-relaxed text-muted-foreground">
-                <li><span className="font-medium text-foreground">1.</span> On the serving zone → SSL/TLS → Custom Hostnames → <span className="font-medium">Enable</span>, and set a Fallback Origin (e.g. <code className="rounded bg-surface-3 px-1">ssl.kova.4dl.app</code> → CNAME <code className="rounded bg-surface-3 px-1">kova.4dl.app</code>, proxied).</li>
-                <li><span className="font-medium text-foreground">2.</span> Create an API token scoped to that zone with <span className="font-medium">SSL and Certificates · Edit</span>.</li>
+                <li><span className="font-medium text-foreground">1.</span> On the serving zone → SSL/TLS → Custom Hostnames → <span className="font-medium">Enable</span>.</li>
+                <li><span className="font-medium text-foreground">2.</span> Add the Fallback Origin as an <span className="font-medium">originless</span> record on the zone apex — AAAA <code className="rounded bg-surface-3 px-1">saas</code> → <code className="rounded bg-surface-3 px-1">100::</code>, proxied — then set Fallback Origin to <code className="rounded bg-surface-3 px-1">saas.4dl.app</code>. Do <span className="font-medium">not</span> CNAME it at the app: every domain gets its own worker route, and a record under the studio root would classify as a studio that does not exist.</li>
+                <li><span className="font-medium text-foreground">3.</span> Create an API token scoped to that zone with <span className="font-medium">SSL and Certificates · Edit</span> <span className="font-medium">and Workers Routes · Edit</span> — both, or adding a domain fails and rolls back.</li>
               </ol>
             </Group>
 
@@ -1683,7 +1684,14 @@ function DomainsConfig() {
                 onChange={(e) => setApiToken(e.target.value)}
               />
               <Field label="Zone id" value={zoneId} onChange={(e) => setZoneId(e.target.value)} />
-              <Field label="CNAME target" icon={Globe} value={cnameTarget} onChange={(e) => setCnameTarget(e.target.value)} placeholder="ssl.kova.4dl.app" />
+              <Field
+                label="CNAME target"
+                icon={Globe}
+                value={cnameTarget}
+                onChange={(e) => setCnameTarget(e.target.value)}
+                placeholder="saas.4dl.app"
+                hint="A proxied hostname on the serving zone — the same one you set as the Fallback Origin. Not a name under the studio root."
+              />
               <Field
                 label="Worker script — blank uses the default"
                 value={workerName}
