@@ -142,6 +142,49 @@ Paste `database_id` and the KV `id` into `apps/api/wrangler.jsonc`, commit, push
 > `ensureSchema` — `CREATE TABLE IF NOT EXISTS` + `ALTER`s, guarded by a
 > `schema_version` marker row). First request after a deploy pays for it.
 
+### 4b. Moving to a different D1 database
+
+D1 has no rename, so the only way to change a database's name is to move to a new
+one. Nothing in the code depends on the name — `wrangler.jsonc` binds by id and
+every command here addresses the binding — so this is **cosmetic**, and the risk
+is not.
+
+⚠️ **Do not just repoint `database_id` at an empty database.** The schema
+self-applies and the plan and AI-model catalogs re-seed themselves
+(`seedBilling`, `seedAiModels`), but `app_config` does **not**: the email
+provider, the Gemini key, every Stripe credential and webhook secret, the
+Cloudflare-for-SaaS token and the Turnstile keys all live there. Losing
+`email.provider`/`email.from` puts you straight back into the bootstrap deadlock
+in section 6 — OTP is the only way in, and the screen that fixes email needs a
+platform-admin session you can no longer obtain. Existing sessions die too: the
+`session` table goes with it.
+
+Copy it instead. Do this while nothing is writing — anything written between the
+export and the swap is lost:
+
+```sh
+cd apps/api
+# 1. Export the CURRENT database. `DB` still resolves to the old id.
+pnpm exec wrangler d1 export DB --remote --output /tmp/d1-move.sql
+
+# 2. Now edit apps/api/wrangler.jsonc: database_id → the NEW database's id.
+
+# 3. Load the dump into the new one (`DB` now resolves to it).
+pnpm exec wrangler d1 execute DB --remote --file /tmp/d1-move.sql
+
+# 4. Prove the config came across BEFORE deploying.
+pnpm exec wrangler d1 execute DB --remote \
+  --command "SELECT key FROM app_config ORDER BY key;"
+```
+
+Step 4 is the gate: if `email.provider`, `email.from` and your `stripe.*` keys
+are not in that list, stop and fix it — do not deploy. Then commit the config
+change and deploy as usual.
+
+**Keep the old database.** It is the rollback: revert `database_id`, redeploy,
+and you are back where you started. Delete it only after a real sign-in, a real
+email and a real Stripe webhook have all succeeded on the new one.
+
 ---
 
 ## 5. First deploy, then set `BETTER_AUTH_SECRET`
