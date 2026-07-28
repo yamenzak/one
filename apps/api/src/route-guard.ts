@@ -183,8 +183,27 @@ function allowedOnRoot(path: string): boolean {
     path === "/api/context" ||
     path === "/api/host" ||
     path.startsWith("/api/auth/") ||
-    path === "/health"
+    path === "/health" ||
+    // The STRIPE WEBHOOKS. They are platform endpoints, not a studio's, so the
+    // root — the canonical platform origin, and the URL anyone configuring Stripe
+    // would reach for first — has to answer them.
+    //
+    // Leaving them off this list was a silent outage waiting to happen: an endpoint
+    // pointed at `https://<root>/api/stripe/webhook` 404s, Stripe retries a few
+    // times and then DISABLES the endpoint, and the symptom is that customers pay
+    // successfully while their studio is never activated. Nothing in the app would
+    // report it, because from our side the request never arrived.
+    //
+    // Safe to expose here for the same reason they are exempt from the read-only
+    // gate below: they carry no session, and each verifies Stripe's signature
+    // against the configured secret before it does anything.
+    isStripeWebhook(path)
   );
+}
+
+/** The two signature-verified Stripe callbacks: platform rail and Connect rail. */
+function isStripeWebhook(path: string): boolean {
+  return path === "/api/stripe/webhook" || path === "/api/connect/webhook";
 }
 
 /**
@@ -203,8 +222,7 @@ function allowedOnRoot(path: string): boolean {
 function allowedWhileReadOnly(path: string): boolean {
   return (
     path.startsWith("/api/auth/") ||
-    path === "/api/stripe/webhook" ||
-    path === "/api/connect/webhook" ||
+    isStripeWebhook(path) ||
     path === "/api/context/switch" ||
     path.startsWith("/api/me/") ||
     path.startsWith("/api/inbox/")
