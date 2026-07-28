@@ -1550,7 +1550,16 @@ function AiSelfTest({ models }: { models: ModelRow[] }) {
 
 // ── Domains (Cloudflare for SaaS, SPEC §14.1) ────────────────────────────────
 
-interface DomainStatus { configured: boolean; zoneId: string | null; cnameTarget: string | null; tokenSet: boolean }
+interface DomainStatus {
+  configured: boolean;
+  zoneId: string | null;
+  cnameTarget: string | null;
+  tokenSet: boolean;
+  /** Stored override, or null when the default applies. */
+  workerName: string | null;
+  /** What the server falls back to — matches `name` in wrangler.jsonc. */
+  workerNameDefault: string;
+}
 
 function DomainsConfig() {
   const load = useCallback(() => api.get<DomainStatus>("/api/admin/domains/config"), []);
@@ -1558,6 +1567,7 @@ function DomainsConfig() {
   const [apiToken, setApiToken] = useState("");
   const [zoneId, setZoneId] = useState("");
   const [cnameTarget, setCnameTarget] = useState("");
+  const [workerName, setWorkerName] = useState("");
   const [seeded, setSeeded] = useState(false);
   const act = useAction();
 
@@ -1566,18 +1576,28 @@ function DomainsConfig() {
     if (status && !seeded) {
       setZoneId(status.zoneId ?? "");
       setCnameTarget(status.cnameTarget ?? "");
+      setWorkerName(status.workerName ?? "");
       setSeeded(true);
     }
   }, [status, seeded]);
 
+  // What a route created right now would point at.
+  const effectiveWorker = status ? (status.workerName || status.workerNameDefault) : "";
+  // A stored value that is not the default is the silent-failure case: routes
+  // are created against a script name nobody re-checked after a worker rename.
+  const workerOverridden = !!status?.workerName && status.workerName !== status.workerNameDefault;
+
   const save = () =>
     act.run("save", async () => {
       // Send only what is filled in — the token is write-only, so an empty box
-      // must keep the stored one rather than clear it.
+      // must keep the stored one rather than clear it. The worker name is the
+      // exception: it is sent whenever it differs from what is stored, so
+      // emptying the box clears the override and restores the default.
       const body: Record<string, string> = {};
       if (apiToken) body.apiToken = apiToken;
       if (zoneId) body.zoneId = zoneId;
       if (cnameTarget) body.cnameTarget = cnameTarget;
+      if (workerName.trim() !== (status?.workerName ?? "")) body.workerName = workerName.trim();
       await api.post("/api/admin/domains/config", body);
       setApiToken("");
       reload();
@@ -1619,12 +1639,26 @@ function DomainsConfig() {
               <ConfigRow label="API token" ok={status.tokenSet} detail="Write-only — never echoed back." okLabel="Stored" />
               <ConfigRow label="Zone id" ok={!!status.zoneId} detail={status.zoneId ?? "The zone with Custom Hostnames enabled."} />
               <ConfigRow label="CNAME target" ok={!!status.cnameTarget} detail={status.cnameTarget ?? "The hostname studios CNAME their domain to."} />
+              <ConfigRow
+                label="Worker script"
+                ok
+                okLabel={status.workerName ? "Overridden" : "Default"}
+                detail={`Routes for new domains point at "${effectiveWorker}".`}
+              />
             </div>
 
             {partial && (
               <Callout tone="warning" icon={AlertTriangle} live="alert">
                 Partly configured — custom domains stay off until all three are stored, and a studio that adds one will
                 see it never verify.
+              </Callout>
+            )}
+            {workerOverridden && (
+              <Callout tone="warning" icon={AlertTriangle} live="alert">
+                The worker script is overridden to <span className="font-medium text-foreground">{status.workerName}</span> instead of
+                the default <span className="font-medium text-foreground">{status.workerNameDefault}</span>. If no script by that
+                name exists, a studio's domain still issues a certificate and reports active — and then serves nothing, with no error
+                anywhere. Clear the field below to restore the default.
               </Callout>
             )}
             {status.configured && (
@@ -1650,7 +1684,18 @@ function DomainsConfig() {
               />
               <Field label="Zone id" value={zoneId} onChange={(e) => setZoneId(e.target.value)} />
               <Field label="CNAME target" icon={Globe} value={cnameTarget} onChange={(e) => setCnameTarget(e.target.value)} placeholder="ssl.kova.4dl.app" />
-              <Button className="min-h-12 w-full" disabled={act.busy !== null || (!apiToken && !zoneId && !cnameTarget)} onClick={() => void save()}>
+              <Field
+                label="Worker script — blank uses the default"
+                value={workerName}
+                onChange={(e) => setWorkerName(e.target.value)}
+                placeholder={status.workerNameDefault}
+                hint={`Leave blank unless the worker was renamed. In force now: "${effectiveWorker}".`}
+              />
+              <Button
+                className="min-h-12 w-full"
+                disabled={act.busy !== null || (!apiToken && !zoneId && !cnameTarget && workerName.trim() === (status.workerName ?? ""))}
+                onClick={() => void save()}
+              >
                 {act.busy === "save" ? <><Spinner className="size-4" /> Saving…</> : "Save"}
               </Button>
             </Group>

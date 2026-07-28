@@ -343,7 +343,7 @@ section 6.
 | `cf.saas.api_token` | *(empty)* | Tenant custom domains can't be registered | Platform admin → **Domains** |
 | `cf.saas.zone_id` | *(empty)* | Same | Platform admin → **Domains** |
 | `cf.saas.cname_target` | *(empty)* | Tenants get no CNAME to point at | Platform admin → **Domains** |
-| `cf.saas.worker_name` | `kova` | Per-hostname routes point at a missing script | Only if the worker is renamed |
+| `cf.saas.worker_name` | `kova` | Per-hostname routes point at a missing script — **silently**: the certificate issues, the domain reports active, and every request serves nothing | Platform admin → **Domains** (blank = the default) |
 
 Worker-level config that is **not** in `app_config`: `BETTER_AUTH_SECRET`
 (wrangler secret, step 5b), `ADMIN_EMAILS` and `BETTER_AUTH_URL`
@@ -716,10 +716,18 @@ key, and do not reuse it elsewhere.
 | Zone id | the zone's id | zone **Overview** → right sidebar → *Zone ID* |
 | CNAME target | e.g. `saas.4dl.app` | your choice in Step 4 |
 
-Optional: `cf.saas.worker_name` overrides which worker script the per-hostname
-routes point at. It defaults to `kova`, matching `wrangler.jsonc`'s `name` — set
-it only if you rename the worker, otherwise every newly added domain would route
-at a script that no longer exists.
+**Worker script** is the fourth field on that screen and it should stay blank.
+Blank means the built-in default, which tracks `wrangler.jsonc`'s `name` — the
+screen shows you which script is in force either way, and warns when an override
+is stored. Set it only if you rename the worker *and* have not redeployed with
+the matching default; **clear it** after a rename to go back to the default.
+
+This is the one value here whose wrong setting fails without an error anywhere:
+the route is created, the DV certificate issues, the domain reports **active** in
+the studio's own Settings — and every request reaches a script that does not
+exist. Nothing polls it, so the first report is a tenant saying their domain is
+blank. That is why it is on the screen rather than only in `app_config`; a stale
+value survives a worker rename and a nuclear reset alike.
 
 Stored in `app_config` as `cf.saas.*`. Until all three are set,
 `saasConfig()` returns null and the owner-facing domain UI answers

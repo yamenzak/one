@@ -32,7 +32,7 @@ import { type AppEnv, requireTenant, requirePermission, isPlatformAdmin } from "
 import { setConfig, getConfig } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
 import { turnstileConfig } from "./turnstile.js";
-import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostname, createWorkerRoute, deleteWorkerRoute, type CustomHostname } from "./cloudflare.js";
+import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostname, createWorkerRoute, deleteWorkerRoute, DEFAULT_WORKER_NAME, WORKER_NAME_RE, type CustomHostname } from "./cloudflare.js";
 import { canonicalHost, invalidateHostCache, isPlatformDoor, rootDomain, shapeOf } from "./host-context.js";
 import { nowIso } from "./ids.js";
 import { parseJson } from "./db.js";
@@ -285,19 +285,51 @@ export const domainRoutes = new Hono<AppEnv>()
 export const domainAdminRoutes = new Hono<AppEnv>()
   .get("/admin/domains/config", async (c) => {
     if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    const cfg = await saasConfig(c.env.DB);
+    // Read the raw rows rather than `saasConfig`, which returns null until the
+    // token/zone/CNAME triple is complete. `workerName` has to be readable
+    // BEFORE that — it is the one value whose wrong setting fails silently
+    // (see DEFAULT_WORKER_NAME), so it must never be invisible while the rest
+    // of the form is being filled in.
+    const cfg = await getConfig(c.env.DB);
+    const zoneId = cfg["cf.saas.zone_id"] || null;
+    const cnameTarget = cfg["cf.saas.cname_target"] || null;
+    const tokenSet = Boolean(cfg["cf.saas.api_token"]);
+    const workerName = cfg["cf.saas.worker_name"] || null;
     // Never echo the token back — only whether it's set + the public bits.
-    return c.json({ configured: !!cfg, zoneId: cfg?.zoneId ?? null, cnameTarget: cfg?.cnameTarget ?? null, tokenSet: !!cfg?.apiToken });
+    return c.json({
+      configured: tokenSet && !!zoneId && !!cnameTarget,
+      zoneId,
+      cnameTarget,
+      tokenSet,
+      /** The stored override, or null when the default applies. */
+      workerName,
+      /** What the code falls back to, so the console can show what is in force. */
+      workerNameDefault: DEFAULT_WORKER_NAME,
+    });
   })
   .post("/admin/domains/config", async (c) => {
     if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
     const d = z
-      .object({ apiToken: z.string().min(1).optional(), zoneId: z.string().min(1).optional(), cnameTarget: z.string().min(1).optional() })
+      .object({
+        apiToken: z.string().min(1).optional(),
+        zoneId: z.string().min(1).optional(),
+        cnameTarget: z.string().min(1).optional(),
+        // Empty string CLEARS the override so the default applies again; that is
+        // the recovery path from a stale name and has to be expressible. The
+        // others stay "blank keeps it" because clearing them just breaks the
+        // feature loudly, whereas a stale worker name breaks it silently.
+        workerName: z.string().max(63).optional(),
+      })
       .safeParse(await c.req.json().catch(() => null));
     if (!d.success) return c.json({ error: "invalid body" }, 400);
+    const workerName = d.data.workerName?.trim().toLowerCase();
+    if (workerName && !WORKER_NAME_RE.test(workerName)) {
+      return c.json({ error: "invalid worker name" }, 400);
+    }
     if (d.data.apiToken) await setConfig(c.env.DB, "cf.saas.api_token", d.data.apiToken);
     if (d.data.zoneId) await setConfig(c.env.DB, "cf.saas.zone_id", d.data.zoneId);
     if (d.data.cnameTarget) await setConfig(c.env.DB, "cf.saas.cname_target", d.data.cnameTarget.trim().toLowerCase());
+    if (workerName !== undefined) await setConfig(c.env.DB, "cf.saas.worker_name", workerName);
     return c.json({ ok: true });
   })
 
