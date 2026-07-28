@@ -4,6 +4,7 @@
  */
 
 import { motion } from "motion/react";
+import { chromeIn } from "./lib/animation.js";
 import type { ReactNode } from "react";
 import { cn } from "./lib/utils.js";
 import { toneVar, type Tone } from "./primitives.js";
@@ -39,7 +40,7 @@ export function AppBar({ leading, title, trailing, bare, scrolled }: { leading?:
   return (
     <header className={cn("sticky top-0 z-30 flex h-[calc(4rem+env(safe-area-inset-top))] items-center justify-between gap-3 px-4 pt-[env(safe-area-inset-top)]", !bare && "border-b border-border/40 bg-background/80 backdrop-blur-xl")}>
       <div className={cn(cluster, "min-w-0 gap-2")}>{leading}</div>
-      {title && <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-base font-semibold">{title}</div>}
+      {title && <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-body-lg">{title}</div>}
       <div className={cn(cluster, "gap-1.5")}>{trailing}</div>
     </header>
   );
@@ -55,7 +56,7 @@ export function BottomTabs({ tabs, active, onSelect, tinted }: { tabs: TabDef[];
   const activeTone = tabs.find((t) => t.key === active)?.tone;
   const onFg = tinted && activeTone && activeTone !== "primary" ? "var(--tone-foreground)" : "var(--primary-foreground)";
   return (
-    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.7rem)] md:hidden">
+    <motion.nav initial="hidden" animate="show" variants={chromeIn} className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.7rem)] md:hidden">
       <div data-tour="navbar" className="pointer-events-auto flex max-w-full items-center gap-0.5 rounded-full border border-border/60 bg-card/75 p-1.5 shadow-lg backdrop-blur-2xl">
         {tabs.map((t) => {
           const on = active === t.key;
@@ -79,7 +80,7 @@ export function BottomTabs({ tabs, active, onSelect, tinted }: { tabs: TabDef[];
                   initial={{ opacity: 0, width: 0 }}
                   animate={{ opacity: 1, width: "auto" }}
                   transition={{ duration: 0.2 }}
-                  className="relative overflow-hidden whitespace-nowrap text-sm font-semibold"
+                  className="relative overflow-hidden whitespace-nowrap text-caption font-semibold"
                 >
                   {t.label}
                 </motion.span>
@@ -88,7 +89,7 @@ export function BottomTabs({ tabs, active, onSelect, tinted }: { tabs: TabDef[];
           );
         })}
       </div>
-    </nav>
+    </motion.nav>
   );
 }
 
@@ -96,8 +97,14 @@ export function NavRail({ tabs, active, onSelect, footer, brand, tinted }: { tab
   const color = activeColor(tabs, active, tinted);
   const soft = `color-mix(in oklch, ${color} 14%, transparent)`;
   return (
-    <nav className="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col items-center border-r border-border/40 bg-card/40 py-6 backdrop-blur-xl md:flex">
-      <div className="mb-6 grid size-11 place-items-center overflow-hidden rounded-2xl bg-primary text-lg font-black text-primary-foreground">{brand ?? "M"}</div>
+    <motion.nav initial="hidden" animate="show" variants={chromeIn} className="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col items-center border-r border-border/40 bg-card/40 py-6 backdrop-blur-xl md:flex">
+      {/* No letter fallback. This shipped as a hardcoded "M" — a leftover from
+          the old product name, which on any other app consuming this package
+          would render a stranger's initial. An absent brand renders an empty
+          mark, which is honest. */}
+      {brand !== undefined && (
+        <div className="mb-6 grid size-11 place-items-center overflow-hidden rounded-2xl bg-primary text-title-3 font-black text-primary-foreground">{brand}</div>
+      )}
       <div className="flex w-full flex-1 flex-col items-center gap-1.5 px-3">
         {tabs.map((t) => {
           const on = active === t.key;
@@ -116,13 +123,13 @@ export function NavRail({ tabs, active, onSelect, footer, brand, tinted }: { tab
                 className={cn("relative size-[1.35rem] transition-colors", !on && "text-muted-foreground group-hover:text-foreground")}
                 strokeWidth={on ? 2.4 : 2}
               />
-              <span style={on ? { color } : undefined} className={cn("relative text-xs font-medium transition-colors", !on && "text-muted-foreground group-hover:text-foreground")}>{t.label}</span>
+              <span style={on ? { color } : undefined} className={cn("relative text-micro normal-case transition-colors", !on && "text-muted-foreground group-hover:text-foreground")}>{t.label}</span>
             </button>
           );
         })}
       </div>
       {footer && <div className="mt-auto">{footer}</div>}
-    </nav>
+    </motion.nav>
   );
 }
 
