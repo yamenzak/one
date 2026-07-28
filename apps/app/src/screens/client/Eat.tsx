@@ -6,7 +6,7 @@ import {
   Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MetricChip, MetricPill, ProgressRing, METRICS, toneSoft, Eyebrow, Page, Stagger, EmptyState, motion, ConfirmDialog,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
   Plus, Utensils, Croissant, Soup, Apple, Dumbbell, Trash2, AlertTriangle, type LucideIcon,
-  TierAnchor, CountUp,
+  TierAnchor, CountUp, Droplet,
 } from "@kova/ui";
 import type { UnitPrefs } from "@kova/domain";
 import { api, errorText, isQueued, todayLocal } from "../../api.js";
@@ -241,10 +241,16 @@ export function Eat({ clientId }: { clientId: string }) {
             <div className="pointer-events-none absolute -right-12 -top-12 size-40 rounded-full bg-calories/10 blur-2xl" />
             <div className="relative flex items-center justify-between gap-4">
               <div className="min-w-0">
-                <div className="text-xs font-medium uppercase tracking-wide text-calories">Today's intake</div>
-                <div className="numeral mt-1.5 text-3xl font-bold leading-none">{fmtEnergy(total, units)}</div>
-                <div className="mt-1.5 text-sm text-muted-foreground">
-                  {calTarget > 0 ? (remaining >= 0 ? `${fmtEnergy(remaining, units)} left` : `${fmtEnergy(-remaining, units)} over`) : "Log your meals to track intake"}
+                <div className="text-micro uppercase text-calories">Today&rsquo;s intake</div>
+                {/* No headline number here — the anchor above already carries it,
+                    and repeating it at a second weight made this card read as a
+                    louder copy of the screen's own subject (§1). What stays is
+                    what the anchor cannot say: the split, and how far over. */}
+                <div className="mt-1.5 text-body-lg">{fmtEnergy(total, units)} eaten</div>
+                <div className="mt-1 text-caption text-muted-foreground">
+                  {calTarget > 0
+                    ? (remaining >= 0 ? "on track" : `${fmtEnergy(-remaining, units)} over target`)
+                    : "Log your meals to track intake"}
                 </div>
               </div>
               {calTarget > 0 && (

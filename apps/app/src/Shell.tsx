@@ -8,6 +8,7 @@
 import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import {
+  ChevronDown,
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
   Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Hand, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, toneVar, type TabDef, type Tone,
 } from "@kova/ui";
@@ -497,34 +498,48 @@ function BillingNotice() {
   ].filter(Boolean) as string[];
 
   return (
+    /*
+      COMPACT BY DEFAULT, expandable for the detail.
+
+      This shipped as a full explanation card pinned above every coach screen —
+      on a phone it ate the top third of the viewport, so the first thing an
+      owner saw was a paragraph about billing rather than their own studio. It
+      pushed the anchor (§1) below the fold on the two screens that most need
+      one.
+
+      A banner is a T3 concern and must not occupy T1 space. So: one line, one
+      action, and the consequences one tap away. Nothing is hidden that was not
+      already a click from Business — and the state is still undismissable,
+      because it describes the studio rather than announcing an event.
+    */
     <div role="status" className="px-4 pt-3">
-      <div className="relative overflow-hidden rounded-2xl border border-danger/30 bg-surface-1 p-3.5">
-        <div className="pointer-events-none absolute -right-10 -top-12 size-40 rounded-full blur-3xl" style={{ backgroundColor: `color-mix(in oklch, ${toneVar.danger} 16%, transparent)` }} />
-        <div className="relative flex flex-wrap items-start gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-2xl [&_svg]:size-[1.2rem]" style={{ backgroundColor: `color-mix(in oklch, ${toneVar.danger} 15%, transparent)`, color: toneVar.danger }}>
-            <AlertTriangle />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-semibold tracking-tight" style={{ color: toneVar.danger }}>
-              {pending
-                ? `Your ${state.pendingPlanName ?? "plan"} subscription was never activated`
-                : "This studio has no subscription"}
-            </h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {pending
-                ? "The card step didn't complete, so nothing is being billed and you're running on Kova's free baseline"
-                : "You're running on Kova's free baseline"}
-              {limits.length > 0 ? `: ${limits.join(" · ")}.` : "."}
-            </p>
-          </div>
-          <Button size="sm" className="shrink-0" style={{ backgroundColor: toneVar.danger }} onClick={() => nav("/business")}>
-            {pending ? "Finish setup" : "Choose a plan"} <ArrowRight />
+      <details className="group overflow-hidden rounded-2xl border border-danger/30 bg-surface-1">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2.5 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
+          <AlertTriangle aria-hidden className="size-[1.05rem] shrink-0" style={{ color: toneVar.danger }} />
+          <span className="min-w-0 flex-1 truncate text-caption font-semibold" style={{ color: toneVar.danger }}>
+            {pending ? `${state.pendingPlanName ?? "Your plan"} was never activated` : "No subscription"}
+          </span>
+          <Button
+            size="sm"
+            className="shrink-0"
+            style={{ backgroundColor: toneVar.danger }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); nav("/business"); }}
+          >
+            {pending ? "Finish setup" : "Choose a plan"}
           </Button>
-        </div>
-      </div>
+          <ChevronDown aria-hidden className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+        </summary>
+        <p className="border-t border-border/50 px-3 py-2.5 text-caption leading-relaxed text-muted-foreground">
+          {pending
+            ? "The card step didn't complete, so nothing is being billed and you're running on Kova's free baseline"
+            : "You're running on Kova's free baseline"}
+          {limits.length > 0 ? `: ${limits.join(" · ")}.` : "."}
+        </p>
+      </details>
     </div>
   );
 }
+
 
 /** "Today" resolves to the coach inbox or the client home by surface. */
 function TodayRoute() {

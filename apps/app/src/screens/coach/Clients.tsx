@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Sheet, Avatar, SegmentedControl, Page, Stagger, EmptyState, Reveal, SkeletonList, ConfirmDialog, toneVar, Users, Mail, User, ArrowLeft, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle , TierAnchor, ActionCluster, CountUp, Group, Row } from "@kova/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, SegmentedControl, Page, Stagger, EmptyState, Reveal, SkeletonList, ConfirmDialog, toneVar, Users, Mail, User, ArrowLeft, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle , TierAnchor, CountUp, Group, Row } from "@kova/ui";
 import type { AttentionSeverity } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -126,7 +126,9 @@ export function Clients() {
         </p>
       </TierAnchor>
 
-      <ActionCluster items={[{ icon: Plus, label: "Add client", onClick: () => setCreateOpen(true) }]} />
+      <Stagger className="pb-1">
+        <Button size="lg" className="w-full" onClick={() => setCreateOpen(true)}><Plus /> Add client</Button>
+      </Stagger>
 
       {freeing && (
         <Card className="space-y-2.5 border border-primary/25" role="status" aria-live="polite">
