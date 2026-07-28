@@ -4525,6 +4525,22 @@ describe("a hostname with no studio serves nothing", () => {
     expect((await SELF.fetch(`${STRAY}/health`)).status).toBe(200);
   });
 
+  it("still answers the Stripe webhooks — they are the platform's, not a studio's", async () => {
+    // A 400 means the request REACHED the handler and was rejected for a bad
+    // signature. A 404 would mean the host gate ate it — and that failure is
+    // invisible: Stripe retries, disables the endpoint, and customers pay while
+    // their studio is never activated. Verified against production, where the root
+    // door was 404ing exactly this.
+    for (const p of ["/api/stripe/webhook", "/api/connect/webhook"]) {
+      const res = await SELF.fetch(`http://localhost:8787${p}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      expect(res.status, `${p} on the ROOT door`).not.toBe(404);
+    }
+  });
+
   it("closes the sign-in lane, which is what made it a studio-creation path", async () => {
     const otp = await SELF.fetch(`${STRAY}/api/auth/email-otp/send-verification-otp`, {
       method: "POST",
