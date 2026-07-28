@@ -62,6 +62,10 @@ placed above its true tier is the single most common way a screen rots.**
   in one noun, the screen is unclear.
 - **T2 tops out at five.** Four is better. The fifth slot, when needed, is
   always **More** — never a fifth real action.
+- **T2 has a floor of three.** A cluster of one is a single circle adrift in the
+  middle of a screen, and a cluster of two reads as an unfinished row. One or two
+  actions is a `Button` (full width) — the cluster is a *set*, and a set needs
+  enough members to read as one.
 - **T3 chunks at seven.** More than ~7 rows in one group gets truncated with a
   **See all** row. Scroll is fine; an un-chunked wall is not.
 - **T4 is translucent, unlabelled where an icon suffices, and never accented.**
@@ -533,7 +537,7 @@ deltas).
 | `Atmosphere` | Automatic inside `Screen`. Place directly only on a surface that owns its own scroll. | A decorative gradient. It is identity, and there is exactly one per screen. | ✅ |
 | `Anchor` | The one thing a screen is about, at `display`. **Exactly one.** | A section heading, a card title, or any value that is not the screen's subject. | ✅ |
 | `Unit` | The unit beside an anchor value (`kJ`, `kg`, `%`). | Units inside rows — those are part of the value string. | ✅ |
-| `ActionCluster` | 3–5 primary verbs under the anchor. | Navigation. Circles are actions; nav lives in the chrome. | ✅ |
+| `ActionCluster` | **3–5** primary verbs under the anchor. | Navigation, or fewer than three actions — one or two is a full-width `Button`. | ✅ |
 | `Section` | A titled block with the standard rhythm. `action` is one quiet affordance. | Wrapping a single row — that is just a `Group`. | ✅ |
 | `Group` | The container rows live in. Rounded, inset hairlines, no padding of its own. | Free-form content. If it is not rows, it is a `Card`. | ✅ |
 | `Row` | Any scannable list line. Three heights by content. | Prose. A row truncates; a sentence in one is a bug (found the hard way on the doorway screens). | ✅ |
