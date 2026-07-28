@@ -37,7 +37,7 @@ async function sig(payload: string, secret: string): Promise<string> {
 }
 
 const post = async (payload: string) =>
-  SELF.fetch("http://x/api/stripe/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await sig(payload, SECRET) }, body: payload });
+  SELF.fetch(`${ORIGIN}/api/stripe/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await sig(payload, SECRET) }, body: payload });
 
 interface Balance { balance: number; purchased: number; granted: number }
 function billingStub(tenantId: string) {
@@ -297,8 +297,8 @@ describe("GET /billing reports the unpaid state the UI renders", () => {
   it("a fresh studio reads `none`; a trial that never completed reads `pending`; a live one reads neither", async () => {
     const cookie = await signInFlow("trial-owner@test.dev", "Trial Studio");
     const H = { Cookie: cookie, origin: ORIGIN };
-    const read = async () => (await (await SELF.fetch("http://x/api/billing", { headers: H })).json()) as BillingBody;
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: H })).json()) as { active: { tenantId: string } };
+    const read = async () => (await (await SELF.fetch(`${ORIGIN}/api/billing`, { headers: H })).json()) as BillingBody;
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: H })).json()) as { active: { tenantId: string } };
     const tenantId = ctx.active.tenantId;
     const db = env.DB as D1Database;
 

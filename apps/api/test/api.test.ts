@@ -122,7 +122,7 @@ beforeAll(async () => {
   // Put Studio One on the top plan so feature/quota gates (commerce, frontDesk,
   // supplementsLabs, branding, active-client capacity) are open for the suites
   // that exercise those surfaces. Studio Two stays on free to prove the gates.
-  const owner1Ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+  const owner1Ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
   await SELF.fetch(`${ADMIN}/api/admin/tenants/${owner1Ctx.active.tenantId}/plan`, {
     method: "POST",
     headers: { "content-type": "application/json", ...auth(ownerCookie) },
@@ -132,19 +132,19 @@ beforeAll(async () => {
 
 describe("health + public lanes", () => {
   it("serves /health", async () => {
-    const res = await SELF.fetch("http://x/health");
+    const res = await SELF.fetch(`${ORIGIN}/health`);
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ ok: true });
   });
 
   it("/api/me is public and returns null when unauthenticated", async () => {
-    const res = await SELF.fetch("http://x/api/me");
+    const res = await SELF.fetch(`${ORIGIN}/api/me`);
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ user: null });
   });
 
   it("blocks mutation routes without a session (401)", async () => {
-    const res = await SELF.fetch("http://x/api/clients", { method: "POST", body: "{}" });
+    const res = await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", body: "{}" });
     expect(res.status).toBe(401);
   });
 });
@@ -153,7 +153,7 @@ describe("health + public lanes", () => {
 // each test that depends on a write keeps that write in-scope.
 describe("clients + tenant isolation", () => {
   it("create → owner reads it, other tenant 404s, roster scopes per tenant", async () => {
-    const res = await SELF.fetch("http://x/api/clients", {
+    const res = await SELF.fetch(`${ORIGIN}/api/clients`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ displayName: "Sara" }),
@@ -163,14 +163,14 @@ describe("clients + tenant isolation", () => {
     expect(client.id).toMatch(/^cli_/);
 
     // Owner reads its own client.
-    expect((await SELF.fetch(`http://x/api/clients/${client.id}`, { headers: auth(ownerCookie) })).status).toBe(200);
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${client.id}`, { headers: auth(ownerCookie) })).status).toBe(200);
 
     // A different tenant cannot (404, not a 403 that leaks existence).
-    expect((await SELF.fetch(`http://x/api/clients/${client.id}`, { headers: auth(otherCookie) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${client.id}`, { headers: auth(otherCookie) })).status).toBe(404);
 
     // Roster is tenant-scoped.
-    const mine = (await (await SELF.fetch("http://x/api/clients", { headers: auth(ownerCookie) })).json()) as { clients: unknown[] };
-    const theirs = (await (await SELF.fetch("http://x/api/clients", { headers: auth(otherCookie) })).json()) as { clients: unknown[] };
+    const mine = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { headers: auth(ownerCookie) })).json()) as { clients: unknown[] };
+    const theirs = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { headers: auth(otherCookie) })).json()) as { clients: unknown[] };
     expect(mine.clients.length).toBeGreaterThan(0);
     expect(theirs.clients.length).toBe(0);
   });
@@ -179,13 +179,13 @@ describe("clients + tenant isolation", () => {
 describe("credits + AI metering", () => {
   it("free plan blocks the AI suite (403)", async () => {
     // Studio Two stays on the free plan, which excludes the AI suite.
-    const clientRes = await SELF.fetch("http://x/api/clients", {
+    const clientRes = await SELF.fetch(`${ORIGIN}/api/clients`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(otherCookie) },
       body: JSON.stringify({ displayName: "AITest" }),
     });
     const { client } = (await clientRes.json()) as { client: { id: string } };
-    const res = await SELF.fetch("http://x/api/ai/parse-food", {
+    const res = await SELF.fetch(`${ORIGIN}/api/ai/parse-food`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(otherCookie) },
       body: JSON.stringify({ clientId: client.id, text: "eggs and toast" }),
@@ -194,14 +194,14 @@ describe("credits + AI metering", () => {
   });
 
   it("comp → studio grants credits → AI runs (mock) and debits the ledger", async () => {
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const comp = await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ planId: "studio" }),
     });
     expect(comp.status).toBe(200);
-    const billing = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as {
+    const billing = (await (await SELF.fetch(`${ORIGIN}/api/billing`, { headers: auth(ownerCookie) })).json()) as {
       balance: { balance: number };
       subscription: { planId: string };
     };
@@ -210,13 +210,13 @@ describe("credits + AI metering", () => {
 
     // Now the AI suite is entitled — run parse-food (mock) and check the debit.
     const { client } = (await (
-      await SELF.fetch("http://x/api/clients", {
+      await SELF.fetch(`${ORIGIN}/api/clients`, {
         method: "POST",
         headers: { "content-type": "application/json", ...auth(ownerCookie) },
         body: JSON.stringify({ displayName: "AITest2" }),
       })
     ).json()) as { client: { id: string } };
-    const res = await SELF.fetch("http://x/api/ai/parse-food", {
+    const res = await SELF.fetch(`${ORIGIN}/api/ai/parse-food`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ clientId: client.id, text: "eggs and toast" }),
@@ -225,7 +225,7 @@ describe("credits + AI metering", () => {
     const out = (await res.json()) as { mocked: boolean; credits: number };
     expect(out.mocked).toBe(true);
     expect(out.credits).toBeGreaterThan(0);
-    const after = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { balance: number } };
+    const after = (await (await SELF.fetch(`${ORIGIN}/api/billing`, { headers: auth(ownerCookie) })).json()) as { balance: { balance: number } };
     expect(after.balance.balance).toBeLessThan(billing.balance.balance);
 
     // Snap-a-Meal (vision) — upload a photo to R2, then the endpoint reads it
@@ -233,10 +233,10 @@ describe("credits + AI metering", () => {
     const fd = new FormData();
     fd.append("file", new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], { type: "image/jpeg" }), "meal.jpg");
     fd.append("purpose", "meal-snap");
-    const up = await SELF.fetch("http://x/api/media/upload", { method: "POST", headers: auth(ownerCookie), body: fd });
+    const up = await SELF.fetch(`${ORIGIN}/api/media/upload`, { method: "POST", headers: auth(ownerCookie), body: fd });
     const { key } = (await up.json()) as { key: string };
     expect(key).toContain(`t/${ctx.active.tenantId}/`);
-    const snap = await SELF.fetch("http://x/api/ai/snap-meal", {
+    const snap = await SELF.fetch(`${ORIGIN}/api/ai/snap-meal`, {
       method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ clientId: client.id, imageKey: key, hint: "lunch" }),
     });
@@ -246,14 +246,14 @@ describe("credits + AI metering", () => {
     expect(snapOut.entries.length).toBeGreaterThan(0);
     expect(typeof snapOut.note).toBe("string"); // AI's one-line meal assessment
     // A key outside the caller's tenant prefix is rejected (no cross-tenant reads).
-    const bad = await SELF.fetch("http://x/api/ai/snap-meal", {
+    const bad = await SELF.fetch(`${ORIGIN}/api/ai/snap-meal`, {
       method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ clientId: client.id, imageKey: "t/other-tenant/meal-snap/x.jpg" }),
     });
     expect(bad.status).toBe(400);
 
     // Label Reader — same vision lane, returns a single per-serving Food shape.
-    const label = await SELF.fetch("http://x/api/ai/label-reader", {
+    const label = await SELF.fetch(`${ORIGIN}/api/ai/label-reader`, {
       method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ imageKey: key }),
     });
@@ -265,30 +265,30 @@ describe("credits + AI metering", () => {
 
   it("delinquency clamp: a suspended tenant loses paid entitlements (AI 403), recovers on reactivation", async () => {
     const db = env.DB as D1Database;
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     // Studio One is on `team` (from beforeAll) → AI entitled.
     const { client } = (await (
-      await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "ClampTest" }) })
+      await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "ClampTest" }) })
     ).json()) as { client: { id: string } };
-    const ok = await SELF.fetch("http://x/api/ai/parse-food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
+    const ok = await SELF.fetch(`${ORIGIN}/api/ai/parse-food`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
     expect(ok.status).toBe(200);
 
     // Suspend the tenant (what the dunning cron does after grace). Status alone
     // must clamp entitlements to free — no plan_id change needed.
     await db.prepare("UPDATE subscriptions SET status = 'suspended' WHERE tenant_id = ?").bind(ctx.active.tenantId).run();
-    const blocked = await SELF.fetch("http://x/api/ai/parse-food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
+    const blocked = await SELF.fetch(`${ORIGIN}/api/ai/parse-food`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
     expect(blocked.status).toBe(403); // clamp bites
-    const billing = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { subscription: { status: string } };
+    const billing = (await (await SELF.fetch(`${ORIGIN}/api/billing`, { headers: auth(ownerCookie) })).json()) as { subscription: { status: string } };
     expect(billing.subscription.status).toBe("suspended");
 
     // Passthrough: the tenant's client loses the tenant-derived AI capability.
-    const cflags = (await (await SELF.fetch(`http://x/api/context?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { clientFlags: { canUseAi: boolean } | null };
+    const cflags = (await (await SELF.fetch(`${ORIGIN}/api/context?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { clientFlags: { canUseAi: boolean } | null };
     if (cflags.clientFlags) expect(cflags.clientFlags.canUseAi).toBe(false);
 
     // Reactivate → capability returns immediately.
     await db.prepare("UPDATE subscriptions SET status = 'active' WHERE tenant_id = ?").bind(ctx.active.tenantId).run();
-    const recovered = await SELF.fetch("http://x/api/ai/parse-food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
+    const recovered = await SELF.fetch(`${ORIGIN}/api/ai/parse-food`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
     expect(recovered.status).toBe(200);
   });
 });
@@ -308,16 +308,16 @@ describe("connect rail — webhook idempotency + grant", () => {
     for (const [k, v] of [["stripe.mode", "test"], ["stripe.secret_key", "sk_test_x"], ["stripe.connect_webhook_secret", secret]] as const) {
       await db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v).run();
     }
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "WebhookBuyer" }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "WebhookBuyer" }) })).json()) as { client: { id: string } };
     const pkgId = "pkg_wh_test";
     await db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, active, created_at) VALUES (?, ?, ?, ?, ?, 'usd', 1, ?)")
       .bind(pkgId, ctx.active.tenantId, "Webhook Pack", 5000, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
     await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_wh_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_wh_1'").bind(ctx.active.tenantId, new Date().toISOString()).run();
 
     const payload = JSON.stringify({ id: "evt_conn_dedup_1", account: "acct_wh_1", type: "checkout.session.completed", data: { object: { id: "cs_test_1", metadata: { kova_tenant: ctx.active.tenantId, kova_client: client.id, kova_package: pkgId } } } });
-    const post = async () => SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
+    const post = async () => SELF.fetch(`${ORIGIN}/api/connect/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
 
     const r1 = await post();
     expect(r1.status).toBe(200);
@@ -330,7 +330,7 @@ describe("connect rail — webhook idempotency + grant", () => {
     expect(n2).toBe(1); // no double grant
 
     // A bad signature is rejected outright.
-    const bad = await SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": "t=1,v1=deadbeef" }, body: payload });
+    const bad = await SELF.fetch(`${ORIGIN}/api/connect/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": "t=1,v1=deadbeef" }, body: payload });
     expect(bad.status).toBe(400);
   });
 
@@ -338,11 +338,11 @@ describe("connect rail — webhook idempotency + grant", () => {
     const db = env.DB as D1Database;
     const secret = "whsec_connect_test";
     await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.connect_webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     // Pin a connected account to this tenant so event.account maps back.
     await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_ref_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_ref_1'").bind(ctx.active.tenantId, new Date().toISOString()).run();
     const payload = JSON.stringify({ id: "evt_refund_1", account: "acct_ref_1", type: "charge.refunded", data: { object: { id: "ch_test_1" } } });
-    const r = await SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
+    const r = await SELF.fetch(`${ORIGIN}/api/connect/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
     expect(r.status).toBe(200);
     const notif = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE tenant_id = ? AND type = 'payment_refunded'").bind(ctx.active.tenantId).first<{ n: number }>())!;
     expect(notif.n).toBeGreaterThanOrEqual(1);
@@ -352,21 +352,21 @@ describe("connect rail — webhook idempotency + grant", () => {
     const db = env.DB as D1Database;
     const secret = "whsec_connect_test";
     await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.connect_webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     // Connect grants now require event.account to map back to the tenant — pin one.
     await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_recur_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_recur_1'").bind(ctx.active.tenantId, new Date().toISOString()).run();
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "RecurBuyer" }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "RecurBuyer" }) })).json()) as { client: { id: string } };
     const pkgId = "pkg_recur_1";
     await db.prepare("INSERT INTO packages (id, tenant_id, name, monthly_price_cents, budgets_json, currency, active, created_at) VALUES (?, ?, ?, ?, ?, 'usd', 1, ?)")
       .bind(pkgId, ctx.active.tenantId, "Monthly Coaching", 4900, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
 
-    const post = async (payload: string) => SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
+    const post = async (payload: string) => SELF.fetch(`${ORIGIN}/api/connect/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
 
     // Period one via subscription-mode checkout.
     const created = JSON.stringify({ id: "evt_sub_create", account: "acct_recur_1", type: "checkout.session.completed", data: { object: { id: "cs_sub_1", mode: "subscription", subscription: "sub_recur_1", metadata: { kova_tenant: ctx.active.tenantId, kova_client: client.id, kova_package: pkgId } } } });
     expect((await post(created)).status).toBe(200);
-    const days1 = (await (await SELF.fetch(`http://x/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number; autoRenew?: boolean; budgets: unknown[] }[] };
+    const days1 = (await (await SELF.fetch(`${ORIGIN}/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number; autoRenew?: boolean; budgets: unknown[] }[] };
     const sub1 = days1.subscriptions.find((s) => (s.budgets?.length ?? 0) > 0)!;
     expect(sub1.autoRenew).toBe(true);
     expect(sub1.daysRemaining).toBeGreaterThan(20);
@@ -375,7 +375,7 @@ describe("connect rail — webhook idempotency + grant", () => {
     // A renewal cycle tops the budget up (queued behind the current period).
     const renew = JSON.stringify({ id: "evt_sub_cycle", account: "acct_recur_1", type: "invoice.paid", data: { object: { subscription: "sub_recur_1", billing_reason: "subscription_cycle" } } });
     expect((await post(renew)).status).toBe(200);
-    const days2 = (await (await SELF.fetch(`http://x/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number; budgets: unknown[] }[] };
+    const days2 = (await (await SELF.fetch(`${ORIGIN}/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number; budgets: unknown[] }[] };
     const sub2 = days2.subscriptions.find((s) => (s.budgets?.length ?? 0) > 0)!;
     expect(sub2.budgets.length).toBeGreaterThan(budgetsAfterCreate); // another period queued
     expect(sub2.daysRemaining).toBeGreaterThan(sub1.daysRemaining);
@@ -385,17 +385,17 @@ describe("connect rail — webhook idempotency + grant", () => {
     const db = env.DB as D1Database;
     const secret = "whsec_connect_test";
     await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.connect_webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_inline_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_inline_1'").bind(ctx.active.tenantId, new Date().toISOString()).run();
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "InlineBuyer" }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "InlineBuyer" }) })).json()) as { client: { id: string } };
     const pkgId = "pkg_inline_ot";
     await db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, active, created_at) VALUES (?, ?, ?, ?, ?, 'usd', 1, ?)")
       .bind(pkgId, ctx.active.tenantId, "Inline Pack", 3000, JSON.stringify([{ feature: "all", days: 20 }]), new Date().toISOString()).run();
     const payload = JSON.stringify({ id: "evt_pi_ot_1", account: "acct_inline_1", type: "payment_intent.succeeded", data: { object: { id: "pi_ot_1", metadata: { kova_tenant: ctx.active.tenantId, kova_client: client.id, kova_package: pkgId } } } });
-    const r = await SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
+    const r = await SELF.fetch(`${ORIGIN}/api/connect/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
     expect(r.status).toBe(200);
-    const subs = (await (await SELF.fetch(`http://x/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number; budgets: unknown[] }[] };
+    const subs = (await (await SELF.fetch(`${ORIGIN}/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number; budgets: unknown[] }[] };
     const granted = subs.subscriptions.find((s) => (s.budgets?.length ?? 0) > 0)!;
     expect(granted.daysRemaining).toBeGreaterThan(15);
   });
@@ -423,9 +423,9 @@ describe("notifications — email provider + per-user preferences", () => {
   it("owner sets Brevo (key masked) and tunes notification channels", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     // Configure Brevo as the tenant email provider.
-    const patch = await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ email: { provider: "brevo", brevoApiKey: "xkeysib-secret", senderEmail: "coach@studio.com", senderName: "Studio" } }) });
+    const patch = await SELF.fetch(`${ORIGIN}/api/settings`, { method: "PATCH", headers: H, body: JSON.stringify({ email: { provider: "brevo", brevoApiKey: "xkeysib-secret", senderEmail: "coach@studio.com", senderName: "Studio" } }) });
     expect(patch.status).toBe(200);
-    const settings = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as { email: { provider: string; brevoKeySet: boolean; ready: boolean; senderEmail: string }; emailPlatformFrom: string };
+    const settings = (await (await SELF.fetch(`${ORIGIN}/api/settings`, { headers: auth(ownerCookie) })).json()) as { email: { provider: string; brevoKeySet: boolean; ready: boolean; senderEmail: string }; emailPlatformFrom: string };
     expect(settings.email.provider).toBe("brevo");
     expect(settings.email.brevoKeySet).toBe(true); // masked — the key itself never returns
     expect(settings.email.ready).toBe(true);
@@ -433,25 +433,25 @@ describe("notifications — email provider + per-user preferences", () => {
     expect(settings.emailPlatformFrom).toContain("fourdegreelabs.com");
 
     // Notification preferences: categories scoped to the owner role + defaults.
-    const prefs0 = (await (await SELF.fetch("http://x/api/notification-prefs", { headers: auth(ownerCookie) })).json()) as { categories: { key: string }[]; prefs: Record<string, { inbox: boolean; email: boolean }> };
+    const prefs0 = (await (await SELF.fetch(`${ORIGIN}/api/notification-prefs`, { headers: auth(ownerCookie) })).json()) as { categories: { key: string }[]; prefs: Record<string, { inbox: boolean; email: boolean }> };
     expect(prefs0.categories.some((c) => c.key === "billing")).toBe(true);
     expect(prefs0.categories.some((c) => c.key === "commerce")).toBe(false); // client-only
     expect(prefs0.prefs["check-ins"]!.email).toBe(false); // coach default: digest-only
 
     // Turn coach check-in emails on; the change round-trips.
-    await SELF.fetch("http://x/api/notification-prefs", { method: "PATCH", headers: H, body: JSON.stringify({ "check-ins": { email: true } }) });
-    const prefs1 = (await (await SELF.fetch("http://x/api/notification-prefs", { headers: auth(ownerCookie) })).json()) as { prefs: Record<string, { email: boolean }> };
+    await SELF.fetch(`${ORIGIN}/api/notification-prefs`, { method: "PATCH", headers: H, body: JSON.stringify({ "check-ins": { email: true } }) });
+    const prefs1 = (await (await SELF.fetch(`${ORIGIN}/api/notification-prefs`, { headers: auth(ownerCookie) })).json()) as { prefs: Record<string, { email: boolean }> };
     expect(prefs1.prefs["check-ins"]!.email).toBe(true);
 
     // The write path offers exactly what the read path does. `commerce` is a real
     // category, just not the owner's — posting it is a 400, not a silent no-op the
     // caller reads back as saved. Same for a key that is not a category at all.
     for (const body of [{ commerce: { email: true } }, { nonsense: { email: true } }]) {
-      const bad = await SELF.fetch("http://x/api/notification-prefs", { method: "PATCH", headers: H, body: JSON.stringify(body) });
+      const bad = await SELF.fetch(`${ORIGIN}/api/notification-prefs`, { method: "PATCH", headers: H, body: JSON.stringify(body) });
       expect(bad.status, JSON.stringify(body)).toBe(400);
     }
     // …and the rejected write left the stored row untouched.
-    const prefs2 = (await (await SELF.fetch("http://x/api/notification-prefs", { headers: auth(ownerCookie) })).json()) as { prefs: Record<string, { email: boolean }> };
+    const prefs2 = (await (await SELF.fetch(`${ORIGIN}/api/notification-prefs`, { headers: auth(ownerCookie) })).json()) as { prefs: Record<string, { email: boolean }> };
     expect(prefs2.prefs.commerce).toBeUndefined();
     expect(prefs2.prefs["check-ins"]!.email).toBe(true);
   });
@@ -459,13 +459,13 @@ describe("notifications — email provider + per-user preferences", () => {
   it("a body-fat reading notifies the primary trainer (never the logger), deduped per day", async () => {
     const db = env.DB as D1Database;
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const tenantId = ctx.active.tenantId;
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "BodyFatBella", heightCm: 170 }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "BodyFatBella", heightCm: 170 }) })).json()) as { client: { id: string } };
 
     // The owner created the client → they are its primary trainer AND the logger,
     // so logging a reading themself must NOT self-notify.
-    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-03-01", weightKg: 68, bodyFatPercent: 24 } }) });
+    await SELF.fetch(`${ORIGIN}/api/measurements`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-03-01", weightKg: 68, bodyFatPercent: 24 } }) });
     const selfN = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE tenant_id = ? AND type = 'body_fat_logged'").bind(tenantId).first<{ n: number }>())!;
     expect(selfN.n).toBe(0);
 
@@ -473,29 +473,29 @@ describe("notifications — email provider + per-user preferences", () => {
     // reading, logged by the owner, notifies that trainer under body-composition.
     await db.prepare("INSERT OR IGNORE INTO member (id, organizationId, userId, role, createdAt) VALUES ('mem_ghostcoach', ?, 'usr_ghostcoach', 'trainer', '2026-01-01')").bind(tenantId).run();
     await db.prepare("UPDATE client_trainers SET trainer_user_id = 'usr_ghostcoach' WHERE client_id = ?").bind(client.id).run();
-    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-03-02", bodyFatPercent: 23 } }) });
+    await SELF.fetch(`${ORIGIN}/api/measurements`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-03-02", bodyFatPercent: 23 } }) });
     const ghost = (await db.prepare("SELECT category, title, message FROM notifications WHERE recipient_user_id = 'usr_ghostcoach' AND type = 'body_fat_logged'").first<{ category: string; title: string; message: string }>())!;
     expect(ghost.category).toBe("body-composition");
     expect(ghost.title).toContain("BodyFatBella");
     expect(ghost.message).toContain("23% body fat");
 
     // Dedupe: re-logging the same day upserts the reading but doesn't re-notify.
-    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-03-02", bodyFatPercent: 22 } }) });
+    await SELF.fetch(`${ORIGIN}/api/measurements`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-03-02", bodyFatPercent: 22 } }) });
     const dup = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE recipient_user_id = 'usr_ghostcoach' AND type = 'body_fat_logged'").first<{ n: number }>())!;
     expect(dup.n).toBe(1);
   });
 
   it("check-ins carry the body-fat reading as of each check-in's date", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "AsOfAva", heightCm: 165 }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "AsOfAva", heightCm: 165 }) })).json()) as { client: { id: string } };
 
     // A check-in BEFORE any body-fat reading has no body-fat context.
-    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-01", mood: 4 } }) });
+    await SELF.fetch(`${ORIGIN}/api/check-ins`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-01", mood: 4 } }) });
     // A body-fat reading lands mid-window, then a later check-in.
-    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-05", bodyFatPercent: 21 } }) });
-    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-10", mood: 5 } }) });
+    await SELF.fetch(`${ORIGIN}/api/measurements`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-05", bodyFatPercent: 21 } }) });
+    await SELF.fetch(`${ORIGIN}/api/check-ins`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-10", mood: 5 } }) });
 
-    const { checkIns } = (await (await SELF.fetch(`http://x/api/check-ins?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { checkIns: { date_local: string; body_fat_percent: number | null }[] };
+    const { checkIns } = (await (await SELF.fetch(`${ORIGIN}/api/check-ins?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { checkIns: { date_local: string; body_fat_percent: number | null }[] };
     const byDate = Object.fromEntries(checkIns.map((ci) => [ci.date_local, ci.body_fat_percent]));
     expect(byDate["2026-04-10"]).toBe(21); // as-of the 04-05 reading
     expect(byDate["2026-04-01"]).toBe(null); // predates any reading → no context
@@ -504,13 +504,13 @@ describe("notifications — email provider + per-user preferences", () => {
   it("owner governs the studio-wide email allow-list, per audience (clients vs staff)", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     type Pol = { notifCategories: { key: string }[]; notifPolicy: { client: Record<string, boolean>; staff: Record<string, boolean> } };
-    const s0 = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as Pol;
+    const s0 = (await (await SELF.fetch(`${ORIGIN}/api/settings`, { headers: auth(ownerCookie) })).json()) as Pol;
     expect(s0.notifCategories.some((c) => c.key === "body-composition")).toBe(true);
     expect(s0.notifPolicy.staff["body-composition"]).toBe(true); // default: allowed
 
     // Disable STAFF email for a couple of categories; junk keys are dropped.
-    await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ notifPolicy: { staff: { "body-composition": false, labs: false, "nonsense-cat": true } } }) });
-    const s1 = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as Pol;
+    await SELF.fetch(`${ORIGIN}/api/settings`, { method: "PATCH", headers: H, body: JSON.stringify({ notifPolicy: { staff: { "body-composition": false, labs: false, "nonsense-cat": true } } }) });
+    const s1 = (await (await SELF.fetch(`${ORIGIN}/api/settings`, { headers: auth(ownerCookie) })).json()) as Pol;
     expect(s1.notifPolicy.staff["body-composition"]).toBe(false);
     expect(s1.notifPolicy.staff["labs"]).toBe(false);
     expect("nonsense-cat" in s1.notifPolicy.staff).toBe(false);
@@ -518,7 +518,7 @@ describe("notifications — email provider + per-user preferences", () => {
     expect(s1.notifPolicy.client["labs"]).toBe(true);
 
     // Re-enable so the flags don't leak into other suites.
-    await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ notifPolicy: { staff: { "body-composition": true, labs: true } } }) });
+    await SELF.fetch(`${ORIGIN}/api/settings`, { method: "PATCH", headers: H, body: JSON.stringify({ notifPolicy: { staff: { "body-composition": true, labs: true } } }) });
   });
 });
 
@@ -541,14 +541,14 @@ describe("notification coverage — new signals", () => {
 
   it("a completed body scan notifies the primary trainer (deduped, distinct from manual)", async () => {
     const db = env.DB as D1Database;
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const tenantId = ctx.active.tenantId;
     const coach = await ghostTrainer(tenantId);
-    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "ScanBella" }) })).json()) as { client: { id: string } }).client.id;
+    const clientId = ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H(), body: JSON.stringify({ displayName: "ScanBella" }) })).json()) as { client: { id: string } }).client.id;
     await db.prepare("UPDATE clients SET gender='female', date_of_birth='1992-01-01', height_cm=168 WHERE id=?").bind(clientId).run();
     await db.prepare("UPDATE client_trainers SET trainer_user_id = ? WHERE client_id = ?").bind(coach, clientId).run();
 
-    const res = await SELF.fetch("http://x/api/body-scans", { method: "POST", headers: H(), body: JSON.stringify({ clientId, date: "2026-05-01", weightKg: 64, circumferences: { neckCm: 33, waistCm: 74 }, storeSilhouette: false }) });
+    const res = await SELF.fetch(`${ORIGIN}/api/body-scans`, { method: "POST", headers: H(), body: JSON.stringify({ clientId, date: "2026-05-01", weightKg: 64, circumferences: { neckCm: 33, waistCm: 74 }, storeSilhouette: false }) });
     expect(res.status).toBe(200);
     const notif = (await db.prepare("SELECT category, title, message FROM notifications WHERE recipient_user_id = ? AND type = 'body_fat_logged' AND title LIKE '%body scan%'").bind(coach).first<{ category: string; title: string; message: string }>())!;
     expect(notif.category).toBe("body-composition");
@@ -556,21 +556,21 @@ describe("notification coverage — new signals", () => {
     expect(notif.message).toContain("% body fat");
 
     // Re-scanning the same day upserts but doesn't re-notify (bfscan_ dedupe key).
-    await SELF.fetch("http://x/api/body-scans", { method: "POST", headers: H(), body: JSON.stringify({ clientId, date: "2026-05-01", weightKg: 63, circumferences: { neckCm: 33, waistCm: 73 }, storeSilhouette: false }) });
+    await SELF.fetch(`${ORIGIN}/api/body-scans`, { method: "POST", headers: H(), body: JSON.stringify({ clientId, date: "2026-05-01", weightKg: 63, circumferences: { neckCm: 33, waistCm: 73 }, storeSilhouette: false }) });
     const dup = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE recipient_user_id = ? AND type = 'body_fat_logged' AND title LIKE '%body scan%'").bind(coach).first<{ n: number }>())!;
     expect(dup.n).toBe(1);
   });
 
   it("beating an all-time e1RM notifies the trainer once per exercise/day; the first-ever lift is silent", async () => {
     const db = env.DB as D1Database;
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const tenantId = ctx.active.tenantId;
     const coach = await ghostTrainer(tenantId);
-    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "PRPete" }) })).json()) as { client: { id: string } }).client.id;
+    const clientId = ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H(), body: JSON.stringify({ displayName: "PRPete" }) })).json()) as { client: { id: string } }).client.id;
     await db.prepare("UPDATE client_trainers SET trainer_user_id = ? WHERE client_id = ?").bind(coach, clientId).run();
     await db.prepare("INSERT OR IGNORE INTO exercises (id, tenant_id, name, active) VALUES ('ex_bench', ?, 'Bench Press', 1)").bind(tenantId).run();
 
-    const logSet = (date: string, weightKg: number, reps: number) => SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H(), body: JSON.stringify({ clientId, data: { date, workoutPlanId: "wp-pr", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "ex_bench", sets: [{ setIndex: 0, reps, weightKg, completed: true }] } }) });
+    const logSet = (date: string, weightKg: number, reps: number) => SELF.fetch(`${ORIGIN}/api/logs/workout-sets`, { method: "POST", headers: H(), body: JSON.stringify({ clientId, data: { date, workoutPlanId: "wp-pr", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "ex_bench", sets: [{ setIndex: 0, reps, weightKg, completed: true }] } }) });
     const prCount = async () => (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE recipient_user_id = ? AND type = 'pr_achieved'").bind(coach).first<{ n: number }>())!.n;
 
     // First-ever lift establishes the baseline — no PR notification.
@@ -594,43 +594,43 @@ describe("notification coverage — new signals", () => {
 
   it("a supplement status/dose change notifies the client; a notes-only edit is silent", async () => {
     const db = env.DB as D1Database;
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const tenantId = ctx.active.tenantId;
-    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "SuppSam" }) })).json()) as { client: { id: string } }).client.id;
+    const clientId = ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H(), body: JSON.stringify({ displayName: "SuppSam" }) })).json()) as { client: { id: string } }).client.id;
     await clientWithUser("SuppSam", tenantId, "usr_suppclient", clientId);
-    const sup = (await (await SELF.fetch("http://x/api/supplements", { method: "POST", headers: H(), body: JSON.stringify({ clientId, name: "Creatine", schedule: [{ slot: "daily" }] }) })).json()) as { id: string };
+    const sup = (await (await SELF.fetch(`${ORIGIN}/api/supplements`, { method: "POST", headers: H(), body: JSON.stringify({ clientId, name: "Creatine", schedule: [{ slot: "daily" }] }) })).json()) as { id: string };
 
     // Pausing it is an actionable change → the client is told.
-    await SELF.fetch(`http://x/api/supplements/${sup.id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ status: "paused" }) });
+    await SELF.fetch(`${ORIGIN}/api/supplements/${sup.id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ status: "paused" }) });
     const notif = (await db.prepare("SELECT category, title, message FROM notifications WHERE recipient_user_id = 'usr_suppclient' AND type = 'supplement_updated'").first<{ category: string; title: string; message: string }>())!;
     expect(notif.category).toBe("labs");
     expect(notif.message).toContain("Creatine");
     expect(notif.message).toContain("paused");
 
     // A notes-only edit doesn't notify (no status/dose change).
-    await SELF.fetch(`http://x/api/supplements/${sup.id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ notes: "take with water" }) });
+    await SELF.fetch(`${ORIGIN}/api/supplements/${sup.id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ notes: "take with water" }) });
     const after = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE recipient_user_id = 'usr_suppclient' AND type = 'supplement_updated'").first<{ n: number }>())!;
     expect(after.n).toBe(1);
   });
 
   it("granting and extending access notifies the client", async () => {
     const db = env.DB as D1Database;
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const tenantId = ctx.active.tenantId;
-    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "AccessAmy" }) })).json()) as { client: { id: string } }).client.id;
+    const clientId = ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H(), body: JSON.stringify({ displayName: "AccessAmy" }) })).json()) as { client: { id: string } }).client.id;
     await clientWithUser("AccessAmy", tenantId, "usr_accessclient", clientId);
-    await SELF.fetch("http://x/api/packages", { method: "POST", headers: H(), body: JSON.stringify({ name: "AccessPack", budgets: [{ feature: "all", days: 30 }] }) });
-    const pkgs = (await (await SELF.fetch("http://x/api/packages", { headers: auth(ownerCookie) })).json()) as { packages: { id: string; name: string }[] };
+    await SELF.fetch(`${ORIGIN}/api/packages`, { method: "POST", headers: H(), body: JSON.stringify({ name: "AccessPack", budgets: [{ feature: "all", days: 30 }] }) });
+    const pkgs = (await (await SELF.fetch(`${ORIGIN}/api/packages`, { headers: auth(ownerCookie) })).json()) as { packages: { id: string; name: string }[] };
     const pkg = pkgs.packages.find((p) => p.name === "AccessPack")!;
 
     // First grant opens a subscription → "new access".
-    await SELF.fetch("http://x/api/subscriptions/grant", { method: "POST", headers: H(), body: JSON.stringify({ clientId, packageId: pkg.id }) });
+    await SELF.fetch(`${ORIGIN}/api/subscriptions/grant`, { method: "POST", headers: H(), body: JSON.stringify({ clientId, packageId: pkg.id }) });
     const granted = (await db.prepare("SELECT category, title, message FROM notifications WHERE recipient_user_id = 'usr_accessclient' AND type = 'access_granted'").first<{ category: string; title: string; message: string }>())!;
     expect(granted.category).toBe("commerce");
     expect(granted.message).toContain("AccessPack");
 
     // Second grant extends the live subscription → an "extended" notification.
-    await SELF.fetch("http://x/api/subscriptions/grant", { method: "POST", headers: H(), body: JSON.stringify({ clientId, packageId: pkg.id }) });
+    await SELF.fetch(`${ORIGIN}/api/subscriptions/grant`, { method: "POST", headers: H(), body: JSON.stringify({ clientId, packageId: pkg.id }) });
     const all = await db.prepare("SELECT title FROM notifications WHERE recipient_user_id = 'usr_accessclient' AND type = 'access_granted'").all<{ title: string }>();
     expect(all.results.length).toBe(2);
     expect(all.results.some((r) => r.title.includes("extended"))).toBe(true);
@@ -638,25 +638,25 @@ describe("notification coverage — new signals", () => {
 
   it("notification links carry the specific item (deep-link params)", async () => {
     const db = env.DB as D1Database;
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const tenantId = ctx.active.tenantId;
     const coach = await ghostTrainer(tenantId);
-    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "DeepLinkDan" }) })).json()) as { client: { id: string } }).client.id;
+    const clientId = ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H(), body: JSON.stringify({ displayName: "DeepLinkDan" }) })).json()) as { client: { id: string } }).client.id;
     await clientWithUser("DeepLinkDan", tenantId, "usr_dlclient", clientId);
     await db.prepare("UPDATE client_trainers SET trainer_user_id = ? WHERE client_id = ?").bind(coach, clientId).run();
 
     // A client check-in → the trainer's notification deep-links to that check-in.
-    const chk = (await (await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H(), body: JSON.stringify({ clientId, data: { date: "2026-06-01", mood: 4, notes: "good week" } }) })).json()) as { id: string };
+    const chk = (await (await SELF.fetch(`${ORIGIN}/api/check-ins`, { method: "POST", headers: H(), body: JSON.stringify({ clientId, data: { date: "2026-06-01", mood: 4, notes: "good week" } }) })).json()) as { id: string };
     const ciLink = (await db.prepare("SELECT link FROM notifications WHERE recipient_user_id = ? AND type = 'check_in'").bind(coach).first<{ link: string }>())!.link;
     expect(ciLink).toBe(`/clients/${clientId}/manage?checkin=${chk.id}`);
 
     // Coach feedback → the client's notification deep-links to the check-in by date.
-    await SELF.fetch(`http://x/api/check-ins/${chk.id}/feedback`, { method: "POST", headers: H(), body: JSON.stringify({ clientId, feedback: "great job" }) });
+    await SELF.fetch(`${ORIGIN}/api/check-ins/${chk.id}/feedback`, { method: "POST", headers: H(), body: JSON.stringify({ clientId, feedback: "great job" }) });
     const fbLink = (await db.prepare("SELECT link FROM notifications WHERE recipient_user_id = 'usr_dlclient' AND type = 'feedback'").first<{ link: string }>())!.link;
     expect(fbLink).toBe("/wellness?checkin=2026-06-01");
 
     // A lab request → the client's notification deep-links to that lab on Wellness.
-    const lab = (await (await SELF.fetch("http://x/api/labs", { method: "POST", headers: H(), body: JSON.stringify({ clientId, type: "bloodwork", displayName: "Full panel" }) })).json()) as { id: string };
+    const lab = (await (await SELF.fetch(`${ORIGIN}/api/labs`, { method: "POST", headers: H(), body: JSON.stringify({ clientId, type: "bloodwork", displayName: "Full panel" }) })).json()) as { id: string };
     const labLink = (await db.prepare("SELECT link FROM notifications WHERE recipient_user_id = 'usr_dlclient' AND type = 'lab_requested'").first<{ link: string }>())!.link;
     expect(labLink).toBe(`/wellness?lab=${lab.id}`);
   });
@@ -674,12 +674,12 @@ describe("platform rail — dunning notifies the owner", () => {
     const db = env.DB as D1Database;
     const secret = "whsec_platform_test";
     await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const payload = JSON.stringify({ id: "evt_pf_1", type: "invoice.payment_failed", data: { object: { id: "in_test_1", metadata: { kova_tenant: ctx.active.tenantId } } } });
-    const r = await SELF.fetch("http://x/api/stripe/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
+    const r = await SELF.fetch(`${ORIGIN}/api/stripe/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
     expect(r.status).toBe(200);
 
-    const billing = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { subscription: { status: string } };
+    const billing = (await (await SELF.fetch(`${ORIGIN}/api/billing`, { headers: auth(ownerCookie) })).json()) as { subscription: { status: string } };
     expect(billing.subscription.status).toBe("past_due");
 
     const notif = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE tenant_id = ? AND type = 'billing_past_due'").bind(ctx.active.tenantId).first<{ n: number }>())!;
@@ -690,12 +690,12 @@ describe("platform rail — dunning notifies the owner", () => {
 describe("AI config (per-tenant model / prompt / tone / enable)", () => {
   it("exposes the registry + catalog and drives generation via per-feature overrides", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     // Entitle the AI suite.
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
 
     // GET /settings/ai — registry + expanded model catalog + tones.
-    const reg = (await (await SELF.fetch("http://x/api/settings/ai", { headers: auth(ownerCookie) })).json()) as {
+    const reg = (await (await SELF.fetch(`${ORIGIN}/api/settings/ai`, { headers: auth(ownerCookie) })).json()) as {
       features: { key: string; audience: string }[]; models: { id: string; task: string }[]; tones: string[]; config: Record<string, unknown>;
     };
     expect(reg.features.some((f) => f.key === "coach-note" && f.audience === "client")).toBe(true);
@@ -703,25 +703,25 @@ describe("AI config (per-tenant model / prompt / tone / enable)", () => {
     expect(reg.models.some((m) => m.id === "@cf/meta/llama-3.1-8b-instruct-fp8-fast")).toBe(true);
     expect(reg.tones).toContain("motivating");
 
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "AICfg" }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "AICfg" }) })).json()) as { client: { id: string } };
 
     // Disable parse-food + set a house tone; the endpoint must now refuse.
-    await SELF.fetch("http://x/api/settings/ai", { method: "PATCH", headers: H, body: JSON.stringify({ tone: "motivating", features: { "parse-food": { enabled: false } } }) });
-    const cfg2 = (await (await SELF.fetch("http://x/api/settings/ai", { headers: auth(ownerCookie) })).json()) as { config: { tone: string; features: Record<string, { enabled: boolean }> } };
+    await SELF.fetch(`${ORIGIN}/api/settings/ai`, { method: "PATCH", headers: H, body: JSON.stringify({ tone: "motivating", features: { "parse-food": { enabled: false } } }) });
+    const cfg2 = (await (await SELF.fetch(`${ORIGIN}/api/settings/ai`, { headers: auth(ownerCookie) })).json()) as { config: { tone: string; features: Record<string, { enabled: boolean }> } };
     expect(cfg2.config.tone).toBe("motivating");
     expect(cfg2.config.features["parse-food"]!.enabled).toBe(false);
-    const off = await SELF.fetch("http://x/api/ai/parse-food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
+    const off = await SELF.fetch(`${ORIGIN}/api/ai/parse-food`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
     expect(off.status).toBe(503);
     // The failure is diagnosable — the real reason is surfaced, not hidden.
     const offBody = (await off.json()) as { error: string; detail?: string };
     expect(offBody.detail ?? offBody.error).toContain("turned off");
 
     // Re-enable with a model override — generation runs again (mock lane).
-    await SELF.fetch("http://x/api/settings/ai", { method: "PATCH", headers: H, body: JSON.stringify({ features: { "parse-food": { enabled: true, model: "@cf/meta/llama-3.1-8b-instruct-fp8-fast" } } }) });
-    const on = await SELF.fetch("http://x/api/ai/parse-food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
+    await SELF.fetch(`${ORIGIN}/api/settings/ai`, { method: "PATCH", headers: H, body: JSON.stringify({ features: { "parse-food": { enabled: true, model: "@cf/meta/llama-3.1-8b-instruct-fp8-fast" } } }) });
+    const on = await SELF.fetch(`${ORIGIN}/api/ai/parse-food`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, text: "eggs" }) });
     expect(on.status).toBe(200);
     // The earlier tone edit is preserved across the second PATCH (deep merge).
-    const cfg3 = (await (await SELF.fetch("http://x/api/settings/ai", { headers: auth(ownerCookie) })).json()) as { config: { tone: string; features: Record<string, { enabled: boolean; model: string }> } };
+    const cfg3 = (await (await SELF.fetch(`${ORIGIN}/api/settings/ai`, { headers: auth(ownerCookie) })).json()) as { config: { tone: string; features: Record<string, { enabled: boolean; model: string }> } };
     expect(cfg3.config.tone).toBe("motivating");
     expect(cfg3.config.features["parse-food"]).toMatchObject({ enabled: true, model: "@cf/meta/llama-3.1-8b-instruct-fp8-fast" });
   });
@@ -730,20 +730,20 @@ describe("AI config (per-tenant model / prompt / tone / enable)", () => {
 describe("client self-profile", () => {
   it("persists blood type, phone, dob and gender (male/female only)", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "Profile Tester" }) })).json()) as { client: { id: string } };
-    const upd = await SELF.fetch(`http://x/api/clients/${client.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ bloodType: "O+", phone: "+1 555 111 2222", dateOfBirth: "1990-05-01", gender: "female" }) });
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "Profile Tester" }) })).json()) as { client: { id: string } };
+    const upd = await SELF.fetch(`${ORIGIN}/api/clients/${client.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ bloodType: "O+", phone: "+1 555 111 2222", dateOfBirth: "1990-05-01", gender: "female" }) });
     expect(upd.status).toBe(200);
-    const got = (await (await SELF.fetch(`http://x/api/clients/${client.id}`, { headers: auth(ownerCookie) })).json()) as { client: { bloodType: string; phone: string; dateOfBirth: string; gender: string } };
+    const got = (await (await SELF.fetch(`${ORIGIN}/api/clients/${client.id}`, { headers: auth(ownerCookie) })).json()) as { client: { bloodType: string; phone: string; dateOfBirth: string; gender: string } };
     expect(got.client).toMatchObject({ bloodType: "O+", phone: "+1 555 111 2222", dateOfBirth: "1990-05-01", gender: "female" });
     // Gender is restricted to male/female (BMR); anything else is rejected.
-    expect((await SELF.fetch(`http://x/api/clients/${client.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ gender: "other" }) })).status).toBe(400);
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${client.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ gender: "other" }) })).status).toBe(400);
   });
 });
 
 describe("entitlement plan builder + grandfathering", () => {
   it("lowering a plan grandfathers existing tenants; new tenants get the lower plan; gifts only raise", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const t1 = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json() as { active: { tenantId: string } }).active.tenantId;
+    const t1 = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json() as { active: { tenantId: string } }).active.tenantId;
     // Put tenant 1 on studio (activeClients 100, branding on).
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${t1}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
 
@@ -763,7 +763,7 @@ describe("entitlement plan builder + grandfathering", () => {
     expect(e1.effective.features.branding).toBe(true);
 
     // A tenant joining studio AFTER the change gets the lower plan.
-    const t2 = (await (await SELF.fetch("http://x/api/context", { headers: auth(otherCookie) })).json() as { active: { tenantId: string } }).active.tenantId;
+    const t2 = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(otherCookie) })).json() as { active: { tenantId: string } }).active.tenantId;
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${t2}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
     const e2 = (await (await SELF.fetch(`${ADMIN}/api/admin/tenants/${t2}/entitlements`, { headers: auth(ownerCookie) })).json()) as { effective: { quotas: Record<string, number>; features: Record<string, boolean> } };
     expect(e2.effective.quotas.activeClients).toBe(25);
@@ -789,24 +789,24 @@ describe("capability gates enforce plan features + quotas", () => {
 
   it("free plan blocks commerce + supplements/labs at write time", async () => {
     // Commerce package creation is gated behind features.commerce.
-    const pkg = await SELF.fetch("http://x/api/packages", {
+    const pkg = await SELF.fetch(`${ORIGIN}/api/packages`, {
       method: "POST", headers: H(),
       body: JSON.stringify({ name: "30-day", budgets: [{ feature: "all", days: 30 }] }),
     });
     expect(pkg.status).toBe(403);
 
     // Labs are gated behind features.supplementsLabs.
-    const { client } = (await (await SELF.fetch("http://x/api/clients", {
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, {
       method: "POST", headers: H(), body: JSON.stringify({ displayName: "GateTest" }),
     })).json()) as { client: { id: string } };
-    const lab = await SELF.fetch("http://x/api/labs", {
+    const lab = await SELF.fetch(`${ORIGIN}/api/labs`, {
       method: "POST", headers: H(), body: JSON.stringify({ clientId: client.id, type: "blood_panel" }),
     });
     expect(lab.status).toBe(403);
   });
 
   it("free plan blocks adding clients past the activeClients ceiling (3)", async () => {
-    const mk = (n: string) => SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: n }) });
+    const mk = (n: string) => SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H(), body: JSON.stringify({ displayName: n }) });
     expect((await mk("C1")).status).toBe(201);
     expect((await mk("C2")).status).toBe(201);
     expect((await mk("C3")).status).toBe(201);
@@ -816,14 +816,14 @@ describe("capability gates enforce plan features + quotas", () => {
   });
 
   it("a gifted feature opens the gate for that tenant", async () => {
-    const t = (await (await SELF.fetch("http://x/api/context", { headers: auth(otherCookie) })).json() as { active: { tenantId: string } }).active.tenantId;
+    const t = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(otherCookie) })).json() as { active: { tenantId: string } }).active.tenantId;
     // Gift commerce (grant-only override) — admin lane (ownerCookie is admin in test env).
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${t}/overrides`, {
       method: "PATCH",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ grants: { features: { commerce: true } } }),
     });
-    const pkg = await SELF.fetch("http://x/api/packages", {
+    const pkg = await SELF.fetch(`${ORIGIN}/api/packages`, {
       method: "POST", headers: H(),
       body: JSON.stringify({ name: "Gifted", budgets: [{ feature: "all", days: 30 }] }),
     });
@@ -840,7 +840,7 @@ describe("a stale catalog id can be repaired — for packs as well as plans", ()
     // because it believed them done, and every top-up checkout failed with
     // "No such price", unfixable from the admin UI.
     const db = env.DB as D1Database;
-    await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) }); // seedBilling
+    await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) }); // seedBilling
     // Plant a stale id on an active plan AND an active pack.
     await db.prepare("UPDATE plans SET stripe_product_id = 'prod_stale', stripe_price_id = 'price_stale' WHERE active = 1 AND price_usd_month > 0").run();
     await db.prepare("UPDATE credit_packs SET stripe_product_id = 'prod_stale', stripe_price_id = 'price_stale' WHERE active = 1").run();
@@ -878,7 +878,7 @@ describe("the 👍/👎 signal is readable, not just writable", () => {
   it("votes aggregate per insight type, with a helpful rate", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const vote = (insightType: string, v: 1 | -1) =>
-      SELF.fetch("http://x/api/ai/feedback", { method: "POST", headers: H, body: JSON.stringify({ insightType, insightRef: "r1", vote: v }) });
+      SELF.fetch(`${ORIGIN}/api/ai/feedback`, { method: "POST", headers: H, body: JSON.stringify({ insightType, insightRef: "r1", vote: v }) });
     const read = async () => (await (await SELF.fetch(`${ADMIN}/api/admin/ai/feedback`, { headers: auth(ownerCookie) })).json()) as {
       types: { type: string; up: number; down: number; total: number; helpfulPct: number | null }[]; totalVotes: number;
     };
@@ -928,13 +928,13 @@ describe("AI model catalog + markup (platform admin)", () => {
 describe("AI meal draft — library-grounded (never fabricated)", () => {
   it("builds meals ONLY from real library food ids, dropping nothing off-library", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
     // Seed a food; the library-grounded mock draft references it by id.
-    const { id: foodId } = (await (await SELF.fetch("http://x/api/foods", { method: "POST", headers: H, body: JSON.stringify({ name: "Rolled Oats", calories: 380, proteinG: 13, carbsG: 67, fatG: 7 }) })).json()) as { id: string };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "MealAI" }) })).json()) as { client: { id: string } };
+    const { id: foodId } = (await (await SELF.fetch(`${ORIGIN}/api/foods`, { method: "POST", headers: H, body: JSON.stringify({ name: "Rolled Oats", calories: 380, proteinG: 13, carbsG: 67, fatG: 7 }) })).json()) as { id: string };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "MealAI" }) })).json()) as { client: { id: string } };
 
-    const r = (await (await SELF.fetch("http://x/api/ai/draft-meal", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { draft: { mealOptions: { mealType: string; foods: { foodId: string; quantity: number; unit: string }[] }[] }; dropped: string[] };
+    const r = (await (await SELF.fetch(`${ORIGIN}/api/ai/draft-meal`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { draft: { mealOptions: { mealType: string; foods: { foodId: string; quantity: number; unit: string }[] }[] }; dropped: string[] };
     const breakfast = r.draft.mealOptions.find((o) => o.mealType === "breakfast")!;
     expect(breakfast.foods.length).toBeGreaterThan(0);
     // Every drafted food is a REAL library row — here, the seeded food id.
@@ -947,14 +947,14 @@ describe("AI meal draft — library-grounded (never fabricated)", () => {
 
   it("refuses to draft meals when the food library is empty", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
     // A fresh client in a tenant whose food library is empty — deactivate any
     // seeded foods first so the library truly has nothing to build from.
-    const foods = (await (await SELF.fetch("http://x/api/foods", { headers: auth(ownerCookie) })).json()) as { foods: { id: string }[] };
-    for (const f of foods.foods) await SELF.fetch(`http://x/api/foods/${f.id}`, { method: "DELETE", headers: auth(ownerCookie) });
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "EmptyLib" }) })).json()) as { client: { id: string } };
-    const res = await SELF.fetch("http://x/api/ai/draft-meal", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) });
+    const foods = (await (await SELF.fetch(`${ORIGIN}/api/foods`, { headers: auth(ownerCookie) })).json()) as { foods: { id: string }[] };
+    for (const f of foods.foods) await SELF.fetch(`${ORIGIN}/api/foods/${f.id}`, { method: "DELETE", headers: auth(ownerCookie) });
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "EmptyLib" }) })).json()) as { client: { id: string } };
+    const res = await SELF.fetch(`${ORIGIN}/api/ai/draft-meal`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) });
     expect(res.status).toBe(409);
   });
 });
@@ -966,29 +966,29 @@ describe("AI workout draft — named exercises resolve to real ids", () => {
     // credit reserve is the difference between a clear message and a charge for
     // an empty plan.
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "NoLib" }) })).json()) as { client: { id: string } };
-    const res = await SELF.fetch("http://x/api/ai/draft-plan", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) });
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "NoLib" }) })).json()) as { client: { id: string } };
+    const res = await SELF.fetch(`${ORIGIN}/api/ai/draft-plan`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) });
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({ error: "empty_library" });
   });
 
   it("drafts a plan and resolves each named exercise to a library/custom id", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "PlanAI" }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "PlanAI" }) })).json()) as { client: { id: string } };
     // A draft can only pick from a library that exists, and nothing installs one
     // implicitly any more — so this test has to do what a real studio does.
     await SELF.fetch(`${ADMIN}/api/admin/starter-library`, { method: "POST", headers: H, body: JSON.stringify({ install: true }) });
-    const r = (await (await SELF.fetch("http://x/api/ai/draft-plan", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { draft: { days: { blocks: { slots: { exerciseId: string }[] }[] }[] } };
+    const r = (await (await SELF.fetch(`${ORIGIN}/api/ai/draft-plan`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { draft: { days: { blocks: { slots: { exerciseId: string }[] }[] }[] } };
     const slots = r.draft.days.flatMap((d) => d.blocks.flatMap((b) => b.slots));
     expect(slots.length).toBeGreaterThan(0);
     // Every slot carries a real exercise id (resolved, never a raw name).
     expect(slots.every((s) => typeof s.exerciseId === "string" && s.exerciseId.length > 0)).toBe(true);
     // The resolved id points at an actual library row.
-    const ex = await SELF.fetch(`http://x/api/exercises?q=`, { headers: auth(ownerCookie) });
+    const ex = await SELF.fetch(`${ORIGIN}/api/exercises?q=`, { headers: auth(ownerCookie) });
     const { exercises } = (await ex.json()) as { exercises: { id: string }[] };
     expect(exercises.some((e) => e.id === slots[0]!.exerciseId)).toBe(true);
   });
@@ -997,9 +997,9 @@ describe("AI workout draft — named exercises resolve to real ids", () => {
 describe("AI exercise auto-fill (enum-constrained meta)", () => {
   it("returns muscles/equipment/force/mechanic folded onto the allowed vocab", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
-    const r = await SELF.fetch("http://x/api/ai/exercise-meta", { method: "POST", headers: H, body: JSON.stringify({ name: "Back Squat" }) });
+    const r = await SELF.fetch(`${ORIGIN}/api/ai/exercise-meta`, { method: "POST", headers: H, body: JSON.stringify({ name: "Back Squat" }) });
     expect(r.status).toBe(200);
     const { meta } = (await r.json()) as { meta: { primaryMuscles: string[]; equipment: string[]; force: string | null; mechanic: string | null } };
     // Fields are populated (not silently emptied by a too-strict filter).
@@ -1015,42 +1015,42 @@ describe("AI exercise auto-fill (enum-constrained meta)", () => {
 describe("AI image generation + recipe", () => {
   it("generates an original library image and recommends a recipe", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
 
     // Food image generation (mock lane) returns a tenant-scoped media url.
-    const img = await SELF.fetch("http://x/api/ai/generate-image", { method: "POST", headers: H, body: JSON.stringify({ feature: "food-image", subject: "grilled salmon" }) });
+    const img = await SELF.fetch(`${ORIGIN}/api/ai/generate-image`, { method: "POST", headers: H, body: JSON.stringify({ feature: "food-image", subject: "grilled salmon" }) });
     expect(img.status).toBe(200);
     const imgOut = (await img.json()) as { url: string; key: string };
     expect(imgOut.url).toContain(`/api/media/t/${ctx.active.tenantId}/`);
 
     // Image-to-image: generating the End from a Start reference (same-tenant key).
-    const ref = await SELF.fetch("http://x/api/ai/generate-image", { method: "POST", headers: H, body: JSON.stringify({ feature: "exercise-image", subject: "barbell squat", hint: "the end position", referenceKey: imgOut.key }) });
+    const ref = await SELF.fetch(`${ORIGIN}/api/ai/generate-image`, { method: "POST", headers: H, body: JSON.stringify({ feature: "exercise-image", subject: "barbell squat", hint: "the end position", referenceKey: imgOut.key }) });
     expect(ref.status).toBe(200);
 
     // Diptych (pair) mode: one wide start|end render the client splits in two.
-    const pair = await SELF.fetch("http://x/api/ai/generate-image", { method: "POST", headers: H, body: JSON.stringify({ feature: "exercise-image", subject: "barbell curl", pair: true }) });
+    const pair = await SELF.fetch(`${ORIGIN}/api/ai/generate-image`, { method: "POST", headers: H, body: JSON.stringify({ feature: "exercise-image", subject: "barbell curl", pair: true }) });
     expect(pair.status).toBe(200);
     const pairOut = (await pair.json()) as { url: string; pair: boolean };
     expect(pairOut.pair).toBe(true);
     expect(pairOut.url).toContain(`/api/media/t/${ctx.active.tenantId}/`);
 
     // Recipe from a meal's foods.
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "RecipeAI" }) })).json()) as { client: { id: string } };
-    const rec = await SELF.fetch("http://x/api/ai/recipe", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, mealName: "Lunch", foods: [{ name: "chicken breast", quantity: 180, unit: "g" }, { name: "white rice", quantity: 150, unit: "g" }] }) });
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "RecipeAI" }) })).json()) as { client: { id: string } };
+    const rec = await SELF.fetch(`${ORIGIN}/api/ai/recipe`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, mealName: "Lunch", foods: [{ name: "chicken breast", quantity: 180, unit: "g" }, { name: "white rice", quantity: 150, unit: "g" }] }) });
     expect(rec.status).toBe(200);
     const recOut = (await rec.json()) as { recipe: string };
     expect(recOut.recipe.length).toBeGreaterThan(10);
     expect(recOut.recipe).toContain("Ingredients");
 
     // Exercise how-to guide.
-    const guide = await SELF.fetch("http://x/api/ai/exercise-guide", { method: "POST", headers: H, body: JSON.stringify({ name: "Barbell Curl", muscleGroups: ["biceps"], equipment: ["barbell"] }) });
+    const guide = await SELF.fetch(`${ORIGIN}/api/ai/exercise-guide`, { method: "POST", headers: H, body: JSON.stringify({ name: "Barbell Curl", muscleGroups: ["biceps"], equipment: ["barbell"] }) });
     expect(guide.status).toBe(200);
     const guideOut = (await guide.json()) as { guide: string };
     expect(guideOut.guide).toContain("Execution");
 
     // Auto-fill exercise metadata — only allowed-vocab values survive.
-    const meta = await SELF.fetch("http://x/api/ai/exercise-meta", { method: "POST", headers: H, body: JSON.stringify({ name: "Barbell Back Squat" }) });
+    const meta = await SELF.fetch(`${ORIGIN}/api/ai/exercise-meta`, { method: "POST", headers: H, body: JSON.stringify({ name: "Barbell Back Squat" }) });
     expect(meta.status).toBe(200);
     const metaOut = (await meta.json()) as { meta: { primaryMuscles: string[]; equipment: string[]; difficulty: string | null; mechanic: string | null } };
     expect(metaOut.meta.primaryMuscles).toContain("quads");
@@ -1058,7 +1058,7 @@ describe("AI image generation + recipe", () => {
     expect(metaOut.meta.mechanic).toBe("compound");
 
     // Food nutrition estimate from a name.
-    const fm = await SELF.fetch("http://x/api/ai/food-meta", { method: "POST", headers: H, body: JSON.stringify({ name: "grilled chicken breast" }) });
+    const fm = await SELF.fetch(`${ORIGIN}/api/ai/food-meta`, { method: "POST", headers: H, body: JSON.stringify({ name: "grilled chicken breast" }) });
     expect(fm.status).toBe(200);
     const fmOut = (await fm.json()) as { food: { name: string; calories: number; proteinG: number; servingUnit: string } };
     expect(fmOut.food.calories).toBeGreaterThan(0);
@@ -1066,32 +1066,32 @@ describe("AI image generation + recipe", () => {
     expect(["g", "ml"]).toContain(fmOut.food.servingUnit);
 
     // Workout day cover — branded (accent colour accepted), mock lane returns a url.
-    const dayImg = await SELF.fetch("http://x/api/ai/generate-image", { method: "POST", headers: H, body: JSON.stringify({ feature: "workout-day-image", subject: "Chest Day", hint: "Dynamic style", brandColor: "#10b981" }) });
+    const dayImg = await SELF.fetch(`${ORIGIN}/api/ai/generate-image`, { method: "POST", headers: H, body: JSON.stringify({ feature: "workout-day-image", subject: "Chest Day", hint: "Dynamic style", brandColor: "#10b981" }) });
     expect(dayImg.status).toBe(200);
     expect(((await dayImg.json()) as { url: string }).url).toContain(`/api/media/t/${ctx.active.tenantId}/`);
     // A malformed brand colour is rejected.
-    expect((await SELF.fetch("http://x/api/ai/generate-image", { method: "POST", headers: H, body: JSON.stringify({ feature: "workout-day-image", subject: "Pull", brandColor: "green" }) })).status).toBe(400);
+    expect((await SELF.fetch(`${ORIGIN}/api/ai/generate-image`, { method: "POST", headers: H, body: JSON.stringify({ feature: "workout-day-image", subject: "Pull", brandColor: "green" }) })).status).toBe(400);
 
     // A day's cover persists in the plan body (schema round-trip).
-    const wp = (await (await SELF.fetch("http://x/api/workout-plans", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, name: "Cover Plan" }) })).json()) as { plan: { id: string } };
-    await SELF.fetch(`http://x/api/workout-plans/${wp.plan.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ body: { days: [{ name: "Chest Day", imageUrl: "/api/media/t/x/day/chest.png", blocks: [] }] } }) });
-    const back = (await (await SELF.fetch(`http://x/api/workout-plans/${wp.plan.id}`, { headers: auth(ownerCookie) })).json()) as { plan: { body: { days: { imageUrl?: string | null }[] } } };
+    const wp = (await (await SELF.fetch(`${ORIGIN}/api/workout-plans`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, name: "Cover Plan" }) })).json()) as { plan: { id: string } };
+    await SELF.fetch(`${ORIGIN}/api/workout-plans/${wp.plan.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ body: { days: [{ name: "Chest Day", imageUrl: "/api/media/t/x/day/chest.png", blocks: [] }] } }) });
+    const back = (await (await SELF.fetch(`${ORIGIN}/api/workout-plans/${wp.plan.id}`, { headers: auth(ownerCookie) })).json()) as { plan: { body: { days: { imageUrl?: string | null }[] } } };
     expect(back.plan.body.days[0]!.imageUrl).toBe("/api/media/t/x/day/chest.png");
 
     // Plated meal image (subtle-brand variant) + a meal option's imageUrl round-trip.
-    const mealImg = await SELF.fetch("http://x/api/ai/generate-image", { method: "POST", headers: H, body: JSON.stringify({ feature: "meal-image", subject: "Chicken & Rice", hint: "made of chicken breast, rice", brandColor: "#10b981" }) });
+    const mealImg = await SELF.fetch(`${ORIGIN}/api/ai/generate-image`, { method: "POST", headers: H, body: JSON.stringify({ feature: "meal-image", subject: "Chicken & Rice", hint: "made of chicken breast, rice", brandColor: "#10b981" }) });
     expect(mealImg.status).toBe(200);
     expect(((await mealImg.json()) as { url: string }).url).toContain(`/api/media/t/${ctx.active.tenantId}/`);
-    const mp = (await (await SELF.fetch("http://x/api/meal-plans", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, name: "Photo Meals" }) })).json()) as { plan: { id: string } };
-    await SELF.fetch(`http://x/api/meal-plans/${mp.plan.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ body: { mealOptions: [{ mealType: "lunch", mealName: "Chicken & Rice", imageUrl: "/api/media/t/x/meal/cr.png", foods: [] }] } }) });
-    const mback = (await (await SELF.fetch(`http://x/api/meal-plans/${mp.plan.id}`, { headers: auth(ownerCookie) })).json()) as { plan: { body: { mealOptions: { imageUrl?: string | null }[] } } };
+    const mp = (await (await SELF.fetch(`${ORIGIN}/api/meal-plans`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, name: "Photo Meals" }) })).json()) as { plan: { id: string } };
+    await SELF.fetch(`${ORIGIN}/api/meal-plans/${mp.plan.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ body: { mealOptions: [{ mealType: "lunch", mealName: "Chicken & Rice", imageUrl: "/api/media/t/x/meal/cr.png", foods: [] }] } }) });
+    const mback = (await (await SELF.fetch(`${ORIGIN}/api/meal-plans/${mp.plan.id}`, { headers: auth(ownerCookie) })).json()) as { plan: { body: { mealOptions: { imageUrl?: string | null }[] } } };
     expect(mback.plan.body.mealOptions[0]!.imageUrl).toBe("/api/media/t/x/meal/cr.png");
   });
 
   it("exercise create accepts start/end images + video", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { id } = (await (await SELF.fetch("http://x/api/exercises", { method: "POST", headers: H, body: JSON.stringify({ name: "Test Lunge", muscleGroups: ["quads"], thumbUrl: "/api/media/t/x/exercise/a.png", thumb2Url: "/api/media/t/x/exercise/b.png", videoUrl: "/api/media/t/x/exercise/c.mp4" }) })).json()) as { id: string };
-    const list = (await (await SELF.fetch("http://x/api/exercises?q=test lunge", { headers: auth(ownerCookie) })).json()) as { exercises: { id: string; thumb_url: string | null; thumb2_url: string | null; video_url: string | null }[] };
+    const { id } = (await (await SELF.fetch(`${ORIGIN}/api/exercises`, { method: "POST", headers: H, body: JSON.stringify({ name: "Test Lunge", muscleGroups: ["quads"], thumbUrl: "/api/media/t/x/exercise/a.png", thumb2Url: "/api/media/t/x/exercise/b.png", videoUrl: "/api/media/t/x/exercise/c.mp4" }) })).json()) as { id: string };
+    const list = (await (await SELF.fetch(`${ORIGIN}/api/exercises?q=test lunge`, { headers: auth(ownerCookie) })).json()) as { exercises: { id: string; thumb_url: string | null; thumb2_url: string | null; video_url: string | null }[] };
     const row = list.exercises.find((e) => e.id === id)!;
     expect(row.thumb_url).toContain("a.png");
     expect(row.thumb2_url).toContain("b.png");
@@ -1102,38 +1102,38 @@ describe("AI image generation + recipe", () => {
 describe("trainer AI features (registry)", () => {
   it("runs supplement reco, article writer, client summary, and lab extract (mock)", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "TrainerAI" }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "TrainerAI" }) })).json()) as { client: { id: string } };
 
-    const rec = (await (await SELF.fetch("http://x/api/ai/supplement-reco", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { recommendations: { name: string }[]; mocked: boolean };
+    const rec = (await (await SELF.fetch(`${ORIGIN}/api/ai/supplement-reco`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { recommendations: { name: string }[]; mocked: boolean };
     expect(rec.recommendations.length).toBeGreaterThan(0);
     expect(rec.mocked).toBe(true);
 
-    const art = (await (await SELF.fetch("http://x/api/ai/article", { method: "POST", headers: H, body: JSON.stringify({ topic: "Sleep and recovery" }) })).json()) as { article: { title: string; body: string } };
+    const art = (await (await SELF.fetch(`${ORIGIN}/api/ai/article`, { method: "POST", headers: H, body: JSON.stringify({ topic: "Sleep and recovery" }) })).json()) as { article: { title: string; body: string } };
     expect(art.article.body.length).toBeGreaterThan(0);
 
-    const sum = (await (await SELF.fetch("http://x/api/ai/client-summary", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { summary: string };
+    const sum = (await (await SELF.fetch(`${ORIGIN}/api/ai/client-summary`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { summary: string };
     expect(sum.summary).toContain("TrainerAI");
 
     // Lab extract needs an uploaded file: request → upload a media key → extract.
-    const { id: labId } = (await (await SELF.fetch("http://x/api/labs", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, type: "blood_panel" }) })).json()) as { id: string };
+    const { id: labId } = (await (await SELF.fetch(`${ORIGIN}/api/labs`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, type: "blood_panel" }) })).json()) as { id: string };
     const fd = new FormData();
     fd.append("file", new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], { type: "image/jpeg" }), "lab.jpg");
     fd.append("purpose", "lab");
-    const { key } = (await (await SELF.fetch("http://x/api/media/upload", { method: "POST", headers: auth(ownerCookie), body: fd })).json()) as { key: string };
-    await SELF.fetch(`http://x/api/labs/${labId}/upload`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, fileKey: key }) });
-    const ex = (await (await SELF.fetch("http://x/api/ai/lab-extract", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, labId }) })).json()) as { values: { marker: string }[] };
+    const { key } = (await (await SELF.fetch(`${ORIGIN}/api/media/upload`, { method: "POST", headers: auth(ownerCookie), body: fd })).json()) as { key: string };
+    await SELF.fetch(`${ORIGIN}/api/labs/${labId}/upload`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, fileKey: key }) });
+    const ex = (await (await SELF.fetch(`${ORIGIN}/api/ai/lab-extract`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, labId }) })).json()) as { values: { marker: string }[] };
     expect(ex.values.length).toBeGreaterThan(0);
     expect(ex.values[0]!.marker.length).toBeGreaterThan(0);
 
     // Nano Banana cover image (mock) → an R2 media key, billed from credits.
-    const before = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { balance: number } };
-    const img = (await (await SELF.fetch("http://x/api/ai/cover-image", { method: "POST", headers: H, body: JSON.stringify({ prompt: "protein and muscle growth" }) })).json()) as { key: string; url: string; mocked: boolean };
+    const before = (await (await SELF.fetch(`${ORIGIN}/api/billing`, { headers: auth(ownerCookie) })).json()) as { balance: { balance: number } };
+    const img = (await (await SELF.fetch(`${ORIGIN}/api/ai/cover-image`, { method: "POST", headers: H, body: JSON.stringify({ prompt: "protein and muscle growth" }) })).json()) as { key: string; url: string; mocked: boolean };
     expect(img.key).toContain(`t/${ctx.active.tenantId}/ai/`);
     expect(img.url).toBe(`/api/media/${img.key}`);
     expect(img.mocked).toBe(true);
-    const after = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { balance: number } };
+    const after = (await (await SELF.fetch(`${ORIGIN}/api/billing`, { headers: auth(ownerCookie) })).json()) as { balance: { balance: number } };
     expect(after.balance.balance).toBeLessThan(before.balance.balance); // billed with markup
   });
 });
@@ -1141,31 +1141,31 @@ describe("trainer AI features (registry)", () => {
 describe("coach note (personalized, context-cached)", () => {
   it("builds a personal note, caches it, and refreshes on a material change", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "NoteCli" }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "NoteCli" }) })).json()) as { client: { id: string } };
     const day = "2026-07-10";
-    await SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: day, workoutPlanId: "wp", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "e", sets: [{ setIndex: 0, reps: 5, weightKg: 80, completed: true }] } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/workout-sets`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: day, workoutPlanId: "wp", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "e", sets: [{ setIndex: 0, reps: 5, weightKg: 80, completed: true }] } }) });
 
     const q = `clientId=${client.id}&surface=home&today=${day}&hour=9`;
-    const r1 = (await (await SELF.fetch(`http://x/api/ai/coach-note?${q}`, { headers: auth(ownerCookie) })).json()) as { message: string | null; cached: boolean; mocked: boolean };
+    const r1 = (await (await SELF.fetch(`${ORIGIN}/api/ai/coach-note?${q}`, { headers: auth(ownerCookie) })).json()) as { message: string | null; cached: boolean; mocked: boolean };
     expect(r1.message).toBeTruthy();
     expect(r1.message).toContain("NoteCli");
     expect(r1.cached).toBe(false);
     expect(r1.mocked).toBe(true);
 
     // Same context within the hour → served from cache.
-    const r2 = (await (await SELF.fetch(`http://x/api/ai/coach-note?${q}`, { headers: auth(ownerCookie) })).json()) as { message: string; cached: boolean };
+    const r2 = (await (await SELF.fetch(`${ORIGIN}/api/ai/coach-note?${q}`, { headers: auth(ownerCookie) })).json()) as { message: string; cached: boolean };
     expect(r2.cached).toBe(true);
     expect(r2.message).toBe(r1.message);
 
     // A different surface gets a different note (own focus).
-    const rt = (await (await SELF.fetch(`http://x/api/ai/coach-note?clientId=${client.id}&surface=train&today=${day}&hour=9`, { headers: auth(ownerCookie) })).json()) as { message: string };
+    const rt = (await (await SELF.fetch(`${ORIGIN}/api/ai/coach-note?clientId=${client.id}&surface=train&today=${day}&hour=9`, { headers: auth(ownerCookie) })).json()) as { message: string };
     expect(rt.message).not.toBe(r1.message);
 
     // A material change (a check-in) shifts the context hash → fresh, not cached.
-    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: day, mood: 5, sleepHours: 8 } }) });
-    const r3 = (await (await SELF.fetch(`http://x/api/ai/coach-note?${q}`, { headers: auth(ownerCookie) })).json()) as { cached: boolean };
+    await SELF.fetch(`${ORIGIN}/api/check-ins`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: day, mood: 5, sleepHours: 8 } }) });
+    const r3 = (await (await SELF.fetch(`${ORIGIN}/api/ai/coach-note?${q}`, { headers: auth(ownerCookie) })).json()) as { cached: boolean };
     expect(r3.cached).toBe(false);
   });
 });
@@ -1173,13 +1173,13 @@ describe("coach note (personalized, context-cached)", () => {
 describe("commerce + redemption", () => {
   it("redeeming an unknown code 404s without leaking (no oracle)", async () => {
     const { client } = (await (
-      await SELF.fetch("http://x/api/clients", {
+      await SELF.fetch(`${ORIGIN}/api/clients`, {
         method: "POST",
         headers: { "content-type": "application/json", ...auth(ownerCookie) },
         body: JSON.stringify({ displayName: "RedeemTest" }),
       })
     ).json()) as { client: { id: string } };
-    const res = await SELF.fetch("http://x/api/redeem", {
+    const res = await SELF.fetch(`${ORIGIN}/api/redeem`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ clientId: client.id, code: "NOPE1234" }),
@@ -1189,43 +1189,43 @@ describe("commerce + redemption", () => {
 
   it("a redemption code adds queued days to a client", async () => {
     const { client } = (await (
-      await SELF.fetch("http://x/api/clients", {
+      await SELF.fetch(`${ORIGIN}/api/clients`, {
         method: "POST",
         headers: { "content-type": "application/json", ...auth(ownerCookie) },
         body: JSON.stringify({ displayName: "RedeemTest2" }),
       })
     ).json()) as { client: { id: string } };
-    await SELF.fetch("http://x/api/redemption-codes", {
+    await SELF.fetch(`${ORIGIN}/api/redemption-codes`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ code: "WELCOME10", daysToAdd: 10, targetFeature: "all", maxUses: 5 }),
     });
-    const res = await SELF.fetch("http://x/api/redeem", {
+    const res = await SELF.fetch(`${ORIGIN}/api/redeem`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ clientId: client.id, code: "welcome10" }),
     });
     expect(res.status).toBe(200);
-    const subs = (await (await SELF.fetch(`http://x/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number }[] };
+    const subs = (await (await SELF.fetch(`${ORIGIN}/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number }[] };
     expect(subs.subscriptions[0]!.daysRemaining).toBe(10);
   });
 });
 
 describe("content hub", () => {
   it("a published public article shows on the tenant marketplace (public lane)", async () => {
-    const created = await SELF.fetch("http://x/api/resources", {
+    const created = await SELF.fetch(`${ORIGIN}/api/resources`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ type: "article", title: "Warm up right", audience: "public", bodyMd: "# Hi" }),
     });
     const { id } = (await created.json()) as { id: string };
-    await SELF.fetch(`http://x/api/resources/${id}/publish`, {
+    await SELF.fetch(`${ORIGIN}/api/resources/${id}/publish`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ status: "published" }),
     });
     // The marketplace is a PUBLIC route (no auth) — the owner's slug is studio-one.
-    const mkt = await SELF.fetch("http://x/api/marketplace/studio-one");
+    const mkt = await SELF.fetch(`${ORIGIN}/api/marketplace/studio-one`);
     expect(mkt.status).toBe(200);
     const body = (await mkt.json()) as { posts: { title: string }[] };
     expect(body.posts.some((p) => p.title === "Warm up right")).toBe(true);
@@ -1233,8 +1233,8 @@ describe("content hub", () => {
 
   it("persists a category + tags and returns them in the staff list", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { id } = (await (await SELF.fetch("http://x/api/resources", { method: "POST", headers: H, body: JSON.stringify({ type: "article", title: "Sleep & Recovery", category: "Recovery", topics: ["sleep", "hormones"], bodyMd: "## Hi\n\n| a | b |\n| --- | --- |\n| 1 | 2 |" }) })).json()) as { id: string; slug: string };
-    const list = (await (await SELF.fetch("http://x/api/resources", { headers: auth(ownerCookie) })).json()) as { resources: { id: string; category: string | null; topics: string[] }[] };
+    const { id } = (await (await SELF.fetch(`${ORIGIN}/api/resources`, { method: "POST", headers: H, body: JSON.stringify({ type: "article", title: "Sleep & Recovery", category: "Recovery", topics: ["sleep", "hormones"], bodyMd: "## Hi\n\n| a | b |\n| --- | --- |\n| 1 | 2 |" }) })).json()) as { id: string; slug: string };
+    const list = (await (await SELF.fetch(`${ORIGIN}/api/resources`, { headers: auth(ownerCookie) })).json()) as { resources: { id: string; category: string | null; topics: string[] }[] };
     const found = list.resources.find((r) => r.id === id)!;
     expect(found.category).toBe("Recovery");
     expect(found.topics).toEqual(["sleep", "hormones"]);
@@ -1242,26 +1242,26 @@ describe("content hub", () => {
 
   it("an assigned article is visible only to the assigned client", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const mkClient = async (n: string) => ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: n }) })).json()) as { client: { id: string } }).client.id;
+    const mkClient = async (n: string) => ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: n }) })).json()) as { client: { id: string } }).client.id;
     const a = await mkClient("Aud A");
     const b = await mkClient("Aud B");
-    const { id } = (await (await SELF.fetch("http://x/api/resources", { method: "POST", headers: H, body: JSON.stringify({ type: "article", title: "Just for A", audience: "assigned", assignedClientIds: [a] }) })).json()) as { id: string };
-    await SELF.fetch(`http://x/api/resources/${id}/publish`, { method: "POST", headers: H, body: JSON.stringify({ status: "published" }) });
+    const { id } = (await (await SELF.fetch(`${ORIGIN}/api/resources`, { method: "POST", headers: H, body: JSON.stringify({ type: "article", title: "Just for A", audience: "assigned", assignedClientIds: [a] }) })).json()) as { id: string };
+    await SELF.fetch(`${ORIGIN}/api/resources/${id}/publish`, { method: "POST", headers: H, body: JSON.stringify({ status: "published" }) });
 
-    const feedA = (await (await SELF.fetch(`http://x/api/resources/feed?clientId=${a}`, { headers: auth(ownerCookie) })).json()) as { resources: { id: string }[] };
-    const feedB = (await (await SELF.fetch(`http://x/api/resources/feed?clientId=${b}`, { headers: auth(ownerCookie) })).json()) as { resources: { id: string }[] };
+    const feedA = (await (await SELF.fetch(`${ORIGIN}/api/resources/feed?clientId=${a}`, { headers: auth(ownerCookie) })).json()) as { resources: { id: string }[] };
+    const feedB = (await (await SELF.fetch(`${ORIGIN}/api/resources/feed?clientId=${b}`, { headers: auth(ownerCookie) })).json()) as { resources: { id: string }[] };
     expect(feedA.resources.map((r) => r.id)).toContain(id);
     expect(feedB.resources.map((r) => r.id)).not.toContain(id);
   });
 
   it("serves published public articles headlessly (no auth); body only on the single-post route", async () => {
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await (env.DB as D1Database).prepare(
       "INSERT INTO resources (id, tenant_id, type, title, summary, body_md, category, slug, topics, audience, status, published_at, created_at, updated_at) VALUES ('res_pub1', ?, 'article', 'Public Post', 'teaser', '# Body text here', 'News', 'public-post-abc123', 'a,b', 'public', 'published', '2026-01-01', '2026-01-01', '2026-01-01')",
     ).bind(ctx.active.tenantId).run();
 
     // Unauthenticated index — metadata, no body.
-    const idx = await SELF.fetch("http://x/api/marketplace/studio-one/posts");
+    const idx = await SELF.fetch(`${ORIGIN}/api/marketplace/studio-one/posts`);
     expect(idx.status).toBe(200);
     const idxBody = (await idx.json()) as { posts: { id: string; slug: string; category: string; tags: string[]; bodyMd?: string }[] };
     const post = idxBody.posts.find((p) => p.id === "res_pub1")!;
@@ -1271,29 +1271,29 @@ describe("content hub", () => {
     expect(post.bodyMd).toBeUndefined();
 
     // Single post by slug — includes the full body.
-    const one = await SELF.fetch("http://x/api/marketplace/studio-one/posts/public-post-abc123");
+    const one = await SELF.fetch(`${ORIGIN}/api/marketplace/studio-one/posts/public-post-abc123`);
     expect(one.status).toBe(200);
     const oneBody = (await one.json()) as { post: { bodyMd: string } };
     expect(oneBody.post.bodyMd).toContain("Body text here");
   });
 
   it("does not expose draft/archived articles on the headless API", async () => {
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await (env.DB as D1Database).prepare(
       "INSERT INTO resources (id, tenant_id, type, title, slug, audience, status, created_at, updated_at) VALUES ('res_draft1', ?, 'article', 'Draft', 'draft-xyz', 'public', 'draft', '2026-01-01', '2026-01-01')",
     ).bind(ctx.active.tenantId).run();
-    expect((await SELF.fetch("http://x/api/marketplace/studio-one/posts/draft-xyz")).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/marketplace/studio-one/posts/draft-xyz`)).status).toBe(404);
   });
 });
 
 describe("reports", () => {
   it("retention radar flags a client with no activity", async () => {
-    await SELF.fetch("http://x/api/clients", {
+    await SELF.fetch(`${ORIGIN}/api/clients`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ displayName: "GhostClient" }),
     });
-    const res = await SELF.fetch("http://x/api/reports/retention", { headers: auth(ownerCookie) });
+    const res = await SELF.fetch(`${ORIGIN}/api/reports/retention`, { headers: auth(ownerCookie) });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { atRisk: { name: string }[] };
     expect(body.atRisk.some((r) => r.name === "GhostClient")).toBe(true);
@@ -1302,13 +1302,13 @@ describe("reports", () => {
   it("coach attention rolls up per-client signals across the roster", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     // A: bare + no logs → gone quiet + profile incomplete.
-    const { client: a } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "QuietQuinn" }) })).json()) as { client: { id: string } };
+    const { client: a } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "QuietQuinn" }) })).json()) as { client: { id: string } };
     // B: a check-in today with no coach feedback → check-in to answer (and NOT quiet — a check-in is activity).
-    const { client: b } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "NeedsReplyRey" }) })).json()) as { client: { id: string } };
+    const { client: b } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "NeedsReplyRey" }) })).json()) as { client: { id: string } };
     const today = new Date().toISOString().slice(0, 10);
-    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: b.id, data: { date: today, mood: 4 } }) });
+    await SELF.fetch(`${ORIGIN}/api/check-ins`, { method: "POST", headers: H, body: JSON.stringify({ clientId: b.id, data: { date: today, mood: 4 } }) });
 
-    const res = await SELF.fetch("http://x/api/coach/attention", { headers: auth(ownerCookie) });
+    const res = await SELF.fetch(`${ORIGIN}/api/coach/attention`, { headers: auth(ownerCookie) });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { clients: { clientId: string; items: { type: string; label: string; link: string }[] }[]; totals: Record<string, number>; total: number };
     const rowA = body.clients.find((r) => r.clientId === a.id)!;
@@ -1328,12 +1328,12 @@ describe("reports", () => {
 describe("client-scoped home widgets (coach configures on the client's behalf)", () => {
   it("a coach sets a client's dashboard widget layout; it surfaces in the client's today bundle", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "WidgetWill" }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "WidgetWill" }) })).json()) as { client: { id: string } };
     const layout = [{ id: "calories", size: "big" }, { id: "protein", size: "small" }];
-    const patched = await SELF.fetch(`http://x/api/clients/${client.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ dashboardPrefs: { widgets: layout } }) });
+    const patched = await SELF.fetch(`${ORIGIN}/api/clients/${client.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ dashboardPrefs: { widgets: layout } }) });
     expect(patched.status).toBe(200);
     const today = new Date().toISOString().slice(0, 10);
-    const bundle = (await (await SELF.fetch(`http://x/api/today?clientId=${client.id}&date=${today}`, { headers: auth(ownerCookie) })).json()) as { widgets: { id: string; size: string }[] | null };
+    const bundle = (await (await SELF.fetch(`${ORIGIN}/api/today?clientId=${client.id}&date=${today}`, { headers: auth(ownerCookie) })).json()) as { widgets: { id: string; size: string }[] | null };
     expect(bundle.widgets).toEqual(layout);
   });
 });
@@ -1341,17 +1341,17 @@ describe("client-scoped home widgets (coach configures on the client's behalf)",
 describe("progress analytics aggregation", () => {
   it("returns per-day body + wellness series, deltas, radar and a consistency heatmap", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "ProgressPat" }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "ProgressPat" }) })).json()) as { client: { id: string } };
     const today = new Date().toISOString().slice(0, 10);
     const dayBack = (n: number) => { const d = new Date(`${today}T00:00:00`); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
 
     // Two weigh-ins (a downward trend) + body fat, and two check-ins.
-    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: dayBack(6), weightKg: 82, bodyFatPercent: 20, waistCm: 90 } }) });
-    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: today, weightKg: 80.5, bodyFatPercent: 19, waistCm: 88 } }) });
-    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: dayBack(1), mood: 4, energy: 3, stress: 2, sleepHours: 7.5 } }) });
-    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: today, mood: 5, energy: 4, stress: 1, sleepHours: 8 } }) });
+    await SELF.fetch(`${ORIGIN}/api/measurements`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: dayBack(6), weightKg: 82, bodyFatPercent: 20, waistCm: 90 } }) });
+    await SELF.fetch(`${ORIGIN}/api/measurements`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: today, weightKg: 80.5, bodyFatPercent: 19, waistCm: 88 } }) });
+    await SELF.fetch(`${ORIGIN}/api/check-ins`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: dayBack(1), mood: 4, energy: 3, stress: 2, sleepHours: 7.5 } }) });
+    await SELF.fetch(`${ORIGIN}/api/check-ins`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: today, mood: 5, energy: 4, stress: 1, sleepHours: 8 } }) });
 
-    const res = await SELF.fetch(`http://x/api/progress/${client.id}?range=30d&today=${today}`, { headers: auth(ownerCookie) });
+    const res = await SELF.fetch(`${ORIGIN}/api/progress/${client.id}?range=30d&today=${today}`, { headers: auth(ownerCookie) });
     expect(res.status).toBe(200);
     const p = (await res.json()) as {
       body: { weight: { date: string; v: number }[]; deltas: { weight: { delta: number } | null }; latest: { weightKg: number | null } };
@@ -1371,14 +1371,14 @@ describe("progress analytics aggregation", () => {
 
   it("scopes every series to an explicit custom start/end window", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "CustomRangePat" }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "CustomRangePat" }) })).json()) as { client: { id: string } };
     // Three weigh-ins spread across April; a custom window should include only
     // the middle one and echo the exact window it was asked for.
-    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-01", weightKg: 85 } }) });
-    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-15", weightKg: 83 } }) });
-    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-30", weightKg: 81 } }) });
+    await SELF.fetch(`${ORIGIN}/api/measurements`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-01", weightKg: 85 } }) });
+    await SELF.fetch(`${ORIGIN}/api/measurements`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-15", weightKg: 83 } }) });
+    await SELF.fetch(`${ORIGIN}/api/measurements`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-04-30", weightKg: 81 } }) });
 
-    const p = (await (await SELF.fetch(`http://x/api/progress/${client.id}?start=2026-04-10&end=2026-04-20&today=2026-05-20`, { headers: auth(ownerCookie) })).json()) as {
+    const p = (await (await SELF.fetch(`${ORIGIN}/api/progress/${client.id}?start=2026-04-10&end=2026-04-20&today=2026-05-20`, { headers: auth(ownerCookie) })).json()) as {
       range: { start: string; end: string; days: string[] };
       body: { weight: { date: string; v: number }[]; latest: { weightKg: number | null } };
     };
@@ -1391,19 +1391,19 @@ describe("progress analytics aggregation", () => {
 
   it("grades calorie adherence against the goal in force on each day, not the current one", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "TimeGoal" }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "TimeGoal" }) })).json()) as { client: { id: string } };
     // Goal A (2000 kcal) effective early, then Goal B (3000 kcal) effective later —
     // manual targets, no calculator (the API accepts explicit targets).
-    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, label: "Cut", startDate: "2026-05-01", targets: { targetCalories: 2000, targetProteinG: 150 } }) });
-    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, label: "Bulk", startDate: "2026-05-10", targets: { targetCalories: 3000, targetProteinG: 200 } }) });
+    await SELF.fetch(`${ORIGIN}/api/goals`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, label: "Cut", startDate: "2026-05-01", targets: { targetCalories: 2000, targetProteinG: 150 } }) });
+    await SELF.fetch(`${ORIGIN}/api/goals`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, label: "Bulk", startDate: "2026-05-10", targets: { targetCalories: 3000, targetProteinG: 200 } }) });
 
     // Logged via the API — each row freezes the target in force on ITS date.
-    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-05-05", mealType: "lunch", label: "Meal A", calories: 2000, proteinG: 150, carbsG: 200, fatG: 60 } }) });
-    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-05-15", mealType: "lunch", label: "Meal B", calories: 3000, proteinG: 200, carbsG: 300, fatG: 90 } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/food`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-05-05", mealType: "lunch", label: "Meal A", calories: 2000, proteinG: 150, carbsG: 200, fatG: 60 } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/food`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-05-15", mealType: "lunch", label: "Meal B", calories: 3000, proteinG: 200, carbsG: 300, fatG: 90 } }) });
     // A pre-existing (historical) row with NO snapshot — resolved via the goal timeline.
     await (env.DB as D1Database).prepare("INSERT INTO food_entries (id, tenant_id, client_id, date_local, meal_type, label, calories, protein_g, carbs_g, fat_g, source, created_at) VALUES ('fen_hist_a', 'x', ?, '2026-05-03', 'breakfast', 'Legacy', 2000, 150, 200, 60, 'self_logged', '2026-05-03T08:00:00.000Z')").bind(client.id).run();
 
-    const p = (await (await SELF.fetch(`http://x/api/progress/${client.id}?range=30d&today=2026-05-20`, { headers: auth(ownerCookie) })).json()) as {
+    const p = (await (await SELF.fetch(`${ORIGIN}/api/progress/${client.id}?range=30d&today=2026-05-20`, { headers: auth(ownerCookie) })).json()) as {
       nutrition: { adherencePct: number | null; targets: { targetCalories?: number }; perDay: { date: string; target: number | null }[] };
     };
     // All three days are within ±10% of THEIR day's target → 100% (would be ~33%
@@ -1420,26 +1420,26 @@ describe("progress analytics aggregation", () => {
 
   it("flags weight In range / off track against the goal's healthy band", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "RangePat", gender: "male", dateOfBirth: "1994-01-01", heightCm: 180 }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "RangePat", gender: "male", dateOfBirth: "1994-01-01", heightCm: 180 }) })).json()) as { client: { id: string } };
     const today = new Date().toISOString().slice(0, 10);
     // Goal with a healthy weight band: 75–78 kg.
-    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, label: "Lean", targets: { targetCalories: 2200 }, ranges: { weightKg: { min: 75, max: 78 } } }) });
+    await SELF.fetch(`${ORIGIN}/api/goals`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, label: "Lean", targets: { targetCalories: 2200 }, ranges: { weightKg: { min: 75, max: 78 } } }) });
     // A weigh-in above the band.
-    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: today, weightKg: 82 } }) });
+    await SELF.fetch(`${ORIGIN}/api/measurements`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: today, weightKg: 82 } }) });
 
     // Client-facing Progress carries the band + status on the latest weight.
-    const prog = (await (await SELF.fetch(`http://x/api/progress/${client.id}?range=30d&today=${today}`, { headers: H })).json()) as { body: { ranges: { weightKg?: { max: number } }; latest: { weightStatus: string | null } } };
+    const prog = (await (await SELF.fetch(`${ORIGIN}/api/progress/${client.id}?range=30d&today=${today}`, { headers: H })).json()) as { body: { ranges: { weightKg?: { max: number } }; latest: { weightStatus: string | null } } };
     expect(prog.body.latest.weightStatus).toBe("above");
     expect(prog.body.ranges.weightKg?.max).toBe(78);
 
     // Coach-facing metrics carry the same status.
-    const cv = (await (await SELF.fetch(`http://x/api/clients/${client.id}`, { headers: H })).json()) as { metrics: { weightStatus: string | null } };
+    const cv = (await (await SELF.fetch(`${ORIGIN}/api/clients/${client.id}`, { headers: H })).json()) as { metrics: { weightStatus: string | null } };
     expect(cv.metrics.weightStatus).toBe("above");
 
     // A later, in-band weigh-in flips weight to In range (metrics take the latest).
     const tomorrow = new Date(Date.parse(today) + 86_400_000).toISOString().slice(0, 10);
-    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: tomorrow, weightKg: 76 } }) });
-    const cv2 = (await (await SELF.fetch(`http://x/api/clients/${client.id}`, { headers: H })).json()) as { metrics: { weightStatus: string | null } };
+    await SELF.fetch(`${ORIGIN}/api/measurements`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: tomorrow, weightKg: 76 } }) });
+    const cv2 = (await (await SELF.fetch(`${ORIGIN}/api/clients/${client.id}`, { headers: H })).json()) as { metrics: { weightStatus: string | null } };
     expect(cv2.metrics.weightStatus).toBe("in_range");
   });
 });
@@ -1447,32 +1447,32 @@ describe("progress analytics aggregation", () => {
 describe("access economy", () => {
   it("granting a package twice queues budgets, never sums", async () => {
     const { client } = (await (
-      await SELF.fetch("http://x/api/clients", {
+      await SELF.fetch(`${ORIGIN}/api/clients`, {
         method: "POST",
         headers: { "content-type": "application/json", ...auth(ownerCookie) },
         body: JSON.stringify({ displayName: "BudgetTest" }),
       })
     ).json()) as { client: { id: string } };
 
-    await SELF.fetch("http://x/api/packages", {
+    await SELF.fetch(`${ORIGIN}/api/packages`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ name: "30-day", budgets: [{ feature: "all", days: 30 }] }),
     });
-    const pkgs = (await (await SELF.fetch("http://x/api/packages", { headers: auth(ownerCookie) })).json()) as { packages: { id: string }[] };
+    const pkgs = (await (await SELF.fetch(`${ORIGIN}/api/packages`, { headers: auth(ownerCookie) })).json()) as { packages: { id: string }[] };
     const pkgId = pkgs.packages[0]!.id;
 
-    await SELF.fetch("http://x/api/subscriptions/grant", {
+    await SELF.fetch(`${ORIGIN}/api/subscriptions/grant`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ clientId: client.id, packageId: pkgId }),
     });
-    await SELF.fetch("http://x/api/subscriptions/grant", {
+    await SELF.fetch(`${ORIGIN}/api/subscriptions/grant`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ clientId: client.id, packageId: pkgId }),
     });
-    const subs = (await (await SELF.fetch(`http://x/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as {
+    const subs = (await (await SELF.fetch(`${ORIGIN}/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as {
       subscriptions: { daysRemaining: number; budgets: unknown[] }[];
     };
     // Queue-not-sum: two 30-day grants → 60 days of runway, not 30 (pooled) and
@@ -1486,7 +1486,7 @@ describe("access economy", () => {
 
 describe("integrations settings", () => {
   it("keyless providers default on; keys save masked (never returned)", async () => {
-    const before = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as {
+    const before = (await (await SELF.fetch(`${ORIGIN}/api/settings`, { headers: auth(ownerCookie) })).json()) as {
       integrations: Record<string, { enabled: boolean; ready: boolean; apiKeySet?: boolean }>;
     };
     // Open Food Facts + wger are keyless → default enabled + ready.
@@ -1495,13 +1495,13 @@ describe("integrations settings", () => {
     // USDA is keyed → not ready until a key is set.
     expect(before.integrations.usda!.ready).toBe(false);
 
-    await SELF.fetch("http://x/api/settings", {
+    await SELF.fetch(`${ORIGIN}/api/settings`, {
       method: "PATCH",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ integrations: { usda: { enabled: true, apiKey: "secret-usda-key" } } }),
     });
 
-    const res = await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) });
+    const res = await SELF.fetch(`${ORIGIN}/api/settings`, { headers: auth(ownerCookie) });
     const raw = await res.text();
     expect(raw).not.toContain("secret-usda-key"); // key never leaves the server
     const after = JSON.parse(raw) as { integrations: Record<string, { enabled: boolean; ready: boolean; apiKeySet?: boolean }> };
@@ -1513,54 +1513,54 @@ describe("integrations settings", () => {
 
 describe("activities feed (Train tab)", () => {
   it("logs an activity and lists it back within a date range", async () => {
-    const { client } = (await (await SELF.fetch("http://x/api/clients", {
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, {
       method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ displayName: "ActivityTest" }),
     })).json()) as { client: { id: string } };
-    const log = await SELF.fetch("http://x/api/logs/activity", {
+    const log = await SELF.fetch(`${ORIGIN}/api/logs/activity`, {
       method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-01", activityKey: "running", durationMin: 30 } }),
     });
     expect([200, 201]).toContain(log.status);
-    const list = (await (await SELF.fetch(`http://x/api/logs/activities?clientId=${client.id}&from=2026-06-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as { activities: { activity_key: string; duration_min: number }[] };
+    const list = (await (await SELF.fetch(`${ORIGIN}/api/logs/activities?clientId=${client.id}&from=2026-06-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as { activities: { activity_key: string; duration_min: number }[] };
     expect(list.activities.length).toBeGreaterThan(0);
     expect(list.activities[0]!.activity_key).toBe("running");
     // Another tenant can't read this client's activities.
-    expect((await SELF.fetch(`http://x/api/logs/activities?clientId=${client.id}&from=2026-06-01&to=2026-07-31`, { headers: auth(otherCookie) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/logs/activities?clientId=${client.id}&from=2026-06-01&to=2026-07-31`, { headers: auth(otherCookie) })).status).toBe(404);
   });
 
   it("carries distance + notes, estimates calories from weight, and re-estimates on edit; a typed number locks", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "ActEdit" }) })).json()) as { client: { id: string } };
-    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-01", weightKg: 80 } }) });
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "ActEdit" }) })).json()) as { client: { id: string } };
+    await SELF.fetch(`${ORIGIN}/api/measurements`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-01", weightKg: 80 } }) });
     // No caloriesBurned → server MET-estimates from the 80kg weight.
-    const created = (await (await SELF.fetch("http://x/api/logs/activity", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-02", activityKey: "swimming", durationMin: 60, distanceM: 1500, notes: "pool laps" } }) })).json()) as { id: string; calories: number };
+    const created = (await (await SELF.fetch(`${ORIGIN}/api/logs/activity`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-02", activityKey: "swimming", durationMin: 60, distanceM: 1500, notes: "pool laps" } }) })).json()) as { id: string; calories: number };
     expect(created.calories).toBe(480); // swimming MET 6 × 80kg × 1h
-    let list = (await (await SELF.fetch(`http://x/api/logs/activities?clientId=${client.id}&from=2026-07-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as { activities: { id: string; distance_m: number; notes: string; calories: number; calories_locked: number }[] };
+    let list = (await (await SELF.fetch(`${ORIGIN}/api/logs/activities?clientId=${client.id}&from=2026-07-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as { activities: { id: string; distance_m: number; notes: string; calories: number; calories_locked: number }[] };
     expect(list.activities[0]!.distance_m).toBe(1500);
     expect(list.activities[0]!.notes).toBe("pool laps");
     expect(list.activities[0]!.calories_locked).toBe(0);
     // Editing the duration re-estimates (still unlocked).
-    await SELF.fetch(`http://x/api/logs/activity/${created.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ clientId: client.id, durationMin: 30 }) });
-    list = (await (await SELF.fetch(`http://x/api/logs/activities?clientId=${client.id}&from=2026-07-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as typeof list;
+    await SELF.fetch(`${ORIGIN}/api/logs/activity/${created.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ clientId: client.id, durationMin: 30 }) });
+    list = (await (await SELF.fetch(`${ORIGIN}/api/logs/activities?clientId=${client.id}&from=2026-07-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as typeof list;
     expect(list.activities[0]!.calories).toBe(240);
     // A typed calorie number locks the row against further re-estimation.
-    await SELF.fetch(`http://x/api/logs/activity/${created.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ clientId: client.id, caloriesBurned: 999 }) });
-    await SELF.fetch(`http://x/api/logs/activity/${created.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ clientId: client.id, durationMin: 10 }) });
-    list = (await (await SELF.fetch(`http://x/api/logs/activities?clientId=${client.id}&from=2026-07-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as typeof list;
+    await SELF.fetch(`${ORIGIN}/api/logs/activity/${created.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ clientId: client.id, caloriesBurned: 999 }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/activity/${created.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ clientId: client.id, durationMin: 10 }) });
+    list = (await (await SELF.fetch(`${ORIGIN}/api/logs/activities?clientId=${client.id}&from=2026-07-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as typeof list;
     expect(list.activities[0]!.calories).toBe(999);
     expect(list.activities[0]!.calories_locked).toBe(1);
     // Delete removes it.
-    await SELF.fetch(`http://x/api/logs/activity/${created.id}?clientId=${client.id}`, { method: "DELETE", headers: auth(ownerCookie) });
-    list = (await (await SELF.fetch(`http://x/api/logs/activities?clientId=${client.id}&from=2026-07-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as typeof list;
+    await SELF.fetch(`${ORIGIN}/api/logs/activity/${created.id}?clientId=${client.id}`, { method: "DELETE", headers: auth(ownerCookie) });
+    list = (await (await SELF.fetch(`${ORIGIN}/api/logs/activities?clientId=${client.id}&from=2026-07-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as typeof list;
     expect(list.activities.length).toBe(0);
   });
 
   it("logs a rep-based move (push-ups) with a count and no duration", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "Reps" }) })).json()) as { client: { id: string } };
-    const r = await SELF.fetch("http://x/api/logs/activity", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-05", activityKey: "push_ups", reps: 50 } }) });
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "Reps" }) })).json()) as { client: { id: string } };
+    const r = await SELF.fetch(`${ORIGIN}/api/logs/activity`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-05", activityKey: "push_ups", reps: 50 } }) });
     expect([200, 201]).toContain(r.status);
-    const list = (await (await SELF.fetch(`http://x/api/logs/activities?clientId=${client.id}&from=2026-07-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as { activities: { activity_key: string; reps: number; duration_min: number | null }[] };
+    const list = (await (await SELF.fetch(`${ORIGIN}/api/logs/activities?clientId=${client.id}&from=2026-07-01&to=2026-07-31`, { headers: auth(ownerCookie) })).json()) as { activities: { activity_key: string; reps: number; duration_min: number | null }[] };
     expect(list.activities[0]!.activity_key).toBe("push_ups");
     expect(list.activities[0]!.reps).toBe(50);
     expect(list.activities[0]!.duration_min).toBeNull();
@@ -1568,11 +1568,11 @@ describe("activities feed (Train tab)", () => {
 
   it("estimates activity calories with AI, grounded on the client's body (mock)", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "ActAI" }) })).json()) as { client: { id: string } };
-    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-01", weightKg: 90 } }) });
-    const est = (await (await SELF.fetch("http://x/api/ai/activity-estimate", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, activityKey: "running", durationMin: 40 }) })).json()) as { calories: number; rationale: string };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "ActAI" }) })).json()) as { client: { id: string } };
+    await SELF.fetch(`${ORIGIN}/api/measurements`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-01", weightKg: 90 } }) });
+    const est = (await (await SELF.fetch(`${ORIGIN}/api/ai/activity-estimate`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, activityKey: "running", durationMin: 40 }) })).json()) as { calories: number; rationale: string };
     // Mock grounds on the 90kg weight: running MET 9.8 × 90 × (40/60) ≈ 588.
     expect(est.calories).toBe(Math.round(9.8 * 90 * (40 / 60)));
   });
@@ -1590,13 +1590,13 @@ describe("log detail (Today-item detail page)", () => {
 
   it("returns normalized detail + analytics for a logged activity", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "DetailAct" }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "DetailAct" }) })).json()) as { client: { id: string } };
     // Weight first so the activity gets a MET-estimated calorie burn.
-    await SELF.fetch("http://x/api/measurements", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-01", weightKg: 80 } }) });
-    const created = (await (await SELF.fetch("http://x/api/logs/activity", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-02", activityKey: "swimming", durationMin: 60, distanceM: 1500, notes: "pool laps" } }) })).json()) as { id: string; calories: number };
+    await SELF.fetch(`${ORIGIN}/api/measurements`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-01", weightKg: 80 } }) });
+    const created = (await (await SELF.fetch(`${ORIGIN}/api/logs/activity`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-02", activityKey: "swimming", durationMin: 60, distanceM: 1500, notes: "pool laps" } }) })).json()) as { id: string; calories: number };
     expect(created.calories).toBe(480);
 
-    const d = (await (await SELF.fetch(`http://x/api/logs/detail?clientId=${client.id}&kind=activity&ref=${created.id}`, { headers: auth(ownerCookie) })).json()) as Detail;
+    const d = (await (await SELF.fetch(`${ORIGIN}/api/logs/detail?clientId=${client.id}&kind=activity&ref=${created.id}`, { headers: auth(ownerCookie) })).json()) as Detail;
     expect(d.kind).toBe("activity");
     expect(d.tone).toBe("cardio");
     expect(d.title).toBe("Swimming");
@@ -1612,18 +1612,18 @@ describe("log detail (Today-item detail page)", () => {
     expect(d.series?.points.at(-1)?.value).toBe(480);
 
     // Unknown ref → 404; another tenant → 404.
-    expect((await SELF.fetch(`http://x/api/logs/detail?clientId=${client.id}&kind=activity&ref=nope`, { headers: auth(ownerCookie) })).status).toBe(404);
-    expect((await SELF.fetch(`http://x/api/logs/detail?clientId=${client.id}&kind=activity&ref=${created.id}`, { headers: auth(otherCookie) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/logs/detail?clientId=${client.id}&kind=activity&ref=nope`, { headers: auth(ownerCookie) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/logs/detail?clientId=${client.id}&kind=activity&ref=${created.id}`, { headers: auth(otherCookie) })).status).toBe(404);
   });
 
   it("aggregates a food meal by date with a 7-day calorie series", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "DetailFood" }) })).json()) as { client: { id: string } };
-    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-10", mealType: "lunch", label: "Rice", calories: 300, proteinG: 8, carbsG: 60, fatG: 2, quantity: 100, unit: "g" } }) });
-    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-10", mealType: "lunch", label: "Chicken", calories: 250, proteinG: 40, carbsG: 0, fatG: 8, quantity: 150, unit: "g" } }) });
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "DetailFood" }) })).json()) as { client: { id: string } };
+    await SELF.fetch(`${ORIGIN}/api/logs/food`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-10", mealType: "lunch", label: "Rice", calories: 300, proteinG: 8, carbsG: 60, fatG: 2, quantity: 100, unit: "g" } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/food`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-10", mealType: "lunch", label: "Chicken", calories: 250, proteinG: 40, carbsG: 0, fatG: 8, quantity: 150, unit: "g" } }) });
 
     // Food kinds arrive with the `:` dot-encoded (food.lunch), ref = the date.
-    const d = (await (await SELF.fetch(`http://x/api/logs/detail?clientId=${client.id}&kind=food.lunch&ref=2026-07-10`, { headers: auth(ownerCookie) })).json()) as Detail;
+    const d = (await (await SELF.fetch(`${ORIGIN}/api/logs/detail?clientId=${client.id}&kind=food.lunch&ref=2026-07-10`, { headers: auth(ownerCookie) })).json()) as Detail;
     expect(d.kind).toBe("food.lunch");
     expect(d.tone).toBe("nutrition");
     expect(d.title).toBe("Lunch");
@@ -1636,31 +1636,31 @@ describe("log detail (Today-item detail page)", () => {
     expect(d.series?.points.at(-1)?.value).toBe(550);
 
     // A meal with no entries that day → 404.
-    expect((await SELF.fetch(`http://x/api/logs/detail?clientId=${client.id}&kind=food.dinner&ref=2026-07-10`, { headers: auth(ownerCookie) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/logs/detail?clientId=${client.id}&kind=food.dinner&ref=2026-07-10`, { headers: auth(ownerCookie) })).status).toBe(404);
   });
 });
 
 describe("weekly nutrition strip (Eat tab)", () => {
   it("buckets 7-day calories/protein/water per day and stays tenant-scoped", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", {
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, {
       method: "POST", headers: H, body: JSON.stringify({ displayName: "WeekTest" }),
     })).json()) as { client: { id: string } };
     // Log food + water on the window end date.
-    await SELF.fetch("http://x/api/logs/food", {
+    await SELF.fetch(`${ORIGIN}/api/logs/food`, {
       method: "POST", headers: H,
       body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-11", mealType: "lunch", label: "Chicken", calories: 500, proteinG: 40, carbsG: 30, fatG: 12 } }),
     });
-    await SELF.fetch("http://x/api/logs/water", {
+    await SELF.fetch(`${ORIGIN}/api/logs/water`, {
       method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-11", amountMl: 750 } }),
     });
     // Log food on an earlier day inside the window.
-    await SELF.fetch("http://x/api/logs/food", {
+    await SELF.fetch(`${ORIGIN}/api/logs/food`, {
       method: "POST", headers: H,
       body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-08", mealType: "dinner", label: "Salmon", calories: 620, proteinG: 45, carbsG: 10, fatG: 30 } }),
     });
 
-    const week = (await (await SELF.fetch(`http://x/api/logs/nutrition/week?clientId=${client.id}&date=2026-07-11`, { headers: auth(ownerCookie) })).json()) as {
+    const week = (await (await SELF.fetch(`${ORIGIN}/api/logs/nutrition/week?clientId=${client.id}&date=2026-07-11`, { headers: auth(ownerCookie) })).json()) as {
       days: { date: string; calories: number; proteinG: number; waterMl: number; logged: boolean }[];
     };
     expect(week.days.length).toBe(7);
@@ -1673,20 +1673,20 @@ describe("weekly nutrition strip (Eat tab)", () => {
     expect(last.logged).toBe(true);
     expect(week.days.filter((d) => d.logged).length).toBe(2);
     // Another tenant is denied.
-    expect((await SELF.fetch(`http://x/api/logs/nutrition/week?clientId=${client.id}&date=2026-07-11`, { headers: auth(otherCookie) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/logs/nutrition/week?clientId=${client.id}&date=2026-07-11`, { headers: auth(otherCookie) })).status).toBe(404);
   });
 });
 
 describe("recent foods (one-tap re-log rail)", () => {
   it("groups a client's logs per food, keeping the latest quantity + a count", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "RecentTest" }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "RecentTest" }) })).json()) as { client: { id: string } };
     // Log "Chicken" twice (different portions) and "Rice" once, Chicken most recent.
-    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-01", mealType: "lunch", label: "Rice", calories: 300, proteinG: 8, carbsG: 60, fatG: 2, quantity: 100, unit: "g" } }) });
-    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-02", mealType: "lunch", label: "Chicken", calories: 250, proteinG: 40, carbsG: 0, fatG: 8, quantity: 150, unit: "g" } }) });
-    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-03", mealType: "dinner", label: "Chicken", calories: 330, proteinG: 53, carbsG: 0, fatG: 11, quantity: 200, unit: "g" } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/food`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-01", mealType: "lunch", label: "Rice", calories: 300, proteinG: 8, carbsG: 60, fatG: 2, quantity: 100, unit: "g" } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/food`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-02", mealType: "lunch", label: "Chicken", calories: 250, proteinG: 40, carbsG: 0, fatG: 8, quantity: 150, unit: "g" } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/food`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: "2026-07-03", mealType: "dinner", label: "Chicken", calories: 330, proteinG: 53, carbsG: 0, fatG: 11, quantity: 200, unit: "g" } }) });
 
-    const r = (await (await SELF.fetch(`http://x/api/foods/recent?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as {
+    const r = (await (await SELF.fetch(`${ORIGIN}/api/foods/recent?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as {
       recents: { label: string; quantity: number; calories: number; log_count: number }[];
     };
     expect(r.recents.length).toBe(2); // Chicken grouped, Rice
@@ -1697,7 +1697,7 @@ describe("recent foods (one-tap re-log rail)", () => {
     expect(r.recents[1]!.label).toBe("Rice");
     expect(r.recents[1]!.log_count).toBe(1);
     // Another tenant can't read this client's recents.
-    expect((await SELF.fetch(`http://x/api/foods/recent?clientId=${client.id}`, { headers: auth(otherCookie) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/foods/recent?clientId=${client.id}`, { headers: auth(otherCookie) })).status).toBe(404);
   });
 });
 
@@ -1705,44 +1705,44 @@ describe("home widget prefs", () => {
   it("persists per-surface widget layout and surfaces it on /context", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const coach = [{ id: "clients", size: "big" }, { id: "swaps", size: "small" }];
-    const r = await SELF.fetch("http://x/api/me/widgets", { method: "PATCH", headers: H, body: JSON.stringify({ surface: "coachHome", items: coach }) });
+    const r = await SELF.fetch(`${ORIGIN}/api/me/widgets`, { method: "PATCH", headers: H, body: JSON.stringify({ surface: "coachHome", items: coach }) });
     expect(r.status).toBe(200);
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { user: { widgets: { coachHome?: unknown; home?: unknown } } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { user: { widgets: { coachHome?: unknown; home?: unknown } } };
     expect(ctx.user.widgets.coachHome).toEqual(coach);
     // A second surface merges without clobbering the first.
     const home = [{ id: "calories", size: "big" }, { id: "water", size: "small" }];
-    await SELF.fetch("http://x/api/me/widgets", { method: "PATCH", headers: H, body: JSON.stringify({ surface: "home", items: home }) });
-    const ctx2 = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { user: { widgets: { coachHome?: unknown; home?: unknown } } };
+    await SELF.fetch(`${ORIGIN}/api/me/widgets`, { method: "PATCH", headers: H, body: JSON.stringify({ surface: "home", items: home }) });
+    const ctx2 = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { user: { widgets: { coachHome?: unknown; home?: unknown } } };
     expect(ctx2.user.widgets.home).toEqual(home);
     expect(ctx2.user.widgets.coachHome).toEqual(coach);
     // Bad size is rejected.
-    expect((await SELF.fetch("http://x/api/me/widgets", { method: "PATCH", headers: H, body: JSON.stringify({ surface: "home", items: [{ id: "x", size: "huge" }] }) })).status).toBe(400);
+    expect((await SELF.fetch(`${ORIGIN}/api/me/widgets`, { method: "PATCH", headers: H, body: JSON.stringify({ surface: "home", items: [{ id: "x", size: "huge" }] }) })).status).toBe(400);
   });
 });
 
 describe("activity history feed", () => {
   it("aggregates logs across surfaces into a dated timeline, tenant-scoped", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", {
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, {
       method: "POST", headers: H, body: JSON.stringify({ displayName: "HistoryTest" }),
     })).json()) as { client: { id: string } };
     const d = "2026-07-10";
-    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, mealType: "lunch", label: "Chicken", calories: 500, proteinG: 40, carbsG: 30, fatG: 12 } }) });
-    await SELF.fetch("http://x/api/logs/water", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, amountMl: 750 } }) });
-    await SELF.fetch("http://x/api/logs/activity", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, activityKey: "running", durationMin: 30 } }) });
-    await SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, workoutPlanId: "wp-hist", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "ex1", sets: [{ setIndex: 0, reps: 8, weightKg: 50, completed: true }] } }) });
-    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, mood: 4, notes: "felt strong" } }) });
-    const { id: labId } = (await (await SELF.fetch("http://x/api/labs", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, type: "blood_panel" }) })).json()) as { id: string };
+    await SELF.fetch(`${ORIGIN}/api/logs/food`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, mealType: "lunch", label: "Chicken", calories: 500, proteinG: 40, carbsG: 30, fatG: 12 } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/water`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, amountMl: 750 } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/activity`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, activityKey: "running", durationMin: 30 } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/workout-sets`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, workoutPlanId: "wp-hist", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "ex1", sets: [{ setIndex: 0, reps: 8, weightKg: 50, completed: true }] } }) });
+    await SELF.fetch(`${ORIGIN}/api/check-ins`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, mood: 4, notes: "felt strong" } }) });
+    const { id: labId } = (await (await SELF.fetch(`${ORIGIN}/api/labs`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, type: "blood_panel" }) })).json()) as { id: string };
     // A body scan on the same day (inserted directly — capture needs image data).
     await (env.DB as D1Database).prepare("INSERT INTO body_scans (id, tenant_id, client_id, date_local, body_fat_percent, weight_kg, created_at) VALUES ('scan_hist_1', 'x', ?, ?, 18.4, 80, ?)").bind(client.id, d, `${d}T09:00:00.000Z`).run();
     // A goal set by the owner (records an audit entry → drives actor attribution).
     // Give the acting user a display name so the audit join can attribute it.
-    const hctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const hctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const hOwner = (await (env.DB as D1Database).prepare("SELECT userId FROM member WHERE organizationId = ? AND role = 'owner' LIMIT 1").bind(hctx.active.tenantId).first<{ userId: string }>())!;
     await (env.DB as D1Database).prepare("UPDATE \"user\" SET name = 'Coach One' WHERE id = ?").bind(hOwner.userId).run();
-    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, label: "Recomp", calculator: { gender: "male", ageYears: 30, heightCm: 178, weightKg: 80, activityLevel: "moderate", primaryGoal: "maintain", dietaryApproach: "balanced" } }) });
+    await SELF.fetch(`${ORIGIN}/api/goals`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, label: "Recomp", calculator: { gender: "male", ageYears: 30, heightCm: 178, weightKg: 80, activityLevel: "moderate", primaryGoal: "maintain", dietaryApproach: "balanced" } }) });
 
-    const feed = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2026-07-10`, { headers: auth(ownerCookie) })).json()) as { events: { kind: string; date: string; title: string; ref?: string; actor?: string; metric?: { unit: string; value: number } }[] };
+    const feed = (await (await SELF.fetch(`${ORIGIN}/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2026-07-10`, { headers: auth(ownerCookie) })).json()) as { events: { kind: string; date: string; title: string; ref?: string; actor?: string; metric?: { unit: string; value: number } }[] };
     const kinds = feed.events.map((e) => e.kind);
     expect(kinds).toContain("food:lunch");
     expect(kinds).toContain("water");
@@ -1756,7 +1756,7 @@ describe("activity history feed", () => {
     // Deep-link ref: a check-in carries its date so the feed can open its detail.
     expect(feed.events.find((e) => e.kind === "checkin")!.ref).toBe(d);
     // A lab is dated by its creation time; a wide window catches it, ref = lab id.
-    const wide = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2030-01-01`, { headers: auth(ownerCookie) })).json()) as { events: { kind: string; ref?: string; actor?: string; subtitle?: string | null }[] };
+    const wide = (await (await SELF.fetch(`${ORIGIN}/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2030-01-01`, { headers: auth(ownerCookie) })).json()) as { events: { kind: string; ref?: string; actor?: string; subtitle?: string | null }[] };
     expect(wide.events.find((e) => e.kind === "lab")!.ref).toBe(labId);
     // The goal is in the feed and carries the acting coach's name (actor attribution).
     const goalEv = wide.events.find((e) => e.kind === "goal")!;
@@ -1764,23 +1764,23 @@ describe("activity history feed", () => {
     expect(typeof goalEv.actor).toBe("string");
     expect(goalEv.actor!.length).toBeGreaterThan(0);
     // Out-of-range window returns nothing.
-    const empty = (await (await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-06-01&to=2026-06-02`, { headers: auth(ownerCookie) })).json()) as { events: unknown[] };
+    const empty = (await (await SELF.fetch(`${ORIGIN}/api/activity-history?clientId=${client.id}&from=2026-06-01&to=2026-06-02`, { headers: auth(ownerCookie) })).json()) as { events: unknown[] };
     expect(empty.events.length).toBe(0);
     // Tenant isolation.
-    expect((await SELF.fetch(`http://x/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2026-07-10`, { headers: auth(otherCookie) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/activity-history?clientId=${client.id}&from=2026-07-08&to=2026-07-10`, { headers: auth(otherCookie) })).status).toBe(404);
   });
 });
 
 describe("wellness score", () => {
   it("composes a 0-100 score from real signals, per-pillar availability", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "ScoreTest" }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "ScoreTest" }) })).json()) as { client: { id: string } };
     const d = "2026-07-10";
-    await SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, workoutPlanId: "wp", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "ex1", sets: [{ setIndex: 0, reps: 8, weightKg: 60, completed: true }] } }) });
-    await SELF.fetch("http://x/api/logs/activity", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, activityKey: "running", durationMin: 30 } }) });
-    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, mood: 5, energy: 4, stress: 1, sleepHours: 8 } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/workout-sets`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, workoutPlanId: "wp", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "ex1", sets: [{ setIndex: 0, reps: 8, weightKg: 60, completed: true }] } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/activity`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, activityKey: "running", durationMin: 30 } }) });
+    await SELF.fetch(`${ORIGIN}/api/check-ins`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: d, mood: 5, energy: 4, stress: 1, sleepHours: 8 } }) });
 
-    const res = (await (await SELF.fetch(`http://x/api/wellness/score?clientId=${client.id}&today=${d}`, { headers: auth(ownerCookie) })).json()) as { score: number; band: string; pillars: { key: string; available: boolean; weight: number }[] };
+    const res = (await (await SELF.fetch(`${ORIGIN}/api/wellness/score?clientId=${client.id}&today=${d}`, { headers: auth(ownerCookie) })).json()) as { score: number; band: string; pillars: { key: string; available: boolean; weight: number }[] };
     expect(typeof res.score).toBe("number");
     expect(res.score).toBeGreaterThan(0);
     expect(res.score).toBeLessThanOrEqual(100);
@@ -1795,36 +1795,36 @@ describe("wellness score", () => {
     // Available weights redistribute to sum ~1 (display-rounded per pillar).
     expect(res.pillars.reduce((s, p) => s + p.weight, 0)).toBeCloseTo(1, 1);
     // Tenant isolation.
-    expect((await SELF.fetch(`http://x/api/wellness/score?clientId=${client.id}&today=${d}`, { headers: auth(otherCookie) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/wellness/score?clientId=${client.id}&today=${d}`, { headers: auth(otherCookie) })).status).toBe(404);
   });
 });
 
 describe("roster activity pulse (coach Today)", () => {
   it("aggregates recent client events across the roster, tagged + tenant-scoped", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const mk = async (name: string) => ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: name }) })).json()) as { client: { id: string } }).client;
+    const mk = async (name: string) => ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: name }) })).json()) as { client: { id: string } }).client;
     const a = await mk("RosterA");
     const b = await mk("RosterB");
     const day = "2026-07-10";
-    await SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H, body: JSON.stringify({ clientId: a.id, data: { date: day, workoutPlanId: "wp", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "e", sets: [{ setIndex: 0, reps: 8, weightKg: 40, completed: true }] } }) });
-    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: b.id, data: { date: day, mood: 4 } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/workout-sets`, { method: "POST", headers: H, body: JSON.stringify({ clientId: a.id, data: { date: day, workoutPlanId: "wp", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "e", sets: [{ setIndex: 0, reps: 8, weightKg: 40, completed: true }] } }) });
+    await SELF.fetch(`${ORIGIN}/api/check-ins`, { method: "POST", headers: H, body: JSON.stringify({ clientId: b.id, data: { date: day, mood: 4 } }) });
 
-    const roster = (await (await SELF.fetch("http://x/api/reports/roster-activity?from=2026-07-08&to=2026-07-10", { headers: auth(ownerCookie) })).json()) as { events: { clientId: string; clientName: string; kind: string }[] };
+    const roster = (await (await SELF.fetch(`${ORIGIN}/api/reports/roster-activity?from=2026-07-08&to=2026-07-10`, { headers: auth(ownerCookie) })).json()) as { events: { clientId: string; clientName: string; kind: string }[] };
     expect(roster.events.some((e) => e.clientId === a.id && e.kind === "workout" && e.clientName === "RosterA")).toBe(true);
     expect(roster.events.some((e) => e.clientId === b.id && e.kind === "checkin")).toBe(true);
     // Another tenant's coach sees their own roster only — not these clients.
-    const other = (await (await SELF.fetch("http://x/api/reports/roster-activity?from=2026-07-08&to=2026-07-10", { headers: auth(otherCookie) })).json()) as { events: { clientId: string }[] };
+    const other = (await (await SELF.fetch(`${ORIGIN}/api/reports/roster-activity?from=2026-07-08&to=2026-07-10`, { headers: auth(otherCookie) })).json()) as { events: { clientId: string }[] };
     expect(other.events.some((e) => e.clientId === a.id || e.clientId === b.id)).toBe(false);
   });
 
   it("roster-analytics aggregates a daily active-clients trend + engagement rates", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "AnalyticsAna" }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "AnalyticsAna" }) })).json()) as { client: { id: string } };
     const today = new Date().toISOString().slice(0, 10);
-    await SELF.fetch("http://x/api/check-ins", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: today, mood: 5 } }) });
-    await SELF.fetch("http://x/api/logs/food", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: today, mealType: "lunch", label: "Rice", calories: 300, proteinG: 8, carbsG: 60, fatG: 2 } }) });
+    await SELF.fetch(`${ORIGIN}/api/check-ins`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: today, mood: 5 } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/food`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date: today, mealType: "lunch", label: "Rice", calories: 300, proteinG: 8, carbsG: 60, fatG: 2 } }) });
 
-    const a = (await (await SELF.fetch(`http://x/api/reports/roster-analytics?days=14&today=${today}`, { headers: auth(ownerCookie) })).json()) as {
+    const a = (await (await SELF.fetch(`${ORIGIN}/api/reports/roster-analytics?days=14&today=${today}`, { headers: auth(ownerCookie) })).json()) as {
       roster: { total: number; active7: number; atRisk: number };
       daily: { date: string; active: number }[];
       engagement: { checkInRate: number; workoutRate: number; avgActivePerDay: number };
@@ -1837,7 +1837,7 @@ describe("roster activity pulse (coach Today)", () => {
     expect(a.engagement.checkInRate).toBeGreaterThanOrEqual(0);
     expect(a.topClients.some((t) => t.clientId === client.id && t.logs >= 2)).toBe(true); // check-in + food
     // Tenant isolation — another tenant's coach doesn't see Ana.
-    const other = (await (await SELF.fetch(`http://x/api/reports/roster-analytics?days=14&today=${today}`, { headers: auth(otherCookie) })).json()) as { topClients: { clientId: string }[] };
+    const other = (await (await SELF.fetch(`${ORIGIN}/api/reports/roster-analytics?days=14&today=${today}`, { headers: auth(otherCookie) })).json()) as { topClients: { clientId: string }[] };
     expect(other.topClients.some((t) => t.clientId === client.id)).toBe(false);
   });
 });
@@ -1845,34 +1845,34 @@ describe("roster activity pulse (coach Today)", () => {
 describe("exercise last performance (progressive-overload hint)", () => {
   it("returns the most recent prior session's sets for an exercise", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "LastPerf" }) })).json()) as { client: { id: string } };
-    const set = (date: string, weightKg: number) => SELF.fetch("http://x/api/logs/workout-sets", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date, workoutPlanId: "wp-lp", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "ex_squat", sets: [{ setIndex: 0, reps: 5, weightKg, completed: true }] } }) });
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "LastPerf" }) })).json()) as { client: { id: string } };
+    const set = (date: string, weightKg: number) => SELF.fetch(`${ORIGIN}/api/logs/workout-sets`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { date, workoutPlanId: "wp-lp", planDayIndex: 0, blockIndex: 0, slotIndex: 0, exerciseId: "ex_squat", sets: [{ setIndex: 0, reps: 5, weightKg, completed: true }] } }) });
     await set("2026-06-01", 60);
     await set("2026-06-08", 65); // the most recent prior session
     await set("2026-06-15", 70); // "today" (excluded by `before`)
 
-    const r = (await (await SELF.fetch(`http://x/api/logs/exercise-last?clientId=${client.id}&exerciseId=ex_squat&before=2026-06-15`, { headers: auth(ownerCookie) })).json()) as {
+    const r = (await (await SELF.fetch(`${ORIGIN}/api/logs/exercise-last?clientId=${client.id}&exerciseId=ex_squat&before=2026-06-15`, { headers: auth(ownerCookie) })).json()) as {
       last: { date: string; sets: { reps: number | null; weightKg: number | null }[] } | null;
     };
     expect(r.last?.date).toBe("2026-06-08");
     expect(r.last?.sets[0]?.weightKg).toBe(65);
     expect(r.last?.sets[0]?.reps).toBe(5);
     // An exercise never logged → null.
-    const none = (await (await SELF.fetch(`http://x/api/logs/exercise-last?clientId=${client.id}&exerciseId=ex_never`, { headers: auth(ownerCookie) })).json()) as { last: unknown };
+    const none = (await (await SELF.fetch(`${ORIGIN}/api/logs/exercise-last?clientId=${client.id}&exerciseId=ex_never`, { headers: auth(ownerCookie) })).json()) as { last: unknown };
     expect(none.last).toBeNull();
     // Another tenant is denied.
-    expect((await SELF.fetch(`http://x/api/logs/exercise-last?clientId=${client.id}&exerciseId=ex_squat`, { headers: auth(otherCookie) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/logs/exercise-last?clientId=${client.id}&exerciseId=ex_squat`, { headers: auth(otherCookie) })).status).toBe(404);
   });
 });
 
 describe("workout logging — measurement modes (SPEC §8.3)", () => {
   it("persists reps, time, and distance sets and reads them back per slot", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch("http://x/api/clients", {
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, {
       method: "POST", headers: H, body: JSON.stringify({ displayName: "WorkoutMeasure" }),
     })).json()) as { client: { id: string } };
     const base = { date: "2026-07-11", workoutPlanId: "wp-measure", planDayIndex: 0 };
-    const log = (data: Record<string, unknown>) => SELF.fetch("http://x/api/logs/workout-sets", {
+    const log = (data: Record<string, unknown>) => SELF.fetch(`${ORIGIN}/api/logs/workout-sets`, {
       method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, data: { ...base, ...data } }),
     });
     // Slot 0 — reps + weight; slot 1 — time hold; slot 2 — distance.
@@ -1880,7 +1880,7 @@ describe("workout logging — measurement modes (SPEC §8.3)", () => {
     expect((await log({ blockIndex: 0, slotIndex: 1, exerciseId: "ex-plank", sets: [{ setIndex: 0, durationSeconds: 45, completed: true }] })).status).toBe(200);
     expect((await log({ blockIndex: 0, slotIndex: 2, exerciseId: "ex-row", sets: [{ setIndex: 0, distanceM: 500, completed: true }] })).status).toBe(200);
 
-    const back = (await (await SELF.fetch(`http://x/api/logs/workout-sessions?clientId=${client.id}&from=2026-07-11&to=2026-07-11`, { headers: auth(ownerCookie) })).json()) as {
+    const back = (await (await SELF.fetch(`${ORIGIN}/api/logs/workout-sessions?clientId=${client.id}&from=2026-07-11&to=2026-07-11`, { headers: auth(ownerCookie) })).json()) as {
       sessions: { entries: { slotIndex: number; exerciseId: string; sets: { reps?: number; weightKg?: number; durationSeconds?: number; distanceM?: number }[] }[] }[];
     };
     expect(back.sessions.length).toBe(1);
@@ -1891,30 +1891,30 @@ describe("workout logging — measurement modes (SPEC §8.3)", () => {
     expect(bySlot.get(1)!.sets[0]!.reps ?? null).toBeNull();
     expect(bySlot.get(2)!.sets[0]!.distanceM).toBe(500);
     // Tenant isolation on the read.
-    expect((await SELF.fetch(`http://x/api/logs/workout-sessions?clientId=${client.id}&from=2026-07-11&to=2026-07-11`, { headers: auth(otherCookie) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/logs/workout-sessions?clientId=${client.id}&from=2026-07-11&to=2026-07-11`, { headers: auth(otherCookie) })).status).toBe(404);
   });
 });
 
 describe("exercise swaps + alternatives (SPEC §8.3)", () => {
   it("bound alternatives auto-apply; open requests wait for the coach's pick", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const mkEx = async (name: string) => ((await (await SELF.fetch("http://x/api/exercises", { method: "POST", headers: H, body: JSON.stringify({ name, visibility: "tenant" }) })).json()) as { id: string }).id;
+    const mkEx = async (name: string) => ((await (await SELF.fetch(`${ORIGIN}/api/exercises`, { method: "POST", headers: H, body: JSON.stringify({ name, visibility: "tenant" }) })).json()) as { id: string }).id;
     const a = await mkEx("Barbell Bench Press");
     const b = await mkEx("Dumbbell Bench Press");
 
     // Bind A↔B and read it back (two-way).
-    expect((await SELF.fetch(`http://x/api/exercises/${a}/alternatives`, { method: "POST", headers: H, body: JSON.stringify({ exerciseId: b }) })).status).toBe(201);
-    const altsOfB = (await (await SELF.fetch(`http://x/api/exercises/${b}/alternatives`, { headers: auth(ownerCookie) })).json()) as { alternatives: { id: string }[] };
+    expect((await SELF.fetch(`${ORIGIN}/api/exercises/${a}/alternatives`, { method: "POST", headers: H, body: JSON.stringify({ exerciseId: b }) })).status).toBe(201);
+    const altsOfB = (await (await SELF.fetch(`${ORIGIN}/api/exercises/${b}/alternatives`, { headers: auth(ownerCookie) })).json()) as { alternatives: { id: string }[] };
     expect(altsOfB.alternatives.map((x) => x.id)).toContain(a);
 
-    const client = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "SwapClient" }) })).json()) as { client: { id: string } }).client;
+    const client = ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "SwapClient" }) })).json()) as { client: { id: string } }).client;
     // The swap now validates that the plan belongs to the client (cross-client IDOR
     // fix) — give the client a real plan with two slots so both the auto-apply and
     // the open-request paths resolve against an owned plan.
-    const swapCtx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const swapCtx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await (env.DB as D1Database).prepare("INSERT INTO workout_plans (id, tenant_id, client_id, name, status, body_json, created_at) VALUES ('wp1', ?, ?, 'P', 'published', ?, '2026-01-01')")
       .bind(swapCtx.active.tenantId, client.id, JSON.stringify({ days: [{ blocks: [{ slots: [{ exerciseId: a }, { exerciseId: a }] }] }] })).run();
-    const swap = (body: Record<string, unknown>) => SELF.fetch("http://x/api/swaps", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, workoutPlanId: "wp1", dayIndex: 0, blockIndex: 0, slotIndex: 0, currentExerciseId: a, ...body }) });
+    const swap = (body: Record<string, unknown>) => SELF.fetch(`${ORIGIN}/api/swaps`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, workoutPlanId: "wp1", dayIndex: 0, blockIndex: 0, slotIndex: 0, currentExerciseId: a, ...body }) });
 
     // Picking a bound alternative auto-approves.
     const auto = (await (await swap({ suggestedExerciseId: b })).json()) as { autoApproved: boolean };
@@ -1925,17 +1925,17 @@ describe("exercise swaps + alternatives (SPEC §8.3)", () => {
     expect(open.autoApproved).toBe(false);
 
     // Approving an open request with no replacement is rejected; with one, it applies.
-    expect((await SELF.fetch(`http://x/api/swaps/${open.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ status: "approved" }) })).status).toBe(400);
-    expect((await SELF.fetch(`http://x/api/swaps/${open.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ status: "approved", replacementExerciseId: b }) })).status).toBe(200);
+    expect((await SELF.fetch(`${ORIGIN}/api/swaps/${open.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ status: "approved" }) })).status).toBe(400);
+    expect((await SELF.fetch(`${ORIGIN}/api/swaps/${open.id}`, { method: "PATCH", headers: H, body: JSON.stringify({ status: "approved", replacementExerciseId: b }) })).status).toBe(200);
   });
 });
 
 describe("inbox — real-time notification WS", () => {
   it("requires a signed-in user, then expects a websocket upgrade", async () => {
     // Unauthenticated → 401 from the guard's user-only lane.
-    expect((await SELF.fetch("http://x/api/inbox/ws")).status).toBe(401);
+    expect((await SELF.fetch(`${ORIGIN}/api/inbox/ws`)).status).toBe(401);
     // Authenticated but not a WS handshake → 426 Upgrade Required.
-    const res = await SELF.fetch("http://x/api/inbox/ws", { headers: auth(ownerCookie) });
+    const res = await SELF.fetch(`${ORIGIN}/api/inbox/ws`, { headers: auth(ownerCookie) });
     expect(res.status).toBe(426);
   });
 
@@ -1952,7 +1952,7 @@ describe("custom domains (SPEC §14.1) — Host pins the tenant", () => {
 
   it("Host resolves the tenant, pins members to it, and locks out strangers", async () => {
     // Studio One's tenant id, then map a custom hostname to it (as provisioning would).
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     tenantId = ctx.active.tenantId;
     await (env.DB as D1Database)
       .prepare("INSERT INTO tenant_domains (hostname, tenant_id, cf_hostname_id, status, created_at, updated_at) VALUES (?, ?, 'ch_test', 'active', '2026-01-01', '2026-01-01')")
@@ -2125,8 +2125,8 @@ describe("OTP-send gate — sign-up eligibility + cooldown", () => {
 
   it("an invited (existing client-row) email is let through even when invite-only", async () => {
     await setSelfRegister(false);
-    const tenantId = ((await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } }).active.tenantId;
-    await SELF.fetch("http://x/api/clients", { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ email: "invited-1@test.dev", displayName: "Invited One" }) });
+    const tenantId = ((await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } }).active.tenantId;
+    await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ email: "invited-1@test.dev", displayName: "Invited One" }) });
     const res = await send({ email: "invited-1@test.dev", type: "sign-in", slug: "studio-one" });
     expect(res.status).toBe(200);
     expect(tenantId).toBeTruthy();
@@ -2134,7 +2134,7 @@ describe("OTP-send gate — sign-up eligibility + cooldown", () => {
 
   it("self sign-up on: a new email is accepted and a pending client is reserved", async () => {
     await setSelfRegister(true);
-    const tenantId = ((await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } }).active.tenantId;
+    const tenantId = ((await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } }).active.tenantId;
     const res = await send({ email: "joiner-1@test.dev", type: "sign-in", slug: "studio-one", intent: "signup" });
     expect(res.status).toBe(200);
     const row = await (env.DB as D1Database)
@@ -2153,7 +2153,7 @@ describe("OTP-send gate — sign-up eligibility + cooldown", () => {
     // at the limit that is a denial-of-capacity against a public studio door.
     const db = env.DB as D1Database;
     await setSelfRegister(true);
-    const tenantId = ((await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } }).active.tenantId;
+    const tenantId = ((await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } }).active.tenantId;
     const seats = async () => (await db.prepare("SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ? AND status != 'pending_signup'").bind(tenantId).first<{ n: number }>())!.n;
     const before = await seats();
 
@@ -2163,17 +2163,17 @@ describe("OTP-send gate — sign-up eligibility + cooldown", () => {
     // No seat spent…
     expect(await seats()).toBe(before);
     // …and not on the coach's roster: an unverified address is not a client.
-    const roster = (await (await SELF.fetch("http://x/api/clients", { headers: auth(ownerCookie) })).json()) as { clients: { id: string }[] };
+    const roster = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { headers: auth(ownerCookie) })).json()) as { clients: { id: string }[] };
     expect(roster.clients.find((cl) => cl.id === row!.id)).toBeFalsy();
 
     // Claiming it — the first authenticated context read — is where the seat goes.
     const claimCookie = await verifyExistingOtp("reserve-1@test.dev");
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(claimCookie) })).json()) as { personas: { tenantId: string; clientId: string | null }[] };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(claimCookie) })).json()) as { personas: { tenantId: string; clientId: string | null }[] };
     expect(ctx.personas.find((p) => p.tenantId === tenantId)?.clientId).toBe(row!.id);
     expect((await db.prepare("SELECT status, user_id FROM clients WHERE id = ?").bind(row!.id).first<{ status: string; user_id: string | null }>())!.status).toBe("active");
     expect(await seats()).toBe(before + 1);
     // Now it IS a client, so the coach sees them.
-    const roster2 = (await (await SELF.fetch("http://x/api/clients", { headers: auth(ownerCookie) })).json()) as { clients: { id: string }[] };
+    const roster2 = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { headers: auth(ownerCookie) })).json()) as { clients: { id: string }[] };
     expect(roster2.clients.find((cl) => cl.id === row!.id)).toBeTruthy();
 
     await setSelfRegister(false);
@@ -2395,14 +2395,14 @@ describe("foods — tenant isolation + copy-on-write", () => {
 
   it("re-importing the same (source, sourceId) from another tenant does not clobber the first", async () => {
     // Studio One imports a food.
-    const a = (await (await SELF.fetch("http://x/api/foods", {
+    const a = (await (await SELF.fetch(`${ORIGIN}/api/foods`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify(mkFood({ name: "Owner1 Bar", calories: 200 })),
     })).json()) as { id: string };
 
     // Studio Two imports the SAME source/sourceId with different values.
-    const b = (await (await SELF.fetch("http://x/api/foods", {
+    const b = (await (await SELF.fetch(`${ORIGIN}/api/foods`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(otherCookie) },
       body: JSON.stringify(mkFood({ name: "Owner2 Bar", calories: 999 })),
@@ -2412,30 +2412,30 @@ describe("foods — tenant isolation + copy-on-write", () => {
     expect(b.id).not.toBe(a.id);
 
     // Studio One's food is unchanged and Studio Two can't see it.
-    const one = (await (await SELF.fetch("http://x/api/foods?q=owner1", { headers: auth(ownerCookie) })).json()) as { foods: { id: string; name: string; calories: number }[] };
+    const one = (await (await SELF.fetch(`${ORIGIN}/api/foods?q=owner1`, { headers: auth(ownerCookie) })).json()) as { foods: { id: string; name: string; calories: number }[] };
     const mine = one.foods.find((f) => f.id === a.id)!;
     expect(mine.name).toBe("Owner1 Bar");
     expect(mine.calories).toBe(200);
-    const twoSees = (await (await SELF.fetch(`http://x/api/foods/${a.id}`, { headers: auth(otherCookie) })).status);
+    const twoSees = (await (await SELF.fetch(`${ORIGIN}/api/foods/${a.id}`, { headers: auth(otherCookie) })).status);
     expect(twoSees).toBe(404);
   });
 
   it("a manually-added food (custom, no sourceId) lands in the library list", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const created = (await (await SELF.fetch("http://x/api/foods", { method: "POST", headers: H, body: JSON.stringify({ name: "Homemade Granola", calories: 420, proteinG: 11, carbsG: 60, fatG: 15, source: "custom" }) })).json()) as { id: string; imported: boolean };
+    const created = (await (await SELF.fetch(`${ORIGIN}/api/foods`, { method: "POST", headers: H, body: JSON.stringify({ name: "Homemade Granola", calories: 420, proteinG: 11, carbsG: 60, fatG: 15, source: "custom" }) })).json()) as { id: string; imported: boolean };
     expect(created.id).toBeTruthy();
     // Appears in the unfiltered library list…
-    const all = (await (await SELF.fetch("http://x/api/foods", { headers: auth(ownerCookie) })).json()) as { foods: { id: string }[] };
+    const all = (await (await SELF.fetch(`${ORIGIN}/api/foods`, { headers: auth(ownerCookie) })).json()) as { foods: { id: string }[] };
     expect(all.foods.map((f) => f.id)).toContain(created.id);
     // …and under a matching search.
-    const q = (await (await SELF.fetch("http://x/api/foods?q=granola", { headers: auth(ownerCookie) })).json()) as { foods: { id: string }[] };
+    const q = (await (await SELF.fetch(`${ORIGIN}/api/foods?q=granola`, { headers: auth(ownerCookie) })).json()) as { foods: { id: string }[] };
     expect(q.foods.map((f) => f.id)).toContain(created.id);
   });
 
   it("the /foods/:id editor route does not shadow /foods/search-external (regression)", async () => {
     // Before the id was constrained to `food_…`, this GET matched /foods/:id
     // with id="search-external" and 404'd — silently killing web food search.
-    const res = await SELF.fetch("http://x/api/foods/search-external?q=banana", { headers: auth(ownerCookie) });
+    const res = await SELF.fetch(`${ORIGIN}/api/foods/search-external?q=banana`, { headers: auth(ownerCookie) });
     expect(res.status).not.toBe(404);
     const body = (await res.json()) as { foods?: unknown[]; error?: string };
     expect(body.error).not.toBe("not found");
@@ -2448,7 +2448,7 @@ describe("foods — tenant isolation + copy-on-write", () => {
       .run();
 
     // Studio One edits it → server forks an owned copy.
-    const res = await SELF.fetch("http://x/api/foods/food_seed1", {
+    const res = await SELF.fetch(`${ORIGIN}/api/foods/food_seed1`, {
       method: "PATCH",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ calories: 120 }),
@@ -2472,20 +2472,20 @@ describe("library archive (soft-delete) + resolve lane", () => {
   // ownerCookie is only assigned in beforeAll (after collection), so build the
   // auth header lazily at call time rather than at describe-body evaluation.
   const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
-  const mkEx = async (name: string) => ((await (await SELF.fetch("http://x/api/exercises", { method: "POST", headers: H(), body: JSON.stringify({ name, visibility: "tenant" }) })).json()) as { id: string }).id;
+  const mkEx = async (name: string) => ((await (await SELF.fetch(`${ORIGIN}/api/exercises`, { method: "POST", headers: H(), body: JSON.stringify({ name, visibility: "tenant" }) })).json()) as { id: string }).id;
 
   it("archiving hides an exercise from browse but keeps it resolvable via scope=all", async () => {
     const id = await mkEx("Archive Me Curl");
-    const before = (await (await SELF.fetch("http://x/api/exercises?q=archive me curl", { headers: auth(ownerCookie) })).json()) as { exercises: { id: string }[] };
+    const before = (await (await SELF.fetch(`${ORIGIN}/api/exercises?q=archive me curl`, { headers: auth(ownerCookie) })).json()) as { exercises: { id: string }[] };
     expect(before.exercises.map((e) => e.id)).toContain(id);
 
-    expect((await SELF.fetch(`http://x/api/exercises/${id}`, { method: "DELETE", headers: H() })).status).toBe(200);
+    expect((await SELF.fetch(`${ORIGIN}/api/exercises/${id}`, { method: "DELETE", headers: H() })).status).toBe(200);
 
     // Gone from the browse lane…
-    const browse = (await (await SELF.fetch("http://x/api/exercises?q=archive me curl", { headers: auth(ownerCookie) })).json()) as { exercises: { id: string }[] };
+    const browse = (await (await SELF.fetch(`${ORIGIN}/api/exercises?q=archive me curl`, { headers: auth(ownerCookie) })).json()) as { exercises: { id: string }[] };
     expect(browse.exercises.map((e) => e.id)).not.toContain(id);
     // …but still resolves on the scope=all lane (plans/logs that reference it).
-    const resolve = (await (await SELF.fetch("http://x/api/exercises?scope=all", { headers: auth(ownerCookie) })).json()) as { exercises: { id: string; active: number }[] };
+    const resolve = (await (await SELF.fetch(`${ORIGIN}/api/exercises?scope=all`, { headers: auth(ownerCookie) })).json()) as { exercises: { id: string; active: number }[] };
     const row = resolve.exercises.find((e) => e.id === id);
     expect(row).toBeTruthy();
     expect(row!.active).toBe(0);
@@ -2494,48 +2494,48 @@ describe("library archive (soft-delete) + resolve lane", () => {
   it("a tenant cannot archive the platform seed or another tenant's row", async () => {
     // Platform seed (tenant NULL) — the tenant-scoped UPDATE can never match it.
     await (env.DB as D1Database).prepare("INSERT INTO exercises (id, tenant_id, visibility, name, active, created_at) VALUES ('exr_seedA', NULL, 'tenant', 'Seed Squat', 1, '2026-01-01')").run();
-    await SELF.fetch("http://x/api/exercises/exr_seedA", { method: "DELETE", headers: H() });
+    await SELF.fetch(`${ORIGIN}/api/exercises/exr_seedA`, { method: "DELETE", headers: H() });
     const seed = await (env.DB as D1Database).prepare("SELECT active FROM exercises WHERE id = 'exr_seedA'").first<{ active: number }>();
     expect(seed!.active).toBe(1);
 
     // Another tenant's row — owner1's delete must not touch owner2's exercise.
-    const other = ((await (await SELF.fetch("http://x/api/exercises", { method: "POST", headers: { "content-type": "application/json", ...auth(otherCookie) }, body: JSON.stringify({ name: "Owner2 Row", visibility: "tenant" }) })).json()) as { id: string }).id;
-    await SELF.fetch(`http://x/api/exercises/${other}`, { method: "DELETE", headers: H() });
-    const stillThere = (await (await SELF.fetch("http://x/api/exercises?q=owner2 row", { headers: auth(otherCookie) })).json()) as { exercises: { id: string }[] };
+    const other = ((await (await SELF.fetch(`${ORIGIN}/api/exercises`, { method: "POST", headers: { "content-type": "application/json", ...auth(otherCookie) }, body: JSON.stringify({ name: "Owner2 Row", visibility: "tenant" }) })).json()) as { id: string }).id;
+    await SELF.fetch(`${ORIGIN}/api/exercises/${other}`, { method: "DELETE", headers: H() });
+    const stillThere = (await (await SELF.fetch(`${ORIGIN}/api/exercises?q=owner2 row`, { headers: auth(otherCookie) })).json()) as { exercises: { id: string }[] };
     expect(stillThere.exercises.map((e) => e.id)).toContain(other);
   });
 
   it("usage counts the plans that reference an exercise", async () => {
     const id = await mkEx("Used In Plan Row");
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const body = JSON.stringify({ days: [{ blocks: [{ slots: [{ exerciseId: id, sets: [] }] }] }] });
     await (env.DB as D1Database).prepare("INSERT INTO workout_plans (id, tenant_id, client_id, name, status, body_json, created_at) VALUES ('wp_use1', ?, 'c1', 'P', 'draft', ?, '2026-01-01')").bind(ctx.active.tenantId, body).run();
 
-    const usage = (await (await SELF.fetch(`http://x/api/exercises/${id}/usage`, { headers: auth(ownerCookie) })).json()) as { plans: number; templates: number };
+    const usage = (await (await SELF.fetch(`${ORIGIN}/api/exercises/${id}/usage`, { headers: auth(ownerCookie) })).json()) as { plans: number; templates: number };
     expect(usage.plans).toBe(1);
     expect(usage.templates).toBe(0);
   });
 
   it("archiving a food hides it from browse but the resolve routes still return it", async () => {
-    const food = ((await (await SELF.fetch("http://x/api/foods", { method: "POST", headers: H(), body: JSON.stringify({ name: "Archive Yogurt", calories: 100 }) })).json()) as { id: string }).id;
-    expect((await SELF.fetch(`http://x/api/foods/${food}`, { method: "DELETE", headers: H() })).status).toBe(200);
+    const food = ((await (await SELF.fetch(`${ORIGIN}/api/foods`, { method: "POST", headers: H(), body: JSON.stringify({ name: "Archive Yogurt", calories: 100 }) })).json()) as { id: string }).id;
+    expect((await SELF.fetch(`${ORIGIN}/api/foods/${food}`, { method: "DELETE", headers: H() })).status).toBe(200);
 
-    const browse = (await (await SELF.fetch("http://x/api/foods?q=archive yogurt", { headers: auth(ownerCookie) })).json()) as { foods: { id: string }[] };
+    const browse = (await (await SELF.fetch(`${ORIGIN}/api/foods?q=archive yogurt`, { headers: auth(ownerCookie) })).json()) as { foods: { id: string }[] };
     expect(browse.foods.map((f) => f.id)).not.toContain(food);
     // Resolvable both by id and on the scope=all lane.
-    expect((await SELF.fetch(`http://x/api/foods/${food}`, { headers: auth(ownerCookie) })).status).toBe(200);
-    const resolve = (await (await SELF.fetch("http://x/api/foods?scope=all", { headers: auth(ownerCookie) })).json()) as { foods: { id: string }[] };
+    expect((await SELF.fetch(`${ORIGIN}/api/foods/${food}`, { headers: auth(ownerCookie) })).status).toBe(200);
+    const resolve = (await (await SELF.fetch(`${ORIGIN}/api/foods?scope=all`, { headers: auth(ownerCookie) })).json()) as { foods: { id: string }[] };
     expect(resolve.foods.map((f) => f.id)).toContain(food);
   });
 });
 
 describe("plan lifecycle — publish supersedes, restore, draft-only delete", () => {
   const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
-  const mkClient = async () => ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "PlanLifecycle" }) })).json()) as { client: { id: string } }).client.id;
-  const mkPlan = async (clientId: string, name: string) => ((await (await SELF.fetch("http://x/api/workout-plans", { method: "POST", headers: H(), body: JSON.stringify({ clientId, name }) })).json()) as { plan: { id: string } }).plan.id;
-  const publish = (id: string) => SELF.fetch(`http://x/api/workout-plans/${id}/publish`, { method: "POST", headers: H() });
+  const mkClient = async () => ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H(), body: JSON.stringify({ displayName: "PlanLifecycle" }) })).json()) as { client: { id: string } }).client.id;
+  const mkPlan = async (clientId: string, name: string) => ((await (await SELF.fetch(`${ORIGIN}/api/workout-plans`, { method: "POST", headers: H(), body: JSON.stringify({ clientId, name }) })).json()) as { plan: { id: string } }).plan.id;
+  const publish = (id: string) => SELF.fetch(`${ORIGIN}/api/workout-plans/${id}/publish`, { method: "POST", headers: H() });
   const statusMap = async (clientId: string) => {
-    const r = (await (await SELF.fetch(`http://x/api/workout-plans?clientId=${clientId}`, { headers: auth(ownerCookie) })).json()) as { plans: { id: string; status: string }[] };
+    const r = (await (await SELF.fetch(`${ORIGIN}/api/workout-plans?clientId=${clientId}`, { headers: auth(ownerCookie) })).json()) as { plans: { id: string; status: string }[] };
     return new Map(r.plans.map((p) => [p.id, p.status]));
   };
 
@@ -2561,12 +2561,12 @@ describe("plan lifecycle — publish supersedes, restore, draft-only delete", ()
   it("plan lanes: publishing supersedes only within a lane; switching the lane changes the active plan", async () => {
     const client = await mkClient();
     // A second lane (e.g. "Off week"). Default lane = null.
-    const laneId = ((await (await SELF.fetch(`http://x/api/clients/${client}/variants`, { method: "POST", headers: H(), body: JSON.stringify({ label: "Off week" }) })).json()) as { id: string }).id;
+    const laneId = ((await (await SELF.fetch(`${ORIGIN}/api/clients/${client}/variants`, { method: "POST", headers: H(), body: JSON.stringify({ label: "Off week" }) })).json()) as { id: string }).id;
 
     // Default-lane plan (variantId omitted → null) + an off-week-lane plan.
     const defA = await mkPlan(client, "Work A");
     await publish(defA);
-    const offA = ((await (await SELF.fetch("http://x/api/workout-plans", { method: "POST", headers: H(), body: JSON.stringify({ clientId: client, name: "Off A", variantId: laneId }) })).json()) as { plan: { id: string } }).plan.id;
+    const offA = ((await (await SELF.fetch(`${ORIGIN}/api/workout-plans`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: client, name: "Off A", variantId: laneId }) })).json()) as { plan: { id: string } }).plan.id;
     await publish(offA);
 
     // Both are published concurrently — different lanes, no cross-supersede.
@@ -2583,63 +2583,63 @@ describe("plan lifecycle — publish supersedes, restore, draft-only delete", ()
     expect(s.get(offA)).toBe("published"); // other lane untouched
 
     // The plan list carries lane context.
-    const list = (await (await SELF.fetch(`http://x/api/workout-plans?clientId=${client}`, { headers: H() })).json()) as { variants: { id: string; label: string }[]; currentVariantId: string | null; defaultLabel: string; plans: { id: string; variantId: string | null }[] };
+    const list = (await (await SELF.fetch(`${ORIGIN}/api/workout-plans?clientId=${client}`, { headers: H() })).json()) as { variants: { id: string; label: string }[]; currentVariantId: string | null; defaultLabel: string; plans: { id: string; variantId: string | null }[] };
     expect(list.variants.map((v) => v.label)).toContain("Off week");
     expect(list.currentVariantId).toBeNull(); // default lane
     expect(list.defaultLabel).toBe("Main"); // default lane's default name
     expect(list.plans.find((p) => p.id === offA)!.variantId).toBe(laneId);
 
     // The default (Main) lane can be renamed; "Main" resets it.
-    await SELF.fetch(`http://x/api/clients/${client}/default-lane`, { method: "PATCH", headers: H(), body: JSON.stringify({ label: "Regular week" }) });
-    const renamed = (await (await SELF.fetch(`http://x/api/workout-plans?clientId=${client}`, { headers: H() })).json()) as { defaultLabel: string };
+    await SELF.fetch(`${ORIGIN}/api/clients/${client}/default-lane`, { method: "PATCH", headers: H(), body: JSON.stringify({ label: "Regular week" }) });
+    const renamed = (await (await SELF.fetch(`${ORIGIN}/api/workout-plans?clientId=${client}`, { headers: H() })).json()) as { defaultLabel: string };
     expect(renamed.defaultLabel).toBe("Regular week");
-    await SELF.fetch(`http://x/api/clients/${client}/default-lane`, { method: "PATCH", headers: H(), body: JSON.stringify({ label: "Main" }) });
-    const reset = (await (await SELF.fetch(`http://x/api/clients/${client}/variants`, { headers: H() })).json()) as { defaultLabel: string };
+    await SELF.fetch(`${ORIGIN}/api/clients/${client}/default-lane`, { method: "PATCH", headers: H(), body: JSON.stringify({ label: "Main" }) });
+    const reset = (await (await SELF.fetch(`${ORIGIN}/api/clients/${client}/variants`, { headers: H() })).json()) as { defaultLabel: string };
     expect(reset.defaultLabel).toBe("Main");
 
     // Today resolves the DEFAULT lane's published plan…
     const today = new Date().toISOString().slice(0, 10);
-    const bundle1 = (await (await SELF.fetch(`http://x/api/today?clientId=${client}&date=${today}`, { headers: H() })).json()) as { publishedWorkoutPlan: { id: string } | null };
+    const bundle1 = (await (await SELF.fetch(`${ORIGIN}/api/today?clientId=${client}&date=${today}`, { headers: H() })).json()) as { publishedWorkoutPlan: { id: string } | null };
     expect(bundle1.publishedWorkoutPlan?.id).toBe(defB);
 
     // …switch to the off-week lane → Today now serves the off-week plan.
-    expect((await SELF.fetch(`http://x/api/clients/${client}/current-variant`, { method: "PATCH", headers: H(), body: JSON.stringify({ variantId: laneId }) })).status).toBe(200);
-    const bundle2 = (await (await SELF.fetch(`http://x/api/today?clientId=${client}&date=${today}`, { headers: H() })).json()) as { publishedWorkoutPlan: { id: string } | null };
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${client}/current-variant`, { method: "PATCH", headers: H(), body: JSON.stringify({ variantId: laneId }) })).status).toBe(200);
+    const bundle2 = (await (await SELF.fetch(`${ORIGIN}/api/today?clientId=${client}&date=${today}`, { headers: H() })).json()) as { publishedWorkoutPlan: { id: string } | null };
     expect(bundle2.publishedWorkoutPlan?.id).toBe(offA);
 
     // An unknown lane id is rejected.
-    expect((await SELF.fetch(`http://x/api/clients/${client}/current-variant`, { method: "PATCH", headers: H(), body: JSON.stringify({ variantId: "lane_bogus" }) })).status).toBe(400);
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${client}/current-variant`, { method: "PATCH", headers: H(), body: JSON.stringify({ variantId: "lane_bogus" }) })).status).toBe(400);
 
     // Archiving the current lane drops the client back to the default lane.
-    await SELF.fetch(`http://x/api/clients/${client}/variants/${laneId}`, { method: "PATCH", headers: H(), body: JSON.stringify({ archived: true }) });
-    const after = (await (await SELF.fetch(`http://x/api/clients/${client}/variants`, { headers: H() })).json()) as { currentVariantId: string | null };
+    await SELF.fetch(`${ORIGIN}/api/clients/${client}/variants/${laneId}`, { method: "PATCH", headers: H(), body: JSON.stringify({ archived: true }) });
+    const after = (await (await SELF.fetch(`${ORIGIN}/api/clients/${client}/variants`, { headers: H() })).json()) as { currentVariantId: string | null };
     expect(after.currentVariantId).toBeNull();
   });
 
   it("creates a client plan from a template, copying the template body", async () => {
     const client = await mkClient();
-    const tpl = (await (await SELF.fetch("http://x/api/workout-templates", { method: "POST", headers: H(), body: JSON.stringify({ name: "PPL Template", visibility: "tenant", body: { days: [{ name: "Push", blocks: [] }, { name: "Pull", blocks: [] }] } }) })).json()) as { template: { id: string } };
-    const res = await SELF.fetch("http://x/api/workout-plans/from-template", { method: "POST", headers: H(), body: JSON.stringify({ clientId: client, templateId: tpl.template.id }) });
+    const tpl = (await (await SELF.fetch(`${ORIGIN}/api/workout-templates`, { method: "POST", headers: H(), body: JSON.stringify({ name: "PPL Template", visibility: "tenant", body: { days: [{ name: "Push", blocks: [] }, { name: "Pull", blocks: [] }] } }) })).json()) as { template: { id: string } };
+    const res = await SELF.fetch(`${ORIGIN}/api/workout-plans/from-template`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: client, templateId: tpl.template.id }) });
     expect(res.status).toBe(201);
     const { plan } = (await res.json()) as { plan: { id: string; name: string } };
     expect(plan.name).toBe("PPL Template");
     // The instantiated plan is a fresh draft carrying the template's body.
-    const back = (await (await SELF.fetch(`http://x/api/workout-plans/${plan.id}`, { headers: auth(ownerCookie) })).json()) as { plan: { status: string; body: { days: { name: string }[] } } };
+    const back = (await (await SELF.fetch(`${ORIGIN}/api/workout-plans/${plan.id}`, { headers: auth(ownerCookie) })).json()) as { plan: { status: string; body: { days: { name: string }[] } } };
     expect(back.plan.status).toBe("draft");
     expect(back.plan.body.days.map((d) => d.name)).toEqual(["Push", "Pull"]);
     // Unknown template id → 404.
-    expect((await SELF.fetch("http://x/api/workout-plans/from-template", { method: "POST", headers: H(), body: JSON.stringify({ clientId: client, templateId: "wtp_missing" }) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/workout-plans/from-template`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: client, templateId: "wtp_missing" }) })).status).toBe(404);
   });
 
   it("only drafts can be deleted; published plans must be archived instead", async () => {
     const client = await mkClient();
     const draft = await mkPlan(client, "Deletable");
-    expect((await SELF.fetch(`http://x/api/workout-plans/${draft}`, { method: "DELETE", headers: H() })).status).toBe(200);
+    expect((await SELF.fetch(`${ORIGIN}/api/workout-plans/${draft}`, { method: "DELETE", headers: H() })).status).toBe(200);
 
     const pub = await mkPlan(client, "Publishable");
     await publish(pub);
-    expect((await SELF.fetch(`http://x/api/workout-plans/${pub}`, { method: "DELETE", headers: H() })).status).toBe(409);
-    expect((await SELF.fetch(`http://x/api/workout-plans/${pub}/status`, { method: "POST", headers: H(), body: JSON.stringify({ status: "archived" }) })).status).toBe(200);
+    expect((await SELF.fetch(`${ORIGIN}/api/workout-plans/${pub}`, { method: "DELETE", headers: H() })).status).toBe(409);
+    expect((await SELF.fetch(`${ORIGIN}/api/workout-plans/${pub}/status`, { method: "POST", headers: H(), body: JSON.stringify({ status: "archived" }) })).status).toBe(200);
     expect((await statusMap(client)).get(pub)).toBe("archived");
   });
 
@@ -2648,32 +2648,32 @@ describe("plan lifecycle — publish supersedes, restore, draft-only delete", ()
     const a = await mkPlan(client, "RollA");
     const b = await mkPlan(client, "RollB");
     await publish(a); await publish(b); // a is now superseded
-    expect((await SELF.fetch(`http://x/api/workout-plans/${a}`, { method: "PATCH", headers: H(), body: JSON.stringify({ name: "nope" }) })).status).toBe(409);
-    expect((await SELF.fetch(`http://x/api/workout-plans/${a}/status`, { method: "POST", headers: H(), body: JSON.stringify({ status: "draft" }) })).status).toBe(200);
-    expect((await SELF.fetch(`http://x/api/workout-plans/${a}`, { method: "PATCH", headers: H(), body: JSON.stringify({ name: "RollA v2" }) })).status).toBe(200);
+    expect((await SELF.fetch(`${ORIGIN}/api/workout-plans/${a}`, { method: "PATCH", headers: H(), body: JSON.stringify({ name: "nope" }) })).status).toBe(409);
+    expect((await SELF.fetch(`${ORIGIN}/api/workout-plans/${a}/status`, { method: "POST", headers: H(), body: JSON.stringify({ status: "draft" }) })).status).toBe(200);
+    expect((await SELF.fetch(`${ORIGIN}/api/workout-plans/${a}`, { method: "PATCH", headers: H(), body: JSON.stringify({ name: "RollA v2" }) })).status).toBe(200);
   });
 });
 
 describe("client preferences + body metrics + goal staleness", () => {
   const H = () => ({ "content-type": "application/json", ...auth(ownerCookie) });
   const mkClient = async (): Promise<string> => {
-    const r = await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: "Metrics Client", gender: "male", dateOfBirth: "1994-01-01", heightCm: 180 }) });
+    const r = await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H(), body: JSON.stringify({ displayName: "Metrics Client", gender: "male", dateOfBirth: "1994-01-01", heightCm: 180 }) });
     return ((await r.json()) as { client: { id: string } }).client.id;
   };
   const measure = (clientId: string, date: string, weightKg: number, bodyFatPercent?: number) =>
-    SELF.fetch("http://x/api/measurements", { method: "POST", headers: H(), body: JSON.stringify({ clientId, data: { date, weightKg, ...(bodyFatPercent != null ? { bodyFatPercent } : {}) } }) });
+    SELF.fetch(`${ORIGIN}/api/measurements`, { method: "POST", headers: H(), body: JSON.stringify({ clientId, data: { date, weightKg, ...(bodyFatPercent != null ? { bodyFatPercent } : {}) } }) });
 
   it("preferences round-trip + profile completeness", async () => {
     const id = await mkClient();
-    await SELF.fetch(`http://x/api/clients/${id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ preferences: { targetWeightKg: 78, primaryGoal: "lose_weight", activityLevel: "moderate", workoutsPerWeek: 4, mealsPerDay: 3, workoutLocation: "gym" } }) });
-    const view = (await (await SELF.fetch(`http://x/api/clients/${id}`, { headers: H() })).json()) as { client: { preferences: Record<string, unknown>; profileComplete: boolean } };
+    await SELF.fetch(`${ORIGIN}/api/clients/${id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ preferences: { targetWeightKg: 78, primaryGoal: "lose_weight", activityLevel: "moderate", workoutsPerWeek: 4, mealsPerDay: 3, workoutLocation: "gym" } }) });
+    const view = (await (await SELF.fetch(`${ORIGIN}/api/clients/${id}`, { headers: H() })).json()) as { client: { preferences: Record<string, unknown>; profileComplete: boolean } };
     expect(view.client.preferences.primaryGoal).toBe("lose_weight");
     expect(view.client.preferences.workoutLocation).toBe("gym");
     expect(view.client.profileComplete).toBe(true);
 
     // Partial patch must not wipe other prefs.
-    await SELF.fetch(`http://x/api/clients/${id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ preferences: { mealsPerDay: 5 } }) });
-    const v2 = (await (await SELF.fetch(`http://x/api/clients/${id}`, { headers: H() })).json()) as { client: { preferences: Record<string, unknown> } };
+    await SELF.fetch(`${ORIGIN}/api/clients/${id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ preferences: { mealsPerDay: 5 } }) });
+    const v2 = (await (await SELF.fetch(`${ORIGIN}/api/clients/${id}`, { headers: H() })).json()) as { client: { preferences: Record<string, unknown> } };
     expect(v2.client.preferences.mealsPerDay).toBe(5);
     expect(v2.client.preferences.primaryGoal).toBe("lose_weight");
   });
@@ -2681,7 +2681,7 @@ describe("client preferences + body metrics + goal staleness", () => {
   it("recomputes BMI + BMR on every weight entry", async () => {
     const id = await mkClient();
     await measure(id, "2026-01-10", 80);
-    const m = (await (await SELF.fetch(`http://x/api/clients/${id}`, { headers: H() })).json()) as { metrics: { bmi: number | null; bmr: number | null; weightKg: number | null } };
+    const m = (await (await SELF.fetch(`${ORIGIN}/api/clients/${id}`, { headers: H() })).json()) as { metrics: { bmi: number | null; bmr: number | null; weightKg: number | null } };
     expect(m.metrics.weightKg).toBe(80);
     expect(m.metrics.bmi).toBe(24.7); // 80 / 1.8^2
     expect(m.metrics.bmr).toBe(10 * 80 + 6.25 * 180 - 5 * 32 + 5); // Mifflin, age 32 in 2026
@@ -2691,12 +2691,12 @@ describe("client preferences + body metrics + goal staleness", () => {
     const id = await mkClient();
     await measure(id, "2026-01-10", 90);
     // Goal built for a 90kg body.
-    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, label: "Cut", calculator: { gender: "male", ageYears: 32, heightCm: 180, weightKg: 90, activityLevel: "moderate", primaryGoal: "lose_weight", dietaryApproach: "balanced" } }) });
-    let m = (await (await SELF.fetch(`http://x/api/clients/${id}`, { headers: H() })).json()) as { metrics: { staleness: { stale: boolean; weightDeltaKg: number | null } | null } };
+    await SELF.fetch(`${ORIGIN}/api/goals`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, label: "Cut", calculator: { gender: "male", ageYears: 32, heightCm: 180, weightKg: 90, activityLevel: "moderate", primaryGoal: "lose_weight", dietaryApproach: "balanced" } }) });
+    let m = (await (await SELF.fetch(`${ORIGIN}/api/clients/${id}`, { headers: H() })).json()) as { metrics: { staleness: { stale: boolean; weightDeltaKg: number | null } | null } };
     expect(m.metrics.staleness?.stale).toBe(false);
     // Drop 8kg → stale.
     await measure(id, "2026-02-20", 82);
-    m = (await (await SELF.fetch(`http://x/api/clients/${id}`, { headers: H() })).json()) as { metrics: { staleness: { stale: boolean; weightDeltaKg: number | null } | null } };
+    m = (await (await SELF.fetch(`${ORIGIN}/api/clients/${id}`, { headers: H() })).json()) as { metrics: { staleness: { stale: boolean; weightDeltaKg: number | null } | null } };
     expect(m.metrics.staleness?.stale).toBe(true);
     expect(m.metrics.staleness?.weightDeltaKg).toBe(-8);
   });
@@ -2704,15 +2704,15 @@ describe("client preferences + body metrics + goal staleness", () => {
   it("keeps a goal history log: manual targets round-trip, supersede is retained, attributed to who set it", async () => {
     const id = await mkClient();
     // Name the acting owner so the created_by join can attribute goals.
-    const gctx = (await (await SELF.fetch("http://x/api/context", { headers: H() })).json()) as { active: { tenantId: string } };
+    const gctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: H() })).json()) as { active: { tenantId: string } };
     const gOwner = (await (env.DB as D1Database).prepare("SELECT userId FROM member WHERE organizationId = ? AND role = 'owner' LIMIT 1").bind(gctx.active.tenantId).first<{ userId: string }>())!;
     await (env.DB as D1Database).prepare("UPDATE \"user\" SET name = 'Coach Nova' WHERE id = ?").bind(gOwner.userId).run();
     // First goal, MANUAL targets (no calculator) — the coach hand-sets macros.
-    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, label: "Phase 1", startDate: "2026-01-01", targets: { targetCalories: 2100, targetProteinG: 160 } }) });
+    await SELF.fetch(`${ORIGIN}/api/goals`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, label: "Phase 1", startDate: "2026-01-01", targets: { targetCalories: 2100, targetProteinG: 160 } }) });
     // Second goal supersedes it.
-    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, label: "Phase 2", startDate: "2026-02-01", targets: { targetCalories: 2600, targetProteinG: 190 } }) });
+    await SELF.fetch(`${ORIGIN}/api/goals`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, label: "Phase 2", startDate: "2026-02-01", targets: { targetCalories: 2600, targetProteinG: 190 } }) });
 
-    const { goals } = (await (await SELF.fetch(`http://x/api/goals?clientId=${id}`, { headers: H() })).json()) as { goals: { label: string; status: string; targets: Record<string, number> | null; start_date: string | null; created_by_name: string | null }[] };
+    const { goals } = (await (await SELF.fetch(`${ORIGIN}/api/goals?clientId=${id}`, { headers: H() })).json()) as { goals: { label: string; status: string; targets: Record<string, number> | null; start_date: string | null; created_by_name: string | null }[] };
     expect(goals.length).toBe(2);
     const active = goals.find((g) => g.status === "active")!;
     const past = goals.find((g) => g.status === "superseded")!;
@@ -2727,8 +2727,8 @@ describe("client preferences + body metrics + goal staleness", () => {
   it("records a coach action in the audit log and lists it newest-first", async () => {
     const id = await mkClient();
     // A coach action (setting a goal) writes an audit row.
-    await SELF.fetch("http://x/api/goals", { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, label: "Recomp", calculator: { gender: "male", ageYears: 30, heightCm: 178, weightKg: 82, activityLevel: "moderate", primaryGoal: "maintain", dietaryApproach: "balanced" } }) });
-    const res = await SELF.fetch(`http://x/api/clients/${id}/audit`, { headers: H() });
+    await SELF.fetch(`${ORIGIN}/api/goals`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, label: "Recomp", calculator: { gender: "male", ageYears: 30, heightCm: 178, weightKg: 82, activityLevel: "moderate", primaryGoal: "maintain", dietaryApproach: "balanced" } }) });
+    const res = await SELF.fetch(`${ORIGIN}/api/clients/${id}/audit`, { headers: H() });
     expect(res.status).toBe(200);
     const { items } = (await res.json()) as { items: { action: string; label: string; summary: string | null; actor: string | null }[] };
     const goalEntry = items.find((i) => i.action === "goal.set");
@@ -2739,11 +2739,11 @@ describe("client preferences + body metrics + goal staleness", () => {
 
   it("Today bundle reports profile completeness", async () => {
     const id = await mkClient();
-    const before = (await (await SELF.fetch(`http://x/api/today?clientId=${id}&date=2026-01-10`, { headers: H() })).json()) as { profile: { complete: boolean; gaps: string[] } };
+    const before = (await (await SELF.fetch(`${ORIGIN}/api/today?clientId=${id}&date=2026-01-10`, { headers: H() })).json()) as { profile: { complete: boolean; gaps: string[] } };
     expect(before.profile.complete).toBe(false);
     expect(before.profile.gaps).toContain("goal");
-    await SELF.fetch(`http://x/api/clients/${id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ preferences: { targetWeightKg: 78, primaryGoal: "maintain", activityLevel: "light", workoutsPerWeek: 3, mealsPerDay: 3, workoutLocation: "home" } }) });
-    const after = (await (await SELF.fetch(`http://x/api/today?clientId=${id}&date=2026-01-10`, { headers: H() })).json()) as { profile: { complete: boolean } };
+    await SELF.fetch(`${ORIGIN}/api/clients/${id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ preferences: { targetWeightKg: 78, primaryGoal: "maintain", activityLevel: "light", workoutsPerWeek: 3, mealsPerDay: 3, workoutLocation: "home" } }) });
+    const after = (await (await SELF.fetch(`${ORIGIN}/api/today?clientId=${id}&date=2026-01-10`, { headers: H() })).json()) as { profile: { complete: boolean } };
     expect(after.profile.complete).toBe(true);
   });
 });
@@ -2756,7 +2756,7 @@ describe("requireClientAccess — trainer assignment lane", () => {
     const db = env.DB as D1Database;
     // Studio One's tenant + a trainer user (created via their own org, then added
     // to Studio One as a trainer member and switched into it).
-    const studioOne = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const studioOne = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const tenantId = studioOne.active.tenantId;
     const trainerCookie = await signInFlow("trainer-lane@test.dev", "Trainer Lane Org");
     const trainerUser = await db.prepare('SELECT id FROM "user" WHERE email = ?').bind("trainer-lane@test.dev").first<{ id: string }>();
@@ -2766,21 +2766,21 @@ describe("requireClientAccess — trainer assignment lane", () => {
 
     // Owner creates two clients; assigns the trainer to A only.
     const mk = async (name: string) =>
-      ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ displayName: name }) })).json()) as { client: { id: string } }).client.id;
+      ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ displayName: name }) })).json()) as { client: { id: string } }).client.id;
     const clientA = await mk("Assigned");
     const clientB = await mk("Unassigned");
-    await SELF.fetch(`http://x/api/clients/${clientA}/trainers`, { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ trainerUserId: trainerUser!.id }) });
+    await SELF.fetch(`${ORIGIN}/api/clients/${clientA}/trainers`, { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ trainerUserId: trainerUser!.id }) });
 
     // Trainer switches their active workspace to Studio One (membership required).
-    const sw = await SELF.fetch("http://x/api/context/switch", { method: "POST", headers: { "content-type": "application/json", ...auth(trainerCookie) }, body: JSON.stringify({ tenantId }) });
+    const sw = await SELF.fetch(`${ORIGIN}/api/context/switch`, { method: "POST", headers: { "content-type": "application/json", ...auth(trainerCookie) }, body: JSON.stringify({ tenantId }) });
     expect(sw.status).toBe(200);
 
     // Assigned → 200; unassigned same-tenant → 403 (NOT 404 — the guard, not tenant scope).
-    expect((await SELF.fetch(`http://x/api/clients/${clientA}`, { headers: auth(trainerCookie) })).status).toBe(200);
-    expect((await SELF.fetch(`http://x/api/clients/${clientB}`, { headers: auth(trainerCookie) })).status).toBe(403);
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${clientA}`, { headers: auth(trainerCookie) })).status).toBe(200);
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${clientB}`, { headers: auth(trainerCookie) })).status).toBe(403);
 
     // Roster scope: the trainer sees only the assigned client, not the whole tenant.
-    const roster = (await (await SELF.fetch("http://x/api/clients", { headers: auth(trainerCookie) })).json()) as { clients: { id: string }[] };
+    const roster = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { headers: auth(trainerCookie) })).json()) as { clients: { id: string }[] };
     const ids = roster.clients.map((r) => r.id);
     expect(ids).toContain(clientA);
     expect(ids).not.toContain(clientB);
@@ -2854,20 +2854,20 @@ describe("platform rail — inline Stripe webhooks", () => {
   }
   const secret = "whsec_platform_inline";
   const post = async (payload: string) =>
-    SELF.fetch("http://x/api/stripe/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await sig(payload, secret) }, body: payload });
+    SELF.fetch(`${ORIGIN}/api/stripe/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await sig(payload, secret) }, body: payload });
 
   it("payment_intent.succeeded tops up the durable purchased bucket (inline pack)", async () => {
     const db = env.DB as D1Database;
     await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    const before = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const before = (await (await SELF.fetch(`${ORIGIN}/api/billing`, { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
     const payload = JSON.stringify({ id: "evt_pi_pack_1", type: "payment_intent.succeeded", data: { object: { id: "pi_pack_1", metadata: { kova_tenant: ctx.active.tenantId, kova_pack: "pack_1k", kova_credits: "1000" } } } });
     expect((await post(payload)).status).toBe(200);
-    const after = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
+    const after = (await (await SELF.fetch(`${ORIGIN}/api/billing`, { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
     expect(after.balance.purchased - before.balance.purchased).toBe(1000);
     // A redelivery of the same event id is a no-op (no double top-up).
     await post(payload);
-    const again = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
+    const again = (await (await SELF.fetch(`${ORIGIN}/api/billing`, { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
     expect(again.balance.purchased).toBe(after.balance.purchased);
   });
 
@@ -2897,9 +2897,9 @@ describe("promo codes — website-native discounts (tenant rail)", () => {
     for (const [k, v] of [["stripe.mode", "test"], ["stripe.secret_key", "sk_test_x"]] as const) {
       await db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v).run();
     }
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, charges_enabled, updated_at) VALUES (?, 'acct_promo', 1, ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_promo', charges_enabled = 1").bind(ctx.active.tenantId, new Date().toISOString()).run();
-    const mk = async (name: string) => ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: name }) })).json()) as { client: { id: string } }).client.id;
+    const mk = async (name: string) => ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: name }) })).json()) as { client: { id: string } }).client.id;
     const buyer = await mk("PromoBuyer");
     const other = await mk("PromoOther");
     const pkgId = "pkg_promo_ot";
@@ -2907,29 +2907,29 @@ describe("promo codes — website-native discounts (tenant rail)", () => {
       .bind(pkgId, ctx.active.tenantId, "Promo Pack", 5000, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
 
     // A 100%-off code exclusive to `buyer` + this package, single use.
-    expect((await SELF.fetch("http://x/api/promo-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "FREE100", discountType: "percent", percentOff: 100, restrictedClientId: buyer, restrictedPackageId: pkgId, maxRedemptions: 1 }) })).status).toBe(201);
+    expect((await SELF.fetch(`${ORIGIN}/api/promo-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "FREE100", discountType: "percent", percentOff: 100, restrictedClientId: buyer, restrictedPackageId: pkgId, maxRedemptions: 1 }) })).status).toBe(201);
 
     // Fully discounted → granted directly, no Stripe charge.
-    const r1 = await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: buyer, packageId: pkgId, promoCode: "FREE100" }) });
+    const r1 = await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: buyer, packageId: pkgId, promoCode: "FREE100" }) });
     expect(r1.status).toBe(200);
     expect((await r1.json() as { granted?: boolean }).granted).toBe(true);
-    const subs = (await (await SELF.fetch(`http://x/api/subscriptions?clientId=${buyer}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { budgets: unknown[] }[] };
+    const subs = (await (await SELF.fetch(`${ORIGIN}/api/subscriptions?clientId=${buyer}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { budgets: unknown[] }[] };
     expect(subs.subscriptions.some((s) => (s.budgets?.length ?? 0) > 0)).toBe(true);
 
     // The single use is now spent.
-    const r2 = await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: buyer, packageId: pkgId, promoCode: "FREE100" }) });
+    const r2 = await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: buyer, packageId: pkgId, promoCode: "FREE100" }) });
     expect(r2.status).toBe(400);
     expect((await r2.json() as { error: string }).error).toBe("promo_exhausted");
 
     // A code locked to `buyer` is rejected for another client.
-    await SELF.fetch("http://x/api/promo-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "ONLYME", discountType: "percent", percentOff: 100, restrictedClientId: buyer }) });
-    const r3 = await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: other, packageId: pkgId, promoCode: "ONLYME" }) });
+    await SELF.fetch(`${ORIGIN}/api/promo-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "ONLYME", discountType: "percent", percentOff: 100, restrictedClientId: buyer }) });
+    const r3 = await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: other, packageId: pkgId, promoCode: "ONLYME" }) });
     expect(r3.status).toBe(400);
     expect((await r3.json() as { error: string }).error).toBe("promo_wrong_client");
 
     // A discount that lands the charge below Stripe's minimum → clean 400, not a 500.
-    await SELF.fetch("http://x/api/promo-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "ALMOSTALL", discountType: "amount", amountOffCents: 4980 }) }); // 5000 → 20¢
-    const r4 = await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: buyer, packageId: pkgId, promoCode: "ALMOSTALL" }) });
+    await SELF.fetch(`${ORIGIN}/api/promo-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "ALMOSTALL", discountType: "amount", amountOffCents: 4980 }) }); // 5000 → 20¢
+    const r4 = await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: buyer, packageId: pkgId, promoCode: "ALMOSTALL" }) });
     expect(r4.status).toBe(400);
     expect((await r4.json() as { error: string }).error).toBe("promo_min_amount");
   });
@@ -2954,7 +2954,7 @@ describe("installments — limited-term subscription (per-cycle unlock)", () => 
     // Connect grants require event.account → tenant. Pin the mapping; the renewal/
     // completion path is pure DB (no Stripe call) so this stays offline.
     await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_install_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_install_1'").bind(tenantId, new Date().toISOString()).run();
-    const post = async (payload: string) => SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await sig(payload, secret) }, body: payload });
+    const post = async (payload: string) => SELF.fetch(`${ORIGIN}/api/connect/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await sig(payload, secret) }, body: payload });
     const subId = "sub_install_1";
 
     // Period one via installment-mode checkout (N=3).
@@ -2982,14 +2982,14 @@ describe("installments — limited-term subscription (per-cycle unlock)", () => 
 describe("notifications — surface-scoped mark-all-read", () => {
   it("coach mode clears staff/owner notifications but leaves client ones unread", async () => {
     const db = env.DB as D1Database;
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const owner = (await db.prepare("SELECT userId FROM member WHERE organizationId = ? AND role = 'owner' LIMIT 1").bind(ctx.active.tenantId).first<{ userId: string }>())!;
     const mk = (id: string, type: string) => db.prepare("INSERT INTO notifications (id, tenant_id, recipient_user_id, type, title, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)").bind(id, ctx.active.tenantId, owner.userId, type, type, new Date().toISOString()).run();
     await mk("ntf_s1", "check_in"); // staff audience
     await mk("ntf_o1", "billing_past_due"); // owner audience
     await mk("ntf_c1", "feedback"); // client audience
 
-    const r = await SELF.fetch("http://x/api/notifications/read-all", { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ surface: "staff" }) });
+    const r = await SELF.fetch(`${ORIGIN}/api/notifications/read-all`, { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ surface: "staff" }) });
     expect(r.status).toBe(200);
     const read = async (id: string) => (await db.prepare("SELECT read FROM notifications WHERE id = ?").bind(id).first<{ read: number }>())!.read;
     expect(await read("ntf_s1")).toBe(1); // staff → cleared
@@ -3002,9 +3002,9 @@ describe("email templates — tenant white-label store", () => {
   it("owner overrides a type's subject/body, GET merges it, reset restores the default", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     // A templatable type can be overridden.
-    const put = await SELF.fetch("http://x/api/email-templates/feedback", { method: "PUT", headers: H, body: JSON.stringify({ subject: "{{coachName}} says hi", body: "<p>Custom body for {{studioName}}.</p>", enabled: true }) });
+    const put = await SELF.fetch(`${ORIGIN}/api/email-templates/feedback`, { method: "PUT", headers: H, body: JSON.stringify({ subject: "{{coachName}} says hi", body: "<p>Custom body for {{studioName}}.</p>", enabled: true }) });
     expect(put.status).toBe(200);
-    const list1 = (await (await SELF.fetch("http://x/api/email-templates", { headers: auth(ownerCookie) })).json()) as { templates: { type: string; subject: string; customized: boolean; defaultSubject: string }[] };
+    const list1 = (await (await SELF.fetch(`${ORIGIN}/api/email-templates`, { headers: auth(ownerCookie) })).json()) as { templates: { type: string; subject: string; customized: boolean; defaultSubject: string }[] };
     const fb1 = list1.templates.find((t) => t.type === "feedback")!;
     expect(fb1.customized).toBe(true);
     expect(fb1.subject).toBe("{{coachName}} says hi");
@@ -3013,12 +3013,12 @@ describe("email templates — tenant white-label store", () => {
     // carries a template — that is the point — so it must be ACCEPTED, and the
     // negative case moves to what is genuinely invalid: a type that does not
     // exist. Keeping the old assertion would have quietly re-asserted the gap.
-    expect((await SELF.fetch("http://x/api/email-templates/check_in", { method: "PUT", headers: H, body: JSON.stringify({ subject: "x", body: "y" }) })).status).toBe(200);
-    expect((await SELF.fetch("http://x/api/email-templates/not_a_real_type", { method: "PUT", headers: H, body: JSON.stringify({ subject: "x", body: "y" }) })).status).toBe(400);
+    expect((await SELF.fetch(`${ORIGIN}/api/email-templates/check_in`, { method: "PUT", headers: H, body: JSON.stringify({ subject: "x", body: "y" }) })).status).toBe(200);
+    expect((await SELF.fetch(`${ORIGIN}/api/email-templates/not_a_real_type`, { method: "PUT", headers: H, body: JSON.stringify({ subject: "x", body: "y" }) })).status).toBe(400);
 
     // Reset drops the override → back to the registry default.
-    expect((await SELF.fetch("http://x/api/email-templates/feedback", { method: "DELETE", headers: auth(ownerCookie) })).status).toBe(200);
-    const list2 = (await (await SELF.fetch("http://x/api/email-templates", { headers: auth(ownerCookie) })).json()) as { templates: { type: string; subject: string; customized: boolean; defaultSubject: string }[] };
+    expect((await SELF.fetch(`${ORIGIN}/api/email-templates/feedback`, { method: "DELETE", headers: auth(ownerCookie) })).status).toBe(200);
+    const list2 = (await (await SELF.fetch(`${ORIGIN}/api/email-templates`, { headers: auth(ownerCookie) })).json()) as { templates: { type: string; subject: string; customized: boolean; defaultSubject: string }[] };
     const fb2 = list2.templates.find((t) => t.type === "feedback")!;
     expect(fb2.customized).toBe(false);
     expect(fb2.subject).toBe(fb2.defaultSubject);
@@ -3037,16 +3037,16 @@ describe("platform promo codes (Kova → tenant)", () => {
     const listed = (await (await SELF.fetch(`${ADMIN}/api/admin/promo-codes`, { headers: auth(ownerCookie) })).json()) as { codes: { code: string }[] };
     expect(listed.codes.some((c) => c.code === "PLAT100")).toBe(true);
 
-    const before = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
+    const before = (await (await SELF.fetch(`${ORIGIN}/api/billing`, { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
     // 100% off → free grant (no Stripe charge); purchased credits jump by the pack size.
-    const r1 = await SELF.fetch("http://x/api/billing/pack-intent", { method: "POST", headers: H, body: JSON.stringify({ packId: "pack_1k", promoCode: "PLAT100" }) });
+    const r1 = await SELF.fetch(`${ORIGIN}/api/billing/pack-intent`, { method: "POST", headers: H, body: JSON.stringify({ packId: "pack_1k", promoCode: "PLAT100" }) });
     expect(r1.status).toBe(200);
     expect((await r1.json() as { granted?: boolean }).granted).toBe(true);
-    const after = (await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
+    const after = (await (await SELF.fetch(`${ORIGIN}/api/billing`, { headers: auth(ownerCookie) })).json()) as { balance: { purchased: number } };
     expect(after.balance.purchased - before.balance.purchased).toBe(1000);
 
     // The single slot is consumed — a repeat is rejected (no second free grant).
-    const r2 = await SELF.fetch("http://x/api/billing/pack-intent", { method: "POST", headers: H, body: JSON.stringify({ packId: "pack_1k", promoCode: "PLAT100" }) });
+    const r2 = await SELF.fetch(`${ORIGIN}/api/billing/pack-intent`, { method: "POST", headers: H, body: JSON.stringify({ packId: "pack_1k", promoCode: "PLAT100" }) });
     expect(r2.status).toBe(400);
     expect((await r2.json() as { error: string }).error).toBe("promo_exhausted");
   });
@@ -3059,9 +3059,9 @@ describe("package lifecycle + redemption scoping", () => {
     for (const [k, v] of [["stripe.mode", "test"], ["stripe.secret_key", "sk_test_x"]] as const) {
       await db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v).run();
     }
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, charges_enabled, updated_at) VALUES (?, 'acct_life', 1, ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_life', charges_enabled = 1").bind(ctx.active.tenantId, new Date().toISOString()).run();
-    const mk = async (n: string) => ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: n }) })).json()) as { client: { id: string } }).client.id;
+    const mk = async (n: string) => ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: n }) })).json()) as { client: { id: string } }).client.id;
     const a = await mk("LifeA");
     const b = await mk("LifeB");
     const mkPkg = async (id: string, visibility: string, restricted: string | null) =>
@@ -3070,19 +3070,19 @@ describe("package lifecycle + redemption scoping", () => {
 
     // A `private` package is grant-only — not client-purchasable.
     await mkPkg("pkg_priv", "private", null);
-    expect((await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: a, packageId: "pkg_priv" }) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: a, packageId: "pkg_priv" }) })).status).toBe(404);
     // A `client_specific` package is purchasable only by its own client.
     await mkPkg("pkg_cs", "client_specific", a);
-    expect((await SELF.fetch("http://x/api/connect/pay-intent", { method: "POST", headers: H, body: JSON.stringify({ clientId: b, packageId: "pkg_cs" }) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: b, packageId: "pkg_cs" }) })).status).toBe(404);
 
     // Redemption code locked to client A: B is rejected, A succeeds.
-    await SELF.fetch("http://x/api/redemption-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "LOCKEDA", daysToAdd: 10, restrictedClientId: a }) });
-    expect((await SELF.fetch("http://x/api/redeem", { method: "POST", headers: H, body: JSON.stringify({ clientId: b, code: "LOCKEDA" }) })).status).toBe(404);
-    expect((await SELF.fetch("http://x/api/redeem", { method: "POST", headers: H, body: JSON.stringify({ clientId: a, code: "LOCKEDA" }) })).status).toBe(200);
+    await SELF.fetch(`${ORIGIN}/api/redemption-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "LOCKEDA", daysToAdd: 10, restrictedClientId: a }) });
+    expect((await SELF.fetch(`${ORIGIN}/api/redeem`, { method: "POST", headers: H, body: JSON.stringify({ clientId: b, code: "LOCKEDA" }) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/redeem`, { method: "POST", headers: H, body: JSON.stringify({ clientId: a, code: "LOCKEDA" }) })).status).toBe(200);
 
     // Redemption code locked to a package the client doesn't hold → rejected.
-    await SELF.fetch("http://x/api/redemption-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "NEEDPKG", daysToAdd: 10, restrictedPackageId: "pkg_cs" }) });
-    expect((await SELF.fetch("http://x/api/redeem", { method: "POST", headers: H, body: JSON.stringify({ clientId: b, code: "NEEDPKG" }) })).status).toBe(404);
+    await SELF.fetch(`${ORIGIN}/api/redemption-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "NEEDPKG", daysToAdd: 10, restrictedPackageId: "pkg_cs" }) });
+    expect((await SELF.fetch(`${ORIGIN}/api/redeem`, { method: "POST", headers: H, body: JSON.stringify({ clientId: b, code: "NEEDPKG" }) })).status).toBe(404);
   });
 });
 
@@ -3090,26 +3090,26 @@ describe("redemption codes — atomic over-redemption guard", () => {
   it("a max_uses=1 code is spent once: a second client and a re-redeem both 409", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
     const mk = async (name: string) =>
-      ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: name }) })).json()) as { client: { id: string } }).client.id;
+      ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: name }) })).json()) as { client: { id: string } }).client.id;
     const a = await mk("RedeemA");
     const b = await mk("RedeemB");
-    await SELF.fetch("http://x/api/redemption-codes", { method: "POST", headers: H, body: JSON.stringify({ code: "ONESHOT1", daysToAdd: 10, maxUses: 1 }) });
+    await SELF.fetch(`${ORIGIN}/api/redemption-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "ONESHOT1", daysToAdd: 10, maxUses: 1 }) });
     // First client redeems it.
-    expect((await SELF.fetch("http://x/api/redeem", { method: "POST", headers: H, body: JSON.stringify({ clientId: a, code: "ONESHOT1" }) })).status).toBe(200);
+    expect((await SELF.fetch(`${ORIGIN}/api/redeem`, { method: "POST", headers: H, body: JSON.stringify({ clientId: a, code: "ONESHOT1" }) })).status).toBe(200);
     // Second client can't — the single slot is spent.
-    expect((await SELF.fetch("http://x/api/redeem", { method: "POST", headers: H, body: JSON.stringify({ clientId: b, code: "ONESHOT1" }) })).status).toBe(409);
+    expect((await SELF.fetch(`${ORIGIN}/api/redeem`, { method: "POST", headers: H, body: JSON.stringify({ clientId: b, code: "ONESHOT1" }) })).status).toBe(409);
     // The first client can't redeem twice either.
-    expect((await SELF.fetch("http://x/api/redeem", { method: "POST", headers: H, body: JSON.stringify({ clientId: a, code: "ONESHOT1" }) })).status).toBe(409);
+    expect((await SELF.fetch(`${ORIGIN}/api/redeem`, { method: "POST", headers: H, body: JSON.stringify({ clientId: a, code: "ONESHOT1" }) })).status).toBe(409);
   });
 });
 
 describe("body scan (camera body-fat)", () => {
   it("recomputes an ensemble estimate server-side, stores it, mirrors to measurements, and lists it", async () => {
     const db = env.DB as D1Database;
-    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ displayName: "ScanTest" }) })).json()) as { client: { id: string } }).client.id;
+    const clientId = ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ displayName: "ScanTest" }) })).json()) as { client: { id: string } }).client.id;
     // Body scan needs sex + birth date + height to run the formulas.
     await db.prepare("UPDATE clients SET gender='male', date_of_birth='1990-01-01', height_cm=180 WHERE id=?").bind(clientId).run();
-    const res = await SELF.fetch("http://x/api/body-scans", { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ clientId, date: "2026-02-01", weightKg: 80, circumferences: { neckCm: 38, waistCm: 85 }, storeSilhouette: false, posture: { cvaDeg: 46, trunkTiltDeg: 4, severity: "moderate" } }) });
+    const res = await SELF.fetch(`${ORIGIN}/api/body-scans`, { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: JSON.stringify({ clientId, date: "2026-02-01", weightKg: 80, circumferences: { neckCm: 38, waistCm: 85 }, storeSilhouette: false, posture: { cvaDeg: 46, trunkTiltDeg: 4, severity: "moderate" } }) });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { bodyFatPercent: number; low: number; high: number; confidence: string; methods: unknown[] };
     expect(body.bodyFatPercent).toBeGreaterThan(5);
@@ -3118,7 +3118,7 @@ describe("body scan (camera body-fat)", () => {
     expect(body.high).toBeGreaterThan(body.bodyFatPercent);
     expect(body.methods.length).toBeGreaterThanOrEqual(2); // navy + rfm + deurenberg
     // Listed for the progress morph.
-    const list = (await (await SELF.fetch(`http://x/api/body-scans?clientId=${clientId}`, { headers: auth(ownerCookie) })).json()) as { scans: { date: string; bodyFatPercent: number; somatotype: string | null; posture: { cvaDeg: number; severity: string } | null }[] };
+    const list = (await (await SELF.fetch(`${ORIGIN}/api/body-scans?clientId=${clientId}`, { headers: auth(ownerCookie) })).json()) as { scans: { date: string; bodyFatPercent: number; somatotype: string | null; posture: { cvaDeg: number; severity: string } | null }[] };
     expect(list.scans.length).toBe(1);
     expect(list.scans[0]!.date).toBe("2026-02-01");
     // Posture is stored as sent; somatotype is recomputed server-side.
@@ -3131,7 +3131,7 @@ describe("body scan (camera body-fat)", () => {
     expect(meas?.neck_cm).toBe(38);
     expect(meas?.waist_cm).toBe(85);
     // Surfaced as the Body tab's latest waist reading.
-    const prog = (await (await SELF.fetch(`http://x/api/progress/${clientId}?range=90d&today=2026-02-05`, { headers: auth(ownerCookie) })).json()) as { body: { latest: { waistCm: number | null; neckCm: number | null } } };
+    const prog = (await (await SELF.fetch(`${ORIGIN}/api/progress/${clientId}?range=90d&today=2026-02-05`, { headers: auth(ownerCookie) })).json()) as { body: { latest: { waistCm: number | null; neckCm: number | null } } };
     expect(prog.body.latest.waistCm).toBe(85);
     expect(prog.body.latest.neckCm).toBe(38);
   });
@@ -3139,26 +3139,26 @@ describe("body scan (camera body-fat)", () => {
   it("owner generates the voice pack (billed); cues serve-only so a client scan never auto-bills", async () => {
     // Before generation cues are unvoiced (empty urls) — a client scan can't bill
     // the owner; the client speaks them with the browser's free speechSynthesis.
-    const before = (await (await SELF.fetch("http://x/api/body-scan/cues", { headers: auth(ownerCookie) })).json()) as { cues: { url: string; text: string }[] };
+    const before = (await (await SELF.fetch(`${ORIGIN}/api/body-scan/cues`, { headers: auth(ownerCookie) })).json()) as { cues: { url: string; text: string }[] };
     expect(before.cues.length).toBeGreaterThan(5);
     expect(before.cues.every((q) => q.url === "")).toBe(true);
     expect(before.cues[0]!.text.length).toBeGreaterThan(0);
     // The owner explicitly generates the pack — the clear, billed moment.
-    const pack = (await (await SELF.fetch("http://x/api/body-scan/voice-pack", { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: "{}" })).json()) as { ok: boolean; generated: number; credits: number; ready: boolean };
+    const pack = (await (await SELF.fetch(`${ORIGIN}/api/body-scan/voice-pack`, { method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: "{}" })).json()) as { ok: boolean; generated: number; credits: number; ready: boolean };
     expect(pack.generated).toBeGreaterThan(5);
     expect(pack.credits).toBeGreaterThan(0);
     expect(pack.ready).toBe(true);
     // Now cues serve the cached urls, and the status endpoint agrees.
-    const after = (await (await SELF.fetch("http://x/api/body-scan/cues", { headers: auth(ownerCookie) })).json()) as { cues: { url: string }[] };
+    const after = (await (await SELF.fetch(`${ORIGIN}/api/body-scan/cues`, { headers: auth(ownerCookie) })).json()) as { cues: { url: string }[] };
     expect(after.cues[0]!.url).toContain("/api/media/");
-    const status = (await (await SELF.fetch("http://x/api/body-scan/voice-pack", { headers: auth(ownerCookie) })).json()) as { ready: boolean; count: number; total: number };
+    const status = (await (await SELF.fetch(`${ORIGIN}/api/body-scan/voice-pack`, { headers: auth(ownerCookie) })).json()) as { ready: boolean; count: number; total: number };
     expect(status.ready).toBe(true);
     expect(status.count).toBe(status.total);
   });
 
   it("requires the bfCamera entitlement (free tenant → 403)", async () => {
-    const clientId = ((await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: { "content-type": "application/json", ...auth(otherCookie) }, body: JSON.stringify({ displayName: "NoScan" }) })).json()) as { client: { id: string } }).client.id;
-    const res = await SELF.fetch("http://x/api/body-scans", { method: "POST", headers: { "content-type": "application/json", ...auth(otherCookie) }, body: JSON.stringify({ clientId, date: "2026-02-01", weightKg: 80, circumferences: { neckCm: 38, waistCm: 85 }, storeSilhouette: false }) });
+    const clientId = ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: { "content-type": "application/json", ...auth(otherCookie) }, body: JSON.stringify({ displayName: "NoScan" }) })).json()) as { client: { id: string } }).client.id;
+    const res = await SELF.fetch(`${ORIGIN}/api/body-scans`, { method: "POST", headers: { "content-type": "application/json", ...auth(otherCookie) }, body: JSON.stringify({ clientId, date: "2026-02-01", weightKg: 80, circumferences: { neckCm: 38, waistCm: 85 }, storeSilhouette: false }) });
     expect(res.status).toBe(403);
   });
 });
@@ -3166,15 +3166,15 @@ describe("body scan (camera body-fat)", () => {
 describe("coach voice (TTS) picker", () => {
   it("owner sets a voice, it persists + lists, drives the cue voice, and rejects unknowns", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    expect((await SELF.fetch("http://x/api/settings/ai", { method: "PATCH", headers: H, body: JSON.stringify({ ttsVoice: "Puck" }) })).status).toBe(200);
-    const ai = (await (await SELF.fetch("http://x/api/settings/ai", { headers: auth(ownerCookie) })).json()) as { voices: { id: string; style: string }[]; config: { ttsVoice?: string } };
+    expect((await SELF.fetch(`${ORIGIN}/api/settings/ai`, { method: "PATCH", headers: H, body: JSON.stringify({ ttsVoice: "Puck" }) })).status).toBe(200);
+    const ai = (await (await SELF.fetch(`${ORIGIN}/api/settings/ai`, { headers: auth(ownerCookie) })).json()) as { voices: { id: string; style: string }[]; config: { ttsVoice?: string } };
     expect(ai.voices.length).toBeGreaterThan(3);
     expect(ai.config.ttsVoice).toBe("Puck");
     // The cue set is now voiced with the tenant's choice (client sends no voice).
-    const cues = (await (await SELF.fetch("http://x/api/body-scan/cues", { headers: auth(ownerCookie) })).json()) as { voice: string };
+    const cues = (await (await SELF.fetch(`${ORIGIN}/api/body-scan/cues`, { headers: auth(ownerCookie) })).json()) as { voice: string };
     expect(cues.voice).toBe("Puck");
     // Unknown voices are rejected by the schema.
-    expect((await SELF.fetch("http://x/api/settings/ai", { method: "PATCH", headers: H, body: JSON.stringify({ ttsVoice: "NotARealVoice" }) })).status).toBe(400);
+    expect((await SELF.fetch(`${ORIGIN}/api/settings/ai`, { method: "PATCH", headers: H, body: JSON.stringify({ ttsVoice: "NotARealVoice" }) })).status).toBe(400);
   });
 });
 
@@ -3249,7 +3249,7 @@ describe("storage accounting + quota gate", () => {
   const B = "http://setup.localhost:8787";
   it("records uploads in the ledger, meters usage, and blocks over quota", async () => {
     const db = env.DB as D1Database;
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const tenantId = ctx.active.tenantId;
 
     const usage0 = (await (await SELF.fetch(`${B}/api/storage-usage`, { headers: auth(ownerCookie) })).json()) as { usedBytes: number; limitBytes: number };
@@ -3338,7 +3338,7 @@ describe("GDPR — action OTP + cascade purge", () => {
   it("purgeClient removes the client's rows, R2 objects, and ledger entries", async () => {
     const db = env.DB as D1Database;
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const tenantId = ctx.active.tenantId;
     const { client } = (await (await SELF.fetch(`${B}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "PurgePat" }) })).json()) as { client: { id: string } };
 
@@ -3379,7 +3379,7 @@ describe("studio close + tenant purge", () => {
     // A throwaway studio so the shared test tenants are never touched.
     const cookie = await signInFlow("teardown@test.dev", "TeardownGym");
     const H = { "content-type": "application/json", ...auth(cookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(cookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(cookie) })).json()) as { active: { tenantId: string } };
     const tenantId = ctx.active.tenantId;
     const { client } = (await (await SELF.fetch(`${B}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "DoomedDan" }) })).json()) as { client: { id: string } };
 
@@ -3423,7 +3423,7 @@ describe("platform nuclear reset — guards", () => {
     expect(noOtp.status).toBe(403);
     expect(((await noOtp.json()) as { error: string }).error).toBe("invalid_code");
     // The shared tenant is still intact (nothing was wiped).
-    const ctx = await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) });
+    const ctx = await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) });
     expect(ctx.status).toBe(200);
   });
 });
@@ -3819,7 +3819,7 @@ async function whSig(payload: string, secret: string): Promise<string> {
 describe("platform rail — refunds reverse credits proportionally + incrementally", () => {
   const secret = "whsec_refund_prop";
   const postPlatform = async (payload: string) =>
-    SELF.fetch("http://x/api/stripe/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await whSig(payload, secret) }, body: payload });
+    SELF.fetch(`${ORIGIN}/api/stripe/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await whSig(payload, secret) }, body: payload });
   type Bal = { purchased: number; granted: number; balance: number };
   const stubFor = async (tenantId: string) => {
     const BILLING = (env as unknown as { BILLING: DurableObjectNamespace }).BILLING;
@@ -3943,7 +3943,7 @@ describe("client flags union across concurrent access rows", () => {
 describe("connect rail — Basil-shaped invoices still renew", () => {
   const secret = "whsec_connect_basil";
   const post = async (payload: string) =>
-    SELF.fetch("http://x/api/connect/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await whSig(payload, secret) }, body: payload });
+    SELF.fetch(`${ORIGIN}/api/connect/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await whSig(payload, secret) }, body: payload });
 
   it("invoice.paid with the subscription under parent.subscription_details tops the budget up", async () => {
     const db = env.DB as D1Database;
@@ -4003,19 +4003,19 @@ describe("once_per_customer is enforced on paid checkout", () => {
     for (const [k, v] of [["stripe.mode", "test"], ["stripe.secret_key", "sk_test_x"]] as const) {
       await db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v).run();
     }
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, charges_enabled, updated_at) VALUES (?, 'acct_once', 1, ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_once', charges_enabled = 1").bind(ctx.active.tenantId, new Date().toISOString()).run();
-    const { client } = (await (await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ displayName: "OnceBuyer" }) })).json()) as { client: { id: string } };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "OnceBuyer" }) })).json()) as { client: { id: string } };
     const pkgId = "pkg_once_intro";
     await db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, visibility, once_per_customer, active, created_at) VALUES (?, ?, 'Intro Month', 5000, ?, 'usd', 'marketplace', 1, 1, ?)")
       .bind(pkgId, ctx.active.tenantId, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
 
     // First purchase: the staff grant lane (also once-gated) writes the row.
-    expect((await SELF.fetch("http://x/api/subscriptions/grant", { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, packageId: pkgId }) })).status).toBeLessThan(300);
+    expect((await SELF.fetch(`${ORIGIN}/api/subscriptions/grant`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, packageId: pkgId }) })).status).toBeLessThan(300);
 
     // Buying it again must be refused BEFORE any Stripe call — on both paid paths.
     for (const path of ["/api/connect/pay-intent", "/api/connect/checkout"]) {
-      const r = await SELF.fetch(`http://x${path}`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, packageId: pkgId, returnUrl: "http://localhost:5173/shop" }) });
+      const r = await SELF.fetch(`${ORIGIN}${path}`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, packageId: pkgId, returnUrl: "http://localhost:5173/shop" }) });
       expect(r.status, path).toBe(409);
       expect((await r.json() as { error: string }).error).toBe("package is once per customer");
     }
@@ -4125,7 +4125,7 @@ describe("invited members land in the studio without an explicit switch", () => 
 describe("branding persists every appearance control", () => {
   it("round-trips radius, elevation, hairline colour and border weight", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     // Branding edits need the entitlement.
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
 
@@ -4141,10 +4141,10 @@ describe("branding persists every appearance control", () => {
       neutral: "warm" as const,
       tokens: { dark: { "--primary": "oklch(0.62 0.19 262)" }, light: { "--primary": "oklch(0.55 0.19 262)" } },
     };
-    const put = await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ branding: sent }) });
+    const put = await SELF.fetch(`${ORIGIN}/api/settings`, { method: "PATCH", headers: H, body: JSON.stringify({ branding: sent }) });
     expect(put.status).toBe(200);
 
-    const back = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as {
+    const back = (await (await SELF.fetch(`${ORIGIN}/api/settings`, { headers: auth(ownerCookie) })).json()) as {
       branding: { radius?: number; shadow?: string; borderColor?: string; borderWidth?: number; neutral?: string; tokens?: { dark?: Record<string, string> } };
     };
     expect(back.branding.radius).toBe(0.55);
@@ -4160,15 +4160,15 @@ describe("branding persists every appearance control", () => {
 
     // …and /api/context carries the same branding, since that is what actually
     // themes the app and seeds the editor.
-    const ctx2 = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as {
+    const ctx2 = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as {
       branding: { radius?: number; shadow?: string; borderWidth?: number } | null;
     };
     expect(ctx2.branding).toMatchObject({ radius: 0.55, shadow: "dramatic", borderWidth: 0 });
 
     // A partial edit must not wipe the rest — the editor saves the whole object,
     // but the merge is what makes an unrelated PATCH safe.
-    await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ branding: { radius: 1.2 } }) });
-    const after = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as {
+    await SELF.fetch(`${ORIGIN}/api/settings`, { method: "PATCH", headers: H, body: JSON.stringify({ branding: { radius: 1.2 } }) });
+    const after = (await (await SELF.fetch(`${ORIGIN}/api/settings`, { headers: auth(ownerCookie) })).json()) as {
       branding: { radius?: number; shadow?: string; borderWidth?: number };
     };
     expect(after.branding).toMatchObject({ radius: 1.2, shadow: "dramatic", borderWidth: 0, neutral: "warm" });
@@ -4179,7 +4179,7 @@ describe("branding persists every appearance control", () => {
     // These land in a <style> block, so the schema is the only thing between a
     // bad value and broken CSS on every page.
     for (const bad of [{ borderWidth: -1 }, { borderWidth: 99 }, { shadow: "sparkly" }, { radius: 12 }, { neutral: "chartreuse" }]) {
-      const res = await SELF.fetch("http://x/api/settings", { method: "PATCH", headers: H, body: JSON.stringify({ branding: bad }) });
+      const res = await SELF.fetch(`${ORIGIN}/api/settings`, { method: "PATCH", headers: H, body: JSON.stringify({ branding: bad }) });
       expect(res.status, JSON.stringify(bad)).toBe(400);
     }
   });
@@ -4202,11 +4202,11 @@ describe("voice packs replace, they do not accumulate", () => {
 
   it("installing a new voice retires the old pack from R2 and the library", async () => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const tid = ctx.active.tenantId;
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${tid}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
 
-    const first = await SELF.fetch("http://x/api/body-scan/voice-pack", { method: "POST", headers: H, body: JSON.stringify({ voice: "Kore" }) });
+    const first = await SELF.fetch(`${ORIGIN}/api/body-scan/voice-pack`, { method: "POST", headers: H, body: JSON.stringify({ voice: "Kore" }) });
     expect(first.status).toBe(200);
     const kore = await cueKeys(tid);
     expect(kore.length, "the first pack was voiced").toBeGreaterThan(0);
@@ -4218,7 +4218,7 @@ describe("voice packs replace, they do not accumulate", () => {
     }
 
     // Switch voices.
-    const second = (await (await SELF.fetch("http://x/api/body-scan/voice-pack", { method: "POST", headers: H, body: JSON.stringify({ voice: "Puck" }) })).json()) as { retired: number };
+    const second = (await (await SELF.fetch(`${ORIGIN}/api/body-scan/voice-pack`, { method: "POST", headers: H, body: JSON.stringify({ voice: "Puck" }) })).json()) as { retired: number };
     expect(second.retired, "the Kore pack should have been retired").toBe(kore.length);
 
     // Nothing of the old voice survives, in either place.
@@ -4233,7 +4233,7 @@ describe("voice packs replace, they do not accumulate", () => {
 
     // The status endpoint can now name what is actually installed — without it
     // the settings card can only ever ask "generate?", never say "installed".
-    const status = (await (await SELF.fetch("http://x/api/body-scan/voice-pack?voice=Puck", { headers: auth(ownerCookie) })).json()) as { installedVoice: string | null; ready: boolean };
+    const status = (await (await SELF.fetch(`${ORIGIN}/api/body-scan/voice-pack?voice=Puck`, { headers: auth(ownerCookie) })).json()) as { installedVoice: string | null; ready: boolean };
     expect(status).toMatchObject({ installedVoice: "Puck", ready: true });
   });
 
@@ -4242,16 +4242,16 @@ describe("voice packs replace, they do not accumulate", () => {
     // Self-contained: install first rather than inheriting the previous test's
     // state, so a reordering or a single-test run cannot make this pass or fail
     // for reasons that have nothing to do with what it is checking.
-    const install = (await (await SELF.fetch("http://x/api/body-scan/voice-pack", { method: "POST", headers: H, body: JSON.stringify({ voice: "Charon" }) })).json()) as { generated: number; ready: boolean };
+    const install = (await (await SELF.fetch(`${ORIGIN}/api/body-scan/voice-pack`, { method: "POST", headers: H, body: JSON.stringify({ voice: "Charon" }) })).json()) as { generated: number; ready: boolean };
     expect(install.ready, "the pack under test must be complete before re-installing it").toBe(true);
 
     // Idempotent: a resumed or partial pack completes without re-billing.
-    const again = (await (await SELF.fetch("http://x/api/body-scan/voice-pack", { method: "POST", headers: H, body: JSON.stringify({ voice: "Charon" }) })).json()) as { generated: number; retired: number };
+    const again = (await (await SELF.fetch(`${ORIGIN}/api/body-scan/voice-pack`, { method: "POST", headers: H, body: JSON.stringify({ voice: "Charon" }) })).json()) as { generated: number; retired: number };
     expect(again).toMatchObject({ generated: 0, retired: 0 });
 
     // `force` is what "Re-voice" sends. Without it that button did nothing at
     // all — the loop skips every cached cue.
-    const forced = (await (await SELF.fetch("http://x/api/body-scan/voice-pack", { method: "POST", headers: H, body: JSON.stringify({ voice: "Charon", force: true }) })).json()) as { generated: number; retired: number };
+    const forced = (await (await SELF.fetch(`${ORIGIN}/api/body-scan/voice-pack`, { method: "POST", headers: H, body: JSON.stringify({ voice: "Charon", force: true }) })).json()) as { generated: number; retired: number };
     expect(forced.retired, "force must retire the pack it is replacing").toBe(install.generated);
     expect(forced.generated, "force must actually re-voice").toBe(install.generated);
   });
@@ -4262,7 +4262,7 @@ describe("storage remaining is the owner's number", () => {
     // The same-tenant NON-owner refusal is asserted in feature-gating.test.ts,
     // where a client session in this studio already exists — `otherCookie` here
     // is another tenant's OWNER and would 403 for the wrong reason.
-    const body = (await (await SELF.fetch("http://x/api/storage-usage", { headers: auth(ownerCookie) })).json()) as { usedMb: number };
+    const body = (await (await SELF.fetch(`${ORIGIN}/api/storage-usage`, { headers: auth(ownerCookie) })).json()) as { usedMb: number };
     expect(body).toHaveProperty("usedMb");
   });
 });
@@ -4385,7 +4385,7 @@ describe("the starter exercise library is opt-in", () => {
     (await (env.DB as D1Database).prepare("SELECT COUNT(*) AS n FROM exercises WHERE source = 'seed' AND tenant_id IS NULL").first<{ n: number }>())?.n ?? 0;
 
   it("browsing the library never installs it", async () => {
-    const res = await SELF.fetch("http://x/api/exercises", { headers: auth(ownerCookie) });
+    const res = await SELF.fetch(`${ORIGIN}/api/exercises`, { headers: auth(ownerCookie) });
     expect(res.status).toBe(200);
     expect(await seeded(), "reading the library installed content into it").toBe(0);
   });
@@ -4403,14 +4403,14 @@ describe("the starter exercise library is opt-in", () => {
     const off = (await (await SELF.fetch(`${ADMIN}/api/admin/starter-library`, { method: "POST", headers: H, body: JSON.stringify({ install: false }) })).json()) as { installed: boolean };
     expect(off.installed).toBe(false);
     // …and it STAYS removed: nothing re-seeds it behind the operator's back.
-    await SELF.fetch("http://x/api/exercises", { headers: auth(ownerCookie) });
+    await SELF.fetch(`${ORIGIN}/api/exercises`, { headers: auth(ownerCookie) });
     expect(await seeded(), "the library re-seeded itself after being removed").toBe(0);
   });
 
   it("removing it leaves a studio's OWN exercises alone", async () => {
     const db = env.DB as D1Database;
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await db.prepare("INSERT OR REPLACE INTO exercises (id, tenant_id, visibility, name, slug, source, active, created_at) VALUES ('exr_mine', ?, 'tenant', 'My Lift', 'my-lift', 'manual', 1, ?)").bind(ctx.active.tenantId, new Date().toISOString()).run();
     await SELF.fetch(`${ADMIN}/api/admin/starter-library`, { method: "POST", headers: H, body: JSON.stringify({ install: false }) });
     expect(await db.prepare("SELECT id FROM exercises WHERE id = 'exr_mine'").first(), "a studio's own exercise was deleted").not.toBeNull();
@@ -4428,7 +4428,7 @@ describe("email on the Kova lane is metered and priced visibly", () => {
   it("publishes the per-email cost with the email settings", async () => {
     // The price belongs where the provider is CHOSEN. It used to be discoverable
     // only afterwards, in the credit ledger.
-    const r = (await (await SELF.fetch("http://x/api/settings", { headers: auth(ownerCookie) })).json()) as { emailCreditsEach: number; email: { provider: string } };
+    const r = (await (await SELF.fetch(`${ORIGIN}/api/settings`, { headers: auth(ownerCookie) })).json()) as { emailCreditsEach: number; email: { provider: string } };
     expect(typeof r.emailCreditsEach).toBe("number");
     expect(r.emailCreditsEach).toBeGreaterThanOrEqual(0);
   });
@@ -4436,12 +4436,12 @@ describe("email on the Kova lane is metered and priced visibly", () => {
   it("charges credits for a send, and refunds one that fails", async () => {
     const { sendTenantEmail } = await import("../src/email-provider.js");
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     const tid = ctx.active.tenantId;
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${tid}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
 
     const balance = async () =>
-      ((await (await SELF.fetch("http://x/api/billing", { headers: auth(ownerCookie) })).json()) as { balance: { balance: number } }).balance.balance;
+      ((await (await SELF.fetch(`${ORIGIN}/api/billing`, { headers: auth(ownerCookie) })).json()) as { balance: { balance: number } }).balance.balance;
 
     const before = await balance();
     const ok = await sendTenantEmail(env as never, tid, { to: "someone@test.dev", subject: "Metered", text: "hi", brandName: "Iron House" });
@@ -4466,7 +4466,7 @@ describe("email on the Kova lane is metered and priced visibly", () => {
 describe("client invites report whether the email actually went", () => {
   const invite = async (email: string) => {
     const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const r = await SELF.fetch("http://x/api/clients", { method: "POST", headers: H, body: JSON.stringify({ email, displayName: "Invitee" }) });
+    const r = await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ email, displayName: "Invitee" }) });
     return (await r.json()) as { invite: { url: string; token: string; email: string; delivery: { sent: boolean; reason: string | null } } | null };
   };
 
@@ -4481,10 +4481,10 @@ describe("client invites report whether the email actually went", () => {
 
   it("reports a FAILED send with a reason the coach can act on", async () => {
     const db = env.DB as D1Database;
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     // Switch the studio's email off — one of the several ordinary ways a send
     // does not happen.
-    await SELF.fetch("http://x/api/settings", {
+    await SELF.fetch(`${ORIGIN}/api/settings`, {
       method: "PATCH",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
       body: JSON.stringify({ email: { provider: "off" } }),
@@ -4501,5 +4501,43 @@ describe("client invites report whether the email actually went", () => {
     } finally {
       await db.prepare("UPDATE tenant_settings SET email_config_json = NULL WHERE tenant_id = ?").bind(ctx.active.tenantId).run().catch(() => undefined);
     }
+  });
+});
+
+/**
+ * A hostname that owns no studio must not be a way into the platform.
+ *
+ * Cloudflare publishes `<worker>.<subdomain>.workers.dev` for every worker, and
+ * anyone can guess it. `/api/auth/*` is a public lane, so before this an unowned
+ * hostname let a stranger request a sign-in code, verify it, and POST
+ * `organization/create` — minting a studio from an address that appears nowhere.
+ */
+describe("a hostname with no studio serves nothing", () => {
+  const STRAY = "http://kova.4dl.workers.dev";
+
+  it("answers /api/host so the app can say 'no studio', and refuses the rest", async () => {
+    const host = await SELF.fetch(`${STRAY}/api/host`);
+    expect(host.status).toBe(200);
+    expect(((await host.json()) as { tenant: unknown }).tenant).toBe(null);
+
+    // /health is deliberately open: dependency-free, reveals nothing, and is what
+    // uptime checks and wrangler's readiness probe use.
+    expect((await SELF.fetch(`${STRAY}/health`)).status).toBe(200);
+  });
+
+  it("closes the sign-in lane, which is what made it a studio-creation path", async () => {
+    const otp = await SELF.fetch(`${STRAY}/api/auth/email-otp/send-verification-otp`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: STRAY },
+      body: JSON.stringify({ email: "stranger@nowhere.test", type: "sign-in" }),
+    });
+    expect(otp.status).toBe(404);
+
+    const org = await SELF.fetch(`${STRAY}/api/auth/organization/create`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: STRAY, ...auth(ownerCookie) },
+      body: JSON.stringify({ name: "Ghost Studio", slug: "ghost-studio" }),
+    });
+    expect(org.status).toBe(404);
   });
 });

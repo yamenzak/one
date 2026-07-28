@@ -92,12 +92,12 @@ beforeAll(async () => {
 
 describe("onboarding plan picker", () => {
   it("401s without a session", async () => {
-    const res = await SELF.fetch("http://x/api/me/onboarding/plans");
+    const res = await SELF.fetch(`${ORIGIN}/api/me/onboarding/plans`);
     expect(res.status).toBe(401);
   });
 
   it("is reachable with a session and NO tenant", async () => {
-    const res = await SELF.fetch("http://x/api/me/onboarding/plans", { headers: auth(tenantlessCookie) });
+    const res = await SELF.fetch(`${ORIGIN}/api/me/onboarding/plans`, { headers: auth(tenantlessCookie) });
     expect(res.status).toBe(200);
     const body = (await res.json()) as PlansPayload;
     expect(body.hasTenant).toBe(false);
@@ -106,7 +106,7 @@ describe("onboarding plan picker", () => {
   });
 
   it("returns only ACTIVE plans and never a retired one", async () => {
-    const res = await SELF.fetch("http://x/api/me/onboarding/plans", { headers: auth(tenantlessCookie) });
+    const res = await SELF.fetch(`${ORIGIN}/api/me/onboarding/plans`, { headers: auth(tenantlessCookie) });
     const { plans } = (await res.json()) as PlansPayload;
     const ids = plans.map((p) => p.id);
     expect(ids).toEqual(["solo", "light", "pro", "max"]);
@@ -117,7 +117,7 @@ describe("onboarding plan picker", () => {
   });
 
   it("exposes the picker's fields — price, headline limits, trial — and nothing else", async () => {
-    const res = await SELF.fetch("http://x/api/me/onboarding/plans", { headers: auth(tenantlessCookie) });
+    const res = await SELF.fetch(`${ORIGIN}/api/me/onboarding/plans`, { headers: auth(tenantlessCookie) });
     const { plans } = (await res.json()) as PlansPayload;
     const solo = plans.find((p) => p.id === "solo")!;
     expect(solo).toMatchObject({ name: "Solo", priceUsdMonth: 4.99, trialDays: 30 });
@@ -133,7 +133,7 @@ describe("onboarding plan picker", () => {
   });
 
   it("leaks no secret or credential anywhere in the payload", async () => {
-    const res = await SELF.fetch("http://x/api/me/onboarding/plans", { headers: auth(tenantlessCookie) });
+    const res = await SELF.fetch(`${ORIGIN}/api/me/onboarding/plans`, { headers: auth(tenantlessCookie) });
     const raw = await res.text();
     for (const forbidden of ["entitlements_json", "stripe_price_id", "stripe_product_id", "secretKey", "sk_", "whsec", "publishableKey"]) {
       expect(raw).not.toContain(forbidden);
@@ -141,7 +141,7 @@ describe("onboarding plan picker", () => {
   });
 
   it("never advertises a reserved (declared-but-unbuilt) feature", async () => {
-    const res = await SELF.fetch("http://x/api/me/onboarding/plans", { headers: auth(tenantlessCookie) });
+    const res = await SELF.fetch(`${ORIGIN}/api/me/onboarding/plans`, { headers: auth(tenantlessCookie) });
     const { plans } = (await res.json()) as PlansPayload;
     for (const p of plans) {
       expect(p.features).not.toContain("chat");
@@ -152,14 +152,14 @@ describe("onboarding plan picker", () => {
   });
 
   it("reports Stripe as unconfigured when no keys are set (the degrade signal)", async () => {
-    const res = await SELF.fetch("http://x/api/me/onboarding/plans", { headers: auth(tenantlessCookie) });
+    const res = await SELF.fetch(`${ORIGIN}/api/me/onboarding/plans`, { headers: auth(tenantlessCookie) });
     expect(((await res.json()) as PlansPayload).stripeEnabled).toBe(false);
   });
 });
 
 describe("onboarding plan selection", () => {
   it("409s `no_tenant` before the studio exists, so the wizard knows to create it", async () => {
-    const res = await SELF.fetch("http://x/api/me/onboarding/plan", {
+    const res = await SELF.fetch(`${ORIGIN}/api/me/onboarding/plan`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(tenantlessCookie) },
       body: JSON.stringify({ planId: "light" }),
@@ -169,7 +169,7 @@ describe("onboarding plan selection", () => {
   });
 
   it("401s without a session", async () => {
-    const res = await SELF.fetch("http://x/api/me/onboarding/plan", {
+    const res = await SELF.fetch(`${ORIGIN}/api/me/onboarding/plan`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ planId: "light" }),
@@ -180,7 +180,7 @@ describe("onboarding plan selection", () => {
   it("records the choice as PENDING and does not grant the paid plan", async () => {
     const cookie = await createStudio(await signInNoTenant("onboarding-owner1@test.dev"), "Onboarding Studio A");
 
-    const res = await SELF.fetch("http://x/api/me/onboarding/plan", {
+    const res = await SELF.fetch(`${ORIGIN}/api/me/onboarding/plan`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(cookie) },
       body: JSON.stringify({ planId: "max" }),
@@ -189,7 +189,7 @@ describe("onboarding plan selection", () => {
     expect(await res.json()).toMatchObject({ ok: true, planId: "max", planName: "Max", stripeEnabled: false, billing: "pending" });
 
     // The plan is recorded…
-    const billing = (await (await SELF.fetch("http://x/api/billing", { headers: auth(cookie) })).json()) as {
+    const billing = (await (await SELF.fetch(`${ORIGIN}/api/billing`, { headers: auth(cookie) })).json()) as {
       subscription: { planId: string; status: string; pendingPlanId: string | null };
     };
     expect(billing.subscription.pendingPlanId).toBe("max");
@@ -198,7 +198,7 @@ describe("onboarding plan selection", () => {
 
     // The teeth: entitlements are still free-tier, so an unpaid "Max" studio has
     // no Max capabilities (Max would be unlimited clients + the whole AI suite).
-    const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(cookie) })).json()) as {
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(cookie) })).json()) as {
       entitlements: { features: Record<string, boolean>; quotas: Record<string, number>; aiCredits: { monthlyGrant: number } };
     };
     expect(ctx.entitlements.features.aiSuite).toBe(false);
@@ -210,7 +210,7 @@ describe("onboarding plan selection", () => {
   it("refuses a retired plan id", async () => {
     const cookie = await createStudio(await signInNoTenant("onboarding-owner2@test.dev"), "Onboarding Studio B");
     for (const planId of ["free", "studio", "team"]) {
-      const res = await SELF.fetch("http://x/api/me/onboarding/plan", {
+      const res = await SELF.fetch(`${ORIGIN}/api/me/onboarding/plan`, {
         method: "POST",
         headers: { "content-type": "application/json", ...auth(cookie) },
         body: JSON.stringify({ planId }),
@@ -222,13 +222,13 @@ describe("onboarding plan selection", () => {
 
   it("refuses an unknown plan id and a malformed body", async () => {
     const cookie = await createStudio(await signInNoTenant("onboarding-owner3@test.dev"), "Onboarding Studio C");
-    const bad = await SELF.fetch("http://x/api/me/onboarding/plan", {
+    const bad = await SELF.fetch(`${ORIGIN}/api/me/onboarding/plan`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(cookie) },
       body: JSON.stringify({ planId: "enterprise-unlimited" }),
     });
     expect(bad.status).toBe(400);
-    const malformed = await SELF.fetch("http://x/api/me/onboarding/plan", {
+    const malformed = await SELF.fetch(`${ORIGIN}/api/me/onboarding/plan`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(cookie) },
       body: "not json",
@@ -239,12 +239,12 @@ describe("onboarding plan selection", () => {
 
   it("re-reads the recorded choice so an abandoned onboarding resumes preselected", async () => {
     const cookie = await createStudio(await signInNoTenant("onboarding-owner4@test.dev"), "Onboarding Studio D");
-    await SELF.fetch("http://x/api/me/onboarding/plan", {
+    await SELF.fetch(`${ORIGIN}/api/me/onboarding/plan`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(cookie) },
       body: JSON.stringify({ planId: "light" }),
     });
-    const body = (await (await SELF.fetch("http://x/api/me/onboarding/plans", { headers: auth(cookie) })).json()) as PlansPayload;
+    const body = (await (await SELF.fetch(`${ORIGIN}/api/me/onboarding/plans`, { headers: auth(cookie) })).json()) as PlansPayload;
     expect(body.hasTenant).toBe(true);
     expect(body.current).toMatchObject({ planId: "free", pendingPlanId: "light" });
   });
@@ -252,14 +252,14 @@ describe("onboarding plan selection", () => {
   it("a later choice replaces the earlier one", async () => {
     const cookie = await createStudio(await signInNoTenant("onboarding-owner5@test.dev"), "Onboarding Studio E");
     const pick = (planId: string) =>
-      SELF.fetch("http://x/api/me/onboarding/plan", {
+      SELF.fetch(`${ORIGIN}/api/me/onboarding/plan`, {
         method: "POST",
         headers: { "content-type": "application/json", ...auth(cookie) },
         body: JSON.stringify({ planId }),
       });
     await pick("solo");
     await pick("pro");
-    const body = (await (await SELF.fetch("http://x/api/me/onboarding/plans", { headers: auth(cookie) })).json()) as PlansPayload;
+    const body = (await (await SELF.fetch(`${ORIGIN}/api/me/onboarding/plans`, { headers: auth(cookie) })).json()) as PlansPayload;
     expect(body.current?.pendingPlanId).toBe("pro");
   });
 });

@@ -67,18 +67,18 @@ const auth = (cookies: string) => ({ Cookie: cookies, origin: ORIGIN });
 const json = (cookies: string) => ({ "content-type": "application/json", ...auth(cookies) });
 
 const tenantOf = async (cookies: string): Promise<string> =>
-  ((await (await SELF.fetch("http://x/api/context", { headers: auth(cookies) })).json()) as { active: { tenantId: string } }).active.tenantId;
+  ((await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(cookies) })).json()) as { active: { tenantId: string } }).active.tenantId;
 
 const mkClient = async (cookies: string, displayName: string): Promise<string> =>
   ((await (
-    await SELF.fetch("http://x/api/clients", { method: "POST", headers: json(cookies), body: JSON.stringify({ displayName }) })
+    await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: json(cookies), body: JSON.stringify({ displayName }) })
   ).json()) as { client: { id: string } }).client.id;
 
 const rosterIds = async (cookies: string): Promise<string[]> =>
-  ((await (await SELF.fetch("http://x/api/clients", { headers: auth(cookies) })).json()) as { clients: { id: string }[] }).clients.map((c) => c.id);
+  ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { headers: auth(cookies) })).json()) as { clients: { id: string }[] }).clients.map((c) => c.id);
 
 const trainersOf = async (cookies: string, clientId: string) =>
-  ((await (await SELF.fetch(`http://x/api/clients/${clientId}/trainers`, { headers: auth(cookies) })).json()) as {
+  ((await (await SELF.fetch(`${ORIGIN}/api/clients/${clientId}/trainers`, { headers: auth(cookies) })).json()) as {
     trainers: { userId: string; isPrimary: boolean; name: string | null; email: string | null }[];
   }).trainers;
 
@@ -91,7 +91,7 @@ async function staffIn(tenantId: string, email: string, ownOrg: string, role: st
     .prepare('INSERT INTO "member" (id, organizationId, userId, role, createdAt) VALUES (?, ?, ?, ?, ?)')
     .bind(`mbr_${user!.id}_${tenantId}`.slice(0, 60), tenantId, user!.id, role, "2026-01-01")
     .run();
-  const sw = await SELF.fetch("http://x/api/context/switch", { method: "POST", headers: json(cookie), body: JSON.stringify({ tenantId }) });
+  const sw = await SELF.fetch(`${ORIGIN}/api/context/switch`, { method: "POST", headers: json(cookie), body: JSON.stringify({ tenantId }) });
   expect(sw.status).toBe(200);
   return { cookie, userId: user!.id };
 }
@@ -114,9 +114,9 @@ describe("coach assignment (client_trainers)", () => {
     // Before any assignment the coach's roster is empty — the exact dead end the
     // missing UI produced (owner-created clients are auto-assigned to the OWNER).
     expect(await rosterIds(trainer.cookie)).toEqual([]);
-    expect((await SELF.fetch(`http://x/api/clients/${clientA}`, { headers: auth(trainer.cookie) })).status).toBe(403);
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${clientA}`, { headers: auth(trainer.cookie) })).status).toBe(403);
 
-    const assign = await SELF.fetch(`http://x/api/clients/${clientA}/trainers`, {
+    const assign = await SELF.fetch(`${ORIGIN}/api/clients/${clientA}/trainers`, {
       method: "POST",
       headers: json(ownerCookie),
       body: JSON.stringify({ trainerUserId: trainer.userId }),
@@ -127,8 +127,8 @@ describe("coach assignment (client_trainers)", () => {
     const after = await rosterIds(trainer.cookie);
     expect(after).toContain(clientA);
     expect(after).not.toContain(clientB);
-    expect((await SELF.fetch(`http://x/api/clients/${clientA}`, { headers: auth(trainer.cookie) })).status).toBe(200);
-    expect((await SELF.fetch(`http://x/api/clients/${clientB}`, { headers: auth(trainer.cookie) })).status).toBe(403);
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${clientA}`, { headers: auth(trainer.cookie) })).status).toBe(200);
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${clientB}`, { headers: auth(trainer.cookie) })).status).toBe(403);
 
     // …and the owner's Coaches list shows both themself (creator auto-assign) and
     // the coach they just handed the client to.
@@ -136,7 +136,7 @@ describe("coach assignment (client_trainers)", () => {
     expect(listed.map((t) => t.userId)).toContain(trainer.userId);
     expect(listed.length).toBe(2);
 
-    const unassign = await SELF.fetch(`http://x/api/clients/${clientA}/trainers/${trainer.userId}`, {
+    const unassign = await SELF.fetch(`${ORIGIN}/api/clients/${clientA}/trainers/${trainer.userId}`, {
       method: "DELETE",
       headers: auth(ownerCookie),
     });
@@ -144,7 +144,7 @@ describe("coach assignment (client_trainers)", () => {
 
     // Removing the row removes the roster entry AND the row-level access again.
     expect(await rosterIds(trainer.cookie)).not.toContain(clientA);
-    expect((await SELF.fetch(`http://x/api/clients/${clientA}`, { headers: auth(trainer.cookie) })).status).toBe(403);
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${clientA}`, { headers: auth(trainer.cookie) })).status).toBe(403);
     expect((await trainersOf(ownerCookie, clientA)).map((t) => t.userId)).not.toContain(trainer.userId);
   });
 
@@ -157,7 +157,7 @@ describe("coach assignment (client_trainers)", () => {
     expect(before.filter((t) => t.isPrimary).length).toBe(1);
     expect(before.find((t) => t.isPrimary)!.userId).not.toBe(trainer.userId);
 
-    const res = await SELF.fetch(`http://x/api/clients/${clientId}/trainers`, {
+    const res = await SELF.fetch(`${ORIGIN}/api/clients/${clientId}/trainers`, {
       method: "POST",
       headers: json(ownerCookie),
       body: JSON.stringify({ trainerUserId: trainer.userId, isPrimary: true }),
@@ -174,7 +174,7 @@ describe("coach assignment (client_trainers)", () => {
   it("only staff can be assigned — a stranger and a client-role member are 400", async () => {
     const clientId = await mkClient(ownerCookie, "Assign Validation");
     const post = (body: unknown) =>
-      SELF.fetch(`http://x/api/clients/${clientId}/trainers`, { method: "POST", headers: json(ownerCookie), body: JSON.stringify(body) });
+      SELF.fetch(`${ORIGIN}/api/clients/${clientId}/trainers`, { method: "POST", headers: json(ownerCookie), body: JSON.stringify(body) });
 
     expect((await post({ trainerUserId: "usr_not_a_member" })).status).toBe(400);
     expect((await post({})).status).toBe(400); // trainerUserId is required
@@ -191,10 +191,10 @@ describe("coach assignment (client_trainers)", () => {
     const trainer = await staffIn(ownerTenant, "cm-outsider@test.dev", "CM Outsider Org", "trainer");
     const clientId = await mkClient(ownerCookie, "Not Theirs");
     // requireClientAccess, not the action gate — observable despite the admin bypass.
-    expect((await SELF.fetch(`http://x/api/clients/${clientId}/trainers`, { headers: auth(trainer.cookie) })).status).toBe(403);
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${clientId}/trainers`, { headers: auth(trainer.cookie) })).status).toBe(403);
     expect(
       (
-        await SELF.fetch(`http://x/api/clients/${clientId}/trainers`, {
+        await SELF.fetch(`${ORIGIN}/api/clients/${clientId}/trainers`, {
           method: "POST",
           headers: json(trainer.cookie),
           body: JSON.stringify({ trainerUserId: trainer.userId }),
@@ -214,11 +214,11 @@ describe("archive / offboard", () => {
     await mkClient(cookie, "Quota Three");
 
     // Fourth create is refused — the ratchet an owner with no archive UI was stuck in.
-    const blocked = await SELF.fetch("http://x/api/clients", { method: "POST", headers: json(cookie), body: JSON.stringify({ displayName: "Quota Four" }) });
+    const blocked = await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: json(cookie), body: JSON.stringify({ displayName: "Quota Four" }) });
     expect(blocked.status).toBe(403);
     expect(await blocked.json()).toMatchObject({ error: "active client limit reached", limit: 3 });
 
-    const archived = await SELF.fetch(`http://x/api/clients/${a}/archive`, { method: "POST", headers: auth(cookie) });
+    const archived = await SELF.fetch(`${ORIGIN}/api/clients/${a}/archive`, { method: "POST", headers: auth(cookie) });
     expect(archived.status).toBe(200);
     expect(await archived.json()).toMatchObject({ ok: true });
 
@@ -232,19 +232,19 @@ describe("archive / offboard", () => {
     // the seat, which meant a 3-seat studio could hold unlimited client data by
     // archiving everyone. Deleting is what frees a seat, because deleting is what
     // stops the storage.
-    const still = await SELF.fetch("http://x/api/clients", { method: "POST", headers: json(cookie), body: JSON.stringify({ displayName: "Quota Four" }) });
+    const still = await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: json(cookie), body: JSON.stringify({ displayName: "Quota Four" }) });
     expect(still.status).toBe(403);
 
     // Erasing the archived record does free it.
-    const del = await SELF.fetch(`http://x/api/clients/${a}/delete`, { method: "POST", headers: json(cookie), body: JSON.stringify({ confirm: "Quota One" }) });
+    const del = await SELF.fetch(`${ORIGIN}/api/clients/${a}/delete`, { method: "POST", headers: json(cookie), body: JSON.stringify({ confirm: "Quota One" }) });
     expect(del.status).toBe(200);
-    const allowed = await SELF.fetch("http://x/api/clients", { method: "POST", headers: json(cookie), body: JSON.stringify({ displayName: "Quota Four" }) });
+    const allowed = await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: json(cookie), body: JSON.stringify({ displayName: "Quota Four" }) });
     expect(allowed.status).toBe(201);
   });
 
   it("archiving retains the record and stamps archived_at (no delete, no un-archive route)", async () => {
     const clientId = await mkClient(ownerCookie, "Retained");
-    expect((await SELF.fetch(`http://x/api/clients/${clientId}/archive`, { method: "POST", headers: auth(ownerCookie) })).status).toBe(200);
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${clientId}/archive`, { method: "POST", headers: auth(ownerCookie) })).status).toBe(200);
 
     const row = await (env.DB as D1Database)
       .prepare("SELECT status, archived_at, display_name FROM clients WHERE id = ?")
@@ -256,7 +256,7 @@ describe("archive / offboard", () => {
     // The record is still addressable by id for staff (requireClientAccess uses
     // getClient, which does not filter status) — this is what "data is retained"
     // means in the archive copy. There is no route back to 'active'.
-    expect((await SELF.fetch(`http://x/api/clients/${clientId}`, { headers: auth(ownerCookie) })).status).toBe(200);
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${clientId}`, { headers: auth(ownerCookie) })).status).toBe(200);
     expect(await rosterIds(ownerCookie)).not.toContain(clientId);
 
     // A linked client user loses their own space: clientForUser filters archived,
