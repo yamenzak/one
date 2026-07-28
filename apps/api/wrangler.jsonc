@@ -112,15 +112,20 @@
     // Everything relational: Better Auth, tenants' coaching data, billing
     // mirrors. Local wrangler dev simulates this.
     //
-    // ⚠️ `database_name` is still `mossa` and that is CORRECT, not a missed rename.
-    // The binding resolves by `database_id`, so the name is only what the `wrangler
-    // d1` CLI looks the database up by — and D1 has no rename, so the database this
-    // id points at is still called `mossa` in the account. Writing `kova` here would
-    // be cosmetic and would break every `wrangler d1 execute <name>` in DEPLOY.md.
-    // Keeping the id is deliberate: it carries the platform config (Gemini key,
-    // email provider, Cloudflare-for-SaaS token, Turnstile keys) that a nuclear
-    // reset preserves and a fresh database would not.
-    { "binding": "DB", "database_name": "mossa", "database_id": "7705a554-6bde-4223-83d4-f9b8de5bb223" }
+    // `database_name` is deliberately ABSENT. D1 has no rename API, so the name a
+    // database was created under is permanent — and this one predates the rename.
+    // Recording that stale name here would have been the only place the old
+    // product name survived, and it buys nothing: the binding resolves purely by
+    // `database_id` (verified — `wrangler deploy --dry-run` binds `env.DB` with no
+    // name present and raises no warning), and the CLI takes the BINDING as its
+    // target, so `wrangler d1 execute DB --remote …` works on any account no
+    // matter what the underlying database is called. DEPLOY.md uses that form
+    // throughout for the same reason.
+    //
+    // Keeping this id rather than creating a fresh database is deliberate: it
+    // carries the platform config (Gemini key, email provider, Cloudflare-for-SaaS
+    // token, Turnstile keys) that a nuclear reset preserves.
+    { "binding": "DB", "database_id": "7705a554-6bde-4223-83d4-f9b8de5bb223" }
   ],
 
   "r2_buckets": [
