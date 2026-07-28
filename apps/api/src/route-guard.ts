@@ -239,9 +239,28 @@ export const routeGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
   // The root is a signpost, not an app.
   if (role === "root" && !allowedOnRoot(path)) return c.json({ error: "wrong_door" }, 404);
 
-  // A well-formed subdomain with no studio behind it. `/api/host` still answers
-  // (that is how the app learns to render "no studio here"); nothing else does.
-  if (role === "tenant" && !host.tenant && path !== "/api/host" && path !== "/health") {
+  /**
+   * A hostname that resolves NO STUDIO serves nothing but `/api/host`.
+   *
+   * Two roles land here and both must be closed:
+   *
+   *  • `tenant` — a well-formed subdomain nobody owns. `/api/host` still answers,
+   *    because that is how the app learns to render "no studio here".
+   *  • `custom` — any hostname that reached this worker without an ACTIVE row in
+   *    `tenant_domains`. That is a custom domain still provisioning… and it is also
+   *    `kova.4dl.workers.dev`, which Cloudflare publishes for every worker and
+   *    which anyone can guess.
+   *
+   * The `custom` case is the one that mattered. `/api/auth/*` is a public lane, so
+   * on an unowned hostname a stranger could request a sign-in code, verify it, and
+   * POST `organization/create` — minting a studio on the platform from an address
+   * that appears nowhere and belongs to nobody. Closing it here covers every stray
+   * hostname uniformly rather than relying on `workers_dev: false` to hide one.
+   *
+   * `/health` stays open on purpose: it is dependency-free, reveals nothing, and is
+   * what uptime checks and `wrangler dev`'s readiness probe use.
+   */
+  if ((role === "tenant" || role === "custom") && !host.tenant && path !== "/api/host" && path !== "/health") {
     return c.json({ error: "no_studio" }, 404);
   }
 

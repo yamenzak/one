@@ -98,7 +98,7 @@ interface PkgRow {
 }
 
 const listPackages = async (archived = false, cookies: string = ownerCookie): Promise<PkgRow[]> =>
-  ((await (await SELF.fetch(`http://x/api/packages${archived ? "?archived=1" : ""}`, { headers: auth(cookies) })).json()) as { packages: PkgRow[] }).packages;
+  ((await (await SELF.fetch(`${ORIGIN}/api/packages${archived ? "?archived=1" : ""}`, { headers: auth(cookies) })).json()) as { packages: PkgRow[] }).packages;
 
 const readPackage = async (id: string, archived = false): Promise<PkgRow> => {
   const found = (await listPackages(archived)).find((p) => p.id === id);
@@ -107,35 +107,35 @@ const readPackage = async (id: string, archived = false): Promise<PkgRow> => {
 };
 
 async function createPackage(body: Record<string, unknown>): Promise<string> {
-  const res = await SELF.fetch("http://x/api/packages", { method: "POST", headers: H(), body: JSON.stringify(body) });
+  const res = await SELF.fetch(`${ORIGIN}/api/packages`, { method: "POST", headers: H(), body: JSON.stringify(body) });
   expect(res.status).toBe(201);
   return ((await res.json()) as { id: string }).id;
 }
 
 const patchPackage = (id: string, body: Record<string, unknown>, cookies: string = ownerCookie) =>
-  SELF.fetch(`http://x/api/packages/${id}`, { method: "PATCH", headers: H(cookies), body: JSON.stringify(body) });
+  SELF.fetch(`${ORIGIN}/api/packages/${id}`, { method: "PATCH", headers: H(cookies), body: JSON.stringify(body) });
 
 const deletePackage = (id: string, cookies: string = ownerCookie) =>
-  SELF.fetch(`http://x/api/packages/${id}`, { method: "DELETE", headers: auth(cookies) });
+  SELF.fetch(`${ORIGIN}/api/packages/${id}`, { method: "DELETE", headers: auth(cookies) });
 
 async function newClient(name: string): Promise<string> {
-  const res = await SELF.fetch("http://x/api/clients", { method: "POST", headers: H(), body: JSON.stringify({ displayName: name }) });
+  const res = await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H(), body: JSON.stringify({ displayName: name }) });
   return ((await res.json()) as { client: { id: string } }).client.id;
 }
 
 interface SubView { id: string; packageId: string | null; status: string; daysRemaining: number }
 const subscriptions = async (clientId: string): Promise<SubView[]> =>
-  ((await (await SELF.fetch(`http://x/api/subscriptions?clientId=${clientId}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: SubView[] }).subscriptions;
+  ((await (await SELF.fetch(`${ORIGIN}/api/subscriptions?clientId=${clientId}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: SubView[] }).subscriptions;
 
 const grant = (clientId: string, packageId: string) =>
-  SELF.fetch("http://x/api/subscriptions/grant", { method: "POST", headers: H(), body: JSON.stringify({ clientId, packageId }) });
+  SELF.fetch(`${ORIGIN}/api/subscriptions/grant`, { method: "POST", headers: H(), body: JSON.stringify({ clientId, packageId }) });
 
 beforeAll(async () => {
   await ensureSchema(env.DB as D1Database);
   ownerCookie = await signInFlow("pkgowner@test.dev", "Package Studio");
   otherCookie = await signInFlow("pkgrival@test.dev", "Rival Studio");
   // The `commerce` entitlement gates POST /packages; the top plan opens it.
-  const ctx = (await (await SELF.fetch("http://x/api/context", { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+  const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
   await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, {
     method: "POST",
     headers: H(),

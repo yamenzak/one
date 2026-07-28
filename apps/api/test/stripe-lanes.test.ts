@@ -84,7 +84,10 @@ const platformEvent = () => JSON.stringify({ id: `evt_lane_${++evtSeq}_${Date.no
 const connectEvent = () => JSON.stringify({ id: `evt_lane_c_${++evtSeq}_${Date.now()}`, account: "acct_lane_none", type: "account.updated", data: { object: {} } });
 
 const postWebhook = async (path: string, payload: string, secret: string) =>
-  SELF.fetch(`http://x${path}`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
+// The SETUP door. A hostname resolving no studio now serves only `/api/host`
+// (route-guard.ts), so a throwaway host no longer reaches the webhook lane —
+// which is correct: a webhook must arrive on a door the platform actually owns.
+  SELF.fetch(`${ORIGIN}${path}`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
 
 /** Verified by the platform rail with `secret`? (400 = bad signature.) */
 const platformAccepts = async (secret: string) => (await postWebhook("/api/stripe/webhook", platformEvent(), secret)).status === 200;

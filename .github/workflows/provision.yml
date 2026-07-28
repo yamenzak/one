@@ -1,10 +1,24 @@
-name: Provision Cloudflare resources (one-time)
+name: Provision Cloudflare resources
 
-# Run this ONCE (Actions tab → "Provision…" → Run workflow) to create the D1
-# database, KV namespace, and R2 bucket the api worker binds to. It prints the
-# ids in the run log — paste them into apps/api/wrangler.jsonc, commit, and the
-# Deploy workflow will then succeed. Safe to re-run (creates are idempotent-ish;
-# "already exists" errors are ignored and the ids are listed at the end).
+# Creates any of the D1 database / KV namespace / R2 bucket the api worker binds
+# to that do not already exist, then prints their ids. Run it from the Actions tab
+# → "Provision Cloudflare resources" → Run workflow.
+#
+# It is genuinely idempotent: each resource is checked before it is created, so a
+# re-run on a provisioned account is a no-op that just re-prints the ids.
+#
+# That check is not decoration, and the old `create … || true` version was unsafe:
+#   • `wrangler kv namespace create` does NOT dedupe by title, so a second run
+#     silently adds a SECOND namespace — and pasting its id into wrangler.jsonc
+#     points the worker at an empty cache.
+#   • `wrangler d1 create` succeeds under any name it has not seen, so a config
+#     whose `database_name` had drifted from the real database would quietly
+#     create a second, empty one and invite a paste of the wrong id.
+#
+# ⚠️ The D1 database is named `mossa`, not `kova`. The binding resolves by
+# `database_id` and D1 has no rename, so the name is historical — see the comment
+# on `d1_databases` in apps/api/wrangler.jsonc. The R2 bucket IS `kova-media`,
+# because R2 binds by NAME and so had to be created fresh at the rename.
 on:
   workflow_dispatch:
 
@@ -14,6 +28,9 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      D1_NAME: mossa
+      KV_TITLE: CACHE
+      R2_BUCKET: kova-media
     steps:
       - uses: actions/checkout@v4
       # No version — read from package.json's packageManager (pnpm@10.33.0).
@@ -23,17 +40,50 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Create resources (ignore "already exists")
+
+      - name: Create only what is missing
         working-directory: apps/api
         run: |
-          pnpm exec wrangler d1 create kova || true
-          pnpm exec wrangler kv namespace create CACHE || true
-          pnpm exec wrangler r2 bucket create kova-media || true
-      - name: List ids to paste into wrangler.jsonc
+          set -euo pipefail
+
+          if pnpm exec wrangler d1 list --json 2>/dev/null | jq -e --arg n "$D1_NAME" '.[]? | select(.name == $n)' >/dev/null; then
+            echo "D1 '$D1_NAME' already exists — skipping."
+          else
+            echo "Creating D1 '$D1_NAME'…"
+            pnpm exec wrangler d1 create "$D1_NAME"
+          fi
+
+          # Wrangler titles the namespace "<worker>-<binding>", so match the suffix.
+          if pnpm exec wrangler kv namespace list 2>/dev/null | jq -e --arg t "$KV_TITLE" '.[]? | select(.title | endswith($t))' >/dev/null; then
+            echo "KV namespace ending in '$KV_TITLE' already exists — skipping."
+          else
+            echo "Creating KV namespace '$KV_TITLE'…"
+            pnpm exec wrangler kv namespace create "$KV_TITLE"
+          fi
+
+          # Bucket names ARE unique, so re-creating one is a harmless error.
+          echo "Ensuring R2 bucket '$R2_BUCKET'…"
+          pnpm exec wrangler r2 bucket create "$R2_BUCKET" || echo "  (already exists)"
+
+      - name: Report the ids
         working-directory: apps/api
         run: |
-          echo "## Paste these into apps/api/wrangler.jsonc" >> "$GITHUB_STEP_SUMMARY"
-          echo '### D1 (database_id)' >> "$GITHUB_STEP_SUMMARY"
-          pnpm exec wrangler d1 list --json >> "$GITHUB_STEP_SUMMARY" || true
-          echo '### KV (id for binding CACHE)' >> "$GITHUB_STEP_SUMMARY"
-          pnpm exec wrangler kv namespace list >> "$GITHUB_STEP_SUMMARY" || true
+          {
+            echo "## Resource ids"
+            echo ""
+            echo "Paste into \`apps/api/wrangler.jsonc\` only if something here is NEW."
+            echo "The D1 database is \`$D1_NAME\` by design — see the config comment."
+            echo ""
+            echo '### D1'
+            echo '```json'
+            pnpm exec wrangler d1 list --json 2>/dev/null || echo '(unavailable)'
+            echo '```'
+            echo '### KV'
+            echo '```json'
+            pnpm exec wrangler kv namespace list 2>/dev/null || echo '(unavailable)'
+            echo '```'
+            echo '### R2'
+            echo '```'
+            pnpm exec wrangler r2 bucket list 2>/dev/null || echo '(unavailable)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
