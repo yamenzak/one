@@ -1,12 +1,26 @@
 /**
- * Motion primitives — shared variants + small wrappers so every screen gets
- * the same tasteful entrance, stagger, and press feedback. Built on `motion`.
+ * Motion COMPONENTS. The values live in `animation.ts` — this file only wraps
+ * them in React so screens compose choreography instead of hand-rolling it.
+ *
+ * The split matters: one file owns every duration, curve and variant (so the
+ * product is cohesive by construction), and this one owns the ergonomics.
  */
 
 import { motion, type Variants, type HTMLMotionProps } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  anchorIn,
+  atmosphereIn,
+  chromeIn,
+  contentIn,
+  contentStagger,
+  fadeUp,
+  pressProps,
+  prefersReducedMotion,
+  stagger,
+} from "./animation.js";
 
-const EASE = [0.22, 1, 0.36, 1] as const;
+export * from "./animation.js";
 
 /** Count a number up from 0 on mount (eased), the way the app animates hero
  *  values. Respects reduced-motion. Re-animates when `value` changes. */
@@ -16,7 +30,7 @@ export function CountUp({ value, decimals = 0, prefix = "", suffix = "", duratio
   const [n, setN] = useState(value);
   const raf = useRef(0);
   useEffect(() => {
-    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { setN(value); return; }
+    if (prefersReducedMotion()) { setN(value); return; }
     const start = performance.now();
     const tick = (t: number) => {
       const p = Math.min(1, (t - start) / durationMs);
@@ -31,25 +45,13 @@ export function CountUp({ value, decimals = 0, prefix = "", suffix = "", duratio
   return <span className={className}>{sign}{n.toFixed(decimals)}{suffix}</span>;
 }
 
-/** Fade + rise, used for page/section entrances. */
-export const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: EASE } },
-};
-
-/** Container that staggers its children in. */
-export const stagger: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.05, delayChildren: 0.02 } },
-};
-
-/** Springy scale-in, for cards/tiles. */
-export const popIn: Variants = {
-  hidden: { opacity: 0, scale: 0.96 },
-  show: { opacity: 1, scale: 1, transition: { type: "spring", stiffness: 320, damping: 26 } },
-};
-
-/** A page wrapper: fades its content up on mount. */
+/**
+ * A page wrapper: staggers its content in.
+ *
+ * For a screen on the four-tier spine, prefer `<Screen>` from `layout.tsx`,
+ * which runs the full choreography (atmosphere → anchor → content → chrome).
+ * This is the plain container for everything else.
+ */
 export function Page({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className={className}>
@@ -67,6 +69,31 @@ export function Stagger({ children, className, ...props }: HTMLMotionProps<"div"
   );
 }
 
+/** T0 — the atmosphere tier. Fades in first, moves never. */
+export function TierAtmosphere({ children, className }: { children: ReactNode; className?: string }) {
+  return <motion.div variants={atmosphereIn} className={className}>{children}</motion.div>;
+}
+
+/** T1 — the anchor tier. Settles down from 1.06. One per screen. */
+export function TierAnchor({ children, className }: { children: ReactNode; className?: string }) {
+  return <motion.div variants={anchorIn} className={className}>{children}</motion.div>;
+}
+
+/** T3 — a content block. Use inside a `contentStagger` container. */
+export function TierContent({ children, className, ...props }: HTMLMotionProps<"div"> & { children: ReactNode }) {
+  return <motion.div variants={contentIn} className={className} {...props}>{children}</motion.div>;
+}
+
+/** The container that staggers T3 blocks in after the anchor. */
+export function TierContentGroup({ children, className }: { children: ReactNode; className?: string }) {
+  return <motion.div variants={contentStagger} className={className}>{children}</motion.div>;
+}
+
+/** T4 — chrome. Always last, fade only. */
+export function TierChrome({ children, className }: { children: ReactNode; className?: string }) {
+  return <motion.div variants={chromeIn} className={className}>{children}</motion.div>;
+}
+
 /**
  * Tap/press feedback wrapper — subtle scale on press.
  *
@@ -79,13 +106,13 @@ export function Stagger({ children, className, ...props }: HTMLMotionProps<"div"
 export function Pressable({ children, className, onClick, "aria-label": ariaLabel }: { children: ReactNode; className?: string; onClick?: () => void; "aria-label"?: string }) {
   if (onClick) {
     return (
-      <motion.button type="button" onClick={onClick} aria-label={ariaLabel} whileTap={{ scale: 0.97 }} className={className}>
+      <motion.button type="button" onClick={onClick} aria-label={ariaLabel} {...pressProps} className={className}>
         {children}
       </motion.button>
     );
   }
   return (
-    <motion.div aria-label={ariaLabel} whileTap={{ scale: 0.97 }} className={className}>
+    <motion.div aria-label={ariaLabel} {...pressProps} className={className}>
       {children}
     </motion.div>
   );

@@ -25,7 +25,7 @@ import {
   ConfirmDialog, CreditCard, EmptyState, Eyebrow, Field, Gift, GlanceStrip, Globe, IconBadge, Info, Input, KeyRound, ThumbsUp,
   Dumbbell, LayoutGrid, Page, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, Sheet, ShieldCheck,
   Skeleton, SkeletonLine, Play, Plug, Spinner, Stagger, Switch, Tag, Trash2, Wallet, cn, toneText, type Tone,
-  ActionResult, ConfigRow, Group, LoadError, TabIntro, useLoad, useAction as useActionBase,
+  ActionResult, ConfigRow, FieldGroup, LoadError, TabIntro, useLoad, useAction as useActionBase,
 } from "@kova/ui";
 import { api, errorText } from "../../api.js";
 import { fmtPrice } from "../../money.js";
@@ -301,7 +301,7 @@ function TenantSheet({ tenant, plans, plansError, onRetryPlans, planName, onClos
 
         <ActionResult msg={act.msg} err={act.err} />
 
-        <Group
+        <FieldGroup
           title="Plan"
           hint={<>Comping moves the studio onto a plan <span className="font-semibold text-foreground">immediately, with no charge</span>, and grants that plan&apos;s monthly AI credits. Only plans that are still on sale can be comped onto.</>}
         >
@@ -349,9 +349,9 @@ function TenantSheet({ tenant, plans, plansError, onRetryPlans, planName, onClos
               This studio is on <span className="font-semibold">{planName(tenant.plan_id)}</span>, which is no longer sold. It keeps those limits until you move it — and you can&apos;t move it back from here.
             </Callout>
           )}
-        </Group>
+        </FieldGroup>
 
-        <Group
+        <FieldGroup
           title="AI credits"
           hint="A manual top-up of the studio's spendable balance. Purchased credits never lapse, so this is platform money given away — there is no undo."
         >
@@ -367,14 +367,14 @@ function TenantSheet({ tenant, plans, plansError, onRetryPlans, planName, onClos
               {act.busy === "topup" ? <><Spinner className="size-4" /> Adding…</> : <><Wallet /> Add</>}
             </Button>
           </div>
-        </Group>
+        </FieldGroup>
 
-        <Group
+        <FieldGroup
           title="Gifted entitlements"
           hint="Raise this studio's limits or unlock a feature above its plan without changing the plan. Grant-only — a gift can never take something away."
         >
           <Button variant="tonal" className="min-h-12 w-full" onClick={onGift}><Gift /> Open the gift editor</Button>
-        </Group>
+        </FieldGroup>
       </div>
 
       <ConfirmDialog
@@ -409,7 +409,7 @@ function EntitlementFields({ ent, meta, onChange }: { ent: Ent; meta: EntMeta; o
   const setFeature = (k: string, v: boolean) => onChange({ ...ent, features: { ...ent.features, [k]: v } });
   return (
     <div className="space-y-5">
-      <Group title="Limits" hint="A number caps it; ∞ makes it unlimited. Keys come from the platform, so a limit added server-side appears here on its own.">
+      <FieldGroup title="Limits" hint="A number caps it; ∞ makes it unlimited. Keys come from the platform, so a limit added server-side appears here on its own.">
         <div className="space-y-3">
           {meta.quotaKeys.map((k) => {
             // An unknown key is a new server-side limit, not a bug — label it by
@@ -449,9 +449,9 @@ function EntitlementFields({ ent, meta, onChange }: { ent: Ent; meta: EntMeta; o
             );
           })}
         </div>
-      </Group>
+      </FieldGroup>
 
-      <Group title="Features" hint="Each switch is a platform capability gate. A studio's client sees a feature only where this and the client's own package both allow it.">
+      <FieldGroup title="Features" hint="Each switch is a platform capability gate. A studio's client sees a feature only where this and the client's own package both allow it.">
         <div className="space-y-3">
           {meta.featureKeys.map((k) => {
             const m = meta.featureMeta[k] ?? { label: k, hint: "New platform feature — no description yet." };
@@ -471,9 +471,9 @@ function EntitlementFields({ ent, meta, onChange }: { ent: Ent; meta: EntMeta; o
             );
           })}
         </div>
-      </Group>
+      </FieldGroup>
 
-      <Group title="AI credits" hint="Granted at the start of each billing period. The grant is a reset, not a top-up — last period's unused grant lapses.">
+      <FieldGroup title="AI credits" hint="Granted at the start of each billing period. The grant is a reset, not a top-up — last period's unused grant lapses.">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium">Monthly grant</div>
@@ -488,7 +488,7 @@ function EntitlementFields({ ent, meta, onChange }: { ent: Ent; meta: EntMeta; o
             className="numeral h-12 w-24 shrink-0 px-2.5 text-right text-sm"
           />
         </div>
-      </Group>
+      </FieldGroup>
     </div>
   );
 }
@@ -940,7 +940,7 @@ function AiConfig() {
 
                 {cfg.error && <Callout tone="warning" icon={AlertTriangle} live="alert">{cfg.error} Showing the last values that loaded.</Callout>}
 
-                <Group title="Gemini key" hint="A Google AI Studio key. Stored write-only — leaving the box blank keeps whatever is saved.">
+                <FieldGroup title="Gemini key" hint="A Google AI Studio key. Stored write-only — leaving the box blank keeps whatever is saved.">
                   <Field
                     label={status.geminiKeySet ? "Gemini API key — stored (blank keeps it)" : "Gemini API key"}
                     icon={KeyRound}
@@ -951,9 +951,9 @@ function AiConfig() {
                   <Button className="min-h-12 w-full" disabled={!geminiKey || provider.busy !== null} onClick={() => void saveKey()}>
                     {provider.busy === "key" ? <><Spinner className="size-4" /> Saving…</> : "Save key"}
                   </Button>
-                </Group>
+                </FieldGroup>
 
-                <Group title="Mock mode" hint={MOCK_HINT[status.mockMode] ?? "Deterministic offline outputs for development and testing."}>
+                <FieldGroup title="Mock mode" hint={MOCK_HINT[status.mockMode] ?? "Deterministic offline outputs for development and testing."}>
                   <SegmentedControl
                     fill
                     options={[{ value: "auto", label: "Auto" }, { value: "on", label: "On" }, { value: "off", label: "Off" }]}
@@ -966,7 +966,7 @@ function AiConfig() {
                       values — and the studio is still billed credits for it.
                     </Callout>
                   )}
-                </Group>
+                </FieldGroup>
 
                 <ActionResult msg={provider.msg} err={provider.err} />
               </Card>
@@ -995,14 +995,14 @@ function AiConfig() {
               {pricing.busy === "markup" ? <><Spinner className="size-4" /> …</> : "Apply"}
             </Button>
           </div>
-          <Group
+          <FieldGroup
             title="Catalog sync"
             hint="Re-reads the official Cloudflare and Gemini pricing pages: it DISCOVERS models new to the page, refreshes every rate, and switches off any model that has disappeared from its provider's page (never deletes one — a studio may still reference it). Task routing, enable/default and markup choices survive. Each provider is handled on its own, so a failed fetch on one never touches the other's models."
           >
             <Button variant="tonal" className="min-h-12 w-full" disabled={pricing.busy !== null} onClick={() => void sync()}>
               {pricing.busy === "sync" ? <><Spinner className="size-4" /> Syncing…</> : <><RefreshCw /> Sync from the pricing docs</>}
             </Button>
-          </Group>
+          </FieldGroup>
           <ActionResult msg={pricing.msg} err={pricing.err} />
           {syncReport && <SyncReportCard report={syncReport} />}
         </Card>
@@ -1435,7 +1435,7 @@ function AiSelfTest({ models }: { models: ModelRow[] }) {
         This spends real credits from the studio you are currently switched into. Nothing is faked or refunded.
       </Callout>
 
-      <Group title="What to run" hint={SCOPE_HINT[scope]}>
+      <FieldGroup title="What to run" hint={SCOPE_HINT[scope]}>
         <div className="overflow-x-auto no-scrollbar">
           <SegmentedControl options={SCOPE_OPTIONS} value={scope} onChange={(v) => setScope(v as SelfTestScope)} />
         </div>
@@ -1454,7 +1454,7 @@ function AiSelfTest({ models }: { models: ModelRow[] }) {
             </select>
           </label>
         )}
-      </Group>
+      </FieldGroup>
 
       {plan.error && !plan.data ? (
         <LoadError what="the self-test plan" error={plan.error} onRetry={plan.reload} />
@@ -1667,15 +1667,15 @@ function DomainsConfig() {
               </Callout>
             )}
 
-            <Group title="One-time Cloudflare setup" hint="These steps can't be done from here — do them in the Cloudflare dashboard first. Full walkthrough in DEPLOY.md §11b.">
+            <FieldGroup title="One-time Cloudflare setup" hint="These steps can't be done from here — do them in the Cloudflare dashboard first. Full walkthrough in DEPLOY.md §11b.">
               <ol className="space-y-1.5 rounded-xl bg-surface-2 p-3 text-xs leading-relaxed text-muted-foreground">
                 <li><span className="font-medium text-foreground">1.</span> On the serving zone → SSL/TLS → Custom Hostnames → <span className="font-medium">Enable</span>.</li>
                 <li><span className="font-medium text-foreground">2.</span> Add the Fallback Origin as an <span className="font-medium">originless</span> record on the zone apex — AAAA <code className="rounded bg-surface-3 px-1">saas</code> → <code className="rounded bg-surface-3 px-1">100::</code>, proxied — then set Fallback Origin to <code className="rounded bg-surface-3 px-1">saas.4dl.app</code>. Do <span className="font-medium">not</span> CNAME it at the app: every domain gets its own worker route, and a record under the studio root would classify as a studio that does not exist.</li>
                 <li><span className="font-medium text-foreground">3.</span> Create an API token scoped to that zone with <span className="font-medium">SSL and Certificates · Edit</span> <span className="font-medium">and Workers Routes · Edit</span> — both, or adding a domain fails and rolls back.</li>
               </ol>
-            </Group>
+            </FieldGroup>
 
-            <Group title="Credentials">
+            <FieldGroup title="Credentials">
               <Field
                 label={status.tokenSet ? "API token — stored (blank keeps it)" : "API token"}
                 icon={KeyRound}
@@ -1706,7 +1706,7 @@ function DomainsConfig() {
               >
                 {act.busy === "save" ? <><Spinner className="size-4" /> Saving…</> : "Save"}
               </Button>
-            </Group>
+            </FieldGroup>
 
             {error && <Callout tone="warning" icon={AlertTriangle} live="alert">{error} Showing the last values that loaded.</Callout>}
             <ActionResult msg={act.msg} err={act.err} />
@@ -1815,7 +1815,7 @@ function SecurityConfig() {
                   <Callout tone="neutral" icon={Info}>Off — sign-in codes send with no challenge.</Callout>
                 )}
 
-                <Group title="Cloudflare setup" hint="List the platform host and any studio custom domains under the widget's Hostnames (or use a domain-flexible widget), so the check works on white-label domains too.">
+                <FieldGroup title="Cloudflare setup" hint="List the platform host and any studio custom domains under the widget's Hostnames (or use a domain-flexible widget), so the check works on white-label domains too.">
                   <Field label="Site key" icon={ShieldCheck} value={siteKey} onChange={(e) => setSiteKey(e.target.value)} placeholder="0x4AAAAAAA…" hint="Public — it is handed to the login screen so the widget can render." />
                   <Field
                     label={status.secretSet ? "Secret key — stored (blank keeps it)" : "Secret key"}
@@ -1835,7 +1835,7 @@ function SecurityConfig() {
                       </Button>
                     )}
                   </div>
-                </Group>
+                </FieldGroup>
 
                 {error && <Callout tone="warning" icon={AlertTriangle} live="alert">{error} Showing the last values that loaded.</Callout>}
                 <ActionResult msg={act.msg} err={act.err} />
@@ -2354,7 +2354,7 @@ function StripeConfig() {
                   </Callout>
                 )}
 
-                <Group title="Mode to save with" hint="Saving applies this mode along with anything typed above. To change lane without touching credentials, use Active lane.">
+                <FieldGroup title="Mode to save with" hint="Saving applies this mode along with anything typed above. To change lane without touching credentials, use Active lane.">
                   <div className="flex gap-2" role="radiogroup" aria-label="Stripe mode">
                     {(["test", "live", "disabled"] as const).map((m) => (
                       <button
@@ -2372,9 +2372,9 @@ function StripeConfig() {
                       </button>
                     ))}
                   </div>
-                </Group>
+                </FieldGroup>
 
-                <Group title="Platform fee" hint="Kova's cut of each client→studio Connect payment, in basis points (100 = 1%). 0 means studios keep everything. Saved by the button below.">
+                <FieldGroup title="Platform fee" hint="Kova's cut of each client→studio Connect payment, in basis points (100 = 1%). 0 means studios keep everything. Saved by the button below.">
                   <Field
                     label="Platform fee (basis points)"
                     icon={Percent}
@@ -2384,7 +2384,7 @@ function StripeConfig() {
                     placeholder="0"
                     hint={feeBps.trim() === "" ? "Blank leaves the stored fee unchanged." : `${(Number(feeBps) / 100).toFixed(2)}% of every client payment`}
                   />
-                </Group>
+                </FieldGroup>
 
                 <div className="flex gap-3">
                   <Button className="min-h-12 flex-1" disabled={busy !== null} onClick={() => void save()}>

@@ -1,8 +1,8 @@
 /**
- * The screens for hosts that are not a studio's app.
+ * The doorway screens — the hosts that are not a studio's app.
  *
- * Three of them, and the distinction between them matters because each answers a
- * different question the visitor actually has:
+ * Three of them, and the distinction matters because each answers a different
+ * question the visitor actually has:
  *
  *   RootSignpost  `kova.4dl.app` — "this isn't anybody's studio". Deliberately not
  *                 a login: signing in here would have no tenancy to sign in to, and
@@ -14,21 +14,50 @@
  *                 exist, and would leak nothing useful either way.
  *   WrongDoor     a reserved or too-deeply-nested host under our root. Serves
  *                 nothing and says nothing about what is here.
+ *
+ * ── Design notes (UI-LANGUAGE) ──────────────────────────────────────────────
+ *
+ * These are the first pixels of the product, and they were the last to look like
+ * it: three centred columns of near-identical cards, no hierarchy, no anchor.
+ *
+ * Rebuilt on the spine. The anchor is the ADDRESS — that is genuinely what every
+ * one of these screens is about, and saying it in `display` type answers the
+ * visitor's question before they read a word of body copy. Everything else drops
+ * to T3 rows in one group, so "your studios" is a scannable list rather than a
+ * stack of cards competing with the thing that explains them.
  */
 
-import { motion } from "motion/react";
-import { ArrowRight, Building2, Card, IconBadge, MapPin, Store } from "@kova/ui";
+import {
+  Anchor,
+  ArrowRight,
+  Building2,
+  Button,
+  ChevronRight,
+  Group,
+  GroupNote,
+  MapPin,
+  Row,
+  Screen,
+  Section,
+  Store,
+  TierContent,
+} from "@kova/ui";
 import { studioUrl, useSession } from "../session.js";
 
-/** Shared frame: centred column, soft brand glow, one gentle reveal. */
-function Doorway({ children }: { children: React.ReactNode }) {
+/**
+ * The address, rendered as the anchor.
+ *
+ * `display` at 56px would wrap a hostname on a phone, and a wrapped hostname
+ * reads as broken rather than large — so the anchor slot carries the host at a
+ * size that fits it, with the label above doing the work of saying what it is.
+ * This is the language's own rule applied honestly: the anchor is the largest
+ * thing on the screen, not a fixed number of pixels.
+ */
+function AddressAnchor({ label, host, sub }: { label: string; host: string; sub?: React.ReactNode }) {
   return (
-    <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-6 overflow-hidden px-6 py-12">
-      <div aria-hidden className="pointer-events-none absolute -top-32 left-1/2 size-72 -translate-x-1/2 rounded-full bg-primary/20 blur-[100px]" />
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="relative space-y-6">
-        {children}
-      </motion.div>
-    </div>
+    <Anchor eyebrow={label} sub={sub} className="pb-4">
+      <span className="block break-all text-title-1 sm:text-[2.5rem] sm:leading-[1.05]">{host}</span>
+    </Anchor>
   );
 }
 
@@ -45,72 +74,80 @@ export function RootSignpost() {
   const { ctx, host } = useSession();
   const root = host?.rootDomain ?? location.hostname;
   const personas = ctx?.personas ?? [];
+  const signedIn = personas.length > 0;
 
   return (
-    <Doorway>
-      <header className="text-center">
-        <div className="mx-auto mb-5 grid size-16 place-items-center rounded-3xl bg-primary text-2xl font-black text-primary-foreground shadow-glow">K</div>
-        <h1 className="text-[1.75rem] font-bold leading-tight tracking-tight">Every studio has its own address</h1>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          There&rsquo;s no app at <span className="text-foreground">{root}</span> itself. Your studio lives at its own
-          address — <span className="text-foreground">yourstudio.{root}</span>, or the domain it uses.
-        </p>
-      </header>
+    <Screen center width="narrow">
+      <AddressAnchor
+        label={signedIn ? "You're signed in at" : "You've arrived at"}
+        host={root}
+        sub={signedIn ? "Pick a studio to continue" : "Every studio has its own address"}
+      />
 
-      {personas.length > 0 ? (
-        <Card className="space-y-3 p-6">
-          <div className="flex items-center gap-2.5">
-            <IconBadge icon={Store} tone="primary" size="sm" />
-            <h2 className="font-semibold tracking-tight">{personas.length === 1 ? "Your studio" : "Your studios"}</h2>
-          </div>
-          <div className="space-y-1">
+      {signedIn ? (
+        <Section title={personas.length === 1 ? "Your studio" : "Your studios"}>
+          <Group>
             {personas.map((p) => (
-              <a
+              <Row
                 key={p.tenantId}
                 href={studioUrl(p.tenantSlug, root)}
-                className="flex min-h-12 items-center gap-3 rounded-2xl p-3 transition-colors hover:bg-secondary"
+                sub={`${p.tenantSlug}.${root}`}
+                leading={
+                  <span aria-hidden className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-sm bg-primary/15 text-body-lg font-bold text-primary">
+                    {p.iconUrl || p.logoUrl ? (
+                      <img src={p.iconUrl || p.logoUrl || ""} alt="" className="size-full object-cover" />
+                    ) : (
+                      p.tenantName.charAt(0).toUpperCase()
+                    )}
+                  </span>
+                }
               >
-                <span aria-hidden className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-2xl bg-primary/15 text-base font-bold text-primary">
-                  {p.iconUrl || p.logoUrl ? <img src={p.iconUrl || p.logoUrl || ""} alt="" className="size-full object-cover" /> : p.tenantName.charAt(0).toUpperCase()}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold tracking-tight">{p.tenantName}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{p.tenantSlug}.{root}</span>
-                </span>
-                <ArrowRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-              </a>
+                {p.tenantName}
+              </Row>
             ))}
-          </div>
-        </Card>
+          </Group>
+          <GroupNote>Your sign-in works across all of them.</GroupNote>
+        </Section>
       ) : (
-        <Card className="space-y-3.5 p-6">
-          <div className="flex items-center gap-2.5">
-            <IconBadge icon={MapPin} tone="activity" size="sm" />
-            <h2 className="font-semibold tracking-tight">Training with a coach?</h2>
-          </div>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Use the link your coach sent you — look for <span className="text-foreground">&ldquo;your space is ready&rdquo;</span> in
-            your email. It opens your studio&rsquo;s own sign-in page, where a one-time code lands in your inbox.
-          </p>
-        </Card>
+        <Section>
+          <Group>
+            <Row icon={MapPin} sub="Use the link they sent you">
+              Training with a coach?
+            </Row>
+            <Row icon={Building2} sub="30 days free" href={host?.setupUrl ?? "/"}>
+              Run a coaching business?
+            </Row>
+          </Group>
+          <GroupNote>
+            Look for &ldquo;your space is ready&rdquo; in your email. It opens your studio&rsquo;s own sign-in page.
+          </GroupNote>
+        </Section>
       )}
 
-      <Card className="space-y-3.5 p-6">
-        <div className="flex items-center gap-2.5">
-          <IconBadge icon={Building2} tone="primary" size="sm" />
-          <h2 className="font-semibold tracking-tight">Run a coaching business?</h2>
-        </div>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Start a studio and pick its address. Solo and Light include 30 days free.
-        </p>
-        <a
-          href={host?.setupUrl ?? "/"}
-          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-        >
-          Set up your studio <ArrowRight aria-hidden className="size-4" />
-        </a>
-      </Card>
-    </Doorway>
+      {/* One primary action, and only when it is genuinely the next step. A
+          signed-in visitor's next step is a studio in the list above, so
+          offering "set up a studio" there would compete with it for the same
+          tap. */}
+      {!signedIn && (
+        <TierContent className="pt-2">
+          <Button size="lg" className="w-full" asChild>
+            <a href={host?.setupUrl ?? "/"}>
+              Set up your studio <ArrowRight aria-hidden />
+            </a>
+          </Button>
+        </TierContent>
+      )}
+      {signedIn && (
+        <TierContent className="pt-1">
+          <a
+            href={host?.setupUrl ?? "/"}
+            className="flex min-h-12 items-center justify-center gap-1.5 text-caption text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Start another studio <ChevronRight aria-hidden className="size-3.5" />
+          </a>
+        </TierContent>
+      )}
+    </Screen>
   );
 }
 
@@ -120,44 +157,44 @@ export function RootSignpost() {
  * Kept distinct from a login on purpose. Rendering the OTP form here would ask
  * someone to sign in to a studio that does not exist, and any code they requested
  * would arrive with nowhere to go.
+ *
+ * The atmosphere is `quiet` rather than `brand`: this is not anybody's studio, so
+ * dressing it in full brand colour would imply it is one.
  */
 export function NoStudio() {
   const { host } = useSession();
   const root = host?.rootDomain ?? location.hostname;
   return (
-    <Doorway>
-      <header className="text-center">
-        <div className="mx-auto mb-5 grid size-16 place-items-center rounded-3xl bg-secondary text-2xl font-black text-muted-foreground">?</div>
-        <h1 className="text-[1.75rem] font-bold leading-tight tracking-tight">No studio at this address</h1>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          <span className="text-foreground">{location.hostname}</span> isn&rsquo;t a studio. Check the link your coach sent
-          you — the address may have changed, or there may be a typo in it.
-        </p>
-      </header>
-      <Card className="space-y-3.5 p-6">
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          If you run this studio and just changed its address, the old one stops working straight away. Your clients need the
-          new link.
-        </p>
-        <a
-          href={host?.setupUrl ?? `https://setup.${root}`}
-          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-secondary px-4 font-semibold transition-colors hover:bg-secondary/70"
-        >
-          Studio setup <ArrowRight aria-hidden className="size-4" />
-        </a>
-      </Card>
-    </Doorway>
+    <Screen center width="narrow" atmosphere="quiet">
+      <AddressAnchor label="No studio at" host={location.hostname} sub="Check the link your coach sent you" />
+      <Section>
+        <Group>
+          <Row icon={MapPin} sub="It may have moved, or have a typo">
+            Nothing lives here
+          </Row>
+          <Row icon={Store} sub="The old one stops working straight away" href={host?.setupUrl ?? `https://setup.${root}`}>
+            Changed your address?
+          </Row>
+        </Group>
+        <GroupNote>If you run this studio, your clients need the new link.</GroupNote>
+      </Section>
+    </Screen>
   );
 }
 
-/** A reserved or over-nested host under our root. Serves nothing, says nothing. */
+/**
+ * A reserved or over-nested host under our root. Serves nothing, says nothing.
+ *
+ * No atmosphere at all — the one screen in the product with a bare canvas. This
+ * host is not ours to brand and the visitor should get no signal from it either
+ * way.
+ */
 export function WrongDoor() {
   return (
-    <Doorway>
-      <header className="text-center">
-        <h1 className="text-[1.75rem] font-bold leading-tight tracking-tight">Nothing here</h1>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">This address doesn&rsquo;t serve anything.</p>
-      </header>
-    </Doorway>
+    <Screen center width="narrow" atmosphere={false}>
+      <Anchor eyebrow="Nothing here">
+        <span className="block text-title-1">This address doesn&rsquo;t serve anything.</span>
+      </Anchor>
+    </Screen>
   );
 }

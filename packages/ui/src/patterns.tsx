@@ -115,7 +115,7 @@ export function TabIntro({ children }: { children: ReactNode }) {
 }
 
 /** A labelled group inside a card: eyebrow + optional explanation + content. */
-export function Group({ title, hint, children, className }: {
+export function FieldGroup({ title, hint, children, className }: {
   title: string; hint?: ReactNode; children: ReactNode; className?: string;
 }) {
   return (
