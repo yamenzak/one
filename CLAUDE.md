@@ -5,9 +5,17 @@ Guidance for Claude Code working in this repository.
 ## Project
 
 **Kova** — a multi-tenant, multi-trainer platform for personal-training
-businesses. Product + technical spec in [SPEC.md](SPEC.md); UI design system in
-[DESIGN.md](DESIGN.md); the ByShujaa feature inventory Kova is modeled on is in
+businesses. Product + technical spec in [SPEC.md](SPEC.md); the ByShujaa feature
+inventory Kova is modeled on is in
 [docs/BY-SHUJAA-FEATURES.md](docs/BY-SHUJAA-FEATURES.md).
+
+**UI: two files, and the order matters.** [UI-LANGUAGE.md](UI-LANGUAGE.md) is the
+interface language — hierarchy, layout, tokens, motion, copy, component grammar —
+written product-agnostically because it is the extraction target for the shared
+UI package other 4DL apps will consume. [DESIGN.md](DESIGN.md) maps Kova's
+screens onto it. **When they disagree, UI-LANGUAGE.md wins.** `packages/ui` today
+predates the language and is not yet conformant; DESIGN.md lists the deltas and
+UI-LANGUAGE.md §13 gives the order to close them.
 
 ## Stack
 

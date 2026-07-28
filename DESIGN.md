@@ -1,199 +1,63 @@
-# KOVA DESIGN.md — UI System
+# KOVA DESIGN.md — product mapping
 
-> Source of truth for Kova's interface. One design system, one app, three roles
-> (client / trainer / owner+admin) — §5. The bar: *premium, alive, and a
-> 70-year-old can use it.*
+> **The interface language lives in [UI-LANGUAGE.md](UI-LANGUAGE.md).** Tokens,
+> hierarchy, layout, motion, copy rules and the component grammar are defined
+> there, product-agnostically, because they are the extraction target for the
+> shared UI package that Scena and Bocca will also consume.
+>
+> **This file is Kova's mapping onto that language**: which surface is the anchor
+> on each screen, what the domain tones mean here, and how one app serves three
+> roles. When the two disagree, UI-LANGUAGE.md wins.
+>
+> The bar: *premium, alive, and a 70-year-old can use it.*
 
-## Design System v2 (current — shipped) ✅
+## What is implemented today
 
-The implemented system (`packages/ui`), a ground-up premium rebuild:
+`packages/ui` ships a working system that predates the language above:
+oklch tokens (dark-first + light theme, tenant-themeable primary/radius/border),
+a lucide icon registry with zero emoji, motion variants (`fadeUp`/`stagger`/
+`popIn`, spring layout indicators), CVA primitives, radix+vaul overlays, the viz
+set (`ProgressRing`, `TargetRing`, `MetricPill`, `StatCard`, `Sparkline`,
+`MiniBars`, `WeekDots`) and shell components (`AppBar`, `BottomTabs`, `NavRail`,
+`InsightCard`, `SettingsList`, `EmptyState`).
 
-- **Tokens** (`src/tokens.css`) — a shadcn-compatible palette in **oklch**,
-  dark-first (`:root`) with a light theme (`:root[data-theme="light"]`). Full
-  shadcn variable set (background/card/popover/primary/secondary/muted/accent/
-  destructive/border/input/ring) **plus** fitness domain accents (activity /
-  nutrition / sleep / cardio / hydration, each with a `-soft` container) and
-  status (success/warning/danger). `@theme inline` maps them to Tailwind
-  utilities so `bg-primary`, `text-muted-foreground`, `rounded-xl` follow the
-  live theme. Radius scale, elevation + brand-glow shadows, tabular numerals,
-  subtle scrollbars, reduced-motion support.
-- **Tenant theming** (`src/lib/theme.ts`, SPEC §7) — **9 brand presets** +
-  custom primary/radius. `applyBranding()` overrides the `--primary` / `--ring`
-  / `--radius` CSS vars at runtime; branding flows through `/api/context` to
-  every role and `ThemeProvider` applies it at boot. Owners get a **live-preview
-  branding editor** in Settings (preset grid + radius slider → `PATCH
-  /api/settings`). This re-skins the whole app for a studio's clients.
-- **Icons** (`src/lib/icons.tsx`) — a curated **lucide-react** registry.
-  **Zero emoji anywhere** in the product.
-- **Motion** (`src/lib/motion.tsx`, built on `motion`) — `fadeUp` / `stagger` /
-  `popIn` variants; `Page` / `Stagger` / `Pressable` wrappers; spring-driven
-  layout indicators (`layoutId`) for tab bar, nav rail, and segmented controls;
-  ring stroke draw-in, sparkline path draw, week-dot pop, toast spring.
-- **Primitives** (CVA) — `Button` (default/tonal/secondary/outline/ghost/
-  destructive × sm/default/lg/icon), `Card`, `Badge`, `Chip`, `Input`/`Field`/
-  `Textarea`, `Switch`, `Skeleton`, `Spinner`, `IconBadge`, `SectionTitle`.
-- **Overlays** (radix + vaul) — `Dialog`, `Sheet` (drag-to-dismiss bottom
-  drawer), `DropdownMenu`, `Tabs`, animated `SegmentedControl`, `Select`,
-  `Tooltip`, `Avatar` — all animated via data-state keyframes.
-- **Identity/viz** — animated `ProgressRing` (gradient stroke draw-in),
-  `TargetRing`, `MetricPill` (two-tone progress fill), `StatCard`, `Sparkline`
-  (area + line draw), `MiniBars`, `WeekDots`.
-- **Shell** — `AppBar` (blur), `BottomTabs` / `NavRail` (spring active pill),
-  `InsightCard` timeline feed with 👍/👎 (lucide), `WavyDivider`, `SettingsList`,
-  `EmptyState`.
+It is **not yet conformant** with UI-LANGUAGE.md. The known deltas, which are the
+work list for the rewrite:
 
-Build: vendor code-split (react/motion/radix/icons chunks); app code ~34 KB
-gzip. The original Google-Health-derived concept that seeded this is preserved
-below for reference.
-
----
-
-## 1. Design Language (extracted from the screenshots)
-
-### Surfaces & depth
-- **Dark-first.** App background near-black (`#0B0C0E`), cards one step lighter
-  (`#16181B`), nested sub-cards one more step (`#1E2126`). **Separation comes from
-  surface tone only — zero borders, zero shadows.** Light theme mirrors the same 3-step
-  tonal ladder (Google does `#F8FAFD → #FFFFFF → #EEF1F6`).
-- **Everything is very round.** Cards ~24–28 px radius, buttons/chips/pills fully
-  rounded, hero metric pills are stadium-shaped, icon containers are squircles. Nothing
-  has a sharp corner.
-- Generous whitespace; one idea per card; screens are long and scroll — never dense.
-
-### Color = meaning
-- **Each data domain owns an accent**, used as a *tonal pair* (Material 3 style:
-  `container` background + `on-container` content):
-  - Activity/training → teal, Nutrition → amber-orange (Kova; GH uses teal for cals),
-    Sleep/recovery → purple, Cardio/heart → blue/green, Hydration → cyan.
-- **Status is always a tonal chip with text**, never color alone: green `In range`,
-  amber `Fair` / `Goal not met`, red `Out of range`. (Colorblind-safe by redundancy.)
-- Actions are one consistent primary (GH: muted blue tonal pills). Destructive = red.
-
-### Typography
-- One friendly geometric sans (GH uses Google Sans; we use **Figtree** or Inter),
-  sentence case everywhere, no all-caps labels.
-- **Huge numerals carry the story**: metric values at 40–56 px semibold with
-  `tabular-nums`; labels are small (13–14 px) and muted, sitting *above* the number.
-  Units rendered smaller than the value (`4.483 cal`).
-
-### Signature patterns (what makes it feel like this app)
-1. **Hero ring + metric pills** — left: one big progress ring (value, goal, curved label
-   on the arc); right: a stack of 3 stadium pills (squircle icon + label + value), each
-   domain-tinted, some with a *two-tone fill showing progress inside the pill* (Exercise
-   days "3 of 5"). The hero is a **swipeable carousel** (dot indicators) — page 2 holds
-   the weekly view (target ring "213 of 360", `+79` delta badge).
-2. **Action row under the hero** — `+ Log` and `▶ Start` as large tonal pills, plus a
-   small circular **pencil = customize this dashboard**.
-3. **Timeline feed** — the rest of Today is a reverse-chronological feed of *events*:
-   sparkle icon (✦ = auto/AI), timestamp, plain-language title ("Sleep tracked"), a
-   big-value sub-card, **👍/👎 feedback buttons**, overflow menu. Days separated by a
-   **wavy squiggle divider** with the day label — whimsy, not chrome.
-4. **Stat card** — label, huge value+unit, status chip bottom-left, **mini chart
-   right** (dot-line sparkline, rounded bars, or S-M-T-W-T-F-S day strip; dotted
-   target line where a goal exists; tiny award badges on goal-met bars).
-5. **Detail page grammar** — duo stat cards up top (score + duration, each with status
-   chip), one rich visualization (the **hypnogram**: per-stage horizontal rounded
-   tracks with a shared time axis), feedback row, then a full-width outline `History`
-   button. Every metric detail follows this.
-6. **Library grid** — 2–3 col grid of tall rounded cards with flat illustrations and a
-   single word label (Strength, Cardio, Yoga…). Quick-start chips above it.
-7. **Form pattern** — full-screen sheet: × close + title; **outlined Material text
-   fields** (label notched into the border) with leading icons; a **"Probable
-   activities" suggestion-chip row** (selected = filled + check); "Optional
-   information" section with helper text ("If left empty, energy burned is
-   auto-calculated"); one giant pill **Save** pinned to the bottom.
-8. **Log sheet** — bottom sheet (grabber handle) titled "Log manually" containing a
-   wrapped **chip grid** of loggable things. Two taps from anywhere to any log form.
-9. **Week dots** — 7 circles S-M-T-W-T-F-S, filled+icon on active days, today
-   highlighted. Used for streaks/recent activity everywhere.
-10. **Settings = flat list** — colored section headers (Your account / App settings /
-    Preferences), icon + label rows, no cards at all.
-11. **App bar** — context chip left (GH: battery), page title center, avatar right
-    (avatar opens account/profile switcher). Bottom: **4-tab bar**, active tab = filled
-    pill around the icon.
-
----
-
-## 2. Rebuild with shadcn/ui + Tailwind v4
-
-Stack: shadcn/ui (Radix primitives) + Tailwind v4 `@theme` tokens + Recharts (charts) +
-vaul (bottom sheets) + custom SVG for rings/hypnogram. Lives in `packages/ui`.
-
-### 2.1 Tokens (Tailwind v4 `@theme`, CSS-first)
-
-```css
-@theme {
-  /* Tonal surface ladder (dark) — light theme flips via [data-theme] */
-  --color-bg: #0b0c0e;            /* app background   */
-  --color-surface-1: #16181b;     /* card             */
-  --color-surface-2: #1e2126;     /* nested card      */
-  --color-surface-3: #262a30;     /* pressed/hover    */
-  --color-fg: #e8eaed;  --color-fg-muted: #9aa0a6;
-
-  /* Primary action (tonal, not saturated) */
-  --color-primary: #a8c7fa;  --color-primary-container: #1b3a57;
-  --color-on-primary-container: #d6e3ff;
-
-  /* Domain accents — each is a container/on-container tonal pair */
-  --color-activity: #6dd3c2;   --color-activity-container: #0f3d36;
-  --color-nutrition: #ffb870;  --color-nutrition-container: #4a2e0e;
-  --color-sleep: #c5a8ff;      --color-sleep-container: #372a54;
-  --color-cardio: #8ab4f8;     --color-cardio-container: #1e3a5f;
-  --color-hydration: #7fd8e8;  --color-hydration-container: #103d46;
-
-  /* Status chips */
-  --color-good: #6dd58c;   --color-good-container: #123f26;
-  --color-warn: #fdd663;   --color-warn-container: #4a3a08;
-  --color-bad:  #f28b82;   --color-bad-container:  #4e1512;
-
-  --radius-card: 1.75rem;  --radius-field: 1rem;  /* radius-full for pills/chips */
-  --font-sans: "Figtree", system-ui;
-}
-```
-
-Rules: components never use raw palette colors — only these roles. `tabular-nums` on
-every numeral. shadcn's `--radius` mapped to `--radius-card` so Card/Sheet/Dialog round
-correctly by default.
-
-### 2.2 Component inventory
-
-**Restyled shadcn (keep the primitive, reskin):**
-
-| Component | shadcn base | Restyle |
-|---|---|---|
-| `Button` | Button | `rounded-full h-14 px-8`; variants: `tonal` (primary-container), `filled`, `outline` (1px fg-muted/30, used for History), `ghost-circle` (pencil) |
-| `Chip` | Badge / Toggle | Status chip = Badge in tonal pair; **SuggestionChip** = Toggle (selected → filled + check icon); chip grid = ToggleGroup wrap |
-| `Card` | Card | `bg-surface-1 rounded-[--radius-card] border-0 shadow-none p-5`; `SubCard` = surface-2 |
-| `Sheet` (bottom) | Drawer (vaul) | grabber bar, `rounded-t-[2rem]`, chip-grid content = the **LogSheet** |
-| `FormDialog` | Dialog | full-screen on mobile (× + title + pinned Save pill), centered `max-w-lg` on desktop |
-| `Field` | Input + Form | **Outlined-notch variant**: wrap in `fieldset` with `legend` carrying the label (pure CSS, no JS), leading icon slot, helper text below |
-| `Select`, `DatePicker`, `Switch`, `Slider`, `Tabs`, `DropdownMenu`, `Toast`, `Skeleton`, `Avatar` | as-is | token reskin only |
-| `SegmentedControl` | Tabs | pill segments for range pickers (7d/30d/90d) |
-
-**Custom components (the identity — build once in `packages/ui`):**
-
-| Component | Notes |
+| Delta | Where |
 |---|---|
-| `ProgressRing` | SVG, rounded linecap, thick stroke (~14%), center value + sub-label, optional **curved label on the arc** (`<textPath>`), color prop = domain role |
-| `TargetRing` | ProgressRing + "213 of 360" center + floating `+79` delta badge |
-| `MetricPill` | stadium pill: squircle icon container + label + value; optional `progress` prop → two-tone fill (the "3 of 5" effect via gradient stop) |
-| `HeroCarousel` | swipeable pages + dot indicators (embla), page = ring + pill stack |
-| `ActionRow` | Log / Start / pencil layout under hero |
-| `StatCard` | label, big value+unit, status chip slot, right-side chart slot |
-| `Sparkline` / `MiniBars` / `DayStrip` | Recharts Line/Bar with dots-on-line, rounded bars, dotted target `ReferenceLine`, S-M-T-W-T-F-S axis, award-badge overlay |
-| `Hypnogram` | custom SVG: N horizontal stage tracks, rounded segments, connectors, shared time axis — reuse for sleep stages, fasting zones, any staged timeline |
-| `ZoneChart` | day line chart with horizontal dotted zone bands + zone chip |
-| `TimelineFeed` / `InsightCard` | ✦ icon, timestamp, title, sub-card, 👍/👎, ⋮ menu |
-| `WavyDivider` | SVG squiggle + centered day label |
-| `WeekDots` | 7 circles, filled/today states |
-| `LibraryCard` | tall rounded card, illustration, single-word label |
-| `BottomTabs` / `NavRail` | 4 items, active = filled pill; rail variant ≥ `md` |
-| `AppBar` | context chip · title · avatar |
-| `SettingsList` | section header (accent text) + icon rows |
-| `ScoreBadge` | big score + qualitative chip (74 · Fair) |
+| No `Atmosphere` — the brand gradient that carries identity does not exist | UI-LANGUAGE §3 |
+| No canonical `Row` / `Group` — the most-repeated element in the product is re-implemented per screen | §2, §7 |
+| No `Anchor` — screens have no single largest thing; hero treatments vary | §1 |
+| No type scale — sizes are chosen per screen | §5 |
+| Radius base (0.95rem) contradicts the documented card radius | §6 |
+| `popIn` scales **up**; the language requires settling **down** | §8 |
+| Entrance has no tier ordering — chrome animates with content | §8 |
+| Desktop is "rail + max-w-3xl", not the three shapes | §11 |
 
-**Accessibility floor:** min 48px tap targets, text ≥13px, chips always text+color,
-visible focus rings, `prefers-reduced-motion` kills carousel autoplay/ring animation.
+Follow the order in UI-LANGUAGE.md §13: tokens → `Row`/`Group` → `Atmosphere`/
+`Anchor` → motion → screen by screen.
+
+---
+
+## Kova's domain tones
+
+The language ships the tone **mechanism** (a foreground tone + a `-soft`
+container, theme-aware, AA-validated). Kova ships the list:
+
+| Tone | Meaning |
+|---|---|
+| `activity` | training, workouts, load |
+| `nutrition` | food, meals, macros |
+| `sleep` | sleep and recovery |
+| `cardio` | heart, conditioning |
+| `hydration` | water |
+| `supplement` | supplements |
+| `lab` | body tests / lab work |
+| `calories` `protein` `carbs` `fat` | the macro set, used only in nutrition viz |
+
+Status (`success` / `warning` / `danger`) is the language's, not Kova's, and is
+always paired with a word (In range · Off track · Out of range).
 
 ---
 
@@ -279,13 +143,16 @@ Bottom tabs: **Today · Train · Eat · Progress** (avatar → profile/settings)
 
 ---
 
-## 4. Desktop behavior (same app, no second UI)
+## 4. Desktop
 
-- `< md`: bottom tabs, single column, sheets slide from bottom.
-- `≥ md`: BottomTabs → **NavRail** left; content `max-w-3xl` centered; Progress/Key
-  metrics become 2–3 col grids; sheets become right-side panels or centered dialogs.
-- `≥ lg` (trainer/owner focus): **two-pane** — list pane (roster/library) + detail pane.
-  The exact same components render in both panes; nothing is dashboard-specific.
+See UI-LANGUAGE.md §11 for the three shapes (Focus / Two-pane / Board) and the
+rules that make them work. Kova's mapping:
+
+- **Focus** — the client persona. One column; the same screens as mobile.
+- **Two-pane** — the coach personas. List pane = roster or library; detail pane
+  is *literally the client screen* (§5 below is what makes that possible).
+- **Board** — owner + platform admin. Detail column plus a right column of
+  secondary cards (credits, at-risk counts, recent activity).
 
 ---
 
