@@ -184,6 +184,18 @@ describe("checkSlug — a slug is a DNS label now", () => {
     expect(RESERVED_LABELS.has(SETUP_LABEL)).toBe(true);
     expect(RESERVED_LABELS.has(ADMIN_LABEL)).toBe(true);
   });
+
+  it("the Cloudflare-for-SaaS plumbing labels are reserved", () => {
+    // The fallback origin and the CNAME target tenants point their own domain at
+    // belong on the zone APEX (`saas.4dl.app`), so a studio slug does not collide
+    // with them today. They are reserved anyway because the failure if the
+    // convention ever slips is not a name clash: a studio sitting on the record
+    // custom-domain issuance depends on breaks white-label for every other tenant,
+    // and un-reserving later is free while un-squatting is a live URL migration.
+    for (const label of ["ssl", "saas", "cname", "fallback"]) {
+      reject(label, "reserved");
+    }
+  });
 });
 
 describe("hostname builders", () => {

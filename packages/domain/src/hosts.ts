@@ -109,6 +109,13 @@ export const RESERVED_LABELS: ReadonlySet<string> = new Set([
   // gym might actually use.
   "ns", "ns1", "ns2", "ns3", "ns4", "dns", "dns1", "dns2", "_acme-challenge",
   "wpad", "localhost", "localdomain",
+  // Cloudflare for SaaS plumbing. `saas`/`ssl` are the conventional names for the
+  // fallback origin and the CNAME target tenants point their own domain at, and
+  // `cname`/`fallback` are the names an operator reaches for next. They normally
+  // live on the zone APEX rather than under the root, but reserving them costs a
+  // studio one character and stops a studio slug from ever shadowing the record
+  // custom-domain issuance depends on.
+  "ssl", "tls", "saas", "cname", "fallback", "custom", "customer", "tenant", "tenants",
   // Auth and account surfaces. A studio at `login.kova.4dl.app` would look more
   // official than the real thing.
   "auth", "oauth", "sso", "login", "signin", "sign-in", "signup", "sign-up", "register",

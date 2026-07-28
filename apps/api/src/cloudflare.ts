@@ -10,7 +10,9 @@
  * binding, so it's runtime-tunable and never shipped in the bundle:
  *   cf.saas.api_token   — token with `SSL and Certificates: Edit` on the zone
  *   cf.saas.zone_id     — the SaaS-enabled zone id
- *   cf.saas.cname_target — what tenants point their CNAME at (e.g. ssl.kova.4dl.app)
+ *   cf.saas.cname_target — what tenants point their CNAME at (e.g. saas.4dl.app —
+ *                          a proxied hostname on the SERVING ZONE, not one under
+ *                          the studio root, which the wildcard route would claim)
  *   cf.saas.worker_name  — the worker script to route hostnames at (default "kova")
  *
  * The token needs TWO permissions: `SSL and Certificates: Edit` to register the
