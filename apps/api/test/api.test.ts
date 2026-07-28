@@ -4535,7 +4535,10 @@ describe("a hostname with no studio serves nothing", () => {
 
     const org = await SELF.fetch(`${STRAY}/api/auth/organization/create`, {
       method: "POST",
-      headers: { "content-type": "application/json", origin: STRAY, ...auth(ownerCookie) },
+      // Spread FIRST, then override `origin` — `auth()` carries the setup door's
+      // origin, and letting it win would test a cross-origin rejection rather than
+      // the host gate this case is about.
+      headers: { "content-type": "application/json", ...auth(ownerCookie), origin: STRAY },
       body: JSON.stringify({ name: "Ghost Studio", slug: "ghost-studio" }),
     });
     expect(org.status).toBe(404);
