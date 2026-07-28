@@ -25,6 +25,7 @@ import {
   setConfig,
 } from "./billing-store.js";
 import { stripeConfig, stripeEnabled, stripeCall } from "./stripe.js";
+import { PLATFORM_FROM_DEFAULT } from "./mailer.js";
 import { newId, nowIso, periodKey } from "./ids.js";
 import { parseJson } from "./db.js";
 
@@ -387,7 +388,7 @@ export const adminRoutes = new Hono<AppEnv>()
     return c.json({
       provider: cfg["email.provider"] ?? "mock",
       from: cfg["email.from"] ?? "Kova <noreply@kova.local>",
-      platformFrom: cfg["email.platform_from"] ?? "Kova <noreply@fourdegreelabs.com>",
+      platformFrom: cfg["email.platform_from"] ?? PLATFORM_FROM_DEFAULT,
       creditsPerEmail: Number(cfg["email.credits_per_email"] ?? "1"),
     });
   })

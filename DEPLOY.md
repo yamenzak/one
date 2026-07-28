@@ -249,10 +249,11 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;
 ```
 
 Replace both addresses with senders you have **onboarded and verified** in
-Cloudflare → Email → Email Sending. The defaults are useless in production:
-`email.from` defaults to `Kova <noreply@kova.local>` (an invalid domain) and
-`email.platform_from` to `Kova <noreply@fourdegreelabs.com>` (a domain you
-almost certainly do not own).
+Cloudflare → Email → Email Sending. `email.from` defaults to
+`Kova <noreply@kova.local>`, an invalid domain that will bounce.
+`email.platform_from` defaults to `Kova <noreply@kova.4dl.app>` — right for this
+deployment, wrong for any other, and **still dead until that sender is verified**:
+a plausible default is not a configured one.
 
 Verify:
 
@@ -373,7 +374,7 @@ section 6.
 | --- | --- | --- | --- |
 | `email.provider` | `mock` | **Nobody can sign in.** Mock fails closed outside dev: no send, no log | ⚠️ no UI — D1 (section 6) |
 | `email.from` | `Kova <noreply@kova.local>` | Sends from an invalid domain → bounces/rejects | ⚠️ no UI — D1 |
-| `email.platform_from` | `Kova <noreply@fourdegreelabs.com>` | Platform/billing email sends from a domain you don't own | ⚠️ no UI — D1 |
+| `email.platform_from` | `Kova <noreply@kova.4dl.app>` | Platform/billing email sends from this address — which bounces until the sender is verified in Email Sending, and is wrong outright on any other deployment | ⚠️ no UI — D1 |
 | `email.credits_per_email` | `1` | Tenants are charged 1 credit per metered email — fine, but set it deliberately | ⚠️ no UI — D1 |
 | `google.gemini_key` | *(empty)* | **The whole vision suite is unavailable**: Snap-a-Meal, Label Reader, lab-extract, image generation, body-scan voice. Every `task: "vision"` model in the seed catalog is provider `google` | Platform admin → **AI** |
 | `ai.mock` | `auto` | `auto` only falls back to the mock on the dev lane; `on` forces the mock (and bills for it) — never set `on` in production | Platform admin → **AI** |

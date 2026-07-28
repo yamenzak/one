@@ -1,7 +1,7 @@
 /**
  * Per-tenant email provider (SPEC §3 notifications).
  *
- * Each tenant either sends through the PLATFORM sender (noreply@fourdegreelabs.com
+ * Each tenant either sends through the PLATFORM sender (noreply@kova.4dl.app
  * via Cloudflare Email Service, metered against the tenant's credits — Cloudflare
  * bills $0.35/1k, so a small per-email credit charge keeps margin) or brings their
  * own BREVO key (their sender, their bill, no credits). `off` means inbox-only.
@@ -9,7 +9,7 @@
  */
 
 import type { Env } from "./env.js";
-import { sendEmail, bareAddress, type SendResult } from "./mailer.js";
+import { sendEmail, bareAddress, PLATFORM_FROM_DEFAULT, type SendResult } from "./mailer.js";
 import { getConfig } from "./billing-store.js";
 import { parseJson } from "./db.js";
 
@@ -98,7 +98,7 @@ export async function sendTenantEmail(env: Env, tenantId: string, msg: EmailMsg)
     const charged = await dobj.charge(perEmail, "email.send", tenantId);
     if (!charged.ok) return { ok: false, skipped: "no_credits" };
   }
-  const platformFrom = conf["email.platform_from"] || "Kova <noreply@fourdegreelabs.com>";
+  const platformFrom = conf["email.platform_from"] || PLATFORM_FROM_DEFAULT;
   // The From display name. `senderName` used to be honoured on the Brevo lane
   // ONLY, so a studio that set it and left the provider on Kova saw no effect at
   // all — the field silently did nothing for the default configuration. The
