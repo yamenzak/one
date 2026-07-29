@@ -13,7 +13,7 @@ import { motion } from "motion/react";
 import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, fmtEnergy, kcalToDisplay, POSTURE_GUIDANCE, presetRange, type RangePreset, type SeriesDelta } from "@kova/domain";
 
 const capp = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-import { Card, Badge, Button, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger, EmptyState, SectionHeader, Sparkline, Eyebrow, GlanceStrip, Reveal, SkeletonHero, SkeletonChart, AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, cn, toneVar, Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, Calendar, Scale, Anchor, CountUp, type Tone, type LucideIcon, NoData, IconTabs, DUR } from "@4dl/ui";
+import { Card, Badge, Button, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger, EmptyState, SectionHeader, Sparkline, Eyebrow, GlanceStrip, Reveal, SkeletonHero, SkeletonChart, AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, cn, toneVar, Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, Calendar, DatePill, Scale, Anchor, CountUp, type Tone, type LucideIcon, NoData, IconTabs, DUR } from "@4dl/ui";
 import { METRICS, POSTURE_SEVERITY_TONE } from "../../registry/index.js";
 import { api, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
@@ -119,10 +119,10 @@ export function Progress({ clientId }: { clientId: string }) {
       </div>
       {range === "custom" && (
         <div className="flex items-center gap-2">
-          <DatePill value={customStart} max={customEnd} label="Start date"
+          <DatePill value={customStart} max={customEnd} label="Start date" display={shortDate(customStart)}
             onChange={(v) => { setCustomStart(v); if (v > customEnd) setCustomEnd(v); }} />
           <span className="shrink-0 text-sm text-muted-foreground">→</span>
-          <DatePill value={customEnd} min={customStart} max={today} label="End date"
+          <DatePill value={customEnd} min={customStart} max={today} label="End date" display={shortDate(customEnd)}
             onChange={(v) => { setCustomEnd(v); if (v < customStart) setCustomStart(v); }} />
         </div>
       )}
@@ -490,16 +490,6 @@ const LENSES: { value: Tab; label: string; icon: LucideIcon }[] = [
   { value: "wellness", label: "Wellness", icon: HeartPulse },
 ];
 
-
-/** A date pill wrapping a native date input — the custom-range endpoints. */
-function DatePill({ value, min, max, label, onChange }: { value: string; min?: string; max?: string; label: string; onChange: (v: string) => void }) {
-  return (
-    <label className="relative flex-1">
-      <input type="date" value={value} min={min} max={max} onChange={(e) => e.target.value && onChange(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" aria-label={label} />
-      <div className="pointer-events-none flex items-center justify-center gap-1.5 rounded-full bg-secondary px-3 py-2 text-sm font-semibold [&_svg]:size-4"><Calendar className="text-muted-foreground" />{shortDate(value)}</div>
-    </label>
-  );
-}
 
 function MiniStat({ icon: Icon, tone, label, value, sub }: { icon: LucideIcon; tone: Tone; label: string; value: string | null; sub?: string }) {
   return (

@@ -906,6 +906,31 @@ invisible cursor.
 `isBlank(v)` is the shared predicate — `null`, `undefined` or `""`, and
 deliberately **not** `0`.
 
+### Dates — `dates.tsx`
+
+| Component | Use it when | Do NOT use it for | State |
+|---|---|---|---|
+| `DatePill` | One date the user can change — a range endpoint, a single field in a filter row. | A date you only *display*. That is text. | ✅ |
+| `DayNav` | The whole screen is scoped to one day and the user steps through days. | Two-way range selection — that is two `DatePill`s. | ✅ |
+
+`surface` is the one decision they share: `"solid"` on ordinary background,
+`"translucent"` where the control sits over the T0 atmosphere (§1: "T4 is
+translucent"). Both existed as hand-rolled copies on Today and Progress with
+different radii and different surfaces before this — the difference was real
+(one is over atmosphere) but nobody had decided it, so it read as drift.
+
+Three rules `DayNav` encodes, each from a defect it shipped with:
+- **The forward arrow disables at the boundary, it does not disappear.** A
+  vanishing control teaches nothing; a dimmed one teaches the edge.
+- **The reset sits in an always-reserved slot.** It used to be a row that only
+  existed off-today, so every step backwards pushed the screen down a line.
+- **The reset is muted, not accented.** It is chrome (§1, T4), and T4 is never
+  accented.
+
+Neither does date math. The caller owns the calendar, because the app's day is
+the *client's local* day (`date_local` from the device) and a UTC shift inside a
+shared component would be off by one for everyone outside UTC.
+
 ### Settings — `settings.tsx`
 
 | Component | Use it when | Do NOT use it for | State |

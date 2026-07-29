@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtVolume, fmtEnergy, fmtWeight, featureEnabled, type UnitPrefs } from "@kova/domain";
-import { Button, Card, Skeleton, IconBadge, Sheet, EmptyState, ProgressRing, Reveal, SkeletonHero, SkeletonList, SkeletonHeader, Page, Stagger, Anchor, ActionCluster, CountUp, Unit, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock, Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Send, Info, Utensils, Croissant, Soup, Apple, Store, Ticket, AlertTriangle, ShieldCheck, toneVar, ChevronLeft, ChevronRight, Target, ScanLine, Calendar, BookOpen, Group, Row, User, type Tone, type LucideIcon } from "@4dl/ui";
+import { Button, Card, Skeleton, IconBadge, Sheet, EmptyState, ProgressRing, Reveal, SkeletonHero, SkeletonList, SkeletonHeader, Page, Stagger, Anchor, DayNav, ChevronRight, ActionCluster, CountUp, Unit, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock, Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Send, Info, Utensils, Croissant, Soup, Apple, Store, Ticket, AlertTriangle, ShieldCheck, toneVar, Target, ScanLine, BookOpen, Group, Row, User, type Tone, type LucideIcon } from "@4dl/ui";
 import { MacroBar } from "../../registry/index.js";
 import type { WidgetItem } from "@kova/protocol";
 import { useNavigate } from "react-router-dom";
@@ -199,26 +199,42 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
    * chose is worse than no claim.
    */
   const energyAnchor = useMemo(() => {
-    const label = units.energy === "kJ" ? "Energy today" : "Calories today";
-    if (!data) return { label, value: 0, unit: "", sub: "" };
+    // The anchor names the day it is actually showing. It used to say "today"
+    // unconditionally while the numbers underneath followed the date picker, so
+    // rewinding a week gave you last Tuesday's calories labelled as today's —
+    // the data was right and the label lied, which is the worse way round.
+    const noun = units.energy === "kJ" ? "Energy" : "Calories";
+    const label = `${noun} ${whenLabel(date, today)}`;
+    if (!data) return { label, value: 0, unit: "", sub: "", word: undefined as string | undefined };
     const net = Math.max(0, data.nutrition.calories - data.burnedKcal);
     const target = targets?.targetCalories ?? 0;
     // `fmtEnergy` returns a formatted string with the unit; the anchor needs the
     // number and the unit apart so the unit can be rendered subordinate (§5).
     const shown = units.energy === "kJ" ? Math.round(net * 4.184) : Math.round(net);
     const shownTarget = units.energy === "kJ" ? Math.round(target * 4.184) : Math.round(target);
+    const hasTarget = target > 0;
+    const targetSub = hasTarget ? `${shownTarget.toLocaleString()} target` : "No target set yet";
+    // §5: "a zero that is zero because there is no input is absence wearing a
+    // number's clothes". A day nobody logged rendered as `0` at display size
+    // over "of 2,100 target" — which reads as a verdict on the client rather
+    // than a gap in the record, and it is the single biggest thing on screen.
+    // Tested on the RAW inputs, not on `net`: food 0 with 500 burned is a real
+    // measured zero and keeps the numeral.
+    if (data.nutrition.calories === 0 && data.burnedKcal === 0)
+      return { label, value: 0, unit: "", word: isToday ? "Nothing logged yet" : "Nothing logged", sub: targetSub };
     return {
       label,
       value: shown,
       unit: units.energy === "kJ" ? " kJ" : "",
-      sub: target > 0 ? `of ${shownTarget.toLocaleString()} target` : "No target set yet",
+      sub: hasTarget ? `of ${targetSub}` : targetSub,
+      word: undefined as string | undefined,
     };
-  }, [data, targets, units.energy]);
+  }, [data, targets, units.energy, date, today, isToday]);
 
   return (
     <Page className="column space-y-5 p-4 pb-28">
       {error && !data ? (
-        <EmptyState icon={AlertTriangle} title="Couldn't load your day" description="Something went wrong loading today. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />
+        <EmptyState icon={AlertTriangle} title="Couldn't load your day" description="Something went wrong loading that day. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />
       ) : (
       <Reveal loading={!data || !agenda} className="space-y-5" skeleton={
         <>
@@ -239,17 +255,16 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
         {data && agenda && widgetData && (
         <>
           {/* Date navigator — the whole day (macros + agenda + feed) rewinds. */}
-          <Stagger className="flex items-center gap-2">
-            <button onClick={() => setDate((d) => shiftDay(d, -1))} aria-label="Previous day" className="grid size-9 shrink-0 place-items-center rounded-full bg-background/25 text-muted-foreground backdrop-blur-md transition-colors hover:bg-background/40 hover:text-foreground [&_svg]:size-4"><ChevronLeft /></button>
-            <label className="relative flex-1">
-              <input type="date" max={today} value={date} onChange={(e) => e.target.value && setDate(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" aria-label="Pick a date" />
-              <div className="pointer-events-none flex items-center justify-center gap-1.5 rounded-xl bg-background/25 px-3 py-2 text-sm font-semibold backdrop-blur-md [&_svg]:size-4"><Calendar className="text-muted-foreground" />{dayLabel(date, today)}</div>
-            </label>
-            {isToday
-              ? <div className="size-9 shrink-0" />
-              : <button onClick={() => setDate((d) => (d < today ? shiftDay(d, 1) : d))} aria-label="Next day" className="grid size-9 shrink-0 place-items-center rounded-full bg-background/25 text-muted-foreground backdrop-blur-md transition-colors hover:bg-background/40 hover:text-foreground [&_svg]:size-4"><ChevronRight /></button>}
+          <Stagger>
+            <DayNav
+              value={date}
+              max={today}
+              display={dayLabel(date, today)}
+              onChange={setDate}
+              onShift={(d) => setDate((cur) => shiftDay(cur, d))}
+              resetTo={today}
+            />
           </Stagger>
-          {!isToday && <button onClick={() => setDate(today)} className="mx-auto block text-xs font-medium text-primary">Jump to today</button>}
 
           {/*
             T1 — THE ANCHOR (UI-LANGUAGE §1).
@@ -263,10 +278,10 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
 
             Net of what you burned, because that is the number a client acts on.
           */}
-          <Anchor eyebrow={energyAnchor.label} sub={energyAnchor.sub}>
-        <CountUp value={energyAnchor.value} />
+          <Anchor eyebrow={energyAnchor.label} sub={energyAnchor.sub} word={energyAnchor.word}>
+              <CountUp value={energyAnchor.value} />
               {energyAnchor.unit && <Unit>{energyAnchor.unit}</Unit>}
-      </Anchor>
+            </Anchor>
 
           {/*
             T2 — what you came here to DO. Circular icon + label, never a row of
@@ -471,6 +486,17 @@ const metaFor = (kind: string) => FEED_META[kind] ?? { icon: Info, tone: "neutra
 function formatMetric(metric: FeedEvent["metric"], units: UnitPrefs): string | null {
   if (!metric) return null;
   return metric.unit === "energy" ? fmtEnergy(metric.value, units) : metric.unit === "volume" ? fmtVolume(metric.value, units) : fmtWeight(metric.value, units);
+}
+
+/**
+ * The same day, phrased to sit after a noun: "Calories today", "Calories
+ * yesterday", "Calories on Mon, Jan 5". `dayLabel` is the standalone form for
+ * the picker itself; this is the one that has to read as a sentence.
+ */
+function whenLabel(day: string, today: string): string {
+  if (day === today) return "today";
+  if (day === shiftDay(today, -1)) return "yesterday";
+  return `on ${new Date(`${day}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}`;
 }
 
 function dayLabel(day: string, today: string): string {
