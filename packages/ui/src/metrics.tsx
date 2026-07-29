@@ -20,6 +20,27 @@ interface MetricPillProps {
   className?: string;
 }
 
+/**
+ * "There is nothing to show here yet." UI-LANGUAGE §5.
+ *
+ * **Never render a dash as a value.** An em-dash set at a numeral size — 26px
+ * bold in a `StatCard`, 40px in a ring — stops reading as punctuation and starts
+ * reading as a horizontal RULE, so a card with no data looks like a card with a
+ * divider stuck in the middle of it. Four of them in a grid look like a broken
+ * layout. Words at a subordinate size say the same thing, and they are the only
+ * version a screen reader can convey at all.
+ *
+ * Every value-bearing component here renders this automatically when its `value`
+ * is `null`/`undefined`, so the correct call is to pass `null` rather than a
+ * placeholder string. `0` is a real number and is never treated as absent.
+ */
+export function NoData({ children = "No data yet", className }: { children?: ReactNode; className?: string }) {
+  return <span className={cn("text-sm font-medium text-muted-foreground", className)}>{children}</span>;
+}
+
+/** True when a value slot should render `NoData` rather than a numeral. */
+export const isBlank = (v: ReactNode): boolean => v === null || v === undefined || v === "";
+
 /** A bare, uppercase section label (optional trailing action) — the flow device
  *  that keeps a page from reading as one long stack of cards. Pair with a
  *  `<section className="space-y-2">` wrapper around the grouped content. */
@@ -41,7 +62,9 @@ export function GlanceStrip({ items, className }: { items: { icon: LucideIcon; t
       {items.map((it, i) => (
         <div key={i} className="flex flex-1 flex-col items-center gap-1.5 px-2 text-center">
           <it.icon className="size-4 shrink-0" style={{ color: toneVar[it.tone] }} />
-          <span className="numeral text-2xl font-bold leading-none">{it.value}</span>
+          {isBlank(it.value)
+            ? <NoData className="text-xs leading-none">Not yet</NoData>
+            : <span className="numeral text-2xl font-bold leading-none">{it.value}</span>}
           <span className="text-xs font-medium leading-tight text-muted-foreground">{it.label}</span>
         </div>
       ))}
@@ -66,7 +89,9 @@ export function MetricPill({ icon: Icon, label, value, tone = "activity", progre
       </span>
       <span className="relative min-w-0">
         <span className="block truncate text-xs font-medium opacity-80">{label}</span>
-        <span className="numeral block text-lg font-bold leading-tight">{value}</span>
+        {isBlank(value)
+          ? <NoData className="block text-xs opacity-80" />
+          : <span className="numeral block text-lg font-bold leading-tight">{value}</span>}
       </span>
     </Comp>
   );
@@ -74,7 +99,10 @@ export function MetricPill({ icon: Icon, label, value, tone = "activity", progre
 
 interface StatCardProps {
   label: string;
+  /** Pass `null` when there is nothing to show — never a dash (see `NoData`). */
   value: ReactNode;
+  /** Overrides the "No data yet" phrase when `value` is blank. */
+  emptyText?: string;
   unit?: string;
   badge?: ReactNode;
   chart?: ReactNode;
@@ -87,7 +115,7 @@ interface StatCardProps {
   stack?: boolean;
 }
 
-export function StatCard({ label, value, unit, badge, chart, icon: Icon, tone = "primary", onClick, className, stack }: StatCardProps) {
+export function StatCard({ label, value, emptyText, unit, badge, chart, icon: Icon, tone = "primary", onClick, className, stack }: StatCardProps) {
   const Comp = onClick ? motion.button : motion.div;
   const head = (
     <div className="min-w-0">
@@ -95,9 +123,15 @@ export function StatCard({ label, value, unit, badge, chart, icon: Icon, tone = 
         {Icon && <Icon className="size-4 shrink-0" style={{ color: toneVar[tone] }} />}
         <span className="truncate">{label}</span>
       </div>
-      <div className={cn("numeral mt-1.5 font-semibold leading-none", stack ? "text-[1.65rem]" : "text-[2rem]")}>
-        {value}
-        {unit && <span className="ml-1 text-base font-medium text-muted-foreground">{unit}</span>}
+      <div className={cn("mt-1.5 leading-none", isBlank(value) ? "pt-1" : cn("numeral font-semibold", stack ? "text-[1.65rem]" : "text-[2rem]"))}>
+        {isBlank(value) ? (
+          <NoData>{emptyText}</NoData>
+        ) : (
+          <>
+            {value}
+            {unit && <span className="ml-1 text-base font-medium text-muted-foreground">{unit}</span>}
+          </>
+        )}
       </div>
       {badge && <div className={stack ? "mt-2" : "mt-3"}>{badge}</div>}
     </div>

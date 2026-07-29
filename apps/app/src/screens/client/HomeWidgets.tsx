@@ -27,8 +27,8 @@ export const DEFAULT_CLIENT_WIDGETS: { id: string; size: WidgetSize }[] = [
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const ratio = (v: number, t?: number) => (t && t > 0 ? v / t : undefined);
-function weightDelta(series: { kg: number; date: string }[] | undefined, units: UnitPrefs): string {
-  if (!series || series.length < 2) return "—";
+function weightDelta(series: { kg: number; date: string }[] | undefined, units: UnitPrefs): string | null {
+  if (!series || series.length < 2) return null;
   const last = series[series.length - 1]!;
   const target = Date.parse(last.date) - 7 * 86400000;
   let ref = series[0]!;
@@ -124,8 +124,8 @@ function BodyFatWidget({ clientId, size }: { clientId: string; size: WidgetSize 
   const delta = latest != null && prev != null ? Math.round((latest - prev) * 10) / 10 : null;
   const sub = latest == null ? "no scans yet" : delta != null ? `${delta > 0 ? "+" : ""}${delta}% vs last` : "estimate";
   return size === "big"
-    ? <RingCard tone={METRICS.bodyFat.tone} progress={latest != null ? Math.min(1, latest / 40) || 0.001 : 0.001} value={latest != null ? latest.toFixed(1) : "—"} label="Body fat" sublabel={sub} />
-    : <MiniCard icon={METRICS.bodyFat.icon} tone={METRICS.bodyFat.tone} label="Body fat" value={latest != null ? `${latest.toFixed(1)}%` : "—"} />;
+    ? <RingCard tone={METRICS.bodyFat.tone} progress={latest != null ? Math.min(1, latest / 40) || 0.001 : 0.001} value={latest != null ? latest.toFixed(1) : null} label="Body fat" sublabel={sub} />
+    : <MiniCard icon={METRICS.bodyFat.icon} tone={METRICS.bodyFat.tone} label="Body fat" value={latest != null ? `${latest.toFixed(1)}%` : null} />;
 }
 
 // ── Wellness Score ───────────────────────────────────────────────────────────
@@ -200,7 +200,7 @@ function SupplementsWidget({ clientId, size }: { clientId: string; size: WidgetS
       api.get<{ taken: { supplement_id: string; slot: string }[] }>(`/api/supplements/logs?clientId=${clientId}&date=${date}`),
     ]).then(([s, l]) => { setTotal(s.supplements.reduce((n, x) => n + Math.max(1, x.schedule.length), 0)); setTaken(l.taken.length); }).catch(() => setTotal(0));
   }, [clientId]);
-  const value = total === null ? "—" : `${taken}/${total}`;
+  const value = total === null ? null : `${taken}/${total}`;
   const progress = total ? taken / total : undefined;
   return size === "big"
     ? <RingCard tone="supplement" progress={progress ?? 0.001} value={value} label="Supplements" sublabel="taken today" />

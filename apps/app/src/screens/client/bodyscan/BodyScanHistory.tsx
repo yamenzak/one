@@ -11,7 +11,7 @@ import { createPortal } from "react-dom";
 import { cmToLengthDisplay, lengthLabel, kgToDisplay, weightLabel, bodyComposition, type UnitPrefs } from "@kova/domain";
 import {
   Button, Badge, IconBadge, SegmentedControl, AreaChart, cn, toneVar, useModalOverlay, POSTURE_SEVERITY_TONE,
-  ScanLine, X, Percent, RotateCcw, User, motion, stagger, popIn, CountUp,
+  ScanLine, X, Percent, RotateCcw, User, motion, stagger, popIn, CountUp, NoData,
 } from "@kova/ui";
 import { Silhouette } from "./Silhouette.js";
 import { Body3D } from "./Body3D.js";
@@ -222,7 +222,9 @@ function Meas({ label, cm, units }: { label: string; cm: number | null; units: U
   return (
     <div className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
       <div className="text-xs font-medium text-muted-foreground">{label}</div>
-      <div className="numeral mt-0.5 text-sm font-bold">{cm != null ? Math.round(cmToLengthDisplay(cm, units)) : "—"}<span className="ml-0.5 text-xs text-muted-foreground">{cm != null ? lengthLabel(units) : ""}</span></div>
+      {cm == null
+        ? <NoData className="mt-0.5 block text-xs">Not measured</NoData>
+        : <div className="numeral mt-0.5 text-sm font-bold">{Math.round(cmToLengthDisplay(cm, units))}<span className="ml-0.5 text-xs text-muted-foreground">{lengthLabel(units)}</span></div>}
     </div>
   );
 }

@@ -12,7 +12,7 @@ import {
   PRIMARY_GOAL_LABELS, ACTIVITY_LEVEL_LABELS, DIETARY_APPROACH_LABELS, WORKOUT_LOCATION_LABELS, BMI_CATEGORY_LABELS,
   type ClientPreferences, type BmiCategory, type CalculatorInputs, type Gender, type ActivityLevel, type PrimaryGoal, type DietaryApproach, type UnitPrefs,
 } from "@kova/domain";
-import { Button, Card, Badge, Field, Select, Reveal, SkeletonStatGrid, SkeletonList, Page, Stagger, Eyebrow, EmptyState, GlanceStrip, METRICS, toneVar, Target, Activity, Scale, Flame, AlertTriangle, Calculator, ArrowRight, Calendar, type MetricKey } from "@kova/ui";
+import { Button, Card, Badge, Field, Select, Reveal, SkeletonStatGrid, SkeletonList, Page, Stagger, Eyebrow, EmptyState, GlanceStrip, METRICS, toneVar, Target, Activity, Scale, Flame, AlertTriangle, Calculator, ArrowRight, Calendar, type MetricKey, NoData } from "@kova/ui";
 import { api, errorText } from "../../api.js";
 import { useUnits } from "../../units.js";
 
@@ -251,10 +251,10 @@ export function GoalManager({ clientId }: { clientId: string }) {
           <Eyebrow action={metrics.measuredAt ? <Badge tone="neutral">{new Date(`${metrics.measuredAt}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</Badge> : undefined}>Body snapshot</Eyebrow>
           <Stagger>
             <GlanceStrip items={[
-              { icon: Scale, tone: "cardio", value: <>{metrics.weightKg != null ? kgToDisplay(metrics.weightKg, units) : "—"}<span className="ml-1 text-xs font-medium text-muted-foreground">{weightLabel(units)}</span></>, label: <>Weight<StatusChip status={metrics.weightStatus} /></> },
-              { icon: Activity, tone: "activity", value: metrics.bmi ?? "—", label: metrics.bmiCategory ? BMI_CATEGORY_LABELS[metrics.bmiCategory] : "BMI" },
-              { icon: Flame, tone: "calories", value: metrics.bmr ?? "—", label: metrics.bmr != null ? "BMR · kcal/day" : "BMR" },
-              { icon: Target, tone: "sleep", value: metrics.bodyFatPercent != null ? `${metrics.bodyFatPercent}%` : "—", label: "Body fat" },
+              { icon: Scale, tone: "cardio", value: metrics.weightKg != null ? <>{kgToDisplay(metrics.weightKg, units)}<span className="ml-1 text-xs font-medium text-muted-foreground">{weightLabel(units)}</span></> : null, label: <>Weight<StatusChip status={metrics.weightStatus} /></> },
+              { icon: Activity, tone: "activity", value: metrics.bmi ?? null, label: metrics.bmiCategory ? BMI_CATEGORY_LABELS[metrics.bmiCategory] : "BMI" },
+              { icon: Flame, tone: "calories", value: metrics.bmr ?? null, label: metrics.bmr != null ? "BMR · kcal/day" : "BMR" },
+              { icon: Target, tone: "sleep", value: metrics.bodyFatPercent != null ? `${metrics.bodyFatPercent}%` : null, label: "Body fat" },
             ]} />
           </Stagger>
         </section>
@@ -292,7 +292,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
                 return (
                   <div key={metric} className="rounded-xl bg-secondary p-3">
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><m.icon className="size-3.5" style={{ color: toneVar[m.tone] }} /> {m.label}</div>
-                    <div className="numeral mt-0.5 text-xl font-semibold">{v == null ? "—" : fmtTarget(key, v, units)}</div>
+                    <div className={v == null ? "mt-0.5" : "numeral mt-0.5 text-xl font-semibold"}>{v == null ? <NoData className="text-xs">Not set</NoData> : fmtTarget(key, v, units)}</div>
                   </div>
                 );
               })}
@@ -348,7 +348,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
           {active?.targets && newCals != null && (
             <div className="flex items-center gap-2 rounded-xl bg-secondary p-3 text-sm">
               <span className="text-muted-foreground">Calories</span>
-              <span className="numeral font-medium">{oldCals != null ? fmtEnergy(oldCals, units) : "—"}</span>
+              {oldCals != null ? <span className="numeral font-medium">{fmtEnergy(oldCals, units)}</span> : <NoData className="text-xs">Not set</NoData>}
               <ArrowRight className="size-4 text-muted-foreground" />
               <span className="numeral font-semibold">{fmtEnergy(newCals, units)}</span>
               {calDelta != null && calDelta !== 0 && (

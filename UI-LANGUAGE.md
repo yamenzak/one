@@ -265,11 +265,33 @@ that the decision is argued in the diff rather than assumed.
 **Numerals:** `tabular-nums` and `−0.02em` on every number, always. A number
 that reflows as it ticks is a bug.
 
-**Never render a dash as a `display` value.** An em-dash at 56px/700 with
+**Never render a dash where a number belongs.** An em-dash at 56px/700 with
 −0.03em tracking is not a placeholder, it is a horizontal rule — it reads as a
-divider with a caption under it, which looks broken rather than empty. When the
-anchor has no value, say so in words at `title-1` ("Not yet", "Nothing active").
-A dash is fine as a row value, where it is small and conventional.
+divider with a caption under it, which looks broken rather than empty. The same
+thing happens at 26px in a stat card, and four of them in a 2×2 grid look like
+the layout failed. It is also the one placeholder assistive tech cannot convey:
+"em dash" is what gets announced, if anything.
+
+So: **a value slot with nothing in it takes `null`, and the component renders
+`NoData`.** Callers say what they know; components decide how absence looks.
+`StatCard`, `MetricPill`, `GlanceStrip` and `ProgressRing` all do this already,
+and `ChartCard` distinguishes three states deliberately — omit `value` for a
+card with no headline number at all, pass `null` for one that hasn't got a
+number *yet*, pass a value otherwise.
+
+Two more rules that follow from it:
+- **A zero is not the same as nothing.** `0` is a real measurement and renders as
+  a numeral. But a computed score that is zero *because there is no input* is
+  absence wearing a number's clothes — a brand-new client's wellness score is
+  `0`, and 0 at display size reads as a verdict on the person. Say the words.
+- **When the container already explains the emptiness, don't say it twice.** A
+  `ChartCard` whose chart prints "Not enough data yet" does not also need a
+  headline saying so.
+
+**Enforced by a lint.** `apps/app/src/no-data.conformance.test.ts` fails on a
+dash reaching a value slot or a `numeral`-classed element. Escape with
+`no-data-exempt: <why>`. A dash in ordinary muted caption text — an empty cell
+in a dense metadata line — is exactly what a dash is for, and is not flagged.
 
 **Units are subordinate:** render the unit at ~55% of the value's size and in
 `muted-foreground`, on the same baseline. `1,905` `GBP`, never `1,905 GBP` at
@@ -624,13 +646,27 @@ reintroduce that shape anywhere.
 | `InsightCard` | One event in a timeline: time, title, optional detail, optional 👍/👎. Animates on scroll-into-view, not on mount — a timeline is unbounded. | A list row. A feed item is read; a row is scanned. | ✅ |
 | `WavyDivider` | A day break in a timeline. | Separating sections — that is `Section`'s own rhythm. | ✅ |
 
-### Primitives, viz and the rest
+### Values — `metrics.tsx`, `rings.tsx`, `charts.tsx`
+
+| Component | Use it when | Do NOT use it for | State |
+|---|---|---|---|
+| `StatCard` | A labelled number in a 1-up or 2-up grid, optionally with a chart under it. | The screen's subject — that is the `Anchor`. | ✅ |
+| `MetricPill` | A compact tinted metric with an optional progress fill. | A row. A pill is glanced at; a row is scanned. | ✅ |
+| `GlanceStrip` | 3 bare numbers split by hairlines — a deliberate break from the card rhythm. | More than 4 items, or anything needing a chart. | ✅ |
+| `ProgressRing` / `TargetRing` | One value against a whole. | Restating the anchor. A ring under an anchor showing the same number is the §1 defect. | ✅ |
+| `ChartCard` | A chart with a headline number. Three `value` states — see §5. | A chart with no story. If the title is the whole point, it is a `Section`. | ✅ |
+| `NoData` | Rendered *by* the components above when their `value` is `null`. Call it directly only in a hand-rolled value slot. | A dash. Ever. See §5. | ✅ |
+
+`isBlank(v)` is the shared predicate — `null`, `undefined` or `""`, and
+deliberately **not** `0`.
+
+### Primitives and the rest
 
 `Button` · `Card` · `Badge` · `Chip` · `Field` · `Input` · `Switch` · `Callout` ·
 `IconBadge` · `Spinner` · `Skeleton` · `Separator` · `SectionHeader` ·
 `FieldGroup` (form fields under a heading — **not** `Group`) · `ConfigRow`
-(status + detail + state, for setup screens) · `ProgressRing` · `TargetRing` ·
-`MetricPill` · `StatCard` · `Sparkline` · `MiniBars` · `WeekDots` · `MacroBar`.
+(status + detail + state, for setup screens) · `Sparkline` · `MiniBars` ·
+`WeekDots` · `MacroBar`.
 
 ### When you need something that is not here
 
