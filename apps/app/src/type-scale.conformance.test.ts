@@ -42,6 +42,7 @@ const BANNED: { re: RegExp; use: string }[] = [
   { re: /text-2xl\s+font-bold\s+tracking-tight/, use: "text-title-2" },
   { re: /text-xl\s+font-semibold\s+tracking-tight/, use: "text-title-3" },
   { re: /text-lg\s+font-semibold\s+tracking-tight/, use: "text-body-lg" },
+  { re: /text-xl\s+font-bold\s+tracking-tight/, use: "text-title-3" },
   { re: /text-xs\s+font-(?:semibold|medium)\s+uppercase\s+tracking-wide/, use: "text-micro uppercase" },
 ];
 
@@ -92,6 +93,7 @@ describe("type scale (UI-LANGUAGE §5)", () => {
       'className="text-2xl font-bold tracking-tight"',
       'className="text-xl font-semibold tracking-tight"',
       'className="text-lg font-semibold tracking-tight"',
+      'className="text-xl font-bold tracking-tight"',
       'className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"',
       'className="text-xs font-medium uppercase tracking-wide"',
     ];

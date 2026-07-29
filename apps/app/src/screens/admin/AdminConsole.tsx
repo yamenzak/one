@@ -51,7 +51,7 @@ export function AdminConsole({ onBack }: { onBack: () => void }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <ShieldCheck className="size-5 shrink-0 text-primary" aria-hidden />
-            <h1 className="truncate text-xl font-bold tracking-tight">Platform admin</h1>
+            <h1 className="truncate text-title-3">Platform admin</h1>
           </div>
           <p className="truncate text-xs text-muted-foreground">Kova itself — every studio, plan, key and switch.</p>
         </div>
