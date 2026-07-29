@@ -20,10 +20,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   AlertTriangle, ArrowLeft, Badge, Building2, Button, Callout, Card, ChevronRight, Chip, CircleAlert, CircleCheck,
   ConfirmDialog, CreditCard, EmptyState, Eyebrow, Field, Gift, GlanceStrip, Globe, IconBadge, Info, Input, KeyRound, ThumbsUp,
-  Dumbbell, LayoutGrid, Page, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, Sheet, ShieldCheck,
+  Dumbbell, LayoutGrid, Page, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, SettingsIndex, SettingsPage, Sheet, ShieldCheck, Wand2, type LucideIcon,
   Skeleton, SkeletonLine, Play, Plug, Spinner, Stagger, Switch, Tag, Trash2, Wallet, cn, toneText, type Tone,
   ActionResult, ConfigRow, FieldGroup, LoadError, TabIntro, useLoad, useAction as useActionBase,
 } from "@kova/ui";
@@ -42,30 +43,66 @@ const TABS: { value: AdminTab; label: string }[] = [
   { value: "security", label: "Security" },
 ];
 
+/**
+ * ── THE OPERATOR CONSOLE: AN INDEX AND A PAGE PER SECTION ──────────────────
+ *
+ * Seven tabs, and the first one — Tenants — measured **61,541px** on a seeded
+ * install: every studio ever created, in one scroll, with no chunking and no
+ * "See all". §1 caps a group at seven rows for exactly this reason. The other
+ * six tabs were invisible until you flicked past a wall.
+ *
+ * Same shape as the studio settings now: a table of contents, then one section
+ * at a time. `?s=<key>` keeps it one component and makes Back step out of a
+ * section before it leaves the console.
+ */
+const ADMIN_SECTIONS: {
+  key: AdminTab; label: string; blurb: string; icon: LucideIcon; tone: Tone; render: () => ReactNode;
+}[] = [
+  { key: "tenants", label: "Studios", blurb: "Every studio, its plan, credits and standing", icon: Building2, tone: "primary", render: () => <Tenants /> },
+  { key: "plans", label: "Plans", blurb: "Price, limits and trials owners buy", icon: CreditCard, tone: "cardio", render: () => <PlansConfig /> },
+  { key: "ai", label: "AI", blurb: "Models, pricing, markup, the self-test", icon: Wand2, tone: "nutrition", render: () => <AiConfig /> },
+  { key: "stripe", label: "Stripe", blurb: "Keys, webhooks, and what is synced", icon: Wallet, tone: "supplement", render: () => <StripeConfig /> },
+  { key: "promos", label: "Promo codes", blurb: "Platform-wide discounts on plans and packs", icon: Tag, tone: "activity", render: () => <PlatformPromos /> },
+  { key: "domains", label: "Custom domains", blurb: "Tenant domains and their certificates", icon: Globe, tone: "sleep", render: () => <DomainsConfig /> },
+  { key: "security", label: "Security", blurb: "Sessions, admin access, and the nuclear reset", icon: ShieldCheck, tone: "danger", render: () => <SecurityConfig /> },
+];
+
 export function AdminConsole({ onBack }: { onBack: () => void }) {
-  const [tab, setTab] = useState<AdminTab>("tenants");
+  const [params, setParams] = useSearchParams();
+  const open = ADMIN_SECTIONS.find((x) => x.key === params.get("s")) ?? null;
+
   return (
     <Page className="column space-y-4 p-4 pb-28">
-      <div className="flex items-center gap-3">
-        <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="size-5 shrink-0 text-primary" aria-hidden />
-            <h1 className="truncate text-title-3">Platform admin</h1>
+      {open ? (
+        <SettingsPage
+          title={open.label}
+          description={open.blurb}
+          onBack={() => setParams((q: URLSearchParams) => { q.delete("s"); return q; }, { replace: true })}
+        >
+          {open.render()}
+        </SettingsPage>
+      ) : (
+        <>
+          <div className="flex items-center gap-3">
+            <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="size-5 shrink-0 text-primary" aria-hidden />
+                <h1 className="truncate text-title-3">Platform admin</h1>
+              </div>
+              <p className="truncate text-xs text-muted-foreground">Kova itself — every studio, plan, key and switch.</p>
+            </div>
           </div>
-          <p className="truncate text-xs text-muted-foreground">Kova itself — every studio, plan, key and switch.</p>
-        </div>
-      </div>
-      <div className="overflow-x-auto no-scrollbar">
-        <SegmentedControl options={TABS} value={tab} onChange={setTab} />
-      </div>
-      {tab === "tenants" && <Tenants />}
-      {tab === "plans" && <PlansConfig />}
-      {tab === "stripe" && <StripeConfig />}
-      {tab === "promos" && <PlatformPromos />}
-      {tab === "ai" && <AiConfig />}
-      {tab === "domains" && <DomainsConfig />}
-      {tab === "security" && <SecurityConfig />}
+          <SettingsIndex
+            groups={[{
+              rows: ADMIN_SECTIONS.map((x) => ({
+                key: x.key, icon: x.icon, tone: x.tone, label: x.label, sub: x.blurb,
+                onClick: () => setParams((q: URLSearchParams) => { q.set("s", x.key); return q; }),
+              })),
+            }]}
+          />
+        </>
+      )}
     </Page>
   );
 }

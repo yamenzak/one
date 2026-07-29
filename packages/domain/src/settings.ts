@@ -21,25 +21,31 @@ export interface SettingsSectionMeta {
   scope: "studio" | "account";
   /** Platform entitlement required to show/use the section (absent ⇒ every plan). */
   requiresFeature?: keyof Entitlements["features"];
+  /**
+   * What is INSIDE, for the settings index — a table-of-contents line, so an
+   * owner can aim before tapping. Not a description of why the section exists:
+   * that is what the section page's own one-liner is for.
+   */
+  blurb: string;
 }
 
 /** The studio (owner) settings sections, in display order. */
 export const STUDIO_SETTINGS_SECTIONS: SettingsSectionMeta[] = [
-  { key: "brand", label: "Brand", scope: "studio", requiresFeature: "branding" },
-  { key: "signin", label: "Sign-in", scope: "studio" },
-  { key: "ai", label: "AI", scope: "studio", requiresFeature: "aiSuite" },
-  { key: "messaging", label: "Messaging", scope: "studio" },
-  { key: "marketplace", label: "Marketplace", scope: "studio" },
+  { key: "brand", label: "Brand", scope: "studio", requiresFeature: "branding", blurb: "Colour, corners, logos, your AI coach" },
+  { key: "signin", label: "Sign-in", scope: "studio", blurb: "Your login link, its copy, passkeys" },
+  { key: "ai", label: "AI", scope: "studio", requiresFeature: "aiSuite", blurb: "Models, cost per action, house voice" },
+  { key: "messaging", label: "Email", scope: "studio", blurb: "Sender, which emails go out, templates" },
+  { key: "marketplace", label: "Storefront", scope: "studio", blurb: "Public listing and client self-signup" },
   // "Integrations" is the food/exercise DATA-PROVIDER surface (USDA, Nutritionix,
   // FatSecret, ExerciseDB keys) — i.e. the `externalSearch` entitlement. It is NOT
   // the reserved `integrations` feature (tenant API / webhooks / exports), which
   // does not exist and must never get a settings tab. Gating it here keeps the tab
   // consistent with the 403 `/foods/search-external` already returns.
-  { key: "integrations", label: "Integrations", scope: "studio", requiresFeature: "externalSearch" },
+  { key: "integrations", label: "Food & exercise data", scope: "studio", requiresFeature: "externalSearch", blurb: "USDA, Nutritionix, FatSecret, ExerciseDB keys" },
   // Closing the studio is irreversible, so it gets its own destination rather
   // than sitting under whichever tab an owner happened to be reading. Last in
   // the row, and never the default.
-  { key: "danger", label: "Danger zone", scope: "studio" },
+  { key: "danger", label: "Close your studio", scope: "studio", blurb: "Cancel billing and erase everything" },
 ];
 
 /**

@@ -457,6 +457,38 @@ body scrolls. Every part of that is load-bearing:
   That picker also rendered its All/Whole/Branded filter on the landing, where
   there were no results to filter.
 
+### Settings surfaces: an index, and a page per section
+
+**Configuration is never a tab strip.** Tabs cap at 2–4 before they truncate,
+they put every sibling one flick away from the one you want, and they force a
+whole section onto a single page — so the page grows without limit and nothing
+on it can be found. Kova shipped seven tabs on studio settings (two off the
+right edge at phone width) where the first tab alone was 5,599px of one card
+holding fifteen unrelated controls under one Save; the operator console's first
+tab reached 61,541px with no chunking at all.
+
+The shape every phone OS converged on, and why each half works:
+
+| | The index | A section page |
+|---|---|---|
+| Component | `SettingsIndex` | `SettingsPage` |
+| Rows | grouped, tinted icon + name | the section's own controls |
+| The sub-line says | **what is inside** — "Colours, corners, logos" | **the current value** — "Elevation · Soft" |
+| Purpose | aim before you tap | answer "what is this set to" by reading |
+
+- **The value in the sub-line is the whole trick.** It lets someone check a
+  setting without opening it, and therefore without risking changing it.
+- **A binary with nothing else to say gets an inline switch and no page.**
+  Anything with more than a value gets a page.
+- **One line of introduction, at most, and only on the section page.** The old
+  surfaces stacked four — a page intro, a tab intro, a card intro and a
+  sub-section intro — before the first control. If a section needs more than a
+  line, its rows are named wrong.
+- **Colour is navigation.** A section keeps its tone everywhere it appears, so
+  the index becomes a map you aim at from memory. A grey badge in a row of toned
+  ones reads as disabled, not as neutral — every row gets a real tone.
+- **Destructive sections take their own group**, below a break, in `danger`.
+
 ### Two rules about repetition
 
 - **A glyph repeated down a list is texture, not identity.** An icon earns its
