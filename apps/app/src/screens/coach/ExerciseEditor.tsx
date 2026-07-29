@@ -45,7 +45,7 @@ function ChipStrip({ options, selected, onChange }: { options: readonly string[]
 
 /** A quiet uppercase section eyebrow that groups the review fields. */
 function SectionLabel({ children }: { children: ReactNode }) {
-  return <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">{children}</div>;
+  return <div className="text-micro uppercase text-muted-foreground/70">{children}</div>;
 }
 
 /**

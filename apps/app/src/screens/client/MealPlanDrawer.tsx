@@ -272,7 +272,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
               <Card className="relative overflow-hidden">
                 <div className="pointer-events-none absolute -right-10 -top-10 size-36 rounded-full bg-nutrition/10 blur-2xl" />
                 <div className="relative">
-                  <div className={cn("text-xs font-medium uppercase tracking-wide", isPast ? "text-muted-foreground" : "text-nutrition")}>{isPast ? "Past plan" : "Your plan"}</div>
+                  <div className={cn("text-micro uppercase", isPast ? "text-muted-foreground" : "text-nutrition")}>{isPast ? "Past plan" : "Your plan"}</div>
                   <h2 className="mt-0.5 text-title-3">{active?.name}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">{groups.length} meal{groups.length === 1 ? "" : "s"} · {active?.body.mealOptions?.length ?? 0} options{active?.publishedAt ? ` · ${new Date(active.publishedAt).toLocaleDateString()}` : ""}</p>
                   {isPast ? (
@@ -346,7 +346,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                 )}
 
                 <div className="flex items-center justify-between px-1 pt-1">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Shopping list</div>
+                  <div className="text-micro uppercase text-muted-foreground">Shopping list</div>
                   <div className="flex items-center gap-2">
                     {(weekTotals.days > 0 || checked.size > 0) && <button data-tour="mp-shop-reset" onClick={() => setConfirmReset(true)} className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-3.5"><RotateCcw /> Start over</button>}
                     {grocery.length > 0 && <Badge tone="nutrition">{grocery.filter((g) => !checked.has(g.id)).length} to buy</Badge>}
@@ -415,7 +415,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
               <div className="flex items-center gap-3">
                 <AiAvatar className="size-9" />
                 <div className="min-w-0">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-primary">Chef's suggestion</div>
+                  <div className="text-micro uppercase text-primary">Chef's suggestion</div>
                   <div className="truncate text-base font-bold tracking-tight">{recipe.title}</div>
                 </div>
               </div>

@@ -85,7 +85,7 @@ export function Inbox({ onBack }: { onBack: () => void }) {
         ) : (
           groups.map((g) => (
             <div key={g.label} className="space-y-2">
-              <div className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{g.label}</div>
+              <div className="px-1 text-micro uppercase text-muted-foreground">{g.label}</div>
               <Stagger className="space-y-2">
                 {g.items.map((n) => {
                   const { icon, tone } = notifCoding(n.type);

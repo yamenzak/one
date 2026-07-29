@@ -256,6 +256,12 @@ overline.** Never a weight above 700.
 | `caption` | 13 / 1.35 | 0 | 400 | row secondary, helper |
 | `micro` | 11 / 1.2 | +0.02em | 600 | overline, badge |
 
+**Enforced by a lint.** `apps/app/src/type-scale.conformance.test.ts` reads the
+source and fails on any hand-rolled spelling of a role that already exists — the
+scale is worth nothing if a screen can quietly opt out. Escape with a
+`type-scale-exempt: <why>` comment; the reason is mandatory, because the point is
+that the decision is argued in the diff rather than assumed.
+
 **Numerals:** `tabular-nums` and `−0.02em` on every number, always. A number
 that reflows as it ticks is a bug.
 

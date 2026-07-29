@@ -150,7 +150,7 @@ export function InsightCard({ timestamp, title, aiGlyph, tone, children, onFeedb
         {aiGlyph}
         <span>{timestamp}</span>
       </div>
-      <h3 className={cn("mt-1 text-xl font-semibold tracking-tight", tone === "primary" ? "text-foreground" : "text-foreground")}>{title}</h3>
+      <h3 className="mt-1 text-title-3">{title}</h3>
       {children && <div className="mt-3">{children}</div>}
       {onFeedback && (
         <div className="mt-3 flex items-center gap-1">

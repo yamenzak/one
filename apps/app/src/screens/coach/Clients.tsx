@@ -256,7 +256,7 @@ function InviteSheet({ invite, onClose }: { invite: Invite; onClose: () => void 
           </div>
         </div>
         <div className="space-y-2 rounded-2xl bg-card p-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{invite.delivery.sent ? "Invite link" : "Invite link — send this to them"}</div>
+          <div className="text-micro uppercase text-muted-foreground">{invite.delivery.sent ? "Invite link" : "Invite link — send this to them"}</div>
           <div className="break-all rounded-xl bg-surface-3 px-3 py-2.5 font-mono text-xs">{invite.url}</div>
           <div className="flex gap-2">
             <Button size="sm" variant="tonal" className="flex-1" onClick={() => void copy()}>{copied ? <><Check /> Copied</> : <><Copy /> Copy link</>}</Button>
@@ -305,7 +305,7 @@ export function ClientDetail() {
             <Avatar name={client?.displayName ?? ""} src={client?.avatarUrl} seed={client?.avatarSeed ?? clientId} className="size-8 shrink-0" />
             <div className="min-w-0 leading-tight">
               <div className="truncate text-sm font-semibold">{client?.displayName ?? "…"}</div>
-              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Coach view</div>
+              <div className="text-micro uppercase text-muted-foreground">Coach view</div>
             </div>
           </div>
         </div>

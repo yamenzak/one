@@ -328,7 +328,7 @@ export function Callout({ tone = "neutral", icon: Icon, live, children, classNam
 export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex items-end justify-between">
-      <h2 className="text-lg font-semibold tracking-tight">{children}</h2>
+      <h2 className="text-body-lg">{children}</h2>
       {action}
     </div>
   );

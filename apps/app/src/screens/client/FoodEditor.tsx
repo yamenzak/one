@@ -304,7 +304,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
 
                 {/* ── Nutrition (per serving) ────────────────────────────── */}
                 <div className="space-y-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nutrition per serving</div>
+                  <div className="text-micro uppercase text-muted-foreground">Nutrition per serving</div>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Serving size" inputMode="decimal" value={f.serving} onChange={(e) => set("serving", dec(e.target.value))} />
                     <Field label="Unit" value={f.unit} onChange={(e) => set("unit", e.target.value)} placeholder="g / ml / piece" />
@@ -346,7 +346,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                 {/* ── Sharing (staff only) ───────────────────────────────── */}
                 {isStaff && (
                   <div className="space-y-2">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Who can use this food</div>
+                    <div className="text-micro uppercase text-muted-foreground">Who can use this food</div>
                     <div className="flex gap-2">
                       <Chip selected={f.visibility === "tenant"} onClick={() => set("visibility", "tenant")}>Shared with team</Chip>
                       <Chip selected={f.visibility === "private"} onClick={() => set("visibility", "private")}>Only me</Chip>

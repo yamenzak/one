@@ -217,7 +217,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
           <Card className="relative overflow-hidden">
             <div className="pointer-events-none absolute -right-10 -top-10 size-36 rounded-full bg-primary/10 blur-2xl" />
             <div className="relative">
-              <div className={cn("text-xs font-medium uppercase tracking-wide", isPast ? "text-muted-foreground" : "text-activity")}>{isPast ? "Past plan" : "Your plan"}</div>
+              <div className={cn("text-micro uppercase", isPast ? "text-muted-foreground" : "text-activity")}>{isPast ? "Past plan" : "Your plan"}</div>
               <h2 className="mt-0.5 text-title-3">{active?.name}</h2>
               <p className="mt-1 text-sm text-muted-foreground">{trainingDays} training day{trainingDays === 1 ? "" : "s"}{active?.publishedAt ? ` · ${new Date(active.publishedAt).toLocaleDateString()}` : ""}</p>
               {isPast ? (
@@ -551,7 +551,7 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
   };
   const Attr = ({ label, chips, tone }: { label: string; chips: string[]; tone: "primary" | "activity" | "neutral" }) => chips.length ? (
     <div className="flex items-start gap-2">
-      <span className="mt-1 w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="mt-1 w-20 shrink-0 text-micro uppercase text-muted-foreground">{label}</span>
       <div className="flex flex-wrap gap-1.5">{chips.map((c) => <Badge key={c} tone={tone}>{c}</Badge>)}</div>
     </div>
   ) : null;
@@ -570,7 +570,7 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
         )}
         {ex?.video_url && (
           <div>
-            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Demo video</div>
+            <div className="mb-1.5 text-micro uppercase text-muted-foreground">Demo video</div>
             <video src={ex.video_url} controls playsInline preload="metadata" className="w-full rounded-2xl bg-black" />
           </div>
         )}
@@ -583,7 +583,7 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
           </div>
         )}
         <div>
-          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prescribed</div>
+          <div className="mb-1.5 text-micro uppercase text-muted-foreground">Prescribed</div>
           <SubCard className="space-y-1.5">
             {slot.sets.map((s, i) => (
               <div key={i}>
@@ -596,7 +596,7 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
         </div>
         {ex?.instructions_md ? (
           <div>
-            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">How to</div>
+            <div className="mb-1.5 text-micro uppercase text-muted-foreground">How to</div>
             <Markdown className="text-[0.95rem] text-foreground/90">{ex.instructions_md}</Markdown>
           </div>
         ) : (
@@ -704,7 +704,7 @@ function SetLogDrawer({ slot, exerciseId, exerciseName, logged, fetchLast, onClo
         </div>
         {last && (
           <div className="rounded-xl bg-surface-2 px-3 py-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Last time · {relativeDate(last.date)}</div>
+            <div className="text-micro uppercase text-muted-foreground">Last time · {relativeDate(last.date)}</div>
             <div className="truncate text-sm font-medium tabular-nums">{summarizeLast(last.sets, units)}</div>
           </div>
         )}
@@ -871,7 +871,7 @@ function SwapDrawer({ clientId, planId, dayIndex, coords, currentName, onClose, 
         }>
           {alts !== null && (alts.length > 0 ? (
             <div>
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Instant swaps — coach-approved alternatives</div>
+              <div className="mb-1.5 text-micro uppercase text-muted-foreground">Instant swaps — coach-approved alternatives</div>
               <div className="space-y-1">
                 {alts.map((e) => (
                   <button key={e.id} disabled={busy} onClick={() => void swapTo(e)} className="w-full rounded-xl bg-surface-2 px-2.5 py-2 text-left transition-colors hover:bg-surface-3 disabled:opacity-50">
@@ -886,7 +886,7 @@ function SwapDrawer({ clientId, planId, dayIndex, coords, currentName, onClose, 
         </Reveal>
 
         <div className="border-t border-border/50 pt-4">
-          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ask your coach</div>
+          <div className="mb-1.5 text-micro uppercase text-muted-foreground">Ask your coach</div>
           <Field label="Why swap? (optional)" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. shoulder pain, no cable machine" />
           <Button variant="outline" className="mt-3 w-full" disabled={busy} onClick={() => void request()}>Request a swap — coach will choose</Button>
         </div>

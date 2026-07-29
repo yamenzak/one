@@ -46,7 +46,7 @@ function CoachFeedback({ title, body, at }: { title: string; body: string; at?: 
   return (
     <div className="relative overflow-hidden rounded-2xl bg-primary/10 p-4">
       <div className="pointer-events-none absolute -right-6 -top-6 size-24 rounded-full bg-primary/10 blur-2xl" />
-      <div className="relative flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary [&_svg]:size-3.5"><HeartPulse /> {title}{at ? <span className="ml-auto font-normal text-muted-foreground">{new Date(at).toLocaleDateString()}</span> : null}</div>
+      <div className="relative flex items-center gap-2 text-micro uppercase text-primary [&_svg]:size-3.5"><HeartPulse /> {title}{at ? <span className="ml-auto font-normal text-muted-foreground">{new Date(at).toLocaleDateString()}</span> : null}</div>
       <p className="relative mt-2 text-sm leading-relaxed">{body}</p>
     </div>
   );
@@ -121,14 +121,14 @@ export function CheckInDetailSheet({ checkIn, onClose }: { checkIn: CheckInFull;
 
         {photos.length > 0 && (
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><Camera className="size-3.5" /> Progress photos</div>
+            <div className="flex items-center gap-2 text-micro uppercase text-muted-foreground"><Camera className="size-3.5" /> Progress photos</div>
             <PhotoGrid photos={photos} />
           </div>
         )}
 
         {checkIn.notes && (
           <SubCard className="space-y-1">
-            <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><ClipboardList className="size-3.5" /> Your note</div>
+            <div className="flex items-center gap-1.5 text-micro uppercase text-muted-foreground"><ClipboardList className="size-3.5" /> Your note</div>
             <p className="text-sm">{checkIn.notes}</p>
           </SubCard>
         )}
@@ -168,7 +168,7 @@ export function LabDetailSheet({ lab, onClose }: { lab: LabFull; onClose: () => 
       <div className="space-y-4">
         {lab.instructions && (
           <SubCard className="space-y-1">
-            <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><FlaskConical className="size-3.5" /> Instructions</div>
+            <div className="flex items-center gap-1.5 text-micro uppercase text-muted-foreground"><FlaskConical className="size-3.5" /> Instructions</div>
             <p className="text-sm text-muted-foreground">{lab.instructions}</p>
           </SubCard>
         )}
@@ -181,7 +181,7 @@ export function LabDetailSheet({ lab, onClose }: { lab: LabFull; onClose: () => 
 
         {fileUrl && (
           <div className="space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Uploaded result</div>
+            <div className="text-micro uppercase text-muted-foreground">Uploaded result</div>
             {hasImage ? (
               <PhotoGrid photos={[{ url: fileUrl, label: lab.display_name }]} cols={2} />
             ) : (
@@ -195,14 +195,14 @@ export function LabDetailSheet({ lab, onClose }: { lab: LabFull; onClose: () => 
 
         {lab.client_notes && (
           <SubCard className="space-y-1">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your note</div>
+            <div className="text-micro uppercase text-muted-foreground">Your note</div>
             <p className="text-sm">{lab.client_notes}</p>
           </SubCard>
         )}
 
         {lab.values && lab.values.length > 0 && (
           <div className="space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Results</div>
+            <div className="text-micro uppercase text-muted-foreground">Results</div>
             <div className="overflow-hidden rounded-2xl bg-surface-2">
               {lab.values.map((v, i) => (
                 <div key={i} className={cn("flex items-center justify-between gap-3 px-3.5 py-2.5", i > 0 && "border-t border-border/50")}>

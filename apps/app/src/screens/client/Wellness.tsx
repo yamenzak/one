@@ -346,7 +346,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
               <Button className="w-full" size="lg" onClick={() => void toggleFast()}><Timer /> Start fasting</Button>
               {(fast?.recentFasts.length ?? 0) > 0 && (
                 <div className="space-y-1.5 border-t border-border/50 pt-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent fasts</div>
+                  <div className="text-micro uppercase text-muted-foreground">Recent fasts</div>
                   {fast!.recentFasts.slice(0, 3).map((r, i) => (
                     <div key={i} className="flex items-center justify-between text-xs text-muted-foreground">
                       <span className="numeral">{Math.floor(r.duration_minutes / 60)}h {r.duration_minutes % 60}m</span>
@@ -397,7 +397,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
 
       {/* This week */}
       <section className="space-y-2">
-        <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">This week</h3>
+        <h3 className="px-1 text-micro uppercase text-muted-foreground">This week</h3>
         <Stagger className="grid grid-cols-2 gap-3">
           <StatCard stack label="Check-in streak" value={week.streak} unit={week.streak === 1 ? "day" : "days"} icon={ClipboardList} tone="nutrition"
             chart={<WeekDots days={week.present} todayIndex={6} tone="nutrition" fill />} />
@@ -416,7 +416,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
       {/* Check-ins */}
       <section className="space-y-2">
         <div className="flex items-center justify-between px-1">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Check-ins</h3>
+          <h3 className="text-micro uppercase text-muted-foreground">Check-ins</h3>
           <button onClick={() => setLogKind("checkin")} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><Plus /> Check in</button>
         </div>
         {failed.has("checkins") ? (
@@ -451,12 +451,12 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
           difference; a tenant without the module gets neither. */}
       {!canSupplementsLabs ? null : failed.has("supps") ? (
         <section className="space-y-2">
-          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Supplements</h3>
+          <h3 className="px-1 text-micro uppercase text-muted-foreground">Supplements</h3>
           <SectionNote text="Couldn't load your supplements or today's doses." onRetry={retry} />
         </section>
       ) : supps.length > 0 && (
         <section className="space-y-2">
-          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Supplements · tap to log</h3>
+          <h3 className="px-1 text-micro uppercase text-muted-foreground">Supplements · tap to log</h3>
           <Stagger>
             <Card className="divide-y divide-border/40 py-0.5">
               {supps.flatMap((s) => (s.schedule.length ? s.schedule : [{ slot: "daily" }]).map((sch) => (
@@ -471,12 +471,12 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
       {/* Labs (`supplementsLabs`) */}
       {!canSupplementsLabs ? null : failed.has("labs") ? (
         <section className="space-y-2">
-          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lab tests</h3>
+          <h3 className="px-1 text-micro uppercase text-muted-foreground">Lab tests</h3>
           <SectionNote text="Couldn't load your lab tests." onRetry={retry} />
         </section>
       ) : labs.length > 0 && (
         <section className="space-y-2">
-          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lab tests</h3>
+          <h3 className="px-1 text-micro uppercase text-muted-foreground">Lab tests</h3>
           <Stagger className="space-y-1.5">
             {labs.map((l) => <LabRow key={l.id} lab={l} clientId={clientId} onOpen={() => setDetailLab(l)} onUploaded={load} />)}
           </Stagger>
@@ -486,7 +486,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
       {/* Sessions (`sessions` — the frontDesk entitlement) */}
       {canSessions && sessions.length > 0 && (
         <section className="space-y-2">
-          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sessions</h3>
+          <h3 className="px-1 text-micro uppercase text-muted-foreground">Sessions</h3>
           <Stagger>
             <Card className="space-y-3">
               {sessions.slice(0, 6).map((s) => (

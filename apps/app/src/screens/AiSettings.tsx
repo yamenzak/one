@@ -264,7 +264,7 @@ export function AiConfigSection() {
           <>
             <div>
               <div className="mb-2 flex items-center justify-between gap-2 px-1">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">AI assistant</h3>
+                <h3 className="text-micro uppercase text-muted-foreground">AI assistant</h3>
                 <Badge tone="primary"><Building2 /> Studio</Badge>
               </div>
               <Card className="space-y-3">
@@ -377,7 +377,7 @@ function DefaultModels({ features, models, config, onApply }: {
 
   return (
     <div>
-      <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Default models</h3>
+      <h3 className="mb-2 px-1 text-micro uppercase text-muted-foreground">Default models</h3>
       <Card className="space-y-3">
         <p className="text-xs text-muted-foreground">Pick a model per category — it applies to every feature of that type at once. Fine-tune any single feature below.</p>
         {rows.map(({ g, keys, pickable, current, mixed }) => {
@@ -425,7 +425,7 @@ function FeatureGroup({ title, icon: Icon, features, models, config, tones, onSa
 }) {
   return (
     <div>
-      <h3 className="mb-2 flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground [&_svg]:size-3.5"><Icon /> {title}</h3>
+      <h3 className="mb-2 flex items-center gap-1.5 px-1 text-micro uppercase text-muted-foreground [&_svg]:size-3.5"><Icon /> {title}</h3>
       <div className="space-y-2">
         {features.map((f) => <FeatureCard key={f.key} feat={f} models={models} cfg={config.features?.[f.key] ?? {}} tones={tones} onSave={(patch) => onSave(f.key, patch)} />)}
       </div>

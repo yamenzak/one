@@ -38,7 +38,7 @@ export function ClientPrefsStrip({ clientId, focus, className }: { clientId: str
 
   return (
     <Card className={className ?? ""}>
-      <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><Target className="size-3.5" /> Client prefers</div>
+      <div className="mb-2 flex items-center gap-1.5 text-micro uppercase text-muted-foreground"><Target className="size-3.5" /> Client prefers</div>
       <div className="flex flex-wrap gap-1.5">
         {chips.map((ch, i) => (
           <span key={i} className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium [&_svg]:size-3">{ch.icon && <ch.icon />}{ch.label}</span>

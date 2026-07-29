@@ -41,7 +41,7 @@ function ScopeTag() {
 function SectionHead({ title, icon: Icon, tone = "primary", scope }: { title: string; icon?: LucideIcon; tone?: Tone; scope?: Scope }) {
   return (
     <div className="mb-2 flex items-center justify-between gap-2 px-1">
-      <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <h3 className="flex items-center gap-1.5 text-micro uppercase text-muted-foreground">
         {Icon && <Icon className={cn("size-3.5", toneText[tone])} aria-hidden />}
         {title}
       </h3>
@@ -592,7 +592,7 @@ function NotificationsSection() {
       <SectionHead title="Notifications" icon={Bell} />
       {error && !data ? <LoadError label="your notification settings" error={typeof error === "string" ? error : null} onRetry={() => void load()} /> : (
       <Card className="divide-y divide-border/50 p-0">
-        <div className="flex items-center justify-end gap-6 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="flex items-center justify-end gap-6 px-4 py-2.5 text-micro uppercase text-muted-foreground">
           <span className="inline-flex items-center gap-1"><Bell className="size-3.5" /> App</span>
           <span className="inline-flex items-center gap-1"><Mail className="size-3.5" /> Email</span>
         </div>
@@ -732,7 +732,7 @@ function NotificationPolicySection() {
       {error && !data ? <LoadError label="your email policy" error={typeof error === "string" ? error : null} onRetry={() => void load()} /> : (
       <Card className="p-0">
         <p className="px-4 pt-4 text-sm text-muted-foreground">Choose which notifications may be emailed — separately for your clients and your staff. Turning one off keeps it in the in-app inbox but never emails it; people still tune their own preferences within what you allow here.</p>
-        <div className="mt-2 flex items-center justify-end gap-6 px-4 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="mt-2 flex items-center justify-end gap-6 px-4 pb-1 text-micro uppercase text-muted-foreground">
           <span className="w-10 text-center">Clients</span><span className="w-10 text-center">Staff</span>
         </div>
         <div className="divide-y divide-border/50">
@@ -968,7 +968,7 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
   };
   return (
     <section>
-      <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Profile</h3>
+      <h3 className="mb-2 px-1 text-micro uppercase text-muted-foreground">Profile</h3>
       {error && !p ? <LoadError label="your profile" error={typeof error === "string" ? error : null} onRetry={() => setReloadKey((k) => k + 1)} /> : (
       <Reveal loading={!p} skeleton={
         <Card className="space-y-4">
@@ -1027,7 +1027,7 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
 function PreferencesSection({ clientId, onSaved }: { clientId: string; onSaved: () => void }) {
   return (
     <section>
-      <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Training &amp; nutrition</h3>
+      <h3 className="mb-2 px-1 text-micro uppercase text-muted-foreground">Training &amp; nutrition</h3>
       <PreferencesEditorCard clientId={clientId} onSaved={onSaved} />
     </section>
   );
@@ -1049,7 +1049,7 @@ function UnitsSection() {
   const set = async (patch: Record<string, string>) => { setBusy(true); try { await api.patch("/api/me/units", patch); await refresh(); } finally { setBusy(false); } };
   return (
     <section>
-      <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Units</h3>
+      <h3 className="mb-2 px-1 text-micro uppercase text-muted-foreground">Units</h3>
       <Card className="space-y-3">
         <p className="text-sm text-muted-foreground">Mix and match freely — these apply everywhere you see numbers, for you only.</p>
         {UNIT_ROWS.map((r) => (
@@ -1169,7 +1169,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
   const copy = () => void navigator.clipboard?.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); });
   return (
     <div className="min-w-0">
-      <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-micro uppercaser text-muted-foreground">{label}</div>
       <button onClick={copy} className="flex w-full items-center gap-1.5 text-left" title="Copy">
         <code className="min-w-0 flex-1 truncate font-mono text-xs">{value}</code>
         {copied ? <Check className="size-3 shrink-0 text-success" /> : <Copy className="size-3 shrink-0 text-muted-foreground" />}
@@ -1418,7 +1418,7 @@ function IntegrationsSection() {
         <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Plug /></div><div><div className="font-medium">Data providers</div><div className="text-sm text-muted-foreground">Turn on sources so builders pull ready-made foods & exercises.</div></div></div>
         {groups.map((g) => (
           <div key={g.key} className="space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{g.label}</div>
+            <div className="text-micro uppercaser text-muted-foreground">{g.label}</div>
             {providers.filter((p) => p.category === g.key).map((p) => {
               const s = state[p.id];
               const needsKeys = !p.keyless && s?.enabled && !s?.ready;
@@ -1777,7 +1777,7 @@ function TokenGrid({ tokens, onSet }: { tokens: BrandTokens; onSet: (mode: "ligh
     <div className="space-y-4">
       {THEME_TOKEN_GROUPS.map((g) => (
         <div key={g.label}>
-          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{g.label}</div>
+          <div className="mb-1.5 text-micro uppercaser text-muted-foreground">{g.label}</div>
           <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1">
             <span />
             <span className="w-[5.5rem] text-center text-xs uppercase tracking-wider text-muted-foreground">Light</span>
