@@ -26,6 +26,7 @@ import { newId, nowIso } from "./ids.js";
 import { notify } from "./notify.js";
 import { recordAudit } from "./audit.js";
 import { parseJson, j } from "./db.js";
+import { loadGoalTimeline } from "./goals.js";
 import { loadClientAccessRows, accessBudgetsOf, REPORTED_ACCESS_STATUSES, gateFeature } from "./client-flags.js";
 
 /** Every log payload arrives wrapped with the target clientId. */
@@ -1373,13 +1374,13 @@ export const logRoutes = new Hono<AppEnv>()
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
     const db = c.env.DB;
-    const [food, water, workout, activities, checkIn, goal, plans, checkInDates, pendingLabs, weights] = await Promise.all([
+    const [food, water, workout, activities, checkIn, timeline, plans, checkInDates, pendingLabs, weights] = await Promise.all([
       db
         .prepare(
-          "SELECT COALESCE(SUM(calories),0) AS calories, COALESCE(SUM(protein_g),0) AS protein, COALESCE(SUM(carbs_g),0) AS carbs, COALESCE(SUM(fat_g),0) AS fat FROM food_entries WHERE client_id = ? AND date_local = ?",
+          "SELECT COALESCE(SUM(calories),0) AS calories, COALESCE(SUM(protein_g),0) AS protein, COALESCE(SUM(carbs_g),0) AS carbs, COALESCE(SUM(fat_g),0) AS fat, MAX(target_calories) AS day_target_cal FROM food_entries WHERE client_id = ? AND date_local = ?",
         )
         .bind(clientId, date)
-        .first<{ calories: number; protein: number; carbs: number; fat: number }>(),
+        .first<{ calories: number; protein: number; carbs: number; fat: number; day_target_cal: number | null }>(),
       db
         .prepare("SELECT total_ml FROM water_logs WHERE client_id = ? AND date_local = ?")
         .bind(clientId, date)
@@ -1396,10 +1397,7 @@ export const logRoutes = new Hono<AppEnv>()
         .prepare("SELECT id FROM check_ins WHERE client_id = ? AND date_local = ?")
         .bind(clientId, date)
         .first<{ id: string }>(),
-      db
-        .prepare("SELECT targets_json, weekly_load_target FROM client_goals WHERE client_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1")
-        .bind(clientId)
-        .first<{ targets_json: string | null; weekly_load_target: number | null }>(),
+      loadGoalTimeline(db, clientId),
       db
         // Resolve the published workout plan for the lane the client is on.
         .prepare("SELECT id, name, status, published_at, body_json FROM workout_plans WHERE client_id = ? AND status = 'published' AND COALESCE(variant_id, '') = COALESCE(?, '') ORDER BY published_at DESC LIMIT 1")
@@ -1468,12 +1466,26 @@ export const logRoutes = new Hono<AppEnv>()
       burnedKcal: sessionOverride > 0 ? sessionOverride : Math.round(activities?.burned ?? 0),
       workout: { loggedSets: workoutSets, sessions: workout.results ?? [] },
       checkedIn: Boolean(checkIn),
-      // weeklyLoadTarget resolves through @kova/domain — targets_json (what the
-      // coach set) wins over the mirrored column, default in exactly one place.
-      goal: goal
+      // The goal IN FORCE ON `date`, not the goal in force now.
+      //
+      // This route used to read `WHERE status = 'active'` with no date bound —
+      // the only query in the bundle that ignored the day it was answering for.
+      // So Today rendered a historical day's intake against TODAY's target: raise
+      // a client from 2,100 to 2,600 and every past day silently re-graded
+      // against the new number, while /progress and the client report (which do
+      // use the timeline) kept showing the old one. Same client, same day, two
+      // different denominators depending on the screen.
+      //
+      // Same precedence as progress-routes, so the two agree by construction:
+      // the target FROZEN onto that day's food rows first — it is what the
+      // client actually saw when they logged — then the timeline resolved at
+      // that date.
+      goal: timeline.hasGoal
         ? (() => {
-            const targets = parseJson<{ weeklyTrainingLoad?: number } | null>(goal.targets_json, null);
-            return { targets, weeklyLoadTarget: resolveWeeklyLoadTarget(targets, goal.weekly_load_target) };
+            const forDay = timeline.resolve(date) ?? {};
+            const snap = food?.day_target_cal ?? null;
+            const targets = { ...forDay, ...(snap != null ? { targetCalories: snap } : {}) };
+            return { targets, weeklyLoadTarget: resolveWeeklyLoadTarget(targets, timeline.weeklyLoadTarget) };
           })()
         : null,
       publishedWorkoutPlan: (plans.results ?? [])[0]

@@ -2807,6 +2807,36 @@ describe("client preferences + body metrics + goal staleness", () => {
     expect(goalEntry!.summary).toBe("Recomp");
   });
 
+  it("Today bundle resolves the goal IN FORCE ON the requested day, not today's", async () => {
+    // The regression this guards: /api/today read `WHERE status = 'active'` with
+    // no date bound, so raising a client's calories silently re-graded every
+    // past day against the NEW target — while /progress, which uses the goal
+    // timeline, kept showing the old one.
+    const id = await mkClient();
+    const OLD_DAY = "2026-01-10";
+    const NEW_DAY = "2026-03-01";
+
+    await SELF.fetch(`${ORIGIN}/api/goals`, {
+      method: "POST", headers: H(),
+      body: JSON.stringify({ clientId: id, label: "Cut", startDate: OLD_DAY, targets: { targetCalories: 2100 } }),
+    });
+    await SELF.fetch(`${ORIGIN}/api/goals`, {
+      method: "POST", headers: H(),
+      body: JSON.stringify({ clientId: id, label: "Bulk", startDate: NEW_DAY, targets: { targetCalories: 2600 } }),
+    });
+
+    const on = async (date: string) =>
+      ((await (await SELF.fetch(`${ORIGIN}/api/today?clientId=${id}&date=${date}`, { headers: H() })).json()) as {
+        goal: { targets: { targetCalories?: number } | null } | null;
+      }).goal?.targets?.targetCalories;
+
+    // A day under the OLD goal keeps the old target; a day under the new one moves.
+    expect(await on("2026-02-01")).toBe(2100);
+    expect(await on("2026-03-15")).toBe(2600);
+    // Before any goal existed there is nothing to resolve.
+    expect(await on("2025-12-01")).toBeUndefined();
+  });
+
   it("Today bundle reports profile completeness", async () => {
     const id = await mkClient();
     const before = (await (await SELF.fetch(`${ORIGIN}/api/today?clientId=${id}&date=2026-01-10`, { headers: H() })).json()) as { profile: { complete: boolean; gaps: string[] } };
