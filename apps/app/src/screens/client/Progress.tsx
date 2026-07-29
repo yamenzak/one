@@ -230,7 +230,11 @@ function Overview({ data, units, dateLabel, canNutrition, canTraining }: { data:
       </section>
 
       <Stagger>
-        <ChartCard title="Consistency" icon={Activity} tone="activity" value={consistency.checkInDays} unit="days logged" delta={<Badge tone="neutral">best {consistency.longestStreak}d streak</Badge>}>
+        {/* "Consistency" already means `consistencyPct` in the stat card above — the
+            same word carrying 40% there and "12 days logged" here was the screen
+            contradicting itself. This is the check-in HISTORY, and its headline
+            number is the glance strip's "Check-ins" three rows up, so it drops. */}
+        <ChartCard title="Check-in history" icon={Activity} tone="activity" delta={<Badge tone="neutral">best {consistency.longestStreak}d streak</Badge>}>
           <CalendarHeatmap days={consistency.heatmap} today={data.today} tone="activity" weeks={Math.min(53, Math.max(10, Math.ceil(data.range.days.length / 7)))} />
         </ChartCard>
       </Stagger>

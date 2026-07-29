@@ -215,7 +215,10 @@ export function Train({ clientId }: { clientId: string }) {
                 <div>
                   <div className="text-micro uppercase text-activity">Active plan</div>
                   <h2 className="mt-0.5 text-title-3">{published.name}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">{published.body.days.filter((d) => !d.isRestDay).length} training days</p>
+                  {(() => {
+                    const n = published.body.days.filter((d) => !d.isRestDay).length;
+                    return <p className="mt-1 text-sm text-muted-foreground">{n} training day{n === 1 ? "" : "s"}</p>;
+                  })()}
                 </div>
                 <div className="grid size-12 place-items-center rounded-full bg-activity-soft text-activity [&_svg]:size-5"><Play /></div>
               </div>
@@ -251,7 +254,7 @@ export function Train({ clientId }: { clientId: string }) {
             <StatCard stack label="Training load" value={week.weekLoad} unit={`/ ${loadTarget}`} icon={TrendingUp} tone="activity"
               badge={<Badge tone={week.weekLoad >= loadTarget ? "success" : "neutral"}>{week.weekLoad >= loadTarget ? "On target" : "Building"}</Badge>}
               chart={week.weekLoad > 0 ? <MiniBars values={week.dailyLoad} tone="activity" width={132} target={loadTarget / 7} /> : undefined} />
-            <StatCard stack label="Tonnage" value={kgToDisplay(week.weekTonnage, units).toLocaleString()} unit={weightLabel(units)} icon={Dumbbell} tone="activity"
+            <StatCard stack label="Weight lifted" value={kgToDisplay(week.weekTonnage, units).toLocaleString()} unit={weightLabel(units)} icon={Dumbbell} tone="activity"
               chart={week.weekTonnage > 0 ? <Sparkline values={week.dailyTonnage.map((v) => kgToDisplay(v, units))} tone="activity" width={132} /> : undefined} />
             <StatCard stack label="Active days" value={week.activeCount} unit="of 7" icon={Flame} tone="cardio"
               chart={<WeekDots days={week.active} todayIndex={6} tone="cardio" fill />} />
@@ -276,7 +279,10 @@ export function Train({ clientId }: { clientId: string }) {
                   <div className="truncate font-medium">{r.title}</div>
                   <div className="truncate text-xs text-muted-foreground">{new Date(`${r.date}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · {r.sub}</div>
                 </div>
-                {r.load > 0 && <div className="shrink-0 text-right"><div className="numeral font-semibold text-activity">{r.load}</div><div className="text-xs uppercase tracking-wide text-muted-foreground">load</div></div>}
+                {/* An all-caps "LOAD" stacked under a bare number shouts a word most
+                    clients have never met. The value carries its own quiet unit
+                    instead, like every other number in the app (§5). */}
+                {r.load > 0 && <div className="numeral shrink-0 text-right font-semibold text-activity">{r.load}<span className="ml-0.5 text-xs font-medium text-muted-foreground">load</span></div>}
               </Card>
             ))}
           </Stagger>
@@ -381,7 +387,7 @@ function LibraryGrid() {
       <Reveal loading={!all} skeleton={<SkeletonList card rows={3} thumb={56} />}>
         {all && (
           <div className="space-y-3">
-            <Field label="Search exercises" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the library…" />
+            <Field label="Search the exercise library" labelHidden icon={Search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the library…" />
             {categories.length > 0 && (
               <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
                 <span className="shrink-0"><Chip selected={cat === null} onClick={() => setCat(null)}>All</Chip></span>

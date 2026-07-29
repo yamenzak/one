@@ -116,14 +116,29 @@ export function ClientReport({ clientId }: { clientId: string }) {
             <Eyebrow>Compliance</Eyebrow>
             <Stagger className="space-y-3">
               <GlanceStrip items={[
-                { icon: Flame, tone: "calories", value: report.compliance.currentStreak, label: "Day streak" },
+                // One name per thing: the widget picker, the client's own Wellness tab and
+                // this report were calling the same number "Check-in streak", "Day streak"
+                // and "Day streak" respectively.
+                { icon: Flame, tone: "calories", value: report.compliance.currentStreak, label: "Check-in streak" },
                 { icon: Gauge, tone: "activity", value: `${report.compliance.checkInConsistencyPct}%`, label: "Consistency" },
                 { icon: Dumbbell, tone: "activity", value: report.compliance.workoutDays, label: "Workout days" },
               ]} />
               <GlanceStrip items={[
                 { icon: Utensils, tone: "nutrition", value: report.compliance.foodDays, label: "Days logged" },
                 { icon: Flame, tone: "calories", value: report.compliance.calorieAdherencePct != null ? `${report.compliance.calorieAdherencePct}%` : null, label: "Cal adherence" },
-                { icon: TrendingUp, tone: "activity", value: `${Math.round(kgToDisplay(report.totalTonnage, units) / 1000).toLocaleString()}k`, label: `Volume ${weightLabel(units)}` },
+                // "0k" was shipping — the k-suffix was unconditional, so a client with no
+                // logged sets got a unit with nothing in front of it. Under 10,000 the
+                // real figure fits and is more useful; the unit rides the value, not the
+                // label (§5).
+                {
+                  icon: TrendingUp,
+                  tone: "activity",
+                  value: (() => {
+                    const v = Math.round(kgToDisplay(report.totalTonnage, units));
+                    return v >= 10_000 ? `${Math.round(v / 1000).toLocaleString()}k` : v.toLocaleString();
+                  })(),
+                  label: `Volume lifted (${weightLabel(units)})`,
+                },
               ]} />
             </Stagger>
           </section>
