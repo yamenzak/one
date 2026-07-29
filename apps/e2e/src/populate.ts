@@ -186,3 +186,75 @@ async function callJson<T>(page: Page, base: string, path: string, body: unknown
   return JSON.parse(out.text) as T;
 }
 
+
+/**
+ * A real plan: four days, mixed block types, a rest day.
+ *
+ * A one-exercise plan is the workout equivalent of an empty account — it hides
+ * the day carousel, the superset round-logging, the block rest clocks and every
+ * name long enough to wrap. Built through the API because doing it through the
+ * builder UI is thirty clicks that test nothing.
+ */
+export async function publishWorkoutPlan(
+  studio: Studio,
+  client: Client,
+  exerciseIds: string[],
+  name = "Upper / Lower Split",
+): Promise<string> {
+  const ex = (i: number) => exerciseIds[i % exerciseIds.length]!;
+  const set = (reps: number, rest = 90) => ({ setType: "working", reps, weightMode: "unspecified", restAfterSec: rest });
+  const slot = (i: number, sets: number, reps: number) => ({
+    exerciseId: ex(i),
+    measurementMode: "reps",
+    sets: Array.from({ length: sets }, () => set(reps)),
+  });
+
+  const created = await callJson<{ plan: { id: string } }>(studio.page, studio.base, "/api/workout-plans", {
+    clientId: client.id,
+    name,
+  });
+  const planId = created.plan.id;
+
+  await callPatch(studio.page, studio.base, `/api/workout-plans/${planId}`, {
+    body: {
+      days: [
+        {
+          name: "Upper A — push focus",
+          isRestDay: false,
+          blocks: [
+            { type: "single", slots: [slot(0, 4, 8), slot(1, 3, 10)] },
+            { type: "superset", rounds: 3, restBetweenRoundsSec: 120, slots: [slot(2, 1, 12), slot(3, 1, 12)] },
+          ],
+        },
+        {
+          name: "Lower A",
+          isRestDay: false,
+          blocks: [{ type: "single", slots: [slot(1, 5, 5), slot(2, 3, 8)] }],
+        },
+        { name: "Rest & mobility", isRestDay: true, blocks: [] },
+        {
+          name: "Upper B — pull focus",
+          isRestDay: false,
+          blocks: [
+            { type: "single", slots: [slot(3, 4, 6)] },
+            { type: "circuit", rounds: 4, restBetweenRoundsSec: 60, slots: [slot(0, 1, 15), slot(1, 1, 15), slot(2, 1, 15)] },
+          ],
+        },
+      ],
+    },
+  });
+  await callJson(studio.page, studio.base, `/api/workout-plans/${planId}/publish`, {});
+  return planId;
+}
+
+async function callPatch(page: Page, base: string, path: string, body: unknown): Promise<void> {
+  await ready(page, base);
+  const out = await page.evaluate(
+    async ([p, b]: [string, string]) => {
+      const res = await fetch(p, { method: "PATCH", headers: { "content-type": "application/json" }, body: b });
+      return { ok: res.ok, status: res.status, text: await res.text() };
+    },
+    [path, JSON.stringify(body)] as [string, string],
+  );
+  if (!out.ok) throw new Error(`PATCH ${base}${path} -> ${out.status} ${out.text}`);
+}
