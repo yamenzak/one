@@ -7,7 +7,7 @@
  * loads the row and, on a successful charge, bumps the redemption counter.
  */
 
-import { applyPromo, type PromoCode, type PromoResult } from "@kova/domain";
+import { applyPromo, type PromoCode, type PromoResult } from "@4dl/platform";
 
 interface PromoRow {
   id: string;

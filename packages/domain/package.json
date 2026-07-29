@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Pure domain logic — credits, entitlements, permissions, access-economy budgets, nutrition/TDEE, body-fat, progress aggregates, workout math. No I/O.",
+  "description": "Kova's pure domain logic \u2014 nutrition/TDEE, body-fat, workout/activity math, progress, wellness, coaching, plus the product registries the platform substrate is parameterized by (entitlements, perms, budgets, notifications, features). No I/O. The shared multi-tenant half lives in @4dl/platform.",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -17,5 +17,8 @@
   "devDependencies": {
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@4dl/platform": "workspace:*"
   }
 }

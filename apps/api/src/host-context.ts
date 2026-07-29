@@ -21,7 +21,7 @@
  */
 
 import type { SessionContext } from "@kova/protocol";
-import { classifyHost, resolveHostGate, tenantHostname, type HostGate, type HostShape } from "@kova/domain";
+import { classifyHost, resolveHostGate, tenantHostname, type HostGate, type HostShape } from "@4dl/platform";
 import { parseJson } from "./db.js";
 
 export interface HostTenant {

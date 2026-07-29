@@ -21,7 +21,8 @@ import { newId, nowIso } from "./ids.js";
 import { recordAudit } from "./audit.js";
 import { canonicalHost, shapeOf } from "./host-context.js";
 import { parseJson, j } from "./db.js";
-import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps, rangeStatus, auditLabel, canAccessClient, seesWholeRoster, resolveStanding, studioStandingOf } from "@kova/domain";
+import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps, rangeStatus, auditLabel, canAccessClient, seesWholeRoster } from "@kova/domain";
+import { resolveStanding, studioStandingOf } from "@4dl/platform";
 
 export interface ClientRow {
   id: string;
