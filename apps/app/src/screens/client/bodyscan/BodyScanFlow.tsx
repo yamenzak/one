@@ -559,7 +559,7 @@ function ManualStep({ profile, latestWeightKg, units, notice, onResult }: {
   return (
     <div className="mx-auto max-w-md space-y-4 px-5 py-4">
       <div className="space-y-1">
-        <h2 className="text-xl font-bold tracking-tight">Enter your measurements</h2>
+        <h2 className="text-title-3">Enter your measurements</h2>
         <p className="text-sm text-muted-foreground">Use a tape measure. We'll estimate your body-fat percentage from these.</p>
       </div>
       {notice && <div className="whitespace-pre-line rounded-2xl bg-warning-soft/50 px-4 py-3 text-sm text-warning">{notice}</div>}

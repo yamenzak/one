@@ -111,7 +111,7 @@ export function MediaLibrary({ onBack }: { onBack: () => void }) {
       <div className="flex items-center gap-3">
         <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-bold tracking-tight">Media library</h1>
+          <h1 className="truncate text-title-3">Media library</h1>
           <p className="truncate text-xs text-muted-foreground">
             {items === null ? "Loading…" : `${items.length} file${items.length === 1 ? "" : "s"} · everything the app stores for you, including what the AI made`}
           </p>

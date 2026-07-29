@@ -212,7 +212,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
         <>
       <div className="flex items-center gap-3">
         <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
-        <h1 className="flex-1 truncate text-xl font-bold tracking-tight">{plan.name}</h1>
+        <h1 className="flex-1 truncate text-title-3">{plan.name}</h1>
         <Badge tone={plan.status === "published" ? "success" : "neutral"}>{plan.status}</Badge>
       </div>
 

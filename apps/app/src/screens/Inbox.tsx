@@ -72,7 +72,7 @@ export function Inbox({ onBack }: { onBack: () => void }) {
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
       <div className="flex items-center gap-3">
         <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
-        <h1 className="flex-1 text-xl font-bold tracking-tight">Notifications</h1>
+        <h1 className="flex-1 text-title-3">Notifications</h1>
         {unread > 0 && <Button size="sm" variant="ghost" onClick={() => void markAll()}><CheckCheck /> Mark all read</Button>}
       </div>
 
