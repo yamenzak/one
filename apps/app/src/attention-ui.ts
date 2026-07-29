@@ -4,7 +4,7 @@
  * tone. Domain owns severity/permission/copy; presentation lives here.
  */
 
-import { Target, Moon, ClipboardList, FlaskConical, ArrowLeftRight, Clock, CircleAlert, CircleUser, Scale, Percent, Dumbbell, type LucideIcon, type Tone } from "@kova/ui";
+import { Target, Moon, ClipboardList, FlaskConical, ArrowLeftRight, Clock, CircleAlert, CircleUser, Scale, Percent, Dumbbell, Mail, type LucideIcon, type Tone } from "@kova/ui";
 import type { AttentionType, AttentionSeverity } from "@kova/domain";
 
 export interface AttentionCoding { icon: LucideIcon; tone: Tone }
@@ -22,6 +22,7 @@ export const ATTENTION_CODING: Record<AttentionType, AttentionCoding> = {
   weight_off_range: { icon: Scale, tone: "cardio" },
   adherence_low: { icon: Percent, tone: "calories" },
   no_active_plan: { icon: Dumbbell, tone: "warning" },
+  invite_pending: { icon: Mail, tone: "neutral" },
 };
 
 const DEFAULT: AttentionCoding = { icon: CircleAlert, tone: "neutral" };
