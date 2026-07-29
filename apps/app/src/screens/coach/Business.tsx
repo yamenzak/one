@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Badge, SegmentedControl, Field, Sheet, SubCard, Page, Stagger, ChartCard, SectionHeader, Eyebrow, GlanceStrip, IconBadge, EmptyState, Spinner, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Wallet, Gauge, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, TrendingDown, CheckCheck, Check, Lock, Tag , TierAnchor, CountUp } from "@kova/ui";
+import { Button, Card, Badge, SegmentedControl, Field, Sheet, SubCard, Page, Stagger, ChartCard, SectionHeader, Eyebrow, GlanceStrip, IconBadge, EmptyState, Spinner, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Wallet, Gauge, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, TrendingDown, CheckCheck, Check, Lock, Tag, TierAnchor, CountUp, Group, Row } from "@kova/ui";
 import { FEATURE_KEYS, FEATURE_META, QUOTA_KEYS, QUOTA_META, type Entitlements } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -41,7 +41,7 @@ const DUNNING: Record<string, { title: string; body: string }> = {
   canceled: { title: "Subscription canceled", body: "You're on the free plan. Resubscribe to bring back paid features for you and your clients." },
 };
 
-/** The GlanceStrip's plan caption. Never `${status} plan`: a studio that never
+/** The plan row's caption. Never `${status} plan`: a studio that never
  *  finished checkout is `status: 'active'` on the free plan, and captioning that
  *  "active plan" is exactly the lie this pass exists to remove. */
 const STATE_LABEL: Record<BillingState, string> = {
@@ -297,10 +297,17 @@ function Overview() {
               appeared during the rewrite (Today, Eat, here), and it always looks
               the same — the screen's own subject, restated smaller, reading as a
               second thought about the first one. */}
+          {/* …and then this replaced it with a ONE-ITEM GlanceStrip, which is the
+              same defect wearing a different component: a strip sets its value at
+              24px/700 dead centre, so "Free" under "No subscription" read as a
+              second hero on a tab that already has one. A strip is a comparison
+              of three things; with one thing it is a hero. This is a row. */}
           <Stagger>
-            <GlanceStrip items={[
-              { icon: CreditCard, tone: "primary", value: isPending ? pendingName : billing.subscription.planName, label: STATE_LABEL[billingState] },
-            ]} />
+            <Group>
+              <Row icon={CreditCard} sub={STATE_LABEL[billingState]}>
+                {isPending ? pendingName : billing.subscription.planName}
+              </Row>
+            </Group>
           </Stagger>
 
           {/* Stripe Connect — sell packages to clients. */}
@@ -376,20 +383,33 @@ function Overview() {
               {isOwner && billing.stripeEnabled && (
                 <Field label="Promo code (optional)" icon={Tag} value={packPromo} onChange={(e) => setPackPromo(e.target.value.toUpperCase())} placeholder="SUMMER20" />
               )}
-              <div className="space-y-1.5">
-                {billing.packs.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5">
-                    <div><div className="text-sm font-medium">{p.name}</div><div className="numeral text-xs text-muted-foreground">{p.credits.toLocaleString()} credits</div></div>
-                    {isOwner && billing.stripeEnabled ? (
-                      <Button size="sm" variant="tonal" disabled={busy === `pack_${p.id}`} onClick={() => void startInline("/api/billing/pack-intent", { packId: p.id, promoCode: packPromo || undefined }, `Buy ${p.name}`, (cents) => `Pay ${fmtPrice(cents ?? usdToCents(p.price_usd))}`, `pack_${p.id}`)}>
-                        {busy === `pack_${p.id}` ? "…" : fmtPrice(usdToCents(p.price_usd))}
-                      </Button>
-                    ) : (
-                      <Badge tone="primary">{fmtPrice(usdToCents(p.price_usd))}</Badge>
-                    )}
-                  </div>
-                ))}
-              </div>
+              {/* The seeded pack names already read "1,000 credits", so the old
+                  sub-line printed the name back at the owner. What's actually
+                  worth comparing between packs is the rate, so that is the
+                  sub-line — and it falls back to the count for a studio whose
+                  packs are named something else. */}
+              <Group>
+                {billing.packs.map((p) => {
+                  const perDollar = p.price_usd > 0 ? Math.round(p.credits / p.price_usd) : null;
+                  const named = p.name.includes(p.credits.toLocaleString());
+                  return (
+                    <Row
+                      key={p.id}
+                      icon={Wallet}
+                      sub={perDollar ? `${perDollar.toLocaleString()} credits per $1` : named ? undefined : `${p.credits.toLocaleString()} credits`}
+                      trailing={isOwner && billing.stripeEnabled ? (
+                        <Button size="sm" variant="tonal" disabled={busy === `pack_${p.id}`} onClick={() => void startInline("/api/billing/pack-intent", { packId: p.id, promoCode: packPromo || undefined }, `Buy ${p.name}`, (cents) => `Pay ${fmtPrice(cents ?? usdToCents(p.price_usd))}`, `pack_${p.id}`)}>
+                          {busy === `pack_${p.id}` ? "…" : fmtPrice(usdToCents(p.price_usd))}
+                        </Button>
+                      ) : (
+                        <Badge tone="primary">{fmtPrice(usdToCents(p.price_usd))}</Badge>
+                      )}
+                    >
+                      {p.name}
+                    </Row>
+                  );
+                })}
+              </Group>
               {!billing.stripeEnabled && <p className="text-xs text-muted-foreground">Credit-pack purchasing turns on once Stripe is configured.</p>}
             </Card>
             </Stagger>
@@ -674,6 +694,9 @@ function DowngradeSheet({ planId, onClose, onDone, onCheckout, onPortal }: {
 function PlanFeatures({ ent }: { ent: Entitlements }) {
   const features = FEATURE_KEYS.filter((k) => !FEATURE_META[k]?.reserved);
   const fmtQuota = (v: number) => (v < 0 ? "Unlimited" : v.toLocaleString());
+  /** Singularise a quota unit so "1 seats" can't ship. Unlimited takes none. */
+  const unitFor = (unit: string | undefined, v: number) =>
+    !unit || v < 0 ? "" : v === 1 && unit.endsWith("s") ? unit.slice(0, -1) : unit;
   return (
     <Card className="space-y-3">
       <SectionHeader icon={CheckCheck} tone="success" title="What's in your plan" />
@@ -697,7 +720,9 @@ function PlanFeatures({ ent }: { ent: Entitlements }) {
         {QUOTA_KEYS.map((k) => (
           <div key={k} className="rounded-xl bg-surface-2 px-3 py-2.5">
             <div className="text-micro uppercase text-muted-foreground">{QUOTA_META[k]?.label ?? k}</div>
-            <div className="numeral mt-0.5 text-sm font-bold">{fmtQuota(ent.quotas[k])}<span className="ml-1 text-[0.6rem] font-medium text-muted-foreground">{QUOTA_META[k]?.unit ?? ""}</span></div>
+            {/* "1 seats" was shipping. A unit that never agrees with its number is
+                the kind of thing nobody reports and everybody notices. */}
+            <div className="numeral mt-0.5 text-sm font-bold">{fmtQuota(ent.quotas[k])}<span className="ml-1 text-[0.6rem] font-medium text-muted-foreground">{unitFor(QUOTA_META[k]?.unit, ent.quotas[k])}</span></div>
           </div>
         ))}
       </div>

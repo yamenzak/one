@@ -2,7 +2,7 @@
  *  cards), Stripe Connect / inline buy, redeem codes. */
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Button, Card, Badge, Field, Sheet, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, EmptyState, toneVar, ArrowLeft, LogOut, Ticket, Store, Check, RotateCcw, Reveal, SkeletonLine, SkeletonList , TierAnchor, CountUp } from "@kova/ui";
+import { Button, Card, Badge, Field, Sheet, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, EmptyState, toneVar, ArrowLeft, LogOut, Ticket, Store, Check, RotateCcw, Reveal, SkeletonLine, SkeletonList , TierAnchor, CountUp, Atmosphere} from "@kova/ui";
 import { CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "@kova/domain";
 import { api } from "../../api.js";
 import { StudioListCard } from "../../StudioSwitcher.js";
@@ -53,6 +53,11 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
     setSub(s.subscriptions.find((x) => x.status === "active") ?? null);
   }, [clientId, canCommerce]);
   useEffect(() => void load(), [load]);
+
+  // Is there actually anything to buy? Both halves matter: a studio that never
+  // bought commerce, and one that did but has published nothing. Either way the
+  // anchor must not tell the client to pick something.
+  const canBuy = canCommerce && !!packages && packages.length > 0;
 
   const redeem = async () => {
     setBusy(true); setRedeemMsg(null);
@@ -118,7 +123,11 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
   const extend = () => { if (activePkg) void (isRecurring(activePkg) ? buy(activePkg.id) : buyInline(activePkg)); };
 
   return (
-    <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+    <Page className="relative isolate mx-auto max-w-xl space-y-5 p-4 pb-28">
+      {/* Shop is an overlay route (Shell.tsx) — it renders OUTSIDE the shell, so
+          it never inherited the shell's ambient wash and was the one anchored
+          screen in the client app sitting on flat canvas. It owns one (§3). */}
+      <Atmosphere />
       {/* Storefront header */}
       <div className="flex items-center gap-3">
         {locked ? (
@@ -144,9 +153,15 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
           </>
         ) : (
           <>
+            {/* "Pick one below to start" is a lie when there is nothing below to
+                pick: a studio that doesn't sell online, or one with no published
+                packages, leaves this screen as a redemption + explanation
+                surface. Say which one it is (§10). */}
             <p className="text-caption text-muted-foreground">Your plan</p>
-            <p className="text-title-1">{locked ? "Choose a package" : "Nothing active"}</p>
-            <p className="text-caption text-muted-foreground">Pick one below to start</p>
+            <p className="text-title-1">{canBuy ? (locked ? "Choose a package" : "Nothing active") : "Nothing active"}</p>
+            <p className="text-caption text-muted-foreground">
+              {canBuy ? "Pick one below to start" : "Your coach sets this up for you"}
+            </p>
           </>
         )}
       </TierAnchor>
@@ -208,7 +223,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
         !locked && <p className="px-1 text-xs text-muted-foreground">Pick a package below to unlock your plan. Buy again anytime to extend — access stacks, it never resets.</p>
       ))}
 
-      <PlanIncludes />
+      <PlanIncludes hasPlan={!!sub && sub.daysRemaining > 0} />
 
       {memberships.length > 0 && (
         <section className="space-y-3">
@@ -339,7 +354,7 @@ function PackageCard({ p, tone, cta, hasActive }: { p: Pkg; tone: (typeof CARD_T
  *  budget), so this shows exactly what they can actually do. Positive framing:
  *  only included capabilities are listed. */
 const PLAN_PREVIEW = 5;
-function PlanIncludes() {
+function PlanIncludes({ hasPlan }: { hasPlan: boolean }) {
   const { ctx } = useSession();
   const [expanded, setExpanded] = useState(false);
   const flags = ctx?.clientFlags;
@@ -350,7 +365,12 @@ function PlanIncludes() {
   const hidden = included.length - shown.length;
   return (
     <section className="space-y-2">
-      <Eyebrow action={<span className="text-xs font-medium text-muted-foreground">{included.length} included</span>}>What your plan includes</Eyebrow>
+      {/* With no active plan these are still real capabilities — the studio's
+          defaults — but calling them "your plan" under an anchor that just said
+          "Nothing active" contradicts it on the same screen. */}
+      <Eyebrow action={<span className="text-xs font-medium text-muted-foreground">{included.length}</span>}>
+        {hasPlan ? "What your plan includes" : "What you can do now"}
+      </Eyebrow>
       <div className="flex flex-wrap gap-1.5 px-1">
         {shown.map((k) => (
           <span key={k} className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success [&_svg]:size-3">
