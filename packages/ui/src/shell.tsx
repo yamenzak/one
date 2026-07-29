@@ -5,7 +5,7 @@
 
 import { motion } from "motion/react";
 import { chromeIn } from "./lib/animation.js";
-import { settle } from "./lib/animation.js";
+import { EASE_OUT, settle } from "./lib/animation.js";
 import { Group, Row } from "./layout.js";
 import type { ReactNode } from "react";
 import { cn } from "./lib/utils.js";
@@ -145,8 +145,20 @@ export function NavRail({ tabs, active, onSelect, footer, brand, tinted }: { tab
  */
 export function InsightCard({ timestamp, title, aiGlyph, tone, children, onFeedback }: { timestamp: string; title: string; aiGlyph?: ReactNode; tone?: "default" | "primary"; children?: ReactNode; onFeedback?: (v: 1 | -1) => void }) {
   return (
-    <motion.article initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.4 }} className="py-3">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+    // `whileInView` + `viewport={{ once: true }}` rather than the spine's
+    // variants, deliberately: a timeline is unbounded, so items animate as they
+    // are scrolled to rather than all at once on mount. The VALUES still come
+    // from the shared set (§8) — it was the one component in the package writing
+    // its own duration and travel, at 10px/400ms against everything else's
+    // 8px/220ms, which read as a heavier arrival than the rows beside it.
+    <motion.article
+      initial={{ opacity: 0, y: 8 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.22, ease: EASE_OUT }}
+      className="py-3"
+    >
+      <div className="flex items-center gap-2 text-caption text-muted-foreground">
         {aiGlyph}
         <span>{timestamp}</span>
       </div>
@@ -175,7 +187,7 @@ export function WavyDivider({ label }: { label: string }) {
   return (
     <div className="my-6 flex items-center gap-4">
       <div className="flex-1">{wave}</div>
-      <span className="shrink-0 text-sm font-medium text-muted-foreground">{label}</span>
+      <span className="shrink-0 text-micro uppercase text-muted-foreground">{label}</span>
       <div className="flex-1">{wave}</div>
     </div>
   );
