@@ -66,10 +66,20 @@ thing on the screen. The score is now the anchor, `WellnessScoreCard` became
 chip row became the action cluster. A brand-new client scores `0`, which the
 anchor renders as the band's words rather than a giant zero — see §5.
 
-**Still not conformant:** the overlay family (`Sheet`, `FixedDrawer`, `Dialog`,
-`DropdownMenu`, `SegmentedControl`, `Select`, `Tooltip`) — they take the radius,
-type and motion tokens now, but their internals have not been read against §7.
-Everything else in the registry is `✅`.
+**The overlay family is now conformant.** Reading `overlays.tsx` against §5–§8
+and §12 turned up four things the tokens alone could not fix:
+
+- The `Sheet` hard-coded its own scrim string without the animation classes, so
+  the dim snapped on and off while the sheet slid. One `overlayCls` now.
+- `DropdownMenuItem` styled `hover:` only. Radix drives keyboard navigation
+  through `data-[highlighted]`, so arrowing down a menu moved an invisible
+  cursor and the menu looked frozen. (`Select` already had this right, which is
+  how the inconsistency stayed invisible.)
+- Three focusable controls — the dialog close, `TabsTrigger`, the segmented
+  buttons — set `outline-none` with nothing in its place. One `FOCUS` constant.
+- The segmented pill wrote its own spring inline; it now takes `SPRING`.
+
+**The whole registry is `✅`.**
 
 **Card-stack → `Group`/`Row` done on:** Clients · Staff · Packages (archived,
 redemption codes, promo codes) · Sessions (add-on types) · Library (templates).

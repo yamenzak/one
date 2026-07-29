@@ -628,12 +628,18 @@ reintroduce that shape anywhere.
 
 | Component | Use it when | Do NOT use it for | State |
 |---|---|---|---|
-| `Sheet` | **Doing** — anything with inputs. The mobile default. | A yes/no question. | ◻︎ |
-| `FixedDrawer` | A multi-step form where an accidental dismiss would lose input. | Anything dismissible. | ◻︎ |
-| `Dialog` / `ConfirmDialog` | **Deciding** — a confirmation, ≥`md`. | Forms. | ◻︎ |
-| `DropdownMenu` | A short list of actions on an element. | Navigation between sections. | ◻︎ |
-| `SegmentedControl` | 2–4 mutually exclusive views of the same data. | More than 4 — that is a `Select`. | ◻︎ |
-| `Select` · `Tooltip` · `Tabs` · `Avatar` | As named. | — | ◻︎ |
+| `Sheet` | **Doing** — anything with inputs. The mobile default. Title is `title-2`: it sits in the content and names the surface. | A yes/no question. | ✅ |
+| `FixedDrawer` | A multi-step form where an accidental dismiss would lose input. Title is `title-3`: it sits in a header bar and is chrome. | Anything dismissible. | ✅ |
+| `Dialog` / `ConfirmDialog` | **Deciding** — a confirmation, ≥`md`. | Forms. | ✅ |
+| `DropdownMenu` | A short list of actions on an element. | Navigation between sections. | ✅ |
+| `SegmentedControl` | 2–4 mutually exclusive views of the same data. | More than 4 — that is a `Select`. | ✅ |
+| `Select` · `Tooltip` · `Tabs` · `Avatar` | As named. | — | ✅ |
+
+All of them share one `overlayCls` scrim and one `FOCUS` ring constant. Both
+exist because the alternative was tried: the `Sheet` hard-coded its own scrim
+and lost the fade, and three focusable controls set `outline-none` with nothing
+in its place, so tabbing through a dialog or a segmented control moved an
+invisible cursor.
 
 ### Chrome — `shell.tsx`
 
