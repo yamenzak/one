@@ -97,12 +97,26 @@ export function FoodRow({
 }) {
   const units = useUnits();
   const subtitle = sub ?? (brand || null);
+  /*
+    MACROS GO UNDER THE NAME, NOT BESIDE IT.
+
+    They used to sit in the trailing column, which is `shrink-0` — so on a phone
+    the three macro chips plus the calorie figure claimed ~110px of a ~330px row
+    and every real food name truncated: "Greek yoghurt, berri…", "Chicken, rice
+    & broc…", "Salmon, sweet potat…". Every one of them. A diary whose entries
+    cannot be read is not a diary, and the fix is free — the second line was
+    already there carrying the quantity, and macros belong with it.
+  */
+  const showMacros = macros && (proteinG != null || carbsG != null || fatG != null);
   const Body = (
     <>
       <FoodThumb src={image} size={thumbSize} />
       <div className="min-w-0 flex-1">
         <div className="truncate font-medium">{name}</div>
-        {subtitle != null && <div className="truncate text-sm text-muted-foreground">{subtitle}</div>}
+        <div className="flex min-w-0 items-center gap-2 truncate text-sm text-muted-foreground">
+          {subtitle != null && <span className="shrink-0">{subtitle}</span>}
+          {showMacros && <MacroInline proteinG={proteinG ?? 0} carbsG={carbsG ?? 0} fatG={fatG ?? 0} className="min-w-0 text-xs" />}
+        </div>
       </div>
     </>
   );
@@ -113,11 +127,8 @@ export function FoodRow({
       ) : (
         <div className="flex min-w-0 flex-1 items-center gap-3">{Body}</div>
       )}
-      {(energy || macros) && (calories != null || proteinG != null) && (
-        <div className="shrink-0 text-right leading-tight">
-          {energy && <div className="numeral text-sm font-semibold text-calories">{fmtEnergy(calories ?? 0, units)}</div>}
-          {macros && <MacroInline proteinG={proteinG ?? 0} carbsG={carbsG ?? 0} fatG={fatG ?? 0} className="mt-0.5 justify-end text-xs" />}
-        </div>
+      {energy && calories != null && (
+        <div className="numeral shrink-0 text-sm font-semibold text-calories">{fmtEnergy(calories, units)}</div>
       )}
       {trailing}
     </div>

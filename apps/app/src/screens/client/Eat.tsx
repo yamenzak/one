@@ -6,7 +6,7 @@ import {
   Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MetricChip, MetricPill, ProgressRing, METRICS, toneSoft, Eyebrow, Page, Stagger, EmptyState, motion, ConfirmDialog,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
   Plus, Utensils, Croissant, Soup, Apple, Dumbbell, Trash2, AlertTriangle, type LucideIcon,
-  TierAnchor, CountUp, Droplet, SPRING_SOFT,
+  TierAnchor, CountUp, Droplet, SPRING_SOFT, cn,
 } from "@kova/ui";
 import type { UnitPrefs } from "@kova/domain";
 import { api, errorText, isQueued, todayLocal } from "../../api.js";
@@ -239,23 +239,30 @@ export function Eat({ clientId }: { clientId: string }) {
         <Stagger data-tour="eat-hero">
           <Card className="relative overflow-hidden">
             <div className="pointer-events-none absolute -right-12 -top-12 size-40 rounded-full bg-calories/10 blur-2xl" />
-            <div className="relative flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <div className="text-micro uppercase text-calories">Today&rsquo;s intake</div>
-                {/* No headline number here — the anchor above already carries it,
-                    and repeating it at a second weight made this card read as a
-                    louder copy of the screen's own subject (§1). What stays is
-                    what the anchor cannot say: the split, and how far over. */}
-                <div className="mt-1.5 text-body-lg">{fmtEnergy(total, units)} eaten</div>
-                <div className="mt-1 text-caption text-muted-foreground">
-                  {calTarget > 0
-                    ? (remaining >= 0 ? "on track" : `${fmtEnergy(-remaining, units)} over target`)
-                    : "Log your meals to track intake"}
-                </div>
+            {/*
+              Three facts, not one fact three times.
+
+              With real data this card was showing "1,770 kcal eaten" beside an
+              "84%" ring, under an anchor already reading "330 left of 2,100" —
+              the same measurement in three notations, stacked. The percentage
+              was the emptiest of the three: it is the anchor divided by the
+              target, carries no unit, and nobody eats a percentage.
+
+              What survives is what the anchor genuinely cannot say — how much
+              is IN (the complement of what's left), whether that is fine, and
+              what it was made of.
+            */}
+            <div className="relative">
+              <div className="text-micro uppercase text-calories">Today&rsquo;s intake</div>
+              <div className="mt-1.5 text-body-lg">
+                {fmtEnergy(total, units)} eaten
+                {calTarget > 0 && (
+                  <span className={cn("ml-2 text-caption font-medium", remaining < 0 ? "text-danger" : "text-muted-foreground")}>
+                    {remaining >= 0 ? "· on track" : `· ${fmtEnergy(-remaining, units)} over`}
+                  </span>
+                )}
               </div>
-              {calTarget > 0 && (
-                <ProgressRing size={92} strokeWidth={9} tone={remaining < 0 ? "danger" : "calories"} progress={pct} value={`${Math.round(pct * 100)}%`} className="shrink-0" />
-              )}
+              {calTarget === 0 && <div className="mt-1 text-caption text-muted-foreground">Log your meals to track intake</div>}
             </div>
             {/* Per-macro detail is `macroBreakdown`. */}
             {canMacros && <MacroBar
@@ -268,11 +275,18 @@ export function Eat({ clientId }: { clientId: string }) {
           </Card>
         </Stagger>
 
-        {/* Hydration (`waterLogging`) + protein (`macroBreakdown`) — same
-            toneSoft-pill language as the MacroBar above. */}
-        {(canWater || canMacros) && (
-        <Stagger className="grid grid-cols-2 gap-3">
-          {canWater && (
+        {/*
+          Water only.
+
+          This was a two-up: water beside a protein pill whose entire content —
+          "130 / 165 g" — is the protein chip in the MacroBar 40px above it,
+          plus "35 g to go", which is that subtraction. Protein was rendering
+          FOUR times on this screen with data in it. Water earns its place
+          because it is the one thing here that is not in the macro bar and the
+          only one with an action attached.
+        */}
+        {canWater && (
+        <Stagger>
           <div className="space-y-1.5">
             <MetricPill
               icon={METRICS.water.icon}
@@ -282,22 +296,9 @@ export function Eat({ clientId }: { clientId: string }) {
               value={<>{fmtVolume(waterMl, units)}<span className="text-xs font-medium text-muted-foreground"> / {fmtVolume(waterTarget, units)}</span></>}
             />
             <div className="flex gap-1.5">
-              {waterPresets.map((v) => <button key={v} onClick={() => void addWater(v)} className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-transform active:scale-95 ${toneSoft.hydration}`}>+{v}</button>)}
+              {waterPresets.map((v) => <button key={v} onClick={() => void addWater(v)} className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-transform active:scale-95 ${toneSoft.hydration}`}>+{v}</button>)}
             </div>
           </div>
-          )}
-          {canMacros && (
-          <div className="space-y-1.5">
-            <MetricPill
-              icon={METRICS.protein.icon}
-              tone="protein"
-              label="Protein"
-              progress={proteinTarget > 0 ? proteinTotal / proteinTarget : undefined}
-              value={<>{proteinTotal}<span className="text-xs font-medium text-muted-foreground">{proteinTarget > 0 ? ` / ${proteinTarget} g` : " g"}</span></>}
-            />
-            <div className="px-1 text-xs text-muted-foreground">{proteinTarget > 0 ? (proteinTotal >= proteinTarget ? "Goal reached" : `${proteinTarget - proteinTotal} g to go`) : "No target set"}</div>
-          </div>
-          )}
         </Stagger>
         )}
       </section>
@@ -307,7 +308,10 @@ export function Eat({ clientId }: { clientId: string }) {
       {canFood && recents.length > 0 && (
         <section className="space-y-2">
           <Eyebrow>Quick add</Eyebrow>
-          <Stagger className="no-scrollbar -mx-4 flex snap-x gap-2.5 overflow-x-auto px-4 pb-1">
+          {/* `pr-8` on a horizontal scroller: without trailing room the last
+              card is sliced flush against the viewport edge mid-word, which
+              reads as a clipping bug rather than as "there is more this way". */}
+          <Stagger className="no-scrollbar -mx-4 flex snap-x gap-2.5 overflow-x-auto px-4 pb-1 pr-8">
             {recents.map((r) => {
               const key = r.food_id ?? r.label;
               const busy = relogging === key;
@@ -354,7 +358,10 @@ export function Eat({ clientId }: { clientId: string }) {
                 <Card key={meal} className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5"><IconBadge icon={meta.icon} tone="nutrition" size="sm" /><span className="font-semibold">{meta.label}</span></div>
-                    <span className="numeral text-sm font-semibold text-calories">{fmtEnergy(mealCal, units)}</span>
+                    {/* A "total" of one thing is not a total — it is the same
+                        number printed twice, 20px apart. Shown only when there
+                        is actually something to add up. */}
+                    {list.length > 1 && <span className="numeral text-sm font-semibold text-calories">{fmtEnergy(mealCal, units)}</span>}
                   </div>
                   <div className="divide-y divide-border/40">
                     {list.map((e) => (

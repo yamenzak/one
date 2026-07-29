@@ -232,21 +232,26 @@ test("owner onboards, invites a client, and the client signs in and completes in
     await coach.getByRole("button").filter({ hasText: clientName }).click();
     await expect(coach.getByText("Coach view")).toBeVisible();
 
-    const profileCard = coach.getByRole("button").filter({ hasText: "Complete your profile" });
-    await expect(profileCard).toBeVisible({ timeout: 30_000 });
-    await expect(profileCard).toContainText("Target weight");
-    await expect(profileCard).not.toContainText("Date of birth");
-    await expect(profileCard).not.toContainText("Height");
-    await expect(profileCard).not.toContainText("Gender");
+    // The gap list is a coach-only affordance now — the client's own version of
+    // this card is a single row, because they are one tap from the form and do
+    // not need it previewed. The coach cannot open that form, so they still get
+    // the field names: "ask them to finish their profile" is useless next to
+    // "ask them for their target weight". `data-profile-gaps` marks the list.
+    const profileGaps = coach.locator("[data-profile-gaps]");
+    await expect(profileGaps).toBeVisible({ timeout: 30_000 });
+    await expect(profileGaps).toContainText("Target weight");
+    await expect(profileGaps).not.toContainText("Date of birth");
+    await expect(profileGaps).not.toContainText("Height");
+    await expect(profileGaps).not.toContainText("Gender");
 
     // The wizard's other three answers must count too. These were sent only as
     // `intake` — free-form AI context — while profileGaps reads the typed
     // `preferences` store, so a client answered their goal, their activity level
     // and where they train, and their coach was still told all three were
     // missing. Onboarding now writes both.
-    await expect(profileCard).not.toContainText("Primary goal");
-    await expect(profileCard).not.toContainText("Activity level");
-    await expect(profileCard).not.toContainText("Where you train");
+    await expect(profileGaps).not.toContainText("Primary goal");
+    await expect(profileGaps).not.toContainText("Activity level");
+    await expect(profileGaps).not.toContainText("Where you train");
   });
 
   await closeAll(coach, client);

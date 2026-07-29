@@ -1,0 +1,129 @@
+/**
+ * Give a client a plausible fortnight of history.
+ *
+ * Every screenshot taken during the UI rewrite was of a brand-new account, so
+ * every review was a review of EMPTY STATES. The widget carousel, the day
+ * agenda, the activity feed, the food diary, the weight trend and the check-in
+ * history had never once been looked at with data in them — which is exactly
+ * where cramming, bad wrapping and confusing copy live.
+ *
+ * This is deliberately not "one of everything": it is the shape of a real
+ * client. Some days are missed, weight drifts down with noise rather than in a
+ * straight line, and the calorie log lands near a target rather than on it.
+ * Perfectly uniform data hides layout problems — every row the same width, every
+ * number the same digit count — and those are precisely the problems worth
+ * finding.
+ */
+
+import type { Page } from "@playwright/test";
+import type { Client, Studio } from "./provision.js";
+
+/** `YYYY-MM-DD`, `n` days before `from` (default today, local). */
+export function dayBefore(n: number, from = new Date()): string {
+  const d = new Date(from);
+  d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Park the page on the APP, not on `/health`.
+ *
+ * `/health` is dependency-free JSON served by the worker with no app on it, and
+ * a write issued from that document comes back 401 even though the very same
+ * page can read `/api/context` fine. Booting the SPA once settles the session's
+ * active organization, and every write after that succeeds. Worth an explicit
+ * step rather than a mystery.
+ */
+async function ready(page: Page, base: string): Promise<void> {
+  if (page.url().startsWith(`${base}/`) && !page.url().endsWith("/health")) return;
+  await page.goto(`${base}/`);
+  await page.waitForTimeout(1200);
+}
+
+async function call(page: Page, base: string, path: string, body: unknown): Promise<void> {
+  await ready(page, base);
+  const out = await page.evaluate(
+    async ([p, b]: [string, string]) => {
+      const res = await fetch(p, { method: "POST", headers: { "content-type": "application/json" }, body: b });
+      return { ok: res.ok, status: res.status, text: await res.text() };
+    },
+    [path, JSON.stringify(body)] as [string, string],
+  );
+  if (!out.ok) throw new Error(`POST ${base}${path} -> ${out.status} ${out.text}`);
+}
+
+const MEALS = [
+  { label: "Greek yoghurt, berries & honey", mealType: "breakfast", calories: 410, proteinG: 32, carbsG: 44, fatG: 11 },
+  { label: "Chicken, rice & broccoli", mealType: "lunch", calories: 640, proteinG: 52, carbsG: 68, fatG: 14 },
+  { label: "Salmon, sweet potato & greens", mealType: "dinner", calories: 720, proteinG: 46, carbsG: 55, fatG: 32 },
+  { label: "Whey shake & banana", mealType: "snack", calories: 280, proteinG: 26, carbsG: 34, fatG: 3 },
+];
+
+const ACTIVITIES = [
+  { activityKey: "walking", label: "Walk", durationMin: 42, distanceM: 3600 },
+  { activityKey: "running", label: "Easy run", durationMin: 28, distanceM: 5100, avgHrBpm: 148 },
+  { activityKey: "cycling", label: "Commute ride", durationMin: 35, distanceM: 11200 },
+];
+
+/**
+ * 14 days of logs for one client, written as the CLIENT (so every row lands on
+ * the same row-level scope a real one would).
+ */
+export async function populateClient(client: Client, days = 14): Promise<void> {
+  const { page, base, id } = client;
+  const post = (path: string, data: unknown) => call(page, base, path, { clientId: id, data });
+
+  let weight = 82.4;
+  for (let i = days - 1; i >= 0; i--) {
+    const date = dayBefore(i);
+    // A missed day every so often — a perfect streak hides how a gap renders.
+    const skipped = i === 3 || i === 9;
+
+    if (!skipped) {
+      for (const m of MEALS.slice(0, i % 4 === 0 ? 3 : 4)) {
+        await post("/api/logs/food", { ...m, date, quantity: 1, unit: "serving" });
+      }
+      await post("/api/logs/water", { date, amountMl: 1800 + ((i * 137) % 900) });
+    }
+
+    // Weight drifts down with real noise, not a straight line.
+    weight -= 0.06 + ((i * 7) % 5) / 100;
+    if (i % 2 === 0) await post("/api/measurements", { date, weightKg: Math.round(weight * 10) / 10 });
+
+    if (!skipped && i % 3 === 0) {
+      const a = ACTIVITIES[i % ACTIVITIES.length]!;
+      await post("/api/logs/activity", { ...a, date, startTime: "07:15" });
+    }
+
+    if (!skipped) {
+      await post("/api/check-ins", {
+        date,
+        weightKg: Math.round(weight * 10) / 10,
+        mood: 3 + (i % 3 === 0 ? 1 : 0),
+        energy: 3 + (i % 4 === 0 ? 1 : 0),
+        stress: 2 + (i % 5 === 0 ? 1 : 0),
+        sleepQuality: 3 + (i % 3 === 0 ? 1 : 0),
+        sleepHours: 6.5 + ((i * 3) % 4) * 0.4,
+        notes: i === 1 ? "Knee felt better on today's run. Sleep still short midweek." : null,
+      });
+    }
+  }
+}
+
+/** A goal with real targets, set by the coach — most client screens key off it. */
+export async function setTargets(studio: Studio, client: Client): Promise<void> {
+  await call(studio.page, studio.base, "/api/goals", {
+    clientId: client.id,
+    label: "Lean out for summer",
+    startDate: dayBefore(30),
+    // GoalTargetsSchema is `.strict()` — an unknown key 400s the whole call.
+    targets: {
+      targetCalories: 2100,
+      targetProteinG: 165,
+      targetCarbsG: 210,
+      targetFatG: 62,
+      targetWaterMl: 3000,
+      weeklyTrainingLoad: 420,
+    },
+  });
+}

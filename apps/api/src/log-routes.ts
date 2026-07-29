@@ -661,7 +661,7 @@ export const logRoutes = new Hono<AppEnv>()
       events.push({ id: `workout-${s.date_local}`, kind: "workout", date: s.date_local, ref: s.date_local, at: atFor(s.date_local, s.updated_at || s.created_at), title: "Workout", subtitle: `${sets} set${sets === 1 ? "" : "s"}`, ...(s.session_calories && s.session_calories > 0 ? { metric: { unit: "energy" as const, value: s.session_calories } } : {}) });
     }
     for (const a of activities.results ?? []) events.push({ id: `act-${a.id}`, kind: "activity", date: a.date_local, ref: a.id, at: atFor(a.date_local, a.created_at), title: a.label || (a.activity_key ?? "Activity").replace(/_/g, " "), subtitle: [a.duration_min ? dur(a.duration_min) : null, a.avg_hr_bpm ? `HR ${a.avg_hr_bpm}` : null].filter(Boolean).join(" · ") || null, ...(a.calories ? { metric: { unit: "energy" as const, value: a.calories } } : {}) });
-    for (const m of measures.results ?? []) { if (m.weight_kg == null && m.body_fat_percent == null && m.waist_cm == null) continue; events.push({ id: `meas-${m.date_local}`, kind: "measurement", date: m.date_local, ref: m.date_local, at: atFor(m.date_local, m.created_at), title: "Body", subtitle: [m.body_fat_percent != null ? `${m.body_fat_percent}% bf` : null, m.waist_cm != null ? `waist ${m.waist_cm}` : null].filter(Boolean).join(" · ") || null, ...(m.weight_kg != null ? { metric: { unit: "weight" as const, value: m.weight_kg } } : {}) }); }
+    for (const m of measures.results ?? []) { if (m.weight_kg == null && m.body_fat_percent == null && m.waist_cm == null) continue; events.push({ id: `meas-${m.date_local}`, kind: "measurement", date: m.date_local, ref: m.date_local, at: atFor(m.date_local, m.created_at), title: m.weight_kg != null ? "Weigh-in" : "Measurements", subtitle: [m.body_fat_percent != null ? `${m.body_fat_percent}% body fat` : null, m.waist_cm != null ? `${m.waist_cm} cm waist` : null].filter(Boolean).join(" · ") || null, ...(m.weight_kg != null ? { metric: { unit: "weight" as const, value: m.weight_kg } } : {}) }); }
     for (const ci of checkins.results ?? []) {
       const parts = [ci.mood != null ? `mood ${ci.mood}/5` : null, ci.energy != null ? `energy ${ci.energy}/5` : null].filter(Boolean).join(" · ");
       events.push({ id: `checkin-${ci.date_local}`, kind: "checkin", date: ci.date_local, at: atFor(ci.date_local, ci.created_at), title: "Check-in", subtitle: parts || "logged", ref: ci.date_local });
@@ -921,7 +921,7 @@ export const logRoutes = new Hono<AppEnv>()
         const hist = await db.prepare("SELECT date_local, weight_kg FROM measurements WHERE client_id = ? AND weight_kg IS NOT NULL ORDER BY date_local DESC LIMIT 30").bind(cid).all<{ date_local: string; weight_kg: number }>();
         const points = (hist.results ?? []).slice().reverse().map((h) => pt(h.date_local, h.weight_kg));
         const body: LogDetailResponse = {
-          kind, date: ref, title: "Body", tone: "cardio",
+          kind, date: ref, title: row.weight_kg != null ? "Weigh-in" : "Measurements", tone: "cardio",
           hero: row.weight_kg != null ? { value: row.weight_kg, unit: "weight", label: "Weight" } : row.body_fat_percent != null ? { value: row.body_fat_percent, unit: "percent", label: "Body fat" } : null,
           stats, items: [], rows: [],
           series: points.length ? { title: "Weight", unit: "weight", chart: "area", points } : null,

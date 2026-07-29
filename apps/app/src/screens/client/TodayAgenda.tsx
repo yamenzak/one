@@ -150,15 +150,12 @@ export function TodayAgenda({ clientId, date, bundle, agenda, onChanged, onNavig
     <section className="space-y-2">
       <div className="flex items-center justify-between px-1">
         <h3 className="text-micro uppercase text-muted-foreground">Today</h3>
-        <AnimatePresence mode="wait" initial={false}>
-          {allDone ? (
-            <motion.span key="done" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={SPRING_SNAP} className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-xs font-semibold text-success">
-              <Check strokeWidth={3} className="size-3" /> Complete
-            </motion.span>
-          ) : (
-            <span key="count" className="numeral text-xs font-semibold text-muted-foreground">{doneCount}/{items.length}</span>
-          )}
-        </AnimatePresence>
+        {/* Just the count. A "Complete" pill here and "All done for today" in
+            the banner 8px below were the same sentence twice, and the pill was
+            the one that dropped the useful part — how many. */}
+        <span className={cn("numeral text-xs font-semibold", allDone ? "text-success" : "text-muted-foreground")}>
+          {doneCount}/{items.length}
+        </span>
       </div>
       <AnimatePresence initial={false}>
         {allDone && <CompletionBanner count={items.length} expanded={expanded} onToggle={() => setExpanded((e) => !e)} />}
@@ -218,7 +215,7 @@ function CompletionBanner({ count, expanded, onToggle }: { count: number; expand
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold">All done for today</div>
-          <div className="text-xs text-muted-foreground">{count} {count === 1 ? "task" : "tasks"} complete — {expanded ? "tap to hide" : "tap to review"}.</div>
+          <div className="text-xs text-muted-foreground">{expanded ? "Tap to hide the list" : "Tap to see what you finished"}</div>
         </div>
         <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-180")} />
       </div>

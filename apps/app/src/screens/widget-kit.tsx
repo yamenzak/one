@@ -39,8 +39,8 @@ export function RingCard({ tone, value, label, sublabel, progress }: { tone: Ton
 
 /** Small widget: the design-system MetricPill (colored, two-tone progress fill),
  *  stretched to fill its 1×1 cell. */
-export function MiniCard({ icon, tone, value, label, progress, onClick }: { icon: LucideIcon; tone: Tone; value: ReactNode; label: string; progress?: number; onClick?: () => void }) {
-  return <MetricPill icon={icon} tone={tone} label={label} value={value} progress={progress} onClick={onClick} className="h-full" />;
+export function MiniCard({ icon, tone, value, unit, label, progress, onClick }: { icon: LucideIcon; tone: Tone; value: ReactNode; unit?: string; label: string; progress?: number; onClick?: () => void }) {
+  return <MetricPill icon={icon} tone={tone} label={label} value={value} unit={unit} progress={progress} onClick={onClick} className="h-full" />;
 }
 
 const norm = (x: WidgetItem | string): WidgetItem => (typeof x === "string" ? { id: x, size: "small" } : x);
