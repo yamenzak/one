@@ -7,7 +7,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { AiSettingsPayload, AiFeatureMeta, AiModelMeta, TenantAiConfig, AiFeatureConfig, AiTone } from "@kova/protocol";
-import { Card, Badge, Skeleton, Reveal, SkeletonLine, Switch, Button, Textarea, Chip, Field, IconBadge, cn, PencilLine, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, Play, Wallet, CircleCheck, CircleAlert, type Tone, type LucideIcon } from "@kova/ui";
+import { Card, Badge, Skeleton, Reveal, SkeletonLine, Switch, Button, Textarea, Chip, Field, IconBadge, cn, PencilLine, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, Play, Wallet, CircleCheck, CircleAlert, type Tone, type LucideIcon, Wand2, Sliders, ListChecks} from "@kova/ui";
+import { SectionSplit } from "./SectionSplit.js";
 import { api } from "../api.js";
 import { AiAvatar, useAiIdentity } from "../AiAvatar.js";
 import { useCan } from "../FeatureLock.js";
@@ -261,7 +262,21 @@ export function AiConfigSection() {
         </>
       }>
         {data && (
-          <>
+          /*
+            ── AI IS THREE SETTINGS ──────────────────────────────────────────
+            The studio's assistant (its tone, its spoken voice, a per-client
+            spend cap), the default model per lane, and a model + tone per
+            individual action. Stacked, they ran to 221 lines and the thing an
+            owner most often wants — "which model is answering, and what is it
+            costing me" — sat below two screens of identity settings.
+          */
+          <SectionSplit
+            param="a"
+            subs={[
+              {
+                key: "voice", label: "Voice & limits", icon: Wand2, tone: "primary",
+                value: `${config.tone ? String(config.tone) : "Default"} tone${config.perClientDailyCreditCap ? ` · ${config.perClientDailyCreditCap} credits/day per client` : " · no per-client cap"}`,
+                render: () => (
             <div>
               <div className="mb-2 flex items-center justify-between gap-2 px-1">
                 <h3 className="text-micro uppercase text-muted-foreground">AI assistant</h3>
@@ -339,12 +354,25 @@ export function AiConfigSection() {
                 />
               </Card>
             </div>
-
-            <DefaultModels features={data.features} models={data.models} config={config} onApply={saveFeatures} />
-
+                ),
+              },
+              {
+                key: "models", label: "Default models", icon: Sliders, tone: "activity",
+                value: `${data.models.length} model${data.models.length === 1 ? "" : "s"} available`,
+                render: () => (<DefaultModels features={data.features} models={data.models} config={config} onApply={saveFeatures} />),
+              },
+              {
+                key: "actions", label: "Per action", icon: ListChecks, tone: "nutrition",
+                value: `${trainer.length} for trainers · ${client.length} for clients`,
+                render: () => (
+                  <div className="space-y-5">
             <FeatureGroup title="For trainers" icon={Users} features={trainer} models={data.models} config={config} tones={data.tones} onSave={saveFeature} />
             <FeatureGroup title="For clients" icon={HeartPulse} features={client} models={data.models} config={config} tones={data.tones} onSave={saveFeature} />
-          </>
+                  </div>
+                ),
+              },
+            ]}
+          />
         )}
       </Reveal>
     </section>

@@ -9,7 +9,7 @@ import { useSearchParams } from "react-router-dom";
 import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
-  KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
+  KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
   ActionResult, ConfigRow, TabIntro, cn, toneText, personaLabel, personaTone, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon,
 } from "@kova/ui";
 import type { LoginBranding, TenantBranding } from "@kova/protocol";
@@ -23,6 +23,7 @@ import { api, errorText, uploadMedia } from "../api.js";
 import { enrollPasskey, listPasskeys, removePasskey, passkeySupported, passkeyErrorMessage, deviceLabel } from "../passkey.js";
 import { usePasskey } from "../PasskeyPrompt.js";
 import { AiConfigSection } from "./AiSettings.js";
+import { SectionSplit } from "./SectionSplit.js";
 
 /**
  * Section header inside a settings PAGE.
@@ -283,7 +284,7 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
     brand: () => <BrandingEditor initial={(ctx?.branding ?? null) as Branding | null} onPreview={preview} onSaved={() => void refresh()} />,
     signin: () => <SignInSettings canBrand={canBrand} branding={ctx?.branding ?? null} slug={ctx?.active?.tenantSlug ?? null} onSaved={() => void refresh()} />,
     ai: () => <AiConfigSection />,
-    messaging: () => <><EmailSection /><NotificationPolicySection /><EmailTemplatesSection /></>,
+    messaging: () => <MessagingSettings />,
     marketplace: () => <MarketplaceSection />,
     integrations: () => <IntegrationsSection />,
     danger: () => <CloseStudioSection />,
@@ -441,15 +442,46 @@ function CloseStudioSection() {
  * domain if live, else their own subdomain), the login-screen customization (copy,
  * hero image, passkey), and the custom-domain setup.
  */
+/**
+ * Sign-in — the address, the screen, and the domain.
+ *
+ * Three unrelated jobs stacked: a link to copy, a full editor with a live
+ * preview, and DNS. The preview alone made the page long enough that the link
+ * — the thing an owner comes here to grab and paste into a message — was above
+ * a screen of editor they did not want.
+ *
+ * Without `branding` the middle and last rows are not hidden: they are shown,
+ * disabled, saying what would unlock them. A capability you cannot see is one
+ * you cannot decide to buy.
+ */
 function SignInSettings({ canBrand, branding, slug, onSaved }: { canBrand: boolean; branding: TenantBranding | null; slug: string | null; onSaved: () => void }) {
+  const login = branding?.login ?? null;
+  const customised = [login?.headline, login?.subtext, login?.bgImageUrl].filter(Boolean).length;
   return (
-    <>
-      <LoginLinkCard slug={slug} />
-      {canBrand
-        ? <LoginCustomizeSection initial={branding?.login ?? null} logoUrl={branding?.logoUrl ?? null} onSaved={onSaved} />
-        : <p className="px-1 text-sm text-muted-foreground">Customizing the sign-in screen (your own copy, a hero image, a branded domain) is part of the branding add-on.</p>}
-      {canBrand && <DomainSection />}
-    </>
+    <SectionSplit
+      param="g"
+      subs={[
+        {
+          key: "link", label: "Your sign-in address", icon: LogIn, tone: "primary",
+          value: slug ? `${slug}.${location.hostname.split(".").slice(1).join(".") || location.hostname}` : "…",
+          render: () => <LoginLinkCard slug={slug} />,
+        },
+        {
+          key: "screen", label: "The sign-in screen", icon: Palette, tone: "cardio",
+          value: !canBrand ? "In the branding add-on" : customised ? `${customised} of 3 customised` : "Kova's default copy",
+          render: () => canBrand
+            ? <LoginCustomizeSection initial={login} logoUrl={branding?.logoUrl ?? null} onSaved={onSaved} />
+            : <p className="px-1 text-sm text-muted-foreground">Your own copy, a hero image and a branded domain are part of the branding add-on.</p>,
+        },
+        {
+          key: "domain", label: "Your own domain", icon: Globe, tone: "sleep",
+          value: !canBrand ? "In the branding add-on" : "Point a domain you own at your studio",
+          render: () => canBrand
+            ? <DomainSection />
+            : <p className="px-1 text-sm text-muted-foreground">Using your own domain is part of the branding add-on.</p>,
+        },
+      ]}
+    />
   );
 }
 
@@ -476,7 +508,6 @@ function LoginLinkCard({ slug }: { slug: string | null }) {
   const copy = () => void navigator.clipboard?.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); });
   return (
     <section>
-      <SectionHead title="Login link" icon={LogIn} />
       <Card className="space-y-3">
         <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><LogIn /></div><div><div className="font-medium">Your sign-in link</div><div className="text-sm text-muted-foreground">Share this with clients — it opens a sign-in screen wearing your brand.</div></div></div>
         <div className="flex items-center gap-2 rounded-xl bg-surface-2 p-2 pl-3.5">
@@ -529,7 +560,6 @@ function LoginCustomizeSection({ initial, logoUrl, onSaved }: { initial: LoginBr
 
   return (
     <section>
-      <SectionHead title="Sign-in screen" icon={Palette} />
       <Card className="space-y-5">
         <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Palette /></div><div><div className="font-medium">Make it yours</div><div className="text-sm text-muted-foreground">Your words and your image on the screen clients land on.</div></div></div>
 
@@ -777,7 +807,6 @@ function EmailTemplatesSection() {
 
   return (
     <section className="space-y-3">
-      <SectionHead title="Email templates" icon={Mail} />
       <Card className="space-y-2">
         <div className="text-sm font-medium">Signature</div>
         <p className="text-xs text-muted-foreground">Appended to the footer of every email your studio sends.</p>
@@ -860,7 +889,6 @@ function NotificationPolicySection() {
   const isStaff = (roles: string[]) => roles.some((r) => r !== "client");
   return (
     <section>
-      <SectionHead title="Email notifications policy" icon={Bell} />
       {error && !data ? <LoadError label="your email policy" error={typeof error === "string" ? error : null} onRetry={() => void load()} /> : (
       <Card className="p-0">
         <p className="px-4 pt-4 text-sm text-muted-foreground">Choose which notifications may be emailed — separately for your clients and your staff. Turning one off keeps it in the in-app inbox but never emails it; people still tune their own preferences within what you allow here.</p>
@@ -887,6 +915,64 @@ function NotificationPolicySection() {
 }
 
 /** Owner: how the studio sends email — the metered platform sender or your Brevo. */
+/**
+ * Email — three settings stacked on one page, now three pages.
+ *
+ * Delivery, notification policy and templates each loaded independently and
+ * rendered one after another, so the page ran to nearly a megabyte of
+ * screenshot and an owner checking "can my studio send email at all" had to
+ * scroll past the whole thing to find out.
+ *
+ * The split does ONE read here and derives all three rows' values from it —
+ * both `/api/settings` reads are the same request, so this costs a fetch and
+ * saves two. Each sub-page still owns its own state and its own save; nothing
+ * here is a shared form, so `SectionSplit` gets no footer.
+ */
+function MessagingSettings() {
+  const [cfg, setCfg] = useState<{
+    email: { provider: string; senderEmail: string; ready: boolean };
+    notifCategories: NotifCat[]; notifPolicy: AudiencePolicy;
+  } | null>(null);
+  const [tpl, setTpl] = useState<{ templates: EmailTemplate[] } | null>(null);
+  useEffect(() => {
+    void api.get<typeof cfg & object>("/api/settings").then(setCfg).catch(() => undefined);
+    void api.get<{ templates: EmailTemplate[] }>("/api/email-templates").then(setTpl).catch(() => undefined);
+  }, []);
+
+  const deliveryValue = !cfg ? "…"
+    : !cfg.email.ready ? "Not set up — nothing can be sent"
+    : `${cfg.email.provider === "platform" ? "Sent by Kova" : "Your own sender"}${cfg.email.senderEmail ? ` · ${cfg.email.senderEmail}` : ""}`;
+
+  const policyValue = (() => {
+    if (!cfg) return "…";
+    const cats = cfg.notifCategories ?? [];
+    const on = (a: "client" | "staff") => cats.filter((c) => cfg.notifPolicy?.[a]?.[c.key] !== false).length;
+    return cats.length ? `${on("client")}/${cats.length} to clients · ${on("staff")}/${cats.length} to staff` : "Every kind allowed";
+  })();
+
+  /* `customized` is the server's own flag for "the owner rewrote this one".
+     Counting templates that merely HAVE a subject counted the defaults too, so
+     a studio that had changed nothing was told it had rewritten all thirty. */
+  const tplValue = !tpl ? "…"
+    : (() => {
+        const edited = tpl.templates.filter((t) => t.customized).length;
+        const off = tpl.templates.filter((t) => !t.enabled).length;
+        if (!edited && !off) return "All using Kova's wording";
+        return [edited ? `${edited} rewritten` : null, off ? `${off} muted` : null].filter(Boolean).join(" · ");
+      })();
+
+  return (
+    <SectionSplit
+      param="m"
+      subs={[
+        { key: "delivery", label: "Who it comes from", icon: Mail, tone: "cardio", value: deliveryValue, render: () => <EmailSection /> },
+        { key: "policy", label: "What may be emailed", icon: Bell, tone: "activity", value: policyValue, render: () => <NotificationPolicySection /> },
+        { key: "templates", label: "What it says", icon: PencilLine, tone: "nutrition", value: tplValue, render: () => <EmailTemplatesSection /> },
+      ]}
+    />
+  );
+}
+
 function EmailSection() {
   const [cfg, setCfg] = useState<{ email: { provider: string; senderEmail: string; senderName: string; brevoKeySet: boolean; ready: boolean }; emailPlatformFrom: string; emailCreditsEach: number } | null>(null);
   const [brevoKey, setBrevoKey] = useState("");
@@ -907,7 +993,6 @@ function EmailSection() {
   // a broken load from a section they'd never been given.
   if (error && !cfg) return (
     <section>
-      <SectionHead title="Email delivery" icon={Mail} />
       <LoadError label="your email delivery settings" error={typeof error === "string" ? error : null} onRetry={() => void load()} />
     </section>
   );
@@ -927,7 +1012,6 @@ function EmailSection() {
   };
   return (
     <section>
-      <SectionHead title="Email delivery" icon={Mail} />
       <Card className="space-y-3">
         <SegmentedControl
           options={[{ value: "platform", label: "Kova" }, { value: "brevo", label: "Brevo" }, { value: "off", label: "Off" }]}
@@ -1389,7 +1473,6 @@ function DomainSection() {
 
   return (
     <section>
-      <SectionHead title="Custom domain" icon={Globe} />
       {loadFailed && !domains ? <LoadError label="your custom domains" error={typeof loadFailed === "string" ? loadFailed : null} onRetry={() => void load()} /> : (
       <Reveal loading={!domains} skeleton={
         <Card className="space-y-4">

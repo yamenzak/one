@@ -493,9 +493,18 @@ The shape every phone OS converged on, and why each half works:
   level down. The studio's Brand section is the case that proves it: 5,599px in
   a single card became five rows reading "Emerald · Brand surfaces", "0.95rem
   corners · Soft · Hairline", "Tab bar and page wash".
-- **A split section keeps ONE save.** The form state is shared and the submit is
-  reachable from every sub-page. Giving each sub-page its own save would let a
-  half-applied theme exist, which is worse than a long page ever was.
+- **A split section keeps ONE save** *when it had one*. Brand's five sub-pages
+  share a form, so the submit is reachable from every one of them — splitting it
+  would let a half-applied theme exist. Sections whose parts save independently
+  (Email's three, Sign-in's three) get no shared footer, because there is no
+  shared state to half-apply. `SectionSplit` takes the footer as a prop for
+  exactly this reason.
+- **Derive the row's value from the real flag, not from a lookalike.** The email
+  templates row counted every template that HAD a subject — which is all of
+  them, from the defaults — and told a studio that had changed nothing it had
+  rewritten all thirty. The server already sends `customized`. A value that is
+  confidently wrong is worse than no value: it is the only thing on the row, so
+  there is nothing to contradict it.
 - **One header per screen.** When a surface renders its own back + title for a
   section, its container must not render another — the two stack into a pair of
   back buttons, one of which goes somewhere the user did not ask for.
