@@ -906,6 +906,39 @@ invisible cursor.
 `isBlank(v)` is the shared predicate — `null`, `undefined` or `""`, and
 deliberately **not** `0`.
 
+### Tiles — `tiles.tsx`
+
+The shapes a placed widget can take in a hero grid. The grid is 2 columns × 3
+rows; `TILE_FOOTPRINT` is the single source of truth for how much of it each
+form occupies, read by the packer, the renderer AND the builder's preview, so
+the three cannot drift.
+
+| Component | Footprint | Use it when | Do NOT use it for | State |
+|---|---|---|---|---|
+| `TileCard` | 1 × 1 | A compact labelled number. | A value that needs a shape to be read. | ✅ |
+| `TileStat` | 1 × 2 | A number with **no denominator**. | Anything with a target — that is a ring. | ✅ |
+| `TileRing` | 1 × 3 | A value against a target. | A target-less number. See below. | ✅ |
+| `TileTrend` | 2 × 1 | A direction over time. | Fewer than 2 points — it renders `NoData`. | ✅ |
+| `TileBars` | 2 × 1 | A handful of discrete periods. | A continuous series — that is a trend. | ✅ |
+| `TileWeek` | 2 × 1 | Which days of a week are done. | Any other period. | ✅ |
+
+**`TileStat` exists because of `progress={0.001}`.** Every target-less metric —
+weight change, calories burned, sets logged, body fat, pending labs, and all
+eight coach roster counts — was drawn as a ring with a token progress value, to
+borrow the ring's size without claiming a target. But a ring IS a claim that
+there is a whole to fill, and an always-empty one is indistinguishable from a
+real target the client is failing. A number with no denominator now gets a form
+that does not draw one.
+
+**A widget declares which forms suit it**, and the picker only offers those, so
+the rule above is structural rather than a convention to remember: a metric with
+no target has no `ring` in its `forms`, and there is no way to select one.
+
+**A form the page cannot fit is offered greyed, with the reason.** `fits()`
+answers whether a form still has room; a disabled chip with no explanation is a
+dead end (switch a ring to a card and the way back becomes invisible), so the
+toolbar says what would free the space instead.
+
 ### Dates — `dates.tsx`
 
 | Component | Use it when | Do NOT use it for | State |

@@ -2837,6 +2837,38 @@ describe("client preferences + body metrics + goal staleness", () => {
     expect(await on("2025-12-01")).toBeUndefined();
   });
 
+  it("Today bundle's widget metrics are read for the requested day, not for today", async () => {
+    // The regression: home widgets used to fetch for themselves, and a widget
+    // that fetches is a widget that picks its own date — the supplements tile
+    // asked for todayLocal() whatever day the picker was on, and body fat took
+    // the newest scan even on a day before that scan happened.
+    const id = await mkClient();
+    const D1 = "2026-05-10";
+    const D2 = "2026-05-11";
+
+    await SELF.fetch(`${ORIGIN}/api/logs/sleep`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, data: { date: D1, durationMinutes: 450, quality: 4 } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/mood`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, data: { date: D1, mood: 4, energy: 3, stress: 2 } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/activity`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, data: { date: D1, activityKey: "running", durationMin: 30, calories: 300 } }) });
+
+    const bundle = async (date: string) =>
+      (await (await SELF.fetch(`${ORIGIN}/api/today?clientId=${id}&date=${date}`, { headers: H() })).json()) as {
+        metrics: { sleepHours: number | null; mood: number | null; stress: number | null; activeMinutes: number } | null;
+      };
+
+    const day1 = await bundle(D1);
+    expect(day1.metrics?.sleepHours).toBe(7.5); // 450 min
+    expect(day1.metrics?.mood).toBe(4);
+    expect(day1.metrics?.stress).toBe(2);
+    expect(day1.metrics?.activeMinutes).toBe(30);
+
+    // The very next day has none of it — nothing leaks across the date boundary,
+    // and "nothing recorded" is null (not 0), so the tile renders NoData.
+    const day2 = await bundle(D2);
+    expect(day2.metrics?.sleepHours).toBeNull();
+    expect(day2.metrics?.mood).toBeNull();
+    expect(day2.metrics?.activeMinutes).toBe(0);
+  });
+
   it("Today bundle reports profile completeness", async () => {
     const id = await mkClient();
     const before = (await (await SELF.fetch(`${ORIGIN}/api/today?clientId=${id}&date=2026-01-10`, { headers: H() })).json()) as { profile: { complete: boolean; gaps: string[] } };

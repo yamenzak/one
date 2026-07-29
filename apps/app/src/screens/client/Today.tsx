@@ -14,7 +14,7 @@ import { useSession } from "../../session.js";
 import { usePasskey } from "../../PasskeyPrompt.js";
 import { LogSheet } from "./LogSheet.js";
 import { LogDetailSheet } from "./LogDetail.js";
-import { WidgetCarousel, WidgetCustomizeSheet } from "../widget-kit.js";
+import { WidgetCarousel, WidgetBuilder } from "../widget-kit.js";
 import { CLIENT_WIDGETS, DEFAULT_CLIENT_WIDGETS, type ClientWidgetData } from "./HomeWidgets.js";
 import { TodayAgenda, fetchAgenda, type AgendaData } from "./TodayAgenda.js";
 import { CoachNote } from "./CoachNote.js";
@@ -26,8 +26,19 @@ export interface TodayBundle {
   nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number };
   waterMl: number;
   burnedKcal: number;
-  workout: { loggedSets: number; sessions: unknown[] };
+  workout: { loggedSets: number; tonnageKg?: number; sessions: unknown[] };
   checkedIn: boolean;
+  /** Day-scoped metrics for the home widgets — see the route comment. `null`
+   *  means nothing recorded and must reach the value slot as `null` (§5). */
+  metrics?: {
+    sleepHours: number | null; sleepQuality: number | null;
+    mood: number | null; energy: number | null; stress: number | null;
+    steps: number | null; activeMinutes: number; activityCount: number;
+    bodyFatPercent: number | null; bodyFatPrev: number | null;
+    waistCm: number | null; chestCm: number | null; hipsCm: number | null;
+    postureSeverity: string | null; somatotype: string | null;
+    supplementsTaken: number; supplementsTotal: number;
+  } | null;
   goal: { targets: Record<string, number> | null; weeklyLoadTarget: number | null } | null;
   publishedWorkoutPlan: { id: string; name: string; body: { days: { name: string; isRestDay?: boolean }[] } } | null;
   checkInDates?: string[];
@@ -146,8 +157,31 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   // customize picker self-discover from the same records the routes enforce.
   const widgetCatalog = useMemo(() => {
     const features = ctx?.entitlements?.features;
+    const flags = ctx?.clientFlags;
     if (!features) return CLIENT_WIDGETS;
-    return CLIENT_WIDGETS.filter((w) => !w.feature || featureEnabled(w.feature, { features, clientFlags: ctx?.clientFlags }));
+    /**
+     * A widget's LANE must be part of what the client actually bought.
+     *
+     * The per-widget `feature` key already gates the individual capability, but
+     * a studio sells coaching in two halves — the access economy carries
+     * separate `workout` and `meal` budgets — and a client on a training-only
+     * package was still offered nutrition tiles. An empty tile for something
+     * you were never sold reads as a broken app, not as a thing you can buy.
+     *
+     * A lane asks for ANY capability on that side rather than plan access
+     * specifically, so a client who self-logs food without following a meal
+     * plan keeps their own numbers. With no flags resolved yet, nothing is
+     * hidden — absence of data is not evidence of absence of access.
+     */
+    const laneOpen = (lane: "meal" | "workout") => {
+      if (!flags) return true;
+      return lane === "meal"
+        ? flags.canAccessMealPlan || flags.canLogOwnFood
+        : flags.canAccessWorkoutPlan || flags.canLogExtraWorkouts;
+    };
+    return CLIENT_WIDGETS.filter(
+      (w) => (!w.feature || featureEnabled(w.feature, { features, clientFlags: flags })) && (!w.lane || laneOpen(w.lane)),
+    );
   }, [ctx?.entitlements?.features, ctx?.clientFlags]);
 
   const saveWidgets = async (items: WidgetItem[]) => {
@@ -187,7 +221,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   useEffect(() => { setData(null); setAgenda(null); setFeed(null); void load(); }, [load, reloadKey]);
 
   const targets = data?.goal?.targets ?? null;
-  const widgetData: ClientWidgetData | null = data ? { clientId, units, bundle: data } : null;
+  const widgetData: ClientWidgetData | null = data ? { clientId, units, bundle: data, isToday } : null;
 
   /**
    * The anchor value: energy taken in, net of what was burned, against target.
@@ -449,7 +483,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
       {detail && <LogDetailSheet kind={detail.kind} ref={detail.ref} onClose={() => setDetail(null)} />}
       <LogSheet open={logOpen} onClose={() => setLogOpen(false)} clientId={clientId} onLogged={() => void load()} />
       {checkInOpen && <LogSheet open initialKind="checkin" onClose={() => setCheckInOpen(false)} clientId={clientId} onLogged={() => { setCheckInOpen(false); void load(); }} />}
-      {widgetsOpen && <WidgetCustomizeSheet catalog={widgetCatalog} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
+      {widgetsOpen && widgetData && <WidgetBuilder data={widgetData} catalog={widgetCatalog} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
     </Page>
   );
 }

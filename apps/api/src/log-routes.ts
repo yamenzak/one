@@ -1374,7 +1374,7 @@ export const logRoutes = new Hono<AppEnv>()
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
     const db = c.env.DB;
-    const [food, water, workout, activities, checkIn, timeline, plans, checkInDates, pendingLabs, weights] = await Promise.all([
+    const [food, water, workout, activities, checkIn, timeline, plans, checkInDates, pendingLabs, weights, sleep, mood, bodyMeasures, scans, suppTaken, supps] = await Promise.all([
       db
         .prepare(
           "SELECT COALESCE(SUM(calories),0) AS calories, COALESCE(SUM(protein_g),0) AS protein, COALESCE(SUM(carbs_g),0) AS carbs, COALESCE(SUM(fat_g),0) AS fat, MAX(target_calories) AS day_target_cal FROM food_entries WHERE client_id = ? AND date_local = ?",
@@ -1390,13 +1390,13 @@ export const logRoutes = new Hono<AppEnv>()
         .bind(clientId, date)
         .all<{ id: string; workout_plan_id: string; plan_day_index: number; entries_json: string | null; session_calories: number | null }>(),
       db
-        .prepare("SELECT COALESCE(SUM(calories),0) AS burned FROM activity_logs WHERE client_id = ? AND date_local = ?")
+        .prepare("SELECT COALESCE(SUM(calories),0) AS burned, COALESCE(SUM(duration_min),0) AS minutes, COUNT(*) AS n FROM activity_logs WHERE client_id = ? AND date_local = ?")
         .bind(clientId, date)
-        .first<{ burned: number }>(),
+        .first<{ burned: number; minutes: number; n: number }>(),
       db
-        .prepare("SELECT id FROM check_ins WHERE client_id = ? AND date_local = ?")
+        .prepare("SELECT id, mood, energy, stress, sleep_quality, sleep_hours, steps_count FROM check_ins WHERE client_id = ? AND date_local = ?")
         .bind(clientId, date)
-        .first<{ id: string }>(),
+        .first<{ id: string; mood: number | null; energy: number | null; stress: number | null; sleep_quality: number | null; sleep_hours: number | null; steps_count: number | null }>(),
       loadGoalTimeline(db, clientId),
       db
         // Resolve the published workout plan for the lane the client is on.
@@ -1404,17 +1404,53 @@ export const logRoutes = new Hono<AppEnv>()
         .bind(clientId, access.client.current_variant_id ?? null)
         .all<{ id: string; name: string; status: string; published_at: string; body_json: string | null }>(),
       db
-        .prepare("SELECT date_local FROM check_ins WHERE client_id = ? ORDER BY date_local DESC LIMIT 30")
-        .bind(clientId)
+        // `<= date`, like every other read here. Unbounded, the streak and the
+        // week dots for a day in the past were computed from check-ins that had
+        // not happened yet on that day.
+        .prepare("SELECT date_local FROM check_ins WHERE client_id = ? AND date_local <= ? ORDER BY date_local DESC LIMIT 30")
+        .bind(clientId, date)
         .all<{ date_local: string }>(),
       db
         .prepare("SELECT COUNT(*) AS n FROM lab_tests WHERE client_id = ? AND status IN ('requested','scheduled')")
         .bind(clientId)
         .first<{ n: number }>(),
       db
-        .prepare("SELECT weight_kg, date_local FROM measurements WHERE client_id = ? AND weight_kg IS NOT NULL ORDER BY date_local DESC LIMIT 30")
-        .bind(clientId)
+        // Same: the 7-day weight trend on a past day was reading FUTURE weigh-ins.
+        .prepare("SELECT weight_kg, date_local FROM measurements WHERE client_id = ? AND weight_kg IS NOT NULL AND date_local <= ? ORDER BY date_local DESC LIMIT 30")
+        .bind(clientId, date)
         .all<{ weight_kg: number; date_local: string }>(),
+      // ── Day-scoped extras for the home widgets ──────────────────────────────
+      // Everything below is keyed on `date` (or "latest AS OF date"), because a
+      // widget that self-fetches is a widget that ignores the day you are
+      // looking at — which is precisely how the hero drifted out of sync with
+      // its own date picker.
+      db
+        .prepare("SELECT duration_minutes, quality FROM sleep_logs WHERE client_id = ? AND date_local = ?")
+        .bind(clientId, date)
+        .first<{ duration_minutes: number | null; quality: number | null }>(),
+      db
+        .prepare("SELECT mood, energy, stress FROM mood_logs WHERE client_id = ? AND date_local = ?")
+        .bind(clientId, date)
+        .first<{ mood: number | null; energy: number | null; stress: number | null }>(),
+      db
+        .prepare("SELECT body_fat_percent, waist_cm, chest_cm, hips_cm, date_local FROM measurements WHERE client_id = ? AND date_local <= ? AND body_fat_percent IS NOT NULL ORDER BY date_local DESC LIMIT 2")
+        .bind(clientId, date)
+        .all<{ body_fat_percent: number | null; waist_cm: number | null; chest_cm: number | null; hips_cm: number | null; date_local: string }>(),
+      db
+        .prepare("SELECT body_fat_percent, posture_severity, somatotype, date_local FROM body_scans WHERE client_id = ? AND date_local <= ? ORDER BY date_local DESC LIMIT 2")
+        .bind(clientId, date)
+        .all<{ body_fat_percent: number | null; posture_severity: string | null; somatotype: string | null; date_local: string }>(),
+      db
+        .prepare("SELECT COUNT(*) AS n FROM supplement_logs WHERE client_id = ? AND date_local = ?")
+        .bind(clientId, date)
+        .first<{ n: number }>(),
+      db
+        // Scoped to the day as well: a supplement prescribed after `date`, or
+        // already ended before it, was not part of that day's regimen and must
+        // not inflate its denominator.
+        .prepare("SELECT schedule_json FROM supplements WHERE client_id = ? AND status = 'active' AND (start_date IS NULL OR start_date <= ?) AND (end_date IS NULL OR end_date >= ?)")
+        .bind(clientId, date, date)
+        .all<{ schedule_json: string | null }>(),
     ]);
 
     // Access lifecycle — powers the client's no-plan / expiring / expired /
@@ -1453,6 +1489,32 @@ export const logRoutes = new Hono<AppEnv>()
       (n, row) => n + (row.session_calories ?? 0),
       0,
     );
+    // Volume lifted on this day, kg. `sessionTonnage` is the same pure helper the
+    // strength report uses, so the hero widget and the report can never disagree.
+    const workoutTonnage = Math.round(
+      (workout.results ?? []).reduce(
+        (n, row) => n + sessionTonnage(parseJson<SessionEntry[]>(row.entries_json, []).flatMap((e) => e.sets)),
+        0,
+      ),
+    );
+    const suppSlots = (supps.results ?? []).reduce(
+      (n, r) => n + Math.max(1, parseJson<{ slot: string }[]>(r.schedule_json, []).length),
+      0,
+    );
+    const measureNow = (bodyMeasures.results ?? [])[0] ?? null;
+    const measurePrev = (bodyMeasures.results ?? [])[1] ?? null;
+    const scanNow = (scans.results ?? [])[0] ?? null;
+    const scanPrev = (scans.results ?? [])[1] ?? null;
+    // Body fat has two possible sources — a manual measurement and a camera scan.
+    // Prefer whichever is NEARER the day being viewed rather than always
+    // preferring one kind, so the number tracks the day instead of the method.
+    const bfPick = (m: { body_fat_percent: number | null; date_local: string } | null, sc: { body_fat_percent: number | null; date_local: string } | null) => {
+      const cands = [m, sc].filter((x): x is { body_fat_percent: number | null; date_local: string } => !!x && x.body_fat_percent != null);
+      if (!cands.length) return null;
+      return cands.reduce((a, b) => (a.date_local >= b.date_local ? a : b));
+    };
+    const bfNow = bfPick(measureNow, scanNow);
+    const bfPrev = bfPick(measurePrev, scanPrev);
 
     return c.json({
       date,
@@ -1464,8 +1526,40 @@ export const logRoutes = new Hono<AppEnv>()
       },
       waterMl: water?.total_ml ?? 0,
       burnedKcal: sessionOverride > 0 ? sessionOverride : Math.round(activities?.burned ?? 0),
-      workout: { loggedSets: workoutSets, sessions: workout.results ?? [] },
+      workout: { loggedSets: workoutSets, tonnageKg: workoutTonnage, sessions: workout.results ?? [] },
       checkedIn: Boolean(checkIn),
+      /**
+       * Everything the home widgets need, resolved FOR `date`.
+       *
+       * It lives in the bundle rather than in each widget because the widgets
+       * that fetched for themselves are exactly the ones that ignored the date
+       * picker: the supplements widget asked for `todayLocal()` no matter which
+       * day you were on, and body fat took the newest scan even when you were
+       * looking at a day before it happened. A widget cannot get the day wrong
+       * if it is never the thing that chooses the day.
+       *
+       * `null` means "nothing recorded" and is passed through as `null` all the
+       * way to the value slot, so §5's NoData path renders instead of a zero.
+       */
+      metrics: {
+        sleepHours: sleep?.duration_minutes != null ? Math.round((sleep.duration_minutes / 60) * 10) / 10 : checkIn?.sleep_hours ?? null,
+        sleepQuality: sleep?.quality ?? checkIn?.sleep_quality ?? null,
+        mood: mood?.mood ?? checkIn?.mood ?? null,
+        energy: mood?.energy ?? checkIn?.energy ?? null,
+        stress: mood?.stress ?? checkIn?.stress ?? null,
+        steps: checkIn?.steps_count ?? null,
+        activeMinutes: Math.round(activities?.minutes ?? 0),
+        activityCount: activities?.n ?? 0,
+        bodyFatPercent: bfNow?.body_fat_percent ?? null,
+        bodyFatPrev: bfPrev?.body_fat_percent ?? null,
+        waistCm: measureNow?.waist_cm ?? null,
+        chestCm: measureNow?.chest_cm ?? null,
+        hipsCm: measureNow?.hips_cm ?? null,
+        postureSeverity: scanNow?.posture_severity ?? null,
+        somatotype: scanNow?.somatotype ?? null,
+        supplementsTaken: suppTaken?.n ?? 0,
+        supplementsTotal: suppSlots,
+      },
       // The goal IN FORCE ON `date`, not the goal in force now.
       //
       // This route used to read `WHERE status = 'active'` with no date bound —

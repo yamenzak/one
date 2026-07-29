@@ -79,11 +79,27 @@ export interface LoginBranding {
   showPasskey?: boolean | null;
 }
 
-/** A placed home widget: which widget, and whether it renders as a big ring
- *  (1 col × 3 rows) or a small card (1 × 1) in the swipeable hero grid. */
+/** How a placed widget draws itself. Footprints live in `@4dl/ui`
+ *  (`TILE_FOOTPRINT`); this is only the stored name. */
+export type WidgetForm = "card" | "stat" | "ring" | "trend" | "bars" | "week";
+
+/** A placed home widget in the swipeable 2 × 3 hero grid. */
 export interface WidgetItem {
   id: string;
-  size: "big" | "small";
+  form?: WidgetForm;
+  /**
+   * Legacy, read only when `form` is absent: layouts saved before the form set
+   * existed stored a size, where "big" meant the ring and "small" the card.
+   * Kept so an existing client's arrangement survives untouched — it is their
+   * layout, not ours to reset.
+   */
+  size?: "big" | "small";
+  /**
+   * Which page this sits on. Absent on legacy layouts, which are auto-packed in
+   * order; the visual builder always writes it, so what the client arranged is
+   * exactly what renders rather than whatever the packer decided.
+   */
+  page?: number;
 }
 
 /** Per-user home-screen widget layout: ordered placements per surface. */

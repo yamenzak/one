@@ -1,162 +1,352 @@
 /**
- * Client home widgets — the metrics that fill the swipeable Today hero. Each has
- * a big ring (1×3) and a small card (1×1) form, tone-coded to its metric and
- * formatted in the user's units. The live fasting tracker is interactive.
+ * Client home widgets — the catalogue behind the swipeable Today hero.
+ *
+ * Three rules this file exists to hold, each from a defect the old catalogue
+ * shipped with:
+ *
+ * 1. **A widget declares which FORMS suit it, and a metric with no target does
+ *    not offer a ring.** Weight change, calories burned, sets, body fat and
+ *    labs were all drawn as rings with `progress={0.001}` — a ring is a claim
+ *    that there is a whole to fill, and an always-empty one is indistinguishable
+ *    from a target the client is failing. Those metrics now offer `stat`, which
+ *    draws a number and no denominator.
+ *
+ * 2. **Nothing here duplicates a fixed surface.** Today's anchor owns calories
+ *    and the `MacroBar` beneath it owns protein/carbs/fat, so the carousel
+ *    offers none of the four. The DEFAULTS were fixed for this once; the
+ *    CATALOGUE was not, so any client could re-add protein and see it three
+ *    times in 200px — ring, pill, and the macro bar's own chip.
+ *
+ * 3. **Every value is read for the day being viewed.** Widgets used to fetch
+ *    for themselves, and a widget that fetches is a widget that picks its own
+ *    date: the supplements tile asked for `todayLocal()` no matter which day
+ *    the picker was on, and body fat took the newest scan even on a day before
+ *    that scan happened. Everything now comes from `bundle.metrics`, which the
+ *    route resolves FOR the requested date.
+ *
+ * The live fasting tracker is the one deliberate exception to (3) — a running
+ * fast is a property of NOW, not of the day you are reading, so it hides itself
+ * on any day but today rather than pretending to be historical.
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { currentStreak, fmtVolume, fmtEnergy, kcalToDisplay, kgToDisplay, weightLabel, energyLabel, type UnitPrefs } from "@kova/domain";
-import { Chip, Button, IconBadge, ProgressRing, Timer, FlaskConical, Pill, HeartPulse } from "@4dl/ui";
+import { currentStreak, fmtVolume, kcalToDisplay, kgToDisplay, weightLabel, energyLabel, fmtLength, lengthLabel, type UnitPrefs } from "@kova/domain";
+import {
+  Chip, Button, IconBadge, ProgressRing, TileCard, TileStat, TileRing, TileTrend, TileWeek,
+  Timer, FlaskConical, Pill, HeartPulse, Footprints, Ruler, Activity, Dumbbell, ClipboardList,
+  type TileForm, type Tone, type LucideIcon,
+} from "@4dl/ui";
+import type { FeatureKey } from "@kova/domain";
 import { METRICS, FASTING_ZONES } from "../../registry/index.js";
-import { api, todayLocal } from "../../api.js";
-import { RingCard, MiniCard, type WidgetDef, type WidgetSize } from "../widget-kit.js";
+import { api } from "../../api.js";
 import type { TodayBundle } from "./Today.js";
 
-export interface ClientWidgetData { clientId: string; units: UnitPrefs; bundle: TodayBundle }
+export interface ClientWidgetData { clientId: string; units: UnitPrefs; bundle: TodayBundle; isToday: boolean }
 
 /**
- * The default carousel: **everything Today does not already show.**
+ * Which half of a coaching package a widget belongs to.
  *
- * Today's spine is calories (the anchor) and the macro split (the `MacroBar`
- * directly beneath it). The old defaults led with protein at BOTH sizes — a big
- * ring and a small pill — so with real data the screen rendered protein three
- * times inside 200px: ring, pill, and then the macro bar's own protein chip.
- * That is unmistakable on a populated account and invisible on an empty one,
- * which is how it survived the rewrite.
+ * A studio can sell a workout-only or a meal-only package (the access economy
+ * carries separate `workout` and `meal` budgets), and a client on one should not
+ * be shown the other half's metrics — an empty "Meals logged" tile on a
+ * training-only package reads as a bug in the app rather than as a thing they
+ * did not buy.
  *
- * So the split is now clean and stateable in one line: the anchor owns
- * calories, the macro bar owns protein/carbs/fat, and the carousel owns
- * everything else. Anyone who already customised keeps their own layout —
- * `resolveItems` only falls back to these when nothing is saved.
+ * A lane asks for ANY capability in that half, not plan access specifically:
+ * a client who self-logs food without following a meal plan still has a
+ * nutrition side to their package and should keep their own numbers.
  */
-export const DEFAULT_CLIENT_WIDGETS: { id: string; size: WidgetSize }[] = [
-  { id: "water", size: "big" },
-  { id: "burned", size: "small" },
-  { id: "streak", size: "small" },
-  { id: "weight", size: "small" },
-  { id: "fasting", size: "big" },
+export type WidgetLane = "meal" | "workout";
+
+export interface ClientWidgetDef {
+  id: string;
+  title: string;
+  /** One line in the picker, so a client knows what they are adding. */
+  blurb: string;
+  icon: LucideIcon;
+  tone: Tone;
+  /** The forms this metric can honestly take. First is the default. */
+  forms: TileForm[];
+  render: (form: TileForm, d: ClientWidgetData) => React.ReactNode;
+  /** Data-driven visibility — hide when there is structurally nothing to show. */
+  available?: (d: ClientWidgetData) => boolean;
+  feature?: FeatureKey;
+  lane?: WidgetLane;
+}
+
+/**
+ * The default carousel: everything Today does not already show.
+ *
+ * The anchor owns calories, the macro bar owns protein/carbs/fat, and the
+ * carousel owns everything else. Anyone who already customised keeps their own
+ * layout — defaults only apply when nothing is saved.
+ */
+export const DEFAULT_CLIENT_WIDGETS: { id: string; form: TileForm; page: number }[] = [
+  { id: "water", form: "ring", page: 0 },
+  { id: "burned", form: "card", page: 0 },
+  { id: "steps", form: "card", page: 0 },
+  { id: "sleep", form: "card", page: 0 },
+  { id: "weight", form: "trend", page: 1 },
+  { id: "checkins", form: "week", page: 1 },
+  { id: "streak", form: "card", page: 1 },
+  { id: "sets", form: "card", page: 1 },
 ];
 
 const pad = (n: number) => String(n).padStart(2, "0");
-const ratio = (v: number, t?: number) => (t && t > 0 ? v / t : undefined);
-function weightDelta(series: { kg: number; date: string }[] | undefined, units: UnitPrefs): string | null {
+const ratio = (v: number, t?: number | null) => (t && t > 0 ? v / t : undefined);
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/** Signed, one decimal — for a delta that should read as a direction. */
+const signed = (n: number | null): string | null => (n == null ? null : `${n > 0 ? "+" : ""}${round1(n)}`);
+
+function weightDelta(series: { kg: number; date: string }[] | undefined, units: UnitPrefs): number | null {
   if (!series || series.length < 2) return null;
   const last = series[series.length - 1]!;
   const target = Date.parse(last.date) - 7 * 86400000;
   let ref = series[0]!;
   for (const p of series) if (Math.abs(Date.parse(p.date) - target) < Math.abs(Date.parse(ref.date) - target)) ref = p;
-  const d = Math.round((kgToDisplay(last.kg, units) - kgToDisplay(ref.kg, units)) * 10) / 10;
-  return `${d > 0 ? "+" : ""}${d}`;
+  return round1(kgToDisplay(last.kg, units) - kgToDisplay(ref.kg, units));
 }
 
-export const CLIENT_WIDGETS: WidgetDef<ClientWidgetData>[] = [
+/** The seven days ending on `date`, as ISO strings. */
+function weekEnding(date: string): string[] {
+  const out: string[] = [];
+  const d = new Date(`${date}T00:00:00`);
+  for (let i = 6; i >= 0; i--) {
+    const x = new Date(d);
+    x.setDate(x.getDate() - i);
+    out.push(`${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`);
+  }
+  return out;
+}
+
+/** A 1–5 self-report, rendered as its number over five. */
+const scale5 = (form: TileForm, d: ClientWidgetData, key: "mood" | "energy" | "stress", label: string) => {
+  const m = d.bundle.metrics;
+  const v = m ? m[key] : null;
+  const meta = METRICS[key];
+  if (form === "ring") return <TileRing tone={meta.tone} progress={v != null ? v / 5 : 0.001} value={v ?? null} label={label} sublabel={v != null ? "out of 5" : "not logged"} />;
+  if (form === "stat") return <TileStat icon={meta.icon} tone={meta.tone} label={label} value={v} unit={v != null ? "/5" : undefined} />;
+  return <TileCard icon={meta.icon} tone={meta.tone} label={label} value={v} unit={v != null ? "/5" : undefined} progress={v != null ? v / 5 : undefined} />;
+};
+
+export const CLIENT_WIDGETS: ClientWidgetDef[] = [
+  // ── Hydration ──────────────────────────────────────────────────────────────
   {
-    id: "wellness", title: "Wellness Score", icon: HeartPulse,
-    renderBig: (d) => <WellnessWidget clientId={d.clientId} date={d.bundle.date} size="big" />,
-    renderSmall: (d) => <WellnessWidget clientId={d.clientId} date={d.bundle.date} size="small" />,
+    id: "water", title: "Water", blurb: "How much you've drunk against your target",
+    icon: METRICS.water.icon, tone: METRICS.water.tone, feature: "waterLogging",
+    forms: ["ring", "card", "stat"],
+    render: (form, d) => {
+      const t = d.bundle.goal?.targets?.targetWaterMl ?? 2500;
+      const v = d.bundle.waterMl;
+      if (form === "ring") return <TileRing tone={METRICS.water.tone} progress={v / t} value={fmtVolume(v, d.units)} label="Water" sublabel={`of ${fmtVolume(t, d.units)}`} />;
+      if (form === "stat") return <TileStat icon={METRICS.water.icon} tone={METRICS.water.tone} label="Water" value={fmtVolume(v, d.units)} delta={`of ${fmtVolume(t, d.units)}`} />;
+      return <TileCard icon={METRICS.water.icon} tone={METRICS.water.tone} label="Water" value={fmtVolume(v, d.units)} progress={v / t} />;
+    },
+  },
+
+  // ── Training ───────────────────────────────────────────────────────────────
+  {
+    id: "sets", title: "Sets logged", blurb: "Sets you completed on this day",
+    icon: METRICS.sets.icon, tone: METRICS.sets.tone, feature: "workoutPlan", lane: "workout",
+    // No target, so no ring.
+    forms: ["card", "stat"],
+    render: (form, d) => form === "stat"
+      ? <TileStat icon={METRICS.sets.icon} tone={METRICS.sets.tone} label="Sets logged" value={d.bundle.workout.loggedSets} />
+      : <TileCard icon={METRICS.sets.icon} tone={METRICS.sets.tone} label="Sets logged" value={d.bundle.workout.loggedSets} />,
   },
   {
-    id: "calories", title: "Calories", icon: METRICS.calories.icon, feature: "foodLogging",
-    renderBig: (d) => { const t = d.bundle.goal?.targets?.targetCalories ?? 0; const net = d.bundle.nutrition.calories - d.bundle.burnedKcal; return <RingCard tone={METRICS.calories.tone} progress={t > 0 ? net / t : 0.001} value={kcalToDisplay(Math.max(0, net), d.units).toLocaleString()} label={d.units.energy === "kJ" ? "Energy" : "Calories"} sublabel={t > 0 ? `of ${kcalToDisplay(t, d.units).toLocaleString()} ${energyLabel(d.units)}` : "no target set"} />; },
-    renderSmall: (d) => { const t = d.bundle.goal?.targets?.targetCalories ?? 0; const net = d.bundle.nutrition.calories - d.bundle.burnedKcal; return <MiniCard icon={METRICS.calories.icon} tone={METRICS.calories.tone} label={d.units.energy === "kJ" ? "Energy" : "Calories"} value={kcalToDisplay(Math.max(0, net), d.units).toLocaleString()} progress={ratio(net, t)} />; },
+    id: "tonnage", title: "Volume lifted", blurb: "Total weight moved — reps × load",
+    icon: Dumbbell, tone: "activity", feature: "exerciseReport", lane: "workout",
+    forms: ["stat", "card"],
+    available: (d) => (d.bundle.workout.tonnageKg ?? 0) > 0,
+    render: (form, d) => {
+      const kg = d.bundle.workout.tonnageKg ?? 0;
+      const v = Math.round(kgToDisplay(kg, d.units)).toLocaleString();
+      return form === "card"
+        ? <TileCard icon={Dumbbell} tone="activity" label="Volume" value={v} unit={weightLabel(d.units)} />
+        : <TileStat icon={Dumbbell} tone="activity" label="Volume lifted" value={v} unit={weightLabel(d.units)} />;
+    },
   },
   {
-    id: "protein", title: "Protein", icon: METRICS.protein.icon, feature: "macroBreakdown",
-    renderBig: (d) => { const t = d.bundle.goal?.targets?.targetProteinG; return <RingCard tone={METRICS.protein.tone} progress={ratio(d.bundle.nutrition.proteinG, t) ?? 0.001} value={`${d.bundle.nutrition.proteinG}`} label="Protein" sublabel={t ? `of ${t} g` : "no target set"} />; },
-    renderSmall: (d) => { const t = d.bundle.goal?.targets?.targetProteinG; return <MiniCard icon={METRICS.protein.icon} tone={METRICS.protein.tone} label="Protein" value={d.bundle.nutrition.proteinG} unit="g" progress={ratio(d.bundle.nutrition.proteinG, t)} />; },
+    id: "burned", title: "Calories burned", blurb: "Energy from activities you logged",
+    icon: METRICS.burned.icon, tone: METRICS.burned.tone, feature: "extraWorkouts",
+    forms: ["card", "stat"],
+    render: (form, d) => {
+      const v = kcalToDisplay(d.bundle.burnedKcal, d.units).toLocaleString();
+      return form === "stat"
+        ? <TileStat icon={METRICS.burned.icon} tone={METRICS.burned.tone} label="Burned" value={v} unit={energyLabel(d.units)} />
+        : <TileCard icon={METRICS.burned.icon} tone={METRICS.burned.tone} label="Burned" value={v} unit={energyLabel(d.units)} />;
+    },
   },
   {
-    id: "carbs", title: "Carbs", icon: METRICS.carbs.icon, feature: "macroBreakdown",
-    renderBig: (d) => { const t = d.bundle.goal?.targets?.targetCarbsG; return <RingCard tone={METRICS.carbs.tone} progress={ratio(d.bundle.nutrition.carbsG, t) ?? 0.001} value={`${d.bundle.nutrition.carbsG}`} label="Carbs" sublabel={t ? `of ${t} g` : "no target set"} />; },
-    renderSmall: (d) => { const t = d.bundle.goal?.targets?.targetCarbsG; return <MiniCard icon={METRICS.carbs.icon} tone={METRICS.carbs.tone} label="Carbs" value={d.bundle.nutrition.carbsG} unit="g" progress={ratio(d.bundle.nutrition.carbsG, t)} />; },
+    id: "active", title: "Active minutes", blurb: "Time spent in logged activities",
+    icon: Activity, tone: "cardio", feature: "extraWorkouts",
+    forms: ["card", "stat"],
+    render: (form, d) => {
+      const m = d.bundle.metrics?.activeMinutes ?? 0;
+      const n = d.bundle.metrics?.activityCount ?? 0;
+      return form === "stat"
+        ? <TileStat icon={Activity} tone="cardio" label="Active minutes" value={m} unit="min" delta={n ? `${n} ${n === 1 ? "activity" : "activities"}` : null} />
+        : <TileCard icon={Activity} tone="cardio" label="Active" value={m} unit="min" />;
+    },
   },
   {
-    id: "fat", title: "Fat", icon: METRICS.fat.icon, feature: "macroBreakdown",
-    renderBig: (d) => { const t = d.bundle.goal?.targets?.targetFatG; return <RingCard tone={METRICS.fat.tone} progress={ratio(d.bundle.nutrition.fatG, t) ?? 0.001} value={`${d.bundle.nutrition.fatG}`} label="Fat" sublabel={t ? `of ${t} g` : "no target set"} />; },
-    renderSmall: (d) => { const t = d.bundle.goal?.targets?.targetFatG; return <MiniCard icon={METRICS.fat.icon} tone={METRICS.fat.tone} label="Fat" value={d.bundle.nutrition.fatG} unit="g" progress={ratio(d.bundle.nutrition.fatG, t)} />; },
+    id: "steps", title: "Steps", blurb: "Steps recorded on your check-in",
+    icon: METRICS.steps.icon, tone: METRICS.steps.tone, feature: "checkIns",
+    forms: ["card", "stat"],
+    render: (form, d) => {
+      const v = d.bundle.metrics?.steps ?? null;
+      return form === "stat"
+        ? <TileStat icon={Footprints} tone={METRICS.steps.tone} label="Steps" value={v?.toLocaleString() ?? null} />
+        : <TileCard icon={Footprints} tone={METRICS.steps.tone} label="Steps" value={v?.toLocaleString() ?? null} />;
+    },
+  },
+
+  // ── Body ───────────────────────────────────────────────────────────────────
+  {
+    id: "weight", title: "Weight · 7 days", blurb: "Which way your weight is going",
+    icon: METRICS.weight.icon, tone: METRICS.weight.tone, feature: "measurementLogging",
+    forms: ["trend", "card", "stat"],
+    render: (form, d) => {
+      const delta = weightDelta(d.bundle.weightSeries, d.units);
+      const series = (d.bundle.weightSeries ?? []).map((p) => kgToDisplay(p.kg, d.units));
+      const latest = series.length ? round1(series[series.length - 1]!) : null;
+      if (form === "trend") return <TileTrend icon={METRICS.weight.icon} tone={METRICS.weight.tone} label="Weight" value={latest ?? ""} unit={weightLabel(d.units)} values={series} />;
+      if (form === "stat") return <TileStat icon={METRICS.weight.icon} tone={METRICS.weight.tone} label="Weight" value={latest} unit={weightLabel(d.units)} delta={delta != null ? `${signed(delta)} ${weightLabel(d.units)} in 7 days` : null} deltaGood={null} />;
+      return <TileCard icon={METRICS.weight.icon} tone={METRICS.weight.tone} label="Weight · 7 days" value={signed(delta)} unit={weightLabel(d.units)} />;
+    },
   },
   {
-    id: "water", title: "Water", icon: METRICS.water.icon, feature: "waterLogging",
-    renderBig: (d) => { const t = d.bundle.goal?.targets?.targetWaterMl ?? 2500; return <RingCard tone={METRICS.water.tone} progress={d.bundle.waterMl / t} value={fmtVolume(d.bundle.waterMl, d.units)} label="Water" sublabel={`of ${fmtVolume(t, d.units)}`} />; },
-    renderSmall: (d) => { const t = d.bundle.goal?.targets?.targetWaterMl ?? 2500; return <MiniCard icon={METRICS.water.icon} tone={METRICS.water.tone} label="Water" value={fmtVolume(d.bundle.waterMl, d.units)} progress={d.bundle.waterMl / t} />; },
+    id: "bodyfat", title: "Body fat", blurb: "Your latest estimate and how it moved",
+    icon: METRICS.bodyFat.icon, tone: METRICS.bodyFat.tone, feature: "bodyScan",
+    forms: ["stat", "card"],
+    render: (form, d) => {
+      const m = d.bundle.metrics;
+      const v = m?.bodyFatPercent ?? null;
+      const prev = m?.bodyFatPrev ?? null;
+      const delta = v != null && prev != null ? round1(v - prev) : null;
+      return form === "card"
+        ? <TileCard icon={METRICS.bodyFat.icon} tone={METRICS.bodyFat.tone} label="Body fat" value={v != null ? `${round1(v)}%` : null} />
+        : <TileStat icon={METRICS.bodyFat.icon} tone={METRICS.bodyFat.tone} label="Body fat" value={v != null ? round1(v) : null} unit="%" delta={delta != null ? `${signed(delta)}% vs last` : null} deltaGood={delta != null ? delta < 0 : null} />;
+    },
   },
   {
-    id: "burned", title: "Calories burned", icon: METRICS.burned.icon, feature: "extraWorkouts",
-    renderBig: (d) => <RingCard tone={METRICS.burned.tone} progress={0.001} value={kcalToDisplay(d.bundle.burnedKcal, d.units).toLocaleString()} label="Burned" sublabel={`${energyLabel(d.units)} today`} />,
-    renderSmall: (d) => <MiniCard icon={METRICS.burned.icon} tone={METRICS.burned.tone} label="Burned" value={kcalToDisplay(d.bundle.burnedKcal, d.units).toLocaleString()} unit={energyLabel(d.units)} />,
+    id: "waist", title: "Waist", blurb: "Your most recent waist measurement",
+    icon: Ruler, tone: METRICS.waist.tone, feature: "measurementLogging",
+    forms: ["card", "stat"],
+    available: (d) => d.bundle.metrics?.waistCm != null,
+    render: (form, d) => {
+      const cm = d.bundle.metrics?.waistCm ?? null;
+      const v = cm != null ? fmtLength(cm, d.units, false) : null;
+      return form === "stat"
+        ? <TileStat icon={Ruler} tone={METRICS.waist.tone} label="Waist" value={v} unit={lengthLabel(d.units)} />
+        : <TileCard icon={Ruler} tone={METRICS.waist.tone} label="Waist" value={v} unit={lengthLabel(d.units)} />;
+    },
+  },
+
+  // ── Wellness ───────────────────────────────────────────────────────────────
+  {
+    id: "sleep", title: "Sleep", blurb: "Hours slept, and how it felt",
+    icon: METRICS.sleep.icon, tone: METRICS.sleep.tone, feature: "sleepLogging",
+    forms: ["card", "stat"],
+    render: (form, d) => {
+      const m = d.bundle.metrics;
+      const h = m?.sleepHours ?? null;
+      const q = m?.sleepQuality ?? null;
+      return form === "stat"
+        ? <TileStat icon={METRICS.sleep.icon} tone={METRICS.sleep.tone} label="Sleep" value={h} unit="h" delta={q != null ? `quality ${q}/5` : null} />
+        : <TileCard icon={METRICS.sleep.icon} tone={METRICS.sleep.tone} label="Sleep" value={h} unit={h != null ? "h" : undefined} />;
+    },
+  },
+  { id: "mood", title: "Mood", blurb: "How you rated your mood", icon: METRICS.mood.icon, tone: METRICS.mood.tone, feature: "moodLogging", forms: ["card", "stat", "ring"], render: (f, d) => scale5(f, d, "mood", "Mood") },
+  { id: "energy", title: "Energy", blurb: "How much energy you had", icon: METRICS.energy.icon, tone: METRICS.energy.tone, feature: "moodLogging", forms: ["card", "stat", "ring"], render: (f, d) => scale5(f, d, "energy", "Energy") },
+  { id: "stress", title: "Stress", blurb: "How stressed you felt", icon: METRICS.stress.icon, tone: METRICS.stress.tone, feature: "moodLogging", forms: ["card", "stat", "ring"], render: (f, d) => scale5(f, d, "stress", "Stress") },
+  {
+    id: "wellness", title: "Wellness score", blurb: "Your overall score across every pillar",
+    icon: HeartPulse, tone: "sleep",
+    forms: ["ring", "card"],
+    render: (form, d) => <WellnessWidget clientId={d.clientId} date={d.bundle.date} form={form} />,
+  },
+
+  // ── Consistency ────────────────────────────────────────────────────────────
+  {
+    id: "checkins", title: "Check-in week", blurb: "Which days this week you checked in",
+    icon: ClipboardList, tone: METRICS.streak.tone, feature: "checkIns",
+    forms: ["week"],
+    render: (_f, d) => {
+      const done = new Set(d.bundle.checkInDates ?? []);
+      const days = weekEnding(d.bundle.date);
+      const n = days.filter((x) => done.has(x)).length;
+      return <TileWeek icon={ClipboardList} tone={METRICS.streak.tone} label="Check-ins" value={`${n}/7`} days={days.map((x) => done.has(x))} todayIndex={6} />;
+    },
   },
   {
-    id: "streak", title: "Check-in streak", icon: METRICS.streak.icon,
-    renderBig: (d) => { const v = d.bundle.checkInDates ? currentStreak(new Set(d.bundle.checkInDates), d.bundle.date) : 0; return <RingCard tone={METRICS.streak.tone} progress={Math.min(1, v / 30) || 0.001} value={v} label="Check-ins" sublabel={v === 1 ? "day in a row" : "days in a row"} />; },
-    renderSmall: (d) => <MiniCard icon={METRICS.streak.icon} tone={METRICS.streak.tone} label="Check-in streak" value={d.bundle.checkInDates ? currentStreak(new Set(d.bundle.checkInDates), d.bundle.date) : 0} unit="days" />,
+    id: "streak", title: "Check-in streak", blurb: "Days in a row you've checked in",
+    icon: METRICS.streak.icon, tone: METRICS.streak.tone, feature: "checkIns",
+    forms: ["card", "stat"],
+    render: (form, d) => {
+      const v = d.bundle.checkInDates ? currentStreak(new Set(d.bundle.checkInDates), d.bundle.date) : 0;
+      return form === "stat"
+        ? <TileStat icon={METRICS.streak.icon} tone={METRICS.streak.tone} label="Check-in streak" value={v} unit={v === 1 ? "day" : "days"} />
+        : <TileCard icon={METRICS.streak.icon} tone={METRICS.streak.tone} label="Check-in streak" value={v} unit="days" />;
+    },
+  },
+
+  // ── Supplements & labs ─────────────────────────────────────────────────────
+  {
+    id: "supplements", title: "Supplements", blurb: "How many of the day's doses you took",
+    icon: Pill, tone: "supplement", feature: "supplementsLabs",
+    forms: ["ring", "card"],
+    available: (d) => (d.bundle.metrics?.supplementsTotal ?? 0) > 0,
+    render: (form, d) => {
+      const taken = d.bundle.metrics?.supplementsTaken ?? 0;
+      const total = d.bundle.metrics?.supplementsTotal ?? 0;
+      const p = total ? taken / total : undefined;
+      return form === "ring"
+        ? <TileRing tone="supplement" progress={p ?? 0.001} value={`${taken}/${total}`} label="Supplements" sublabel="taken" />
+        : <TileCard icon={Pill} tone="supplement" label="Supplements" value={`${taken}/${total}`} progress={p} />;
+    },
   },
   {
-    id: "weight", title: "Weight · 7 days", icon: METRICS.weight.icon, feature: "measurementLogging",
-    renderBig: (d) => <RingCard tone={METRICS.weight.tone} progress={0.001} value={weightDelta(d.bundle.weightSeries, d.units)} label="Weight" sublabel={`${weightLabel(d.units)} over 7 days`} />,
-    renderSmall: (d) => <MiniCard icon={METRICS.weight.icon} tone={METRICS.weight.tone} label="Weight · 7 days" value={weightDelta(d.bundle.weightSeries, d.units)} unit={weightLabel(d.units)} />,
+    id: "labs", title: "Labs due", blurb: "Lab tests waiting on you",
+    icon: FlaskConical, tone: "lab", feature: "supplementsLabs",
+    forms: ["card", "stat"],
+    available: (d) => (d.bundle.pendingLabs ?? 0) > 0,
+    render: (form, d) => form === "stat"
+      ? <TileStat icon={FlaskConical} tone="lab" label="Labs due" value={d.bundle.pendingLabs ?? 0} delta="waiting on you" />
+      : <TileCard icon={FlaskConical} tone="lab" label="Labs due" value={d.bundle.pendingLabs ?? 0} />,
   },
+
+  // ── Fasting (live only — see the file header) ───────────────────────────────
   {
-    id: "bodyfat", title: "Body fat", icon: METRICS.bodyFat.icon, feature: "bodyScan",
-    renderBig: (d) => <BodyFatWidget clientId={d.clientId} size="big" />,
-    renderSmall: (d) => <BodyFatWidget clientId={d.clientId} size="small" />,
-  },
-  {
-    id: "sets", title: "Sets logged today", icon: METRICS.sets.icon, feature: "workoutPlan",
-    renderBig: (d) => <RingCard tone={METRICS.sets.tone} progress={0.001} value={d.bundle.workout.loggedSets} label="Sets" sublabel="logged today" />,
-    renderSmall: (d) => <MiniCard icon={METRICS.sets.icon} tone={METRICS.sets.tone} label="Sets logged today" value={d.bundle.workout.loggedSets} />,
-  },
-  {
-    id: "labs", title: "Labs due", icon: FlaskConical, feature: "supplementsLabs",
-    renderBig: (d) => <RingCard tone="lab" progress={0.001} value={d.bundle.pendingLabs ?? 0} label="Labs" sublabel="waiting on you" />,
-    renderSmall: (d) => <MiniCard icon={FlaskConical} tone="lab" label="Labs due" value={d.bundle.pendingLabs ?? 0} />,
-  },
-  {
-    id: "supplements", title: "Supplements today", icon: Pill, feature: "supplementsLabs",
-    renderBig: (d) => <SupplementsWidget clientId={d.clientId} size="big" />,
-    renderSmall: (d) => <SupplementsWidget clientId={d.clientId} size="small" />,
-  },
-  {
-    id: "fasting", title: "Live fasting tracker", icon: Timer, feature: "fastingTimer",
-    renderBig: (d) => <FastingWidget clientId={d.clientId} size="big" />,
-    renderSmall: (d) => <FastingWidget clientId={d.clientId} size="small" />,
+    id: "fasting", title: "Fasting timer", blurb: "Start, watch and end a fast",
+    icon: Timer, tone: "sleep", feature: "fastingTimer",
+    forms: ["ring", "card"],
+    available: (d) => d.isToday,
+    render: (form, d) => <FastingWidget clientId={d.clientId} form={form} />,
   },
 ];
 
-// ── Body fat (self-fetched from the camera/manual scans) ─────────────────────
-function BodyFatWidget({ clientId, size }: { clientId: string; size: WidgetSize }) {
-  const [scans, setScans] = useState<{ bodyFatPercent: number | null }[] | null>(null);
-  useEffect(() => {
-    void api.get<{ scans: { bodyFatPercent: number | null }[] }>(`/api/body-scans?clientId=${clientId}`)
-      .then((r) => setScans(r.scans)).catch(() => setScans([]));
-  }, [clientId]);
-  if (!scans) return <div className="h-full animate-pulse rounded-2xl bg-surface-2" />;
-  const withBf = scans.filter((s) => s.bodyFatPercent != null); // newest-first
-  const latest = withBf[0]?.bodyFatPercent ?? null;
-  const prev = withBf[1]?.bodyFatPercent ?? null;
-  const delta = latest != null && prev != null ? Math.round((latest - prev) * 10) / 10 : null;
-  const sub = latest == null ? "no scans yet" : delta != null ? `${delta > 0 ? "+" : ""}${delta}% vs last` : "estimate";
-  return size === "big"
-    ? <RingCard tone={METRICS.bodyFat.tone} progress={latest != null ? Math.min(1, latest / 40) || 0.001 : 0.001} value={latest != null ? latest.toFixed(1) : null} label="Body fat" sublabel={sub} />
-    : <MiniCard icon={METRICS.bodyFat.icon} tone={METRICS.bodyFat.tone} label="Body fat" value={latest != null ? `${latest.toFixed(1)}%` : null} />;
-}
-
-// ── Wellness Score ───────────────────────────────────────────────────────────
+// ── Wellness score ───────────────────────────────────────────────────────────
 const BAND_LABEL: Record<string, string> = { start: "Just starting", building: "Building", solid: "Solid", strong: "Strong", peak: "Peak" };
 interface ScoreResult { score: number; band: string }
-function WellnessWidget({ clientId, date, size }: { clientId: string; date: string; size: WidgetSize }) {
+function WellnessWidget({ clientId, date, form }: { clientId: string; date: string; form: TileForm }) {
   const [res, setRes] = useState<ScoreResult | null>(null);
-  useEffect(() => { void api.get<ScoreResult>(`/api/wellness/score?clientId=${clientId}&today=${date}`).then(setRes).catch(() => setRes({ score: 0, band: "start" })); }, [clientId, date]);
+  // Keyed on `date`, so stepping through days re-reads rather than showing the
+  // score for whichever day happened to load first.
+  useEffect(() => { setRes(null); void api.get<ScoreResult>(`/api/wellness/score?clientId=${clientId}&today=${date}`).then(setRes).catch(() => setRes({ score: 0, band: "start" })); }, [clientId, date]);
   if (!res) return <div className="h-full animate-pulse rounded-2xl bg-surface-2" />;
-  return size === "big"
-    ? <RingCard tone="sleep" progress={res.score / 100 || 0.001} value={res.score} label="Wellness" sublabel={BAND_LABEL[res.band] ?? "this week"} />
-    : <MiniCard icon={HeartPulse} tone="sleep" label="Wellness" value={res.score} progress={res.score / 100} />;
+  return form === "ring"
+    ? <TileRing tone="sleep" progress={res.score / 100 || 0.001} value={res.score} label="Wellness" sublabel={BAND_LABEL[res.band] ?? "this week"} />
+    : <TileCard icon={HeartPulse} tone="sleep" label="Wellness" value={res.score} progress={res.score / 100} />;
 }
 
 // ── Live fasting tracker ─────────────────────────────────────────────────────
-const ZONES = FASTING_ZONES; // SSOT — @4dl/ui
+const ZONES = FASTING_ZONES;
 interface Fast { activeFast: { started_at: string; target_hours: number } | null }
 
-function FastingWidget({ clientId, size }: { clientId: string; size: WidgetSize }) {
+function FastingWidget({ clientId, form }: { clientId: string; form: TileForm }) {
   const [fast, setFast] = useState<Fast | null>(null);
   const [target, setTarget] = useState(16);
   const [now, setNow] = useState(0);
@@ -176,12 +366,11 @@ function FastingWidget({ clientId, size }: { clientId: string; size: WidgetSize 
 
   if (!fast) return <div className="h-full animate-pulse rounded-2xl bg-surface-2" />;
 
-  if (size === "small") {
-    if (!active) return <MiniCard icon={Timer} tone="sleep" label="Fasting" value="Start 16h" onClick={() => void start(16)} />;
-    return <MiniCard icon={Timer} tone={zone.tone} label={`Fasting · ${zone.label}`} value={<span className="tabular-nums">{h}:{pad(m)}</span>} progress={pct} />;
+  if (form !== "ring") {
+    if (!active) return <TileCard icon={Timer} tone="sleep" label="Fasting" value="Start 16h" onClick={() => void start(16)} />;
+    return <TileCard icon={Timer} tone={zone.tone} label={`Fasting · ${zone.label}`} value={<span className="tabular-nums">{h}:{pad(m)}</span>} progress={pct} />;
   }
 
-  // big (1×3 ring cell) — bare, matching the airy ring widgets
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3">
       {active ? (
@@ -198,23 +387,4 @@ function FastingWidget({ clientId, size }: { clientId: string; size: WidgetSize 
       )}
     </div>
   );
-}
-
-// ── Supplements taken today ──────────────────────────────────────────────────
-interface Supp { id: string; name: string; schedule: { slot: string }[] }
-function SupplementsWidget({ clientId, size }: { clientId: string; size: WidgetSize }) {
-  const [total, setTotal] = useState<number | null>(null);
-  const [taken, setTaken] = useState(0);
-  useEffect(() => {
-    const date = todayLocal();
-    void Promise.all([
-      api.get<{ supplements: Supp[] }>(`/api/supplements?clientId=${clientId}`),
-      api.get<{ taken: { supplement_id: string; slot: string }[] }>(`/api/supplements/logs?clientId=${clientId}&date=${date}`),
-    ]).then(([s, l]) => { setTotal(s.supplements.reduce((n, x) => n + Math.max(1, x.schedule.length), 0)); setTaken(l.taken.length); }).catch(() => setTotal(0));
-  }, [clientId]);
-  const value = total === null ? null : `${taken}/${total}`;
-  const progress = total ? taken / total : undefined;
-  return size === "big"
-    ? <RingCard tone="supplement" progress={progress ?? 0.001} value={value} label="Supplements" sublabel="taken today" />
-    : <MiniCard icon={Pill} tone="supplement" label="Supplements" value={value} progress={progress} />;
 }
