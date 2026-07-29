@@ -281,7 +281,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
                   if (!items.length) return null;
                   return (
                     <div key={g.key}>
-                      <div className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{g.label}</div>
+                      <div className="px-1 pb-1 text-micro uppercase text-muted-foreground">{g.label}</div>
                       <div className="flex flex-wrap gap-1.5">
                         {items.map((a) => {
                           const Icon = activityIcon(a.key);

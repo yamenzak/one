@@ -149,7 +149,7 @@ export function TodayAgenda({ clientId, date, bundle, agenda, onChanged, onNavig
   return (
     <section className="space-y-2">
       <div className="flex items-center justify-between px-1">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today</h3>
+        <h3 className="text-micro uppercase text-muted-foreground">Today</h3>
         <AnimatePresence mode="wait" initial={false}>
           {allDone ? (
             <motion.span key="done" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ type: "spring", stiffness: 520, damping: 24 }} className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-xs font-semibold text-success">

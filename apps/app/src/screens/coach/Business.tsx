@@ -696,7 +696,7 @@ function PlanFeatures({ ent }: { ent: Entitlements }) {
       <div className="grid grid-cols-2 gap-2 border-t border-border/40 pt-3">
         {QUOTA_KEYS.map((k) => (
           <div key={k} className="rounded-xl bg-surface-2 px-3 py-2.5">
-            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{QUOTA_META[k]?.label ?? k}</div>
+            <div className="text-micro uppercase text-muted-foreground">{QUOTA_META[k]?.label ?? k}</div>
             <div className="numeral mt-0.5 text-sm font-bold">{fmtQuota(ent.quotas[k])}<span className="ml-1 text-[0.6rem] font-medium text-muted-foreground">{QUOTA_META[k]?.unit ?? ""}</span></div>
           </div>
         ))}

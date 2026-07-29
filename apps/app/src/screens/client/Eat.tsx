@@ -207,7 +207,7 @@ export function Eat({ clientId }: { clientId: string }) {
               <div className="pointer-events-none absolute -right-8 -top-8 size-32 rounded-full bg-nutrition/10 blur-2xl" />
               <div className="relative flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-xs font-medium uppercase tracking-wide text-nutrition">Your meal plan</div>
+                  <div className="text-micro uppercase text-nutrition">Your meal plan</div>
                   <h2 className="mt-0.5 truncate text-title-3">{mealPlan.name}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">{mealPlan.meals} meal{mealPlan.meals === 1 ? "" : "s"} · {mealPlan.options} options to choose from</p>
                 </div>

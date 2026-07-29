@@ -125,7 +125,7 @@ export function WidgetCustomizeSheet<D>({ catalog, items, defaults, onClose, onS
   return (
     <Sheet open onClose={onClose} title="Customize hero">
       <div className="space-y-4">
-        <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Showing · ring or card</div>
+        <div className="mb-1.5 text-micro uppercase text-muted-foreground">Showing · ring or card</div>
         <div className="space-y-1.5">
           {list.map((it, i) => {
             const def = defOf(it.id);
@@ -149,7 +149,7 @@ export function WidgetCustomizeSheet<D>({ catalog, items, defaults, onClose, onS
         </div>
         {available.length > 0 && (
           <div>
-            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Add</div>
+            <div className="mb-1.5 text-micro uppercase text-muted-foreground">Add</div>
             <div className="flex flex-wrap gap-2">
               {available.map((w) => <button key={w.id} onClick={() => add(w.id)} className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-surface-3 active:scale-95 [&_svg]:size-4"><w.icon /> {w.title}</button>)}
             </div>

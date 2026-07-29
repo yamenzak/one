@@ -307,7 +307,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
                     <div className="relative flex items-center gap-4">
                       <div className="grid size-12 shrink-0 place-items-center rounded-2xl [&_svg]:size-6" style={{ backgroundColor: `color-mix(in oklch, ${tint} 15%, transparent)`, color: tint }}><notice.icon /></div>
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs font-medium uppercase tracking-wide" style={{ color: tint }}>{notice.eyebrow}</div>
+                        <div className="text-micro uppercase" style={{ color: tint }}>{notice.eyebrow}</div>
                         <h3 className="mt-0.5 text-body-lg">{notice.title}</h3>
                         <p className="mt-0.5 text-sm text-muted-foreground">{notice.body}</p>
                       </div>
@@ -338,7 +338,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
                     <div className="relative flex items-center gap-4">
                       <ProgressRing size={66} strokeWidth={7} tone="primary" progress={pct || 0.001} value={<span className="text-sm font-bold">{done}/{total}</span>} softTrack tintValue />
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs font-medium uppercase tracking-wide text-primary">{ownView ? "Finish setting up" : "Profile incomplete"}</div>
+                        <div className="text-micro uppercase text-primary">{ownView ? "Finish setting up" : "Profile incomplete"}</div>
                         <h3 className="mt-0.5 text-body-lg">{ownView ? dest.label : "Complete your profile"}</h3>
                         <p className="mt-0.5 text-sm text-muted-foreground">{ownView ? "A few details let your coach tailor your plans and targets to you." : "Ask this client to finish their profile for accurate targets."}</p>
                       </div>
@@ -382,7 +382,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
 
           {/* The day's activity timeline — the client's own logs + coach events. */}
           <Stagger className="space-y-2">
-            <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{isToday ? "Today's activity" : `${dayLabel(date, today)} · activity`}</h3>
+            <h3 className="px-1 text-micro uppercase text-muted-foreground">{isToday ? "Today's activity" : `${dayLabel(date, today)} · activity`}</h3>
             <Reveal loading={!feed} skeleton={<SkeletonList card rows={3} />}>
               {feed && (feedError ? (
                 /* The feed alone failed — an empty timeline would read as "you
@@ -476,7 +476,7 @@ function ExploreRail({ clientId, onOpen }: { clientId: string; onOpen: () => voi
   return (
     <Stagger className="space-y-2">
       <button onClick={onOpen} className="flex w-full items-center justify-between px-1">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Explore</h3>
+        <h3 className="text-micro uppercase text-muted-foreground">Explore</h3>
         <span className="inline-flex items-center gap-0.5 text-sm font-medium text-primary [&_svg]:size-4">See all <ChevronRight /></span>
       </button>
       <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
@@ -488,7 +488,7 @@ function ExploreRail({ clientId, onOpen }: { clientId: string; onOpen: () => voi
                 {r.coverUrl ? <img src={r.coverUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2 text-primary/60 [&_svg]:size-7"><Icon /></div>}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-3">
-                  {r.category && <div className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-white/80">{r.category}</div>}
+                  {r.category && <div className="mb-0.5 text-micro uppercase text-white/80">{r.category}</div>}
                   <div className="line-clamp-2 text-sm font-semibold leading-snug text-white">{r.title}</div>
                 </div>
               </div>

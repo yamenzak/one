@@ -182,7 +182,7 @@ export function BodyScanHistory({ scans, units, initialId, onClose }: { scans: H
 
           {/* All scans */}
           <div>
-            <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{list.length} scan{list.length === 1 ? "" : "s"}</div>
+            <div className="mb-2 px-1 text-micro uppercase text-muted-foreground">{list.length} scan{list.length === 1 ? "" : "s"}</div>
             <div className="space-y-2">
               {list.map((s) => {
                 const on = s.id === scan.id;

@@ -149,7 +149,7 @@ export function CoachToday() {
 
       {analytics && analytics.roster.total > 0 && (
         <Stagger className="space-y-3">
-          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Roster analytics</h3>
+          <h3 className="px-1 text-micro uppercase text-muted-foreground">Roster analytics</h3>
           <ChartCard title="Active clients" icon={Activity} tone="cardio" value={analytics.engagement.avgActivePerDay} unit={`/ day · of ${analytics.roster.total}`} delta={<Badge tone="neutral">{analytics.daily.length}-day trend</Badge>}>
             <BarChart values={analytics.daily.map((d) => d.active)} labels={analytics.daily.map((d) => dm(d.date))} tone="cardio" target={analytics.roster.total} format={(v) => `${v} active`} />
           </ChartCard>
@@ -226,7 +226,7 @@ export function CoachToday() {
 
       {activity.length > 0 && (
         <Stagger className="space-y-2">
-          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent client activity</h3>
+          <h3 className="px-1 text-micro uppercase text-muted-foreground">Recent client activity</h3>
           {groupByDay(activity).map(([day, evs]) => (
             <div key={day}>
               <div className="px-1 pb-1 pt-2 text-xs font-semibold text-muted-foreground">{dayLabel(day)}</div>

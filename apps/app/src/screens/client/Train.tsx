@@ -213,7 +213,7 @@ export function Train({ clientId }: { clientId: string }) {
               <div className="pointer-events-none absolute -right-8 -top-8 size-32 rounded-full bg-primary/10 blur-2xl" />
               <div className="relative flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-medium uppercase tracking-wide text-activity">Active plan</div>
+                  <div className="text-micro uppercase text-activity">Active plan</div>
                   <h2 className="mt-0.5 text-title-3">{published.name}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">{published.body.days.filter((d) => !d.isRestDay).length} training days</p>
                 </div>
@@ -238,7 +238,7 @@ export function Train({ clientId }: { clientId: string }) {
           (`exerciseReport`). */}
       {canStats && hasData && (
         <section className="space-y-2">
-          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">This week</h3>
+          <h3 className="px-1 text-micro uppercase text-muted-foreground">This week</h3>
           <Stagger className="grid grid-cols-2 gap-3">
             <StatCard stack label="Training load" value={week.weekLoad} unit={`/ ${loadTarget}`} icon={TrendingUp} tone="activity"
               badge={<Badge tone={week.weekLoad >= loadTarget ? "success" : "neutral"}>{week.weekLoad >= loadTarget ? "On target" : "Building"}</Badge>}
@@ -257,7 +257,7 @@ export function Train({ clientId }: { clientId: string }) {
       {recent.length > 0 && (
         <section className="space-y-2">
           <div className="flex items-center justify-between px-1">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent</h3>
+            <h3 className="text-micro uppercase text-muted-foreground">Recent</h3>
             {canActivities && <button onClick={() => setActivityOpen(true)} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><Plus /> Log activity</button>}
           </div>
           <Stagger className="space-y-1.5">
@@ -278,7 +278,7 @@ export function Train({ clientId }: { clientId: string }) {
       {/* Plan days — a carousel of branded day covers, tap to start (`workoutPlan`). */}
       {canPlan && published && (
         <section className="space-y-2">
-          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Plan days</h3>
+          <h3 className="px-1 text-micro uppercase text-muted-foreground">Plan days</h3>
           <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
             {published.body.days.map((day, i) => {
               const sets = day.isRestDay ? 0 : prescribedSetsForDay(day);
@@ -359,7 +359,7 @@ function LibraryGrid() {
   if (all && all.length === 0) return null;
   return (
     <section className="space-y-2">
-      <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Exercise library</h3>
+      <h3 className="px-1 text-micro uppercase text-muted-foreground">Exercise library</h3>
       <Reveal loading={!all} skeleton={<SkeletonList card rows={3} thumb={56} />}>
         {all && (
           <div className="space-y-3">

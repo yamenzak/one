@@ -106,7 +106,7 @@ export function DialogContent({ title, children, className }: { title?: string; 
           className,
         )}
       >
-        {title && <DialogPrimitive.Title className="mb-4 text-xl font-semibold tracking-tight">{title}</DialogPrimitive.Title>}
+        {title && <DialogPrimitive.Title className="mb-4 text-title-3">{title}</DialogPrimitive.Title>}
         {!title && <DialogPrimitive.Title className="sr-only">Dialog</DialogPrimitive.Title>}
         <DialogPrimitive.Close className="absolute right-4 top-4 grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
           <X className="size-4" />

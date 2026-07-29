@@ -26,7 +26,7 @@ interface MetricPillProps {
 export function Eyebrow({ children, action, className }: { children: ReactNode; action?: ReactNode; className?: string }) {
   return (
     <div className={cn("flex items-center justify-between px-1", className)}>
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{children}</h2>
+      <h2 className="text-micro uppercase text-muted-foreground">{children}</h2>
       {action}
     </div>
   );

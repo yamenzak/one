@@ -420,7 +420,7 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
             if (!keys.length) return null;
             return (
               <div key={cat.key} className="space-y-1.5 rounded-2xl bg-card p-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{cat.label}</div>
+                <div className="text-micro uppercase text-muted-foreground">{cat.label}</div>
                 {keys.map((k) => {
                   const m = CLIENT_FLAG_META[k];
                   const checked = flags[k] ?? DEFAULT_CLIENT_FLAGS[k];

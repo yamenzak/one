@@ -426,7 +426,7 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
             {recents.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{recentTab === "frequent" ? "Most logged" : "Recent"}</h3>
+                  <h3 className="px-1 text-micro uppercase text-muted-foreground">{recentTab === "frequent" ? "Most logged" : "Recent"}</h3>
                   <SegmentedControl
                     options={[{ value: "recent", label: "Recent" }, { value: "frequent", label: "Frequent" }]}
                     value={recentTab}
@@ -519,7 +519,7 @@ function SnapReview({ entries, note, mocked, defaultMeal, units, onCancel, onRet
           <div className="flex items-start gap-3 rounded-2xl bg-primary/10 p-3">
             <AiAvatar className="size-8 shrink-0" />
             <div className="min-w-0">
-              <div className="text-xs font-semibold uppercase tracking-wide text-primary">AI read</div>
+              <div className="text-micro uppercase text-primary">AI read</div>
               <Markdown className="mt-0.5 text-sm">{note}</Markdown>
             </div>
           </div>

@@ -45,7 +45,7 @@ export function LaneSwitcher({
 
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center gap-1.5 px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="flex items-center gap-1.5 px-1 text-micro uppercase text-muted-foreground">
         <ArrowLeftRight className="size-3.5" /> Schedule
       </div>
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 no-scrollbar">

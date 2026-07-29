@@ -270,7 +270,7 @@ function TabLayout() {
               <span className="flex h-9 items-center truncate text-base font-semibold tracking-tight">{active.tenantName}</span>
             )}
             {isStaff && (
-              <span className="hidden h-9 items-center rounded-full bg-secondary px-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:inline-flex">
+              <span className="hidden h-9 items-center rounded-full bg-secondary px-2.5 text-micro uppercase text-muted-foreground sm:inline-flex">
                 {clientSurface ? "Train" : "Coach"}
               </span>
             )}
