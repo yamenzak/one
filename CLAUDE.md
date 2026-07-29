@@ -109,6 +109,11 @@ remote bindings without editing the config (this is what the E2E suite does).
     changes a live studio's URL.
   - One passkey and one session across every door under the root (`rpIdFor`,
     `cookieDomainFor`). A custom domain gets its own — WebAuthn allows nothing else.
+  - The console is reachable at `admin.` and NOWHERE else. There used to be an
+    `/admin` route inside the studio Shell too; in production it rendered the
+    whole console and then 404'd on every call, because `/api/admin/*` answers
+    on the operator door only. It is gone — the avatar menu now hops to the door
+    (`adminUrl()`), which is the one address the console has.
   - `wrangler.jsonc` declares NO `routes`, deliberately: declaring them makes
     `wrangler dev` rewrite the incoming Host to the route's hostname, which collapses
     every door onto the root. The two production routes are a dashboard step
