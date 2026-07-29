@@ -9,6 +9,7 @@ import { cn } from "./lib/utils.js";
 import { toneSoft, toneText, toneVar, type Tone } from "./primitives.js";
 import { Check, type LucideIcon } from "./lib/icons.js";
 import { METRICS, MACRO_KEYS, type MetricKey } from "./lib/metric-coding.js";
+import { SPRING_SNAP , DUR} from "./lib/animation.js";
 
 interface MetricPillProps {
   icon: LucideIcon;
@@ -82,7 +83,7 @@ export function MetricPill({ icon: Icon, label, value, tone = "activity", progre
       className={cn("relative flex w-full items-center gap-3 overflow-hidden rounded-2xl p-3 text-left", toneSoft[tone], className)}
     >
       {pct !== null && (
-        <motion.span aria-hidden className="absolute inset-y-0 left-0 rounded-2xl bg-current opacity-[0.12]" initial={{ width: 0 }} animate={{ width: `${pct * 100}%` }} transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }} />
+        <motion.span aria-hidden className="absolute inset-y-0 left-0 rounded-2xl bg-current opacity-[0.12]" initial={{ width: 0 }} animate={{ width: `${pct * 100}%` }} transition={{ duration: DUR.draw, ease: [0.22, 1, 0.36, 1] }} />
       )}
       <span className="relative grid size-10 shrink-0 place-items-center rounded-xl bg-current/15 [&_svg]:size-[1.15rem]">
         <Icon style={{ color: toneVar[tone] }} />
@@ -230,7 +231,7 @@ export function Sparkline({ values, width = 120, height = 52, tone = "activity",
       </defs>
       <path d={area} fill={`url(#${gid})`} />
       {target !== undefined && <line x1={pad} x2={width - pad} y1={y(target)} y2={y(target)} stroke={color} strokeDasharray="2 5" strokeWidth={1.5} opacity={0.6} />}
-      <motion.path d={line} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.8, ease: "easeOut" }} />
+      <motion.path d={line} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: DUR.draw, ease: "easeOut" }} />
       <circle cx={x(values.length - 1)} cy={y(values[values.length - 1]!)} r={3.5} fill={color} />
     </svg>
   );
@@ -246,7 +247,7 @@ export function MiniBars({ values, width = 130, height = 52, tone = "activity", 
     <svg width={width} height={height} aria-hidden>
       {values.map((v, i) => {
         const h = (v / max) * (height - 4);
-        return <motion.rect key={i} x={i * (bw + gap)} width={bw} rx={bw / 2} fill={color} initial={{ height: 0, y: height }} animate={{ height: Math.max(3, h), y: height - Math.max(3, h) }} transition={{ delay: i * 0.03, duration: 0.4 }} opacity={0.55 + 0.45 * (v / max)} />;
+        return <motion.rect key={i} x={i * (bw + gap)} width={bw} rx={bw / 2} fill={color} initial={{ height: 0, y: height }} animate={{ height: Math.max(3, h), y: height - Math.max(3, h) }} transition={{ delay: i * 0.03, duration: DUR.slow }} opacity={0.55 + 0.45 * (v / max)} />;
       })}
     </svg>
   );
@@ -271,7 +272,7 @@ export function WeekDots({ days, todayIndex, tone = "activity", className, fill 
           <motion.span
             initial={{ scale: 0.6, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: i * 0.03, type: "spring", stiffness: 400, damping: 22 }}
+            transition={{ ...SPRING_SNAP, delay: i * 0.03 }}
             className={cn("grid place-items-center rounded-full [&_svg]:size-3", fill ? "size-[1.15rem]" : "size-7", days[i] ? toneSoft[tone] : "bg-surface-2 text-muted-foreground/40")}
           >
             {days[i] ? <Check strokeWidth={3} /> : ""}

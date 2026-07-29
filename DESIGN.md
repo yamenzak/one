@@ -97,9 +97,9 @@ by design (§7 `Tile` vs `Row`).
 Follow the order in UI-LANGUAGE.md §14: tokens → `Row`/`Group` → `Atmosphere`/
 `Anchor` → motion → screen by screen.
 
-## Four enforcement layers
+## Five enforcement layers
 
-The language is only worth what a screen cannot quietly opt out of. Four things
+The language is only worth what a screen cannot quietly opt out of. Five things
 are now checked rather than agreed:
 
 | Guard | Lives in | Catches |
@@ -108,8 +108,9 @@ are now checked rather than agreed:
 | Radius · elevation · hairlines | `apps/app/src/design-tokens.conformance.test.ts` | a hard-coded visual value that cannot follow a tenant's brand |
 | Type scale | `apps/app/src/type-scale.conformance.test.ts` | a hand-rolled spelling of a role the scale already names |
 | Empty values | `apps/app/src/no-data.conformance.test.ts` | a dash reaching a value slot, where at numeral sizes it reads as a horizontal rule (§5) |
+| Motion | `apps/app/src/motion.conformance.test.ts` | a spring or a raw duration written at a call site instead of taken from `lib/animation.ts` (§8) |
 
-All four scan `packages/ui` as well as the app — the design system is where a
+All five scan `packages/ui` as well as the app — the design system is where a
 bypass does the most damage, and each of these found real violations there.
 Each has an escape hatch that requires a written reason.
 

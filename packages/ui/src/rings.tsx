@@ -8,6 +8,7 @@ import { useId, type ReactNode } from "react";
 import { toneVar, type Tone } from "./primitives.js";
 import { NoData, isBlank } from "./metrics.js";
 import { cn } from "./lib/utils.js";
+import { DUR, TIER_DELAY } from "./lib/animation.js";
 
 interface ProgressRingProps {
   progress: number; // 0..1
@@ -65,7 +66,7 @@ export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activi
           strokeDasharray={c}
           initial={{ strokeDashoffset: c }}
           animate={{ strokeDashoffset: c * (1 - p) }}
-          transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: DUR.draw, ease: [0.22, 1, 0.36, 1] }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -80,7 +81,7 @@ export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activi
           style={isBlank(value) ? undefined : { fontSize: size * 0.2, color: tintValue ? color : undefined }}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15, duration: 0.4 }}
+          transition={{ delay: TIER_DELAY.content, duration: DUR.slow }}
         >
           {isBlank(value) ? <NoData className="text-xs">Not yet</NoData> : value}
         </motion.div>

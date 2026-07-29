@@ -36,6 +36,16 @@ export const DUR = {
   base: 0.24,
   /** A screen or sheet. The longest thing in the product. */
   slow: 0.36,
+  /**
+   * Data drawing itself in — a line tracing, bars growing, an arc sweeping.
+   *
+   * Deliberately longer than anything else here, and the only exception to
+   * "nothing takes more than `slow`". This is the one place motion is CONTENT
+   * rather than interface: the eye follows the line and reads the shape of the
+   * series while it draws. At UI speed it registers as a flicker and the chart
+   * may as well have been static.
+   */
+  draw: 0.9,
 } as const;
 
 /**
@@ -57,6 +67,25 @@ export const EASE_IN_OUT = [0.65, 0, 0.35, 1] as const;
  * design system accidentally gets bouncy.
  */
 export const SPRING: Transition = { type: "spring", stiffness: 380, damping: 34, mass: 0.9 };
+
+/**
+ * Small, high-frequency things: a segmented pill sliding, a checkbox filling, a
+ * badge popping in. Stiffer than `SPRING` so it lands under the thumb, and
+ * damped to match so it still lands rather than wobbling.
+ *
+ * ζ ≈ 0.97. The screens this replaced had ζ as low as **0.40** (620/20), which
+ * is a visible three-bounce wobble — the exact thing rule 2 above forbids, in
+ * the most-repeated micro-interactions in the product.
+ */
+export const SPRING_SNAP: Transition = { type: "spring", stiffness: 520, damping: 42, mass: 0.9 };
+
+/**
+ * Large things changing size: a section expanding, a chart polygon drawing, a
+ * panel revealing. Slower, because a big surface moving at `SPRING_SNAP` reads
+ * as a jump-cut rather than as motion.
+ */
+export const SPRING_SOFT: Transition = { type: "spring", stiffness: 240, damping: 30, mass: 1 };
+
 /** For something being dragged back to rest — the one place a little give is right. */
 export const SPRING_DRAG: Transition = { type: "spring", stiffness: 300, damping: 30, mass: 0.8 };
 

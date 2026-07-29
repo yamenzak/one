@@ -17,7 +17,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { motion } from "motion/react";
-import { Button, Card, Field, Mail, KeyRound, ArrowRight, Check, Spinner } from "@kova/ui";
+import { Button, Card, Field, Mail, KeyRound, ArrowRight, Check, Spinner, DUR} from "@kova/ui";
 import { api, ApiError } from "../api.js";
 import { useSession } from "../session.js";
 import { Turnstile } from "../Turnstile.js";
@@ -118,7 +118,7 @@ export function AcceptInvite() {
     return (
       <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-8 px-6">
         <div className="pointer-events-none absolute -top-32 left-1/2 size-72 -translate-x-1/2 rounded-full bg-primary/25 blur-[100px]" />
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="relative">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.slow }} className="relative">
           <Card className="space-y-5 p-6 text-center">
             {accepting || !done ? (
               <>
@@ -148,7 +148,7 @@ export function AcceptInvite() {
     <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-8 overflow-hidden px-6">
       <div className="pointer-events-none absolute -top-32 left-1/2 size-72 -translate-x-1/2 rounded-full bg-primary/25 blur-[100px]" />
 
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="relative text-center">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.slow }} className="relative text-center">
         {logoUrl ? (
           <img src={logoUrl} alt={brandName} className="mx-auto mb-5 h-16 w-auto max-w-[70%] object-contain" />
         ) : (
@@ -158,7 +158,7 @@ export function AcceptInvite() {
         <p className="mt-2 text-muted-foreground">Join the {brandName} team — sign in with the email your invite was sent to.</p>
       </motion.div>
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="relative">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.slow, delay: 0.1 }} className="relative">
         <Card className="space-y-5 p-6">
           {step === "email" ? (
             <>

@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { Atmosphere, anchorIn, contentIn, contentStagger } from "@kova/ui";
+import { Atmosphere, anchorIn, contentIn, contentStagger, DUR} from "@kova/ui";
 import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
 import { ThemeProvider } from "./theme.js";
@@ -139,7 +139,7 @@ function App() {
   return (
     <>
       <AnimatePresence mode="wait">
-        <motion.div key={screen} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+        <motion.div key={screen} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: DUR.base }}>
           {screen === "boot" && <BootSplash />}
           {screen === "signpost" && <RootSignpost />}
           {screen === "nostudio" && <NoStudio />}

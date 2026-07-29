@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { feetInchesToCm } from "@kova/domain";
-import { Button, Card, Field, Chip, Calendar, Ruler, ArrowRight, Trophy } from "@kova/ui";
+import { Button, Card, Field, Chip, Calendar, Ruler, ArrowRight, Trophy, DUR} from "@kova/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 
@@ -59,7 +59,7 @@ export function Onboarding({ clientId, displayName, onDone }: { clientId: string
       <div className="flex gap-1.5">{[0, 1, 2, 3, 4].map((i) => <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i <= step ? "bg-primary" : "bg-secondary"}`} />)}</div>
 
       <AnimatePresence mode="wait">
-        <motion.div key={step} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
+        <motion.div key={step} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: DUR.base }}>
           {step === 0 && (
             <Card className="space-y-4">
               <div><h2 className="text-title-3">Hi {displayName}</h2><p className="mt-1 text-sm text-muted-foreground">A few basics so your coach can tailor everything.</p></div>

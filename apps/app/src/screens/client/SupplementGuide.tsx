@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Button } from "@kova/ui";
+import { Button, DUR} from "@kova/ui";
 import { featureEnabled } from "@kova/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -46,7 +46,7 @@ export function SupplementGuide({ clientId }: { clientId: string }) {
           <AiAvatar className="size-5" /> {busy ? "Thinking…" : "Explain my supplements"}
         </Button>
       ) : (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} className="flex items-start gap-3">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.slow, ease: [0.22, 1, 0.36, 1] }} className="flex items-start gap-3">
           <AiAvatar className="mt-0.5 size-8 shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">Supplement tips</div>

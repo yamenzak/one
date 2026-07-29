@@ -6,7 +6,7 @@ import {
   Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MetricChip, MetricPill, ProgressRing, METRICS, toneSoft, Eyebrow, Page, Stagger, EmptyState, motion, ConfirmDialog,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
   Plus, Utensils, Croissant, Soup, Apple, Dumbbell, Trash2, AlertTriangle, type LucideIcon,
-  TierAnchor, CountUp, Droplet,
+  TierAnchor, CountUp, Droplet, SPRING_SOFT,
 } from "@kova/ui";
 import type { UnitPrefs } from "@kova/domain";
 import { api, errorText, isQueued, todayLocal } from "../../api.js";
@@ -428,7 +428,7 @@ function WeekStrip({ week }: { week: Week }) {
                 <motion.div
                   initial={{ height: 4, opacity: 0 }}
                   animate={{ height: h, opacity: d.logged ? 1 : 0.6 }}
-                  transition={{ delay: i * 0.04, type: "spring", stiffness: 300, damping: 26 }}
+                  transition={{ ...SPRING_SOFT, delay: i * 0.04 }}
                   className={`w-full max-w-6 rounded-md ${!d.logged ? "bg-surface-2" : over ? "bg-danger" : "bg-calories"} ${today ? "ring-2 ring-calories/30" : ""}`}
                 />
               </div>

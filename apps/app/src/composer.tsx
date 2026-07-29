@@ -5,7 +5,7 @@
  */
 
 import { motion, AnimatePresence } from "motion/react";
-import { cn, toneSoft, Check, ChevronRight, type Tone } from "@kova/ui";
+import { cn, toneSoft, Check, ChevronRight, type Tone, SPRING_SNAP, DUR} from "@kova/ui";
 import type { ReactNode } from "react";
 
 /**
@@ -24,7 +24,7 @@ export function ModeCard({ icon: Icon, label, hint, onClick, disabled, active, b
       onClick={onClick}
       disabled={disabled || busy}
       whileTap={{ scale: 0.97 }}
-      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+      transition={SPRING_SNAP}
       className={cn(
         "group relative flex flex-col items-center gap-2 overflow-hidden rounded-2xl border p-3.5 text-center transition-colors disabled:pointer-events-none disabled:opacity-40",
         active
@@ -36,7 +36,7 @@ export function ModeCard({ icon: Icon, label, hint, onClick, disabled, active, b
         <motion.span
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 600, damping: 24 }}
+          transition={SPRING_SNAP}
           className="absolute right-2 top-2 grid size-4 place-items-center rounded-full bg-primary text-primary-foreground [&_svg]:size-3"
         >
           <Check strokeWidth={3} />
@@ -69,7 +69,7 @@ export function ModeRow({ icon: Icon, label, hint, onClick, disabled, active, bu
       onClick={onClick}
       disabled={disabled || busy}
       whileTap={{ scale: 0.985 }}
-      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+      transition={SPRING_SNAP}
       className={cn(
         "group flex w-full items-center gap-3.5 rounded-2xl border p-3 text-left transition-colors disabled:pointer-events-none disabled:opacity-40",
         active
@@ -105,7 +105,7 @@ export function StepFade({ stepKey, children }: { stepKey: string; children: Rea
         initial={{ opacity: 0, x: 12 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -12 }}
-        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: DUR.base, ease: [0.22, 1, 0.36, 1] }}
       >
         {children}
       </motion.div>

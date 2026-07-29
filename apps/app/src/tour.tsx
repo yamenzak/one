@@ -14,7 +14,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { Button, ArrowRight, ArrowLeft, X, Info, Hand, CircleCheck, toneVar, type Tone } from "@kova/ui";
+import { Button, ArrowRight, ArrowLeft, X, Info, Hand, CircleCheck, toneVar, type Tone, DUR} from "@kova/ui";
 import { setApiInterceptor } from "./api.js";
 import { tourInterceptor } from "./tour-mock.js";
 
@@ -236,7 +236,7 @@ function TourOverlay({ steps, idx, setIdx, stop }: { steps: TourStep[]; idx: num
             aria-label={shown.title}
             tabIndex={-1}
             initial={{ opacity: 0, y: below ? -8 : 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: DUR.base, ease: [0.22, 1, 0.36, 1] }}
             className="pointer-events-auto mx-auto max-w-md rounded-3xl border border-border/50 bg-card p-5 shadow-lg outline-none"
           >
             <div className="flex items-start gap-3">
