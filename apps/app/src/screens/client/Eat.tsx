@@ -495,7 +495,15 @@ function EditEntrySheet({ entry, clientId, units, onClose, onSaved }: { entry: E
   };
 
   return (
-    <Sheet open onClose={onClose} title={entry.label ?? "Edit food"}>
+    <Sheet
+      open
+      onClose={onClose}
+      title={entry.label ?? "Edit food"}
+      footer={<div className="flex gap-3">
+        <Button variant="ghost" className="text-danger" disabled={busy} onClick={() => setConfirmDelete(true)}><Trash2 /> Delete</Button>
+        <Button size="lg" className="flex-1" disabled={busy || (scalable && !!qty && !qtyValid)} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</Button>
+      </div>}
+    >
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-surface-2">
@@ -518,10 +526,6 @@ function EditEntrySheet({ entry, clientId, units, onClose, onSaved }: { entry: E
 
         {err && <p role="alert" className="text-sm text-warning">{err}</p>}
 
-        <div className="flex gap-3">
-          <Button variant="ghost" className="text-danger" disabled={busy} onClick={() => setConfirmDelete(true)}><Trash2 /> Delete</Button>
-          <Button size="lg" className="flex-1" disabled={busy || (scalable && !!qty && !qtyValid)} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</Button>
-        </div>
       </div>
 
       <ConfirmDialog

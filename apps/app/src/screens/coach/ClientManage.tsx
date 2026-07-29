@@ -1020,7 +1020,7 @@ function SuggestSuppSheet({ clientId, onClose, onPrescribed }: { clientId: strin
     finally { setPrescribing(null); }
   };
   return (
-    <Sheet open onClose={onClose} title="Suggested supplements">
+    <Sheet open onClose={onClose} title="Suggested supplements" size="tall">
       <div className="space-y-3">
         <div className="flex items-center gap-2.5 rounded-xl bg-primary/10 p-2.5"><AiAvatar className="size-8" /><p className="text-xs text-muted-foreground">Evidence-based ideas from this client's reviewed labs, goal and current stack. Review before prescribing.</p></div>
         {error ? <AiErrorBox error={error} /> : (

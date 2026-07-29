@@ -440,6 +440,22 @@ body scrolls. Every part of that is load-bearing:
 - **The sheet owns the title.** A form that renders its own `<h2>` inside the
   body has two headings — one of them invisible to the accessibility tree — and
   once the header is pinned, the visible one scrolls away under an empty bar.
+- **Not every sheet has a footer, and forcing one is worse than none.** A detail
+  sheet is for reading. A field-scoped action ("Or enter the digits" → *Look up
+  product*) belongs beside its field, not at the sheet's edge, because pinning
+  it orphans it from the label that explains it. Pin the sheet's action; leave
+  a field's action where its label is.
+- **Shortcuts go under the general path, never over it.** The food picker put
+  Snap-a-meal, a barcode tile, a manual tile, a segmented control and four
+  recents above its search field — so the one way to find a food that *isn't* in
+  your recents was the last thing on the sheet, and at `tall` its filter chips
+  fell off the bottom entirely. Recents are a shortcut past search, which means
+  they sit below it. Same family as "the first step is the primary action" (§1):
+  a surface that buries its general-purpose control under its conveniences has
+  the hierarchy upside down.
+- **A control that cannot change anything on screen should not be on screen.**
+  That picker also rendered its All/Whole/Branded filter on the landing, where
+  there were no results to filter.
 
 ### Two rules about repetition
 

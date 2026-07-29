@@ -502,7 +502,12 @@ function OptionDetailSheet({ opt, index, units, foods, foodMap, image, logged, l
   const hasMicros = microRows.some(([, v]) => v > 0);
 
   return (
-    <Sheet open onClose={onClose} title={opt.mealName || (opt.isFree ? "Free meal" : `Option ${index + 1}`)}>
+    <Sheet
+      open
+      onClose={onClose}
+      title={opt.mealName || (opt.isFree ? "Free meal" : `Option ${index + 1}`)}
+      footer={readOnly ? undefined : <Button size="lg" className="w-full" variant={logged ? "secondary" : "default"} disabled={logging} onClick={() => { onLog(); onClose(); }}>{logging ? "Logging…" : logged ? "Log again" : "Log this meal"}</Button>}
+    >
       <div className="space-y-3">
         {image && <img src={image} alt="" className="h-44 w-full rounded-2xl object-cover" />}
         {opt.isFree ? (
@@ -556,7 +561,6 @@ function OptionDetailSheet({ opt, index, units, foods, foodMap, image, logged, l
             )}
           </>
         )}
-        {!readOnly && <Button size="lg" className="w-full" variant={logged ? "secondary" : "default"} disabled={logging} onClick={() => { onLog(); onClose(); }}>{logging ? "Logging…" : logged ? "Log again" : "Log this meal"}</Button>}
       </div>
     </Sheet>
   );

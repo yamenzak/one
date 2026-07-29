@@ -548,7 +548,7 @@ function SeedTemplateSheet({ onClose, onPick }: { onClose: () => void; onPick: (
     return () => { alive = false; };
   }, []);
   return (
-    <Sheet open onClose={onClose} title="Start from a template">
+    <Sheet open onClose={onClose} title="Start from a template" size="tall">
       <p className="mb-3 text-sm text-muted-foreground">Loads a saved template into this draft, replacing the current meals.</p>
       {templates === null ? (
         <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>

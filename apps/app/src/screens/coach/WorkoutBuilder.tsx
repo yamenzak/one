@@ -717,7 +717,7 @@ function ExercisePicker({ library, onClose, onPick, reloadLibrary }: { library: 
   }
 
   return (
-    <Sheet open onClose={onClose} title="Add exercise">
+    <Sheet open onClose={onClose} title="Add exercise" size="tall">
       <Field label="Search your library" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} className="mb-2" />
       <Button size="sm" variant="secondary" className="mb-3 w-full" onClick={() => setCompose(true)}><Plus /> Create a new exercise</Button>
       {muscles.length > 0 && (
@@ -772,7 +772,7 @@ function SeedTemplateSheet({ onClose, onPick }: { onClose: () => void; onPick: (
     return () => { alive = false; };
   }, []);
   return (
-    <Sheet open onClose={onClose} title="Start from a template">
+    <Sheet open onClose={onClose} title="Start from a template" size="tall">
       <p className="mb-3 text-sm text-muted-foreground">Loads a saved template into this draft, replacing the current days.</p>
       {templates === null ? (
         <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>

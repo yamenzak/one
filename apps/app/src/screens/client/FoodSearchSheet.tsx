@@ -308,7 +308,12 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
     ];
     const hasMicros = microRows.some(([, v]) => v > 0);
     return (
-      <Sheet open onClose={() => setSelected(null)} title={selected.name}>
+      <Sheet
+        open
+        onClose={() => setSelected(null)}
+        title={selected.name}
+        footer={<div className="flex gap-3"><Button variant="ghost" onClick={() => setSelected(null)}>Back</Button><Button size="lg" className="flex-1" disabled={logging} onClick={() => void log()}>{logging ? "Logging…" : "Log it"}</Button></div>}
+      >
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             {img && <img src={img} alt="" className="size-14 shrink-0 rounded-xl object-cover" />}
@@ -344,7 +349,6 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
               ))}
             </div>
           )}
-          <div className="flex gap-3"><Button variant="ghost" onClick={() => setSelected(null)}>Back</Button><Button size="lg" className="flex-1" disabled={logging} onClick={() => void log()}>{logging ? "Logging…" : "Log it"}</Button></div>
         </div>
       </Sheet>
     );
@@ -378,7 +382,7 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
     <Sheet
       open
       onClose={onClose}
-      title="Add food"
+      title="Add food" size="tall"
       titleAction={
         // Pick mode keeps the compact header actions (no snap-a-meal); log mode
         // promotes them to the hero tiles below.
@@ -397,6 +401,41 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
       )}
 
       <div className="space-y-4">
+        {/*
+          SEARCH FIRST.
+
+          This block used to sit BELOW the landing — under the Snap hero, the
+          barcode/manual pair, a segmented control and four recents. Searching is
+          the general way to find a food and the only way to find one that isn't
+          in your recents, and it was the last thing on the sheet: at `tall` the
+          field was at the very bottom edge and its filter chips were off-screen
+          entirely. Shortcuts go under the general path, never over it.
+        */}
+        <div className="space-y-3">
+          <Field label="Search foods" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} autoFocus={!!onPick} />
+          {/* Compact action toolbar while searching (log mode) — keeps snap /
+              scan / manual one tap away, and snap still passes the query as a hint. */}
+          {!onPick && hasQuery && (
+            <div className="flex gap-2">
+              <button onClick={() => snapInputRef.current?.click()} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-4"><Camera /> Snap</button>
+              <button onClick={() => setScanOpen(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-4"><Barcode /> Scan</button>
+              <button onClick={() => openManual()} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-4"><PencilLine /> Manual</button>
+            </div>
+          )}
+          {/* The filter narrows RESULTS. On the landing there are none, so it was
+              a three-way control that could not change anything on screen. */}
+          {hasQuery && (
+            <SegmentedControl
+              options={[{ value: "all", label: "All" }, { value: "whole", label: "Whole" }, { value: "branded", label: "Branded" }]}
+              value={filter}
+              onChange={setFilter}
+            />
+          )}
+          {snapErr != null && <AiErrorBox error={snapErr} />}
+          {aiError && <p className="text-sm text-warning">{aiError}</p>}
+          {results}
+        </div>
+
         {/* LANDING (log mode, empty query): hero AI actions + recents rail. */}
         {!onPick && !hasQuery && (
           <>
@@ -450,26 +489,6 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
           </>
         )}
 
-        <div className="space-y-3">
-          <Field label="Search foods" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} autoFocus={!!onPick} />
-          {/* Compact action toolbar while searching (log mode) — keeps snap /
-              scan / manual one tap away, and snap still passes the query as a hint. */}
-          {!onPick && hasQuery && (
-            <div className="flex gap-2">
-              <button onClick={() => snapInputRef.current?.click()} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-4"><Camera /> Snap</button>
-              <button onClick={() => setScanOpen(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-4"><Barcode /> Scan</button>
-              <button onClick={() => openManual()} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-4"><PencilLine /> Manual</button>
-            </div>
-          )}
-          <SegmentedControl
-            options={[{ value: "all", label: "All" }, { value: "whole", label: "Whole" }, { value: "branded", label: "Branded" }]}
-            value={filter}
-            onChange={setFilter}
-          />
-          {snapErr != null && <AiErrorBox error={snapErr} />}
-          {aiError && <p className="text-sm text-warning">{aiError}</p>}
-          {results}
-        </div>
       </div>
 
       {scanOpen && <BarcodeScanner onDetected={(code) => void lookupBarcode(code)} onClose={() => setScanOpen(false)} />}
@@ -511,7 +530,15 @@ function SnapReview({ entries, note, mocked, defaultMeal, units, onCancel, onRet
   const confirm = async () => { setBusy(true); try { await onConfirm(items, meal); } finally { setBusy(false); } };
 
   return (
-    <Sheet open onClose={onCancel} title="Review meal">
+    <Sheet
+      open
+      onClose={onCancel}
+      title="Review meal"
+      footer={<div className="flex gap-3">
+        <Button variant="ghost" onClick={onRetake}><Camera /> Retake</Button>
+        <Button size="lg" className="flex-1" disabled={busy || items.length === 0} onClick={() => void confirm()}>{busy ? "Logging…" : `Log ${items.length} item${items.length === 1 ? "" : "s"}`}</Button>
+      </div>}
+    >
       <div className="space-y-4">
         {/* Simulated output must never read as a real model answer (AGENTS §6). */}
         <MockedNotice mocked={mocked} what="These foods and macros" />
@@ -557,10 +584,6 @@ function SnapReview({ entries, note, mocked, defaultMeal, units, onCancel, onRet
           </div>
         )}
 
-        <div className="flex gap-3">
-          <Button variant="ghost" onClick={onRetake}><Camera /> Retake</Button>
-          <Button size="lg" className="flex-1" disabled={busy || items.length === 0} onClick={() => void confirm()}>{busy ? "Logging…" : `Log ${items.length} item${items.length === 1 ? "" : "s"}`}</Button>
-        </div>
       </div>
     </Sheet>
   );
