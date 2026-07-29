@@ -9,7 +9,7 @@ import {
   Reveal, SkeletonHero, SkeletonList, SkeletonHeader,
   Page, Stagger, TierAnchor, ActionCluster, CountUp, Unit, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
   Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Send, Info, Utensils, Croissant, Soup, Apple,
-  Store, Ticket, AlertTriangle, ShieldCheck, toneVar, ChevronLeft, ChevronRight, Target, ScanLine, Calendar, BookOpen, type Tone, type LucideIcon,
+  Store, Ticket, AlertTriangle, ShieldCheck, toneVar, ChevronLeft, ChevronRight, Target, ScanLine, Calendar, BookOpen, Group, Row, User, type Tone, type LucideIcon,
 } from "@kova/ui";
 import type { WidgetItem } from "@kova/protocol";
 import { useNavigate } from "react-router-dom";
@@ -327,44 +327,69 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
           {data.profile && !data.profile.complete && (() => {
             const total = Object.keys(GAP_LABELS).length;
             const done = total - data.profile.gaps.length;
-            const pct = total ? done / total : 0;
             const needsPasskey = ownView && pk?.supported && pk.hasPasskey === false;
             const dest = gapDestination(data.profile.gaps);
             return (
+              /*
+                A NAG IS A ROW, NOT A HERO.
+
+                This shipped as a 200px card — a 66px ring, an eyebrow, a title,
+                a sentence, and up to seven gap chips — sitting directly above
+                the client's actual day. It was the second-largest thing on
+                Today, and it is housekeeping. The chips were the worst of it:
+                they listed the very fields the destination screen shows anyway,
+                so the card previewed a form nobody had asked to see yet.
+
+                One row: what's left, how far along, and a way in. Everything
+                else belongs on the other side of the tap.
+              */
               <Stagger>
-                <Card className="relative overflow-hidden">
-                  <div className="pointer-events-none absolute -right-12 -top-14 size-44 rounded-full bg-primary/15 blur-3xl" />
-                  <button onClick={ownView ? () => nav(dest.href) : undefined} disabled={!ownView} className="block w-full text-left">
-                    <div className="relative flex items-center gap-4">
-                      <ProgressRing size={66} strokeWidth={7} tone="primary" progress={pct || 0.001} value={<span className="text-sm font-bold">{done}/{total}</span>} softTrack tintValue />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-micro uppercase text-primary">{ownView ? "Finish setting up" : "Profile incomplete"}</div>
-                        <h3 className="mt-0.5 text-body-lg">{ownView ? dest.label : "Complete your profile"}</h3>
-                        <p className="mt-0.5 text-sm text-muted-foreground">{ownView ? "A few details let your coach tailor your plans and targets to you." : "Ask this client to finish their profile for accurate targets."}</p>
-                      </div>
-                      {ownView && <ChevronRight className="size-5 shrink-0 self-center text-muted-foreground" />}
-                    </div>
-                    <div className="relative mt-3.5 flex flex-wrap gap-1.5">
+                <Group>
+                  <Row
+                    icon={ownView ? Target : User}
+                    sub={ownView ? "So your coach can set the right targets" : "Ask them to finish it"}
+                    value={`${done}/${total}`}
+                    onClick={ownView ? () => nav(dest.href) : undefined}
+                    chevron={ownView}
+                    divider={!needsPasskey}
+                  >
+                    {ownView ? dest.label : "Profile incomplete"}
+                  </Row>
+                  {/*
+                    The gap list stays — but only for the COACH.
+
+                    For the client the chips previewed a form they were one tap
+                    from opening, which is why they came off the row. For the
+                    coach they are the whole point: they cannot open the form,
+                    they have to ASK, and "ask them to finish their profile" is
+                    useless next to "ask them for their target weight". Same
+                    component, opposite audiences, different answer.
+                  */}
+                  {!ownView && (
+                    <div data-profile-gaps className="flex flex-wrap gap-1.5 px-4 pb-3.5">
                       {data.profile.gaps.slice(0, 6).map((g) => <span key={g} className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium">{GAP_LABELS[g] ?? g}</span>)}
                       {data.profile.gaps.length > 6 && <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">+{data.profile.gaps.length - 6} more</span>}
                     </div>
-                  </button>
-                  {needsPasskey && (
-                    <div className="relative mt-3.5 flex items-center gap-3 border-t border-border/50 pt-3.5">
-                      <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><ShieldCheck /></div>
-                      <div className="min-w-0 flex-1"><div className="text-sm font-medium">Add a passkey</div><div className="text-xs text-muted-foreground">One-tap sign-in with Face ID or fingerprint.</div></div>
-                      <Button size="sm" variant="tonal" onClick={() => pk!.promptEnroll()}>Set up</Button>
-                    </div>
                   )}
-                </Card>
+                  {needsPasskey && (
+                    <Row
+                      icon={ShieldCheck}
+                      sub="One-tap sign-in with Face ID or fingerprint"
+                      trailing={<Button size="sm" variant="tonal" onClick={() => pk!.promptEnroll()}>Set up</Button>}
+                      divider={false}
+                    >
+                      Add a passkey
+                    </Row>
+                  )}
+                </Group>
               </Stagger>
             );
           })()}
 
-          <Stagger data-tour="today-hero">
-            <WidgetCarousel catalog={widgetCatalog} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
-          </Stagger>
-
+          {/* The macro bar is the ANCHOR'S SPLIT, which §1 explicitly endorses —
+              so it belongs next to the anchor, not below a carousel of unrelated
+              metrics. Read top to bottom it is now one thought: calories today,
+              what those calories were made of, then everything else. */}
           <Stagger>
             <MacroBar
               proteinG={data.nutrition.proteinG}
@@ -372,6 +397,10 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
               fatG={data.nutrition.fatG}
               targets={targets ? { proteinG: targets.targetProteinG, carbsG: targets.targetCarbsG, fatG: targets.targetFatG } : null}
             />
+          </Stagger>
+
+          <Stagger data-tour="today-hero">
+            <WidgetCarousel catalog={widgetCatalog} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
           </Stagger>
 
           {isToday && (

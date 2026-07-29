@@ -15,6 +15,14 @@ interface MetricPillProps {
   icon: LucideIcon;
   label: string;
   value: ReactNode;
+  /**
+   * The unit, rendered subordinate to the value (§5).
+   *
+   * It exists because the alternative was being used: widgets were putting the
+   * unit in the LABEL — `label="Weight 7d kg"` with `value="-0.5"` — which is
+   * §5 exactly backwards, and it made the label the longest text on a 1×1 card.
+   */
+  unit?: string;
   tone?: Tone;
   progress?: number; // 0..1 two-tone fill
   onClick?: () => void;
@@ -84,7 +92,7 @@ export function GlanceStrip({ items, className }: { items: { icon: LucideIcon; t
   );
 }
 
-export function MetricPill({ icon: Icon, label, value, tone = "activity", progress, onClick, className }: MetricPillProps) {
+export function MetricPill({ icon: Icon, label, value, unit, tone = "activity", progress, onClick, className }: MetricPillProps) {
   const pct = progress === undefined ? null : Math.min(1, Math.max(0, progress));
   const Comp = onClick ? motion.button : motion.div;
   return (
@@ -103,7 +111,12 @@ export function MetricPill({ icon: Icon, label, value, tone = "activity", progre
         <span className="block truncate text-xs font-medium opacity-80">{label}</span>
         {isBlank(value)
           ? <NoData className="block text-xs opacity-80" />
-          : <span className="numeral block text-lg font-bold leading-tight">{value}</span>}
+          : (
+            <span className="numeral block text-lg font-bold leading-tight">
+              {value}
+              {unit && <span className="ml-0.5 text-[0.72em] font-semibold opacity-70">{unit}</span>}
+            </span>
+          )}
       </span>
     </Comp>
   );
@@ -207,9 +220,14 @@ export function MacroBar({ proteinG, carbsG, fatG, targets, className }: { prote
           <div key={k} className={cn("relative flex items-center gap-2 overflow-hidden rounded-xl px-2.5 py-2", toneSoft[m.tone])}>
             {t ? <span aria-hidden className="absolute inset-y-0 left-0 bg-current opacity-[0.12]" style={{ width: `${Math.min(100, (grams[k] / t) * 100)}%` }} /> : null}
             <m.icon className="relative size-4 shrink-0" style={{ color: toneVar[m.tone] }} />
+            {/* `truncate`, not wrap. "Protein / 165" in a third of a phone
+                wrapped to two lines and pushed the chip taller than its two
+                neighbours, so a row designed as three equal pills rendered as
+                two pills and a box. Losing the tail of a target is a smaller
+                cost than losing the rhythm of the row. */}
             <span className="relative min-w-0">
               <span className="numeral block text-sm font-bold leading-none">{Math.round(grams[k])}<span className="text-xs font-medium opacity-70"> g</span></span>
-              <span className="block text-xs font-medium opacity-70">{m.label}{t ? ` / ${t}` : ""}</span>
+              <span className="block truncate text-xs font-medium leading-tight opacity-70">{m.label}{t ? ` / ${t}` : ""}</span>
             </span>
           </div>
         );
