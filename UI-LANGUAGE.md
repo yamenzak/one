@@ -919,7 +919,15 @@ translucent"). Both existed as hand-rolled copies on Today and Progress with
 different radii and different surfaces before this — the difference was real
 (one is over atmosphere) but nobody had decided it, so it read as drift.
 
-Three rules `DayNav` encodes, each from a defect it shipped with:
+Everything in the bar is `rounded-full` and 44px tall — the arrows AND the
+centre. The centre pill is a button (pressing it opens the picker), and
+`tokens.css` is explicit that `radius-full` is the ACTION radius while
+`radius-sm`/`xl` is the IDENTITY one, and that the two are never mixed. Today's
+hand-rolled version had the centre at `rounded-xl` between two round arrows —
+one row, two pressable shapes — and its arrows at 36px, under any usable touch
+floor (§4 holds rows to 48).
+
+Three more rules `DayNav` encodes, each from a defect it shipped with:
 - **The forward arrow disables at the boundary, it does not disappear.** A
   vanishing control teaches nothing; a dimmed one teaches the edge.
 - **The reset sits in an always-reserved slot.** It used to be a row that only

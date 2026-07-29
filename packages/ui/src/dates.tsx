@@ -76,7 +76,13 @@ export function DatePill({
       />
       <div
         className={cn(
-          "pointer-events-none flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold [&_svg]:size-4",
+          // rounded-full, not rounded-xl: tokens.css is explicit that radius-full
+          // is the ACTION radius and radius-sm/xl the IDENTITY one, and "never
+          // mix them". This pill IS an action — pressing it opens the picker —
+          // and it sits between two round arrow buttons, so an xl here made one
+          // row contain two pressable shapes. Today's original had it as xl and
+          // the extraction inherited the defect; Progress's had it right.
+          "pointer-events-none flex h-11 items-center justify-center gap-1.5 rounded-full px-4 text-sm font-semibold [&_svg]:size-4",
           SURFACE[surface],
         )}
       >
@@ -87,8 +93,12 @@ export function DatePill({
   );
 }
 
+// size-11 (44px), not the size-9 this inherited: 36px is under any sane touch
+// floor, and the rows in §4 are held to 48. It also makes the arrows exactly as
+// tall as the pill, so the three controls read as one bar rather than a wide
+// element with two small satellites.
 const ARROW =
-  "grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors " +
+  "grid size-11 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors " +
   "enabled:hover:text-foreground disabled:opacity-30 [&_svg]:size-4";
 
 /**
