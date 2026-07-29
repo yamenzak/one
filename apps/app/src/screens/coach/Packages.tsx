@@ -381,7 +381,7 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
           {budgets.map((b, i) => (
             <div key={i} className="flex items-center gap-2">
               <div className="flex gap-1">{BUDGET_FEATURES.map((f) => <Chip key={f} selected={b.feature === f} onClick={() => setBudget(i, { feature: f })}>{f}</Chip>)}</div>
-              <input type="number" min={1} value={b.days} onChange={(e) => setBudget(i, { days: Number(e.target.value) })} aria-label="Budget days" className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 text-sm outline-none" />
+              <input type="number" min={1} value={b.days} onChange={(e) => setBudget(i, { days: Number(e.target.value) })} aria-label="Budget days" className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
               <span className="text-xs text-muted-foreground">days</span>
               {budgets.length > 1 && <button type="button" onClick={() => setBudgets((x) => x.filter((_, idx) => idx !== i))} aria-label="Remove budget" className="text-muted-foreground hover:text-danger [&_svg]:size-3.5"><X /></button>}
             </div>
@@ -398,7 +398,7 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
             {addOnTypes.map((t) => (
               <div key={t.id} className="flex items-center justify-between gap-2">
                 <div className="min-w-0"><div className="text-sm">{t.label}</div><div className="text-xs text-muted-foreground">{t.duration_minutes} min</div></div>
-                <input type="number" min={0} value={addOns[t.id] ?? 0} onChange={(e) => setAddOns((p) => ({ ...p, [t.id]: Math.max(0, Number(e.target.value)) }))} className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 text-sm outline-none" aria-label={`${t.label} units included`} />
+                <input type="number" min={0} value={addOns[t.id] ?? 0} onChange={(e) => setAddOns((p) => ({ ...p, [t.id]: Math.max(0, Number(e.target.value)) }))} className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70" aria-label={`${t.label} units included`} />
               </div>
             ))}
           </div>
