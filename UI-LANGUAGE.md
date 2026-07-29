@@ -906,6 +906,26 @@ invisible cursor.
 `isBlank(v)` is the shared predicate — `null`, `undefined` or `""`, and
 deliberately **not** `0`.
 
+### Settings — `settings.tsx`
+
+| Component | Use it when | Do NOT use it for | State |
+|---|---|---|---|
+| `SettingsIndex` | The table of contents for a configuration surface. Groups of rows; each row's sub-line says **what is inside**. | A list of data (that is `Group`/`Row`). An index's rows are doors, not records. | ✅ |
+| `SettingsPage` | The frame around one section: back, title, and **one** line of description. | A section that needs a paragraph — if it does, its rows are named wrong. | ✅ |
+| `SectionDetail` | A section that is itself several settings: an index of sub-pages, one open at a time, each row stating its **current value**. | Two or three controls that fit on one page. Splitting those buys a tap and costs a screen. | ✅ |
+
+`SectionDetail` is **controlled and router-free**: `openKey` + `onOpen` are
+props, because this package has no router dependency and must not gain one — a
+design system that imports one cannot be consumed by an app using a different
+one. The product binds it to whatever its navigation is (Kova: a query param per
+section, so Back steps out one level at a time). `SettingsIndex` and
+`SectionDetail` are the same rows at two depths, which is why this file is thin.
+
+`footer` on `SectionDetail` renders under the index and every sub-page. Pass one
+**only** when the sub-pages share form state and must therefore share a submit;
+a split that gives each sub-page its own save can leave a half-applied
+configuration behind. Sections whose parts save independently pass nothing.
+
 ### Product-side registries (in the app, not the package)
 
 These are not components — they are the single source for a *vocabulary* that
@@ -916,6 +936,7 @@ things, and they exist because in every case the copies had already drifted.
 |---|---|---|
 | `screens/client/scales.ts` | The 1–5 wellness scales: the word for each step, the endpoint captions, and which scales are **inverted** (`stress`). | The check-in / mood / sleep forms, the check-in detail sheet, the Wellness history rows. |
 | `attention-ui.ts` | Icon + tone per attention type. | Coach Today, the roster, the client header. |
+| `screens/SectionSplit.tsx` | Binding `SectionDetail` to the router — the open sub-page in a query param. | Every split settings section. |
 | `activityIcons.ts` | The glyph for an activity key, category default plus overrides. | The activity feed and the selected-activity header — **not** the picker chips (see §7). |
 
 A screen that renders one of these must go through the registry, including for
