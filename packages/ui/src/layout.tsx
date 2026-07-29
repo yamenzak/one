@@ -122,7 +122,7 @@ export function Screen({
       <div
         className={cn(
           "relative mx-auto flex w-full flex-col px-4 md:px-6",
-          width === "narrow" ? "max-w-md" : "max-w-[640px] lg:max-w-[720px]",
+          width === "narrow" ? "max-w-md" : "column",
           center ? "min-h-dvh justify-center py-10" : "pb-16 pt-6",
         )}
       >

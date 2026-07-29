@@ -221,7 +221,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   }, [data, targets, units.energy]);
 
   return (
-    <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+    <Page className="column space-y-5 p-4 pb-28">
       {error && !data ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load your day" description="Something went wrong loading today. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />
       ) : (

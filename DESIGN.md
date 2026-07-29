@@ -100,6 +100,37 @@ by design (§7 `Tile` vs `Row`).
 Follow the order in UI-LANGUAGE.md §14: tokens → `Row`/`Group` → `Atmosphere`/
 `Anchor` → motion → screen by screen.
 
+## Desktop — one of §11's three shapes is real
+
+Stated plainly, because the language describes three and the app has one.
+
+**Focus (`md` 768) — shipped.** Nav rail, one centred column, sheets as bottom
+drawers. This is what every screen renders at every width above 768.
+
+**Two-pane (`lg` 1100) and Board (`xl` 1400) — NOT built.** No list pane, no
+right column of secondary cards. Above ~1100 the app is a 720px column with
+empty space either side. That is not a defect in the sense of something broken —
+§11's first rule is that cards never stretch, so nothing is misshapen — but it is
+not the promised desktop experience either, and it should not be described as
+one.
+
+What the desktop pass DID fix, both of them §11 violations by its own words:
+
+- **The column had never actually been 640/720.** Every screen wrote
+  `mx-auto max-w-xl` (576px) inside a `<main>` that capped at 640/720, so the
+  inner cap always won and §2's column table applied nowhere. The app was 576px
+  wide on a 1512px display, which is most of why desktop read as a phone in a
+  window. There is now one `.column` utility (tokens.css) and 27 files use it,
+  so the column is one thing that can be tuned in one place.
+- **The billing banner stretched to the full viewport** while every card below it
+  stopped at the column — label hard left, button ~900px away hard right. That is
+  §11's "a row stretched to 1400px with a value floating in the void", verbatim.
+  The paused-studio strip stays full-bleed (it describes the whole surface) but
+  its text now sits in the column: a single line across a desktop window is a
+  ~180-character measure and §5 caps prose at ~68.
+
+---
+
 ## Six enforcement layers
 
 The language is only worth what a screen cannot quietly opt out of. Six things

@@ -105,7 +105,7 @@ export function Progress({ clientId }: { clientId: string }) {
   const dateLabel = (i: number) => shortDate(days[i] ?? today);
 
   return (
-    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+    <Page className="column space-y-4 p-4 pb-28">
       {/* T1 lives INSIDE each lens (§1): a tabbed surface is four screens
           sharing chrome, and each names a different subject. "Progress" itself is
           navigation — the tab bar already says it — so it is an eyebrow here

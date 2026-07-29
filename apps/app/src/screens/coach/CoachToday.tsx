@@ -83,7 +83,7 @@ export function CoachToday() {
   }, []);
 
   return (
-    <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+    <Page className="column space-y-5 p-4 pb-28">
 
       <Reveal loading={!clients || !notifications} className="space-y-5" skeleton={
         <>

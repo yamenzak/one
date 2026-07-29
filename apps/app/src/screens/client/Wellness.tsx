@@ -265,7 +265,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
   const clock = `${Math.floor(fastSecs / 3600)}:${String(Math.floor((fastSecs % 3600) / 60)).padStart(2, "0")}:${String(fastSecs % 60).padStart(2, "0")}`;
 
   return (
-    <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+    <Page className="column space-y-5 p-4 pb-28">
       {onBack && (
         <div className="flex items-center gap-3">
           <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>

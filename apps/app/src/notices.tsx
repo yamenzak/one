@@ -26,10 +26,15 @@ export function StudioPausedBanner() {
   if (!host?.gate?.readOnly) return null;
   const closing = reason === "closing";
   return (
+    /* The STRIP is full-bleed — it describes the whole surface, so a floating
+       card would understate it — but its TEXT sits in the content column. A
+       single line running the full width of a desktop window is a ~180-character
+       measure; §5 caps prose at ~68. */
     <div
       role="status"
-      className="flex items-start gap-2 border-b border-warning/25 bg-warning/12 px-4 py-2.5 text-xs leading-relaxed text-warning"
+      className="border-b border-warning/25 bg-warning/12 px-4 py-2.5 text-xs leading-relaxed text-warning"
     >
+      <div className="column flex items-start gap-2">
       <Lock aria-hidden className="mt-0.5 size-3.5 shrink-0" />
       <span>
         <span className="font-semibold">{closing ? "This studio is closing." : "This studio is paused."}</span>{" "}
@@ -37,6 +42,7 @@ export function StudioPausedBanner() {
           ? "Everything is readable, but nothing new can be saved. The owner can still cancel the closure from Billing."
           : "Everything is readable, but nothing new can be saved until the studio renews."}
       </span>
+      </div>
     </div>
   );
 }

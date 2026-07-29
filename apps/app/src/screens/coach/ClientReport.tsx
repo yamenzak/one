@@ -68,7 +68,7 @@ export function ClientReport({ clientId }: { clientId: string }) {
   const maxE1 = report?.prs[0]?.e1rm ?? 1;
 
   return (
-    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+    <Page className="column space-y-4 p-4 pb-28">
       <SegmentedControl options={[{ value: "7d", label: "7 days" }, { value: "30d", label: "30 days" }, { value: "90d", label: "90 days" }]} value={range} onChange={(v) => setRange(v as RangePreset)} />
 
       {canAi && (

@@ -24,7 +24,7 @@ export function Library() {
   const { tab: tabParam } = useParams<{ tab?: string }>();
   const tab = (TABS.includes(tabParam as Tab) ? tabParam : "exercises") as Tab;
   return (
-    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+    <Page className="column space-y-4 p-4 pb-28">
       <p className="px-1 text-caption text-muted-foreground">Library</p>
       <SegmentedControl options={[{ value: "exercises", label: "Exercises" }, { value: "foods", label: "Foods" }, { value: "templates", label: "Templates" }, { value: "content", label: "Content" }]} value={tab} onChange={(v) => nav(`/library/${v}`)} />
       {tab === "exercises" && <Exercises />}

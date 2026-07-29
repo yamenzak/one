@@ -67,7 +67,7 @@ export function Sessions() {
   };
 
   return (
-    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+    <Page className="column space-y-4 p-4 pb-28">
       <FeatureLock feature="frontDesk">
         <Reveal loading={!sessions || !types} className="space-y-4" skeleton={<><SkeletonList card rows={4} thumb={40} /><SkeletonList card rows={2} thumb={36} /></>}>
           {sessions && types && (

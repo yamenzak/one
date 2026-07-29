@@ -171,7 +171,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   if (loadError && plan === undefined) return (
     <PlanShell onEscape={onExit}>
       <HeaderBar title="Workout plan" onBack={onExit} />
-      <div className="mx-auto max-w-xl p-4">
+      <div className="column p-4">
         <EmptyState icon={AlertTriangle} title="Couldn't load your plan" description="Something went wrong reaching your workout plan. Check your connection and try again."
           action={<Button onClick={() => { setLoadError(false); setReloadKey((k) => k + 1); }}>Try again</Button>} />
       </div>
@@ -183,7 +183,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   if (plan === undefined) return (
     <PlanShell onEscape={onExit}>
       <HeaderBar title="Workout plan" onBack={onExit} />
-      <div className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+      <div className="column space-y-5 p-4 pb-28">
         <Skeleton className="h-28 w-full rounded-2xl" />
         <div className="grid grid-cols-2 gap-3">
           {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="aspect-[4/5] w-full rounded-2xl" />)}
@@ -195,7 +195,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   if (!plan) return (
     <PlanShell onEscape={onExit}>
       <HeaderBar title="Workout plan" onBack={onExit} />
-      <div className="mx-auto max-w-xl p-4"><EmptyState icon={Dumbbell} title="No published plan" description="Your coach hasn't published a workout plan yet." /></div>
+      <div className="column p-4"><EmptyState icon={Dumbbell} title="No published plan" description="Your coach hasn't published a workout plan yet." /></div>
     </PlanShell>
   );
 
@@ -212,7 +212,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
               {pastPlans.length > 0 && <button onClick={() => setHistOpen(true)} aria-label="Past plans" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><History /></button>}
             </div>
           } />
-        <motion.div variants={stagger} initial="hidden" animate="show" className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+        <motion.div variants={stagger} initial="hidden" animate="show" className="column space-y-5 p-4 pb-28">
         {/*
           T1 — THE ANCHOR (UI-LANGUAGE §1).
 
@@ -363,13 +363,13 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
         right={<span data-tour="wp-progress"><ProgressRing progress={totalSets ? loggedSets / totalSets : 0} size={40} strokeWidth={5} tone="activity" value={<span className="text-xs font-semibold">{loggedSets}</span>} /></span>} />
 
       {loadWarning && (
-        <div role="status" className="mx-auto flex max-w-xl items-center justify-between gap-3 px-4 pt-3">
+        <div role="status" className="column flex items-center justify-between gap-3 px-4 pt-3">
           <p className="min-w-0 text-sm text-warning">{loadWarning}</p>
           <Button size="sm" variant="secondary" className="shrink-0" onClick={() => setReloadKey((k) => k + 1)}>Retry</Button>
         </div>
       )}
 
-      <ol className="mx-auto max-w-xl p-4 pb-28">
+      <ol className="column p-4 pb-28">
         {steps.map((step, i) => {
           const last = i === steps.length - 1;
           const single = step.kind === "single";

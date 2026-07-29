@@ -240,7 +240,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
         {pastPlans.length > 0 && <button onClick={() => setHistOpen(true)} aria-label="Past plans" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><History /></button>}
       </div>
 
-      <div className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+      <div className="column space-y-5 p-4 pb-28">
         <Reveal loading={plan === undefined} className="space-y-5" skeleton={
           <>
             <SkeletonHero height={128} />
