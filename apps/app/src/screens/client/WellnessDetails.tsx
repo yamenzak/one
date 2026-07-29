@@ -13,6 +13,7 @@ import {
 } from "@kova/ui";
 import { useUnits } from "../../units.js";
 import type { UnitPrefs } from "@kova/domain";
+import { SCALES, scaleWord } from "./scales.js";
 
 export interface CheckInFull {
   id: string; date_local: string;
@@ -56,18 +57,26 @@ function CoachFeedback({ title, body, at }: { title: string; body: string; at?: 
 
 function Rating({ kind, value }: { kind: "mood" | "energy" | "stress"; value: number }) {
   const m = METRICS[kind]; // label/icon/tone from the metric registry (SSOT)
+  // A full bar means "a lot of this", and a lot of stress is not a win — so an
+  // inverted scale fills the other way and wears the warning tone at its bad
+  // end. "4/5" beside a full bar in a positive tone said the opposite.
+  const inverted = !!SCALES[kind].inverted;
+  const filled = inverted ? 6 - value : value;
+  const tone = inverted && value >= 4 ? "warning" : m.tone;
   return (
     <div className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2.5">
-      <IconBadge icon={m.icon} tone={m.tone} size="sm" />
+      <IconBadge icon={m.icon} tone={tone} size="sm" />
       <div className="min-w-0 flex-1">
         <div className="text-xs font-medium text-muted-foreground">{m.label}</div>
         <div className="mt-1 flex gap-1">
           {[1, 2, 3, 4, 5].map((n) => (
-            <span key={n} className={cn("h-1.5 flex-1 rounded-full", n > value && "bg-surface-3")} style={n <= value ? { backgroundColor: toneVar[m.tone] } : undefined} />
+            <span key={n} className={cn("h-1.5 flex-1 rounded-full", n > filled && "bg-surface-3")} style={n <= filled ? { backgroundColor: toneVar[tone] } : undefined} />
           ))}
         </div>
       </div>
-      <span className="numeral text-sm font-semibold">{value}/5</span>
+      {/* The word, not "4/5" — a number out of five says nothing about which
+          direction is the good one. */}
+      <span className="shrink-0 text-sm font-semibold">{scaleWord(kind, value)}</span>
     </div>
   );
 }
@@ -92,7 +101,7 @@ function checkInStats(ci: CheckInFull, units: UnitPrefs): { icon: LucideIcon; la
   const out: { icon: LucideIcon; label: string; value: string; tone: Tone }[] = [];
   if (ci.weight_kg != null) out.push({ icon: m.weight.icon, label: m.weight.label, value: fmtWeight(ci.weight_kg, units), tone: m.weight.tone });
   if (ci.body_fat_percent != null) out.push({ icon: m.bodyFat.icon, label: m.bodyFat.label, value: `${ci.body_fat_percent.toFixed(1)}%`, tone: m.bodyFat.tone });
-  if (ci.sleep_hours != null) out.push({ icon: m.sleep.icon, label: m.sleep.label, value: `${ci.sleep_hours}h${ci.sleep_quality != null ? ` · ${ci.sleep_quality}/5` : ""}`, tone: m.sleep.tone });
+  if (ci.sleep_hours != null) out.push({ icon: m.sleep.icon, label: m.sleep.label, value: `${ci.sleep_hours}h${ci.sleep_quality != null ? ` · ${scaleWord("sleepQ", ci.sleep_quality)}` : ""}`, tone: m.sleep.tone });
   if (ci.steps_count != null) out.push({ icon: m.steps.icon, label: m.steps.label, value: ci.steps_count.toLocaleString(), tone: m.steps.tone });
   if (ci.water_ml != null && ci.water_ml > 0) out.push({ icon: m.water.icon, label: m.water.label, value: fmtVolume(ci.water_ml, units), tone: m.water.tone });
   return out;

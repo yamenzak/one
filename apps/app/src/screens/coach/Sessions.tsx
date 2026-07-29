@@ -1,19 +1,26 @@
 /**
  * Coach: sessions & front desk (SPEC §8.9, `frontDesk` entitlement). Owners
- * define add-on types (consultations) and any staff member schedules sessions
- * against a client's add-on balance.
+ * define session types (consultations) and any staff member books a client in
+ * against the sessions their package prepaid.
+ *
+ * ── The words on this screen ────────────────────────────────────────────────
+ * The server calls these things "add-on types" and an "add-on balance", and the
+ * routes/columns keep those names. The SCREEN does not: a coach at a front desk
+ * says "session type" and "sessions left", and "add-on unit" is a billing-model
+ * word leaking into a scheduling tool. The API vocabulary stays in the code, the
+ * human vocabulary stays on the glass.
  *
  * The balance ledger lives server-side (`session-routes.ts`) and this screen must
- * describe it truthfully: **completing OR no-showing spends a unit; cancelling a
- * session that already spent one hands it back; cancelling a still-scheduled
- * session spends and refunds nothing.** Booking without an unspent unit is
- * refused, so the schedule sheet has to surface the server's message rather than
- * failing silently. Resolved sessions stay on screen as history (the API returns
- * a 30-day tail) — that is where a consumed unit can be handed back by reopening.
+ * describe it truthfully: **completing OR no-showing spends a session; cancelling
+ * a booking that already spent one hands it back; cancelling a still-scheduled
+ * booking spends and refunds nothing.** Booking with nothing left is refused, so
+ * the schedule sheet has to surface the server's message rather than failing
+ * silently. Resolved bookings stay on screen as history (the API returns a 30-day
+ * tail) — that is where a spent session can be handed back by reopening.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Card, Badge, Field, Sheet, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonList, Avatar, Calendar, Clock, CheckCheck, X, User, Plus, Ticket, CreditCard, History, RotateCcw , Group, Row } from "@kova/ui";
+import { Button, Card, Badge, Field, Sheet, Select, Page, Stagger, EmptyState, SectionHeader, ConfirmDialog, Reveal, SkeletonList, Avatar, TierAnchor, CountUp, Calendar, Clock, CheckCheck, X, User, Plus, Ticket, CreditCard, History, RotateCcw , Group, Row } from "@kova/ui";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
 import { FeatureLock } from "../../FeatureLock.js";
@@ -24,6 +31,9 @@ interface AddOnType { id: string; slug: string; label: string; kind: string; dur
 interface SessionRow { id: string; client_id: string; addon_type_id: string; scheduled_at: string; duration_minutes: number; status: string; notes: string | null }
 
 const STATUS_TONE: Record<string, "success" | "activity" | "danger" | "neutral"> = { completed: "success", scheduled: "activity", no_show: "danger", cancelled: "neutral" };
+/** `status.replace("_", " ")` put a lowercase "no show" on a badge next to
+ *  sentence-cased ones. Statuses are a closed set; write them out. */
+const STATUS_LABEL: Record<string, string> = { completed: "Completed", scheduled: "Scheduled", no_show: "No-show", cancelled: "Cancelled" };
 
 export function Sessions() {
   const { ctx } = useSession();
@@ -58,6 +68,33 @@ export function Sessions() {
     [sessions],
   );
 
+  // Nothing to book against yet — the whole screen's first step.
+  const needsType = types != null && types.length === 0;
+  // The anchor's sub-line is the SECOND fact, never a restatement of the number
+  // above it (§1): when something is booked it says when the next one is.
+  const anchorSub = useMemo(() => {
+    if (needsType) return "No session types yet";
+    if (upcoming.length === 0) return clients.length === 0 ? "No clients yet" : "Nothing booked";
+    const next = upcoming.reduce((a, b) => (a.scheduled_at <= b.scheduled_at ? a : b));
+    /*
+      RELATIVE HERE, ABSOLUTE ON THE CARD.
+
+      The sub-line used to print "Fri 4:30 PM" — the same string the first card
+      prints a hundred pixels below it, which with a single booking made the
+      anchor a caption for the thing under it. How far out it is, is the fact
+      the anchor can add and the card can't.
+    */
+    const when = new Date(next.scheduled_at);
+    const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+    const days = Math.floor((when.getTime() - midnight.getTime()) / 86_400_000);
+    const rel = days <= 0 ? `today, ${when.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+      : days === 1 ? "tomorrow"
+      : days < 7 ? `in ${days} days`
+      : when.toLocaleDateString([], { month: "short", day: "numeric" });
+    return `Next ${rel} · ${clientName(next.client_id)}`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clientName reads `clients`, which is in the deps
+  }, [needsType, upcoming, clients]);
+
   const transition = async (id: string, status: "scheduled" | "completed" | "no_show" | "cancelled") => {
     setBusyId(id);
     setMsg(null);
@@ -72,10 +109,51 @@ export function Sessions() {
         <Reveal loading={!sessions || !types} className="space-y-4" skeleton={<><SkeletonList card rows={4} thumb={40} /><SkeletonList card rows={2} thumb={36} /></>}>
           {sessions && types && (
           <>
-            <SectionHeader icon={Calendar} tone="cardio" title="Upcoming sessions" action={<Button size="sm" disabled={types.length === 0 || clients.length === 0} onClick={() => setScheduleOpen(true)}><Plus /> Schedule</Button>} />
+            {/*
+              FIRST-RUN IS ITS OWN SCREEN.
+
+              With no session types there is nothing to anchor: "Booked in 0" is
+              the least informative number on a page whose entire subject is
+              setup, and it stacked a hero, a button and an empty state all
+              saying the same thing. This is the §1 no-T1 case — the empty state
+              IS the surface, and it carries the action.
+            */}
+            {needsType ? (
+              <EmptyState
+                icon={Ticket}
+                title="Set up your session types"
+                description={isOwner
+                  ? "A session type is one thing you offer — a nutrition consult, a body scan, a check-in call. Name it once and anyone on your team can book clients in."
+                  : "Your studio owner sets these up. Once there's one, you can book clients in from here."}
+                action={isOwner ? <Button size="lg" onClick={() => setTypeOpen(true)}><Plus /> Add a session type</Button> : undefined}
+              />
+            ) : (
+            <>
+            {/* T1 (§1). A front desk has exactly one question on arrival: what is
+                booked. The old screen opened with a section header and two large
+                empty regions and nothing to read. */}
+            <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
+              <p className="text-caption text-muted-foreground">Booked in</p>
+              <p className="numeral text-display"><CountUp value={upcoming.length} /></p>
+              <p className="text-caption text-muted-foreground">{anchorSub}</p>
+            </TierAnchor>
+
+            <Stagger className="pb-1">
+              <Button size="lg" className="w-full" disabled={clients.length === 0} onClick={() => setScheduleOpen(true)}><Plus /> Book a session</Button>
+            </Stagger>
+
             {msg && <p role="status" aria-live="polite" className="text-sm text-danger">{msg}</p>}
             {upcoming.length === 0 ? (
-              <EmptyState icon={Calendar} title="No sessions scheduled" description={types.length === 0 ? "Add a consultation type below, then schedule a session against a client's add-on balance." : "Schedule a session against a client's add-on balance — completing it or marking a no-show spends a unit."} />
+              /* NOT an EmptyState. The anchor two lines up already says "Nothing
+                 booked" and the action is the button between them, so a 350px
+                 illustrated block could only repeat both — which it did, title
+                 for title. What's left is the one thing neither says: what a
+                 booking costs the client, and when. */
+              <p className="px-6 pb-2 text-center text-sm text-muted-foreground">
+                {clients.length === 0
+                  ? "Add a client first, then book them in from here."
+                  : "Marking a session complete — or a no-show — uses one of that client's prepaid sessions."}
+              </p>
             ) : (
               <Stagger className="space-y-2">
                 {upcoming.map((s) => (
@@ -86,7 +164,9 @@ export function Sessions() {
                         <div className="truncate font-semibold">{clientName(s.client_id)}</div>
                         <div className="truncate text-sm text-muted-foreground">{typeLabel(s.addon_type_id)}</div>
                       </div>
-                      <Badge tone={STATUS_TONE[s.status] ?? "neutral"}>{s.status.replace("_", " ")}</Badge>
+                      {/* No "Scheduled" badge here: everything in this list is
+                          scheduled, so the badge said nothing and took the room
+                          a long client name needed. */}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1 [&_svg]:size-3.5"><Calendar />{new Date(s.scheduled_at).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
@@ -117,12 +197,12 @@ export function Sessions() {
                             {typeLabel(s.addon_type_id)} · {new Date(s.scheduled_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                           </div>
                         </div>
-                        <Badge tone={STATUS_TONE[s.status] ?? "neutral"}>{s.status.replace("_", " ")}</Badge>
+                        <Badge tone={STATUS_TONE[s.status] ?? "neutral"}>{STATUS_LABEL[s.status] ?? s.status}</Badge>
                       </div>
                       {(s.status === "completed" || s.status === "no_show") && (
                         <div className="flex flex-wrap items-center gap-2 border-t border-border/40 pt-2.5">
                           <Button size="sm" variant="ghost" disabled={busyId === s.id} onClick={() => void transition(s.id, "scheduled")}><RotateCcw /> Reopen</Button>
-                          <span className="text-xs text-muted-foreground">Returns the add-on unit to their balance.</span>
+                          <span className="text-xs text-muted-foreground">Gives the client their session back.</span>
                         </div>
                       )}
                     </Card>
@@ -131,17 +211,23 @@ export function Sessions() {
               </>
             )}
 
-            <SectionHeader className="pt-2" icon={Ticket} tone="primary" title="Add-on types" action={isOwner ? <Button size="sm" onClick={() => setTypeOpen(true)}><Plus /> Type</Button> : undefined} />
-            {types.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{isOwner ? "Consultation types you can schedule against a client's add-on balance." : "No add-on types yet — ask the studio owner to add one."}</p>
-            ) : (
-              <Group>
-                {types.map((t) => (
-                  <Row key={t.id} icon={Calendar} sub={`${t.duration_minutes} min${t.standalone_price_cents != null ? ` · ${fmtPrice(t.standalone_price_cents)}` : ""}`}>
-                    {t.label}
-                  </Row>
-                ))}
-              </Group>
+            {/* Only once there is something to list. Empty, this used to be a
+                section header, one hanging sentence, and half a screen of dead
+                space below it — the setup instruction already lives in the
+                empty state and the primary action above. */}
+            {types.length > 0 && (
+              <>
+                <SectionHeader className="pt-2" icon={Ticket} tone="primary" title="What you offer" count={types.length} action={isOwner ? <Button size="sm" variant="secondary" onClick={() => setTypeOpen(true)}><Plus /> Add type</Button> : undefined} />
+                <Group>
+                  {types.map((t) => (
+                    <Row key={t.id} icon={Calendar} sub={`${t.duration_minutes} min${t.standalone_price_cents != null ? ` · ${fmtPrice(t.standalone_price_cents)} on its own` : ""}`}>
+                      {t.label}
+                    </Row>
+                  ))}
+                </Group>
+              </>
+            )}
+            </>
             )}
           </>
           )}
@@ -158,7 +244,7 @@ export function Sessions() {
           // unit to refund — the booking is simply released. (The old text promised
           // a refund that never happened.) A unit only comes back by reopening a
           // completed / no-showed session.
-          description="Cancelling releases the booking and notifies the client. Their add-on unit was never spent, so nothing is refunded."
+          description="The booking is released and the client is told. Nothing was used yet, so their prepaid sessions are untouched."
           confirmLabel="Cancel session"
           destructive
           onConfirm={() => { if (cancelling) void transition(cancelling.id, "cancelled"); }}
@@ -168,7 +254,7 @@ export function Sessions() {
   );
 }
 
-/** Schedule a session — client × add-on type × when. */
+/** Book a session — client × type × when. */
 function ScheduleSheet({ clients, types, onClose, onSaved }: { clients: ClientSummary[]; types: AddOnType[]; onClose: () => void; onSaved: () => void }) {
   const [clientId, setClientId] = useState("");
   const [addOnTypeId, setAddOnTypeId] = useState(types[0]?.id ?? "");
@@ -190,23 +276,26 @@ function ScheduleSheet({ clients, types, onClose, onSaved }: { clients: ClientSu
     finally { setBusy(false); }
   };
   return (
-    <Sheet open onClose={onClose} title="Schedule a session">
+    <Sheet open onClose={onClose} title="Book a session">
       <div className="space-y-4">
         <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Client</span><Select aria-label="Client" value={clientId} onChange={setClientId} options={[{ value: "", label: "Choose a client…" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} /></div>
-        <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Add-on type</span><Select aria-label="Add-on type" value={addOnTypeId} onChange={setAddOnTypeId} options={types.map((t) => ({ value: t.id, label: `${t.label} · ${t.duration_minutes} min` }))} /></div>
+        <div className="space-y-1.5"><span className="text-sm text-muted-foreground">What for</span><Select aria-label="What for" value={addOnTypeId} onChange={setAddOnTypeId} options={types.map((t) => ({ value: t.id, label: `${t.label} · ${t.duration_minutes} min` }))} /></div>
         <label className="block space-y-1.5">
           <span className="text-sm text-muted-foreground">When</span>
           <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className="w-full rounded-xl bg-surface-3 px-3 py-2.5 text-sm outline-none ring-ring focus-visible:ring-2" />
         </label>
         <Field label="Notes (optional)" icon={User} value={notes} onChange={(e) => setNotes(e.target.value)} />
         {err && <p role="status" aria-live="polite" className="text-sm text-danger">{err}</p>}
-        <Button size="lg" className="w-full" disabled={!clientId || !addOnTypeId || !when || busy} onClick={() => void save()}>{busy ? "Scheduling…" : "Schedule session"}</Button>
+        {/* What the button is about to cost the client, said before it's spent —
+            not after, in an error. */}
+        <p className="text-xs text-muted-foreground">Booking holds the slot. It only uses one of their prepaid sessions when you mark it complete or a no-show.</p>
+        <Button size="lg" className="w-full" disabled={!clientId || !addOnTypeId || !when || busy} onClick={() => void save()}>{busy ? "Booking…" : "Book session"}</Button>
       </div>
     </Sheet>
   );
 }
 
-/** Define a new add-on / consultation type (owner only). */
+/** Define a new session type — one thing the studio offers (owner only). */
 function AddOnTypeSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [label, setLabel] = useState("");
   const [duration, setDuration] = useState("30");
@@ -220,17 +309,17 @@ function AddOnTypeSheet({ onClose, onSaved }: { onClose: () => void; onSaved: ()
       await api.post("/api/addon-types", { label: label.trim(), durationMinutes: Number(duration) || 30, standalonePriceCents: price ? Math.round(Number(price) * 100) : undefined });
       onSaved();
     }
-    catch (e) { setErr(errorText(e, "Couldn't create that add-on type.")); }
+    catch (e) { setErr(errorText(e, "Couldn't create that session type.")); }
     finally { setBusy(false); }
   };
   return (
-    <Sheet open onClose={onClose} title="New add-on type">
+    <Sheet open onClose={onClose} title="New session type">
       <div className="space-y-4">
-        <Field label="Label" icon={Ticket} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nutrition consultation" />
-        <Field label="Duration (minutes)" icon={Clock} value={duration} inputMode="numeric" onChange={(e) => setDuration(e.target.value.replace(/\D/g, ""))} />
-        <Field label="Standalone price (USD, optional)" icon={CreditCard} value={price} inputMode="decimal" onChange={(e) => setPrice(e.target.value)} hint="What one session costs on its own. Setting it also lets staff book this type when a client has no included units left." />
+        <Field label="Name" icon={Ticket} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nutrition consultation" hint="What you'd call it to a client." />
+        <Field label="How long" icon={Clock} value={duration} inputMode="numeric" onChange={(e) => setDuration(e.target.value.replace(/\D/g, ""))} hint="In minutes." />
+        <Field label="Price on its own (optional)" icon={CreditCard} value={price} inputMode="decimal" onChange={(e) => setPrice(e.target.value)} hint="USD. What one costs when it isn't already in a package — set it and your team can still book a client who's used theirs up." />
         {err && <p role="status" aria-live="polite" className="text-sm text-danger">{err}</p>}
-        <Button size="lg" className="w-full" disabled={label.trim().length < 2 || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create type"}</Button>
+        <Button size="lg" className="w-full" disabled={label.trim().length < 2 || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create session type"}</Button>
       </div>
     </Sheet>
   );

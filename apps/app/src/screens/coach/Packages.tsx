@@ -392,13 +392,16 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
         {addOnTypes.length > 0 && (
           <div className="space-y-2">
             <div>
-              <span className="text-sm text-muted-foreground">Included add-ons</span>
-              <p className="text-xs text-muted-foreground/80">Consultation units this package grants — consumed when a session is completed.</p>
+              {/* Same vocabulary as the Sessions screen: "session type", "prepaid
+                  sessions". "Add-on units" is the billing model's word, not the
+                  coach's. */}
+              <span className="text-sm text-muted-foreground">Sessions included</span>
+              <p className="text-xs text-muted-foreground/80">How many of each the client gets. Used up when you mark a session complete or a no-show.</p>
             </div>
             {addOnTypes.map((t) => (
               <div key={t.id} className="flex items-center justify-between gap-2">
                 <div className="min-w-0"><div className="text-sm">{t.label}</div><div className="text-xs text-muted-foreground">{t.duration_minutes} min</div></div>
-                <input type="number" min={0} value={addOns[t.id] ?? 0} onChange={(e) => setAddOns((p) => ({ ...p, [t.id]: Math.max(0, Number(e.target.value)) }))} className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70" aria-label={`${t.label} units included`} />
+                <input type="number" min={0} value={addOns[t.id] ?? 0} onChange={(e) => setAddOns((p) => ({ ...p, [t.id]: Math.max(0, Number(e.target.value)) }))} className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70" aria-label={`${t.label} sessions included`} />
               </div>
             ))}
           </div>

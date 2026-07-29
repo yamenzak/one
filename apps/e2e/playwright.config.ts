@@ -80,7 +80,21 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
   webServer: [
     {
-      command: `pnpm --filter @kova/api exec wrangler dev --local --log-level ${process.env.E2E_SERVER_LOGS ? "info" : "warn"} --port ${APP_PORT}`,
+      /*
+       * `E2E_DEV_ADMIN=1` blanks ADMIN_EMAILS for this run only.
+       *
+       * `isPlatformAdmin` allowlists that var when it is set and otherwise falls
+       * back to "any signed-in user, in development". wrangler.jsonc pins it to
+       * the real operator address, so the dev convenience never applies and a
+       * fixture cannot reach `/api/admin/*` — which is correct for the golden
+       * paths and blocking for a REVIEW fixture that needs a studio on a bigger
+       * plan (Sessions and Packages are entitlement-gated, and the roster caps
+       * at three).
+       *
+       * Off by default: the three golden paths must run against the same
+       * authorization the product ships. Opt in per command, never in config.
+       */
+      command: `pnpm --filter @kova/api exec wrangler dev --local --log-level ${process.env.E2E_SERVER_LOGS ? "info" : "warn"} --port ${APP_PORT}${process.env.E2E_DEV_ADMIN ? " --var ADMIN_EMAILS:" : ""}`,
       // Readiness is checked on the ROOT host: `/health` is dependency-free and
       // answers on every door, and the root is the one that exists before any
       // studio does.

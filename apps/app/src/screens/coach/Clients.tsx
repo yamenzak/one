@@ -3,9 +3,9 @@
  * (same surfaces scoped to the client) wrapped in coach chrome + editing tabs.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Sheet, Avatar, IconTabs, Page, Stagger, EmptyState, Reveal, SkeletonList, ConfirmDialog, toneVar, Users, Mail, User, ArrowLeft, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle, TierAnchor, CountUp, Group, Row, Sun, ClipboardList, Target, TrendingUp, BarChart3, Settings as SettingsIcon } from "@kova/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, IconTabs, Page, Stagger, EmptyState, Reveal, SkeletonList, ConfirmDialog, toneVar, Users, Mail, User, Search, ArrowLeft, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle, TierAnchor, CountUp, Group, Row, Sun, ClipboardList, Target, TrendingUp, BarChart3, Settings as SettingsIcon } from "@kova/ui";
 import type { AttentionSeverity } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -74,6 +74,25 @@ export function Clients() {
       .catch(() => undefined);
   }, []);
 
+  /*
+    ORDER BY WHAT NEEDS DOING, then by name.
+
+    At ten clients the screen said "1 needs a look" at the top and put that
+    client LAST — the roster came back in creation order, so the anchor pointed
+    at something below the fold. Anyone who has never signed in sinks to the
+    bottom: they are waiting on the client, not on the coach.
+  */
+  const [q, setQ] = useState("");
+  const ordered = useMemo(() => {
+    if (!clients) return null;
+    const rank = (c: ClientSummary) => (!c.hasLogin ? 2 : att.has(c.id) ? 0 : 1);
+    const needle = q.trim().toLowerCase();
+    return clients
+      .filter((c) => !needle || c.displayName.toLowerCase().includes(needle) || (c.email ?? "").toLowerCase().includes(needle))
+      .slice()
+      .sort((a, b) => rank(a) - rank(b) || a.displayName.localeCompare(b.displayName));
+  }, [clients, att, q]);
+
   const create = async () => {
     if (busy) return;
     setBusy(true); setCreateErr(null);
@@ -131,8 +150,25 @@ export function Clients() {
             // Same rule as the rows: someone who has never signed in is
             // "Invited", not "needs a look".
             const flagged = clients.filter((c) => c.hasLogin && att.has(c.id)).length;
-            if (flagged === 0) return "All caught up";
-            return flagged === clients.length ? "Every one needs a look" : `${flagged} need${flagged === 1 ? "s" : ""} a look`;
+            const active = clients.filter((c) => c.hasLogin);
+            const pending = clients.length - active.length;
+            /*
+              A COUNT OF TEN THAT IS NINE INVITATIONS IS A FLATTERING COUNT.
+
+              The anchor is the roster's size, so the sub-line has to say how
+              much of it is real. Nine people who have never opened the app
+              still read as "10 clients · all caught up" — true of the one who
+              signed in, and quietly wrong about the studio.
+            */
+            const waiting = pending > 0 ? `${pending} not signed in yet` : null;
+            const head = flagged === 0
+              ? (active.length === 0 ? null : "All caught up")
+              // "Every active one needs a look" only reads as a summary when
+              // there is more than one of them; at one it is a long way to say
+              // "1".
+              : flagged === active.length && active.length > 1 ? "Every active one needs a look"
+              : `${flagged} need${flagged === 1 ? "s" : ""} a look`;
+            return [head, waiting].filter(Boolean).join(" · ") || "All caught up";
           })()}
         </p>
       </TierAnchor>
@@ -161,11 +197,27 @@ export function Clients() {
         <EmptyState icon={AlertTriangle} title="Couldn't load your clients" description="Something went wrong reaching the server. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
       ) : (
       <Reveal loading={!clients} skeleton={<SkeletonList card rows={6} thumb={44} />}>
-        {clients && (clients.length === 0 ? (
+        {/* Search appears once scrolling is the alternative. Below that it is a
+            control asking to be used on a list you can already see. */}
+        {clients && clients.length > 7 && (
+          <Field
+            label="Search clients"
+            labelHidden
+            icon={Search}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search by name or email…"
+            className="mb-2"
+          />
+        )}
+        {ordered && (clients!.length === 0 ? (
           <EmptyState icon={Users} title="No clients yet" description="Add your first client. With an email set, they sign in the moment you do — no codes, no passwords." action={<Button onClick={() => setCreateOpen(true)}><Plus /> Add your first client</Button>} />
         ) : (
+          ordered.length === 0 ? (
+            <EmptyState icon={Users} title="Nothing matches" description="Try part of a name or an email address." />
+          ) : (
           <Group>
-            {clients.map((c) => (
+            {ordered.map((c) => (
               <Row
                 key={c.id}
                 onClick={() => nav(`/clients/${c.id}/today`)}
@@ -179,7 +231,14 @@ export function Clients() {
                   as the fallback for a client who has not named themselves yet,
                   where it is the only identity there is.
                 */
-                sub={(c.hasLogin ? att.get(c.id)?.labels.join(" · ") : null) ?? c.email ?? "No email yet"}
+                /* Two labels and a count, not three labels and an ellipsis:
+                   "Check-in to answer · No active plan · Profil…" spent its last
+                   characters on a word nobody can finish reading. */
+                sub={(() => {
+                  const ls = c.hasLogin ? att.get(c.id)?.labels : undefined;
+                  if (!ls?.length) return c.email ?? "No email yet";
+                  return ls.length > 2 ? `${ls.slice(0, 2).join(" · ")} · +${ls.length - 2}` : ls.join(" · ");
+                })()}
                 leading={<Avatar name={c.displayName} src={c.avatarUrl} seed={c.avatarSeed ?? c.id} className="size-10" />}
                 trailing={
                   freeing ? (
@@ -215,6 +274,7 @@ export function Clients() {
               </Row>
             ))}
           </Group>
+          )
         ))}
       </Reveal>
       )}
