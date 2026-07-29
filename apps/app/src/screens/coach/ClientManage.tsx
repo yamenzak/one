@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@kova/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, personaLabel, personaTone, NoData } from "@kova/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, personaLabel, personaTone, NoData, TierAnchor, ActionCluster, CountUp, Group, Row, GroupNote } from "@kova/ui";
 import { api, errorText, todayLocal } from "../../api.js";
 import { FeatureLock, useCan } from "../../FeatureLock.js";
 import { useSession } from "../../session.js";
@@ -60,6 +60,7 @@ export function ClientManage({ clientId, clientName }: { clientId: string; clien
   const [supps, setSupps] = useState<Supp[]>([]);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [grantOpen, setGrantOpen] = useState(false);
+  const [prefsOpen, setPrefsOpen] = useState(false);
   const [suppOpen, setSuppOpen] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
@@ -153,31 +154,77 @@ export function ClientManage({ clientId, clientName }: { clientId: string; clien
           <Button size="sm" variant="secondary" onClick={() => void load()}>Retry</Button>
         </Card>
       )}
-      <section className="space-y-2">
-        <Eyebrow action={
-          <div className="flex gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setReportOpen(true)}><BarChart3 /> Report</Button>
-            <Button size="sm" onClick={() => setGrantOpen(true)}><Plus /> Grant</Button>
+      {/*
+        T1 — the tab's anchor (§1: the client detail is six screens sharing
+        chrome, so the anchor belongs to the tab). Manage is an admin surface,
+        and the one number a coach acts on here is how long this client's access
+        still runs — everything else on the tab is a section you open when you
+        need it. No access → words, not a zero: `0` here would read as a
+        countdown that has run out rather than as a state that was never
+        granted.
+
+        The strip below deliberately keeps Status and Plan and drops the day
+        count: the anchor's value appears once (§1).
+      */}
+      <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-1 text-center">
+        <p className="text-caption text-muted-foreground">Access</p>
+        {active ? (
+          <>
+            <p className="numeral text-display"><CountUp value={active.daysRemaining} /></p>
+            <p className="text-caption text-muted-foreground">{active.daysRemaining === 1 ? "day left" : "days left"}{activePkg?.name ? ` · ${activePkg.name}` : ""}</p>
+          </>
+        ) : (
+          <>
+            <p className="text-title-1">No access</p>
+            <p className="text-caption text-muted-foreground">Grant a package — or a $0 comp — to unlock their features.</p>
+          </>
+        )}
+        {/* Three actions only when the studio actually has three (§1's floor);
+            a permanently-disabled circle is noise, not an affordance. */}
+        {canSuppLabs ? (
+          <ActionCluster
+            className="pt-2"
+            items={[
+              { icon: Plus, label: "Grant", onClick: () => setGrantOpen(true) },
+              { icon: BarChart3, label: "Report", onClick: () => setReportOpen(true) },
+              { icon: ClipboardList, label: "Prescribe", onClick: () => setSuppOpen(true) },
+            ]}
+          />
+        ) : (
+          <div className="flex w-full max-w-sm gap-2 pt-3">
+            <Button className="flex-1" onClick={() => setGrantOpen(true)}><Plus /> Grant</Button>
+            <Button className="flex-1" variant="secondary" onClick={() => setReportOpen(true)}><BarChart3 /> Report</Button>
           </div>
-        }>Access</Eyebrow>
-        <Stagger>
-          {active ? (
+        )}
+      </TierAnchor>
+
+      {active && (
+        <section className="space-y-2">
+          <Eyebrow>Subscription</Eyebrow>
+          <Stagger>
             <GlanceStrip items={[
               { icon: Check, tone: "activity", value: "Active", label: "Status" },
-              { icon: Ticket, tone: "primary", value: active.daysRemaining, label: "Days left" },
               { icon: ClipboardList, tone: "neutral", value: activePkg?.name ?? null, label: "Plan" },
             ]} />
-          ) : (
-            <Card><p className="text-sm text-muted-foreground">No active subscription. Grant a package (or a $0 comp) to unlock features.</p></Card>
-          )}
-        </Stagger>
-      </section>
+          </Stagger>
+        </section>
+      )}
 
+      {/*
+        The preferences editor is ~20 fields and it used to sit open on this tab,
+        which made a form four times taller than everything else the single
+        largest thing on an admin surface. It is a "doing" surface, so it belongs
+        in a Sheet behind a Row (§7) — the tab stays scannable, and editing
+        someone else's profile becomes a deliberate act rather than something you
+        scroll past.
+      */}
       <section className="space-y-2">
-        <Eyebrow>Profile &amp; preferences</Eyebrow>
-        <Stagger>
-          <PreferencesEditorCard clientId={clientId} includeProfile onSaved={load} />
-        </Stagger>
+        <Eyebrow>Profile</Eyebrow>
+        <Group>
+          <Row icon={User} sub="Gender, birth date, height, goal, training and food limits" onClick={() => setPrefsOpen(true)}>
+            Profile &amp; preferences
+          </Row>
+        </Group>
       </section>
 
       {pending.length > 0 && (
@@ -253,6 +300,10 @@ export function ClientManage({ clientId, clientName }: { clientId: string; clien
       {isOwner
         ? <><OffboardRequestQueue clientId={clientId} onDecided={load} /><OffboardSection clientId={clientId} clientName={clientName} /></>
         : <OffboardRequestSection clientId={clientId} clientName={clientName} />}
+
+      <Sheet open={prefsOpen} onClose={() => setPrefsOpen(false)} title="Profile & preferences">
+        <PreferencesEditorCard clientId={clientId} includeProfile onSaved={() => { setPrefsOpen(false); void load(); }} />
+      </Sheet>
 
       <Sheet open={grantOpen} onClose={() => setGrantOpen(false)} title="Grant a package">
         {/* `/api/packages` + `/api/subscriptions/grant` are gated on `commerce`.
@@ -364,32 +415,44 @@ function CoachesSection({ clientId }: { clientId: string }) {
       ) : (
       <Reveal loading={!coaches} skeleton={<Card><SkeletonRow thumb={40} /></Card>}>
         {coaches && (
-        <Card className="space-y-3">
-          <p className="text-sm text-muted-foreground">Only assigned coaches see this client on their roster. The primary coach receives their notifications.</p>
+        /* A Group of Rows, not a Card of SubCards. Card > card > row is three
+           nesting levels for what is a roster (§1 caps it at two), and the
+           explanatory line reads as a GroupNote under the list rather than as a
+           paragraph sitting on top of it. */
+        <>
           {coaches.length === 0 ? (
-            <p className="text-sm text-warning" role="status">No coach is assigned — nobody but an owner can see this client.</p>
-          ) : coaches.map((co) => (
-            <SubCard key={co.userId} className="flex items-center gap-3 py-3">
-              <Avatar name={coachName(co)} seed={co.email ?? co.userId} className="size-10 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="truncate font-medium">{coachName(co)}</span>
-                  <Badge tone={personaTone(roleOf(co.userId), { self: co.userId === myUserId })}>{personaLabel(roleOf(co.userId), { self: co.userId === myUserId })}</Badge>
-                  {co.isPrimary && <Badge tone="primary"><Star /> Primary</Badge>}
-                </div>
-                {co.email && <div className="truncate text-sm text-muted-foreground">{co.email}</div>}
-              </div>
-              {!co.isPrimary && (
-                <Button size="sm" variant="secondary" className="shrink-0" disabled={busy !== null} onClick={() => void assign(co.userId, true)}>
-                  {busy === co.userId ? "…" : "Make primary"}
-                </Button>
-              )}
-              <Button size="icon" variant="ghost" className="size-12 shrink-0 text-muted-foreground" aria-label={`Remove ${coachName(co)} from this client`} disabled={busy !== null} onClick={() => { setErr(null); setToRemove(co); }}><X /></Button>
-            </SubCard>
-          ))}
-          {staffErr && <p className="text-sm text-muted-foreground">Your staff list didn't load, so assigning is unavailable right now. <button onClick={() => void load()} className="font-medium text-primary underline">Retry</button></p>}
-          {err && <p className="text-sm text-warning" role="alert">{err}</p>}
-        </Card>
+            <Card><p className="text-sm text-warning" role="status">No coach is assigned — nobody but an owner can see this client.</p></Card>
+          ) : (
+            <Group>
+              {coaches.map((co) => (
+                <Row
+                  key={co.userId}
+                  leading={<Avatar name={coachName(co)} seed={co.email ?? co.userId} className="size-10" />}
+                  sub={co.email ?? undefined}
+                  trailing={
+                    <>
+                      {!co.isPrimary && (
+                        <Button size="sm" variant="secondary" className="shrink-0" disabled={busy !== null} onClick={() => void assign(co.userId, true)}>
+                          {busy === co.userId ? "…" : "Make primary"}
+                        </Button>
+                      )}
+                      <Button size="icon" variant="ghost" className="shrink-0 text-muted-foreground" aria-label={`Remove ${coachName(co)} from this client`} disabled={busy !== null} onClick={() => { setErr(null); setToRemove(co); }}><X /></Button>
+                    </>
+                  }
+                >
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span className="truncate">{coachName(co)}</span>
+                    <Badge tone={personaTone(roleOf(co.userId), { self: co.userId === myUserId })}>{personaLabel(roleOf(co.userId), { self: co.userId === myUserId })}</Badge>
+                    {co.isPrimary && <Badge tone="primary"><Star /> Primary</Badge>}
+                  </span>
+                </Row>
+              ))}
+            </Group>
+          )}
+          <GroupNote>Only assigned coaches see this client on their roster. The primary coach receives their notifications.</GroupNote>
+          {staffErr && <p className="pt-2 text-sm text-muted-foreground">Your staff list didn't load, so assigning is unavailable right now. <button onClick={() => void load()} className="font-medium text-primary underline">Retry</button></p>}
+          {err && <p className="pt-2 text-sm text-warning" role="alert">{err}</p>}
+        </>
         )}
       </Reveal>
       )}

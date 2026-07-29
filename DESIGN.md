@@ -42,19 +42,26 @@ compact billing banner. See UI-LANGUAGE §13 for the component registry.
 
 **Screens on the spine:** the four doorways · sign-in · the three-step studio
 wizard · client Today · client Eat · client Train · client Progress (per-lens) ·
-client Wellness · client Shop · coach Today · coach Clients.
+client Wellness · client Shop · client WorkoutPlayer (day picker) · client
+MealPlanDrawer · coach Today · coach Clients · coach Business · coach Staff ·
+coach ClientManage.
 
-**Screens still to do**, with what each one's anchor should be — the question is
-always "what is this screen about, in one noun":
+**Screens still to do:** `coach/WorkoutBuilder` and `coach/MealBuilder` — both
+task surfaces (§1), so the work there is chrome and type conformance rather than
+finding an anchor.
 
-| Screen | Candidate anchor | Note |
-|---|---|---|
-| `client/WorkoutPlayer` | the set you are on | Full-bleed; likely opts out of the content column. |
-| `coach/Business` | this month's revenue, or credits left | Tabbed — one anchor per tab (§1). |
-| `coach/Library` | items in the library | List-shaped: `Group` of `Row`s. |
-| `coach/ClientManage` | the client | Tabbed. |
-| `coach/Packages`, `coach/Staff`, `coach/Sessions` | count of each | All list-shaped. |
-| `Settings`, `AdminConsole` | — | Settings surfaces are lists, not anchored screens: `SettingsList` / `Group` of `Row`s, no display numeral. |
+**Resolved, and the resolutions are the useful part.** The ledger used to say
+"anchor = count of each" for the list-shaped coach screens. That was wrong, and
+working through them is what produced §1's no-anchor rule:
+
+| Screen | Outcome |
+|---|---|
+| `client/WorkoutPlayer` | Day picker = browse surface → anchor (plan name as eyebrow, training days as the number). Session view = **task surface, no anchor**; progress stays in the sticky header where it remains visible. |
+| `client/MealPlanDrawer` | The player's twin, same anchor shape: plan name, meals a day, daily targets beneath as context. |
+| `coach/ClientManage` | Anchor = **days of access left** — the one number a coach acts on here — with "No access" in words when there is none. The 20-field preferences form moved behind a `Row` → `Sheet`; the tab went from 7,245px tall to 4,313px. |
+| `coach/Staff` | Anchor = **seats used of the plan's ceiling**. Both halves were already in hand (roster + `ctx.entitlements.quotas`), so it costs no request — and it fixed a real gap: the ceiling used to be invisible until an invite bounced off it. |
+| `coach/Library`, `coach/Packages`, `coach/Sessions` | **List surfaces — no anchor, deliberately.** A coach opening the exercise library came to find an exercise, not to learn there are 42. A display numeral there counts something nobody came to count. |
+| `Settings`, `AdminConsole` | Same, as always. |
 
 **`client/Wellness` — resolved.** It looked like four subjects on one surface
 (sleep + mood + water + fasting) and so like a §1 violation waiting for a product

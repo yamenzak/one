@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PERMISSION_CATALOG } from "@kova/domain";
-import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, Plus, personaLabel, personaTone , Group, Row } from "@kova/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, Plus, personaLabel, personaTone, Group, Row, TierAnchor, CountUp } from "@kova/ui";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useCan } from "../../FeatureLock.js";
@@ -19,6 +19,7 @@ interface Member { userId: string; role: string; name: string | null; email: str
 const roleOption = (value: string) => ({ value, label: personaLabel(value) });
 
 export function Staff() {
+  const { ctx } = useSession();
   const [members, setMembers] = useState<Member[] | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [email, setEmail] = useState("");
@@ -43,6 +44,15 @@ export function Staff() {
   const load = useCallback(async () => setMembers((await api.get<{ members: Member[] }>("/api/members")).members), []);
   useEffect(() => void load(), [load]);
 
+  // The seat ceiling was invisible until an invite bounced off it. It is the one
+  // number on this tab a coach acts on — "can I add someone, or do I need to
+  // upgrade first" — so it is the anchor (§1). Both halves are already in hand:
+  // the roster is this screen's own read, and the quota rides on the session
+  // context, so this costs no request.
+  const seatCap = ctx?.entitlements?.quotas?.staffSeats ?? null;
+  const seatsUsed = members ? members.filter((m) => m.role !== "client").length : null;
+  const seatsLeft = seatCap != null && seatsUsed != null ? Math.max(0, seatCap - seatsUsed) : null;
+
   const [busy, setBusy] = useState(false);
   const changeRole = async (userId: string, newRole: string) => {
     setBusy(true);
@@ -55,7 +65,7 @@ export function Staff() {
     finally { setBusy(false); }
   };
   const ROLE_LABEL = (r: string) => personaLabel(r);
-  const myUserId = useSession().ctx?.user.id ?? null;
+  const myUserId = ctx?.user.id ?? null;
   const invite = async () => {
     setBusy(true);
     setMsg(null);
@@ -66,7 +76,23 @@ export function Staff() {
 
   return (
     <Page className="mx-auto max-w-xl space-y-3 p-4 pb-28">
-      <SectionHeader icon={Users} tone="cardio" title="Staff" action={<Button size="sm" onClick={() => setInviteOpen(true)}><Plus /> Invite</Button>} />
+      {/* T1 — the tab's anchor (§1: a tabbed surface is N screens sharing chrome). */}
+      <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-1 text-center">
+        <p className="text-caption text-muted-foreground">Staff seats</p>
+        {seatsUsed == null ? (
+          <p className="text-title-1">Loading…</p>
+        ) : (
+          <>
+            <p className="numeral text-display"><CountUp value={seatsUsed} /></p>
+            <p className="text-caption text-muted-foreground">
+              {seatCap == null ? (seatsUsed === 1 ? "person on the team" : "people on the team")
+                : seatsLeft === 0 ? `of ${seatCap} · none left`
+                : `of ${seatCap} · ${seatsLeft} left`}
+            </p>
+          </>
+        )}
+      </TierAnchor>
+      <SectionHeader icon={Users} tone="cardio" title="Team" action={<Button size="sm" onClick={() => setInviteOpen(true)}><Plus /> Invite</Button>} />
       {msg && <p role="status" aria-live="polite" className="text-sm text-muted-foreground">{msg}</p>}
       <Reveal loading={!members} className="space-y-3" skeleton={
         <div className="space-y-2">
@@ -101,6 +127,15 @@ export function Staff() {
               </Row>
             ))}
           </Group>
+          {/* At the ceiling the Invite button still works — the server's refusal
+              names the fix — but a coach should not have to press it to find
+              out. Now that the seat count is on screen, saying nothing here
+              would be the odd choice. */}
+          {seatsLeft === 0 && seatCap != null && (
+            <p className="pt-1 text-xs text-warning">
+              All {seatCap} seat{seatCap === 1 ? " is" : "s are"} in use. Upgrade your plan to add another coach.
+            </p>
+          )}
           <p className="pt-1 text-xs text-muted-foreground">Clients appear in the Clients tab, not here.</p>
         </>
         )}
