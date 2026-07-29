@@ -276,7 +276,16 @@ function TenantSheet({ tenant, plans, plansError, onRetryPlans, planName, onClos
     }, "Couldn't add credits — the balance is unchanged.");
 
   return (
-    <Sheet open onClose={onClose} title={tenant.name}>
+    <Sheet
+      open
+      onClose={onClose}
+      title={tenant.name}
+      /* Tall, and deliberately no footer: this is not a form with an action, it
+         is a rack of operator tools — plan, credits, gifts — each of which owns
+         its own button inside its own FieldGroup. Pinning one of them would
+         promote it over its siblings. */
+      size="tall"
+    >
       <div className="space-y-5">
         <div className="space-y-2 rounded-2xl bg-surface-2 p-3.5">
           <div className="flex items-center justify-between gap-3">
@@ -692,7 +701,25 @@ function GiftSheet({ tenantId, name, onClose }: { tenantId: string; name: string
     }, "Couldn't clear the gifts — nothing was changed.");
 
   return (
-    <Sheet open onClose={onClose} title={`Gift — ${name}`}>
+    <Sheet
+      open
+      onClose={onClose}
+      title={`Gift — ${name}`}
+      /* Tall: the entitlement matrix is long and loads async, so a content-sized
+         sheet grew by half a screen the moment the read came back. The submit
+         pair pins below it — otherwise it sits under the whole matrix. */
+      size="tall"
+      footer={ent && !error ? (
+        <div className="flex gap-2">
+          <Button size="lg" className="flex-1" disabled={act.busy !== null} onClick={() => void save()}>
+            {act.busy === "save" ? <><Spinner className="size-4" /> Applying…</> : "Apply gifts"}
+          </Button>
+          <Button size="lg" variant="outline" disabled={act.busy !== null} onClick={() => void reset()}>
+            {act.busy === "reset" ? <><Spinner className="size-4" /> …</> : "Reset to plan"}
+          </Button>
+        </div>
+      ) : undefined}
+    >
       {error && !data ? (
         <LoadError what="this studio's entitlements" error={error} onRetry={reload} />
       ) : (
@@ -735,14 +762,6 @@ function GiftSheet({ tenantId, name, onClose }: { tenantId: string; name: string
               <EntitlementFields ent={ent} meta={data} onChange={setEnt} />
 
               <ActionResult msg={act.msg} err={act.err} />
-              <div className="flex gap-2">
-                <Button className="min-h-12 flex-1" disabled={act.busy !== null} onClick={() => void save()}>
-                  {act.busy === "save" ? <><Spinner className="size-4" /> Applying…</> : "Apply gifts"}
-                </Button>
-                <Button variant="outline" className="min-h-12" disabled={act.busy !== null} onClick={() => void reset()}>
-                  {act.busy === "reset" ? <><Spinner className="size-4" /> …</> : "Reset to plan"}
-                </Button>
-              </div>
             </div>
           )}
         </Reveal>
@@ -1980,7 +1999,26 @@ function NuclearResetCard() {
         </Button>
       </Card>
 
-      <Sheet open={open} onClose={() => setOpen(false)} title="Nuclear reset">
+      <Sheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Nuclear reset"
+        /* Three states, one frame — a warning, a two-field confirmation, and a
+           receipt. The footer follows the state so the single thing to press is
+           always at the bottom edge, including on the step whose two fields
+           push it below the fold. */
+        footer={done != null ? (
+          <Button size="lg" className="w-full" onClick={() => location.assign("/")}>Reload</Button>
+        ) : stage === "intro" ? (
+          <Button size="lg" className="w-full" disabled={busy} onClick={() => void sendCode()}>
+            {busy ? <><Spinner className="size-4" /> Sending…</> : "Email me a confirmation code"}
+          </Button>
+        ) : (
+          <Button size="lg" variant="destructive" className="w-full" disabled={busy || code.length < 6 || confirm !== PHRASE} onClick={() => void run()}>
+            {busy ? <><Spinner className="size-4" /> Wiping…</> : <><Trash2 /> Erase everything, permanently</>}
+          </Button>
+        )}
+      >
         {done != null ? (
           <div className="space-y-3 text-center" role="status" aria-live="polite">
             <div className="mx-auto grid size-12 place-items-center rounded-full bg-success-soft/60 text-success"><CircleCheck className="size-6" aria-hidden /></div>
@@ -1988,7 +2026,6 @@ function NuclearResetCard() {
               Wiped <span className="font-semibold">{done}</span> studio{done === 1 ? "" : "s"} and everything in them.
               You&apos;ll be signed out — sign back in to start fresh.
             </p>
-            <Button className="min-h-12 w-full" onClick={() => location.assign("/")}>Reload</Button>
           </div>
         ) : stage === "intro" ? (
           <div className="space-y-4">
@@ -1997,9 +2034,6 @@ function NuclearResetCard() {
             </Callout>
             <p className="text-sm text-muted-foreground">We&apos;ll email a confirmation code to your admin address first.</p>
             {err && <Callout tone="danger" icon={AlertTriangle} live="alert">{err}</Callout>}
-            <Button className="min-h-12 w-full" disabled={busy} onClick={() => void sendCode()}>
-              {busy ? <><Spinner className="size-4" /> Sending…</> : "Email me a confirmation code"}
-            </Button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -2009,9 +2043,6 @@ function NuclearResetCard() {
             <Field label="Confirmation code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} placeholder="000000" autoFocus />
             <Field label={`Type ${PHRASE} to confirm`} value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder={PHRASE} />
             {err && <Callout tone="danger" icon={AlertTriangle} live="alert">{err}</Callout>}
-            <Button variant="destructive" className="min-h-12 w-full" disabled={busy || code.length < 6 || confirm !== PHRASE} onClick={() => void run()}>
-              {busy ? <><Spinner className="size-4" /> Wiping…</> : <><Trash2 /> Erase everything, permanently</>}
-            </Button>
           </div>
         )}
       </Sheet>
