@@ -621,7 +621,8 @@ reintroduce that shape anywhere.
 | `BottomTabs` / `NavRail` | Top-level navigation, ≤5 items. Animates in **last**. | Actions. | ✅ |
 | `EmptyState` | A surface with nothing in it yet: one line of why, one action. | An error. Errors say what happened and what to do. | ✅ |
 | `SettingsList` | Sections of setting rows. Built on `Group`/`Row`, so a settings row and a roster row are the same object. | An anchored screen — settings surfaces are lists and take no display numeral (§1). | ✅ |
-| `InsightCard` · `WavyDivider` | As named. | — | ◻︎ |
+| `InsightCard` | One event in a timeline: time, title, optional detail, optional 👍/👎. Animates on scroll-into-view, not on mount — a timeline is unbounded. | A list row. A feed item is read; a row is scanned. | ✅ |
+| `WavyDivider` | A day break in a timeline. | Separating sections — that is `Section`'s own rhythm. | ✅ |
 
 ### Primitives, viz and the rest
 

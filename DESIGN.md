@@ -57,8 +57,10 @@ always "what is this screen about, in one noun":
 | `coach/Packages`, `coach/Staff`, `coach/Sessions` | count of each | All list-shaped. |
 | `Settings`, `AdminConsole` | — | Settings surfaces are lists, not anchored screens: `SettingsList` / `Group` of `Row`s, no display numeral. |
 
-**Still not conformant:** `InsightCard`, `WavyDivider` and the overlay family
-(registry marks them `◻︎`). `EmptyState` and `SettingsList` are done.
+**Still not conformant:** the overlay family (`Sheet`, `FixedDrawer`, `Dialog`,
+`DropdownMenu`, `SegmentedControl`, `Select`, `Tooltip`) — they take the radius,
+type and motion tokens now, but their internals have not been read against §7.
+Everything else in the registry is `✅`.
 
 **Card-stack → `Group`/`Row` done on:** Clients · Staff · Packages (archived,
 redemption codes, promo codes) · Sessions (add-on types) · Library (templates).
