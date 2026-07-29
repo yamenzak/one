@@ -39,6 +39,7 @@ import { WellnessPillars, weakestPillar, WELLNESS_BAND, type WellnessScoreResult
 import { CheckRow } from "./TodayAgenda.js";
 import { CoachNote } from "./CoachNote.js";
 import { SupplementGuide } from "./SupplementGuide.js";
+import { scaleWord } from "./scales.js";
 
 interface Supplement { id: string; name: string; dose: string | null; kind: string; schedule: { slot: string }[] }
 interface Fast { activeFast: { started_at: string; target_hours: number } | null; recentFasts: { duration_minutes: number; target_hours: number }[] }
@@ -483,8 +484,19 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
             chart={week.moodSeries.length >= 2 ? <Sparkline values={week.moodSeries} tone={METRICS.mood.tone} width={132} /> : undefined} />}
           {canFasting && <StatCard stack label="Fasts done" value={week.fastsDone} icon={Timer} tone="activity"
             chart={week.fastHoursSeries.length >= 2 ? <MiniBars values={week.fastHoursSeries} tone="activity" width={132} target={16} /> : undefined} />}
-          {canSupplementsLabs && <StatCard stack label="Supplements" value={week.suppSlots ? `${week.suppTaken}/${week.suppSlots}` : null} emptyText="None set" unit="today" icon={Pill} tone="supplement" />}
-          {canSessions && <StatCard stack label="Sessions" value={week.sessionsWeek} unit="this wk" icon={Calendar} tone="cardio" />}
+          {/*
+            A TILE IS FOR A NUMBER THAT MOVED, NOT FOR A FEATURE NOBODY USES.
+
+            "Supplements — None set" and "Sessions — 0 this wk" sat in this grid
+            on every account that has neither, which is most of them: two dead
+            tiles, one of them orphaned on its own row, in the middle of the
+            week's real numbers. Neither is something the client can act on
+            (their coach sets supplements and books sessions), so an empty one
+            is pure furniture. The full supplement checklist still renders below
+            when there IS one.
+          */}
+          {canSupplementsLabs && week.suppSlots > 0 && <StatCard stack label="Supplements" value={`${week.suppTaken}/${week.suppSlots}`} unit="today" icon={Pill} tone="supplement" />}
+          {canSessions && week.sessionsWeek > 0 && <StatCard stack label="Sessions" value={week.sessionsWeek} unit="this wk" icon={Calendar} tone="cardio" />}
         </Stagger>
       </section>
 
@@ -502,7 +514,10 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
           <Stagger className="space-y-1.5">
             {checkIns.slice(0, 5).map((c) => {
               const photos = c.photos_json ? (() => { try { return (JSON.parse(c.photos_json!) as unknown[]).length; } catch { return 0; } })() : 0;
-              const bits = [c.mood != null ? `mood ${c.mood}/5` : null, c.sleep_hours != null ? `${c.sleep_hours}h sleep` : null].filter(Boolean).join(" · ");
+              // "mood 4/5" says nothing without knowing which end is good — and
+              // it is the one thing the row has room to say properly. Same words
+              // the check-in form and its detail sheet use.
+              const bits = [c.mood != null ? scaleWord("mood", c.mood) : null, c.sleep_hours != null ? `${c.sleep_hours}h sleep` : null].filter(Boolean).join(" · ");
               return (
                 <button key={c.id} onClick={() => setDetailCheckIn(c)} className="w-full text-left">
                   <Card interactive className="flex items-center gap-3 py-3">

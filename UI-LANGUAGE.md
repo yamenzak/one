@@ -77,6 +77,19 @@ placed above its true tier is the single most common way a screen rots.**
   still has an anchor, and finding it is the work. The workout player is both in
   one file — its day picker is a browse surface and has an anchor; its session
   view is a task surface and does not.
+- **A screen's FIRST RUN may be a different screen.** The no-T1 rule applies per
+  *state*, not only per surface. A front desk with no session types defined has
+  no schedule to anchor: "Booked in — 0" is the least informative number on a
+  page whose whole subject is setup, and stacking it over a button over an empty
+  state gives you three elements saying one thing. In that state the empty state
+  **is** the surface and carries the action; the anchor appears once there is
+  something to count. Same test as always — can you name the anchor in one noun
+  *in this state*.
+- **The first step is the primary action.** If the thing a screen needs first
+  lives at the bottom, the screen is upside down. Sessions shipped a disabled
+  "Schedule" at the top and the instruction "add a consultation type below" —
+  the impossible action promoted, the required one demoted to prose. T2 is
+  whatever step is genuinely next, and it changes with state.
 - **T2 tops out at five.** Four is better. The fifth slot, when needed, is
   always **More** — never a fifth real action.
 - **T2 has a floor of three.** A cluster of one is a single circle adrift in the
@@ -96,6 +109,18 @@ placed above its true tier is the single most common way a screen rots.**
   *split*, the *delta* or the *trend* — never the number itself. This was the
   single most repeated defect of the rewrite: Today, Eat and Business all shipped
   it, and all three looked fine in the diff.
+- **An EmptyState earns its 350px by adding something.** It exists to *explain*
+  and to *offer a way in*. When the anchor already says "Nothing booked" and a
+  full-width primary button sits between them, an illustrated block titled
+  "Nothing booked" is the anchor's value restated at hero size with an icon —
+  the rule above, wearing a component. Either the block carries the whole state
+  (no anchor, no separate button — the first-run case above) or it collapses to
+  one muted caption saying the thing neither of the other two can.
+- **Relative in the anchor, absolute in the record.** When an anchor's sub-line
+  and the first row below it describe the same event, the sub-line must add the
+  dimension the row cannot afford: "Next in 2 days" over a card that says
+  "Fri, Jul 31, 4:30 PM". Printing the same timestamp twice turns the anchor
+  into a caption for the thing underneath it.
 
 ### The vertical spine
 
@@ -387,6 +412,21 @@ mobile) · `Dialog` (centred, ≥md only, for confirmations) · `Menu` · `Popov
 **One rule governs all overlays:** a sheet is for *doing*, a dialog is for
 *deciding*. If it has inputs, it is a sheet.
 
+### Two rules about repetition
+
+- **A glyph repeated down a list is texture, not identity.** An icon earns its
+  place by *distinguishing* — so it belongs where the neighbours differ. The
+  activity picker resolved its icon by category, which meant a section already
+  headed CARDIO showed the same footprints mark nine times, on Rowing and
+  Elliptical too, while eating the width the labels needed (three chips a row,
+  bottom row clipped). Removing it fitted four a row and lost nothing. The same
+  icon is *correct* one level up — on the selected-activity header, and in a
+  mixed feed where rows come from different categories. Test: **if every visible
+  sibling would show the same glyph, delete it.**
+- **A scroll area never hard-cuts through a row.** A container clipped mid-chip
+  reads as broken, not as "there is more". Fade the last ~24px with a
+  `mask-image` gradient and pad the scroller so the final row can clear it.
+
 ### Chrome
 `AppBar` (blur + hairline on scroll only) · `TabBar` (≤5 items, active = filled
 pill behind the icon) · `NavRail` (≥md) · `Header` (large screen title that
@@ -500,6 +540,10 @@ ship:
 | credential / WebAuthn | passkey |
 | entitlement / feature flag | what's included in your plan |
 | provisioning your tenant | setting up your space |
+| add-on type / consultation type | session type |
+| add-on balance / add-on unit | their prepaid sessions |
+| configured on this deployment | *say the consequence: "card payments aren't switched on yet"* |
+| (opt) | (optional) |
 | an error occurred | *say what happened* |
 | invalid input | *say which field and why* |
 | are you sure? | *name the consequence* |
@@ -517,6 +561,25 @@ ship:
 - **Empty states explain and offer.** One line of why it is empty, one action to
   fill it. Never just "No data".
 - **Never apologise for a working feature.** No "Unfortunately, you'll need to…".
+- **The API's nouns are not the product's nouns.** Routes, columns and types keep
+  whatever the data model calls them; the glass says what a person at a front
+  desk says. `addon_types` / `/api/addon-types` stayed exactly as they are while
+  every string above them became "session type" — renaming the schema to match
+  the copy is a migration, and renaming the copy to match the schema is how the
+  billing model ends up in the scheduling tool.
+- **Name the count, not three of the names.** "AI suite, Body-fat camera,
+  Supplements & labs and 1 more are locked" costs three clauses, ends in an
+  opaque number, and still sends the reader looking for the rest. Either
+  enumerate in full — in the component whose job that is — or say "3 features
+  locked" and let the full list be one scroll away. Half a list is worse than
+  none.
+- **A 1–5 scale must say which end is which.** Five faces with no endpoint
+  captions is only guessable for mood; on Energy it is a coin flip and on Stress
+  it was *wrong*, because the stored direction (5 = worst) was the opposite of
+  what the ascending glyphs implied. Every scale names its ends, shows the
+  chosen step in words, and any inverted scale renders inverted everywhere it
+  is read back. The words live in one registry — `screens/client/scales.ts` —
+  because three surfaces render them and they diverged the moment they didn't.
 
 ---
 
@@ -699,6 +762,22 @@ invisible cursor.
 
 `isBlank(v)` is the shared predicate — `null`, `undefined` or `""`, and
 deliberately **not** `0`.
+
+### Product-side registries (in the app, not the package)
+
+These are not components — they are the single source for a *vocabulary* that
+more than one screen renders. They live in the product because they name domain
+things, and they exist because in every case the copies had already drifted.
+
+| Registry | Owns | Read by |
+|---|---|---|
+| `screens/client/scales.ts` | The 1–5 wellness scales: the word for each step, the endpoint captions, and which scales are **inverted** (`stress`). | The check-in / mood / sleep forms, the check-in detail sheet, the Wellness history rows. |
+| `attention-ui.ts` | Icon + tone per attention type. | Coach Today, the roster, the client header. |
+| `activityIcons.ts` | The glyph for an activity key, category default plus overrides. | The activity feed and the selected-activity header — **not** the picker chips (see §7). |
+
+A screen that renders one of these must go through the registry, including for
+`aria-label`s. "4 out of 5" as an accessible name is the same defect as "4/5"
+on screen.
 
 ### Primitives and the rest
 

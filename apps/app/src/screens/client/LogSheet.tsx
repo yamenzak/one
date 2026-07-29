@@ -19,6 +19,7 @@ import { useUnits } from "../../units.js";
 import { AiAvatar, useAiIdentity } from "../../AiAvatar.js";
 import { FoodSearchSheet } from "./FoodSearchSheet.js";
 import { activityIcon } from "./activityIcons.js";
+import { SCALES, type ScaleKey } from "./scales.js";
 import { BodyScanLauncher } from "./bodyscan/BodyScanLauncher.js";
 
 type LogKind = "food" | "activity" | "water" | "weight" | "body" | "sleep" | "mood" | "checkin";
@@ -34,16 +35,42 @@ const CHIPS: { kind: LogKind; label: string; icon: LucideIcon; tone: Tone }[] = 
 ];
 const MOOD_ICONS = [Angry, Frown, Meh, Smile, Laugh];
 
-function Rating({ label, value, onChange }: { label: string; value: number | null; onChange: (n: number) => void }) {
+/*
+  ── STRESS RUNS THE OTHER WAY, AND THE FACES DIDN'T ─────────────────────────
+
+  All three scales rendered the SAME five faces, ascending: Angry … Laugh. On
+  Mood and Energy that is right. On Stress it inverted the answer. The domain
+  stores 5 = MOST stressed (`wellness.ts` scores `6 - avgStress`; `progress.ts`
+  subtracts `(stress - 3)`), so a client having a great, calm day tapped the
+  grinning face on the right — and the app recorded maximum stress, dragged
+  their wellness score down, and handed their coach the opposite of the truth.
+
+  Nothing about the widget could have told them: five faces, no endpoints, no
+  words. So both are fixed — the glyphs run calm→stressed for this scale, and
+  every scale now names what each end means.
+*/
+const STRESS_ICONS = [...MOOD_ICONS].reverse();
+
+function Rating({ label, scale, value, onChange }: { label: string; scale: ScaleKey; value: number | null; onChange: (n: number) => void }) {
+  const s = SCALES[scale];
+  const icons = s.inverted ? STRESS_ICONS : MOOD_ICONS;
   return (
     <div>
-      <div className="mb-2 text-sm text-muted-foreground">{label}</div>
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <span className="text-sm text-muted-foreground">{label}</span>
+        {/* The answer in words, so what you tapped is never a guess. */}
+        {value != null && <span className="text-sm font-medium">{s.words[value - 1]}</span>}
+      </div>
       <div className="flex gap-2" role="radiogroup" aria-label={label}>
-        {MOOD_ICONS.map((Face, i) => (
-          <button key={i} role="radio" aria-label={`${label} ${i + 1} of 5`} aria-checked={value === i + 1} onClick={() => onChange(i + 1)} className={`grid size-11 place-items-center rounded-full transition-all active:scale-90 [&_svg]:size-5 ${value === i + 1 ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+        {icons.map((Face, i) => (
+          <button key={i} role="radio" aria-label={`${label}: ${s.words[i]}`} aria-checked={value === i + 1} onClick={() => onChange(i + 1)} className={`grid size-11 place-items-center rounded-full transition-all active:scale-90 [&_svg]:size-5 ${value === i + 1 ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
             <Face />
           </button>
         ))}
+      </div>
+      {/* Endpoints, always — a bare row of faces is only guessable for Mood. */}
+      <div className="mt-1.5 flex justify-between px-1 text-micro uppercase text-muted-foreground">
+        <span>{s.low}</span><span>{s.high}</span>
       </div>
     </div>
   );
@@ -274,7 +301,25 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <input value={actSearch} onChange={(e) => setActSearch(e.target.value)} aria-label="Search sports & workouts" placeholder="Search sports & workouts…" className="h-9 w-full rounded-full bg-background pl-8 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
               </div>
-              <div className="max-h-52 space-y-2 overflow-y-auto pr-0.5">
+              {/*
+                NO GLYPH ON THE CHIPS.
+
+                Every chip carried `activityIcon(a.key)`, which resolves by
+                CATEGORY — so a section headed "CARDIO" showed the identical
+                footprints mark nine times in a row, on Rowing and Elliptical
+                too. An icon repeated down a list is not an identifier, it is
+                texture: it said nothing the heading hadn't, and it took the
+                width the labels needed, forcing three-per-row and a clipped
+                bottom line. The selected activity keeps its glyph in the header
+                above, where there is exactly one of them.
+
+                The mask is the other half: a scroll area that hard-cuts through
+                the middle of a row reads as broken, not as "there's more".
+              */}
+              <div
+                className="max-h-52 space-y-2 overflow-y-auto pr-0.5"
+                style={{ maskImage: "linear-gradient(to bottom, #000 calc(100% - 1.5rem), transparent)", WebkitMaskImage: "linear-gradient(to bottom, #000 calc(100% - 1.5rem), transparent)" }}
+              >
                 {activitiesByCategory().map((g) => {
                   const q = actSearch.trim().toLowerCase();
                   const items = g.activities.filter((a) => a.label.toLowerCase().includes(q));
@@ -284,11 +329,10 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
                       <div className="px-1 pb-1 text-micro uppercase text-muted-foreground">{g.label}</div>
                       <div className="flex flex-wrap gap-1.5">
                         {items.map((a) => {
-                          const Icon = activityIcon(a.key);
                           const on = activityKey === a.key;
                           return (
-                            <button key={a.key} aria-pressed={on} onClick={() => setActivityKey(a.key)} style={on ? { background: toneVar.cardio, color: "var(--tone-foreground)" } : undefined} className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors [&_svg]:size-3.5", !on && "bg-background hover:bg-surface-3")}>
-                              <Icon /> {a.label}
+                            <button key={a.key} aria-pressed={on} onClick={() => setActivityKey(a.key)} style={on ? { background: toneVar.cardio, color: "var(--tone-foreground)" } : undefined} className={cn("rounded-full px-3 py-1.5 text-sm transition-colors", !on && "bg-background hover:bg-surface-3")}>
+                              {a.label}
                             </button>
                           );
                         })}
@@ -296,6 +340,11 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
                     </div>
                   );
                 })}
+                {/* A search that matches nothing must say so. */}
+                {actSearch.trim() && !ACTIVITIES.some((a) => a.label.toLowerCase().includes(actSearch.trim().toLowerCase())) && (
+                  <p className="px-1 py-3 text-center text-sm text-muted-foreground">Nothing matches “{actSearch.trim()}”. Pick <span className="font-medium text-foreground">Other</span> and name it yourself.</p>
+                )}
+                <div className="h-4" aria-hidden="true" />
               </div>
             </div>
             {activityKey === "other" && <Field label="What was it?" value={f.actLabel ?? ""} onChange={(e) => set("actLabel", e.target.value)} placeholder="Name your activity" />}
@@ -304,9 +353,9 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
             <div className="grid grid-cols-2 gap-3">
               {track === "reps" && <Field label="Count (reps)" icon={Dumbbell} inputMode="numeric" value={f.reps ?? ""} onChange={(e) => set("reps", e.target.value.replace(/\D/g, ""))} />}
               {track === "distance" && <Field label={`Distance (${distUnit})`} icon={MapPin} inputMode="decimal" value={f.distance ?? ""} onChange={(e) => setDec("distance", e.target.value)} />}
-              <Field label={track === "reps" ? "Duration (min, opt)" : "Duration (min)"} icon={Timer} inputMode="numeric" value={f.duration ?? ""} onChange={(e) => set("duration", e.target.value.replace(/\D/g, ""))} />
-              <Field label="Avg HR (opt)" icon={HeartPulse} inputMode="numeric" value={f.hr ?? ""} onChange={(e) => set("hr", e.target.value.replace(/\D/g, ""))} />
-              <Field label={`Energy (${energyLabel(units)}, opt)`} icon={Flame} inputMode="numeric" value={f.kcal ?? ""} onChange={(e) => set("kcal", e.target.value.replace(/\D/g, ""))} />
+              <Field label={track === "reps" ? "Duration (min, optional)" : "Duration (min)"} icon={Timer} inputMode="numeric" value={f.duration ?? ""} onChange={(e) => set("duration", e.target.value.replace(/\D/g, ""))} />
+              <Field label="Avg HR (optional)" icon={HeartPulse} inputMode="numeric" value={f.hr ?? ""} onChange={(e) => set("hr", e.target.value.replace(/\D/g, ""))} />
+              <Field label={`Energy (${energyLabel(units)}, optional)`} icon={Flame} inputMode="numeric" value={f.kcal ?? ""} onChange={(e) => set("kcal", e.target.value.replace(/\D/g, ""))} />
             </div>
             <p className="text-xs text-muted-foreground">Enter what your watch, Whoop, Apple Health or Fitbit shows. No numbers? Ask {ai.name} to estimate them from your body &amp; training.</p>
             <Button variant="tonal" size="sm" disabled={aiBusy} onClick={() => void askAi()}><AiAvatar className="size-5" /> {aiBusy ? "Estimating…" : `Ask ${ai.name} to estimate`}</Button>
@@ -316,13 +365,13 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
           {kind === "sleep" && (<>
             <h2 className="text-lg font-semibold">Log sleep</h2>
             <Field label="Hours slept" icon={Moon} inputMode="decimal" value={f.hours ?? ""} onChange={(e) => setDec("hours", e.target.value)} />
-            <Rating label="Quality" value={ratings.sleepQ} onChange={(n) => setRatings((r) => ({ ...r, sleepQ: n }))} />
+            <Rating label="Quality" scale="sleepQ" value={ratings.sleepQ} onChange={(n) => setRatings((r) => ({ ...r, sleepQ: n }))} />
           </>)}
           {kind === "mood" && (<>
             <h2 className="text-lg font-semibold">Log mood</h2>
-            <Rating label="Mood" value={ratings.mood} onChange={(n) => setRatings((r) => ({ ...r, mood: n }))} />
-            <Rating label="Energy" value={ratings.energy} onChange={(n) => setRatings((r) => ({ ...r, energy: n }))} />
-            <Rating label="Stress" value={ratings.stress} onChange={(n) => setRatings((r) => ({ ...r, stress: n }))} />
+            <Rating label="Mood" scale="mood" value={ratings.mood} onChange={(n) => setRatings((r) => ({ ...r, mood: n }))} />
+            <Rating label="Energy" scale="energy" value={ratings.energy} onChange={(n) => setRatings((r) => ({ ...r, energy: n }))} />
+            <Rating label="Stress" scale="stress" value={ratings.stress} onChange={(n) => setRatings((r) => ({ ...r, stress: n }))} />
           </>)}
           {kind === "checkin" && (<>
             <h2 className="text-lg font-semibold">Daily check-in</h2>
@@ -330,11 +379,14 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
             <div className="grid grid-cols-2 gap-3">
               {ciMeasurements && <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={f.weight ?? ""} onChange={(e) => setDec("weight", e.target.value)} />}
               {ciSleep && <Field label="Sleep (hrs)" inputMode="decimal" value={f.sleepHours ?? ""} onChange={(e) => setDec("sleepHours", e.target.value)} />}
-              <Field label="Steps" inputMode="numeric" value={f.steps ?? ""} onChange={(e) => set("steps", e.target.value.replace(/\D/g, ""))} />
+              {/* Steps is the odd one out of three, so it takes the whole row
+                  rather than leaving a hole beside itself. When the package
+                  drops weight or sleep it falls back into the pair. */}
+              <Field className={ciMeasurements !== ciSleep ? undefined : "col-span-2"} label="Steps" inputMode="numeric" value={f.steps ?? ""} onChange={(e) => set("steps", e.target.value.replace(/\D/g, ""))} />
             </div>
-            {ciMood && <Rating label="Mood" value={ratings.mood} onChange={(n) => setRatings((r) => ({ ...r, mood: n }))} />}
-            {ciMood && <Rating label="Energy" value={ratings.energy} onChange={(n) => setRatings((r) => ({ ...r, energy: n }))} />}
-            {ciStress && <Rating label="Stress" value={ratings.stress} onChange={(n) => setRatings((r) => ({ ...r, stress: n }))} />}
+            {ciMood && <Rating label="Mood" scale="mood" value={ratings.mood} onChange={(n) => setRatings((r) => ({ ...r, mood: n }))} />}
+            {ciMood && <Rating label="Energy" scale="energy" value={ratings.energy} onChange={(n) => setRatings((r) => ({ ...r, energy: n }))} />}
+            {ciStress && <Rating label="Stress" scale="stress" value={ratings.stress} onChange={(n) => setRatings((r) => ({ ...r, stress: n }))} />}
             <Textarea rows={2} placeholder="Notes for your coach…" value={f.notes ?? ""} onChange={(e) => set("notes", e.target.value)} />
             {ciPhotos && (
             <div>

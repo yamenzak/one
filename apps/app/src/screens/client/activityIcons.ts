@@ -26,6 +26,10 @@ const KEY_ICON: Record<string, LucideIcon> = {
   jump_rope: Zap,
   hiit: Zap,
   burpees: Zap,
+  // Rowing is filed under cardio, so it inherited FOOTPRINTS — a walking glyph
+  // on the one cardio machine you sit down for. The category default is right
+  // for the rest of that group; this one had to be said out loud.
+  rowing: Waves,
 };
 
 export function activityIcon(key: string | null | undefined): LucideIcon {

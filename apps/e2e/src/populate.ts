@@ -17,6 +17,8 @@
 
 import type { Page } from "@playwright/test";
 import type { Client, Studio } from "./provision.js";
+import { carrySessionTo } from "./app.js";
+import { ADMIN_URL, ROOT_DOMAIN, SETUP_URL } from "./env.js";
 
 /** `YYYY-MM-DD`, `n` days before `from` (default today, local). */
 export function dayBefore(n: number, from = new Date()): string {
@@ -257,4 +259,88 @@ async function callPatch(page: Page, base: string, path: string, body: unknown):
     [path, JSON.stringify(body)] as [string, string],
   );
   if (!out.ok) throw new Error(`PATCH ${base}${path} -> ${out.status} ${out.text}`);
+}
+
+/**
+ * Put a studio on bigger entitlements for a review run.
+ *
+ * Uses the real operator route — `PATCH /api/admin/tenants/:id/overrides`,
+ * which answers on the `admin.` door and grants quotas/features exactly as the
+ * platform console does. **Requires `E2E_DEV_ADMIN=1`** so that
+ * `isPlatformAdmin` falls back to its development lane; see the note in
+ * playwright.config.ts for why that is opt-in.
+ *
+ * This exists because whole surfaces are invisible on the free baseline —
+ * Sessions and Packages render a FeatureLock card, and the roster stops at
+ * three — so they had never been looked at with anything in them. It grants;
+ * it does not fake. Every screen still resolves its own entitlements the
+ * normal way.
+ */
+export async function grantEntitlements(
+  studio: Studio,
+  grants: { quotas?: Record<string, number>; features?: Record<string, boolean> },
+): Promise<void> {
+  await carrySessionTo(studio.context, SETUP_URL, `admin.${ROOT_DOMAIN}`);
+  const page = await studio.context.newPage();
+  try {
+    await page.goto(`${ADMIN_URL}/health`);
+    const out = await page.evaluate(
+      async ([path, body]: [string, string]) => {
+        const res = await fetch(path, { method: "PATCH", headers: { "content-type": "application/json" }, body });
+        return { ok: res.ok, status: res.status, text: await res.text() };
+      },
+      [`/api/admin/tenants/${studio.tenantId}/overrides`, JSON.stringify({ grants })] as [string, string],
+    );
+    if (!out.ok) {
+      throw new Error(
+        `PATCH overrides -> ${out.status} ${out.text}` +
+          (out.status === 403 ? " (run with E2E_DEV_ADMIN=1)" : ""),
+      );
+    }
+  } finally {
+    await page.close();
+  }
+}
+
+/**
+ * A front desk with something in it: two session types and a booking.
+ *
+ * The Sessions screen has two states worth reviewing and they look nothing
+ * alike — first-run (no types, no bookings, which is what a real new studio
+ * sees) and running (a booked card with its complete / no-show / cancel row,
+ * and the "what you offer" list). Seeding the second one is the only way to
+ * see the first one is not the only design that matters.
+ */
+export async function seedFrontDesk(studio: Studio, clientId: string): Promise<void> {
+  const types = [
+    { label: "Nutrition consultation", durationMinutes: 45, standalonePriceCents: 6000 },
+    { label: "InBody scan & review", durationMinutes: 20 },
+  ];
+  const created: string[] = [];
+  for (const t of types) {
+    const r = await callJson<{ id: string }>(studio.page, studio.base, "/api/addon-types", t);
+    created.push(r.id);
+  }
+  // Booking is refused without an unspent prepaid session, and that balance
+  // comes from a PACKAGE SUBSCRIPTION — which needs the Connect rail, i.e. real
+  // Stripe. So on a seeded studio this call usually 409s and the shot shows the
+  // "types defined, nothing booked yet" state. That is a real state (it is what
+  // every studio sees between setting up and taking its first booking), so the
+  // capture is still worth having; the booked-card state is only reachable with
+  // Stripe configured, and is reviewed from the Packages rail instead.
+  const when = new Date(Date.now() + 2 * 86_400_000);
+  when.setHours(16, 30, 0, 0);
+  try {
+    await callJson(studio.page, studio.base, "/api/sessions", {
+      clientId,
+      addOnTypeId: created[0],
+      scheduledAt: when.toISOString(),
+      durationMinutes: 45,
+      notes: "Bring the last two weeks of food logs.",
+    });
+  } catch (e) {
+    // No balance on this client's package — the empty upcoming list is still a
+    // legitimate shot, so say so rather than failing the whole capture.
+    console.warn(`[seedFrontDesk] booking skipped: ${String(e).slice(0, 200)}`);
+  }
 }

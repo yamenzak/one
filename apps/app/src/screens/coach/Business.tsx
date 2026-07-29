@@ -198,10 +198,19 @@ function Overview() {
     const b = billing?.baseline;
     if (!b) return null;
     const locked = b.lockedFeatures;
+    /*
+      NAME THE COUNT, NOT THREE OF THE NAMES.
+
+      This used to read "AI suite, Body-fat camera, Supplements & labs and 1 more
+      are locked" — a partial list ending in an opaque number, in a card sitting
+      a few hundred pixels above "What's in your plan", which lists every one of
+      them with a lock beside it. Half a list is worse than none: it costs three
+      clauses and still sends you looking for the rest.
+    */
     return [
-      b.activeClientLimit >= 0 ? `${b.activeClientLimit} active client${b.activeClientLimit === 1 ? "" : "s"} max` : null,
+      b.activeClientLimit >= 0 ? `${b.activeClientLimit} active client${b.activeClientLimit === 1 ? "" : "s"}` : null,
       b.monthlyCredits > 0 ? `${b.monthlyCredits.toLocaleString()} AI credits a month` : "no AI credits",
-      locked.length ? `${locked.slice(0, 3).join(", ")}${locked.length > 3 ? ` and ${locked.length - 3} more` : ""} ${locked.length === 1 ? "is" : "are"} locked` : null,
+      locked.length ? `${locked.length} feature${locked.length === 1 ? "" : "s"} locked` : null,
     ].filter(Boolean).join(" · ");
   })();
 
@@ -233,8 +242,16 @@ function Overview() {
           <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-1 text-center">
             <p className="text-caption text-muted-foreground">AI credits left</p>
             <p className="numeral text-display"><CountUp value={billing.balance.available} /></p>
+            {/* Zero credits means two completely different things, and the screen
+                used to say the actionable one in both cases: a studio whose plan
+                doesn't include the AI suite was told to "top up", which would
+                have bought credits it still couldn't spend. */}
             <p className="text-caption text-muted-foreground">
-              {billing.balance.available === 0 ? "The AI suite is paused until you top up" : "across monthly and purchased"}
+              {billing.balance.available > 0
+                ? "across monthly and purchased"
+                : ctx?.entitlements?.features?.aiSuite
+                  ? "The AI suite is paused until you top up"
+                  : "The AI suite isn't in your plan"}
             </p>
           </TierAnchor>
           {/* No live subscription. Distinct from dunning: a past-due studio HAS a
@@ -263,7 +280,9 @@ function Overview() {
                         {busy === `plan_${pendingPlanId}` ? "…" : "Finish setup"} <ArrowRight />
                       </Button>
                     )}
-                    {!billing.stripeEnabled && <p className="mt-2 text-xs text-muted-foreground">Subscriptions turn on once Stripe is configured on this deployment.</p>}
+                    {/* "configured on this deployment" is a sentence for whoever
+                        runs the servers, shown to whoever runs the gym. */}
+                    {!billing.stripeEnabled && <p className="mt-2 text-xs text-muted-foreground">Card payments aren't switched on yet, so there's nothing to subscribe to right now.</p>}
                   </div>
                 </div>
               </Card>
@@ -302,13 +321,19 @@ function Overview() {
               24px/700 dead centre, so "Free" under "No subscription" read as a
               second hero on a tab that already has one. A strip is a comparison
               of three things; with one thing it is a hero. This is a row. */}
-          <Stagger>
-            <Group>
-              <Row icon={CreditCard} sub={STATE_LABEL[billingState]}>
-                {isPending ? pendingName : billing.subscription.planName}
-              </Row>
-            </Group>
-          </Stagger>
+          {/* …and it only earns its place when nothing else has said it. With no
+              subscription the red card directly above already names the plan AND
+              its state, so this row made "No subscription" the third statement of
+              the same fact on one screen (Shell bar, card, row). */}
+          {!noSub && (
+            <Stagger>
+              <Group>
+                <Row icon={CreditCard} sub={STATE_LABEL[billingState]}>
+                  {billing.subscription.planName}
+                </Row>
+              </Group>
+            </Stagger>
+          )}
 
           {/* Stripe Connect — sell packages to clients. */}
           {canSell && billing.connect && (
@@ -373,12 +398,19 @@ function Overview() {
             <Eyebrow>Credit packs</Eyebrow>
             <Stagger>
             <Card className="space-y-3">
-              {/* Purchased credits never expire; the monthly plan grant resets each period. */}
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="numeral">{billing.balance.purchased.toLocaleString()} purchased</span>
-                <span className="text-muted-foreground/40">·</span>
-                <span className="numeral">{billing.balance.granted.toLocaleString()} monthly</span>
-                <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-xs">resets monthly</span>
+              {/*
+                Purchased credits never expire; the plan grant resets each period.
+                THAT is the fact this line exists to teach, and it used to be
+                three fragments — "0 purchased · 0 monthly · resets monthly" —
+                where the only word carrying meaning ("resets") sat in a chip
+                attached to nothing and repeated the word beside it.
+              */}
+              {/* Two lines, not one wrapped one: at phone width the inline
+                  separator ended up stranded at the end of the first line,
+                  pointing at nothing. */}
+              <div className="space-y-0.5 text-xs text-muted-foreground">
+                <div><span className="numeral font-medium text-foreground">{billing.balance.purchased.toLocaleString()}</span> bought — these never expire</div>
+                <div><span className="numeral font-medium text-foreground">{billing.balance.granted.toLocaleString()}</span> from your plan — resets each month</div>
               </div>
               {isOwner && billing.stripeEnabled && (
                 <Field label="Promo code (optional)" icon={Tag} value={packPromo} onChange={(e) => setPackPromo(e.target.value.toUpperCase())} placeholder="SUMMER20" />
@@ -387,7 +419,10 @@ function Overview() {
                   sub-line printed the name back at the owner. What's actually
                   worth comparing between packs is the rate, so that is the
                   sub-line — and it falls back to the count for a studio whose
-                  packs are named something else. */}
+                  packs are named something else.
+                  The rate drops the word "credits" for the same reason: under a
+                  row titled "1,000 credits", "1,000 credits per $1" reads as the
+                  title stuttering rather than as a different number. */}
               <Group>
                 {billing.packs.map((p) => {
                   const perDollar = p.price_usd > 0 ? Math.round(p.credits / p.price_usd) : null;
@@ -396,7 +431,7 @@ function Overview() {
                     <Row
                       key={p.id}
                       icon={Wallet}
-                      sub={perDollar ? `${perDollar.toLocaleString()} credits per $1` : named ? undefined : `${p.credits.toLocaleString()} credits`}
+                      sub={perDollar ? `${perDollar.toLocaleString()} per $1` : named ? undefined : `${p.credits.toLocaleString()} credits`}
                       trailing={isOwner && billing.stripeEnabled ? (
                         <Button size="sm" variant="tonal" disabled={busy === `pack_${p.id}`} onClick={() => void startInline("/api/billing/pack-intent", { packId: p.id, promoCode: packPromo || undefined }, `Buy ${p.name}`, (cents) => `Pay ${fmtPrice(cents ?? usdToCents(p.price_usd))}`, `pack_${p.id}`)}>
                           {busy === `pack_${p.id}` ? "…" : fmtPrice(usdToCents(p.price_usd))}
@@ -410,7 +445,7 @@ function Overview() {
                   );
                 })}
               </Group>
-              {!billing.stripeEnabled && <p className="text-xs text-muted-foreground">Credit-pack purchasing turns on once Stripe is configured.</p>}
+              {!billing.stripeEnabled && <p className="text-xs text-muted-foreground">Card payments aren't switched on yet, so packs can't be bought right now.</p>}
             </Card>
             </Stagger>
           </section>
@@ -692,14 +727,32 @@ function DowngradeSheet({ planId, onClose, onDone, onCheckout, onPortal }: {
  *  registry (FEATURE_META / QUOTA_META) so it can't drift from what's enforced.
  *  Reserved (unreleased) features are hidden. */
 function PlanFeatures({ ent }: { ent: Entitlements }) {
-  const features = FEATURE_KEYS.filter((k) => !FEATURE_META[k]?.reserved);
+  /*
+    INCLUDED FIRST, LOCKED AFTER.
+
+    The registry's own order interleaved them — ✓ Commerce, 🔒 AI suite, 🔒
+    Body-fat, ✓ External food search, 🔒 Supplements, ✓ Front desk, 🔒 Branding —
+    so "what do I actually have" could only be answered by reading all seven rows
+    and sorting them in your head. Sorted, the card answers it in one glance and
+    the locked run underneath becomes a single, honest upsell block.
+  */
+  const features = FEATURE_KEYS
+    .filter((k) => !FEATURE_META[k]?.reserved)
+    .slice()
+    .sort((a, b) => Number(!!ent.features[b]) - Number(!!ent.features[a]));
+  const included = features.filter((k) => ent.features[k]).length;
   const fmtQuota = (v: number) => (v < 0 ? "Unlimited" : v.toLocaleString());
-  /** Singularise a quota unit so "1 seats" can't ship. Unlimited takes none. */
-  const unitFor = (unit: string | undefined, v: number) =>
-    !unit || v < 0 ? "" : v === 1 && unit.endsWith("s") ? unit.slice(0, -1) : unit;
+  /** Singularise a quota unit so "1 seats" can't ship. Unlimited takes none —
+   *  and neither does a quota whose LABEL already ends in the unit, which is
+   *  what put "Staff seats / 10 seats" on screen. */
+  const unitFor = (unit: string | undefined, v: number, label: string) => {
+    if (!unit || v < 0) return "";
+    if (label.toLowerCase().endsWith(unit.toLowerCase())) return "";
+    return v === 1 && unit.endsWith("s") ? unit.slice(0, -1) : unit;
+  };
   return (
     <Card className="space-y-3">
-      <SectionHeader icon={CheckCheck} tone="success" title="What's in your plan" />
+      <SectionHeader icon={CheckCheck} tone="success" title="What's in your plan" count={`${included} of ${features.length}`} />
       <div className="space-y-1">
         {features.map((k) => {
           const on = ent.features[k];
@@ -717,14 +770,18 @@ function PlanFeatures({ ent }: { ent: Entitlements }) {
         })}
       </div>
       <div className="grid grid-cols-2 gap-2 border-t border-border/40 pt-3">
-        {QUOTA_KEYS.map((k) => (
-          <div key={k} className="rounded-xl bg-surface-2 px-3 py-2.5">
-            <div className="text-micro uppercase text-muted-foreground">{QUOTA_META[k]?.label ?? k}</div>
-            {/* "1 seats" was shipping. A unit that never agrees with its number is
-                the kind of thing nobody reports and everybody notices. */}
-            <div className="numeral mt-0.5 text-sm font-bold">{fmtQuota(ent.quotas[k])}<span className="ml-1 text-[0.6rem] font-medium text-muted-foreground">{unitFor(QUOTA_META[k]?.unit, ent.quotas[k])}</span></div>
-          </div>
-        ))}
+        {QUOTA_KEYS.map((k) => {
+          const label = QUOTA_META[k]?.label ?? k;
+          const unit = unitFor(QUOTA_META[k]?.unit, ent.quotas[k], label);
+          return (
+            <div key={k} className="rounded-xl bg-surface-2 px-3 py-2.5">
+              <div className="text-micro uppercase text-muted-foreground">{label}</div>
+              {/* "1 seats" was shipping. A unit that never agrees with its number is
+                  the kind of thing nobody reports and everybody notices. */}
+              <div className="numeral mt-0.5 text-sm font-bold">{fmtQuota(ent.quotas[k])}{unit && <span className="ml-1 text-[0.6rem] font-medium text-muted-foreground">{unit}</span>}</div>
+            </div>
+          );
+        })}
       </div>
     </Card>
   );

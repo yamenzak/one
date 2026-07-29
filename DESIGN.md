@@ -63,7 +63,8 @@ working through them is what produced §1's no-anchor rule:
 | `client/MealPlanDrawer` | The player's twin, same anchor shape: plan name, meals a day, daily targets beneath as context. |
 | `coach/ClientManage` | Anchor = **days of access left** — the one number a coach acts on here — with "No access" in words when there is none. The 20-field preferences form moved behind a `Row` → `Sheet`; the tab went from 7,245px tall to 4,313px. |
 | `coach/Staff` | Anchor = **seats used of the plan's ceiling**. Both halves were already in hand (roster + `ctx.entitlements.quotas`), so it costs no request — and it fixed a real gap: the ceiling used to be invisible until an invite bounced off it. |
-| `coach/Library`, `coach/Packages`, `coach/Sessions` | **List surfaces — no anchor, deliberately.** A coach opening the exercise library came to find an exercise, not to learn there are 42. A display numeral there counts something nobody came to count. |
+| `coach/Library`, `coach/Packages` | **List surfaces — no anchor, deliberately.** A coach opening the exercise library came to find an exercise, not to learn there are 42. A display numeral there counts something nobody came to count. |
+| `coach/Sessions` | **Reversed on review, and the reversal is the interesting part.** It was filed above as a list surface. Looked at with a front desk actually running, it is a *schedule*: the one question on arrival is what is booked, and the answer is a number. It now anchors on **Booked in**, sub-lined with how far out the next one is (relative — the card underneath carries the absolute time). What made the original call look right was the FIRST-RUN state, which genuinely has no anchor — so that state got the no-T1 treatment on its own, and §1 grew the rule that the exemption applies per *state*, not only per surface. |
 | `Settings`, `AdminConsole` | Same, as always. |
 
 **`client/Wellness` — resolved.** It looked like four subjects on one surface
@@ -148,6 +149,48 @@ are now checked rather than agreed:
 All six scan `packages/ui` as well as the app — the design system is where a
 bypass does the most damage, and each of these found real violations there.
 Each has an escape hatch that requires a written reason.
+
+---
+
+## What only shows up in a populated account
+
+Every layer above is static. The defects that survived them all needed **data on
+the screen** — and, at the end, a studio on a bigger plan than the free baseline,
+because Sessions and Packages are entitlement-gated and the roster caps at three.
+`apps/e2e/src/populate.ts` exists for that: it seeds a deliberately *uneven*
+fortnight (missed days, drifting weight, long names) and `grantEntitlements()`
+raises the plan through the real admin route. `E2E_DEV_ADMIN=1` blanks
+`ADMIN_EMAILS` for that one run — opt-in per command, never in config, because
+the three golden paths must run against the authorization the product ships.
+
+What that found, in rough order of how much it mattered:
+
+- **The stress scale recorded the opposite of the answer.** Mood, Energy and
+  Stress all rendered the same ascending five faces, Angry → Laugh. The domain
+  scores stress with 5 as the *worst* (`wellness.ts`: `6 - avgStress`). A client
+  having a calm day tapped the grinning face on the right, and the app stored
+  maximum stress, pushed their wellness score down, and showed the coach the
+  reverse of the truth. Nothing on the widget could have told them: five faces,
+  no endpoint captions, no words. Now the glyphs run calm→stressed for that
+  scale, every scale names both ends and echoes the chosen step in words, and
+  the read-back surfaces invert their bar and tone to match. Words in one
+  registry — `screens/client/scales.ts` — because three screens render them.
+- **A roster of ten put the one client who needed attention last**, because the
+  list came back in creation order while the anchor above said "1 needs a look".
+  Ordering is now attention → active → never-signed-in, with search above seven
+  rows, and the anchor's sub-line admits how much of the count is invitations.
+- **Sessions was upside down on first run** — see the ledger above.
+- **Business said "No subscription" three times** on one screen (the Shell strip,
+  a red card, and a plan row directly under it), told an owner whose plan
+  *excludes* the AI suite to "top up" credits they could not spend, and printed
+  a half-list of locked features ending in "and 1 more" a few hundred pixels
+  above the card that lists all of them.
+- **Icons that repeated instead of distinguishing**, and copy carrying the
+  billing model's vocabulary ("add-on unit", "add-on balance") into a scheduling
+  tool. §7 and §10 now name both.
+
+None of these are visible in a diff, and only the first is visible in a test.
+The method is the finding: **build the account, then look at it.**
 
 ---
 
