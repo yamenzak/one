@@ -2,7 +2,7 @@
  *  cards), Stripe Connect / inline buy, redeem codes. */
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Button, Card, Badge, Field, Sheet, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, EmptyState, toneVar, ArrowLeft, LogOut, Ticket, Store, Check, RotateCcw, Reveal, SkeletonLine, SkeletonList } from "@kova/ui";
+import { Button, Card, Badge, Field, Sheet, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, EmptyState, toneVar, ArrowLeft, LogOut, Ticket, Store, Check, RotateCcw, Reveal, SkeletonLine, SkeletonList , TierAnchor, CountUp } from "@kova/ui";
 import { CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "@kova/domain";
 import { api } from "../../api.js";
 import { StudioListCard } from "../../StudioSwitcher.js";
@@ -127,11 +127,29 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
           <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
         )}
         <div className="min-w-0 flex-1">
-          <h1 className="text-title-2">Shop</h1>
-          <p className="truncate text-xs text-muted-foreground">Plans &amp; packages{studio ? ` from ${studio}` : ""}</p>
+          <p className="text-caption text-muted-foreground">Plans &amp; packages{studio ? ` from ${studio}` : ""}</p>
         </div>
         {locked && <Button size="sm" variant="ghost" onClick={() => void signOut()}><LogOut /> Sign out</Button>}
       </div>
+
+      {/* T1 (§1). The question a client opens Shop with is "how long have I got",
+          not "what is this screen called" — so the anchor is their remaining
+          access when they have some, and the offer when they do not. */}
+      <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-1 text-center">
+        {sub && sub.daysRemaining > 0 ? (
+          <>
+            <p className="text-caption text-muted-foreground">Access left</p>
+            <p className="numeral text-display"><CountUp value={sub.daysRemaining} /></p>
+            <p className="text-caption text-muted-foreground">{sub.daysRemaining === 1 ? "day" : "days"}</p>
+          </>
+        ) : (
+          <>
+            <p className="text-caption text-muted-foreground">Your plan</p>
+            <p className="text-title-1">{locked ? "Choose a package" : "Nothing active"}</p>
+            <p className="text-caption text-muted-foreground">Pick one below to start</p>
+          </>
+        )}
+      </TierAnchor>
 
       {/* THE STRANDING FIX. In `locked` mode this screen replaces the whole Shell,
           so there is no app bar and therefore no studio switcher — the only way

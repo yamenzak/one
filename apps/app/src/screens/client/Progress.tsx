@@ -17,7 +17,8 @@ import {
   Card, Badge, Button, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger, EmptyState, SectionHeader, Sparkline, Eyebrow, GlanceStrip,
   Reveal, SkeletonHero, SkeletonChart,
   AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, METRICS, POSTURE_SEVERITY_TONE, cn, toneVar,
-  Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, Calendar, Scale, type Tone, type LucideIcon,
+  Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, Calendar, Scale,
+  TierAnchor, CountUp, type Tone, type LucideIcon,
 } from "@kova/ui";
 import { api, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
@@ -105,7 +106,11 @@ export function Progress({ clientId }: { clientId: string }) {
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
-      <h1 className="text-title-2">Progress</h1>
+      {/* T1 lives INSIDE each lens (§1): a tabbed surface is four screens
+          sharing chrome, and each names a different subject. "Progress" itself is
+          navigation — the tab bar already says it — so it is an eyebrow here
+          rather than the largest thing on a screen it does not describe. */}
+      <p className="px-1 text-caption text-muted-foreground">Progress</p>
       {/* Lens tabs collapse to icons (active one keeps its label, navbar-style)
           so the whole row — tabs + range — fits the Progress column. "Custom"
           is a calendar icon; picking it reveals the start→end pickers below. */}
@@ -142,7 +147,20 @@ export function Progress({ clientId }: { clientId: string }) {
              wait-handshake (which could strand the incoming tab unmounted).
              Dim while a new range loads (prior data stays put — no skeleton flash). */
           <motion.div key={tab} variants={stagger} initial="hidden" animate="show" className={cn("space-y-4 transition-opacity", loading && "pointer-events-none opacity-50")}>
-            {tab === "overview" && <Overview data={data} units={units} dateLabel={dateLabel} canNutrition={canNutrition} canTraining={canTraining} />}
+            {tab === "overview" && (
+              <>
+                <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-1 text-center">
+                  <p className="text-caption text-muted-foreground">Wellness index</p>
+                  <p className="numeral text-display">
+                    {data.wellness.index == null ? "—" : <CountUp value={Math.round(data.wellness.index)} />}
+                  </p>
+                  <p className="text-caption text-muted-foreground">
+                    {data.wellness.index == null ? "Log how you feel to see this" : "out of 100"}
+                  </p>
+                </TierAnchor>
+                <Overview data={data} units={units} dateLabel={dateLabel} canNutrition={canNutrition} canTraining={canTraining} />
+              </>
+            )}
             {tab === "body" && <Body data={data} units={units} dateLabel={dateLabel} clientId={clientId} canBodyScan={canBodyScan} />}
             {tab === "training" && <Training data={data} units={units} />}
             {tab === "wellness" && <Wellness data={data} />}
