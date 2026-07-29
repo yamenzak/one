@@ -1,7 +1,7 @@
 /**
  * `SectionDetail` bound to this app's navigation.
  *
- * The presentation lives in `@kova/ui` — index of sub-pages, one open at a
+ * The presentation lives in `@4dl/ui` — index of sub-pages, one open at a
  * time, every row stating its current value. What could NOT move there is this
  * file: the package has no router dependency and must not gain one, because a
  * design system that imports one cannot be consumed by an app using a
@@ -15,7 +15,7 @@
 
 import type { ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { SectionDetail, type SettingsEntry } from "@kova/ui";
+import { SectionDetail, type SettingsEntry } from "@4dl/ui";
 
 /**
  * `value` rather than the package's `sub`, because at a sub-page call site the

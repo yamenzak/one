@@ -36,7 +36,7 @@ installLocalhostResolver();
 export const APP_PORT = 8787;
 
 /** The dev/E2E root domain. Loopback classifies against `localhost` regardless of
- *  the worker's configured ROOT_DOMAIN — see `@kova/domain` `classifyHost`. */
+ *  the worker's configured ROOT_DOMAIN — see `@4dl/platform` `classifyHost`. */
 export const ROOT_DOMAIN = "localhost";
 
 /** The root door: a signpost, not an app. */

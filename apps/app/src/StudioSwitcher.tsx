@@ -32,10 +32,8 @@
 
 import { useState } from "react";
 import type { PersonaRef } from "@kova/protocol";
-import {
-  Badge, Button, Card, Sheet, Check, ChevronsUpDown, Store, Spinner, cn,
-  personaLabel, personaTone,
-} from "@kova/ui";
+import { Badge, Button, Card, Sheet, Check, ChevronsUpDown, Store, Spinner, cn } from "@4dl/ui";
+import { personaLabel, personaTone } from "./registry/index.js";
 import { useSession } from "./session.js";
 
 /** The mark for a studio: its uploaded icon, else its initial on its own colour. */

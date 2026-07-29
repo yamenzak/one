@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { IScannerControls } from "@zxing/browser";
-import { Button, Field, Sheet, Barcode } from "@kova/ui";
+import { Button, Field, Sheet, Barcode } from "@4dl/ui";
 
 export function BarcodeScanner({ onDetected, onClose }: { onDetected: (code: string) => void; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);

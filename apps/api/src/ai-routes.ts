@@ -7,7 +7,8 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { WorkoutBody, MUSCLE_GROUPS, EQUIPMENT_TYPES, normalizeMuscle, normalizeEquipment } from "@kova/protocol";
-import { resolveUnits, activityByKey, estimateBurnedCalories, mockModeSettable, shouldUseMockLane } from "@kova/domain";
+import { resolveUnits, activityByKey, estimateBurnedCalories } from "@kova/domain";
+import { mockModeSettable, shouldUseMockLane } from "@4dl/platform";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import type { Env } from "./env.js";
 import { requireClientAccess, clientForUser } from "./clients.js";

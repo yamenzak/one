@@ -8,11 +8,11 @@
  * tokens, so they re-skin with the tenant theme like everything else.
  */
 
-import type { Tone } from "../primitives.js";
+import type { Tone } from "@4dl/ui";
 import {
   Flame, Beef, Wheat, Droplets, Droplet, Salad, Weight, Percent, Footprints,
   Moon, Smile, Zap, Activity, Dumbbell, Timer, Ruler, HeartPulse, type LucideIcon,
-} from "./icons.js";
+} from "@4dl/ui";
 
 /** The unit dimension a metric is stored/converted in (matches @kova/domain
  *  units). Absent ⇒ the value is dimensionless or a fixed unit (see noConvert). */

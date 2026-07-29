@@ -29,7 +29,7 @@
     },
     "@kova/domain#build": { "outputs": [] },
     "@kova/protocol#build": { "outputs": [] },
-    "@kova/ui#build": { "outputs": [] },
+    "@4dl/ui#build": { "outputs": [] },
     "lint": {},
     "dev": {
       "cache": false,

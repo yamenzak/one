@@ -12,7 +12,7 @@ import {
   Button, Card, Badge, SegmentedControl, Page, Stagger, StatCard, ChartCard, AreaChart, SectionHeader, Eyebrow, GlanceStrip, Sparkline, toneVar,
   Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList,
   Flame, Gauge, Dumbbell, Utensils, Scale, Moon, Smile, TrendingUp, Percent, cn,
-} from "@kova/ui";
+} from "@4dl/ui";
 import { api, errorText, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";

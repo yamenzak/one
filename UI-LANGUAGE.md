@@ -790,7 +790,7 @@ Non-negotiable, checked on every screen:
 
 ## 13. The registry
 
-**Every component in `@kova/ui`, what it is for, and — more usefully — what it is
+**Every component in `@4dl/ui`, what it is for, and — more usefully — what it is
 NOT for.** This section is the working reference: check here before building
 anything, and add to it in the same commit that adds a component. A component
 that is not listed here does not exist as far as the next screen is concerned.

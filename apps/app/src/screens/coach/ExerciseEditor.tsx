@@ -13,7 +13,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Globe, PencilLine, ArrowLeft, ArrowRight, Search, Plus, Trash2, Check, toneSoft, cn, type Tone, SPRING_SNAP} from "@kova/ui";
+import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Globe, PencilLine, ArrowLeft, ArrowRight, Search, Plus, Trash2, Check, toneSoft, cn, type Tone, SPRING_SNAP} from "@4dl/ui";
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@kova/protocol";
 import { api, ApiError, uploadMedia } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";

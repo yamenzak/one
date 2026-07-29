@@ -60,9 +60,18 @@ apps/api/     THE worker. Hono router + TenantBillingDO + InboxDO. Also serves
               with no CORS).
 apps/app/     ONE role-adaptive React 19 PWA for every persona.
 apps/www/     Marketing site. ALL content is inline in apps/www/build.mjs.
-packages/domain/    Pure logic, no I/O, no Date.now() — time enters as a param.
+packages/platform/  @4dl/platform — the SHARED multi-tenant substrate: hosts,
+              DCV, credits, promo, standing, ai-mock. Pure, no product words.
+packages/domain/    @kova/domain — Kova's pure logic (fitness + its registries:
+              entitlements, perms, budgets, notifications). No I/O, no Date.now()
+              — time enters as a param. May import @4dl/platform, never the reverse.
 packages/protocol/  Zod wire schemas shared api <-> app.
-packages/ui/        Design system: tokens, primitives, shell, charts.
+packages/ui/        @4dl/ui — the SHARED design system: tokens, primitives, shell,
+              charts. No product words, no router. Kova's registries live in
+              apps/app/src/registry/.
+
+Both `@4dl/*` packages carry a README stating the boundary rule and the leaks
+left standing on purpose. Read it before adding a name to either.
 ```
 
 **All ~30 routers mount at `/api`** (`apps/api/src/index.ts`). A router declaring
@@ -177,7 +186,7 @@ Two things bit hard:
   under-estimated reserve makes the *platform* eat the overrun. Estimates must be
   true upper bounds (see `IMAGE_TOKEN_EST`). On provider failure `release(hold)`;
   on settle failure swallow and return the output — the hold self-reaps.
-- **Pricing math is pure** (`packages/domain/src/credits.ts`). Never hand-compute
+- **Pricing math is pure** (`packages/platform/src/credits.ts`). Never hand-compute
   credits at a route. Provider usage numbers are untrusted.
 - **Amounts are integer cents** (packages, promos) or float USD (plans, packs).
   Don't mix. Render with `fmtPrice` (`apps/app/src/money.ts`) — never `$${x}`.
@@ -398,7 +407,7 @@ Americas. This applies to every date-only column, including `lab_tests.due_by`.
 **Units.** Store metric, convert at display via `@kova/domain` `units.ts` and the
 `useUnits()` hook. Never post a display-unit number.
 
-**Design system.** Use `@kova/ui` primitives, never raw palette classes. **Text
+**Design system.** Use `@4dl/ui` primitives, never raw palette classes. **Text
 or icons on a solid domain tone must be `text-[var(--tone-foreground)]`, never
 `text-white`** — tones invert per mode, so white-on-tone is ~1.9:1 in dark. Never
 add `[color-scheme:dark]` to an element; `tokens.css` owns it at the root.

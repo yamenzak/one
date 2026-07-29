@@ -10,7 +10,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { kcalToDisplay, scaleFood, servingsToQuantity, SERVING_PRESETS, type UnitPrefs } from "@kova/domain";
-import { Button, Field, Sheet, Chip, SegmentedControl, IconBadge, cn, toneSoft, METRICS, Search, Barcode, Camera, PencilLine, ChevronRight, Plus, X } from "@kova/ui";
+import { Button, Field, Sheet, Chip, SegmentedControl, IconBadge, cn, toneSoft, Search, Barcode, Camera, PencilLine, ChevronRight, Plus, X } from "@4dl/ui";
+import { METRICS } from "../../registry/index.js";
 import { api, errorText, isQueued, todayLocal, uploadMedia } from "../../api.js";
 import { QueuedNotice } from "../../notices.js";
 import { useSession } from "../../session.js";

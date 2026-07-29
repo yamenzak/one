@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Badge, Button, Callout, Choice, ChoiceGroup, GroupNote, Reveal, SkeletonList, AlertTriangle, Gift } from "@kova/ui";
+import { Badge, Button, Callout, Choice, ChoiceGroup, GroupNote, Reveal, SkeletonList, AlertTriangle, Gift } from "@4dl/ui";
 import { FEATURE_META } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { fmtPrice } from "../../money.js";

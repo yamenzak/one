@@ -293,7 +293,7 @@ subscription creation, as Stripe's `trial_period_days`.
 
 ### Credit system (transplant Scena wholesale)
 
-- `packages/domain/credits.ts` — pure math: **1 credit = $0.001**; neurons are the
+- `packages/platform/credits.ts` — pure math: **1 credit = $0.001**; neurons are the
   metering unit; `credits = max(1, ceil(neurons × $0.011/1000-neurons × markup))`,
   **default markup 3×**. Google/Gemini list prices pre-expressed as neuron-equivalents in
   the model rate table so both providers meter identically.

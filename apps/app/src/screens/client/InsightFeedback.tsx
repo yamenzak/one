@@ -9,7 +9,7 @@
 
 import { useState } from "react";
 import { api } from "../../api.js";
-import { ThumbsUp, ThumbsDown, Check, cn } from "@kova/ui";
+import { ThumbsUp, ThumbsDown, Check, cn } from "@4dl/ui";
 
 const MUTE_PREFIX = "kova:insight-muted:";
 

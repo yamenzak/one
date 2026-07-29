@@ -4,7 +4,7 @@
  * tone. Domain owns severity/permission/copy; presentation lives here.
  */
 
-import { Target, Moon, ClipboardList, FlaskConical, ArrowLeftRight, Clock, CircleAlert, CircleUser, Scale, Percent, Dumbbell, Mail, type LucideIcon, type Tone } from "@kova/ui";
+import { Target, Moon, ClipboardList, FlaskConical, ArrowLeftRight, Clock, CircleAlert, CircleUser, Scale, Percent, Dumbbell, Mail, type LucideIcon, type Tone } from "@4dl/ui";
 import type { AttentionType, AttentionSeverity } from "@kova/domain";
 
 export interface AttentionCoding { icon: LucideIcon; tone: Tone }

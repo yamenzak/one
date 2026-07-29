@@ -10,7 +10,7 @@ import {
   Button, Card, Page, Reveal, EmptyState, Badge, Chip, IconBadge, ConfirmDialog, SkeletonList,
   ArrowLeft, Trash2, ImageIcon, Wand2, Archive, Building2, Dumbbell, FlaskConical, HeartPulse, Utensils,
   type LucideIcon,
-} from "@kova/ui";
+} from "@4dl/ui";
 import { api } from "../api.js";
 
 interface MediaItem {

@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Button, DUR} from "@kova/ui";
+import { Button, DUR} from "@4dl/ui";
 import { featureEnabled } from "@kova/domain";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";

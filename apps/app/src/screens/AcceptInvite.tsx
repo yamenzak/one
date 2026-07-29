@@ -17,7 +17,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { motion } from "motion/react";
-import { Button, Card, Field, Mail, KeyRound, ArrowRight, Check, Spinner, DUR} from "@kova/ui";
+import { Button, Card, Field, Mail, KeyRound, ArrowRight, Check, Spinner, DUR} from "@4dl/ui";
 import { api, ApiError } from "../api.js";
 import { useSession } from "../session.js";
 import { Turnstile } from "../Turnstile.js";

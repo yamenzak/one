@@ -27,7 +27,7 @@ import {
   Dumbbell, LayoutGrid, Page, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, SettingsIndex, SettingsPage, Sheet, ShieldCheck, Wand2, type LucideIcon,
   Skeleton, SkeletonLine, Play, Plug, Spinner, Stagger, Switch, Tag, Trash2, Wallet, cn, toneText, type Tone,
   ActionResult, ConfigRow, FieldGroup, LoadError, useLoad, useAction as useActionBase,
-} from "@kova/ui";
+} from "@4dl/ui";
 import { SectionSplit } from "../SectionSplit.js";
 import { api, errorText } from "../../api.js";
 import { fmtPrice } from "../../money.js";
@@ -118,7 +118,7 @@ export function AdminConsole({ onBack }: { onBack: () => void }) {
  *  so a retry (or a post-mutation refresh) never flashes the skeleton back over
  *  content that already arrived. */
 // The console patterns (useLoad/useAction, LoadError, ActionResult, ConfigRow,
-// TabIntro, Group) now live in @kova/ui so the STUDIO settings render the same
+// TabIntro, Group) now live in @4dl/ui so the STUDIO settings render the same
 // shapes from the same code rather than a drifting copy. `errorText` is passed in
 // because the design system holds no opinion about the app's HTTP error shape.
 const useAdminLoad = <T,>(load: () => Promise<T>, what: string) => useLoad(load, what, errorText);

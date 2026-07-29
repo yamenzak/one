@@ -15,7 +15,7 @@ import {
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
   Dumbbell, Play, Moon, ChevronRight, Plus, Footprints, Flame, TrendingUp, Trophy, Activity, AlertTriangle, Search,
   Anchor, CountUp,
-} from "@kova/ui";
+} from "@4dl/ui";
 import { api, todayLocal, shiftDay } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { activityIcon } from "./activityIcons.js";

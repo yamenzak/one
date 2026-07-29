@@ -13,7 +13,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { kcalToDisplay, displayToKcal, energyLabel, featureEnabled, type UnitPrefs } from "@kova/domain";
-import { FixedDrawer, Button, Field, Chip, SegmentedControl, cn, toneSoft, METRICS, Utensils, Barcode, ChevronDown, Globe, PencilLine, ScanLine, Search, Plus, X, ArrowLeft } from "@kova/ui";
+import { FixedDrawer, Button, Field, Chip, SegmentedControl, cn, toneSoft, Utensils, Barcode, ChevronDown, Globe, PencilLine, ScanLine, Search, Plus, X, ArrowLeft } from "@4dl/ui";
+import { METRICS } from "../../registry/index.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { api, uploadMedia } from "../../api.js";
 import { useSession } from "../../session.js";

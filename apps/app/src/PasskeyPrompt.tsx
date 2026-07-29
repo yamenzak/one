@@ -11,7 +11,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { Button, Dialog, DialogContent, ShieldCheck, KeyRound, Hand, ArrowRight } from "@kova/ui";
+import { Button, Dialog, DialogContent, ShieldCheck, KeyRound, Hand, ArrowRight } from "@4dl/ui";
 import { passkeySupported, listPasskeys, enrollPasskey, passkeyErrorMessage, deviceLabel } from "./passkey.js";
 
 interface PasskeyState {

@@ -41,7 +41,7 @@ import {
   Section,
   Store,
   TierContent,
-} from "@kova/ui";
+} from "@4dl/ui";
 import { studioUrl, useSession } from "../session.js";
 
 /**

@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { Atmosphere, anchorIn, contentIn, contentStagger, DUR} from "@kova/ui";
+import { Atmosphere, anchorIn, contentIn, contentStagger, DUR} from "@4dl/ui";
 import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
 import { ThemeProvider } from "./theme.js";

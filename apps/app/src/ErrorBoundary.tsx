@@ -7,7 +7,7 @@
  */
 
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { Button } from "@kova/ui";
+import { Button } from "@4dl/ui";
 
 interface Props { children: ReactNode; resetKey?: unknown; fallback?: ReactNode }
 interface State { error: Error | null; key: unknown }

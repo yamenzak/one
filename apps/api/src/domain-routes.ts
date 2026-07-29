@@ -36,7 +36,7 @@ import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostna
 import { canonicalHost, invalidateHostCache, isPlatformDoor, rootDomain, shapeOf } from "./host-context.js";
 import { nowIso } from "./ids.js";
 import { parseJson } from "./db.js";
-import { caaFixFromErrors, setupHostname } from "@kova/domain";
+import { caaFixFromErrors, setupHostname } from "@4dl/platform";
 
 const HOSTNAME = z
   .string()

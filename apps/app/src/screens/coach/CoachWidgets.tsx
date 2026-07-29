@@ -5,7 +5,7 @@
  */
 
 import type { FeatureKey } from "@kova/domain";
-import { Users, ArrowLeftRight, AlertTriangle, ClipboardList, Bell, Flame, Activity, FlaskConical } from "@kova/ui";
+import { Users, ArrowLeftRight, AlertTriangle, ClipboardList, Bell, Flame, Activity, FlaskConical } from "@4dl/ui";
 import { RingCard, MiniCard, type WidgetDef, type WidgetItem } from "../widget-kit.js";
 
 export interface CoachWidgetData {

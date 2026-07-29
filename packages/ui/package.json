@@ -1,9 +1,9 @@
 {
-  "name": "@kova/ui",
+  "name": "@4dl/ui",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The Kova design system (DESIGN.md): tonal tokens + identity components — rings, metric pills, stat cards, chips, sheets, week dots, timeline feed.",
+  "description": "The 4DL design system (UI-LANGUAGE.md): tonal tokens + product-agnostic primitives — rings, stat cards, chips, sheets, settings pattern, timeline feed. No product vocabulary — see README.md.",
   "exports": {
     ".": "./src/index.ts",
     "./tokens.css": "./src/tokens.css"

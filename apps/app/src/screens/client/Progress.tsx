@@ -4,7 +4,7 @@
  * consistency heatmap, calorie adherence), Body (weight / body-fat / waist
  * trends with moving-average lines + deltas), Training (weekly volume bars,
  * totals, a PR leaderboard) and Wellness (a mood/energy/sleep/calm/consistency
- * radar + per-day mood & sleep trends). Charts are the @kova/ui chart set.
+ * radar + per-day mood & sleep trends). Charts are the @4dl/ui chart set.
  */
 
 import { useEffect, useState } from "react";
@@ -13,13 +13,8 @@ import { motion } from "motion/react";
 import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, fmtEnergy, kcalToDisplay, POSTURE_GUIDANCE, presetRange, type RangePreset, type SeriesDelta } from "@kova/domain";
 
 const capp = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-import {
-  Card, Badge, Button, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger, EmptyState, SectionHeader, Sparkline, Eyebrow, GlanceStrip,
-  Reveal, SkeletonHero, SkeletonChart,
-  AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, METRICS, POSTURE_SEVERITY_TONE, cn, toneVar,
-  Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, Calendar, Scale,
-  Anchor, CountUp, type Tone, type LucideIcon, NoData, IconTabs, DUR,
-} from "@kova/ui";
+import { Card, Badge, Button, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger, EmptyState, SectionHeader, Sparkline, Eyebrow, GlanceStrip, Reveal, SkeletonHero, SkeletonChart, AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, cn, toneVar, Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, Calendar, Scale, Anchor, CountUp, type Tone, type LucideIcon, NoData, IconTabs, DUR } from "@4dl/ui";
+import { METRICS, POSTURE_SEVERITY_TONE } from "../../registry/index.js";
 import { api, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";

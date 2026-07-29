@@ -14,7 +14,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { Button, ArrowRight, ArrowLeft, X, Info, Hand, CircleCheck, toneVar, type Tone, DUR} from "@kova/ui";
+import { Button, ArrowRight, ArrowLeft, X, Info, Hand, CircleCheck, toneVar, type Tone, DUR} from "@4dl/ui";
 import { setApiInterceptor } from "./api.js";
 import { tourInterceptor } from "./tour-mock.js";
 

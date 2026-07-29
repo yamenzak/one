@@ -58,7 +58,7 @@ import {
   Info,
   Mail,
   Store,
-} from "@kova/ui";
+} from "@4dl/ui";
 import { api, errorText, isOffline } from "../../api.js";
 import { fmtPrice } from "../../money.js";
 import { studioUrl, useSession } from "../../session.js";

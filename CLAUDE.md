@@ -13,9 +13,16 @@ inventory Kova is modeled on is in
 interface language — hierarchy, layout, tokens, motion, copy, component grammar —
 written product-agnostically because it is the extraction target for the shared
 UI package other 4DL apps will consume. [DESIGN.md](DESIGN.md) maps Kova's
-screens onto it. **When they disagree, UI-LANGUAGE.md wins.** `packages/ui` today
-predates the language and is not yet conformant; DESIGN.md lists the deltas and
-UI-LANGUAGE.md §13 gives the order to close them.
+screens onto it. **When they disagree, UI-LANGUAGE.md wins.** DESIGN.md lists the
+remaining deltas and UI-LANGUAGE.md §13 gives the order to close them.
+
+**The design system is `@4dl/ui`, not Kova's.** It is shared across 4DL apps, so
+it carries no product vocabulary: no clients, workouts, meals, or coaches, and no
+router. Kova's registries (`METRICS`, `MACRO_KEYS`, `FASTING_ZONES`, personas,
+`MetricChip`/`MacroBar`) live in `apps/app/src/registry/`, and
+`registry.conformance.test.ts` keeps them there. The boundary rule — plus the one
+documented leak (`Tone`) — is in [packages/ui/README.md](packages/ui/README.md).
+Read it before adding anything to that package.
 
 ## Stack
 
@@ -33,10 +40,15 @@ apps/
   www/   # marketing site (dependency-free static generator)
   e2e/   # Playwright — the golden paths, in a browser against the real worker
 packages/
-  domain/    # pure logic (no I/O): credits, entitlements, perms, budgets,
-             # nutrition/TDEE, body-fat, activity/workout math, progress. Tested.
+  platform/  # @4dl/platform — the SHARED multi-tenant substrate (pure, no I/O):
+             # hosts/tenancy, custom-domain DCV, AI credit metering, promo math,
+             # tenant standing, the AI mock-lane decision. See its README.
+  domain/    # @kova/domain — Kova's pure logic (no I/O): nutrition/TDEE, body-fat,
+             # activity/workout math, progress, plus the product registries
+             # (entitlements, perms, budgets, notifications, features). Tested.
   protocol/  # zod wire schemas shared api <-> app (plan bodies, log payloads, context)
-  ui/        # the design system (tokens + identity components)
+  ui/        # @4dl/ui — the SHARED design system: tokens + product-agnostic
+             # primitives. No product vocabulary, no router. See its README.
   brand/     # (reserved) logos, illustrations
 ```
 
@@ -48,6 +60,9 @@ packages/
   SPA first** (`pnpm --filter @kova/app build`) — the worker's `assets` dir is
   `apps/app/dist`, and Miniflare aborts (reporting "no tests") without it. The
   root `pnpm test` handles this automatically (turbo builds the app first).
+  ⚠️ Under a *parallel* root `pnpm test` this suite can fail with
+  `Isolated storage failed` — Miniflare storage contention with the sibling
+  tasks, not a real failure. Re-run it on its own filter before believing it.
 - `pnpm --filter @kova/app build` — build the SPA (the api worker serves `apps/app/dist`)
 - `pnpm e2e` — the Playwright golden paths (`apps/e2e`). One command from a clean
   checkout: turbo builds the SPA, Playwright boots `wrangler dev --local` on :8787
@@ -88,7 +103,7 @@ remote bindings without editing the config (this is what the E2E suite does).
   the security invariant; never bypass it.
 - **Credits**: `TenantBillingDO` (`billing-do.ts`) is the authoritative balance;
   AI goes through `ai.ts` `generate()` = reserve → run (Workers AI | mock) →
-  settle. Metering math is pure in `@kova/domain` credits.ts.
+  settle. Metering math is pure in `@4dl/platform` credits.ts.
 - **Access economy**: `commerce-routes.ts` + `@kova/domain` budgets.ts —
   budgets carry `expiresAt`, days derive at read time, purchases QUEUE not sum,
   status reconciles lazily on read. No domain cron.
@@ -96,7 +111,7 @@ remote bindings without editing the config (this is what the E2E suite does).
   Kova, `entitlements.ts`) vs per-package client flags (client bought from the
   tenant, `clientFlags.ts`). Client capability = the intersection.
 - **The host IS the tenancy** (read this before touching routing or auth).
-  `@kova/domain` `hosts.ts` classifies every hostname into five doors:
+  `@4dl/platform` `hosts.ts` classifies every hostname into five doors:
   `kova.4dl.app` = a signpost (not an app, refuses to send a sign-in code),
   `setup.` = the only place a studio is created, `admin.` = the operator console
   (`/api/admin/*` answers there and nowhere else), `<slug>.` = a studio, a tenant's
@@ -141,8 +156,10 @@ Be conservative here: this section is read as ground truth by future agents, so
 an over-claim costs more than an under-claim. Verify before editing it.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured most recently: **303 domain + 460 API + 7 protocol + 28 app + 9 ui**
-(807 total, 38 skipped). The pricing and normalizer suites live
+moves. Measured most recently, per package: **465 API + 206 domain + 98 platform +
+61 ui + 38 app + 7 protocol** (875 total, 38 skipped). Domain used to read 304;
+98 of those are now `@4dl/platform` — the split moved tests, it did not add any.
+The pricing and normalizer suites live
 in `apps/api/test` and are already *inside* the API count — the older
 "protocol/pricing/normalizer" phrasing double-counted them. **E2E is separate**
 (`pnpm e2e`, not part of `pnpm test`): 3 Playwright specs, ~40 s all in, all green.

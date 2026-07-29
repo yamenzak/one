@@ -293,7 +293,7 @@ PATCH /swaps/:id gates on `if (!staffOnly(c))` and loads the swap with only `SEL
 **Area:** UI / Design-System Consistency — `apps/app/src/screens/client/Shop.tsx:67`  
 Package price entry allows cents (Packages.tsx:110/124/148: `inputMode="decimal"`, `const cents = price ? Math.round(Number(price) * 100) : null`), but every price display divides by 100 and calls `.toFixed(0)`: Shop.tsx:14-17 `priceLabel` (`$${(p.monthly_price_cents / 100).toFixed(0)}/mo`), Shop.tsx:242-244 the storefront card price, Packages.tsx:57 the coach list, and critically Shop.tsx:67 the inline checkout: `price: `$${((p.one_time_price_cents ?? 0) / 100).toFixed(0)}`` which becomes the PaymentSheet submit label `Pay ${checkout.price}` (Shop.tsx:211). A coach who sets a $49.99 package shows clients a "$49.99" charge at Stripe but a "Buy $50" card and a "Pay $50" button — the displayed amount disagrees with the actual charge. Promo `amount_off_cents` gets the same truncation (Packages.tsx:79, AdminConsole.tsx:528).
 
-**Fix:** Add one shared money formatter (e.g. `fmtUsd(cents)` using Intl.NumberFormat, dropping `.00` only when cents are zero) in @kova/ui or @kova/domain and use it for all price/discount renders, especially the payment submit label.
+**Fix:** Add one shared money formatter (e.g. `fmtUsd(cents)` using Intl.NumberFormat, dropping `.00` only when cents are zero) in @4dl/ui or @kova/domain and use it for all price/discount renders, especially the payment submit label.
 
 ### M32. Native date pickers hardcode [color-scheme:dark], breaking the light theme
 **Area:** UI / Design-System Consistency — `apps/app/src/screens/client/Today.tsx:189`  
