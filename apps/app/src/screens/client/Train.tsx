@@ -14,7 +14,7 @@ import {
   Card, Badge, Button, Chip, Field, Skeleton, Page, Stagger, EmptyState, StatCard, WeekDots, Sparkline, MiniBars, IconBadge, Sheet,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
   Dumbbell, Play, Moon, ChevronRight, Plus, Footprints, Flame, TrendingUp, Trophy, Activity, AlertTriangle, Search,
-  TierAnchor, CountUp,
+  Anchor, CountUp,
 } from "@kova/ui";
 import { api, todayLocal, shiftDay } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
@@ -176,11 +176,9 @@ export function Train({ clientId }: { clientId: string }) {
       {/* T1 (§1). The question Train answers on arrival is "am I keeping up this
           week", and days trained is the honest version of that — tonnage is a
           number only some clients read, and a plan name is not a measure. */}
-      <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
-        <p className="text-caption text-muted-foreground">Trained this week</p>
-        <p className="numeral text-display"><CountUp value={week.activeCount} /></p>
-        <p className="text-caption text-muted-foreground">{week.activeCount === 1 ? "day" : "days"}</p>
-      </TierAnchor>
+      <Anchor eyebrow={"Trained this week"} sub={week.activeCount === 1 ? "day" : "days"}>
+        <CountUp value={week.activeCount} />
+      </Anchor>
 
       {error && !plans ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load your training" description="Something went wrong. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />

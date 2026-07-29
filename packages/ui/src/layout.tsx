@@ -24,7 +24,7 @@
  */
 
 import { forwardRef, type ReactNode } from "react";
-import { motion } from "motion/react";
+import { motion, type HTMLMotionProps } from "motion/react";
 import { cn } from "./lib/utils.js";
 import { anchorIn, atmosphereIn, contentIn, contentStagger, pressProps, rowIn, rowStagger, stepPanelVariants } from "./lib/animation.js";
 import { ChevronRight, type LucideIcon } from "./lib/icons.js";
@@ -141,29 +141,53 @@ export function Screen({
  * should be more than one screen. It is also the transform origin the rest of
  * the content settles toward, which is why it is the only element that scales
  * on entrance.
+ *
+ * ── Why this exists twice over ──────────────────────────────────────────────
+ *
+ * This component shipped early and then sixteen screens hand-rolled
+ * `<TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-2 ...">`
+ * around three `<p>`s instead of using it — which is the worst outcome
+ * available: a primitive that exists, is exported, and is bypassed. It was
+ * bypassed for two concrete reasons, both now fixed. Its spacing was stale
+ * (`gap-2 pb-2 pt-6`, from before the anchor sat under the app bar) while the
+ * screens had all converged on the tighter set; and it spread no props, so a
+ * screen needing `data-tour` had no way in.
+ *
+ * The lesson is in the file header: the value of these components is that the
+ * hierarchy becomes structural. That only holds while they are the path of
+ * least resistance — a primitive nobody adopts enforces nothing.
  */
 export function Anchor({
   eyebrow,
   children,
+  word,
   sub,
   below,
   className,
-}: {
+  ...props
+}: Omit<HTMLMotionProps<"div">, "children"> & {
   /** A short label above the value. Muted, `caption`. */
   eyebrow?: ReactNode;
-  /** The value. Rendered at `display`. */
-  children: ReactNode;
-  /** A quiet line under the value. */
+  /** The value. Rendered at `display`, tabular. */
+  children?: ReactNode;
+  /**
+   * The anchor's value when it is **words, not a number** — "Not scored yet",
+   * "No access". Rendered at `title-1`, because a sentence at `display` either
+   * wraps to three lines or gets truncated, and §5 forbids the third option
+   * (a dash where a number belongs). Takes precedence over `children`.
+   */
+  word?: ReactNode;
+  /** A quiet line under the value. The SECOND fact — never the value restated. */
   sub?: ReactNode;
   /** A pill or small control directly beneath — the Revolut "Accounts" slot. */
   below?: ReactNode;
   className?: string;
 }) {
   return (
-    <motion.div variants={anchorIn} className={cn("flex flex-col items-center gap-2 pb-2 pt-6 text-center", className)}>
-      {eyebrow && <div className="text-caption text-muted-foreground">{eyebrow}</div>}
-      <div className="numeral text-display">{children}</div>
-      {sub && <div className="text-caption text-muted-foreground">{sub}</div>}
+    <motion.div variants={anchorIn} className={cn("flex flex-col items-center gap-1 pb-1 pt-2 text-center", className)} {...props}>
+      {eyebrow && <p className="text-caption text-muted-foreground">{eyebrow}</p>}
+      {word != null ? <p className="text-title-1">{word}</p> : <p className="numeral text-display">{children}</p>}
+      {sub && <p className="text-caption text-muted-foreground">{sub}</p>}
       {below && <div className="pt-2">{below}</div>}
     </motion.div>
   );

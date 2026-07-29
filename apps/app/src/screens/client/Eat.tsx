@@ -6,7 +6,7 @@ import {
   Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MetricChip, MetricPill, ProgressRing, METRICS, toneSoft, Eyebrow, Page, Stagger, EmptyState, motion, ConfirmDialog,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
   Plus, Utensils, Croissant, Soup, Apple, Dumbbell, Trash2, AlertTriangle, type LucideIcon,
-  TierAnchor, CountUp, Droplet, SPRING_SOFT, cn,
+  Anchor, CountUp, Droplet, SPRING_SOFT, cn,
 } from "@kova/ui";
 import type { UnitPrefs } from "@kova/domain";
 import { api, errorText, isQueued, todayLocal } from "../../api.js";
@@ -162,17 +162,11 @@ export function Eat({ clientId }: { clientId: string }) {
       {/* T1 (§1). Nobody opens Eat to read the word "Eat" — they open it to find
           out how much room is left. With no target there is no "left", so the
           anchor shows what has been eaten instead of inventing a denominator. */}
-      <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
-        <p className="text-caption text-muted-foreground">{calTarget > 0 ? "Left today" : "Eaten today"}</p>
-        <p className="numeral text-display">
-          <CountUp value={kcalToDisplay(calTarget > 0 ? Math.max(0, remaining) : total, units)} />
-        </p>
-        <p className="text-caption text-muted-foreground">
-          {calTarget > 0
+      <Anchor eyebrow={calTarget > 0 ? "Left today" : "Eaten today"} sub={calTarget > 0
             ? `of ${kcalToDisplay(calTarget, units).toLocaleString()} ${units.energy === "kJ" ? "kJ" : "kcal"}`
-            : units.energy === "kJ" ? "kJ" : "kcal"}
-        </p>
-      </TierAnchor>
+            : units.energy === "kJ" ? "kJ" : "kcal"}>
+        <CountUp value={kcalToDisplay(calTarget > 0 ? Math.max(0, remaining) : total, units)} />
+      </Anchor>
 
       {error && !entries ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load your day" description="Something went wrong loading your diary. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />

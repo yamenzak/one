@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Sheet, Avatar, IconTabs, Page, Stagger, EmptyState, Reveal, SkeletonList, ConfirmDialog, toneVar, Users, Mail, User, Search, ArrowLeft, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle, TierAnchor, CountUp, Group, Row, Sun, ClipboardList, Target, TrendingUp, BarChart3, Settings as SettingsIcon } from "@kova/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, IconTabs, Page, Stagger, EmptyState, Reveal, SkeletonList, ConfirmDialog, toneVar, Users, Mail, User, Search, ArrowLeft, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle, Anchor, CountUp, Group, Row, Sun, ClipboardList, Target, TrendingUp, BarChart3, Settings as SettingsIcon } from "@kova/ui";
 import type { AttentionSeverity } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -141,11 +141,7 @@ export function Clients() {
       {/* T1 (§1). The roster IS the screen, so the anchor is its size — and the
           sub-line carries the only fact a coach scans for on arrival: how many
           of them want something. */}
-      <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
-        <p className="text-caption text-muted-foreground">Clients</p>
-        <p className="numeral text-display"><CountUp value={clients?.length ?? 0} /></p>
-        <p className="text-caption text-muted-foreground">
-          {(() => {
+      <Anchor eyebrow={"Clients"} sub={(() => {
             if (!clients?.length) return "None yet";
             // Same rule as the rows: someone who has never signed in is
             // "Invited", not "needs a look".
@@ -169,9 +165,9 @@ export function Clients() {
               : flagged === active.length && active.length > 1 ? "Every active one needs a look"
               : `${flagged} need${flagged === 1 ? "s" : ""} a look`;
             return [head, waiting].filter(Boolean).join(" · ") || "All caught up";
-          })()}
-        </p>
-      </TierAnchor>
+          })()}>
+        <CountUp value={clients?.length ?? 0} />
+      </Anchor>
 
       <Stagger className="pb-1">
         <Button size="lg" className="w-full" onClick={() => setCreateOpen(true)}><Plus /> Add client</Button>
@@ -279,11 +275,10 @@ export function Clients() {
       </Reveal>
       )}
 
-      <Sheet open={createOpen} onClose={() => { setCreateOpen(false); setCreateErr(null); }} title="New client">
+      <Sheet open={createOpen} onClose={() => { setCreateOpen(false); setCreateErr(null); }} title="New client" footer={<Button size="lg" className="w-full" disabled={!emailValid || busy} onClick={() => void create()}>{busy ? "Sending…" : "Send invite"}</Button>}>
         <div className="space-y-4">
           <Field label="Email" icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} hint="This is the invite — they sign in with a code and their space links automatically." />
           <Field label="Name (optional)" icon={User} value={name} onChange={(e) => setName(e.target.value)} hint="Leave blank and they'll add it on their profile." />
-          <Button size="lg" className="w-full" disabled={!emailValid || busy} onClick={() => void create()}>{busy ? "Sending…" : "Send invite"}</Button>
           {createErr && <p className="text-sm text-warning" role="alert">{createErr}</p>}
         </div>
       </Sheet>
@@ -318,7 +313,7 @@ function InviteSheet({ invite, onClose }: { invite: Invite; onClose: () => void 
     try { await navigator.clipboard.writeText(invite.url); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* clipboard blocked */ }
   };
   return (
-    <Sheet open onClose={onClose} title="Client invited">
+    <Sheet open onClose={onClose} title="Client invited" footer={<Button size="lg" className="w-full" onClick={onClose}>Go to client</Button>}>
       <div className="space-y-4">
         {/* The truth about the email, not a claim. This said "We emailed a
             branded sign-in link" unconditionally — including when email was off,
@@ -359,7 +354,6 @@ function InviteSheet({ invite, onClose }: { invite: Invite; onClose: () => void 
             <Button size="sm" variant="secondary" className="flex-1" onClick={() => window.open(invite.url, "_blank", "noopener")}><ExternalLink /> Open</Button>
           </div>
         </div>
-        <Button size="lg" className="w-full" onClick={onClose}>Go to client</Button>
       </div>
     </Sheet>
   );

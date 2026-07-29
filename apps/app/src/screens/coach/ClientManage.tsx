@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@kova/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, personaLabel, personaTone, NoData, TierAnchor, ActionCluster, CountUp, Group, Row, GroupNote } from "@kova/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, personaLabel, personaTone, NoData, Anchor, ActionCluster, CountUp, Group, Row, GroupNote } from "@kova/ui";
 import { api, errorText, todayLocal } from "../../api.js";
 import { FeatureLock, useCan } from "../../FeatureLock.js";
 import { useSession } from "../../session.js";
@@ -166,24 +166,17 @@ export function ClientManage({ clientId, clientName }: { clientId: string; clien
         The strip below deliberately keeps Status and Plan and drops the day
         count: the anchor's value appears once (§1).
       */}
-      <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-1 text-center">
-        <p className="text-caption text-muted-foreground">Access</p>
-        {active ? (
-          <>
-            <p className="numeral text-display"><CountUp value={active.daysRemaining} /></p>
-            <p className="text-caption text-muted-foreground">{active.daysRemaining === 1 ? "day left" : "days left"}{activePkg?.name ? ` · ${activePkg.name}` : ""}</p>
-          </>
-        ) : (
-          <>
-            <p className="text-title-1">No access</p>
-            <p className="text-caption text-muted-foreground">Grant a package — or a $0 comp — to unlock their features.</p>
-          </>
-        )}
-        {/* Three actions only when the studio actually has three (§1's floor);
-            a permanently-disabled circle is noise, not an affordance. */}
-        {canSuppLabs ? (
+      <Anchor
+        eyebrow="Access"
+        className="pt-1"
+        word={active ? undefined : "No access"}
+        sub={active
+          ? `${active.daysRemaining === 1 ? "day left" : "days left"}${activePkg?.name ? ` · ${activePkg.name}` : ""}`
+          : "Grant a package — or a $0 comp — to unlock their features."}
+        /* Three actions only when the studio actually has three (§1's floor);
+           a permanently-disabled circle is noise, not an affordance. */
+        below={canSuppLabs ? (
           <ActionCluster
-            className="pt-2"
             items={[
               { icon: Plus, label: "Grant", onClick: () => setGrantOpen(true) },
               { icon: BarChart3, label: "Report", onClick: () => setReportOpen(true) },
@@ -191,12 +184,14 @@ export function ClientManage({ clientId, clientName }: { clientId: string; clien
             ]}
           />
         ) : (
-          <div className="flex w-full max-w-sm gap-2 pt-3">
+          <div className="flex w-full max-w-sm gap-2 pt-1">
             <Button className="flex-1" onClick={() => setGrantOpen(true)}><Plus /> Grant</Button>
             <Button className="flex-1" variant="secondary" onClick={() => setReportOpen(true)}><BarChart3 /> Report</Button>
           </div>
         )}
-      </TierAnchor>
+      >
+        {active && <CountUp value={active.daysRemaining} />}
+      </Anchor>
 
       {active && (
         <section className="space-y-2">
@@ -737,7 +732,24 @@ function DeleteClientSheet({ clientId, clientName, onClose, onDone }: { clientId
     finally { setBusy(false); }
   };
   return (
-    <Sheet open onClose={done ? onDone : onClose} title={done ? "Client deleted" : `Delete ${name || "client"}`}>
+    <Sheet
+      open
+      onClose={done ? onDone : onClose}
+      title={done ? "Client deleted" : `Delete ${name || "client"}`}
+      /* The footer follows the branch. This sheet is two surfaces sharing a
+         frame — a typed confirmation, then a receipt — and each has its own
+         way out. */
+      footer={done ? (
+        <Button size="lg" className="w-full" onClick={onDone}>Back to roster</Button>
+      ) : (
+        <div className="space-y-2">
+          <Button variant="outline" size="lg" className="w-full border-danger/40 text-danger" disabled={busy || !matches} onClick={() => void del()}>
+            {busy ? <><Spinner /> Deleting…</> : <><Trash2 /> Delete permanently</>}
+          </Button>
+          <Button variant="ghost" size="lg" className="w-full" onClick={onClose}>Keep this client</Button>
+        </div>
+      )}
+    >
       {done ? (
         <div className="space-y-4" role="status" aria-live="polite">
           <div className="flex items-start gap-3">
@@ -756,7 +768,6 @@ function DeleteClientSheet({ clientId, clientName, onClose, onDone }: { clientId
               </p>
             </div>
           </div>
-          <Button size="lg" className="w-full" onClick={onDone}>Back to roster</Button>
         </div>
       ) : (
         <div className="space-y-4">
@@ -774,10 +785,6 @@ function DeleteClientSheet({ clientId, clientName, onClose, onDone }: { clientId
             hint="Case doesn't matter."
           />
           {err && <p className="text-sm text-danger" role="alert">{err}</p>}
-          <Button variant="outline" size="lg" className="w-full border-danger/40 text-danger" disabled={busy || !matches} onClick={() => void del()}>
-            {busy ? <><Spinner /> Deleting…</> : <><Trash2 /> Delete permanently</>}
-          </Button>
-          <Button variant="ghost" size="lg" className="w-full" onClick={onClose}>Keep this client</Button>
         </div>
       )}
     </Sheet>
@@ -975,13 +982,12 @@ function PrescribeSheet({ clientId, onClose, onDone }: { clientId: string; onClo
     finally { setBusy(false); }
   };
   return (
-    <Sheet open onClose={onClose} title="Prescribe supplement">
+    <Sheet open onClose={onClose} title="Prescribe supplement" footer={<Button size="lg" className="w-full" disabled={busy || name.trim().length < 2} onClick={() => void save()}>{busy ? "Saving…" : "Prescribe"}</Button>}>
       <div className="space-y-4">
         <Field label="Name" icon={Pill} value={name} onChange={(e) => setName(e.target.value)} placeholder="Creatine monohydrate" />
         <Field label="Dose" value={dose} onChange={(e) => setDose(e.target.value)} placeholder="5 g" />
         <div className="flex flex-wrap gap-2">{["protein", "creatine", "vitamin", "omega3", "pre_workout", "other"].map((k) => <Chip key={k} selected={kind === k} onClick={() => setKind(k)}>{k.replace("_", " ")}</Chip>)}</div>
         <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Schedule</label><div className="flex flex-wrap gap-2">{["morning", "pre_workout", "post_workout", "evening", "bedtime"].map((s) => <Chip key={s} selected={slots.includes(s)} onClick={() => toggle(s)}>{s.replace("_", " ")}</Chip>)}</div></div>
-        <Button size="lg" className="w-full" disabled={busy || name.trim().length < 2} onClick={() => void save()}>{busy ? "Saving…" : "Prescribe"}</Button>
       </div>
     </Sheet>
   );
@@ -1053,12 +1059,11 @@ function RequestLabSheet({ clientId, onClose, onDone }: { clientId: string; onCl
     finally { setBusy(false); }
   };
   return (
-    <Sheet open onClose={onClose} title="Request a lab test">
+    <Sheet open onClose={onClose} title="Request a lab test" footer={<Button size="lg" className="w-full" disabled={busy || (type === "custom" && customType.trim().length < 2)} onClick={() => void save()}>{busy ? "Requesting…" : "Request test"}</Button>}>
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2">{LAB_TYPES.map((t) => <Chip key={t} selected={type === t} onClick={() => setType(t)}>{t.replace("_", " ")}</Chip>)}</div>
         {type === "custom" && <Field label="Custom name" value={customType} onChange={(e) => setCustomType(e.target.value)} />}
         <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Instructions</label><Textarea rows={3} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Fasted, morning draw…" /></div>
-        <Button size="lg" className="w-full" disabled={busy || (type === "custom" && customType.trim().length < 2)} onClick={() => void save()}>{busy ? "Requesting…" : "Request test"}</Button>
       </div>
     </Sheet>
   );
@@ -1094,7 +1099,7 @@ function ReviewLabSheet({ clientId, lab, onClose, onDone }: { clientId: string; 
     } finally { setBusy(false); }
   };
   return (
-    <Sheet open onClose={onClose} title={`Review — ${lab.display_name}`}>
+    <Sheet open onClose={onClose} title={`Review — ${lab.display_name}`} footer={<Button size="lg" className="w-full" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Mark reviewed"}</Button>}>
       <div className="space-y-4">
         {fileUrl && (
           <div className="space-y-2">
@@ -1123,7 +1128,6 @@ function ReviewLabSheet({ clientId, lab, onClose, onDone }: { clientId: string; 
           <button onClick={() => setValues((v) => [...v, { _id: rowId(), marker: "", value: "", unit: "", flag: "normal" }])} className="text-xs font-medium text-primary">+ Row</button>
         </div>
         <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Feedback</label><Textarea rows={3} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="What this means and next steps…" /></div>
-        <Button size="lg" className="w-full" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Mark reviewed"}</Button>
       </div>
     </Sheet>
   );

@@ -47,6 +47,7 @@ import {
   StepHeader,
   StepPanel,
   TierAnchor,
+  Anchor,
   TierContent,
   Spinner,
   AlertTriangle,
@@ -360,25 +361,24 @@ export function StudioOnboarding() {
           {step === 2 && (
             <>
               {/* T1 — what this costs and when. The number is the story (§0). */}
-              <TierAnchor className="flex flex-col items-center gap-1.5 pb-6 pt-2 text-center">
-                {plan && plan.trialDays > 0 ? (
-                  <>
-                    <p className="text-caption text-muted-foreground">{plan.name}</p>
-                    <p className="numeral text-display">{plan.trialDays}</p>
-                    <p className="text-body text-muted-foreground">
-                      days free, then {fmtPrice(usdToCents(plan.priceUsdMonth))} a month
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-caption text-muted-foreground">{plan?.name ?? "Your plan"}</p>
-                    {plan
-                      ? <p className="numeral text-display">{fmtPrice(usdToCents(plan.priceUsdMonth))}</p>
-                      : <p className="text-title-1">Pick a plan</p>}
-                    <p className="text-body text-muted-foreground">{plan ? "per month" : "to see what it costs"}</p>
-                  </>
-                )}
-              </TierAnchor>
+              {plan && plan.trialDays > 0 ? (
+                <Anchor
+                  className="gap-1.5 pb-6"
+                  eyebrow={plan.name}
+                  sub={`days free, then ${fmtPrice(usdToCents(plan.priceUsdMonth))} a month`}
+                >
+                  {plan.trialDays}
+                </Anchor>
+              ) : (
+                <Anchor
+                  className="gap-1.5 pb-6"
+                  eyebrow={plan?.name ?? "Your plan"}
+                  word={plan ? undefined : "Pick a plan"}
+                  sub={plan ? "per month" : "to see what it costs"}
+                >
+                  {plan && fmtPrice(usdToCents(plan.priceUsdMonth))}
+                </Anchor>
+              )}
 
               {pay.k === "checkout" && (
                 <Section>

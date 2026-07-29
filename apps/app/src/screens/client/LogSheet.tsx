@@ -36,6 +36,26 @@ const CHIPS: { kind: LogKind; label: string; icon: LucideIcon; tone: Tone }[] = 
 const MOOD_ICONS = [Angry, Frown, Meh, Smile, Laugh];
 
 /*
+  ONE TITLE, IN THE HEADER.
+
+  Each form used to open with its own `<h2 className="text-lg font-semibold">`
+  while the Sheet's real title slot was passed `undefined` — a heading rendered
+  twice over at two sizes, one of them invisible to the accessibility tree. It
+  became visible once the sheet header was pinned: the `<h2>` scrolled away
+  under an empty pinned bar. The Sheet owns the title; these are its values.
+*/
+const KIND_TITLE: Record<LogKind, string> = {
+  food: "Log food",
+  activity: "Log activity",
+  water: "Log water",
+  weight: "Log weight",
+  body: "Body measurements",
+  sleep: "Log sleep",
+  mood: "Log mood",
+  checkin: "Daily check-in",
+};
+
+/*
   ── STRESS RUNS THE OTHER WAY, AND THE FACES DIDN'T ─────────────────────────
 
   All three scales rendered the SAME five faces, ascending: Angry … Laugh. On
@@ -243,7 +263,20 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
   }
 
   return (
-    <Sheet open={open} onClose={close} title={kind ? undefined : "Log"}>
+    <Sheet
+      open={open}
+      onClose={close}
+      title={kind ? KIND_TITLE[kind] : "Log"}
+      /* The chip grid is a picker, so it takes the tall size and stops resizing
+         as capabilities change the chip count. A form sizes to itself. */
+      size={kind ? "default" : "tall"}
+      footer={kind ? (
+        <div className="flex gap-3">
+          <Button variant="ghost" onClick={() => { setErr(null); setQueued(false); setKind(null); }}>Back</Button>
+          <Button size="lg" className="flex-1" disabled={busy} onClick={() => void submit()}>{busy ? "Saving…" : queued ? "Done" : "Save"}</Button>
+        </div>
+      ) : undefined}
+    >
       {!kind ? (
         <div className="grid grid-cols-2 gap-3 pb-2">
           {chips.map((c) => (
@@ -256,16 +289,13 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
       ) : (
         <div className="space-y-4">
           {kind === "water" && (<>
-            <h2 className="text-lg font-semibold">Log water</h2>
             <div className="flex flex-wrap gap-2">{waterPresets.map((v) => <Chip key={v} selected={f.amount === String(v)} onClick={() => set("amount", String(v))}>{v} {volumeLabel(units)}</Chip>)}</div>
             <Field label={`Amount (${volumeLabel(units)})`} icon={Droplet} inputMode="numeric" value={f.amount ?? ""} onChange={(e) => set("amount", e.target.value.replace(/\D/g, ""))} />
           </>)}
           {kind === "weight" && (<>
-            <h2 className="text-lg font-semibold">Log weight</h2>
             <Field label={`Weight (${weightLabel(units)})`} icon={Weight} inputMode="decimal" value={f.amount ?? ""} onChange={(e) => setDec("amount", e.target.value)} />
           </>)}
           {kind === "body" && (<>
-            <h2 className="text-lg font-semibold">Body measurements</h2>
             {canBodyScan && (
             <BodyScanLauncher clientId={clientId} onSaved={() => { onLogged(); close(); }}>
               {({ open, loading, profileReady }) =>
@@ -290,7 +320,6 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
             </div>
           </>)}
           {kind === "activity" && (<>
-            <h2 className="text-lg font-semibold">Log activity</h2>
             {/* Searchable, categorized picker with a per-sport glyph. */}
             <div className="rounded-2xl border border-border/60 bg-surface-2 p-2">
               <div className="mb-2 flex items-center gap-2 px-1">
@@ -363,18 +392,15 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
             <Textarea rows={2} placeholder="Notes (optional)…" value={f.actNotes ?? ""} onChange={(e) => set("actNotes", e.target.value)} />
           </>)}
           {kind === "sleep" && (<>
-            <h2 className="text-lg font-semibold">Log sleep</h2>
             <Field label="Hours slept" icon={Moon} inputMode="decimal" value={f.hours ?? ""} onChange={(e) => setDec("hours", e.target.value)} />
             <Rating label="Quality" scale="sleepQ" value={ratings.sleepQ} onChange={(n) => setRatings((r) => ({ ...r, sleepQ: n }))} />
           </>)}
           {kind === "mood" && (<>
-            <h2 className="text-lg font-semibold">Log mood</h2>
             <Rating label="Mood" scale="mood" value={ratings.mood} onChange={(n) => setRatings((r) => ({ ...r, mood: n }))} />
             <Rating label="Energy" scale="energy" value={ratings.energy} onChange={(n) => setRatings((r) => ({ ...r, energy: n }))} />
             <Rating label="Stress" scale="stress" value={ratings.stress} onChange={(n) => setRatings((r) => ({ ...r, stress: n }))} />
           </>)}
           {kind === "checkin" && (<>
-            <h2 className="text-lg font-semibold">Daily check-in</h2>
             {/* Form composition from the package's check-in flags. */}
             <div className="grid grid-cols-2 gap-3">
               {ciMeasurements && <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={f.weight ?? ""} onChange={(e) => setDec("weight", e.target.value)} />}
@@ -407,10 +433,6 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
           </>)}
           {err && <p className="text-sm text-warning" role="alert">{err}</p>}
           {queued && <QueuedNotice />}
-          <div className="flex gap-3 pt-1">
-            <Button variant="ghost" onClick={() => { setErr(null); setQueued(false); setKind(null); }}>Back</Button>
-            <Button size="lg" className="flex-1" disabled={busy} onClick={() => void submit()}>{busy ? "Saving…" : queued ? "Done" : "Save"}</Button>
-          </div>
         </div>
       )}
     </Sheet>

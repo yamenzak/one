@@ -2,7 +2,7 @@
  *  cards), Stripe Connect / inline buy, redeem codes. */
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Button, Card, Badge, Field, Sheet, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, EmptyState, toneVar, ArrowLeft, LogOut, Ticket, Store, Check, RotateCcw, Reveal, SkeletonLine, SkeletonList , TierAnchor, CountUp, Atmosphere} from "@kova/ui";
+import { Button, Card, Badge, Field, Sheet, Page, Stagger, IconBadge, Eyebrow, ConfirmDialog, EmptyState, toneVar, ArrowLeft, LogOut, Ticket, Store, Check, RotateCcw, Reveal, SkeletonLine, SkeletonList , Anchor, CountUp, Atmosphere} from "@kova/ui";
 import { CLIENT_FLAG_KEYS, CLIENT_FLAG_META } from "@kova/domain";
 import { api } from "../../api.js";
 import { StudioListCard } from "../../StudioSwitcher.js";
@@ -144,27 +144,22 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
       {/* T1 (§1). The question a client opens Shop with is "how long have I got",
           not "what is this screen called" — so the anchor is their remaining
           access when they have some, and the offer when they do not. */}
-      <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-1 text-center">
-        {sub && sub.daysRemaining > 0 ? (
-          <>
-            <p className="text-caption text-muted-foreground">Access left</p>
-            <p className="numeral text-display"><CountUp value={sub.daysRemaining} /></p>
-            <p className="text-caption text-muted-foreground">{sub.daysRemaining === 1 ? "day" : "days"}</p>
-          </>
-        ) : (
-          <>
-            {/* "Pick one below to start" is a lie when there is nothing below to
-                pick: a studio that doesn't sell online, or one with no published
-                packages, leaves this screen as a redemption + explanation
-                surface. Say which one it is (§10). */}
-            <p className="text-caption text-muted-foreground">Your plan</p>
-            <p className="text-title-1">{canBuy ? (locked ? "Choose a package" : "Nothing active") : "Nothing active"}</p>
-            <p className="text-caption text-muted-foreground">
-              {canBuy ? "Pick one below to start" : "Your coach sets this up for you"}
-            </p>
-          </>
-        )}
-      </TierAnchor>
+      {sub && sub.daysRemaining > 0 ? (
+        <Anchor eyebrow="Access left" className="pt-1" sub={sub.daysRemaining === 1 ? "day" : "days"}>
+          <CountUp value={sub.daysRemaining} />
+        </Anchor>
+      ) : (
+        /* "Pick one below to start" is a lie when there is nothing below to
+           pick: a studio that doesn't sell online, or one with no published
+           packages, leaves this screen as a redemption + explanation surface.
+           Say which one it is (§10). */
+        <Anchor
+          eyebrow="Your plan"
+          className="pt-1"
+          word={canBuy ? (locked ? "Choose a package" : "Nothing active") : "Nothing active"}
+          sub={canBuy ? "Pick one below to start" : "Your coach sets this up for you"}
+        />
+      )}
 
       {/* THE STRANDING FIX. In `locked` mode this screen replaces the whole Shell,
           so there is no app bar and therefore no studio switcher — the only way
@@ -281,11 +276,10 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
       />
 
       {redeemOpen && (
-        <Sheet open onClose={() => { setRedeemOpen(false); setRedeemMsg(null); }} title="Redeem an access code">
+        <Sheet open onClose={() => { setRedeemOpen(false); setRedeemMsg(null); }} title="Redeem an access code" footer={<Button size="lg" className="w-full" disabled={code.length < 4 || busy} onClick={() => void redeem()}>{busy ? "Redeeming…" : "Redeem"}</Button>}>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">Have an access code from your coach? Enter it to add days to your plan. This is different from a checkout discount code.</p>
             <Field label="Access code" icon={Ticket} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="WELCOME7" />
-            <Button size="lg" className="w-full" disabled={code.length < 4 || busy} onClick={() => void redeem()}>{busy ? "Redeeming…" : "Redeem"}</Button>
             {redeemMsg && <p className="text-sm text-muted-foreground">{redeemMsg}</p>}
           </div>
         </Sheet>
