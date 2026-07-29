@@ -113,6 +113,19 @@ export interface HostInfo {
  *  session and switches instantly, while a custom domain is a separate origin with
  *  its own cookie jar and would demand a fresh sign-in. The custom domain is for
  *  that studio's own clients arriving cold, not for crossing between studios. */
+/**
+ * The operator console's address. It has exactly one, and this is how you get
+ * there from inside a studio.
+ *
+ * `/api/admin/*` answers on this door and nowhere else (route-guard.ts), which
+ * is what stops a session valid across the whole root from carrying platform
+ * powers onto a tenant's subdomain. The console used to ALSO be an in-app route
+ * on every studio — it rendered fine and then 404'd on every call it made.
+ */
+export function adminUrl(rootDomain: string): string {
+  return studioUrl("admin", rootDomain);
+}
+
 export function studioUrl(slug: string, rootDomain: string): string {
   // The PORT has to come along. Dev serves on :8787, and a bare hostname points at
   // :80 — where nothing is listening — so dropping it turns every studio hop into a

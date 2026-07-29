@@ -13,7 +13,7 @@ import {
   Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Hand, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, toneVar, type TabDef, type Tone,
 } from "@kova/ui";
 import { resolveStanding, studioStandingOfGate } from "@kova/domain";
-import { useSession, useActiveClientId } from "./session.js";
+import { useSession, useActiveClientId, adminUrl } from "./session.js";
 import { useTheme } from "./theme.js";
 import { api } from "./api.js";
 import { hardRefresh } from "./hard-refresh.js";
@@ -36,7 +36,6 @@ import { Wellness } from "./screens/client/Wellness.js";
 import { Onboarding } from "./screens/client/Onboarding.js";
 import { Shop } from "./screens/client/Shop.js";
 import { Explore } from "./screens/client/Explore.js";
-import { AdminConsole } from "./screens/admin/AdminConsole.js";
 import { AcceptInvite } from "./screens/AcceptInvite.js";
 import { NotificationBell } from "./NotificationBell.js";
 import { OfflinePill, StudioPausedBanner } from "./notices.js";
@@ -134,7 +133,6 @@ export function Shell() {
       <Route path="/media" element={<MediaRoute />} />
       <Route path="/shop" element={<OverlayWithClient render={(cid, back) => <Shop clientId={cid} onBack={back} />} />} />
       <Route path="/explore" element={<OverlayWithClient render={(cid, back) => <Explore clientId={cid} onBack={back} />} />} />
-      <Route path="/admin" element={<AdminRoute />} />
       {/* Staff invitation deep-link (SPEC §4). Full-screen; the screen drives its
           own OTP flow, so a signed-in staffer accepts a seat on another tenant
           in place. (For a not-yet-signed-in invitee the pre-session router in
@@ -170,7 +168,7 @@ export function Shell() {
 
 /** The tab layout: app bar + routed content + bottom tabs / nav rail. */
 function TabLayout() {
-  const { ctx, mode, setMode, switchTenant, signOut, refresh } = useSession();
+  const { ctx, host, mode, setMode, switchTenant, signOut, refresh } = useSession();
   const { mode: themeMode, toggleMode, tintedNav, ambient } = useTheme();
   const clientId = useActiveClientId();
   const clientSurface = useClientSurface();
@@ -361,7 +359,23 @@ function TabLayout() {
                 <DropdownMenuItem onSelect={() => nav("/profile")}><SlidersHorizontal /> Settings</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => nav("/media")}><ImageIcon /> Media library</DropdownMenuItem>
                 {active.role === "owner" && <DropdownMenuItem onSelect={() => nav("/settings")}><SettingsIcon /> Studio settings</DropdownMenuItem>}
-                {ctx!.isPlatformAdmin && <DropdownMenuItem onSelect={() => nav("/admin")}><ShieldCheck /> Platform admin</DropdownMenuItem>}
+                {/*
+                    A HOP TO THE DOOR, NOT AN IN-APP ROUTE.
+
+                    This used to render the whole operator console inside the
+                    studio shell. In production every one of its calls 404s:
+                    `/api/admin/*` answers on the operator door and nowhere else
+                    (route-guard.ts), precisely so a session valid across the
+                    root cannot carry platform powers onto a tenant's subdomain.
+                    So the route loaded a console that then failed everywhere —
+                    a surface that looked reachable and was not. The console has
+                    one address; this goes there.
+                */}
+                {ctx!.isPlatformAdmin && host?.rootDomain && (
+                  <DropdownMenuItem onSelect={() => { location.href = adminUrl(host.rootDomain); }}>
+                    <ShieldCheck /> Platform admin
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={toggleMode}>{themeMode === "dark" ? <Sun /> : <Moon />} {themeMode === "dark" ? "Light mode" : "Dark mode"}</DropdownMenuItem>
                 {/* The only way off a stale cached build on a phone: mobile browsers
@@ -614,12 +628,6 @@ function MediaRoute() {
   return <MediaLibrary onBack={() => nav(-1)} />;
 }
 
-function AdminRoute() {
-  const { ctx } = useSession();
-  const nav = useNavigate();
-  if (!ctx!.isPlatformAdmin) return <Navigate to="/today" replace />;
-  return <AdminConsole onBack={() => nav(-1)} />;
-}
 
 /** Client-scoped full-screen overlays (wellness / shop / explore). */
 function OverlayWithClient({ render }: { render: (clientId: string, back: () => void) => ReactNode }) {
