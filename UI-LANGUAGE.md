@@ -65,6 +65,18 @@ placed above its true tier is the single most common way a screen rots.**
   the page's own title drops to an eyebrow, because the tab bar already says it
   and a title is navigation rather than content. This is the honest reading of
   "one anchor per screen" — not an exception to it.
+- **Some surfaces have no T1, and that is the correct answer.** Two kinds:
+  **list surfaces** (settings, admin consoles) — a screen that is only a set of
+  rows has no single value to promote, and forcing one gives you a display
+  numeral counting something nobody came to count. And **task surfaces** — a
+  workout player mid-session, a plan builder, a camera flow. A task surface's
+  subject *changes as you work through it*, so a fixed T1 would be stale by the
+  second interaction; its progress belongs in persistent chrome, where it stays
+  visible, rather than at the top of a spine that scrolls away. Reach for this
+  deliberately, not as an excuse: a browse surface that merely *feels* busy
+  still has an anchor, and finding it is the work. The workout player is both in
+  one file — its day picker is a browse surface and has an anchor; its session
+  view is a task surface and does not.
 - **T2 tops out at five.** Four is better. The fifth slot, when needed, is
   always **More** — never a fifth real action.
 - **T2 has a floor of three.** A cluster of one is a single circle adrift in the
@@ -628,12 +640,18 @@ reintroduce that shape anywhere.
 
 | Component | Use it when | Do NOT use it for | State |
 |---|---|---|---|
-| `Sheet` | **Doing** — anything with inputs. The mobile default. | A yes/no question. | ◻︎ |
-| `FixedDrawer` | A multi-step form where an accidental dismiss would lose input. | Anything dismissible. | ◻︎ |
-| `Dialog` / `ConfirmDialog` | **Deciding** — a confirmation, ≥`md`. | Forms. | ◻︎ |
-| `DropdownMenu` | A short list of actions on an element. | Navigation between sections. | ◻︎ |
-| `SegmentedControl` | 2–4 mutually exclusive views of the same data. | More than 4 — that is a `Select`. | ◻︎ |
-| `Select` · `Tooltip` · `Tabs` · `Avatar` | As named. | — | ◻︎ |
+| `Sheet` | **Doing** — anything with inputs. The mobile default. Title is `title-2`: it sits in the content and names the surface. | A yes/no question. | ✅ |
+| `FixedDrawer` | A multi-step form where an accidental dismiss would lose input. Title is `title-3`: it sits in a header bar and is chrome. | Anything dismissible. | ✅ |
+| `Dialog` / `ConfirmDialog` | **Deciding** — a confirmation, ≥`md`. | Forms. | ✅ |
+| `DropdownMenu` | A short list of actions on an element. | Navigation between sections. | ✅ |
+| `SegmentedControl` | 2–4 mutually exclusive views of the same data. | More than 4 — that is a `Select`. | ✅ |
+| `Select` · `Tooltip` · `Tabs` · `Avatar` | As named. | — | ✅ |
+
+All of them share one `overlayCls` scrim and one `FOCUS` ring constant. Both
+exist because the alternative was tried: the `Sheet` hard-coded its own scrim
+and lost the fade, and three focusable controls set `outline-none` with nothing
+in its place, so tabbing through a dialog or a segmented control moved an
+invisible cursor.
 
 ### Chrome — `shell.tsx`
 

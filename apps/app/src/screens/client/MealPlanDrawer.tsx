@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MealBody, MealOption } from "@kova/protocol";
 import { optionMacroTotals, type FoodLike } from "@kova/protocol";
 import { fmtEnergy, kcalToDisplay, featureEnabled } from "@kova/domain";
-import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, ConfirmDialog, useModalOverlay, Utensils, ShoppingCart, Plus, Minus, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw } from "@kova/ui";
+import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, ConfirmDialog, useModalOverlay, Utensils, ShoppingCart, Plus, Minus, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw, TierAnchor, CountUp, Atmosphere, DUR, EASE_OUT } from "@kova/ui";
 import { api, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
@@ -229,10 +229,13 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   const overlayRef = useModalOverlay(onClose);
 
   return (
-    <motion.div ref={overlayRef} role="dialog" aria-modal="true" aria-label="Meal plan" tabIndex={-1} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-background outline-none">
+    <motion.div ref={overlayRef} role="dialog" aria-modal="true" aria-label="Meal plan" tabIndex={-1} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.slow, ease: EASE_OUT }} className="fixed inset-0 z-50 isolate overflow-y-auto overscroll-contain bg-background outline-none">
+      {/* Full-screen surface, so it owns its atmosphere — the twin of the workout
+          player, and the two are meant to feel identical (§3). */}
+      <Atmosphere tone="brand" />
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border/40 bg-background/85 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 backdrop-blur-xl">
         <button onClick={onClose} aria-label="Close" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><ArrowLeft /></button>
-        <div className="min-w-0 flex-1"><div className="truncate text-base font-bold tracking-tight">{isPast ? "Past plan" : "Meal plan"}</div>{active && <div className="truncate text-xs text-muted-foreground">{active.name}</div>}</div>
+        <div className="min-w-0 flex-1"><div className="truncate text-body-lg">{isPast ? "Past plan" : "Meal plan"}</div></div>
         <button onClick={() => startTour("meal")} aria-label="Replay meal plan tour" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><LifeBuoy /></button>
         {pastPlans.length > 0 && <button onClick={() => setHistOpen(true)} aria-label="Past plans" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><History /></button>}
       </div>
@@ -267,25 +270,29 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
           <EmptyState icon={Utensils} title="No meal plan yet" description="Your coach hasn't published a meal plan. You can still log food from the Eat tab." />
         ) : (
           <>
-            {/* Hero — the plan at a glance + daily target context */}
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} data-tour="mp-hero">
-              <Card className="relative overflow-hidden">
-                <div className="pointer-events-none absolute -right-10 -top-10 size-36 rounded-full bg-nutrition/10 blur-2xl" />
-                <div className="relative">
-                  <div className={cn("text-micro uppercase", isPast ? "text-muted-foreground" : "text-nutrition")}>{isPast ? "Past plan" : "Your plan"}</div>
-                  <h2 className="mt-0.5 text-title-3">{active?.name}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">{groups.length} meal{groups.length === 1 ? "" : "s"} · {active?.body.mealOptions?.length ?? 0} options{active?.publishedAt ? ` · ${new Date(active.publishedAt).toLocaleDateString()}` : ""}</p>
-                  {isPast ? (
-                    <button onClick={() => pickPlan(null)} className="mt-3 inline-flex items-center gap-1 rounded-full bg-nutrition-soft px-3 py-1 text-xs font-semibold text-nutrition [&_svg]:size-3.5"><ArrowLeft /> Back to current plan</button>
-                  ) : (targets?.targetCalories || targets?.targetProteinG) ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {targets?.targetCalories ? <span className="rounded-full bg-calories-soft px-2.5 py-1 text-xs font-semibold text-calories">{fmtEnergy(targets.targetCalories, units)} / day</span> : null}
-                      {targets?.targetProteinG ? <span className="rounded-full bg-protein-soft px-2.5 py-1 text-xs font-semibold text-protein">{targets.targetProteinG} g protein</span> : null}
-                    </div>
-                  ) : null}
+            {/*
+              T1 — THE ANCHOR (§1). Deliberately the same shape as the workout
+              player's day picker, because these two surfaces are twins and the
+              client moves between them: the plan's NAME is the eyebrow (a name
+              cannot be a display numeral) and the number is the plan's shape.
+              The daily targets stay directly beneath as the `below` slot — they
+              are context for the number, not a competing one.
+            */}
+            <TierAnchor data-tour="mp-hero" className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
+              <p className={cn("text-caption", isPast ? "text-muted-foreground" : "text-nutrition")}>{isPast ? "Past plan" : active?.name}</p>
+              <p className="numeral text-display"><CountUp value={groups.length} /></p>
+              <p className="text-caption text-muted-foreground">
+                {groups.length === 1 ? "meal a day" : "meals a day"} · {active?.body.mealOptions?.length ?? 0} option{(active?.body.mealOptions?.length ?? 0) === 1 ? "" : "s"}
+              </p>
+              {isPast ? (
+                <button onClick={() => pickPlan(null)} className="mt-2 inline-flex items-center gap-1 rounded-full bg-nutrition-soft px-3 py-1 text-xs font-semibold text-nutrition [&_svg]:size-3.5"><ArrowLeft /> Back to current plan</button>
+              ) : (targets?.targetCalories || targets?.targetProteinG) ? (
+                <div className="mt-2 flex flex-wrap justify-center gap-2">
+                  {targets?.targetCalories ? <span className="rounded-full bg-calories-soft px-2.5 py-1 text-xs font-semibold text-calories">{fmtEnergy(targets.targetCalories, units)} / day</span> : null}
+                  {targets?.targetProteinG ? <span className="rounded-full bg-protein-soft px-2.5 py-1 text-xs font-semibold text-protein">{targets.targetProteinG} g protein</span> : null}
                 </div>
-              </Card>
-            </motion.div>
+              ) : null}
+            </TierAnchor>
 
             <div data-tour="mp-tabs"><SegmentedControl options={[{ value: "plan", label: "My meals" }, { value: "shop", label: "Shopping list" }]} value={view} onChange={setView} /></div>
 
@@ -416,7 +423,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                 <AiAvatar className="size-9" />
                 <div className="min-w-0">
                   <div className="text-micro uppercase text-primary">Chef's suggestion</div>
-                  <div className="truncate text-base font-bold tracking-tight">{recipe.title}</div>
+                  <div className="truncate text-body-lg">{recipe.title}</div>
                 </div>
               </div>
               <Markdown className="text-[0.95rem] text-foreground/90">{recipe.text}</Markdown>

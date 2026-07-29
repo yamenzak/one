@@ -12,11 +12,26 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
 import { Drawer } from "vaul";
 import { motion } from "motion/react";
+import { SPRING } from "./lib/animation.js";
 import { Check, ChevronDown, X } from "./lib/icons.js";
 import { cn } from "./lib/utils.js";
 import { Button } from "./primitives.js";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
+/**
+ * The house focus ring (§12). Every focusable control in this file sets
+ * `outline-none`, which is only defensible if something replaces it — three of
+ * them did not, so a keyboard user tabbing through a dialog, a tab bar or a
+ * segmented control saw nothing move.
+ */
+const FOCUS = "focus-visible:ring-2 focus-visible:ring-ring/70";
+
+/**
+ * The dim behind every overlay. **One constant, used by all of them**: the
+ * Sheet used to hard-code the same colours without the animation classes, so
+ * its scrim snapped on and off while the sheet itself slid (§8 — the dim fades
+ * WITH the layer, never after it).
+ */
 const overlayCls =
   "fixed inset-0 z-50 bg-scrim backdrop-blur-sm data-[state=open]:animate-[overlay-in_0.2s_ease] data-[state=closed]:animate-[overlay-out_0.15s_ease]";
 
@@ -108,7 +123,7 @@ export function DialogContent({ title, children, className }: { title?: string; 
       >
         {title && <DialogPrimitive.Title className="mb-4 text-title-3">{title}</DialogPrimitive.Title>}
         {!title && <DialogPrimitive.Title className="sr-only">Dialog</DialogPrimitive.Title>}
-        <DialogPrimitive.Close className="absolute right-4 top-4 grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+        <DialogPrimitive.Close className={cn("absolute right-4 top-4 grid size-9 place-items-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-secondary hover:text-foreground", FOCUS)}>
           <X className="size-4" />
         </DialogPrimitive.Close>
         {children}
@@ -168,13 +183,23 @@ export function FixedDrawer({ open, onClose, dismissible = true, title, headerAc
   );
 }
 
+/**
+ * The bottom sheet — the mobile default for **doing** (§7). Drag-to-dismiss.
+ *
+ * Its title is `title-2` while `FixedDrawer`'s is `title-3`, which looks like
+ * drift and isn't: a sheet's title sits in the CONTENT, where it names the
+ * subject of the surface, and a fixed drawer's sits in a compact header BAR,
+ * where it is chrome around a form that carries its own headings. Same rule as
+ * everywhere else — a component never decides its own importance, its container
+ * does. Set them equal and one of the two stops reading correctly.
+ */
 // ── Sheet (bottom drawer, drag-to-dismiss) ──────────────────────────────────
 export function Sheet({ open, onClose, title, titleAction, children }: { open: boolean; onClose: () => void; title?: string; titleAction?: ReactNode; children: ReactNode }) {
   const kb = useKeyboardInset(open);
   return (
     <Drawer.Root open={open} onOpenChange={(o) => !o && onClose()} repositionInputs={false}>
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 z-50 bg-scrim backdrop-blur-sm" />
+        <Drawer.Overlay className={overlayCls} />
         <Drawer.Content
           style={{ bottom: kb || undefined, maxHeight: kb ? `calc(100dvh - ${kb}px)` : undefined }}
           className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92vh] max-w-xl flex-col rounded-t-[--radius-sheet] border-t border-border/60 bg-popover outline-none transition-[max-height,bottom] duration-200 ease-out"
@@ -220,8 +245,10 @@ export function DropdownMenuItem({ children, onSelect, className, destructive }:
     <DropdownPrimitive.Item
       onSelect={onSelect}
       className={cn(
-        "flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm outline-none transition-colors [&_svg]:size-4 [&_svg]:text-muted-foreground",
-        destructive ? "text-danger hover:bg-danger-soft [&_svg]:text-danger" : "text-foreground hover:bg-secondary",
+        "flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-body outline-none transition-colors [&_svg]:size-4 [&_svg]:text-muted-foreground",
+        destructive
+          ? "text-danger hover:bg-danger-soft data-[highlighted]:bg-danger-soft [&_svg]:text-danger"
+          : "text-foreground hover:bg-secondary data-[highlighted]:bg-secondary",
         className,
       )}
     >
@@ -231,7 +258,7 @@ export function DropdownMenuItem({ children, onSelect, className, destructive }:
 }
 
 export function DropdownMenuLabel({ children }: { children: ReactNode }) {
-  return <div className="px-3 py-2 text-xs font-semibold text-muted-foreground">{children}</div>;
+  return <div className="px-3 py-2 text-micro uppercase text-muted-foreground">{children}</div>;
 }
 export function DropdownMenuSeparator() {
   return <div className="my-1 h-px bg-border" />;
@@ -246,7 +273,7 @@ export function TabsTrigger({ value, children }: { value: string; children: Reac
   return (
     <TabsPrimitive.Trigger
       value={value}
-      className="rounded-full px-4 py-1.5 text-sm font-medium text-muted-foreground outline-none transition-colors data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+      className={cn("rounded-full px-4 py-1.5 text-sm font-medium text-muted-foreground outline-none transition-colors data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm", FOCUS)}
     >
       {children}
     </TabsPrimitive.Trigger>
@@ -285,7 +312,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
           className="absolute inset-y-1 rounded-full bg-primary"
           initial={false}
           animate={{ left: pill.left, width: pill.width }}
-          transition={{ type: "spring", stiffness: 380, damping: 32 }}
+          transition={SPRING}
         />
       )}
       {options.map((o) => (
@@ -293,7 +320,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
           key={o.value}
           ref={(el) => { btnRefs.current[o.value] = el; }}
           onClick={() => onChange(o.value)}
-          className={cn("relative z-10 truncate rounded-full py-1.5 text-sm font-medium transition-colors", fill ? "flex-1 basis-0 px-2 text-center" : "px-4", value === o.value ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+          className={cn("relative z-10 truncate rounded-full py-1.5 text-sm font-medium outline-none transition-colors", FOCUS, fill ? "flex-1 basis-0 px-2 text-center" : "px-4", value === o.value ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
         >
           {o.label}
         </button>
@@ -309,7 +336,8 @@ export function Select<T extends string>({ value, onChange, options, placeholder
       <SelectPrimitive.Trigger
         aria-label={ariaLabel}
         className={cn(
-          "inline-flex h-11 w-full items-center justify-between gap-2 rounded-xl border border-input bg-secondary/50 px-3.5 text-sm outline-none transition-colors focus:border-primary/70 data-[placeholder]:text-muted-foreground",
+          "inline-flex h-11 w-full items-center justify-between gap-2 rounded-xl border border-input bg-secondary/50 px-3.5 text-sm outline-none transition-colors focus-visible:border-primary/70 data-[placeholder]:text-muted-foreground",
+          FOCUS,
           className,
         )}
       >
@@ -347,7 +375,7 @@ export function Tooltip({ content, children }: { content: ReactNode; children: R
       <TooltipPrimitive.Root>
         <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
         <TooltipPrimitive.Portal>
-          <TooltipPrimitive.Content sideOffset={6} className="z-50 rounded-lg bg-foreground px-2.5 py-1.5 text-xs font-medium text-background shadow-md data-[state=delayed-open]:animate-[menu-in_var(--dur-fast)_var(--ease-out)]">
+          <TooltipPrimitive.Content sideOffset={6} className="z-50 rounded-lg bg-foreground px-2.5 py-1.5 text-caption font-medium text-background shadow-md data-[state=delayed-open]:animate-[menu-in_var(--dur-fast)_var(--ease-out)]">
             {content}
           </TooltipPrimitive.Content>
         </TooltipPrimitive.Portal>
