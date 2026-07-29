@@ -353,15 +353,13 @@ function TabLayout() {
                 {clientSurface && clientId && (
                   <DropdownMenuItem onSelect={() => nav("/shop")}><Store /> Plans &amp; access</DropdownMenuItem>
                 )}
-                {/* Personal settings — each its own destination (no buried tabs). */}
-                {clientSurface && clientId && <DropdownMenuItem onSelect={() => nav("/profile")}><CircleUser /> Profile</DropdownMenuItem>}
-                {/* One destination for "how this app behaves for me". These were
-                    four menu entries a tap apart — preferences, notifications,
-                    appearance, units — each a half-empty screen. They are tabs on
-                    one page now. */}
-                <DropdownMenuItem onSelect={() => nav("/preferences")}><SlidersHorizontal /> Preferences</DropdownMenuItem>
+                {/* ONE door for everything about me. This was three entries a tap
+                    apart — Profile, Preferences, Passkeys & security — each a
+                    half-empty screen about the same subject, so finding your own
+                    units meant remembering which of the three it was behind. The
+                    old routes still work as deep links into their section. */}
+                <DropdownMenuItem onSelect={() => nav("/profile")}><SlidersHorizontal /> Settings</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => nav("/media")}><ImageIcon /> Media library</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => nav("/passkeys")}><KeyRound /> Passkeys &amp; security</DropdownMenuItem>
                 {active.role === "owner" && <DropdownMenuItem onSelect={() => nav("/settings")}><SettingsIcon /> Studio settings</DropdownMenuItem>}
                 {ctx!.isPlatformAdmin && <DropdownMenuItem onSelect={() => nav("/admin")}><ShieldCheck /> Platform admin</DropdownMenuItem>}
                 <DropdownMenuSeparator />
