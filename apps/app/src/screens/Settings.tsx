@@ -9,7 +9,7 @@ import { useSearchParams } from "react-router-dom";
 import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
-  KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
+  KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
   ActionResult, ConfigRow, TabIntro, cn, toneText, personaLabel, personaTone, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon,
 } from "@kova/ui";
 import type { LoginBranding, TenantBranding } from "@kova/protocol";
@@ -24,29 +24,25 @@ import { enrollPasskey, listPasskeys, removePasskey, passkeySupported, passkeyEr
 import { usePasskey } from "../PasskeyPrompt.js";
 import { AiConfigSection } from "./AiSettings.js";
 
-/** Studio-level settings the owner controls carry this badge, so the owner can
- *  tell them apart from their own personal (Account / Preferences) settings. */
-type Scope = "tenant";
-function ScopeTag() {
-  return <Badge tone="primary"><Building2 /> Studio</Badge>;
-}
 /**
- * Section header with an optional studio-scope badge.
+ * Section header inside a settings PAGE.
  *
- * Carries an icon like the platform console's `SectionHeader` does — a settings
- * page is a long vertical list of near-identical cards, and the icon is what lets
- * an owner find the one they came for by scanning rather than reading. The scope
- * badge stays, because "is this MY setting or the STUDIO's?" is a question the
- * admin console never has to answer.
+ * Only for a page that genuinely holds more than one section — Email has four
+ * (delivery, policy, templates), Sign-in has two. Where the page has one, the
+ * header restated the page's own title a few pixels below it and is gone.
+ *
+ * It used to carry a "Studio" badge as well, from when studio and personal
+ * settings shared a screen and "is this MY setting or the STUDIO's?" was a real
+ * question. It isn't any more: you reach these through Studio settings, whose
+ * title is still on screen behind you.
  */
-function SectionHead({ title, icon: Icon, tone = "primary", scope }: { title: string; icon?: LucideIcon; tone?: Tone; scope?: Scope }) {
+function SectionHead({ title, icon: Icon, tone = "primary" }: { title: string; icon?: LucideIcon; tone?: Tone }) {
   return (
     <div className="mb-2 flex items-center justify-between gap-2 px-1">
       <h3 className="flex items-center gap-1.5 text-micro uppercase text-muted-foreground">
         {Icon && <Icon className={cn("size-3.5", toneText[tone])} aria-hidden />}
         {title}
       </h3>
-      {scope && <ScopeTag />}
     </div>
   );
 }
@@ -199,20 +195,20 @@ function PersonalSettings({ clientId, initialTab, onBack, onSaved }: {
   const sections = [
     {
       value: "profile", label: "Profile", icon: CircleUser, tone: "cardio", show: !!clientId,
-      blurb: "Your name, photo and the basics",
+      blurb: "Your name, photo and the basics", intro: "Your coach sees these, and your targets are calculated from them.",
       body: () => <ClientProfileSection clientId={clientId!} email={ctx?.user.email ?? ""} onSaved={onSaved} />,
     },
     {
       value: "preferences", label: "Training & nutrition", icon: Target, tone: "primary", show: true,
-      blurb: "Your goal, how you train, what to avoid",
+      blurb: "Your goal, how you train, what to avoid", intro: "What your coach builds your plans and targets around. Keep it current.",
       body: () => (clientId
         ? <><PreferencesSection clientId={clientId} onSaved={onSaved} /><MutedInsightsSection /></>
         : <Stagger><Card className="text-sm text-muted-foreground">These appear here once you&apos;re set up as a client.</Card></Stagger>),
     },
-    { value: "notifications", label: "Notifications", icon: Bell, tone: "activity", show: true, blurb: "What you hear about, and where", body: () => <NotificationsSection /> },
-    { value: "units", label: "Units", icon: Scale, tone: "sleep", show: true, blurb: "Metric or imperial", body: () => <UnitsSection /> },
-    { value: "security", label: "Passkeys & security", icon: KeyRound, tone: "supplement", show: true, blurb: "How you sign in on this device", body: () => <SecuritySection /> },
-  ] as const satisfies readonly { value: PersonalTab; label: string; blurb: string; icon: LucideIcon; tone: Tone; show: boolean; body: () => ReactNode }[];
+    { value: "notifications", label: "Notifications", icon: Bell, tone: "activity", show: true, blurb: "What you hear about, and where", intro: "Pick a channel per kind of update. Nothing here emails anyone else.", body: () => <NotificationsSection /> },
+    { value: "units", label: "Units", icon: Scale, tone: "sleep", show: true, blurb: "Metric or imperial", intro: "Mix and match freely — these apply everywhere you see a number, for you only.", body: () => <UnitsSection /> },
+    { value: "security", label: "Passkeys & security", icon: KeyRound, tone: "supplement", show: true, blurb: "How you sign in on this device", intro: "A passkey signs you in with your face, fingerprint or screen lock — no code to wait for.", body: () => <SecuritySection /> },
+  ] as const satisfies readonly { value: PersonalTab; label: string; blurb: string; intro: string; icon: LucideIcon; tone: Tone; show: boolean; body: () => ReactNode }[];
   const shown = sections.filter((x) => x.show);
 
   const open = shown.find((x) => x.value === openKey) ?? null;
@@ -220,7 +216,7 @@ function PersonalSettings({ clientId, initialTab, onBack, onSaved }: {
 
   if (open) {
     return (
-      <SettingsPage title={open.label} onBack={() => setParams((q: URLSearchParams) => { q.delete("s"); return q; }, { replace: true })}>
+      <SettingsPage title={open.label} description={open.intro} onBack={() => setParams((q: URLSearchParams) => { q.delete("s"); return q; }, { replace: true })}>
         <motion.div key={open.value} variants={stagger} initial="hidden" animate="show" className="space-y-6">
           {open.body()}
         </motion.div>
@@ -397,7 +393,6 @@ function CloseStudioSection() {
 
   return (
     <Stagger>
-      <SectionHead title="Danger zone" icon={AlertTriangle} tone="danger" scope="tenant" />
       {status?.closing ? (
         <Card className="space-y-2.5">
           <div className="flex items-center gap-2 font-medium text-danger"><AlertTriangle className="size-4" /> Studio scheduled for deletion</div>
@@ -481,7 +476,7 @@ function LoginLinkCard({ slug }: { slug: string | null }) {
   const copy = () => void navigator.clipboard?.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); });
   return (
     <section>
-      <SectionHead title="Login link" icon={LogIn} scope="tenant" />
+      <SectionHead title="Login link" icon={LogIn} />
       <Card className="space-y-3">
         <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><LogIn /></div><div><div className="font-medium">Your sign-in link</div><div className="text-sm text-muted-foreground">Share this with clients — it opens a sign-in screen wearing your brand.</div></div></div>
         <div className="flex items-center gap-2 rounded-xl bg-surface-2 p-2 pl-3.5">
@@ -534,7 +529,7 @@ function LoginCustomizeSection({ initial, logoUrl, onSaved }: { initial: LoginBr
 
   return (
     <section>
-      <SectionHead title="Sign-in screen" icon={Palette} scope="tenant" />
+      <SectionHead title="Sign-in screen" icon={Palette} />
       <Card className="space-y-5">
         <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Palette /></div><div><div className="font-medium">Make it yours</div><div className="text-sm text-muted-foreground">Your words and your image on the screen clients land on.</div></div></div>
 
@@ -627,7 +622,6 @@ function SecuritySection() {
   const fmtAdded = (iso: string) => { const d = new Date(iso); return isNaN(+d) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); };
   return (
     <section>
-      <SectionHead title="Security" icon={KeyRound} />
       <Card className="space-y-3">
         <div className="flex items-center justify-between">
           <div><div className="font-medium">Passkeys</div><div className="text-sm text-muted-foreground">One-tap sign-in with Face ID / fingerprint.</div></div>
@@ -728,7 +722,6 @@ function NotificationsSection() {
   };
   return (
     <section>
-      <SectionHead title="Notifications" icon={Bell} />
       {error && !data ? <LoadError label="your notification settings" error={typeof error === "string" ? error : null} onRetry={() => void load()} /> : (
       <Card className="divide-y divide-border/50 p-0">
         <div className="flex items-center justify-end gap-6 px-4 py-2.5 text-micro uppercase text-muted-foreground">
@@ -784,7 +777,7 @@ function EmailTemplatesSection() {
 
   return (
     <section className="space-y-3">
-      <SectionHead title="Email templates" icon={Mail} scope="tenant" />
+      <SectionHead title="Email templates" icon={Mail} />
       <Card className="space-y-2">
         <div className="text-sm font-medium">Signature</div>
         <p className="text-xs text-muted-foreground">Appended to the footer of every email your studio sends.</p>
@@ -867,7 +860,7 @@ function NotificationPolicySection() {
   const isStaff = (roles: string[]) => roles.some((r) => r !== "client");
   return (
     <section>
-      <SectionHead title="Email notifications policy" icon={Bell} scope="tenant" />
+      <SectionHead title="Email notifications policy" icon={Bell} />
       {error && !data ? <LoadError label="your email policy" error={typeof error === "string" ? error : null} onRetry={() => void load()} /> : (
       <Card className="p-0">
         <p className="px-4 pt-4 text-sm text-muted-foreground">Choose which notifications may be emailed — separately for your clients and your staff. Turning one off keeps it in the in-app inbox but never emails it; people still tune their own preferences within what you allow here.</p>
@@ -914,7 +907,7 @@ function EmailSection() {
   // a broken load from a section they'd never been given.
   if (error && !cfg) return (
     <section>
-      <SectionHead title="Email delivery" icon={Mail} scope="tenant" />
+      <SectionHead title="Email delivery" icon={Mail} />
       <LoadError label="your email delivery settings" error={typeof error === "string" ? error : null} onRetry={() => void load()} />
     </section>
   );
@@ -934,7 +927,7 @@ function EmailSection() {
   };
   return (
     <section>
-      <SectionHead title="Email delivery" icon={Mail} scope="tenant" />
+      <SectionHead title="Email delivery" icon={Mail} />
       <Card className="space-y-3">
         <SegmentedControl
           options={[{ value: "platform", label: "Kova" }, { value: "brevo", label: "Brevo" }, { value: "off", label: "Off" }]}
@@ -1206,9 +1199,7 @@ function UnitsSection() {
   const set = async (patch: Record<string, string>) => { setBusy(true); try { await api.patch("/api/me/units", patch); await refresh(); } finally { setBusy(false); } };
   return (
     <section>
-      <h3 className="mb-2 px-1 text-micro uppercase text-muted-foreground">Units</h3>
       <Card className="space-y-3">
-        <p className="text-sm text-muted-foreground">Mix and match freely — these apply everywhere you see numbers, for you only.</p>
         {UNIT_ROWS.map((r) => (
           <div key={r.key} className="flex items-center justify-between gap-3">
             <span className="text-sm">{r.label}</span>
@@ -1261,41 +1252,53 @@ function MarketplaceSection() {
     finally { setBusy(false); }
   };
 
+  /*
+    ── TWO SWITCHES, NOT FIVE HEADINGS ──────────────────────────────────────
+
+    This page carried, in order: the page title "Storefront", a page
+    description, a "MARKETPLACE" eyebrow, a "Studio" badge, and a card headed
+    "Your Shop" with its own two-line description — five layers of chrome and
+    three different names for one thing, above two toggles. Then a card with an
+    icon, a "Coming later" badge and four lines of prose about a feature that
+    does not exist, taking a third of the page.
+
+    `SettingsPage` already gives the title and one line of context. What is left
+    is what you came to change: two switches. The unbuilt public page is a
+    footnote — a settings screen configures what exists, and a roadmap item is
+    not a setting.
+  */
   return (
     <section>
-      <SectionHead title="Marketplace" icon={Store} scope="tenant" />
       {error && !loaded ? <LoadError label="your storefront settings" error={typeof error === "string" ? error : null} onRetry={() => void load()} /> : (
       <Reveal loading={!loaded} className="space-y-3" skeleton={
         <Card className="space-y-3">
-          <div className="flex items-center gap-2.5"><Skeleton className="size-9 rounded-xl" /><div className="flex-1 space-y-1.5"><SkeletonLine w="45%" h="text" /><SkeletonLine w="70%" h="xs" /></div></div>
           {Array.from({ length: 2 }).map((_, i) => (
             <div key={i} className="flex items-center justify-between"><SkeletonLine w="40%" h="text" /><Skeleton className="h-6 w-11 rounded-full" /></div>
           ))}
         </Card>
       }>
         {loaded && (
-        <>
-        <Card className="space-y-3">
-          <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Store /></div><div><div className="font-medium">Your Shop</div><div className="text-sm text-muted-foreground">Packages you mark for the Shop are listed in every client&rsquo;s Shop tab, where they can buy them.</div></div></div>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0"><div className="text-sm">Allow self sign-up</div><div className="text-xs text-muted-foreground">A new email can create their own client account from your studio&rsquo;s sign-in page.</div></div>
-            <Switch checked={!!marketplace.selfRegister} disabled={busy} onCheckedChange={(v) => void setMarket({ selfRegister: v })} />
-          </div>
-          <div className="flex items-start justify-between gap-3 border-t border-border/50 pt-3">
-            <div className="min-w-0"><div className="text-sm">Require an active plan</div><div className="text-xs text-muted-foreground">Clients with no live package are locked to the Shop screen until they have one.</div></div>
-            <Switch checked={!!marketplace.requireActiveAccess} disabled={busy} onCheckedChange={(v) => void setMarket({ requireActiveAccess: v })} />
-          </div>
+        <div className="space-y-3">
+          <Stagger>
+            <div className="overflow-hidden rounded-2xl bg-card">
+              <ToggleRow
+                icon={UserPlus} title="Let clients sign themselves up"
+                desc="A new email can create its own client account from your sign-in page."
+                checked={!!marketplace.selfRegister} onChange={(v) => void setMarket({ selfRegister: v })}
+              />
+              <div className="border-t border-border/50" />
+              <ToggleRow
+                icon={Lock} title="Require an active package"
+                desc="Without one, a client sees only the Shop until they buy."
+                checked={!!marketplace.requireActiveAccess} onChange={(v) => void setMarket({ requireActiveAccess: v })}
+              />
+            </div>
+          </Stagger>
           {saveErr && <p role="status" aria-live="polite" className="text-sm text-danger">{saveErr}</p>}
-        </Card>
-        <Card className="space-y-2">
-          <div className="flex items-center gap-2.5">
-            <div className="grid size-9 place-items-center rounded-xl bg-secondary text-muted-foreground [&_svg]:size-4"><Globe /></div>
-            <div className="min-w-0 flex-1"><div className="font-medium">Public storefront</div></div>
-            <Badge tone="neutral">Coming later</Badge>
-          </div>
-          <p className="text-sm text-muted-foreground">A shareable public page listing your packages and public articles. Not built yet — your studio&rsquo;s address is a branded sign-in page for now, and packages sell inside the app on each client&rsquo;s Shop tab.</p>
-        </Card>
-        </>
+          <p className="px-1 text-xs text-muted-foreground">
+            Packages you mark <span className="font-medium text-foreground">In client Shop</span> appear in every client&rsquo;s Shop tab. A shareable public page isn&rsquo;t built yet — your studio&rsquo;s address is a branded sign-in page for now.
+          </p>
+        </div>
         )}
       </Reveal>
       )}
@@ -1386,7 +1389,7 @@ function DomainSection() {
 
   return (
     <section>
-      <SectionHead title="Custom domain" icon={Globe} scope="tenant" />
+      <SectionHead title="Custom domain" icon={Globe} />
       {loadFailed && !domains ? <LoadError label="your custom domains" error={typeof loadFailed === "string" ? loadFailed : null} onRetry={() => void load()} /> : (
       <Reveal loading={!domains} skeleton={
         <Card className="space-y-4">
@@ -1550,7 +1553,6 @@ function IntegrationsSection() {
 
   return (
     <section>
-      <SectionHead title="Integrations" icon={Plug} scope="tenant" />
       {error && !providers ? <LoadError label="your data providers" error={typeof error === "string" ? error : null} onRetry={() => void load()} /> : (
       <Reveal loading={!providers} skeleton={
         <Card className="space-y-4">
