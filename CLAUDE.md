@@ -9,6 +9,12 @@ businesses. Product + technical spec in [SPEC.md](SPEC.md); the ByShujaa feature
 inventory Kova is modeled on is in
 [docs/BY-SHUJAA-FEATURES.md](docs/BY-SHUJAA-FEATURES.md).
 
+**Looking for the file that draws a screen?** [docs/SCREENS.md](docs/SCREENS.md)
+maps every surface — routes, sub-tabs, and the sheets/drawers that aren't routes
+— to `file:line`, per persona. Grepping for a screen's name usually fails: one
+path renders different files per persona, and most surfaces live inside their
+parent's file. **Update it in the same commit as any screen you add or move.**
+
 **UI: two files, and the order matters.** [UI-LANGUAGE.md](UI-LANGUAGE.md) is the
 interface language — hierarchy, layout, tokens, motion, copy, component grammar —
 written product-agnostically because it is the extraction target for the shared
