@@ -44,7 +44,7 @@ export function Explore({ clientId, onBack }: { clientId: string; onBack: () => 
   if (open) return <Reader r={open} onBack={() => setOpen(null)} />;
 
   return (
-    <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+    <Page className="column space-y-5 p-4 pb-28">
       <div className="flex items-center gap-3">
         <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
         <div className="min-w-0">
@@ -143,7 +143,7 @@ function ArticleCard({ r, onOpen }: { r: Resource; onOpen: () => void }) {
 /** Immersive reader — cover-bleed header, meta, then the premium Markdown body. */
 function Reader({ r, onBack }: { r: Resource; onBack: () => void }) {
   return (
-    <Page className="mx-auto max-w-xl p-0 pb-28">
+    <Page className="column p-0 pb-28">
       {r.coverUrl ? (
         <div className="relative">
           <img src={r.coverUrl} alt="" className="h-60 w-full object-cover" />
@@ -157,7 +157,7 @@ function Reader({ r, onBack }: { r: Resource; onBack: () => void }) {
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: DUR.slow, ease: [0.22, 1, 0.36, 1] }}
-        className={cn("mx-auto max-w-xl space-y-4 px-4", r.coverUrl && "relative -mt-8")}
+        className={cn("column space-y-4 px-4", r.coverUrl && "relative -mt-8")}
       >
         <div className="flex flex-wrap items-center gap-2">
           {r.category && <Badge tone="activity">{r.category}</Badge>}

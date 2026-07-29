@@ -75,7 +75,7 @@ export function Staff() {
   };
 
   return (
-    <Page className="mx-auto max-w-xl space-y-3 p-4 pb-28">
+    <Page className="column space-y-3 p-4 pb-28">
       {/* T1 — the tab's anchor (§1: a tabbed surface is N screens sharing chrome). */}
       <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-1 text-center">
         <p className="text-caption text-muted-foreground">Staff seats</p>

@@ -525,6 +525,12 @@ ship:
 Not a second design. **The mobile column is the unit; desktop adds columns
 around it.**
 
+**The column is one class.** `.column` (tokens.css) is this table, and it is the
+only place these numbers appear. A screen that writes its own `max-w-*` inside
+the shell's column silently wins the cascade and pins the whole app narrower
+than the language says — which is exactly what happened, app-wide, unnoticed,
+because every screen agreed on the same wrong number.
+
 ### Three shapes
 
 | Shape | From | Layout |

@@ -414,7 +414,7 @@ function TabLayout() {
         canvas, a two-pane roster) opt out with `data-fullbleed` on their own
         root, which the negative margins below release.
       */}
-      <main key={activeTour === "app" ? "tour" : "live"} className="mx-auto w-full max-w-[640px] lg:max-w-[720px] [&>[data-fullbleed]]:max-w-none">
+      <main key={activeTour === "app" ? "tour" : "live"} className="column [&>[data-fullbleed]]:max-w-none">
         <ErrorBoundary resetKey={loc.pathname}><Outlet /></ErrorBoundary>
       </main>
       </div>
@@ -517,7 +517,12 @@ function BillingNotice() {
       already a click from Business — and the state is still undismissable,
       because it describes the studio rather than announcing an event.
     */
-    <div role="status" className="px-4 pt-3">
+    /* Constrained to the content column, not the viewport. On desktop this ran
+       the full width of the window while every card below it stopped at 720 —
+       so the label sat at the far left and its button ~900px away on the far
+       right, which is §11's "a row stretched to 1400px with a value floating in
+       the void", verbatim. */
+    <div role="status" className="column px-4 pt-3">
       <details className="group overflow-hidden rounded-2xl border border-danger/30 bg-surface-1">
         <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2.5 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
           <AlertTriangle aria-hidden className="size-[1.05rem] shrink-0" style={{ color: toneVar.danger }} />

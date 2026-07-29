@@ -88,7 +88,7 @@ export function Business() {
   ];
   return (
     <div>
-      <div className="mx-auto max-w-xl p-4 pb-0"><SegmentedControl options={options} value={activeTab} onChange={(v) => setTab(v as Tab)} /></div>
+      <div className="column p-4 pb-0"><SegmentedControl options={options} value={activeTab} onChange={(v) => setTab(v as Tab)} /></div>
       {activeTab === "overview" && <Overview />}
       {activeTab === "packages" && <Packages />}
       {activeTab === "staff" && <Staff />}
@@ -211,7 +211,7 @@ function Overview() {
   const totalCalls = aiUsage.reduce((n, u) => n + u.calls, 0);
 
   return (
-    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+    <Page className="column space-y-4 p-4 pb-28">
 
       {error && !billing ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load your business" description="Something went wrong. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />

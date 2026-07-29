@@ -172,7 +172,7 @@ export function Train({ clientId }: { clientId: string }) {
   const hasData = week.activeCount > 0 || week.weekTonnage > 0 || recent.length > 0;
 
   return (
-    <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+    <Page className="column space-y-5 p-4 pb-28">
       {/* T1 (§1). The question Train answers on arrival is "am I keeping up this
           week", and days trained is the honest version of that — tonnage is a
           number only some clients read, and a plan name is not a measure. */}

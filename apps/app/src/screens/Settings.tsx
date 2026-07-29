@@ -127,7 +127,7 @@ export function Settings({ onBack, view = "studio" }: { onBack: () => void; view
   })();
 
   return (
-    <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+    <Page className="column space-y-5 p-4 pb-28">
       <div className="flex items-center gap-3">
         <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
         <h1 className="text-title-2">{VIEW_TITLE[view]}</h1>

@@ -45,7 +45,7 @@ const TABS: { value: AdminTab; label: string }[] = [
 export function AdminConsole({ onBack }: { onBack: () => void }) {
   const [tab, setTab] = useState<AdminTab>("tenants");
   return (
-    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+    <Page className="column space-y-4 p-4 pb-28">
       <div className="flex items-center gap-3">
         <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
         <div className="min-w-0">

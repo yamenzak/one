@@ -463,3 +463,27 @@ body {
   .border-r { border-right-width: var(--border-width, 1px); }
   .border-2 { border-width: calc(var(--border-width, 1px) * 2); }
 }
+
+/**
+ * THE CONTENT COLUMN — UI-LANGUAGE §2.
+ *
+ * One class, because there is one column. Every screen used to write
+ * `mx-auto max-w-xl` (576px) inside a shell whose `<main>` already capped at
+ * 640/720, so the inner cap always won and §2's table — 640 at `md`, 720 at
+ * `lg` — had never actually applied anywhere. The app was 576px wide on a
+ * 1512px display, which is most of why desktop read as a phone in a window.
+ *
+ * Widening it is safe by construction: §11's first rule is that cards fill
+ * their column and columns multiply, so nothing here has to reflow — the
+ * two-up grids simply get the room they were designed for.
+ */
+@layer utilities {
+  .column {
+    margin-inline: auto;
+    width: 100%;
+    max-width: 40rem; /* 640 */
+  }
+  @media (min-width: 1100px) {
+    .column { max-width: 45rem; } /* 720 */
+  }
+}

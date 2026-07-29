@@ -123,7 +123,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
   const extend = () => { if (activePkg) void (isRecurring(activePkg) ? buy(activePkg.id) : buyInline(activePkg)); };
 
   return (
-    <Page className="relative isolate mx-auto max-w-xl space-y-5 p-4 pb-28">
+    <Page className="relative isolate column space-y-5 p-4 pb-28">
       {/* Shop is an overlay route (Shell.tsx) — it renders OUTSIDE the shell, so
           it never inherited the shell's ambient wash and was the one anchored
           screen in the client app sitting on flat canvas. It owns one (§3). */}

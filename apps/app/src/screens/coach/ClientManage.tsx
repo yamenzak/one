@@ -133,7 +133,7 @@ export function ClientManage({ clientId, clientName }: { clientId: string; clien
   const pending = swaps.filter((s) => s.status === "pending");
 
   return (
-    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+    <Page className="column space-y-4 p-4 pb-28">
       {loadError && !subs ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load this client" description="Something went wrong reaching the server. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
       ) : (

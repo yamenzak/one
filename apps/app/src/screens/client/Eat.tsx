@@ -158,7 +158,7 @@ export function Eat({ clientId }: { clientId: string }) {
   const remaining = calTarget - total;
 
   return (
-    <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+    <Page className="column space-y-5 p-4 pb-28">
       {/* T1 (§1). Nobody opens Eat to read the word "Eat" — they open it to find
           out how much room is left. With no target there is no "left", so the
           anchor shows what has been eaten instead of inventing a denominator. */}

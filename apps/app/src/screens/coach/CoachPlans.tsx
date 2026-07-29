@@ -67,7 +67,7 @@ export function CoachPlans({ clientId }: { clientId: string }) {
   const laneName = laneId ? liveLanes.find((l) => l.id === laneId)?.label ?? "" : defaultLabel;
 
   return (
-    <Page className="mx-auto max-w-xl space-y-3 p-4 pb-28">
+    <Page className="column space-y-3 p-4 pb-28">
       <SegmentedControl options={[{ value: "workout", label: "Workout" }, { value: "meal", label: "Meal" }]} value={kind} onChange={setKind} />
 
       {/* Lane (schedule) chips — filter + the lane a new plan lands in. Shown

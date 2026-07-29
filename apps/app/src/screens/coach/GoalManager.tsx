@@ -224,7 +224,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
   const selRow = "mb-1.5 block text-sm font-medium text-muted-foreground";
 
   return (
-    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+    <Page className="column space-y-4 p-4 pb-28">
       {loadError && !goals ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load goals" description="Something went wrong reaching the server. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
       ) : (

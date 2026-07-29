@@ -114,7 +114,7 @@ export function Clients() {
   }, [wantsNew, setParams]);
 
   return (
-    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
+    <Page className="column space-y-4 p-4 pb-28">
       {/* T1 (§1). The roster IS the screen, so the anchor is its size — and the
           sub-line carries the only fact a coach scans for on arrival: how many
           of them want something. */}
@@ -303,7 +303,7 @@ export function ClientDetail() {
           no solid slab, so the page wash + content bleed behind it and only the
           identity chip + tab pill float over what's scrolling past. */}
       <div className="sticky top-16 z-20 space-y-2.5 px-4 pb-2 pt-2">
-        <div className="mx-auto flex max-w-xl items-center">
+        <div className="column flex items-center">
           <div className="flex min-w-0 items-center gap-1.5 rounded-full border border-border/40 bg-background/60 py-1 pl-1 pr-3.5 backdrop-blur-md">
             <button onClick={() => nav("/clients")} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" aria-label="All clients">
               <ArrowLeft className="size-[1.1rem]" />
@@ -315,7 +315,7 @@ export function ClientDetail() {
             </div>
           </div>
         </div>
-        <div className="mx-auto max-w-xl">
+        <div className="column">
           <IconTabs items={TABS} value={tab} onChange={(v) => nav(`/clients/${clientId}/${v}`)} />
         </div>
       </div>

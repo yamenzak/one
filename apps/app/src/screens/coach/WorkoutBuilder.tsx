@@ -405,7 +405,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   const nameOf = (id: string) => exOf(id)?.name ?? "Exercise";
 
   return (
-    <Page className="mx-auto max-w-xl space-y-4 p-4 pb-32">
+    <Page className="column space-y-4 p-4 pb-32">
       {loadError && !plan ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load this plan" description="Something went wrong reaching the server. Check your connection and try again." action={<div className="flex gap-2"><Button variant="secondary" onClick={onBack}>Back</Button><Button onClick={() => void load()}>Try again</Button></div>} />
       ) : (
@@ -561,7 +561,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
       </Stagger>
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/40 bg-background/90 p-3 backdrop-blur-xl md:pl-24">
-        <div className="mx-auto max-w-xl space-y-2">
+        <div className="column space-y-2">
           {readOnly && (
             <div className="flex items-center gap-2 rounded-xl bg-warning-soft px-3 py-2 text-xs text-warning [&_svg]:size-3.5"><History /> This plan is {plan.status} — read-only. Roll it back to a draft to edit, or make it active again.</div>
           )}
