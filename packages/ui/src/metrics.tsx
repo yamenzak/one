@@ -54,10 +54,21 @@ export function Eyebrow({ children, action, className }: { children: ReactNode; 
   );
 }
 
-/** A card-less stat strip: icon + big numeral + label per item, split by
- *  hairline dividers. A deliberate break from the boxed-card rhythm — use for a
- *  quick "at a glance" row that shouldn't compete with the real cards. */
+/**
+ * A card-less stat strip: icon + big numeral + label per item, split by hairline
+ * dividers. A deliberate break from the boxed-card rhythm — use for a quick "at
+ * a glance" row that shouldn't compete with the real cards.
+ *
+ * **Two or more, and three is the shape it was drawn for.** A strip is a
+ * COMPARISON; with one item it is just a 24px/700 value centred on the page,
+ * which is a hero — and a second hero on a screen that already has an anchor
+ * (§1). One value is a `Row`. Same reasoning as `ActionCluster`'s floor, and it
+ * shipped on coach Business before anyone noticed.
+ */
 export function GlanceStrip({ items, className }: { items: { icon: LucideIcon; tone: Tone; value: ReactNode; label: ReactNode }[]; className?: string }) {
+  if (items.length === 1) {
+    console.warn("GlanceStrip: 1 item. A strip is a comparison — one value is a `Row`. (UI-LANGUAGE §1)");
+  }
   return (
     <div className={cn("flex items-stretch divide-x divide-border/50", className)}>
       {items.map((it, i) => (

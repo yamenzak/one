@@ -222,12 +222,20 @@ export function Train({ clientId }: { clientId: string }) {
             </Card>
           </button>
         </Stagger>
-      ) : (
+      ) : hasData ? (
+        /* No plan, but there IS history below — so say the plan-shaped thing
+           here and let the history carry the screen. With no history either,
+           this and the "Nothing here yet" state at the bottom were two empty
+           states stacked with a stray chip between them, on a screen that was
+           otherwise blank: one fact, said three times, in three components.
+           The bottom one says both facts now. */
         <EmptyState icon={Dumbbell} title="No plan yet" description={canActivities ? "Your coach hasn't published a plan. You can still log activities." : "Your coach hasn't published a plan yet."} />
-      ))}
+      ) : null)}
 
-      {/* Quick-start chips — one per capability the package includes. */}
-      {((canPlan && published) || canActivities) && (
+      {/* Quick-start chips — one per capability the package includes. Hidden in
+          the fully-empty case, where the single remaining chip would be a lone
+          tag floating in whitespace duplicating the empty state's button. */}
+      {((canPlan && published) || (canActivities && (published || hasData))) && (
       <Stagger className="flex flex-wrap gap-2">
         {canPlan && published && <Chip icon={Play} selected onClick={() => start()}>Start workout</Chip>}
         {canActivities && <Chip icon={Footprints} onClick={() => setActivityOpen(true)}>Log activity</Chip>}
@@ -303,7 +311,17 @@ export function Train({ clientId }: { clientId: string }) {
       )}
 
       {!published && !hasData && (
-        <EmptyState icon={Activity} title="Nothing here yet" description={canActivities ? "Log an activity to get started." : "Your training will show up here."} action={canActivities ? <Button onClick={() => setActivityOpen(true)}><Plus /> Log activity</Button> : undefined} />
+        <EmptyState
+          icon={Dumbbell}
+          title={canPlan ? "No plan yet" : "Nothing here yet"}
+          description={
+            canPlan && canActivities ? "Your coach hasn't published a plan. You can still log a walk, a run or anything else you do."
+            : canPlan ? "Your coach hasn't published a plan yet — it'll show up here."
+            : canActivities ? "Log an activity to get started."
+            : "Your training will show up here."
+          }
+          action={canActivities ? <Button onClick={() => setActivityOpen(true)}><Plus /> Log activity</Button> : undefined}
+        />
       )}
 
       {/* Browsable exercise library (SPEC §8.11) — freestyle content for no-plan

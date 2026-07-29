@@ -100,7 +100,11 @@ function Exercises() {
       <Reveal loading={!items} skeleton={
         <div className="space-y-1">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="rounded-2xl bg-card px-3 py-2.5"><SkeletonRow thumb={44} /></div>)}</div>
       }>
-        {items && (filtered.length === 0 ? <EmptyState icon={Dumbbell} title="No matches" /> : view === "grid" ? (
+        {items && (filtered.length === 0 ? (
+          items.length === 0
+            ? <EmptyState icon={Dumbbell} title="No exercises yet" description="Build your library as you go, or install the starter set from the platform." action={<Button onClick={() => setEditor({})}><Plus /> New exercise</Button>} />
+            : <EmptyState icon={Dumbbell} title="Nothing matches" description="Try a different word, or clear the muscle and equipment filters." />
+        ) : view === "grid" ? (
         <Stagger className="grid grid-cols-2 gap-3">{filtered.map((e) => (
           <Card key={e.id} className="overflow-hidden p-0">
             <button onClick={() => open(e)} className="block w-full text-left transition-opacity active:opacity-80">
@@ -285,7 +289,11 @@ function Foods() {
       <Reveal loading={!items} skeleton={
         <div className="space-y-1">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="rounded-2xl bg-card p-4"><SkeletonRow thumb={40} /></div>)}</div>
       }>
-        {items && (filtered.length === 0 ? <EmptyState icon={Utensils} title="No foods" description="Add one, or build your library from the Eat tab." action={<Button onClick={() => setEditor({})}><Plus /> New food</Button>} /> : view === "grid" ? (
+        {items && (filtered.length === 0 ? (
+          items.length === 0
+            ? <EmptyState icon={Utensils} title="No foods yet" description="Add one, or build your library from the Eat tab." action={<Button onClick={() => setEditor({})}><Plus /> New food</Button>} />
+            : <EmptyState icon={Utensils} title="Nothing matches" description="Try a different word." />
+        ) : view === "grid" ? (
         <Stagger className="grid grid-cols-2 gap-3">{filtered.map((f) => (
           <Card key={f.id} className="overflow-hidden p-0">
             <button onClick={() => setEditor({ id: f.id })} className="block w-full text-left transition-opacity active:opacity-80">
