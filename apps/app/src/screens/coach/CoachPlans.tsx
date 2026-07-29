@@ -156,7 +156,7 @@ function LaneManager({ clientId, variants, defaultLabel, onClose, onChanged }: {
   const renameDefault = async (label: string) => { await api.patch(`/api/clients/${clientId}/default-lane`, { label }); onChanged(); };
 
   return (
-    <Sheet open onClose={onClose} title="Schedules">
+    <Sheet open onClose={onClose} title="Schedules" size="tall">
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">Lanes let a client run parallel plans — a "Work week" and an "Off week", or "Night shift" and "Morning shift". Each lane keeps its own published plan; the client switches between them.</p>
         <div className="space-y-2">
