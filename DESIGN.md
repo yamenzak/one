@@ -57,9 +57,8 @@ always "what is this screen about, in one noun":
 | `coach/Packages`, `coach/Staff`, `coach/Sessions` | count of each | All list-shaped. |
 | `Settings`, `AdminConsole` | — | Settings surfaces are lists, not anchored screens: `SettingsList` / `Group` of `Row`s, no display numeral. |
 
-**Still not conformant anywhere:** `EmptyState`, `SettingsList`, `InsightCard`,
-`WavyDivider` and the overlay family predate the language (registry marks them
-`◻︎`).
+**Still not conformant:** `InsightCard`, `WavyDivider` and the overlay family
+(registry marks them `◻︎`). `EmptyState` and `SettingsList` are done.
 
 **Card-stack → `Group`/`Row` done on:** Clients · Staff · Packages (archived,
 redemption codes, promo codes) · Sessions (add-on types) · Library (templates).

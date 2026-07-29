@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Badge, SegmentedControl, Field, Sheet, SubCard, Page, Stagger, ChartCard, SectionHeader, Eyebrow, GlanceStrip, IconBadge, EmptyState, Spinner, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Wallet, Gauge, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, TrendingDown, CheckCheck, Check, Lock, Tag } from "@kova/ui";
+import { Button, Card, Badge, SegmentedControl, Field, Sheet, SubCard, Page, Stagger, ChartCard, SectionHeader, Eyebrow, GlanceStrip, IconBadge, EmptyState, Spinner, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Wallet, Gauge, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, TrendingDown, CheckCheck, Check, Lock, Tag , TierAnchor, CountUp } from "@kova/ui";
 import { FEATURE_KEYS, FEATURE_META, QUOTA_KEYS, QUOTA_META, type Entitlements } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -212,7 +212,6 @@ function Overview() {
 
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
-      <h1 className="text-title-2">Business</h1>
 
       {error && !billing ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load your business" description="Something went wrong. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />
@@ -227,6 +226,17 @@ function Overview() {
       }>
         {billing && (
         <>
+          {/* T1 (§1). Overview's subject is what this studio has to spend. Credits
+              are the number an owner checks, and the one that stops the AI suite
+              dead when it hits zero — so it is the anchor rather than a tile in a
+              grid of four. */}
+          <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-1 text-center">
+            <p className="text-caption text-muted-foreground">AI credits left</p>
+            <p className="numeral text-display"><CountUp value={billing.balance.available} /></p>
+            <p className="text-caption text-muted-foreground">
+              {billing.balance.available === 0 ? "The AI suite is paused until you top up" : "across monthly and purchased"}
+            </p>
+          </TierAnchor>
           {/* No live subscription. Distinct from dunning: a past-due studio HAS a
               subscription and a card to fix; this one is either sitting on the free
               baseline or holding a plan whose checkout never completed. The Shell
@@ -281,11 +291,15 @@ function Overview() {
             </Stagger>
           )}
 
-          {/* Headline glance — plan + credit balance, deliberately card-less. */}
+          {/* Headline glance — the PLAN only. The credit balance used to sit here
+              too, which put the same number on screen twice: once as the anchor
+              and once as a tile 300px below it. Third time this pattern has
+              appeared during the rewrite (Today, Eat, here), and it always looks
+              the same — the screen's own subject, restated smaller, reading as a
+              second thought about the first one. */}
           <Stagger>
             <GlanceStrip items={[
               { icon: CreditCard, tone: "primary", value: isPending ? pendingName : billing.subscription.planName, label: STATE_LABEL[billingState] },
-              { icon: Wallet, tone: "warning", value: billing.balance.available.toLocaleString(), label: "AI credits left" },
             ]} />
           </Stagger>
 
