@@ -1204,7 +1204,7 @@ function DefaultModelPicker({ models, busy, onPick }: { models: ModelRow[]; busy
                   value={current?.id ?? ""}
                   disabled={busy !== null}
                   onChange={(e) => { const m = options.find((x) => x.id === e.target.value); if (m) onPick(m); }}
-                  className="max-w-[52%] shrink-0 truncate rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none disabled:opacity-60"
+                  className="max-w-[52%] shrink-0 truncate rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70 disabled:opacity-60"
                 >
                   {!current && <option value="">Choose a model…</option>}
                   {options.map((m) => {

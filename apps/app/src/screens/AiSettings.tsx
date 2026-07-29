@@ -389,7 +389,7 @@ function DefaultModels({ features, models, config, onApply }: {
                   <IconBadge icon={g.icon} tone={g.tone} size="sm" />
                   <div className="min-w-0"><div className="text-sm font-medium">{g.label}</div><div className="truncate text-xs text-muted-foreground">{g.desc}</div></div>
                 </div>
-                <select value={current} onChange={(e) => onApply(keys, { model: e.target.value || null })} className="max-w-[44%] shrink-0 truncate rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none">
+                <select value={current} onChange={(e) => onApply(keys, { model: e.target.value || null })} className="max-w-[44%] shrink-0 truncate rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70">
                   <option value="">{mixed ? "Mixed — set all…" : "Default (auto)"}</option>
                   {pickable.map((m) => <option key={m.id} value={m.id}>{modelOption(m, g.priceTask)}</option>)}
                 </select>
@@ -495,7 +495,7 @@ function FeatureCard({ feat, models, cfg, tones, onSave }: {
               <select
                 value={cfg.model ?? ""}
                 onChange={(e) => onSave({ model: e.target.value || null })}
-                className="max-w-[60%] truncate rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none"
+                className="max-w-[60%] truncate rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
               >
                 <option value="">Default (auto)</option>
                 {pickable.map((m) => <option key={m.id} value={m.id}>{modelOption(m, feat.task)}</option>)}

@@ -947,7 +947,7 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
             {c.trainer_feedback ? <div className="flex items-start gap-1.5 rounded-lg bg-primary/10 px-3 py-2 text-xs text-primary"><Check className="mt-0.5 size-3.5 shrink-0" /><span>You replied: {c.trainer_feedback}</span></div> : (
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <input value={draft[c.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [c.id]: e.target.value }))} placeholder="Reply…" className="flex-1 rounded-lg bg-surface-3 px-3 py-2 text-sm outline-none" />
+                  <input value={draft[c.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [c.id]: e.target.value }))} placeholder="Reply…" className="flex-1 rounded-lg bg-surface-3 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
                   <Button size="sm" disabled={!draft[c.id]?.trim() || sending === c.id} onClick={() => void send(c.id)}>{sending === c.id ? "Sending…" : "Send"}</Button>
                 </div>
                 {sendErr[c.id] && <p className="text-sm text-warning" role="alert">{sendErr[c.id]}</p>}
@@ -1114,10 +1114,10 @@ function ReviewLabSheet({ clientId, lab, onClose, onDone }: { clientId: string; 
           <label className="block text-sm font-medium text-muted-foreground">Values</label>
           {values.map((v, i) => (
             <div key={v._id} className="flex items-center gap-1.5 text-sm">
-              <input value={v.marker} onChange={(e) => setRow(i, { marker: e.target.value })} placeholder="Marker" className="min-w-0 flex-1 rounded-lg bg-surface-3 px-2.5 py-1.5 outline-none" />
-              <input value={v.value} onChange={(e) => setRow(i, { value: e.target.value })} placeholder="Value" className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 outline-none" />
-              <input value={v.unit} onChange={(e) => setRow(i, { unit: e.target.value })} placeholder="unit" className="w-14 rounded-lg bg-surface-3 px-2 py-1.5 outline-none" />
-              <select value={v.flag} onChange={(e) => setRow(i, { flag: e.target.value as LabValue["flag"] })} className="rounded-lg bg-surface-3 px-1.5 py-1.5 outline-none"><option value="low">low</option><option value="normal">ok</option><option value="high">high</option></select>
+              <input value={v.marker} onChange={(e) => setRow(i, { marker: e.target.value })} placeholder="Marker" className="min-w-0 flex-1 rounded-lg bg-surface-3 px-2.5 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
+              <input value={v.value} onChange={(e) => setRow(i, { value: e.target.value })} placeholder="Value" className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
+              <input value={v.unit} onChange={(e) => setRow(i, { unit: e.target.value })} placeholder="unit" className="w-14 rounded-lg bg-surface-3 px-2 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
+              <select value={v.flag} onChange={(e) => setRow(i, { flag: e.target.value as LabValue["flag"] })} className="rounded-lg bg-surface-3 px-1.5 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/70"><option value="low">low</option><option value="normal">ok</option><option value="high">high</option></select>
             </div>
           ))}
           <button onClick={() => setValues((v) => [...v, { _id: rowId(), marker: "", value: "", unit: "", flag: "normal" }])} className="text-xs font-medium text-primary">+ Row</button>

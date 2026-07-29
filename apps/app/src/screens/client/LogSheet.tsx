@@ -272,7 +272,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
               </div>
               <div className="relative mb-2">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <input value={actSearch} onChange={(e) => setActSearch(e.target.value)} aria-label="Search sports & workouts" placeholder="Search sports & workouts…" className="h-9 w-full rounded-full bg-background pl-8 pr-3 text-sm outline-none" />
+                <input value={actSearch} onChange={(e) => setActSearch(e.target.value)} aria-label="Search sports & workouts" placeholder="Search sports & workouts…" className="h-9 w-full rounded-full bg-background pl-8 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
               </div>
               <div className="max-h-52 space-y-2 overflow-y-auto pr-0.5">
                 {activitiesByCategory().map((g) => {

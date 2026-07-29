@@ -1809,7 +1809,7 @@ function TokenCell({ mode, tokenKey, value, def, onSet }: { mode: "light" | "dar
         value={value}
         placeholder={def.replace(/oklch\(|\)/g, "")}
         onChange={(e) => onSet(mode, tokenKey, e.target.value)}
-        className="w-full bg-transparent font-mono text-xs outline-none placeholder:text-muted-foreground/40"
+        className="w-full bg-transparent font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/70 placeholder:text-muted-foreground/40"
       />
     </div>
   );
