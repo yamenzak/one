@@ -1311,6 +1311,18 @@ describe("reports", () => {
     const today = new Date().toISOString().slice(0, 10);
     await SELF.fetch(`${ORIGIN}/api/check-ins`, { method: "POST", headers: H, body: JSON.stringify({ clientId: b.id, data: { date: today, mood: 4 } }) });
 
+    // Both of these are LINKED clients — they have signed in at least once.
+    // Every rule under test ("gone quiet", "no active plan", "profile
+    // incomplete") describes an active client who stopped doing something, and
+    // the rollup now says so: a client with no `user_id` has never started, so
+    // it emits `invite_pending` alone rather than four accusations. The fixture
+    // used to leave `user_id` null and still assert the active-client rules,
+    // which is the state that shipped "Gone quiet" on a five-second-old invite.
+    await (env.DB as D1Database)
+      .prepare("UPDATE clients SET user_id = 'usr_test_linked' WHERE id IN (?, ?)")
+      .bind(a.id, b.id)
+      .run();
+
     const res = await SELF.fetch(`${ORIGIN}/api/coach/attention`, { headers: auth(ownerCookie) });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { clients: { clientId: string; items: { type: string; label: string; link: string }[] }[]; totals: Record<string, number>; total: number };
@@ -1325,6 +1337,21 @@ describe("reports", () => {
     expect(rowB.items.find((i) => i.type === "checkin_unanswered")!.link).toBe(`/clients/${b.id}/manage`);
     expect(rowA.items.find((i) => i.type === "client_quiet")!.label).toBe("Gone quiet");
     expect(body.totals.client_quiet).toBeGreaterThanOrEqual(1);
+  });
+
+  it("an invited client who has never signed in gets one honest item, not four", async () => {
+    const H = { "content-type": "application/json", ...auth(ownerCookie) };
+    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "InvitedIvy" }) })).json()) as { client: { id: string } };
+
+    const res = await SELF.fetch(`${ORIGIN}/api/coach/attention`, { headers: auth(ownerCookie) });
+    const body = (await res.json()) as { clients: { clientId: string; items: { type: string; detail: string | null }[] }[] };
+    const row = body.clients.find((r) => r.clientId === client.id)!;
+
+    expect(row.items.map((i) => i.type)).toEqual(["invite_pending"]);
+    // Specifically NOT the active-client rules: they cannot log, cannot fill
+    // their own profile, and have not lapsed at anything.
+    expect(row.items.map((i) => i.type)).not.toContain("client_quiet");
+    expect(row.items.map((i) => i.type)).not.toContain("profile_incomplete");
   });
 });
 

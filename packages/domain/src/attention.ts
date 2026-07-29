@@ -27,7 +27,8 @@ export type AttentionType =
   | "profile_incomplete"
   | "weight_off_range"
   | "adherence_low"
-  | "no_active_plan";
+  | "no_active_plan"
+  | "invite_pending";
 
 export interface AttentionMeta {
   /** Short human label for the chip / list. */
@@ -57,6 +58,16 @@ export const ATTENTION_TYPES: Record<AttentionType, AttentionMeta> = {
   weight_off_range: { label: "Off target weight", severity: "warn", permission: "tracking", feature: "goals", actionLabel: "Review", clientTab: "progress" },
   adherence_low: { label: "Low adherence", severity: "info", permission: "tracking", feature: "foodLogging", actionLabel: "Review", clientTab: "progress" },
   no_active_plan: { label: "No active plan", severity: "warn", permission: "plan", feature: "workoutPlan", actionLabel: "Build plan", clientTab: "plans" },
+  /**
+   * Invited, never signed in.
+   *
+   * Every other type here describes an ACTIVE client who stopped doing
+   * something, so applying them to someone who has not started yet produced
+   * "Gone quiet · No activity logged yet" on a client invited five seconds
+   * ago — literally true, and the wrong claim. This is the one honest fact
+   * about that client, and while it holds it is the ONLY item they get.
+   */
+  invite_pending: { label: "Hasn't signed in", severity: "info", permission: "client", actionLabel: "Resend invite", clientTab: "manage" },
 };
 
 export const SEVERITY_RANK: Record<AttentionSeverity, number> = { urgent: 3, warn: 2, info: 1 };

@@ -157,7 +157,10 @@ export function CoachToday() {
             <StatCard stack label="Check-in rate" value={analytics.engagement.checkInRate} unit="%" icon={ClipboardList} tone="nutrition" badge={<Badge tone="neutral">7-day</Badge>} />
             <StatCard stack label="Workout rate" value={analytics.engagement.workoutRate} unit="%" icon={Dumbbell} tone="activity" badge={<Badge tone="neutral">7-day</Badge>} />
           </div>
-          {analytics.topClients.length > 0 && (
+          {/* A leaderboard needs somebody to lead. With one client it was a
+              full-width bar at 100% under the word "Most active" — a ranking of
+              one, which says nothing and looks like a result. */}
+          {analytics.topClients.length > 1 && (
             <Card className="space-y-3">
               <SectionHeader icon={Trophy} tone="activity" title="Most active" />
               <div className="space-y-2.5">

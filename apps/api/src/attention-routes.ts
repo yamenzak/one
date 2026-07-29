@@ -17,14 +17,14 @@ import { visibleClientIds } from "./clients.js";
 import { parseJson } from "./db.js";
 
 interface OutItem { type: AttentionType; severity: AttentionSeverity; label: string; actionLabel: string; detail: string | null; link: string }
-export interface AttentionClientRow { id: string; display_name: string; email: string | null; avatar_url: string | null; gender: string | null; date_of_birth: string | null; height_cm: number | null; preferences_json: string | null }
+export interface AttentionClientRow { id: string; user_id: string | null; created_at?: string | null; display_name: string; email: string | null; avatar_url: string | null; gender: string | null; date_of_birth: string | null; height_cm: number | null; preferences_json: string | null }
 export interface AttentionRollup {
   clients: { clientId: string; name: string; email: string | null; avatarUrl: string | null; items: OutItem[] }[];
   totals: Record<string, number>;
   total: number;
 }
 
-const SELECT_CLIENT = "id, display_name, email, avatar_url, gender, date_of_birth, height_cm, preferences_json";
+const SELECT_CLIENT = "id, user_id, created_at, display_name, email, avatar_url, gender, date_of_birth, height_cm, preferences_json";
 
 /** Compute the attention rollup for a specific set of client rows. */
 export async function rollupAttention(db: D1Database, clients: AttentionClientRow[]): Promise<AttentionRollup> {
@@ -115,6 +115,28 @@ export async function rollupAttention(db: D1Database, clients: AttentionClientRo
     const items: OutItem[] = [];
     const goal = goalBy.get(cl.id);
     const meas = measBy.get(cl.id);
+
+    /*
+      NEVER SIGNED IN → one item, and it is not a lapse.
+
+      Every rule below assumes an active client who stopped doing something.
+      Run against someone who has not started, they compound into "Gone quiet ·
+      No activity logged yet · No published plan · Profile incomplete" for a
+      client invited five seconds ago — four accusations for a state that has a
+      name. `user_id` is null until the first sign-in, so that is the signal.
+    */
+    if (cl.user_id == null) {
+      // The detail says something the label does not: how long it has been
+      // waiting, which is what decides whether to resend.
+      const invitedDays = cl.created_at ? Math.floor((Date.parse(today) - Date.parse(cl.created_at.slice(0, 10))) / 86_400_000) : null;
+      const detail = invitedDays == null ? null
+        : invitedDays <= 0 ? "Invited today"
+        : invitedDays === 1 ? "Invited yesterday"
+        : `Invited ${invitedDays} days ago`;
+      items.push(mk("invite_pending", "info", detail, cl.id));
+      rows.push({ clientId: cl.id, name: cl.display_name, email: cl.email, avatarUrl: cl.avatar_url, items });
+      continue;
+    }
 
     // Gone quiet.
     const last = lastBy.get(cl.id) ?? null;
