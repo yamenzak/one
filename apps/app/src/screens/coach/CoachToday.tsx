@@ -11,7 +11,7 @@ import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
 import type { UnitPrefs } from "@kova/domain";
 import type { ClientSummary } from "./Clients.js";
-import { WidgetCarousel, WidgetCustomizeSheet } from "../widget-kit.js";
+import { WidgetCarousel, WidgetBuilder } from "../widget-kit.js";
 import { COACH_WIDGETS, DEFAULT_COACH_WIDGETS, type CoachWidgetData } from "./CoachWidgets.js";
 import { featureEnabled } from "@kova/domain";
 
@@ -55,6 +55,24 @@ export function CoachToday() {
   const [attention, setAttention] = useState<AttentionData>({ clients: [], totals: {}, total: 0 });
   const [activity, setActivity] = useState<RosterEvent[]>([]);
   const [analytics, setAnalytics] = useState<RosterAnalytics | null>(null);
+  // Hoisted to component scope: the hero renders inside a Reveal callback but
+  // the builder renders outside it, and both must read the SAME numbers — the
+  // builder's canvases are the real widgets with real data, not mock previews.
+  const coachWidgets: CoachWidgetData = useMemo(() => {
+    const today = todayLocal();
+    return {
+      clientsTotal: clients?.length ?? 0,
+      clientsActive: clients?.filter((c) => c.hasLogin).length ?? 0,
+      // Real roster attention totals (not notification-feed proxies).
+      swaps: attention.totals.swap_pending ?? 0,
+      atRisk: attention.totals.client_quiet ?? 0,
+      unreadCheckins: attention.totals.checkin_unanswered ?? 0,
+      unread: (notifications ?? []).filter((n) => !n.read).length,
+      activeToday: new Set(activity.filter((e) => e.date === today).map((e) => e.clientId)).size,
+      logsToday: activity.filter((e) => e.date === today).length,
+      labsToReview: attention.totals.lab_review ?? 0,
+    };
+  }, [clients, notifications, attention, activity]);
   const [widgetsOpen, setWidgetsOpen] = useState(false);
   const [widgetItems, setWidgetItems] = useState<WidgetItem[] | null>(ctx?.user.widgets?.coachHome ?? null);
   const saveWidgets = async (items: WidgetItem[]) => {
@@ -98,18 +116,7 @@ export function CoachToday() {
         const unread = notifications.filter((n) => !n.read);
         const nameOf = (id: string) => clients.find((c) => c.id === id)?.displayName ?? "A client";
         const today = todayLocal();
-        const widgetData: CoachWidgetData = {
-          clientsTotal: clients.length,
-          clientsActive: activated,
-          // Real roster attention totals (not notification-feed proxies).
-          swaps: attention.totals.swap_pending ?? 0,
-          atRisk: attention.totals.client_quiet ?? 0,
-          unreadCheckins: attention.totals.checkin_unanswered ?? 0,
-          unread: unread.length,
-          activeToday: new Set(activity.filter((e) => e.date === today).map((e) => e.clientId)).size,
-          logsToday: activity.filter((e) => e.date === today).length,
-          labsToReview: attention.totals.lab_review ?? 0,
-        };
+        const widgetData = coachWidgets;
         // The one number this screen is about (§1). A coach's Today is a TRIAGE
         // surface, not a dashboard: the question on arrival is "does anything
         // need me", and it deserves an answer in one glance rather than four
@@ -249,7 +256,7 @@ export function CoachToday() {
       })()}
       </Reveal>
 
-      {widgetsOpen && <WidgetCustomizeSheet catalog={widgetCatalog} items={widgetItems} defaults={DEFAULT_COACH_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
+      {widgetsOpen && <WidgetBuilder data={coachWidgets} catalog={widgetCatalog} items={widgetItems} defaults={DEFAULT_COACH_WIDGETS} onClose={() => setWidgetsOpen(false)} onSave={saveWidgets} />}
     </Page>
   );
 }
