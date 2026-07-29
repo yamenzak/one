@@ -499,6 +499,17 @@ The shape every phone OS converged on, and why each half works:
   (Email's three, Sign-in's three) get no shared footer, because there is no
   shared state to half-apply. `SectionSplit` takes the footer as a prop for
   exactly this reason.
+- **An unbounded list is not a screen, and truncating it silently is worse.**
+  The operator console rendered every studio ever created — 61,541px in one
+  scroll, with six other sections behind it. §1 chunks at seven; a list with
+  nowhere to navigate TO grows in place instead, and the control says what it is
+  holding back ("Showing 25 of 312 — show 25 more"). A list that quietly stops
+  reads as a complete list that happens to be short.
+- **A table of contents may not lie.** The console's Security row promised
+  "sessions, admin access, and the nuclear reset" — it has never had the first
+  two. And the section carried a starter EXERCISE LIBRARY, which is content
+  seeding filed under security because it had nowhere else to be. Both fixed by
+  saying the true thing and giving the orphan its own row.
 - **Derive the row's value from the real flag, not from a lookalike.** The email
   templates row counted every template that HAD a subject — which is all of
   them, from the defaults — and told a studio that had changed nothing it had
