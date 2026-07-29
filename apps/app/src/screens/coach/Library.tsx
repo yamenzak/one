@@ -67,9 +67,22 @@ function Exercises() {
     (!equip || splitList(e.equipment).includes(equip)),
   );
 
+  /*
+    TWO ACTIONS, NOT THREE — AND NEVER THE ROW'S OWN.
+
+    Every row carried Edit / Alternatives / Archive as three 32px icon buttons,
+    96px of trailing controls squeezing the exercise name, twelve unlabelled
+    glyphs on a screen of four rows. The pencil was the worst of them: the row
+    and the grid card ALREADY call `open(e)` on tap, so it was a second button
+    for the thing the whole row does. (The food list keeps its pencil — those
+    cards are not tappable, so there it is the only way in.)
+
+    Two stay inline rather than moving behind a `···` menu, which is the rule the
+    plan list follows at five actions: below three, a menu costs a tap and hides
+    an affordance to save nothing.
+  */
   const actions = (e: LibraryExercise) => (
     <>
-      <button onClick={() => open(e)} aria-label="Edit" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><PencilLine /></button>
       <button onClick={() => setAltFor(e)} aria-label="Alternatives" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><ArrowLeftRight /></button>
       {/* Only tenant-owned rows can be archived; platform seeds have no delete affordance. */}
       {e.tenant_id ? <button onClick={() => setArchiveFor(e)} aria-label="Archive" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Archive /></button> : null}
@@ -83,14 +96,18 @@ function Exercises() {
         <Button variant="ghost" aria-label={view === "list" ? "Grid view" : "List view"} onClick={() => setView((v) => (v === "list" ? "grid" : "list"))}>{view === "list" ? <LayoutGrid /> : <List />}</Button>
         <Button variant="tonal" aria-label="New exercise" onClick={() => setEditor({})}><Plus /></Button>
       </div>
-      {items && (muscles.length > 0 || equipment.length > 0) && (
+      {/* A rail with a single option filters nothing — tapping it narrows the
+            list to everything already on screen. Same rule as the food picker's
+            All/Whole/Branded: a control that cannot change what you see is not
+            a control. */}
+      {items && (muscles.length > 1 || equipment.length > 1) && (
         <div className="space-y-1.5">
-          {muscles.length > 0 && (
+          {muscles.length > 1 && (
             <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
               {muscles.map((m) => <span key={m} className="shrink-0"><Chip className="h-8 px-3 text-[0.8rem]" selected={muscle === m} onClick={() => setMuscle(muscle === m ? null : m)}>{pretty(m)}</Chip></span>)}
             </div>
           )}
-          {equipment.length > 0 && (
+          {equipment.length > 1 && (
             <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
               {equipment.map((eq) => <span key={eq} className="shrink-0"><Chip className="h-8 px-3 text-[0.8rem]" selected={equip === eq} onClick={() => setEquip(equip === eq ? null : eq)}>{pretty(eq)}</Chip></span>)}
             </div>

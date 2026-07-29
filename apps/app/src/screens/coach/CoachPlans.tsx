@@ -8,7 +8,36 @@ import { useNavigate } from "react-router-dom";
 import { Button, Card, Badge, Chip, Field, Sheet, Reveal, SkeletonList, SegmentedControl, Page, Stagger, EmptyState, SectionHeader, cn, AlertTriangle, Dumbbell, Utensils, Plus, Ellipsis, Trash2, Archive, History, Zap, PencilLine } from "@kova/ui";
 import { api, errorText } from "../../api.js";
 
-interface Plan { id: string; name: string; status: string; publishedAt: string | null; variantId: string | null }
+interface Plan {
+  id: string; name: string; status: string; publishedAt: string | null; variantId: string | null;
+  /** Already on the wire — `planView` returns the parsed body for every plan in
+   *  the list. The row was rendering a publish DATE while the shape of the plan
+   *  sat unread in the same response. */
+  body?: { days?: { isRestDay?: boolean }[]; mealOptions?: unknown[] } | null;
+}
+
+/** `{p.status}` printed the column verbatim, so a success badge read "published"
+ *  in lower case beside sentence-cased ones, and the DB's "superseded" reached a
+ *  coach untranslated. Statuses are a closed set (§10). */
+const PLAN_STATUS: Record<string, string> = {
+  published: "Live", draft: "Draft", superseded: "Replaced", archived: "Archived",
+};
+
+/** What a coach scans a plan list for: how big it is, and how current. An
+ *  absolute publish date answers neither — it is a record's fact on a scanning
+ *  surface (§7). */
+function planSummary(p: Plan): string | null {
+  const bits: string[] = [];
+  const days = p.body?.days?.filter((d) => !d?.isRestDay).length;
+  const opts = p.body?.mealOptions?.length;
+  if (days) bits.push(`${days} training day${days === 1 ? "" : "s"}`);
+  else if (opts) bits.push(`${opts} option${opts === 1 ? "" : "s"}`);
+  if (p.publishedAt) {
+    const d = Math.floor((Date.now() - Date.parse(p.publishedAt)) / 86_400_000);
+    bits.push(d <= 0 ? "live today" : d === 1 ? "live since yesterday" : d < 30 ? `live ${d} days` : `live since ${new Date(p.publishedAt).toLocaleDateString()}`);
+  }
+  return bits.length ? bits.join(" · ") : null;
+}
 interface Lane { id: string; label: string; archived: boolean }
 type Kind = "workout" | "meal";
 
@@ -98,9 +127,9 @@ export function CoachPlans({ clientId }: { clientId: string }) {
           <Stagger className="space-y-2">
             {shown.map((p) => (
               <Card key={p.id} interactive onClick={() => open(p.id)} className="flex items-center justify-between gap-2">
-                <div className="min-w-0"><div className="truncate font-semibold">{p.name}</div>{p.publishedAt && <div className="text-xs text-muted-foreground">Published {new Date(p.publishedAt).toLocaleDateString()}</div>}</div>
+                <div className="min-w-0"><div className="truncate font-semibold">{p.name}</div>{planSummary(p) && <div className="truncate text-xs text-muted-foreground">{planSummary(p)}</div>}</div>
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <Badge tone={p.status === "published" ? "success" : p.status === "draft" ? "neutral" : "warning"}>{p.status}</Badge>
+                  <Badge tone={p.status === "published" ? "success" : p.status === "draft" ? "neutral" : "warning"}>{PLAN_STATUS[p.status] ?? p.status}</Badge>
                   <button onClick={(e) => { e.stopPropagation(); setMenuFor(p); }} aria-label="Plan actions" className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><Ellipsis /></button>
                 </div>
               </Card>
@@ -112,9 +141,14 @@ export function CoachPlans({ clientId }: { clientId: string }) {
 
       {/* A quiet "add a schedule" entry when the client has no lanes yet. */}
       {liveLanes.length === 0 && plans && (
-        <button onClick={() => setLanesOpen(true)} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border py-2.5 text-sm text-muted-foreground transition-colors hover:bg-surface-2">
-          <Plus className="size-4" /> Add a schedule (e.g. Off week / Night shift)
-        </button>
+        /* Buttons are verbs (§10). The parenthetical was the button explaining
+           itself inside its own label — that is a caption's job. */
+        <div className="space-y-1.5">
+          <button onClick={() => setLanesOpen(true)} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border py-2.5 text-sm text-muted-foreground transition-colors hover:bg-surface-2">
+            <Plus className="size-4" /> Add a schedule
+          </button>
+          <p className="px-1 text-center text-xs text-muted-foreground/80">A separate set of plans for a different rhythm — an off week, night shifts, a holiday.</p>
+        </div>
       )}
 
       <Sheet open={createOpen} onClose={() => { setCreateOpen(false); setCreateErr(null); }} title={`New ${kind} plan${liveLanes.length > 0 ? ` · ${laneName}` : ""}`} footer={<Button size="lg" className="w-full" disabled={name.trim().length < 2 || creating} onClick={() => void create()}>{creating ? "Creating…" : <>Create &amp; build</>}</Button>}>

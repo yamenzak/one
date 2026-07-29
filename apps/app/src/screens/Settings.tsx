@@ -282,19 +282,28 @@ function CloseStudioSection() {
         </Card>
       )}
 
-      <Sheet open={open} onClose={() => setOpen(false)} title="Close your studio">
+      <Sheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Close your studio"
+        /* Two steps, one frame — so the footer follows the step. Each stage has
+           exactly one thing to press, and it is always in the same place. */
+        footer={stage === "intro" ? (
+          <Button size="lg" className="w-full" disabled={busy} onClick={() => void sendCode()}>{busy ? <><Spinner /> Sending…</> : "Email me a confirmation code"}</Button>
+        ) : (
+          <Button size="lg" className="w-full border-danger/40 text-danger" variant="outline" disabled={busy || code.length < 6} onClick={() => void confirmClose()}>{busy ? <><Spinner /> …</> : <><Trash2 /> Schedule studio deletion</>}</Button>
+        )}
+      >
         {stage === "intro" ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">This cancels billing immediately and schedules your studio for permanent deletion in 7 days. We'll email you a confirmation code first.</p>
             <ActionResult msg={null} err={err} />
-            <Button className="w-full" disabled={busy} onClick={() => void sendCode()}>{busy ? <><Spinner /> Sending…</> : "Email me a confirmation code"}</Button>
           </div>
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">Enter the 6-digit code we emailed you to schedule the closure.</p>
             <Field label="Confirmation code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} placeholder="000000" autoFocus />
             <ActionResult msg={null} err={err} />
-            <Button className="w-full border-danger/40 text-danger" variant="outline" disabled={busy || code.length < 6} onClick={() => void confirmClose()}>{busy ? <><Spinner /> …</> : <><Trash2 /> Schedule studio deletion</>}</Button>
           </div>
         )}
       </Sheet>
@@ -902,19 +911,28 @@ function DeleteAccountSection() {
         )}
       </Card>
 
-      <Sheet open={open} onClose={() => setOpen(false)} title="Delete your account">
+      <Sheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Delete your account"
+        footer={stage === "intro" ? (
+          <Button size="lg" className="w-full" disabled={busy} onClick={() => void sendCode()}>{busy ? <><Spinner /> Sending…</> : "Email me a confirmation code"}</Button>
+        ) : (
+          <Button size="lg" className="w-full border-danger/40 text-danger" variant="outline" disabled={busy || code.length < 6} onClick={() => void confirmDelete()}>{busy ? <><Spinner /> Deleting…</> : <><Trash2 /> Permanently delete my account</>}</Button>
+        )}
+      >
         {stage === "intro" ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">We'll email a confirmation code to <span className="font-medium text-foreground">{ctx?.user.email}</span>. Entering it permanently erases your account and all your data. There's no undo.</p>
             <ActionResult msg={null} err={err} />
-            <Button className="w-full" disabled={busy} onClick={() => void sendCode()}>{busy ? <><Spinner /> Sending…</> : "Email me a confirmation code"}</Button>
           </div>
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">Enter the 6-digit code we emailed you, then confirm. This erases everything.</p>
             <Field label="Confirmation code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} placeholder="000000" autoFocus />
             <ActionResult msg={null} err={err} />
-            <Button className="w-full border-danger/40 text-danger" variant="outline" disabled={busy || code.length < 6} onClick={() => void confirmDelete()}>{busy ? <><Spinner /> Deleting…</> : <><Trash2 /> Permanently delete my account</>}</Button>
+            {/* Stays in the body: it is an escape from the step, not the step's
+                action, and the footer holds exactly one thing to press. */}
             <button className="w-full text-center text-xs text-muted-foreground hover:underline" onClick={() => void sendCode()} disabled={busy}>Resend code</button>
           </div>
         )}

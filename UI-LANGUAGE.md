@@ -472,6 +472,21 @@ body scrolls. Every part of that is load-bearing:
   reads as broken, not as "there is more". Fade the last ~24px with a
   `mask-image` gradient and pad the scroller so the final row can clear it.
 
+### How many actions a row may show
+
+| Trailing actions | Shape |
+|---|---|
+| 0 | the row itself is the action — tap it |
+| 1–2 | inline icon buttons |
+| 3+ | one `···` opening a menu |
+
+And the rule underneath: **never render an icon for the thing the row already
+does.** The exercise library gave every row Edit / Alternatives / Archive — 96px
+of trailing controls squeezing the name, twelve unlabelled glyphs on a screen of
+four rows — while the row *and* the grid card already opened the editor on tap.
+The pencil was a second button for the row's own job. A list whose cards are not
+tappable is the case where that icon is the only way in and belongs there.
+
 ### Chrome
 `AppBar` (blur + hairline on scroll only) · `TabBar` (≤5 items, active = filled
 pill behind the icon) · `NavRail` (≥md) · `Header` (large screen title that
