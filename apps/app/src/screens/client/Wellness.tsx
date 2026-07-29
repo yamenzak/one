@@ -35,7 +35,7 @@ import { scanProfile, modelSilhouette } from "./bodyscan/model.js";
 import { PostureFigure } from "./bodyscan/PostureFigure.js";
 import { LogSheet } from "./LogSheet.js";
 import { CheckInDetailSheet, LabDetailSheet, labStatus, isLabImage, type CheckInFull, type LabFull } from "./WellnessDetails.js";
-import { WellnessPillars, WELLNESS_BAND, type WellnessScoreResult } from "./WellnessScore.js";
+import { WellnessPillars, weakestPillar, WELLNESS_BAND, type WellnessScoreResult } from "./WellnessScore.js";
 import { CheckRow } from "./TodayAgenda.js";
 import { CoachNote } from "./CoachNote.js";
 import { SupplementGuide } from "./SupplementGuide.js";
@@ -359,12 +359,23 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
           deliberately absent: it already exists once, above. By this point the
           load has finished, so a null `score` is a failed read, not a pending
           one — show nothing rather than a skeleton that never resolves. */}
-      {score && score.pillars.filter((p) => p.available).length >= 2 && (
-        <section className="space-y-2">
-          <h3 className="px-1 text-micro uppercase text-muted-foreground">What's behind it</h3>
-          <Stagger><WellnessPillars result={score} /></Stagger>
-        </section>
-      )}
+      {score && score.pillars.filter((p) => p.available).length >= 2 && (() => {
+        const weak = weakestPillar(score);
+        return (
+          <section className="space-y-2">
+            {/* Name the finding in the header. Seven scores out of 100 with no
+                scale stated and no ranking is trivia; "Training is holding it
+                back" is the same data doing a job. */}
+            <div className="flex items-baseline justify-between gap-3 px-1">
+              <h3 className="text-micro uppercase text-muted-foreground">
+                {weak ? `${weak.label} is holding it back` : "What's behind it"}
+              </h3>
+              <span className="text-micro uppercase text-muted-foreground/70">each out of 100</span>
+            </div>
+            <Stagger><WellnessPillars result={score} /></Stagger>
+          </section>
+        );
+      })()}
 
       {/* Hydration — slim daily control (`waterLogging`) */}
       {canWater && (

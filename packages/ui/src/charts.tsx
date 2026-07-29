@@ -71,6 +71,17 @@ function movingAverage(vals: (number | null)[], win: number): (number | null)[] 
   });
 }
 
+/**
+ * The next "nice" interval at or above `raw` — 1, 2 or 5 times a power of ten.
+ * The ladder people actually read axes on.
+ */
+function niceStep(raw: number): number {
+  if (!Number.isFinite(raw) || raw <= 0) return 1;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const norm = raw / mag;
+  return (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
+}
+
 export function AreaChart({ values, tone = "activity", height = 180, target, targetSeries, trend, grid = 4, format = (v) => `${Math.round(v)}`, label, className }: AreaChartProps) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [active, setActive] = useState<number | null>(null);
@@ -86,7 +97,21 @@ export function AreaChart({ values, tone = "activity", height = 180, target, tar
   const lo = Math.min(...present, ...targetVals);
   const hi = Math.max(...present, ...targetVals);
   const span = hi - lo || 1;
-  const yLo = lo - span * 0.12, yHi = hi + span * 0.12, yspan = yHi - yLo;
+  /*
+    ROUND THE AXIS.
+
+    Padding the extremes by 12% and slicing the result into four gives ticks
+    like 1730 / 1867 / 2003 / 2140 — numbers nobody would ever choose, which
+    make a chart look computed rather than designed. `niceStep` snaps the
+    interval to a 1/2/5 × 10ⁿ ladder and the bounds to multiples of it, so the
+    same series reads 1750 / 2000 / 2250 / 2500. Invisible on an empty account;
+    unmissable the moment there is a series to plot.
+  */
+  const rawSpan = (hi - lo) || Math.abs(hi) || 1;
+  const step = niceStep(rawSpan / Math.max(1, grid - 1));
+  const yLo = Math.floor((lo - rawSpan * 0.08) / step) * step;
+  const yHi = Math.ceil((hi + rawSpan * 0.08) / step) * step;
+  const yspan = yHi - yLo || step;
   const n = values.length;
   const x = (i: number) => padX + (n <= 1 ? 0 : (i / (n - 1)) * (width - padX * 2));
   const y = (v: number) => padTop + (1 - (v - yLo) / yspan) * (height - padTop - padBot);

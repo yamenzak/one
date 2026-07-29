@@ -219,20 +219,30 @@ export function Label({ className, ...props }: React.ComponentProps<typeof Label
 
 interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
+  /**
+   * Keep the label for assistive tech, hide it from sight.
+   *
+   * For a search box under a section header that already names the thing —
+   * "Exercise library" / "Search exercises" / "Search the library…" was the
+   * same instruction three times inside 80px. The label is never optional,
+   * because an input with no accessible name is unusable by voice control and
+   * announced as "edit text"; only its *visibility* is negotiable.
+   */
+  labelHidden?: boolean;
   icon?: LucideIcon;
   hint?: string;
   error?: string;
 }
 
 /** Labeled input with an optional leading icon + hint. */
-export const Field = forwardRef<HTMLInputElement, FieldProps>(({ label, icon: Icon, hint, error, className, id, ...props }, ref) => {
+export const Field = forwardRef<HTMLInputElement, FieldProps>(({ label, labelHidden, icon: Icon, hint, error, className, id, ...props }, ref) => {
   // A stable, guaranteed-unique fallback id so repeated labels (e.g. superset
   // round rows) never collide into duplicate DOM ids. Explicit `id` still wins.
   const generatedId = useId();
   const fieldId = id ?? generatedId;
   return (
     <div className={className}>
-      <Label htmlFor={fieldId} className="mb-1.5 block">
+      <Label htmlFor={fieldId} className={labelHidden ? "sr-only" : "mb-1.5 block"}>
         {label}
       </Label>
       <div className="relative">

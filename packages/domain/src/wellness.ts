@@ -149,7 +149,8 @@ const PILLARS: PillarDef[] = [
   },
   {
     key: "body",
-    label: "Body",
+    // "Body" is a system word for a pillar a client reads on their own screen.
+    label: "Body composition",
     weight: 0.05,
     compute: (i) => (i.bodyProgress != null ? clamp01(i.bodyProgress) : null),
   },
