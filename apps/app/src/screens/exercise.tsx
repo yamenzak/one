@@ -125,8 +125,20 @@ export function ExerciseRow({
       <ExerciseThumb thumb={ex?.thumb_url} thumb2={ex?.thumb2_url} size={thumbSize} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1 font-medium"><span className="truncate">{label}</span>{info && <Info className="size-3.5 shrink-0 text-muted-foreground" />}</div>
+        {/*
+          The PRESCRIPTION never truncates; the muscle/equipment meta does.
+
+          These were concatenated into one truncating line, so a superset slot
+          read "Quadriceps · Barbell · 1 × 12 r…" — the part you need mid-set cut
+          off, and the part you already know kept whole. Which of the two you can
+          afford to lose is not a close call.
+        */}
         {(m || sub != null) && (
-          <div className="truncate text-sm text-muted-foreground">{m}{m && sub != null ? <span className="mx-1 text-muted-foreground/50">·</span> : null}{sub}</div>
+          <div className="flex min-w-0 items-baseline gap-1 text-sm text-muted-foreground">
+            {m && <span className="min-w-0 truncate">{m}</span>}
+            {m && sub != null && <span className="shrink-0 text-muted-foreground/50">·</span>}
+            {sub != null && <span className="shrink-0">{sub}</span>}
+          </div>
         )}
       </div>
     </>

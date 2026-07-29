@@ -251,7 +251,10 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                   {!day.imageUrl && <div className="absolute inset-0 grid place-items-center text-white/35 [&_svg]:size-9">{day.isRestDay ? <Moon /> : <Dumbbell />}</div>}
                   {day.isRestDay ? <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-xs font-semibold text-sleep">Rest</span> : rec ? <span className="absolute right-2 top-2 rounded-full bg-activity px-2 py-0.5 text-xs font-semibold text-[var(--tone-foreground)]">Recommended</span> : null}
                   <div className="absolute inset-x-0 bottom-0 p-3">
-                    <div className="truncate font-semibold text-white">{day.name || `Day ${i + 1}`}</div>
+                    {/* Two lines, not an ellipsis. A day name is short and the
+                        tile is 4:5 — "Upper A — push fo…" was losing the half
+                        that says what the day IS. */}
+                    <div className="line-clamp-2 font-semibold leading-tight text-white">{day.name || `Day ${i + 1}`}</div>
                     <div className="truncate text-xs text-white/75">{day.isRestDay ? "Rest day" : `${exercises} exercise${exercises === 1 ? "" : "s"} · ${sets} sets`}</div>
                   </div>
                 </div>

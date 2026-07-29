@@ -523,10 +523,18 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                 const applyToAll = (setIdx: number) => setSlot((sl) => { const src = sl.sets[setIdx]!; sl.sets = sl.sets.map((s, i) => (i === setIdx ? s : copyPrescription(src, s))); });
                 return (
                 <SubCard key={slotIdx} className="space-y-3">
-                  <ExerciseRow ex={exOf(slot.exerciseId)} name={nameOf(slot.exerciseId)} meta={false} thumbSize={34} trailing={<>
-                    <Select value={slot.measurementMode} onChange={(v) => { const nm = v as MeasurementMode; setSlot((sl) => { sl.measurementMode = nm; sl.sets.forEach((s) => normalizeSetForMode(s, nm)); }); }} options={MEASURE_MODES} aria-label="Measurement mode" className="h-9 w-32 text-xs" />
+                  {/*
+                    The exercise name gets the row; the mode picker gets its own line.
+
+                    A 128px `Select` plus a remove button pinned to the right of a
+                    ~330px row left "Barbell Bac…", "Romanian …", "Incline Du…" —
+                    every exercise in a real plan truncated, in the one screen
+                    whose entire job is knowing which exercise you are editing.
+                  */}
+                  <ExerciseRow ex={exOf(slot.exerciseId)} name={nameOf(slot.exerciseId)} meta={false} thumbSize={34} trailing={
                     <button onClick={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots.splice(slotIdx, 1))} aria-label="Remove exercise" className="text-muted-foreground hover:text-danger [&_svg]:size-4"><X /></button>
-                  </>} />
+                  } />
+                  <Select value={slot.measurementMode} onChange={(v) => { const nm = v as MeasurementMode; setSlot((sl) => { sl.measurementMode = nm; sl.sets.forEach((s) => normalizeSetForMode(s, nm)); }); }} options={MEASURE_MODES} aria-label="Measurement mode" className="h-9 w-40 text-xs" />
 
                   {/* Bulk-set presets — replace the slot's sets in one tap. */}
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -650,7 +658,11 @@ function SetRow({ set, index, mode, onPatch, onApplyToAll, onRemove }: { set: Wo
         {mode === "distance" && (
           <Input type="number" inputMode="numeric" aria-label="Metres" placeholder="m" value={set.distanceM ?? ""} onChange={(e) => onPatch({ distanceM: num(e.target.value) })} className={cell} />
         )}
-        <Select value={set.weightMode} onChange={(v) => onPatch({ weightMode: v as WeightMode })} options={WEIGHT_MODES.map((m) => ({ value: m.value, label: m.label }))} aria-label="Weight mode" className="h-10 min-w-0 flex-1" />
+        {/* `whitespace-nowrap`: "Client picks" wrapped to two lines in this
+            cell, so a set row was taller than its neighbours and a column of
+            sets stopped reading as a column. A set row is a spreadsheet line —
+            it truncates, it does not reflow. */}
+        <Select value={set.weightMode} onChange={(v) => onPatch({ weightMode: v as WeightMode })} options={WEIGHT_MODES.map((m) => ({ value: m.value, label: m.label }))} aria-label="Weight mode" className="h-10 min-w-0 flex-1 whitespace-nowrap" />
         {wm?.unit && wm.value !== "bodyweight" && wm.value !== "unspecified" && (
           <Input type="number" inputMode="decimal" aria-label={wm.unit} placeholder={wm.unit} value={set.weightMode === "percent_1rm" ? (set.percent1rm ?? "") : (set.weightValue ?? "")} onChange={(e) => onPatch(set.weightMode === "percent_1rm" ? { percent1rm: num(e.target.value) } : { weightValue: num(e.target.value) })} className={cell} />
         )}
