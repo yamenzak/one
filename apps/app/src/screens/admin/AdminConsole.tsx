@@ -26,12 +26,13 @@ import {
   ConfirmDialog, CreditCard, EmptyState, Eyebrow, Field, Gift, GlanceStrip, Globe, IconBadge, Info, Input, KeyRound, ThumbsUp,
   Dumbbell, LayoutGrid, Page, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, SettingsIndex, SettingsPage, Sheet, ShieldCheck, Wand2, type LucideIcon,
   Skeleton, SkeletonLine, Play, Plug, Spinner, Stagger, Switch, Tag, Trash2, Wallet, cn, toneText, type Tone,
-  ActionResult, ConfigRow, FieldGroup, LoadError, TabIntro, useLoad, useAction as useActionBase,
+  ActionResult, ConfigRow, FieldGroup, LoadError, useLoad, useAction as useActionBase,
 } from "@kova/ui";
+import { SectionSplit } from "../SectionSplit.js";
 import { api, errorText } from "../../api.js";
 import { fmtPrice } from "../../money.js";
 
-type AdminTab = "tenants" | "plans" | "stripe" | "promos" | "domains" | "ai" | "security";
+type AdminTab = "tenants" | "plans" | "stripe" | "promos" | "domains" | "ai" | "content" | "security";
 
 const TABS: { value: AdminTab; label: string }[] = [
   { value: "tenants", label: "Tenants" },
@@ -64,7 +65,10 @@ const ADMIN_SECTIONS: {
   { key: "stripe", label: "Stripe", blurb: "Keys, webhooks, and what is synced", icon: Wallet, tone: "supplement", render: () => <StripeConfig /> },
   { key: "promos", label: "Promo codes", blurb: "Platform-wide discounts on plans and packs", icon: Tag, tone: "activity", render: () => <PlatformPromos /> },
   { key: "domains", label: "Custom domains", blurb: "Tenant domains and their certificates", icon: Globe, tone: "sleep", render: () => <DomainsConfig /> },
-  { key: "security", label: "Security", blurb: "Sessions, admin access, and the nuclear reset", icon: ShieldCheck, tone: "danger", render: () => <SecurityConfig /> },
+  { key: "content", label: "Starter content", blurb: "The exercise library a fresh deployment starts without", icon: Dumbbell, tone: "supplement", render: () => <StarterLibraryCard /> },
+  /* The blurb used to promise "sessions, admin access" — neither of which this
+     section has ever had. A table of contents that lies is worse than none. */
+  { key: "security", label: "Security", blurb: "The bot check on sign-in, and the platform reset", icon: ShieldCheck, tone: "danger", render: () => <SecurityConfig /> },
 ];
 
 export function AdminConsole({ onBack }: { onBack: () => void }) {
@@ -162,6 +166,11 @@ function Tenants() {
   const plans = useAdminLoad(loadPlans, "the plan catalog");
 
   const [query, setQuery] = useState("");
+  /** How many rows are on screen. Grows in place; resets whenever the search
+   *  changes, so a narrowed list never opens already-expanded. */
+  const PAGE = 25;
+  const [shown, setShown] = useState(PAGE);
+  useEffect(() => { setShown(PAGE); }, [query]);
   const [manageId, setManageId] = useState<string | null>(null);
   const [gift, setGift] = useState<{ id: string; name: string } | null>(null);
 
@@ -170,6 +179,14 @@ function Tenants() {
   // the moment the list reloads, instead of showing a stale snapshot.
   const manage = manageId ? rows.find((t) => t.id === manageId) ?? null : null;
 
+  /*
+    ── A LIST OF EVERY STUDIO EVER IS NOT A SCREEN ──────────────────────────
+    This rendered `filtered.map(...)` with no bound. On a seeded install it
+    measured 61,541px — twenty-eight phone screens in one scroll, with the
+    console's other six sections behind it. §1 chunks at seven for exactly this
+    reason; an operator list has no "See all" to navigate TO, so it grows in
+    place instead, and says how much it is showing.
+  */
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return q ? rows.filter((t) => `${t.name} ${t.slug}`.toLowerCase().includes(q)) : rows;
@@ -183,9 +200,6 @@ function Tenants() {
   return (
     <>
       <Stagger className="space-y-3">
-        <TabIntro>
-          Every studio on the platform. Open one to comp it onto a plan, top up its AI credits, or gift it extra limits.
-        </TabIntro>
 
         {tenants.error && !tenants.data ? (
           <LoadError what="the studios" error={tenants.error} onRetry={tenants.reload} />
@@ -232,7 +246,7 @@ function Tenants() {
               ) : filtered.length === 0 ? (
                 <EmptyState icon={Search} title="No studio matches" description="Nothing in the list matches that name or slug." />
               ) : (
-                filtered.map((t) => (
+                filtered.slice(0, shown).map((t) => (
                   <Card key={t.id} interactive onClick={() => setManageId(t.id)} aria-label={`Manage ${t.name}`} className="flex items-center gap-3 p-4">
                     <IconBadge icon={Building2} tone={t.comp ? "sleep" : "primary"} size="sm" />
                     <div className="min-w-0 flex-1">
@@ -248,6 +262,17 @@ function Tenants() {
                     <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                   </Card>
                 ))
+              )}
+
+              {/* Says what it is holding back. A list that silently truncates
+                  reads as a complete list that happens to be short. */}
+              {filtered.length > shown && (
+                <button
+                  onClick={() => setShown((n) => n + PAGE)}
+                  className="w-full rounded-2xl border border-dashed border-border py-3 text-sm text-muted-foreground transition-colors hover:bg-surface-2"
+                >
+                  Showing {shown} of {filtered.length} — show {Math.min(PAGE, filtered.length - shown)} more
+                </button>
               )}
             </div>
           </Reveal>
@@ -560,10 +585,6 @@ function PlansConfig() {
   return (
     <>
       <Stagger className="space-y-3">
-        <TabIntro>
-          Each plan is composed from every limit and feature flag the platform knows about. Raising a limit or enabling a
-          feature reaches all studios on the plan instantly; lowering one grandfathers the studios already there.
-        </TabIntro>
 
         {saved && <Callout tone="success" icon={CircleCheck} live="status">{saved}</Callout>}
 
@@ -952,8 +973,21 @@ function AiConfig() {
 
   return (
     <>
-      <Stagger className="space-y-3">
-        <TabIntro>Which provider answers an AI call, what it costs the studio in credits, and which models are on.</TabIntro>
+      {/*
+        ── THE PLATFORM AI SECTION IS THREE THINGS ─────────────────────────
+        The provider (its key, its status, mock mode), what a call COSTS a
+        studio in credits, and a live self-test that spends real money to prove
+        the wiring. Stacked, they measured a megabyte of screenshot, and the
+        pricing table — the one an operator changes — sat under the whole
+        provider block every time.
+      */}
+      <SectionSplit
+        param="a"
+        subs={[
+          {
+            key: "provider", label: "Provider", icon: Plug, tone: "primary",
+            value: status ? (status.geminiKeySet ? `Gemini key set · mock ${status.mockMode}` : "No Gemini key — the AI suite is dead") : "…",
+            render: () => (<div className="space-y-3">
 
         {/* ── Providers ─────────────────────────────────────────────────── */}
         {cfg.error && !status ? (
@@ -1029,7 +1063,12 @@ function AiConfig() {
           </Reveal>
         )}
 
-        {/* ── Pricing ───────────────────────────────────────────────────── */}
+            </div>),
+          },
+          {
+            key: "pricing", label: "Credit pricing", icon: Percent, tone: "activity",
+            value: status ? `${status.modelCount} model${status.modelCount === 1 ? "" : "s"} · ${Math.round((status.markup ?? 1) * 100)}% markup` : "…",
+            render: () => (<div className="space-y-3">
         <Card className="space-y-4">
           <SectionHeader icon={Percent} title="Credit pricing" />
           <p className="text-sm text-muted-foreground">
@@ -1152,10 +1191,15 @@ function AiConfig() {
 
         {/* ── The 👍/👎 signal ──────────────────────────────────────────── */}
         <AiFeedbackPanel />
-
-        {/* ── Live self-test ────────────────────────────────────────────── */}
-        <AiSelfTest models={models.data ?? []} />
-      </Stagger>
+            </div>),
+          },
+          {
+            key: "selftest", label: "Live self-test", icon: Play, tone: "nutrition",
+            value: "Runs real prompts and bills real credits",
+            render: () => <AiSelfTest models={models.data ?? []} />,
+          },
+        ]}
+      />
     </>
   );
 }
@@ -1667,7 +1711,6 @@ function DomainsConfig() {
 
   return (
     <Stagger className="space-y-3">
-      <TabIntro>Cloudflare for SaaS: the credentials that let a studio serve the app on its own domain.</TabIntro>
       <Reveal
         loading={loading}
         skeleton={
@@ -1826,7 +1869,6 @@ function SecurityConfig() {
   return (
     <>
       <Stagger className="space-y-3">
-        <TabIntro>The bot check in front of every emailed sign-in code, and the platform-wide reset.</TabIntro>
 
         {error && !status ? (
           <LoadError what="the Turnstile configuration" error={error} onRetry={reload} />
@@ -1899,7 +1941,6 @@ function SecurityConfig() {
           </Reveal>
         )}
 
-        <StarterLibraryCard />
         <NuclearResetCard />
       </Stagger>
 
@@ -2261,7 +2302,6 @@ function StripeConfig() {
   return (
     <>
       <Stagger className="space-y-3">
-        <TabIntro>Both payment rails: studios paying Kova, and clients paying their studio through Connect.</TabIntro>
 
         <Reveal
           loading={!status}
