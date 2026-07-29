@@ -54,7 +54,7 @@ export function Clients() {
 
   // Per-client attention rollup — the worst item's label + how many, so a coach
   // spots a stale goal / quiet client / lab-to-review straight from the roster.
-  const [att, setAtt] = useState<Map<string, { label: string; count: number; severity: AttentionSeverity }>>(new Map());
+  const [att, setAtt] = useState<Map<string, { labels: string[]; severity: AttentionSeverity }>>(new Map());
   // Uncaught, this left the roster skeleton up forever with nothing said and no
   // way back — the coach's entire book of business looking like a slow load.
   // A failure keeps whatever roster we already had and offers a retry.
@@ -66,7 +66,11 @@ export function Clients() {
   useEffect(() => void load(), [load]);
   useEffect(() => {
     void api.get<{ clients: { clientId: string; items: { label: string; severity: AttentionSeverity }[] }[] }>("/api/coach/attention")
-      .then((r) => setAtt(new Map(r.clients.filter((c) => c.items.length).map((c) => [c.clientId, { label: c.items[0]!.label, count: c.items.length, severity: c.items[0]!.severity }]))))
+      // Keep ALL the labels, not just the first. The row used to render
+      // "Gone quiet +2" — a category plus an opaque number — while the two
+      // things the coach actually has to act on were fetched, discarded, and
+      // only reachable by opening the client.
+      .then((r) => setAtt(new Map(r.clients.filter((c) => c.items.length).map((c) => [c.clientId, { labels: c.items.map((i) => i.label), severity: c.items[0]!.severity }]))))
       .catch(() => undefined);
   }, []);
 
@@ -122,7 +126,14 @@ export function Clients() {
         <p className="text-caption text-muted-foreground">Clients</p>
         <p className="numeral text-display"><CountUp value={clients?.length ?? 0} /></p>
         <p className="text-caption text-muted-foreground">
-          {att.size > 0 ? `${att.size} need${att.size === 1 ? "s" : ""} a look` : clients?.length ? "All caught up" : "None yet"}
+          {(() => {
+            if (!clients?.length) return "None yet";
+            // Same rule as the rows: someone who has never signed in is
+            // "Invited", not "needs a look".
+            const flagged = clients.filter((c) => c.hasLogin && att.has(c.id)).length;
+            if (flagged === 0) return "All caught up";
+            return flagged === clients.length ? "Every one needs a look" : `${flagged} need${flagged === 1 ? "s" : ""} a look`;
+          })()}
         </p>
       </TierAnchor>
 
@@ -158,7 +169,17 @@ export function Clients() {
               <Row
                 key={c.id}
                 onClick={() => nav(`/clients/${c.id}/today`)}
-                sub={c.email ?? "no email"}
+                /*
+                  What needs doing, not who they are.
+
+                  Every row's sub-line was the client's email, truncated —
+                  "e2e-roster-0-aswcwg@kova.t…" — which is an identifier, not a
+                  fact a coach scans by (§7: the secondary line is a fact, not a
+                  category). The attention labels are the fact. Email survives
+                  as the fallback for a client who has not named themselves yet,
+                  where it is the only identity there is.
+                */
+                sub={(c.hasLogin ? att.get(c.id)?.labels.join(" · ") : null) ?? c.email ?? "No email yet"}
                 leading={<Avatar name={c.displayName} src={c.avatarUrl} seed={c.avatarSeed ?? c.id} className="size-10" />}
                 trailing={
                   freeing ? (
@@ -170,9 +191,24 @@ export function Clients() {
                       aria-label={`Archive ${c.displayName}`}
                       onClick={(e) => { e.stopPropagation(); setArchiveErr(null); setToArchive(c); }}
                     ><Archive /> Archive</Button>
+                  ) : !c.hasLogin ? (
+                    /*
+                      An invited client is not a lapsed one.
+
+                      Attention rules assume an ACTIVE client who stopped doing
+                      something, so they fired "Gone quiet" and "No active plan"
+                      at someone invited five seconds ago who has never signed
+                      in — which the E2E caught by asserting the row still shows
+                      the address the invite went to. Until they log in, the row
+                      is about the invitation: the email is the thing a coach
+                      double-checks, and "Invited" is the whole status.
+                    */
+                    <Badge tone="neutral">Invited</Badge>
                   ) : att.has(c.id) ? (
-                    <Badge tone={SEVERITY_TONE[att.get(c.id)!.severity]}>{att.get(c.id)!.label}{att.get(c.id)!.count > 1 ? ` +${att.get(c.id)!.count - 1}` : ""}</Badge>
-                  ) : c.hasLogin ? <Badge tone="success">Active</Badge> : <Badge tone="neutral">Invited</Badge>
+                    // The badge is the COUNT — the sub-line carries the words —
+                    // so a long name keeps its room.
+                    <Badge tone={SEVERITY_TONE[att.get(c.id)!.severity]}>{att.get(c.id)!.labels.length}</Badge>
+                  ) : <Badge tone="success">Active</Badge>
                 }
               >
                 {c.displayName}

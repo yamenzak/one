@@ -74,3 +74,4 @@ export function latestSignInOtp(email: string): string | null {
   );
   return (String(row?.value ?? "").match(/\d{6}/) ?? [])[0] ?? null;
 }
+

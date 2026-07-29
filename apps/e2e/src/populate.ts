@@ -127,3 +127,62 @@ export async function setTargets(studio: Studio, client: Client): Promise<void> 
     },
   });
 }
+
+/**
+ * Names for a roster, longest first.
+ *
+ * One client hides everything a list does — no truncation, no sorting stress,
+ * no mixed states side by side — so a review wants several. **How many you
+ * actually get is the plan's business:** the free baseline caps a studio at
+ * three active clients and the server refuses the fourth, which is correct.
+ * `populateRoster` stops at that wall rather than pretending, because the
+ * alternative (a fixture reaching for the operator door to raise its own
+ * quota) is exactly the kind of thing that makes a test suite lie about what
+ * the product does.
+ *
+ * The first name is deliberately long: a roster row has to survive one.
+ */
+export const ROSTER_NAMES = [
+  "Amara Okonkwo-Fitzgerald",
+  "Ben Ho",
+  "Carla Ruiz",
+  "Dimitri Volkov",
+  "Elena Petrova",
+  "Farouk Al-Amin",
+  "Grace Lindqvist",
+  "Hana Kobayashi",
+  "Idris Bello",
+] as const;
+
+/**
+ * Add `names` to the studio's roster, stopping cleanly at the plan's active-
+ * client ceiling. Returns the ids actually created.
+ */
+export async function populateRoster(studio: Studio, names: readonly string[] = ROSTER_NAMES): Promise<string[]> {
+  const ids: string[] = [];
+  for (const [i, displayName] of names.entries()) {
+    const email = `e2e-roster-${i}-${Math.random().toString(36).slice(2, 8)}@kova.test`;
+    try {
+      const created = await callJson<{ client: { id: string } }>(studio.page, studio.base, "/api/clients", { email, displayName });
+      ids.push(created.client.id);
+    } catch (e) {
+      if (String(e).includes("active client limit")) break;
+      throw e;
+    }
+  }
+  return ids;
+}
+
+async function callJson<T>(page: Page, base: string, path: string, body: unknown): Promise<T> {
+  await ready(page, base);
+  const out = await page.evaluate(
+    async ([p, b]: [string, string]) => {
+      const res = await fetch(p, { method: "POST", headers: { "content-type": "application/json" }, body: b });
+      return { ok: res.ok, status: res.status, text: await res.text() };
+    },
+    [path, JSON.stringify(body)] as [string, string],
+  );
+  if (!out.ok) throw new Error(`POST ${base}${path} -> ${out.status} ${out.text}`);
+  return JSON.parse(out.text) as T;
+}
+

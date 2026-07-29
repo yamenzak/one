@@ -425,14 +425,14 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
 
             {recents.length > 0 && (
               <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="px-1 text-micro uppercase text-muted-foreground">{recentTab === "frequent" ? "Most logged" : "Recent"}</h3>
-                  <SegmentedControl
-                    options={[{ value: "recent", label: "Recent" }, { value: "frequent", label: "Frequent" }]}
-                    value={recentTab}
-                    onChange={setRecentTab}
-                  />
-                </div>
+                {/* No eyebrow. The control's selected segment already says
+                    "Recent", so the header was labelling the thing the control
+                    directly beneath it labels — twice, on one line. */}
+                <SegmentedControl
+                  options={[{ value: "recent", label: "Recent" }, { value: "frequent", label: "Most logged" }]}
+                  value={recentTab}
+                  onChange={setRecentTab}
+                />
                 <div className="space-y-1">
                   {recentList.map((r) => (
                     <button key={`${r.food_id ?? r.label}`} disabled={logging} onClick={() => void relog(r)} className="block w-full rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary disabled:opacity-60">

@@ -108,6 +108,14 @@ export function FoodRow({
     already there carrying the quantity, and macros belong with it.
   */
   const showMacros = macros && (proteinG != null || carbsG != null || fatG != null);
+  /*
+    When the row already has a trailing control — a "+" in the quick-add sheet,
+    a stepper, a remove — the calorie figure is the SECOND thing competing with
+    the name for the same edge, and the name loses again: "Salmon, sweet potato
+    & …". So it moves down to the detail line with the macros, and the trailing
+    column keeps exactly one thing.
+  */
+  const energyInline = energy && calories != null && trailing != null;
   const Body = (
     <>
       <FoodThumb src={image} size={thumbSize} />
@@ -115,6 +123,7 @@ export function FoodRow({
         <div className="truncate font-medium">{name}</div>
         <div className="flex min-w-0 items-center gap-2 truncate text-sm text-muted-foreground">
           {subtitle != null && <span className="shrink-0">{subtitle}</span>}
+          {energyInline && <span className="numeral shrink-0 font-semibold text-calories">{fmtEnergy(calories!, units)}</span>}
           {showMacros && <MacroInline proteinG={proteinG ?? 0} carbsG={carbsG ?? 0} fatG={fatG ?? 0} className="min-w-0 text-xs" />}
         </div>
       </div>
@@ -127,7 +136,7 @@ export function FoodRow({
       ) : (
         <div className="flex min-w-0 flex-1 items-center gap-3">{Body}</div>
       )}
-      {energy && calories != null && (
+      {energy && calories != null && !energyInline && (
         <div className="numeral shrink-0 text-sm font-semibold text-calories">{fmtEnergy(calories, units)}</div>
       )}
       {trailing}
