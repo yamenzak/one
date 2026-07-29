@@ -4,7 +4,7 @@
  */
 
 import { motion } from "motion/react";
-import { chromeIn } from "./lib/animation.js";
+import { chromeIn , SPRING_SNAP, DUR} from "./lib/animation.js";
 import { EASE_OUT, settle } from "./lib/animation.js";
 import { Group, Row } from "./layout.js";
 import type { ReactNode } from "react";
@@ -20,7 +20,7 @@ export interface TabDef {
   tone?: Tone;
 }
 
-const pillTween = { backgroundColor: { type: "tween" as const, duration: 0.35, ease: "easeOut" as const } };
+const pillTween = { backgroundColor: { type: "tween" as const, duration: DUR.slow, ease: "easeOut" as const } };
 /** The active tab's tint colour — its domain token when tinting is on, else the brand accent. */
 const activeColor = (tabs: TabDef[], active: string, tinted?: boolean): string => {
   const tone = tabs.find((t) => t.key === active)?.tone;
@@ -48,7 +48,8 @@ export function AppBar({ leading, title, trailing, bare, scrolled }: { leading?:
   );
 }
 
-const navSpring = { type: "spring" as const, stiffness: 420, damping: 34 };
+/** The nav pill. `SPRING_SNAP` — it is the most-pressed indicator in the app. */
+const navSpring = SPRING_SNAP;
 
 export function BottomTabs({ tabs, active, onSelect, tinted }: { tabs: TabDef[]; active: string; onSelect: (k: string) => void; tinted?: boolean }) {
   const color = activeColor(tabs, active, tinted);
@@ -81,7 +82,7 @@ export function BottomTabs({ tabs, active, onSelect, tinted }: { tabs: TabDef[];
                 <motion.span
                   initial={{ opacity: 0, width: 0 }}
                   animate={{ opacity: 1, width: "auto" }}
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: DUR.base }}
                   className="relative overflow-hidden whitespace-nowrap text-caption font-semibold"
                 >
                   {t.label}
@@ -155,7 +156,7 @@ export function InsightCard({ timestamp, title, aiGlyph, tone, children, onFeedb
       initial={{ opacity: 0, y: 8 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
-      transition={{ duration: 0.22, ease: EASE_OUT }}
+      transition={{ duration: DUR.base, ease: EASE_OUT }}
       className="py-3"
     >
       <div className="flex items-center gap-2 text-caption text-muted-foreground">

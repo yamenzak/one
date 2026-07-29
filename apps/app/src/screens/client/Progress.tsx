@@ -18,7 +18,7 @@ import {
   Reveal, SkeletonHero, SkeletonChart,
   AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, METRICS, POSTURE_SEVERITY_TONE, cn, toneVar,
   Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, Calendar, Scale,
-  TierAnchor, CountUp, type Tone, type LucideIcon, NoData,
+  TierAnchor, CountUp, type Tone, type LucideIcon, NoData, SPRING_SNAP, DUR,
 } from "@kova/ui";
 import { api, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
@@ -507,9 +507,9 @@ function LensTabs({ lenses, tab, onChange }: { lenses: typeof LENSES; tab: Tab; 
         return (
           <button key={l.value} onClick={() => onChange(l.value)} aria-current={on ? "page" : undefined} title={l.label}
             className={cn("relative z-10 flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium transition-colors", on ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-            {on && <motion.span layoutId="progress-lens-pill" initial={false} transition={{ type: "spring", stiffness: 380, damping: 32 }} className="absolute inset-0 rounded-full bg-primary" />}
+            {on && <motion.span layoutId="progress-lens-pill" initial={false} transition={SPRING_SNAP} className="absolute inset-0 rounded-full bg-primary" />}
             <l.icon className="relative size-4 shrink-0" strokeWidth={on ? 2.4 : 2} />
-            {on && <motion.span initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: "auto" }} transition={{ duration: 0.2 }} className="relative overflow-hidden whitespace-nowrap">{l.label}</motion.span>}
+            {on && <motion.span initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: "auto" }} transition={{ duration: DUR.base }} className="relative overflow-hidden whitespace-nowrap">{l.label}</motion.span>}
           </button>
         );
       })}

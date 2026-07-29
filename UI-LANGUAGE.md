@@ -623,7 +623,9 @@ it here.
 
 | Export | Use it for |
 |---|---|
-| `DUR` / `EASE_OUT` / `EASE_IN_OUT` / `SPRING` | Any hand-rolled transition. |
+| `DUR` (`instant` · `fast` · `base` · `slow` · `draw`) | Every duration. `draw` (900ms) is the one exception to "nothing is longer than `slow`": a chart drawing itself in is *content*, and at UI speed it registers as a flicker. |
+| `EASE_OUT` / `EASE_IN_OUT` | Every curve. |
+| `SPRING` · `SPRING_SNAP` · `SPRING_SOFT` · `SPRING_DRAG` | Every spring. Layout · small high-frequency things (pills, checkboxes, badges) · large things changing size · a drag returning to rest. All near-critically damped (ζ ≈ 0.92–0.97). |
 | `atmosphereIn` `anchorIn` `contentIn` `chromeIn` | The four-tier entrance, in that order. |
 | `contentStagger` | The spine container. No `delayChildren` — see the note in the file. |
 | `settle` | A card appearing in place. **Scales down from 1.04**, never up. |
@@ -635,6 +637,15 @@ it here.
 
 `popIn` is a deprecated alias of `settle`. It used to scale **up**; do not
 reintroduce that shape anywhere.
+
+**Enforced by a lint.** `apps/app/src/motion.conformance.test.ts` fails on a
+spring or a raw duration written at a call site. It has teeth: §8 claimed a
+single source from the day it was written, and the app was carrying 16
+hand-rolled springs across 13 tunings, most of them well under critical damping
+— one at ζ = 0.40, a visible three-bounce wobble, on the check-off a client sees
+several times a day. Two carve-outs, both deliberate: `delay:` (a stagger offset
+belongs to the list) and `repeat:` (an ambient loop's period belongs to the
+effect; the entrance ladder means nothing to something that never ends).
 
 ### Overlays — `overlays.tsx`
 

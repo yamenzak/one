@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  Card, IconBadge, cn, Check, ClipboardList, Dumbbell, Utensils, Pill, ChevronRight, ChevronDown, type LucideIcon, type Tone,
+  Card, IconBadge, cn, Check, ClipboardList, Dumbbell, Utensils, Pill, ChevronRight, ChevronDown, type LucideIcon, type Tone, SPRING_SNAP, SPRING_SOFT, DUR,
 } from "@kova/ui";
 import { api, isQueued, errorText } from "../../api.js";
 import { QueuedNotice } from "../../notices.js";
@@ -67,10 +67,10 @@ export function CheckRow({ icon: Icon, tone, label, sub, done, actionable, onCli
 function CheckBox({ done }: { done: boolean }) {
   return (
     <span className={cn("relative grid size-6 shrink-0 place-items-center overflow-hidden rounded-full border-2 transition-colors duration-300", done ? "border-transparent" : "border-surface-3")}>
-      <motion.span aria-hidden className="absolute inset-0 rounded-full bg-primary" initial={false} animate={{ scale: done ? 1 : 0, opacity: done ? 1 : 0 }} transition={{ type: "spring", stiffness: 480, damping: 26 }} />
+      <motion.span aria-hidden className="absolute inset-0 rounded-full bg-primary" initial={false} animate={{ scale: done ? 1 : 0, opacity: done ? 1 : 0 }} transition={SPRING_SNAP} />
       <AnimatePresence initial={false}>
         {done && (
-          <motion.span key="check" className="relative text-primary-foreground [&_svg]:size-3.5" initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0, opacity: 0 }} transition={{ type: "spring", stiffness: 620, damping: 20, delay: 0.06 }}>
+          <motion.span key="check" className="relative text-primary-foreground [&_svg]:size-3.5" initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0, opacity: 0 }} transition={{ ...SPRING_SNAP, delay: 0.06 }}>
             <Check strokeWidth={3.5} />
           </motion.span>
         )}
@@ -152,7 +152,7 @@ export function TodayAgenda({ clientId, date, bundle, agenda, onChanged, onNavig
         <h3 className="text-micro uppercase text-muted-foreground">Today</h3>
         <AnimatePresence mode="wait" initial={false}>
           {allDone ? (
-            <motion.span key="done" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ type: "spring", stiffness: 520, damping: 24 }} className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-xs font-semibold text-success">
+            <motion.span key="done" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={SPRING_SNAP} className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-xs font-semibold text-success">
               <Check strokeWidth={3} className="size-3" /> Complete
             </motion.span>
           ) : (
@@ -165,7 +165,7 @@ export function TodayAgenda({ clientId, date, bundle, agenda, onChanged, onNavig
       </AnimatePresence>
       <AnimatePresence initial={false}>
         {showList && (
-          <motion.div key="list" initial={allDone ? { opacity: 0, height: 0 } : false} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={{ type: "spring", stiffness: 320, damping: 32 }} className="overflow-hidden">
+          <motion.div key="list" initial={allDone ? { opacity: 0, height: 0 } : false} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={SPRING_SOFT} className="overflow-hidden">
             <Card className="divide-y divide-border/40 py-0.5">
               {items.map((i) => <CheckRow key={i.key} icon={i.icon} tone={i.tone} label={i.label} sub={i.sub} done={i.done} actionable={i.actionable} onClick={i.onClick} />)}
             </Card>
@@ -189,7 +189,7 @@ function CompletionBanner({ count, expanded, onToggle }: { count: number; expand
       initial={{ opacity: 0, y: -6, height: 0 }}
       animate={{ opacity: 1, y: 0, height: "auto" }}
       exit={{ opacity: 0, y: -6, height: 0 }}
-      transition={{ type: "spring", stiffness: 320, damping: 30 }}
+      transition={SPRING_SOFT}
       className="relative w-full overflow-hidden rounded-2xl bg-gradient-to-br from-success/15 to-primary/10 p-4 text-left transition-colors hover:from-success/20"
     >
       <div className="pointer-events-none absolute -right-6 -top-8 size-24 rounded-full bg-success/25 blur-2xl" />
@@ -202,16 +202,16 @@ function CompletionBanner({ count, expanded, onToggle }: { count: number; expand
               className="absolute inset-0 rounded-full border border-success/50"
               initial={{ scale: 0.5, opacity: 0.7 }}
               animate={{ scale: 2, opacity: 0 }}
-              transition={{ duration: 0.9, ease: "easeOut", delay: 0.1 + i * 0.12 }}
+              transition={{ duration: DUR.draw, ease: "easeOut", delay: 0.1 + i * 0.12 }}
             />
           ))}
           <motion.span
             className="relative grid size-11 place-items-center rounded-full bg-success text-[var(--tone-foreground)] [&_svg]:size-5"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 500, damping: 18 }}
+            transition={SPRING_SNAP}
           >
-            <motion.span initial={{ scale: 0, rotate: -25 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 620, damping: 20, delay: 0.14 }}>
+            <motion.span initial={{ scale: 0, rotate: -25 }} animate={{ scale: 1, rotate: 0 }} transition={{ ...SPRING_SNAP, delay: 0.14 }}>
               <Check strokeWidth={3.5} />
             </motion.span>
           </motion.span>

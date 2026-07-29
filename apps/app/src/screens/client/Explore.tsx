@@ -3,7 +3,7 @@
  *  fresh article cards, and an immersive reader with a cover-bleed header. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Card, Badge, Chip, Field, Button, Page, Stagger, EmptyState, motion, cn, ArrowLeft, Search, Clock, BookOpen, Utensils, Dumbbell, AlertTriangle, Reveal, SkeletonHero, SkeletonList } from "@kova/ui";
+import { Card, Badge, Chip, Field, Button, Page, Stagger, EmptyState, motion, cn, ArrowLeft, Search, Clock, BookOpen, Utensils, Dumbbell, AlertTriangle, Reveal, SkeletonHero, SkeletonList, DUR} from "@kova/ui";
 import { api } from "../../api.js";
 import { Markdown } from "../../Markdown.js";
 
@@ -99,7 +99,7 @@ export function Explore({ clientId, onBack }: { clientId: string; onBack: () => 
 function FeaturedCard({ r, onOpen }: { r: Resource; onOpen: () => void }) {
   const Icon = typeIcon(r.type);
   return (
-    <motion.button initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} whileTap={{ scale: 0.985 }} onClick={onOpen} className="relative block w-full overflow-hidden rounded-3xl text-left shadow-lg">
+    <motion.button initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.slow, ease: [0.22, 1, 0.36, 1] }} whileTap={{ scale: 0.985 }} onClick={onOpen} className="relative block w-full overflow-hidden rounded-3xl text-left shadow-lg">
       {r.coverUrl ? <img src={r.coverUrl} alt="" className="h-56 w-full object-cover" /> : <div className="grid h-56 w-full place-items-center bg-gradient-to-br from-primary/30 via-primary/10 to-surface-2 text-primary/60 [&_svg]:size-12"><Icon /></div>}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
       <div className="absolute left-4 top-4"><span className="rounded-full bg-white/15 px-2.5 py-1 text-micro uppercase text-white backdrop-blur-md">Featured</span></div>
@@ -156,7 +156,7 @@ function Reader({ r, onBack }: { r: Resource; onBack: () => void }) {
       <motion.div
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: DUR.slow, ease: [0.22, 1, 0.36, 1] }}
         className={cn("mx-auto max-w-xl space-y-4 px-4", r.coverUrl && "relative -mt-8")}
       >
         <div className="flex flex-wrap items-center gap-2">

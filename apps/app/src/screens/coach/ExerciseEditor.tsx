@@ -13,7 +13,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Globe, PencilLine, ArrowLeft, ArrowRight, Search, Plus, Trash2, Check, toneSoft, cn, type Tone } from "@kova/ui";
+import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Globe, PencilLine, ArrowLeft, ArrowRight, Search, Plus, Trash2, Check, toneSoft, cn, type Tone, SPRING_SNAP} from "@kova/ui";
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@kova/protocol";
 import { api, ApiError, uploadMedia } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
@@ -65,7 +65,7 @@ function HeroChoice({ icon: Icon, tone, title, subtitle, badge, active, busy, di
       onClick={onClick}
       disabled={disabled || busy}
       whileTap={{ scale: 0.985 }}
-      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+      transition={SPRING_SNAP}
       className={cn(
         "group relative flex w-full items-center gap-3.5 overflow-hidden rounded-2xl border p-4 text-left transition-colors disabled:pointer-events-none disabled:opacity-40",
         active

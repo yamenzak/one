@@ -17,6 +17,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { toneVar, toneSoft, type Tone } from "./primitives.js";
 import { NoData } from "./metrics.js";
 import { cn } from "./lib/utils.js";
+import { SPRING_SOFT , DUR} from "./lib/animation.js";
 
 /** Measure a container's width so an SVG viewBox can fill it responsively. */
 function useWidth<T extends HTMLElement>(fallback = 320): [React.RefObject<T | null>, number] {
@@ -143,7 +144,7 @@ export function AreaChart({ values, tone = "activity", height = 180, target, tar
           <line x1={padX} x2={width - padX} y1={y(target)} y2={y(target)} stroke={color} strokeDasharray="2 5" strokeWidth={1.5} opacity={0.7} />
         ) : null}
         <path d={areaPath} fill={`url(#${gid})`} />
-        <motion.path d={linePath} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }} />
+        <motion.path d={linePath} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: DUR.draw, ease: [0.22, 1, 0.36, 1] }} />
         {trendPath && <path d={trendPath} fill="none" stroke={color} strokeWidth={1.5} strokeDasharray="4 4" opacity={0.55} strokeLinecap="round" />}
         {/* crosshair */}
         <line x1={x(activePt.i)} x2={x(activePt.i)} y1={padTop} y2={height - padBot} stroke={color} strokeWidth={1} opacity={active != null ? 0.4 : 0} />
@@ -199,7 +200,7 @@ export function BarChart({ values, labels, tone = "activity", height = 160, targ
             <motion.rect key={i} x={bx} width={bw} rx={Math.min(bw / 2, 5)} fill={color}
               onPointerEnter={() => setActive(i)} onPointerLeave={() => setActive(null)}
               initial={{ height: 0, y: height - padBot }} animate={{ height: h, y: height - padBot - h }}
-              transition={{ delay: Math.min(i * 0.02, 0.3), duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ delay: Math.min(i * 0.02, 0.3), duration: DUR.slow, ease: [0.22, 1, 0.36, 1] }}
               opacity={i === shown ? 1 : 0.42 + 0.4 * (v / max)} />
           );
         })}
@@ -243,7 +244,7 @@ export function RadarChart({ axes, tone = "cardio", size = 220, rings = 3, class
       })}
       {axes.map((_, i) => { const p = pt(i, r); return <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="var(--border)" strokeWidth={1} opacity={0.4} />; })}
       <motion.polygon points={poly} fill={mix(color, 22)} stroke={color} strokeWidth={2} strokeLinejoin="round"
-        initial={{ scale: 0.2, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 120, damping: 18 }} style={{ transformOrigin: "center" }} />
+        initial={{ scale: 0.2, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={SPRING_SOFT} style={{ transformOrigin: "center" }} />
       {axes.map((a, i) => {
         const p = pt(i, r + 16);
         const dot = pt(i, Math.max(0.04, Math.min(1, a.value)) * r);
@@ -310,7 +311,7 @@ export function CalendarHeatmap({ days, today, tone = "activity", weeks = 16, ma
         {cols.map((col, w) => col.map((c, d) => (
           <motion.rect key={c.date} x={w * (cell + gap)} y={14 + d * (cell + gap)} width={cell} height={cell} rx={3}
             fill={c.future ? "transparent" : fill(c.lv)} stroke={c.date === today ? color : "transparent"} strokeWidth={1.5}
-            initial={{ opacity: 0 }} animate={{ opacity: c.future ? 0 : 1 }} transition={{ delay: Math.min(w * 0.01, 0.4), duration: 0.3 }}>
+            initial={{ opacity: 0 }} animate={{ opacity: c.future ? 0 : 1 }} transition={{ delay: Math.min(w * 0.01, 0.4), duration: DUR.base }}>
             <title>{`${c.date}`}</title>
           </motion.rect>
         )))}
