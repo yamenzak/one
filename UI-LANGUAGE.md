@@ -488,6 +488,22 @@ The shape every phone OS converged on, and why each half works:
   the index becomes a map you aim at from memory. A grey badge in a row of toned
   ones reads as disabled, not as neutral — every row gets a real tone.
 - **Destructive sections take their own group**, below a break, in `danger`.
+- **An index nests.** A section that is itself five settings gets its own index
+  rather than a longer page — same rows, same value-carrying sub-lines, one
+  level down. The studio's Brand section is the case that proves it: 5,599px in
+  a single card became five rows reading "Emerald · Brand surfaces", "0.95rem
+  corners · Soft · Hairline", "Tab bar and page wash".
+- **A split section keeps ONE save.** The form state is shared and the submit is
+  reachable from every sub-page. Giving each sub-page its own save would let a
+  half-applied theme exist, which is worse than a long page ever was.
+- **One header per screen.** When a surface renders its own back + title for a
+  section, its container must not render another — the two stack into a pair of
+  back buttons, one of which goes somewhere the user did not ask for.
+- **The ways out are rows, like everything else.** "Sign out" as a row beside
+  "Delete my account" as a card with a heading, a paragraph and a button is two
+  spellings of one idea. The consequence belongs on the confirmation, at the
+  moment you are asked to accept it — not two taps earlier where it is only
+  furniture.
 
 ### Two rules about repetition
 

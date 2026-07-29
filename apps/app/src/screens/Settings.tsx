@@ -9,7 +9,7 @@ import { useSearchParams } from "react-router-dom";
 import {
   Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
-  KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
+  KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
   ActionResult, ConfigRow, TabIntro, cn, toneText, personaLabel, personaTone, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon,
 } from "@kova/ui";
 import type { LoginBranding, TenantBranding } from "@kova/protocol";
@@ -82,7 +82,7 @@ function LoadError({ label, error, onRetry }: { label: string; error?: string | 
 export type SettingsView = "profile" | "preferences" | "notifications" | "passkeys" | "studio";
 
 const VIEW_TITLE: Record<SettingsView, string> = {
-  profile: "Profile",
+  profile: "Settings",
   preferences: "Preferences",
   notifications: "Notifications",
   passkeys: "Passkeys & security",
@@ -91,48 +91,49 @@ const VIEW_TITLE: Record<SettingsView, string> = {
 
 export function Settings({ onBack, view = "studio" }: { onBack: () => void; view?: SettingsView }) {
   const { ctx, refresh } = useSession();
+  const [pageParams] = useSearchParams();
+  const inSection = pageParams.get("s") != null;
   const isOwner = ctx?.active?.role === "owner";
   const canBrand = isOwner && ctx?.entitlements.features.branding;
   const role = ctx?.active?.role ?? "member";
   const clientId = ctx?.active?.clientId ?? null;
 
+  /*
+    FOUR ROUTES, ONE SURFACE.
+
+    `/profile`, `/preferences`, `/notification-settings` and `/passkeys` were
+    four destinations in the avatar menu, each a half-empty screen about the
+    same subject: me. They now all render the merged personal surface, opened
+    at their own section — so every old link and deep-link still lands exactly
+    where it did, and there is one place to look.
+  */
+  const AS_SECTION: Partial<Record<SettingsView, string>> = {
+    // `/profile` is the ROOT of the merged surface — the menu's one door. The
+    // other three are the old destinations, kept as deep links into their
+    // section so no existing link or bookmark breaks.
+    profile: "", preferences: "preferences", notifications: "notifications", passkeys: "security",
+  };
   const body = (() => {
-    switch (view) {
-      case "profile":
-        return (
-          <>
-            <Stagger>
-              <Card className="flex items-center justify-between gap-3">
-                <div className="min-w-0"><div className="text-sm text-muted-foreground">Signed in as</div><div className="truncate font-semibold">{ctx?.user.email}</div></div>
-                <Badge tone={personaTone(role)}>{personaLabel(role)}</Badge>
-              </Card>
-            </Stagger>
-            {clientId ? (
-              <ClientProfileSection clientId={clientId} email={ctx!.user.email} onSaved={() => void refresh()} />
-            ) : (
-              <Stagger><Card className="text-sm text-muted-foreground">Your name and photo are managed with your studio account.</Card></Stagger>
-            )}
-          </>
-        );
-      case "preferences":
-        return <PersonalSettings clientId={clientId} onSaved={() => void refresh()} />;
-      // Kept as its own route for deep links and back-compat; the menu now goes
-      // to Preferences, which carries this as a tab.
-      case "notifications":
-        return <PersonalSettings clientId={clientId} initialTab="notifications" onSaved={() => void refresh()} />;
-      case "passkeys":
-        return <><SecuritySection /><SignOutSection /><DeleteAccountSection /></>;
-      case "studio":
-        return isOwner ? <StudioSettings canBrand={!!canBrand} /> : <Stagger><Card className="text-sm text-muted-foreground">Studio settings are available to studio owners.</Card></Stagger>;
+    if (view === "studio") {
+      return isOwner
+        ? <StudioSettings canBrand={!!canBrand} />
+        : <Stagger><Card className="text-sm text-muted-foreground">Studio settings are available to studio owners.</Card></Stagger>;
     }
+    const initial = AS_SECTION[view];
+    return <PersonalSettings clientId={clientId} initialTab={(initial || undefined) as never} onBack={onBack} onSaved={() => void refresh()} />;
   })();
 
   return (
     <Page className="column space-y-5 p-4 pb-28">
-      <div className="flex items-center gap-3">
-        <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
-        <h1 className="text-title-2">{VIEW_TITLE[view]}</h1>
-      </div>
+      {/* One header, not two. The inner surface renders its own back + title
+          once a section is open (`?s=`), so showing the page-level one too gave
+          every settings detail page a pair of stacked back buttons. */}
+      {view === "studio" && !inSection && (
+        <div className="flex items-center gap-3">
+          <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
+          <h1 className="text-title-2">{VIEW_TITLE[view]}</h1>
+        </div>
+      )}
       <motion.div key={view} variants={stagger} initial="hidden" animate="show" className="space-y-6">
         {body}
       </motion.div>
@@ -157,7 +158,6 @@ export function Settings({ onBack, view = "studio" }: { onBack: () => void; view
  * The old routes still resolve (deep links, and anything already bookmarked) —
  * they just open this page on the matching tab.
  */
-type PersonalTab = "preferences" | "notifications" | "units";
 
 /**
  * Personal settings — the same index/detail shape as the studio surface.
@@ -168,26 +168,55 @@ type PersonalTab = "preferences" | "notifications" | "units";
  * screen you could not see yet. The index row now carries the one line that
  * mattered and the rest is gone.
  */
-function PersonalSettings({ clientId, initialTab, onSaved }: {
+/**
+ * ── ONE PERSONAL SETTINGS SURFACE ─────────────────────────────────────────
+ *
+ * Profile, Preferences and "Passkeys & security" were three separate menu
+ * destinations, each a half-empty screen: Profile was an email card plus a name
+ * and a photo; security was three stacked sections; preferences was three tabs.
+ * Nothing about them was different in KIND — all three are "settings about me",
+ * and splitting them across the avatar menu meant a user hunting for their own
+ * units had to remember which of three doors it was behind.
+ *
+ * They are one index now, in the order a phone OS uses: WHO you are at the top
+ * (the account row), then what the app does for you, then the account's own
+ * plumbing, then the two ways out. The old routes still work — each opens the
+ * merged surface at its section.
+ */
+type PersonalTab = "profile" | "preferences" | "notifications" | "units" | "security";
+
+function PersonalSettings({ clientId, initialTab, onBack, onSaved }: {
   clientId: string | null;
   initialTab?: PersonalTab;
+  onBack: () => void;
   onSaved: () => void;
 }) {
+  const { ctx } = useSession();
   const [params, setParams] = useSearchParams();
   const openKey = (params.get("s") ?? initialTab ?? null) as PersonalTab | null;
+  const role = ctx?.active?.role ?? "member";
 
-  const sections: { value: PersonalTab; label: string; blurb: string; icon: LucideIcon; tone: Tone; body: () => ReactNode }[] = [
+  const sections = [
     {
-      value: "preferences", label: "Training & nutrition", icon: Target, tone: "primary",
+      value: "profile", label: "Profile", icon: CircleUser, tone: "cardio", show: !!clientId,
+      blurb: "Your name, photo and the basics",
+      body: () => <ClientProfileSection clientId={clientId!} email={ctx?.user.email ?? ""} onSaved={onSaved} />,
+    },
+    {
+      value: "preferences", label: "Training & nutrition", icon: Target, tone: "primary", show: true,
       blurb: "Your goal, how you train, what to avoid",
       body: () => (clientId
         ? <><PreferencesSection clientId={clientId} onSaved={onSaved} /><MutedInsightsSection /></>
         : <Stagger><Card className="text-sm text-muted-foreground">These appear here once you&apos;re set up as a client.</Card></Stagger>),
     },
-    { value: "notifications", label: "Notifications", icon: Bell, tone: "cardio", blurb: "What you hear about, and where", body: () => <NotificationsSection /> },
-    { value: "units", label: "Units", icon: Scale, tone: "activity", blurb: "Metric or imperial", body: () => <UnitsSection /> },
-  ];
-  const open = sections.find((x) => x.value === openKey) ?? null;
+    { value: "notifications", label: "Notifications", icon: Bell, tone: "activity", show: true, blurb: "What you hear about, and where", body: () => <NotificationsSection /> },
+    { value: "units", label: "Units", icon: Scale, tone: "sleep", show: true, blurb: "Metric or imperial", body: () => <UnitsSection /> },
+    { value: "security", label: "Passkeys & security", icon: KeyRound, tone: "supplement", show: true, blurb: "How you sign in on this device", body: () => <SecuritySection /> },
+  ] as const satisfies readonly { value: PersonalTab; label: string; blurb: string; icon: LucideIcon; tone: Tone; show: boolean; body: () => ReactNode }[];
+  const shown = sections.filter((x) => x.show);
+
+  const open = shown.find((x) => x.value === openKey) ?? null;
+  const go = (k: PersonalTab) => setParams((q: URLSearchParams) => { q.set("s", k); return q; });
 
   if (open) {
     return (
@@ -200,14 +229,39 @@ function PersonalSettings({ clientId, initialTab, onSaved }: {
   }
 
   return (
-    <SettingsIndex
-      groups={[{
-        rows: sections.map((x) => ({
-          key: x.value, icon: x.icon, tone: x.tone, label: x.label, sub: x.blurb,
-          onClick: () => setParams((q: URLSearchParams) => { q.set("s", x.value); return q; }),
-        })),
-      }]}
-    />
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
+        <h1 className="text-title-2">Settings</h1>
+      </div>
+
+      {/* WHO, first — the account row phone settings open with. It is the one
+          thing here that is a fact rather than a door, so it says the fact and
+          does not pretend to navigate. */}
+      <Stagger>
+        <Card className="flex items-center gap-3.5">
+          <Avatar name={ctx?.user.name || ctx?.user.email || "?"} seed={ctx?.user.email ?? "me"} className="size-12" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-semibold">{ctx?.user.name || ctx?.user.email}</div>
+            {ctx?.user.name && <div className="truncate text-sm text-muted-foreground">{ctx.user.email}</div>}
+          </div>
+          <Badge tone={personaTone(role)}>{personaLabel(role)}</Badge>
+        </Card>
+      </Stagger>
+
+      <SettingsIndex
+        groups={[
+          { rows: shown.filter((x) => x.value !== "security").map((x) => ({
+              key: x.value, icon: x.icon, tone: x.tone, label: x.label, sub: x.blurb, onClick: () => go(x.value),
+            })) },
+          { rows: shown.filter((x) => x.value === "security").map((x) => ({
+              key: x.value, icon: x.icon, tone: x.tone, label: x.label, sub: x.blurb, onClick: () => go(x.value),
+            })) },
+        ]}
+      />
+
+      <DeleteAccountSection />
+    </div>
   );
 }
 
@@ -937,11 +991,29 @@ function EmailSection() {
   );
 }
 
-function SignOutSection() {
+/*
+  Sign out and Delete are the two ways OUT, so they are one group of two rows.
+  Delete used to be a card with a heading, a paragraph and a button while Sign
+  out beside it was a row — two spellings of the same idea, stacked. The
+  paragraph moved to the confirmation sheet, which is where a consequence
+  belongs: at the moment you are asked to accept it, not two taps earlier.
+*/
+function AccountExits({ onDelete, deleteBlocked }: { onDelete: () => void; deleteBlocked: boolean }) {
   const { signOut } = useSession();
   return (
-    <SettingsList
-      sections={[{ header: "Account", rows: [{ icon: LogOut, label: "Sign out", destructive: true, onClick: () => void signOut() }] }]}
+    <SettingsIndex
+      groups={[{
+        header: "Account",
+        rows: [
+          { key: "signout", icon: LogOut, label: "Sign out", tone: "neutral", onClick: () => void signOut() },
+          {
+            key: "delete", icon: Trash2, label: "Delete my account", destructive: true,
+            sub: deleteBlocked ? "Close your studio first" : "Erases everything, permanently",
+            disabled: deleteBlocked,
+            onClick: onDelete,
+          },
+        ],
+      }]}
     />
   );
 }
@@ -976,17 +1048,8 @@ function DeleteAccountSection() {
 
   return (
     <Stagger>
-      <SectionHead title="Danger zone" icon={AlertTriangle} tone="danger" />
-      <Card className="space-y-2.5">
-        <div className="flex items-center gap-2 font-medium text-danger"><AlertTriangle className="size-4" /> Delete my account</div>
-        <p className="text-sm text-muted-foreground">Permanently erase your account and everything in it — photos, logs, measurements, messages. This can't be undone.</p>
-        {isOwner ? (
-          <p className="text-xs text-muted-foreground">You own a studio. To delete your account, first close your studio in <span className="font-medium text-foreground">Studio settings → Danger zone</span> (that cancels billing and wipes the studio).</p>
-        ) : (
-          <Button variant="outline" className="w-full border-danger/40 text-danger" onClick={() => { setStage("intro"); setCode(""); setErr(null); setOpen(true); }}><Trash2 /> Delete my account…</Button>
-        )}
-      </Card>
-
+      <AccountExits deleteBlocked={isOwner} onDelete={() => { setStage("intro"); setCode(""); setErr(null); setOpen(true); }} />
+      
       <Sheet
         open={open}
         onClose={() => setOpen(false)}
@@ -1586,6 +1649,7 @@ function BrandingEditor(props: { initial: Branding | null; onPreview: (b: Brandi
 }
 
 function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding | null; onPreview: (b: Branding | null) => void; onSaved: () => void }) {
+  const [params, setParams] = useSearchParams();
   const { ctx } = useSession();
   const [tokens, setTokens] = useState<BrandTokens>(() => (initial?.tokens && hasTokens(initial.tokens) ? initial.tokens : deriveTokens({ primary: seedFrom(initial) })));
   const [seed, setSeed] = useState<string>(seedFrom(initial));
@@ -1663,12 +1727,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
 
   const seedHex = oklchStringToHex(seed.startsWith("#") ? hexToOklchString(seed) : seed);
 
-  return (
-    <section>
-      <SectionHead title="Branding" icon={Palette} scope="tenant" />
-      <Card className="space-y-5">
-        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Palette /></div><div><div className="font-medium">Theme</div><div className="text-sm text-muted-foreground">Pick one color — the whole app themes itself, light and dark.</div></div></div>
-
+  const marksBlock = (<>
         {/* Logo (wide wordmark, shown in the app bar) */}
         <div className="space-y-2">
           <div className="text-sm font-medium">Logo <span className="font-normal text-muted-foreground">— app bar</span></div>
@@ -1723,6 +1782,9 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
           </div>
         </div>
 
+  </>);
+
+  const colourBlock = (<>
         {/* Brand color — presets + wheel, each generates the full palette */}
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
@@ -1751,6 +1813,9 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
           <span className="text-sm text-muted-foreground">Surface tint</span>
           <div className="flex gap-2">{NEUTRALS.map((n) => <Chip key={n.id} selected={neutral === n.id} onClick={() => generate(seed, n.id)}>{n.label}</Chip>)}</div>
         </div>
+  </>);
+
+  const shapeBlock = (<>
 
         {/* Radius — the slider belongs to the design system now, and a live
             preview sits beside it so the number is not the only feedback. */}
@@ -1817,6 +1882,9 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
         </div>
         )}
 
+  </>);
+
+  const sectionBlock = (<>
         {/* Section colour. These two used to be per-device toggles in a personal
             "Appearance" tab, which meant two clients of the same studio could see
             differently-coloured chrome — and a studio that had deliberately dialled
@@ -1837,6 +1905,9 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
           </p>
         </div>
 
+  </>);
+
+  const advancedBlock = (<>
         {/* Advanced */}
         <button onClick={() => setAdvanced((a) => !a)} className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground">
           <span>Fine-tune tokens</span>
@@ -1857,10 +1928,66 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
             </div>
           </div>
         )}
+  </>);
 
-        <ActionResult msg={msg} err={null} />
-        <Button className="w-full" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save branding"}</Button>
-      </Card>
+  /*
+    ── BRAND IS FIVE SETTINGS, NOT ONE CARD ────────────────────────────────
+
+    This was 5,599px inside a single `<Card>` — theme blurb, logo, app icon, AI
+    coach, nine brand swatches, surface tint, corner radius, elevation, borders,
+    border colour, two section toggles and a token grid, all under one Save.
+    Nothing in it could be found, and not one row said what it was set to.
+
+    Now an index whose every row carries its CURRENT VALUE, and a page each.
+    `?b=` so Back steps out of a sub-page rather than out of settings. The form
+    state stays shared and there is still exactly ONE Save, reachable from every
+    sub-page — splitting the save would let a half-applied theme exist, which is
+    a worse thing than a long page.
+  */
+  const presetName = BRAND_PRESETS.find((x) => x.primary === seed)?.label ?? "Custom";
+  const SUBS: { key: string; label: string; icon: LucideIcon; tone: Tone; value: string; block: ReactNode }[] = [
+    { key: "marks", label: "Logos & AI coach", icon: ImageIcon, tone: "cardio", block: marksBlock,
+      value: [logoUrl ? "Logo" : "No logo", iconUrl ? "icon" : "no icon", aiName.trim() || "coach unnamed"].join(" · ") },
+    { key: "colour", label: "Colour", icon: Palette, tone: "primary", block: colourBlock,
+      value: `${presetName} · ${NEUTRALS.find((n) => n.id === neutral)?.label ?? neutral} surfaces` },
+    { key: "shape", label: "Shape & depth", icon: Sliders, tone: "activity", block: shapeBlock,
+      value: `${radius.toFixed(2)}rem corners · ${SHADOW_PRESETS.find((x) => x.id === shadow)?.label ?? shadow} · ${BORDER_WIDTHS.find((x) => x.value === borderWidth)?.label ?? "hairline"}` },
+    { key: "sections", label: "Section colour", icon: Waves, tone: "nutrition", block: sectionBlock,
+      value: tintedNav && ambient ? "Tab bar and page wash" : tintedNav ? "Tab bar only" : ambient ? "Page wash only" : "Off — brand colour everywhere" },
+    { key: "advanced", label: "Fine-tune tokens", icon: Wand2, tone: "sleep", block: advancedBlock,
+      value: "Every token, light and dark" },
+  ];
+  const sub = params.get("b");
+  const openSub = SUBS.find((x) => x.key === sub) ?? null;
+  const goSub = (k: string | null) =>
+    setParams((q: URLSearchParams) => { if (k) q.set("b", k); else q.delete("b"); return q; }, { replace: !k });
+
+  const saveBar = (
+    <div className="space-y-3">
+      <ActionResult msg={msg} err={null} />
+      <Button size="lg" className="w-full" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save branding"}</Button>
+    </div>
+  );
+
+  if (openSub) {
+    return (
+      <section className="space-y-5">
+        <div className="flex items-center gap-3">
+          <Button size="icon" variant="secondary" onClick={() => goSub(null)} aria-label="Back to brand"><ArrowLeft /></Button>
+          <h2 className="min-w-0 flex-1 truncate text-title-3">{openSub.label}</h2>
+        </div>
+        <Card className="space-y-5">{openSub.block}</Card>
+        {saveBar}
+      </section>
+    );
+  }
+
+  return (
+    <section className="space-y-5">
+      <SettingsIndex groups={[{ rows: SUBS.map((x) => ({
+        key: x.key, icon: x.icon, tone: x.tone, label: x.label, sub: x.value, onClick: () => goSub(x.key),
+      })) }]} />
+      {saveBar}
     </section>
   );
 }
