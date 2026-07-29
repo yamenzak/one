@@ -5,10 +5,11 @@
 
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
+import { useSearchParams } from "react-router-dom";
 import {
-  Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, Page, Stagger, Field, Avatar, stagger, ConfirmDialog,
+  Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog,
   BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl,
-  KeyRound, Moon, Sun, LogOut, Palette, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
+  KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle,
   ActionResult, ConfigRow, TabIntro, cn, toneText, personaLabel, personaTone, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon,
 } from "@kova/ui";
 import type { LoginBranding, TenantBranding } from "@kova/protocol";
@@ -158,42 +159,76 @@ export function Settings({ onBack, view = "studio" }: { onBack: () => void; view
  */
 type PersonalTab = "preferences" | "notifications" | "units";
 
-function PersonalSettings({ clientId, initialTab = "preferences", onSaved }: {
+/**
+ * Personal settings — the same index/detail shape as the studio surface.
+ *
+ * It was three tabs, and the page carried FOUR levels of intro before the first
+ * control: a page description, a tab intro, a card intro inside the section,
+ * and a sub-section intro above each field group. Four paragraphs explaining a
+ * screen you could not see yet. The index row now carries the one line that
+ * mattered and the rest is gone.
+ */
+function PersonalSettings({ clientId, initialTab, onSaved }: {
   clientId: string | null;
   initialTab?: PersonalTab;
   onSaved: () => void;
 }) {
-  const tabs: { value: PersonalTab; label: string; intro: string }[] = [
-    { value: "preferences", label: "Preferences", intro: "What your coach plans around — your goal, your training, what to avoid." },
-    { value: "notifications", label: "Notifications", intro: "What you want to hear about, and where it reaches you." },
-    { value: "units", label: "Units", intro: "Whether weights, heights and volumes read metric or imperial." },
+  const [params, setParams] = useSearchParams();
+  const openKey = (params.get("s") ?? initialTab ?? null) as PersonalTab | null;
+
+  const sections: { value: PersonalTab; label: string; blurb: string; icon: LucideIcon; tone: Tone; body: () => ReactNode }[] = [
+    {
+      value: "preferences", label: "Training & nutrition", icon: Target, tone: "primary",
+      blurb: "Your goal, how you train, what to avoid",
+      body: () => (clientId
+        ? <><PreferencesSection clientId={clientId} onSaved={onSaved} /><MutedInsightsSection /></>
+        : <Stagger><Card className="text-sm text-muted-foreground">These appear here once you&apos;re set up as a client.</Card></Stagger>),
+    },
+    { value: "notifications", label: "Notifications", icon: Bell, tone: "cardio", blurb: "What you hear about, and where", body: () => <NotificationsSection /> },
+    { value: "units", label: "Units", icon: Scale, tone: "activity", blurb: "Metric or imperial", body: () => <UnitsSection /> },
   ];
-  const [tab, setTab] = useState<PersonalTab>(initialTab);
-  const active = tabs.find((t) => t.value === tab) ?? tabs[0]!;
+  const open = sections.find((x) => x.value === openKey) ?? null;
+
+  if (open) {
+    return (
+      <SettingsPage title={open.label} onBack={() => setParams((q: URLSearchParams) => { q.delete("s"); return q; }, { replace: true })}>
+        <motion.div key={open.value} variants={stagger} initial="hidden" animate="show" className="space-y-6">
+          {open.body()}
+        </motion.div>
+      </SettingsPage>
+    );
+  }
 
   return (
-    <div className="space-y-5">
-      <div className="-mx-4 overflow-x-auto px-4 no-scrollbar">
-        <SegmentedControl options={tabs.map((t) => ({ value: t.value, label: t.label }))} value={tab} onChange={(v) => setTab(v as PersonalTab)} />
-      </div>
-      <motion.div key={tab} variants={stagger} initial="hidden" animate="show" className="space-y-6">
-        <Stagger><TabIntro>{active.intro}</TabIntro></Stagger>
-        {tab === "preferences" && (clientId
-          ? <><PreferencesSection clientId={clientId} onSaved={onSaved} /><MutedInsightsSection /></>
-          : <Stagger><Card className="text-sm text-muted-foreground">Training &amp; nutrition preferences appear here once you're set up as a client.</Card></Stagger>)}
-        {tab === "notifications" && <NotificationsSection />}
-        {tab === "units" && <UnitsSection />}
-      </motion.div>
-    </div>
+    <SettingsIndex
+      groups={[{
+        rows: sections.map((x) => ({
+          key: x.value, icon: x.icon, tone: x.tone, label: x.label, sub: x.blurb,
+          onClick: () => setParams((q: URLSearchParams) => { q.set("s", x.value); return q; }),
+        })),
+      }]}
+    />
   );
 }
 
+/**
+ * ── STUDIO SETTINGS: AN INDEX AND A PAGE PER SECTION ───────────────────────
+ *
+ * This was seven horizontally-scrolling tabs (two off the right edge at phone
+ * width) over one page each. The Brand tab alone measured 5,599px — a single
+ * card holding theme, logo, app icon, the AI coach's identity, nine brand
+ * swatches, surface tint, corner radius, elevation, borders, border colour, two
+ * section toggles and a fine-tune drawer, under one Save. Nothing in it could
+ * be found, and the two tabs you could not see may as well not have shipped.
+ *
+ * Now: a table of contents, and a route per section. `?s=<key>` rather than a
+ * nested route so the whole surface stays one component and the browser Back
+ * button steps out of a section before it leaves settings.
+ */
 function StudioSettings({ canBrand }: { canBrand: boolean }) {
   const { ctx, refresh } = useSession();
   const { preview } = useTheme();
-  // Each section's editor, keyed by its registry id. Which tabs SHOW (and their
-  // order + labels) comes from STUDIO_SETTINGS_SECTIONS, so the visible surface
-  // can't drift from the tenant's entitlements.
+  const [params, setParams] = useSearchParams();
   const render: Record<string, () => ReactNode> = {
     brand: () => <BrandingEditor initial={(ctx?.branding ?? null) as Branding | null} onPreview={preview} onSaved={() => void refresh()} />,
     signin: () => <SignInSettings canBrand={canBrand} branding={ctx?.branding ?? null} slug={ctx?.active?.tenantSlug ?? null} onSaved={() => void refresh()} />,
@@ -204,38 +239,79 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
     danger: () => <CloseStudioSection />,
   };
   const features = ctx?.entitlements.features;
-  const groups = STUDIO_SETTINGS_SECTIONS
-    .filter((s) => (!features || settingsSectionVisible(s, features)) && render[s.key])
-    .map((s) => ({ value: s.key, label: s.label, render: render[s.key]! }));
+  const sections = STUDIO_SETTINGS_SECTIONS.filter(
+    (x) => (!features || settingsSectionVisible(x, features)) && render[x.key],
+  );
 
-  // What each sub-tab is for, in one line. The platform console leads every tab
-  // with this and the studio settings did not — an owner landing on "Messaging"
-  // had to open three cards to find out what it governed.
+  /** One line per section page — what it governs. The index rows say what is
+   *  INSIDE; this says what the section is FOR. Never both on one screen. */
   const INTRO: Record<string, string> = {
-    brand: "Your colours, corners, elevation and marks. Every screen your clients see follows this — the whole app is themed from these tokens, not from per-screen styling.",
+    brand: "Every screen your clients see is themed from these — not from per-screen styling.",
     signin: "The front door: your login link, the copy on it, and whether passkeys are offered.",
-    ai: "Which model answers each AI action, what it costs your balance, and the house voice it writes in.",
-    messaging: "How email leaves your studio — who sends it, which categories are allowed, and what the templates say.",
-    marketplace: "Your public storefront: whether it's open, and whether clients can sign themselves up.",
-    integrations: "Outside data sources you connect, and the keys they use.",
-    danger: "Closing the studio. Billing stops immediately, your data is held for seven days, then everything is erased — for you and for every member.",
+    ai: "Which model answers each AI action, what it costs your balance, and the voice it writes in.",
+    messaging: "How email leaves your studio — who sends it, which categories are allowed, what it says.",
+    marketplace: "Whether your storefront is open, and whether clients can sign themselves up.",
+    integrations: "Outside food and exercise databases, and the keys they use.",
+    danger: "Billing stops immediately, your data is held for seven days, then everything is erased — for you and for every member.",
   };
-  const [sub, setSub] = useState<string>(groups[0]?.value ?? "signin");
-  const active = groups.find((g) => g.value === sub) ?? groups[0];
+
+  const openKey = params.get("s");
+  const open = sections.find((x) => x.key === openKey) ?? null;
+
+  if (open) {
+    return (
+      <SettingsPage
+        title={open.label}
+        description={INTRO[open.key]}
+        onBack={() => setParams((q: URLSearchParams) => { q.delete("s"); return q; }, { replace: true })}
+      >
+        <motion.div key={open.key} variants={stagger} initial="hidden" animate="show" className="space-y-6">
+          {render[open.key]!()}
+        </motion.div>
+      </SettingsPage>
+    );
+  }
 
   return (
-    <div className="space-y-5">
-      <p className="px-1 text-sm text-muted-foreground">Studio-wide settings you control as the owner — your brand, your front door, your AI and your business. The <span className="font-medium text-primary">Studio</span> badge marks them apart from your personal settings.</p>
-      <div className="-mx-4 overflow-x-auto px-4 no-scrollbar">
-        <SegmentedControl options={groups.map((g) => ({ value: g.value, label: g.label }))} value={active?.value ?? ""} onChange={setSub} />
-      </div>
-      <motion.div key={active?.value} variants={stagger} initial="hidden" animate="show" className="space-y-6">
-        {active && INTRO[active.value] && <TabIntro>{INTRO[active.value]}</TabIntro>}
-        {active?.render()}
-      </motion.div>
-    </div>
+    <SettingsIndex
+      groups={[
+        {
+          rows: sections.filter((x) => x.key !== "danger").map((x) => ({
+            key: x.key,
+            icon: STUDIO_SECTION_ICON[x.key] ?? SettingsIcon,
+            tone: STUDIO_SECTION_TONE[x.key],
+            label: x.label,
+            sub: x.blurb,
+            onClick: () => setParams((q: URLSearchParams) => { q.set("s", x.key); return q; }),
+          })),
+        },
+        {
+          rows: sections.filter((x) => x.key === "danger").map((x) => ({
+            key: x.key,
+            icon: Trash2,
+            label: x.label,
+            sub: x.blurb,
+            destructive: true,
+            onClick: () => setParams((q: URLSearchParams) => { q.set("s", x.key); return q; }),
+          })),
+        },
+      ]}
+    />
   );
 }
+
+/** Icon + tone per studio section. Colour here is navigation, not decoration:
+ *  a section keeps its tone wherever it appears, so the index becomes a map you
+ *  can aim at from memory rather than a list you re-read. */
+const STUDIO_SECTION_ICON: Record<string, LucideIcon> = {
+  brand: Palette, signin: KeyRound, ai: Wand2, messaging: Mail,
+  marketplace: Store, integrations: Plug,
+};
+const STUDIO_SECTION_TONE: Record<string, Tone> = {
+  brand: "primary", signin: "activity", ai: "nutrition", messaging: "cardio",
+  // A grey badge in a row of toned ones reads as disabled, not as neutral.
+  marketplace: "supplement", integrations: "sleep",
+};
 
 /** Owner danger zone — close the studio: cancels billing now, holds data 7 days,
  *  then wipes everything (R2 + D1) for the studio and its members. OTP-confirmed. */

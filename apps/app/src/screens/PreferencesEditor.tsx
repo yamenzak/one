@@ -13,6 +13,7 @@ import {
 } from "@kova/domain";
 import { Button, Card, Chip, Field, Select, Textarea, Reveal, Skeleton, SkeletonLine, FieldGroup, ActionResult, Target, Dumbbell, Utensils, MapPin, Activity } from "@kova/ui";
 import { api } from "../api.js";
+import { useSession } from "../session.js";
 import { useUnits } from "../units.js";
 
 interface Editable { gender: string | null; dateOfBirth: string | null; heightCm: number | null; preferences: ClientPreferences }
@@ -20,6 +21,22 @@ const WORKOUT_LOCATIONS = Object.keys(WORKOUT_LOCATION_LABELS) as WorkoutLocatio
 const opts = (m: Record<string, string>) => [{ value: "", label: "Select…" }, ...Object.entries(m).map(([value, label]) => ({ value, label }))];
 
 export function PreferencesEditorCard({ clientId, includeProfile = false, onSaved }: { clientId: string; includeProfile?: boolean; onSaved?: () => void }) {
+  /*
+    WHO IS READING THIS.
+
+    One editor, two readers: a coach filling in a client's profile, and the
+    client filling in their own from Preferences. Every string was written for
+    the coach — so a client opening their own settings was asked for "Target
+    weight … Where THEY'RE headed", "Where THEY train", and injuries described as
+    "equipment THEY don't have". Their own screen, talking about them in the
+    third person.
+
+    Derived from the session rather than passed as a prop: a call site cannot
+    get it wrong, and there is exactly one truth (does this client record belong
+    to the signed-in user).
+  */
+  const { ctx } = useSession();
+  const self = ctx?.active?.clientId != null && ctx.active.clientId === clientId;
   const [c, setC] = useState<Editable | null>(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -75,7 +92,7 @@ export function PreferencesEditorCard({ clientId, includeProfile = false, onSave
           <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-muted-foreground"><Target className="size-4" /> Primary goal</label>
           <Select value={p.primaryGoal ?? ""} onChange={(v) => setP({ primaryGoal: (v || null) as ClientPreferences["primaryGoal"] })} options={opts(PRIMARY_GOAL_LABELS)} />
         </div>
-        <Field label={`Target weight (${weightLabel(units)})`} inputMode="decimal" value={tw != null ? String(tw) : ""} onChange={(e) => setP({ targetWeightKg: e.target.value ? displayToKg(Number(e.target.value.replace(/[^\d.]/g, "")), units) : null })} placeholder="Where they're headed" />
+        <Field label={`Target weight (${weightLabel(units)})`} inputMode="decimal" value={tw != null ? String(tw) : ""} onChange={(e) => setP({ targetWeightKg: e.target.value ? displayToKg(Number(e.target.value.replace(/[^\d.]/g, "")), units) : null })} placeholder={self ? "Where you're headed" : "Where they're headed"} />
         </FieldGroup>
 
         <FieldGroup title="Training" hint="How much, how often, and where.">
@@ -89,7 +106,7 @@ export function PreferencesEditorCard({ clientId, includeProfile = false, onSave
           <Field label="Meals / day" icon={Utensils} inputMode="numeric" value={p.mealsPerDay != null ? String(p.mealsPerDay) : ""} onChange={(e) => setP({ mealsPerDay: num(e.target.value) })} />
         </div>
         <div>
-          <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-muted-foreground"><MapPin className="size-4" /> Where they train</label>
+          <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-muted-foreground"><MapPin className="size-4" /> {self ? "Where you train" : "Where they train"}</label>
           <div className="flex flex-wrap gap-2">{WORKOUT_LOCATIONS.map((loc) => <Chip key={loc} selected={p.workoutLocation === loc} onClick={() => setP({ workoutLocation: p.workoutLocation === loc ? null : loc })}>{WORKOUT_LOCATION_LABELS[loc]}</Chip>)}</div>
         </div>
         </FieldGroup>
@@ -101,7 +118,7 @@ export function PreferencesEditorCard({ clientId, includeProfile = false, onSave
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Injuries or limitations</label>
-          <Textarea value={p.limitations ?? ""} onChange={(e) => setP({ limitations: e.target.value || null })} placeholder="A bad knee, allergies, equipment they don't have…" rows={3} />
+          <Textarea value={p.limitations ?? ""} onChange={(e) => setP({ limitations: e.target.value || null })} placeholder={self ? "A bad knee, allergies, equipment you don't have…" : "A bad knee, allergies, equipment they don't have…"} rows={3} />
         </div>
         </FieldGroup>
 
