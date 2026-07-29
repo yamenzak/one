@@ -5,6 +5,8 @@
 
 import { motion } from "motion/react";
 import { chromeIn } from "./lib/animation.js";
+import { settle } from "./lib/animation.js";
+import { Group, Row } from "./layout.js";
 import type { ReactNode } from "react";
 import { cn } from "./lib/utils.js";
 import { toneVar, type Tone } from "./primitives.js";
@@ -187,25 +189,38 @@ export interface SettingsRow {
   trailing?: ReactNode;
   destructive?: boolean;
 }
+/**
+ * A settings surface: sections of rows.
+ *
+ * Rebuilt on `Group`/`Row` rather than re-implementing them (UI-LANGUAGE §7), so
+ * a settings row and a roster row are the same object — same heights, same inset
+ * hairline, same press feedback, same squircle icon container. They had drifted:
+ * this list used a 14px hairline inset and a full-bleed divider while every other
+ * list in the product inset to the text origin.
+ *
+ * Settings surfaces are deliberately NOT anchored (§1). A settings screen is a
+ * list, not a screen about a number, and a display numeral on one would be
+ * decoration pretending to be hierarchy.
+ */
 export function SettingsList({ sections }: { sections: { header: string; rows: SettingsRow[] }[] }) {
   return (
     <div className="space-y-7">
       {sections.map((s) => (
         <section key={s.header}>
-          <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{s.header}</h3>
-          <div className="overflow-hidden rounded-2xl bg-card">
-            {s.rows.map((r, i) => (
-              <button
+          <h3 className="mb-2 px-1 text-micro uppercase text-muted-foreground">{s.header}</h3>
+          <Group>
+            {s.rows.map((r) => (
+              <Row
                 key={r.label}
+                icon={r.icon}
                 onClick={r.onClick}
-                className={cn("flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-secondary [&_svg]:size-[1.2rem]", i > 0 && "border-t border-border/50", r.destructive ? "text-danger" : "text-foreground")}
+                trailing={r.trailing}
+                tone={r.destructive ? "danger" : "default"}
               >
-                <r.icon className={r.destructive ? "text-danger" : "text-muted-foreground"} />
-                <span className="flex-1 font-medium">{r.label}</span>
-                {r.trailing}
-              </button>
+                {r.label}
+              </Row>
             ))}
-          </div>
+          </Group>
         </section>
       ))}
     </div>
@@ -213,15 +228,27 @@ export function SettingsList({ sections }: { sections: { header: string; rows: S
 }
 
 // ── Empty state ──────────────────────────────────────────────────────────────
+/**
+ * A surface with nothing in it yet: one line of why, one action (§7).
+ *
+ * The dashed border is gone. A dashed outline is the visual language of "drop
+ * something here" or "this is a placeholder that will be replaced" — neither is
+ * true of an empty list, and on a dark canvas it drew a rectangle round the
+ * emptiness rather than letting it be empty. Space says "nothing here" better
+ * than a box does (§0 rule 4).
+ *
+ * Settles down like everything else (§8); it used to rise 8px with no scale,
+ * which was the one entrance in the product that matched nothing around it.
+ */
 export function EmptyState({ icon: Icon, title, description, action }: { icon: LucideIcon; title: string; description?: string; action?: ReactNode }) {
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center rounded-2xl border border-dashed border-border bg-card/40 px-6 py-12 text-center">
-      <div className="grid size-14 place-items-center rounded-2xl bg-secondary text-muted-foreground [&_svg]:size-7">
-        <Icon />
+    <motion.div variants={settle} initial="hidden" animate="show" className="flex flex-col items-center px-6 py-14 text-center">
+      <div className="grid size-14 place-items-center rounded-xl bg-surface-2 text-muted-foreground [&_svg]:size-6">
+        <Icon aria-hidden />
       </div>
-      <h3 className="mt-4 text-lg font-semibold">{title}</h3>
-      {description && <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">{description}</p>}
-      {action && <div className="mt-5">{action}</div>}
+      <h3 className="mt-4 text-title-3">{title}</h3>
+      {description && <p className="mt-1.5 max-w-xs text-body text-muted-foreground">{description}</p>}
+      {action && <div className="mt-6">{action}</div>}
     </motion.div>
   );
 }

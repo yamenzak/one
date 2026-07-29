@@ -77,6 +77,13 @@ placed above its true tier is the single most common way a screen rots.**
   The tab bar does not use the brand colour except on the active item.
 - **Nothing spans two tiers.** A card that is both the anchor and a list is two
   components stacked, not one clever one.
+- **The anchor's value appears ONCE.** Restating it in a tile, a card headline or
+  a ring further down the screen reads as a second thought about the first one,
+  and the copy is always the louder of the two because it brings a chart with it.
+  If a component below the anchor needs that number for context, it gets the
+  *split*, the *delta* or the *trend* — never the number itself. This was the
+  single most repeated defect of the rewrite: Today, Eat and Business all shipped
+  it, and all three looked fine in the diff.
 
 ### The vertical spine
 
@@ -606,8 +613,9 @@ reintroduce that shape anywhere.
 |---|---|---|---|
 | `AppBar` | The top bar. `bare` lets an ambient wash bleed through it. | Carrying primary actions — chrome is recessive. | ✅ |
 | `BottomTabs` / `NavRail` | Top-level navigation, ≤5 items. Animates in **last**. | Actions. | ✅ |
-| `EmptyState` | A surface with nothing in it yet: one line of why, one action. | An error. Errors say what happened and what to do. | ◻︎ |
-| `SettingsList` · `InsightCard` · `WavyDivider` | As named. | — | ◻︎ |
+| `EmptyState` | A surface with nothing in it yet: one line of why, one action. | An error. Errors say what happened and what to do. | ✅ |
+| `SettingsList` | Sections of setting rows. Built on `Group`/`Row`, so a settings row and a roster row are the same object. | An anchored screen — settings surfaces are lists and take no display numeral (§1). | ✅ |
+| `InsightCard` · `WavyDivider` | As named. | — | ◻︎ |
 
 ### Primitives, viz and the rest
 
