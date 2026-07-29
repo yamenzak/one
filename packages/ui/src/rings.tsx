@@ -6,6 +6,7 @@
 import { motion } from "motion/react";
 import { useId, type ReactNode } from "react";
 import { toneVar, type Tone } from "./primitives.js";
+import { NoData, isBlank } from "./metrics.js";
 import { cn } from "./lib/utils.js";
 
 interface ProgressRingProps {
@@ -13,6 +14,7 @@ interface ProgressRingProps {
   size?: number;
   strokeWidth?: number;
   tone?: Tone;
+  /** Pass `null` when there is nothing to show — never a dash (see `NoData`). */
   value: ReactNode;
   label?: string;
   sublabel?: string;
@@ -36,7 +38,11 @@ export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activi
   // the tone (e.g. a cardio-blue ring with a green track).
   const track = softTrack ? `color-mix(in oklch, ${color} 24%, transparent)` : "var(--surface-3)";
   // Summarize the ring's data for AT — colour + arc length alone convey nothing.
-  const ariaLabel = [label, `${Math.round(p * 100)}%`, sublabel].filter(Boolean).join(", ");
+  // A blank value means there is no reading yet, so the arc is not a measurement
+  // — announcing "0%" would be a claim the screen isn't making.
+  const ariaLabel = isBlank(value)
+    ? [label, "no data yet"].filter(Boolean).join(", ")
+    : [label, `${Math.round(p * 100)}%`, sublabel].filter(Boolean).join(", ");
 
   return (
     <div className={cn("relative shrink-0", className)} style={{ width: size, height: size }}>
@@ -70,15 +76,15 @@ export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activi
             barely legible. */}
         {label && <div className="text-xs font-medium text-muted-foreground" style={{ fontSize: Math.max(12, size * 0.065) }}>{label}</div>}
         <motion.div
-          className="numeral font-semibold leading-none"
-          style={{ fontSize: size * 0.2, color: tintValue ? color : undefined }}
+          className={isBlank(value) ? "leading-none" : "numeral font-semibold leading-none"}
+          style={isBlank(value) ? undefined : { fontSize: size * 0.2, color: tintValue ? color : undefined }}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15, duration: 0.4 }}
         >
-          {value}
+          {isBlank(value) ? <NoData className="text-xs">Not yet</NoData> : value}
         </motion.div>
-        {sublabel && <div className="mt-1 text-muted-foreground" style={{ fontSize: Math.max(12, size * 0.062) }}>{sublabel}</div>}
+        {sublabel && !isBlank(value) && <div className="mt-1 text-muted-foreground" style={{ fontSize: Math.max(12, size * 0.062) }}>{sublabel}</div>}
       </div>
     </div>
   );

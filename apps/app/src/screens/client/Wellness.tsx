@@ -1,9 +1,10 @@
 /**
- * Wellness tab — the health hub, brought up to the Train/Eat bar: a hydration
- * hero ring, quick-log chips, a live fasting timer with metabolic zones, a
- * "this week" metrics grid, tappable check-in history (opens a detail with
- * photos + coach feedback), a supplement tap-log, and lab tests (tap for the
- * reviewed result). Deep-linkable via ?checkin=<date> and ?lab=<id>.
+ * Wellness tab — how you're doing, as one number and what's behind it.
+ *
+ * Anchored on the wellness score (§1), with the pillar breakdown, hydration, a
+ * live fasting timer with metabolic zones, a "this week" metrics grid, tappable
+ * check-in history (opens a detail with photos + coach feedback), a supplement
+ * tap-log, and lab tests. Deep-linkable via ?checkin=<date> and ?lab=<id>.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -11,7 +12,7 @@ import { useSearchParams } from "react-router-dom";
 import { fmtVolume, volumeLabel, volumeDisplayToMl, POSTURE_GUIDANCE } from "@kova/domain";
 import {
   Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, StatCard, WeekDots, Sparkline, MiniBars, EmptyState, cn, toneVar,
-  Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList,
+  Reveal, SkeletonStatGrid, SkeletonList, TierAnchor, ActionCluster, CountUp,
   ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Flame, Plus, ChevronRight, Upload, HeartPulse, AlertTriangle, METRICS, POSTURE_SEVERITY_TONE, FASTING_ZONES, type FastingZone, type Tone,
 } from "@kova/ui";
 
@@ -34,7 +35,7 @@ import { scanProfile, modelSilhouette } from "./bodyscan/model.js";
 import { PostureFigure } from "./bodyscan/PostureFigure.js";
 import { LogSheet } from "./LogSheet.js";
 import { CheckInDetailSheet, LabDetailSheet, labStatus, isLabImage, type CheckInFull, type LabFull } from "./WellnessDetails.js";
-import { WellnessScoreCard, WellnessScoreCardSkeleton, type WellnessScoreResult } from "./WellnessScore.js";
+import { WellnessPillars, WELLNESS_BAND, type WellnessScoreResult } from "./WellnessScore.js";
 import { CheckRow } from "./TodayAgenda.js";
 import { CoachNote } from "./CoachNote.js";
 import { SupplementGuide } from "./SupplementGuide.js";
@@ -265,10 +266,12 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
 
   return (
     <Page className="mx-auto max-w-xl space-y-5 p-4 pb-28">
-      <div className="flex items-center gap-3">
-        {onBack && <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>}
-        <h1 className={onBack ? "text-title-3" : "text-title-2"}>Wellness</h1>
-      </div>
+      {onBack && (
+        <div className="flex items-center gap-3">
+          <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
+          <h2 className="text-title-3">Wellness</h2>
+        </div>
+      )}
 
       {/* Write feedback for the tap-logging controls — one spot, always visible. */}
       {logQueued && <QueuedNotice />}
@@ -277,12 +280,21 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
       {loadError && !today ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load your wellness" description="Something went wrong loading your day. Check your connection and try again." action={<Button onClick={retry}>Try again</Button>} />
       ) : (
+      /* The skeleton mirrors the real spine — anchor, cluster, content — so the
+         screen doesn't visibly re-lay-out the moment the data lands. */
       <Reveal loading={loading || !today} className="space-y-5" skeleton={
         <>
-          <SkeletonHero height={150} />
-          <div className="flex flex-wrap gap-2">
-            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-9 w-24 rounded-full" />)}
+          <div className="flex flex-col items-center gap-2 pb-1 pt-2">
+            <Skeleton className="h-3 w-24 rounded-full" />
+            <Skeleton className="h-14 w-32 rounded-2xl" />
+            <Skeleton className="h-3 w-48 rounded-full" />
           </div>
+          <div className="flex justify-center gap-6 py-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex flex-col items-center gap-2"><Skeleton className="size-12 rounded-full" /><Skeleton className="h-2.5 w-10 rounded-full" /></div>
+            ))}
+          </div>
+          <Skeleton className="h-36 rounded-2xl" />
           <Skeleton className="h-32 rounded-2xl" />
           <Skeleton className="h-44 rounded-2xl" />
           <SkeletonStatGrid count={6} />
@@ -291,16 +303,68 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
       }>
         {today && (
         <>
-      {/* Wellness Score hero */}
-      <Stagger data-tour="wellness-hero">{score ? <WellnessScoreCard result={score} /> : <WellnessScoreCardSkeleton />}</Stagger>
+      {/*
+        T1 — THE ANCHOR (UI-LANGUAGE §1).
 
-      {/* Quick-log chips — one per capability this client actually holds. */}
-      <Stagger className="flex flex-wrap gap-2">
-        <Chip icon={ClipboardList} selected onClick={() => setLogKind("checkin")}>Check in</Chip>
-        {canSleep && <Chip icon={METRICS.sleep.icon} onClick={() => setLogKind("sleep")}>Log sleep</Chip>}
-        {canMood && <Chip icon={METRICS.mood.icon} onClick={() => setLogKind("mood")}>Log mood</Chip>}
-        {canFasting && <Chip icon={Timer} onClick={() => void toggleFast()}>{fast?.activeFast ? "End fast" : "Start fast"}</Chip>}
-      </Stagger>
+        Wellness is four subjects on one surface (sleep, mood, water, fasting),
+        which looks like a screen with more than one job — but it isn't: those
+        four are the INPUTS, and the wellness score is the one noun they add up
+        to. The tour has always said as much ("one number for how you're really
+        doing"); it just wasn't the largest thing on the screen. It is now, and
+        the pillar breakdown drops to T3 where a breakdown belongs.
+
+        No score yet → words, never a `0` or a dash (§5). A brand-new client
+        scores exactly 0, and a 0 rendered at 56px/700 is not a measurement — it
+        reads as a verdict on the person. The band already has the right sentence
+        for that state, so say it instead and keep the numeral for a real number.
+      */}
+      <TierAnchor data-tour="wellness-hero" className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
+        <p className="text-caption text-muted-foreground">Wellness score</p>
+        {score && score.score > 0 ? (
+          <>
+            <p className="numeral text-display"><CountUp value={score.score} /></p>
+            <p className="text-caption text-muted-foreground">{WELLNESS_BAND[score.band].label} · {WELLNESS_BAND[score.band].blurb}</p>
+          </>
+        ) : (
+          <>
+            <p className="text-title-1">{score ? WELLNESS_BAND[score.band].label : "Not scored yet"}</p>
+            <p className="text-caption text-muted-foreground">{score ? WELLNESS_BAND[score.band].blurb : "Log a few things this week and your score appears here."}</p>
+          </>
+        )}
+      </TierAnchor>
+
+      {/*
+        T2 — what you came here to DO. The same verbs the chip row carried, but
+        as a cluster, so they read as a set of choices rather than a row of
+        tags. Capabilities decide the count: below three the cluster looks
+        adrift (§1), so a thin client gets a plain full-width button instead.
+      */}
+      {(() => {
+        const acts = [
+          { icon: ClipboardList, label: "Check in", onClick: () => setLogKind("checkin") },
+          ...(canSleep ? [{ icon: METRICS.sleep.icon, label: "Sleep", onClick: () => setLogKind("sleep") }] : []),
+          ...(canMood ? [{ icon: METRICS.mood.icon, label: "Mood", onClick: () => setLogKind("mood") }] : []),
+          ...(canFasting ? [{ icon: Timer, label: fast?.activeFast ? "End fast" : "Fast", onClick: () => void toggleFast() }] : []),
+        ];
+        return acts.length >= 3 ? (
+          <ActionCluster items={acts} />
+        ) : (
+          <Stagger className="flex gap-2">
+            {acts.map((a) => <Button key={a.label} variant={a.label === "Check in" ? "default" : "outline"} className="flex-1" onClick={a.onClick}><a.icon /> {a.label}</Button>)}
+          </Stagger>
+        );
+      })()}
+
+      {/* What's behind the anchor — one bar per pillar. T3, and the score is
+          deliberately absent: it already exists once, above. By this point the
+          load has finished, so a null `score` is a failed read, not a pending
+          one — show nothing rather than a skeleton that never resolves. */}
+      {score && score.pillars.filter((p) => p.available).length >= 2 && (
+        <section className="space-y-2">
+          <h3 className="px-1 text-micro uppercase text-muted-foreground">What's behind it</h3>
+          <Stagger><WellnessPillars result={score} /></Stagger>
+        </section>
+      )}
 
       {/* Hydration — slim daily control (`waterLogging`) */}
       {canWater && (
@@ -402,23 +466,23 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
           <StatCard stack label="Check-in streak" value={week.streak} unit={week.streak === 1 ? "day" : "days"} icon={ClipboardList} tone="nutrition"
             chart={<WeekDots days={week.present} todayIndex={6} tone="nutrition" fill />} />
           {/* Each stat follows its capability — no stat for a surface we hid. */}
-          {canSleep && <StatCard stack label="Avg sleep" value={week.avgSleep != null ? week.avgSleep.toFixed(1) : "—"} unit={week.avgSleep != null ? "h" : undefined} icon={METRICS.sleep.icon} tone={METRICS.sleep.tone}
+          {canSleep && <StatCard stack label="Avg sleep" value={week.avgSleep != null ? week.avgSleep.toFixed(1) : null} emptyText="Not logged" unit="h" icon={METRICS.sleep.icon} tone={METRICS.sleep.tone}
             chart={week.sleepSeries.length >= 2 ? <Sparkline values={week.sleepSeries} tone={METRICS.sleep.tone} width={132} /> : undefined} />}
-          {canMood && <StatCard stack label="Avg mood" value={week.avgMood != null ? week.avgMood.toFixed(1) : "—"} unit={week.avgMood != null ? "/ 5" : undefined} icon={METRICS.mood.icon} tone={METRICS.mood.tone}
+          {canMood && <StatCard stack label="Avg mood" value={week.avgMood != null ? week.avgMood.toFixed(1) : null} emptyText="Not logged" unit="/ 5" icon={METRICS.mood.icon} tone={METRICS.mood.tone}
             chart={week.moodSeries.length >= 2 ? <Sparkline values={week.moodSeries} tone={METRICS.mood.tone} width={132} /> : undefined} />}
           {canFasting && <StatCard stack label="Fasts done" value={week.fastsDone} icon={Timer} tone="activity"
             chart={week.fastHoursSeries.length >= 2 ? <MiniBars values={week.fastHoursSeries} tone="activity" width={132} target={16} /> : undefined} />}
-          {canSupplementsLabs && <StatCard stack label="Supplements" value={week.suppSlots ? `${week.suppTaken}/${week.suppSlots}` : "—"} unit={week.suppSlots ? "today" : undefined} icon={Pill} tone="supplement" />}
+          {canSupplementsLabs && <StatCard stack label="Supplements" value={week.suppSlots ? `${week.suppTaken}/${week.suppSlots}` : null} emptyText="None set" unit="today" icon={Pill} tone="supplement" />}
           {canSessions && <StatCard stack label="Sessions" value={week.sessionsWeek} unit="this wk" icon={Calendar} tone="cardio" />}
         </Stagger>
       </section>
 
       {/* Check-ins */}
       <section className="space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <h3 className="text-micro uppercase text-muted-foreground">Check-ins</h3>
-          <button onClick={() => setLogKind("checkin")} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><Plus /> Check in</button>
-        </div>
+        {/* No "+ Check in" here: the action cluster at the top of the screen is
+            the way in, and a third identical affordance on one screen is how a
+            list header stops reading as a header (§1). */}
+        <h3 className="px-1 text-micro uppercase text-muted-foreground">Check-ins</h3>
         {failed.has("checkins") ? (
           <SectionNote text="Couldn't load your check-in history." onRetry={retry} />
         ) : checkIns.length === 0 ? (

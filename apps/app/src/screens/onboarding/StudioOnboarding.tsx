@@ -372,8 +372,10 @@ export function StudioOnboarding() {
                 ) : (
                   <>
                     <p className="text-caption text-muted-foreground">{plan?.name ?? "Your plan"}</p>
-                    <p className="numeral text-display">{plan ? fmtPrice(usdToCents(plan.priceUsdMonth)) : "—"}</p>
-                    <p className="text-body text-muted-foreground">per month</p>
+                    {plan
+                      ? <p className="numeral text-display">{fmtPrice(usdToCents(plan.priceUsdMonth))}</p>
+                      : <p className="text-title-1">Pick a plan</p>}
+                    <p className="text-body text-muted-foreground">{plan ? "per month" : "to see what it costs"}</p>
                   </>
                 )}
               </TierAnchor>

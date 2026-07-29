@@ -1,11 +1,14 @@
 /**
- * Wellness Score hero — the one number that reflects a client's whole-system
- * commitment (training, nutrition, sleep, consistency, hydration, mood,
- * supplements, body progress), with a per-pillar breakdown so it's obvious
- * what's lifting or dragging it. Theme-tokened; the ring uses the brand color.
+ * Wellness score — the pillar breakdown that sits under the Wellness anchor.
+ *
+ * The score itself is no longer rendered here. It is the screen's T1 anchor
+ * (UI-LANGUAGE §1), and the anchor's value appears ONCE: a hero card repeating
+ * the same number a few pixels below the display numeral is the exact defect the
+ * language calls out. What's left is the part the anchor can't say — which
+ * pillar is lifting the number and which is dragging it.
  */
 
-import { ProgressRing, cn, toneVar, IconBadge, Dumbbell, Utensils, Bed, ListChecks, Droplet, Smile, Pill, Scale, HeartPulse, type Tone, type LucideIcon } from "@kova/ui";
+import { toneVar, IconBadge, Dumbbell, Utensils, Bed, ListChecks, Droplet, Smile, Pill, Scale, HeartPulse, Skeleton, type Tone, type LucideIcon } from "@kova/ui";
 
 export interface WellnessPillar { key: string; label: string; score: number | null; weight: number; available: boolean }
 export interface WellnessScoreResult { score: number; band: "start" | "building" | "solid" | "strong" | "peak"; pillars: WellnessPillar[] }
@@ -21,7 +24,11 @@ const PILLAR_META: Record<string, { tone: Tone; icon: LucideIcon }> = {
   body: { tone: "cardio", icon: Scale },
 };
 
-const BAND: Record<WellnessScoreResult["band"], { label: string; blurb: string }> = {
+/**
+ * The words for a band. `label` is the one-word verdict that rides under the
+ * anchor; `blurb` is what to do about it.
+ */
+export const WELLNESS_BAND: Record<WellnessScoreResult["band"], { label: string; blurb: string }> = {
   start: { label: "Just starting", blurb: "Log a few things to build your score." },
   building: { label: "Building", blurb: "Momentum is forming — keep it steady." },
   solid: { label: "Solid", blurb: "Good, well-rounded week." },
@@ -48,30 +55,24 @@ function PillarBar({ pillar }: { pillar: WellnessPillar }) {
   );
 }
 
-export function WellnessScoreCard({ result }: { result: WellnessScoreResult }) {
-  const band = BAND[result.band];
+/**
+ * What's behind the number — one bar per pillar the client actually has.
+ *
+ * T3 content, not a hero: no wash, no ring, no restatement of the score.
+ * Returns null when there is nothing to break down, so a client with a single
+ * pillar doesn't get a section header over one bar.
+ */
+export function WellnessPillars({ result }: { result: WellnessScoreResult }) {
   const shown = result.pillars.filter((p) => p.available);
+  if (shown.length < 2) return null;
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-card p-5">
-      <div className="pointer-events-none absolute -right-12 -top-12 size-44 rounded-full bg-primary/10 blur-3xl" />
-      <div className="relative flex items-center gap-5">
-        <ProgressRing size={132} strokeWidth={11} tone="sleep" progress={result.score / 100} value={result.score} label="Wellness" />
-        <div className="min-w-0 flex-1">
-          <div className="text-micro uppercase text-primary">This week</div>
-          <div className="mt-0.5 text-lg font-bold tracking-tight">{band.label}</div>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{band.blurb}</p>
-        </div>
-      </div>
-      {shown.length > 0 && (
-        <div className="relative mt-4 grid grid-cols-1 gap-2.5 border-t border-border/50 pt-4 sm:grid-cols-2">
-          {shown.map((p) => <PillarBar key={p.key} pillar={p} />)}
-        </div>
-      )}
+    <div className="grid grid-cols-1 gap-3 rounded-2xl bg-card p-4 sm:grid-cols-2">
+      {shown.map((p) => <PillarBar key={p.key} pillar={p} />)}
     </div>
   );
 }
 
-/** Compact skeleton block matching the hero footprint. */
-export function WellnessScoreCardSkeleton() {
-  return <div className={cn("h-56 animate-pulse rounded-2xl bg-surface-2")} />;
+/** Placeholder matching the pillar block's footprint. */
+export function WellnessPillarsSkeleton() {
+  return <Skeleton className="h-36 rounded-2xl" />;
 }

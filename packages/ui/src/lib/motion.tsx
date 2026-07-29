@@ -75,8 +75,8 @@ export function TierAtmosphere({ children, className }: { children: ReactNode; c
 }
 
 /** T1 — the anchor tier. Settles down from 1.06. One per screen. */
-export function TierAnchor({ children, className }: { children: ReactNode; className?: string }) {
-  return <motion.div variants={anchorIn} className={className}>{children}</motion.div>;
+export function TierAnchor({ children, className, ...props }: HTMLMotionProps<"div"> & { children: ReactNode }) {
+  return <motion.div variants={anchorIn} className={className} {...props}>{children}</motion.div>;
 }
 
 /** T3 — a content block. Use inside a `contentStagger` container. */

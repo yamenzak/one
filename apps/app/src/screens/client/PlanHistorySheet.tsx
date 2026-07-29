@@ -161,7 +161,7 @@ function MealDetail({ body, foodMap, nameOf, units }: { body: MealBody; foodMap:
                 <div key={i} className="rounded-lg bg-card p-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="min-w-0 truncate text-sm font-medium">{opt.mealName || (opt.isFree ? "Free meal" : `Option ${i + 1}`)}</span>
-                    <span className="numeral shrink-0 text-xs text-calories">{opt.isFree ? (opt.freeMealMaxCalories != null ? `≤ ${fmtEnergy(opt.freeMealMaxCalories, units)}` : "—") : fmtEnergy(t.calories, units)}</span>
+                    <span className="numeral shrink-0 text-xs text-calories">{opt.isFree ? (opt.freeMealMaxCalories != null ? `≤ ${fmtEnergy(opt.freeMealMaxCalories, units)}` : "No cap") : fmtEnergy(t.calories, units)}</span>
                   </div>
                   {!opt.isFree && (
                     <>

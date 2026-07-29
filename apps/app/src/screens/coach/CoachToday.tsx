@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fmtWeight, type AttentionType } from "@kova/domain";
-import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, Avatar, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, CountUp, TierAnchor, ActionCluster, UserPlus, cn, type Tone, type LucideIcon } from "@kova/ui";
+import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, Avatar, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, CountUp, TierAnchor, ActionCluster, UserPlus, cn, type Tone, type LucideIcon, NoData } from "@kova/ui";
 import { attentionCoding, SEVERITY_TONE } from "../../attention-ui.js";
 import type { WidgetItem } from "@kova/protocol";
 import { api, todayLocal, shiftDay } from "../../api.js";
@@ -183,7 +183,7 @@ export function CoachToday() {
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Avg body-fat Δ · 90d</div>
-                  <div className="numeral text-2xl font-bold">{analytics.composition.avgDeltaPct != null ? <CountUp value={analytics.composition.avgDeltaPct} decimals={1} prefix={analytics.composition.avgDeltaPct > 0 ? "+" : ""} suffix="%" /> : "—"}</div>
+                  <div className={analytics.composition.avgDeltaPct != null ? "numeral text-2xl font-bold" : ""}>{analytics.composition.avgDeltaPct != null ? <CountUp value={analytics.composition.avgDeltaPct} decimals={1} prefix={analytics.composition.avgDeltaPct > 0 ? "+" : ""} suffix="%" /> : <NoData className="text-xs">No scans yet</NoData>}</div>
                 </div>
               </div>
               {analytics.composition.mostImproved && (

@@ -20,7 +20,7 @@ import {
 import {
   Button, Field, Switch, Badge, IconBadge, Spinner, cn, toneVar, useModalOverlay,
   Camera, ScanLine, ShieldCheck, Ruler, User, Check, RotateCcw, X, AlertTriangle, ArrowRight, Percent,
-  motion, stagger, popIn, CountUp,
+  motion, stagger, popIn, CountUp, NoData,
 } from "@kova/ui";
 import { api, todayLocal } from "../../../api.js";
 import { AiAvatar } from "../../../AiAvatar.js";
@@ -765,7 +765,9 @@ function MeasBox({ label, cm, units }: { label: string; cm: number | null | unde
   return (
     <div className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
       <div className="text-xs font-medium text-muted-foreground">{label}</div>
-      <div className="numeral mt-0.5 text-sm font-bold">{cm != null ? Math.round(cmToLengthDisplay(cm, units)) : "—"}<span className="ml-0.5 text-xs text-muted-foreground">{cm != null ? lengthLabel(units) : ""}</span></div>
+      {cm == null
+        ? <NoData className="mt-0.5 block text-xs">Not measured</NoData>
+        : <div className="numeral mt-0.5 text-sm font-bold">{Math.round(cmToLengthDisplay(cm, units))}<span className="ml-0.5 text-xs text-muted-foreground">{lengthLabel(units)}</span></div>}
     </div>
   );
 }

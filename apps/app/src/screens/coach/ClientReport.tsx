@@ -122,7 +122,7 @@ export function ClientReport({ clientId }: { clientId: string }) {
               ]} />
               <GlanceStrip items={[
                 { icon: Utensils, tone: "nutrition", value: report.compliance.foodDays, label: "Days logged" },
-                { icon: Flame, tone: "calories", value: report.compliance.calorieAdherencePct != null ? `${report.compliance.calorieAdherencePct}%` : "—", label: "Cal adherence" },
+                { icon: Flame, tone: "calories", value: report.compliance.calorieAdherencePct != null ? `${report.compliance.calorieAdherencePct}%` : null, label: "Cal adherence" },
                 { icon: TrendingUp, tone: "activity", value: `${Math.round(kgToDisplay(report.totalTonnage, units) / 1000).toLocaleString()}k`, label: `Volume ${weightLabel(units)}` },
               ]} />
             </Stagger>
@@ -152,8 +152,8 @@ export function ClientReport({ clientId }: { clientId: string }) {
           <section className="space-y-2">
             <Eyebrow>Averages</Eyebrow>
             <Stagger className="grid grid-cols-2 gap-3">
-              <StatCard stack label="Avg mood" value={report.averages.mood ?? "—"} unit={report.averages.mood != null ? "/ 5" : undefined} icon={Smile} tone="nutrition" />
-              <StatCard stack label="Avg sleep" value={report.averages.sleepHours ?? "—"} unit={report.averages.sleepHours != null ? "h" : undefined} icon={Moon} tone="sleep" />
+              <StatCard stack label="Avg mood" value={report.averages.mood ?? null} unit="/ 5" icon={Smile} tone="nutrition" />
+              <StatCard stack label="Avg sleep" value={report.averages.sleepHours ?? null} unit="h" icon={Moon} tone="sleep" />
             </Stagger>
           </section>
 

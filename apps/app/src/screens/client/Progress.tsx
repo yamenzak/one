@@ -18,7 +18,7 @@ import {
   Reveal, SkeletonHero, SkeletonChart,
   AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, METRICS, POSTURE_SEVERITY_TONE, cn, toneVar,
   Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, Calendar, Scale,
-  TierAnchor, CountUp, type Tone, type LucideIcon,
+  TierAnchor, CountUp, type Tone, type LucideIcon, NoData,
 } from "@kova/ui";
 import { api, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
@@ -163,8 +163,13 @@ export function Progress({ clientId }: { clientId: string }) {
                     </>
                   ) : (
                     <>
-                      <p className="numeral text-display"><CountUp value={Math.round(data.wellness.index)} /></p>
-                      <p className="text-caption text-muted-foreground">out of 100</p>
+                      {/* `wellnessIndex` is a 1–5 scale (domain/progress.ts), not a
+                          percentage. Rounding it to an integer and captioning it
+                          "out of 100" turned a healthy 4.2 into a giant "4" over
+                          the word hundred — the scale has to come from the same
+                          place the number does. */}
+                      <p className="numeral text-display"><CountUp value={data.wellness.index} decimals={1} /></p>
+                      <p className="text-caption text-muted-foreground">out of 5</p>
                     </>
                   )}
                 </TierAnchor>
@@ -190,17 +195,22 @@ function Overview({ data, units, dateLabel, canNutrition, canTraining }: { data:
   const days = data.range.days;
   const cals = nutrition.perDay.map((p) => (p.logged ? p.calories : null));
   const calTargets = nutrition.perDay.map((p) => p.target);
-  const idxPct = wellness.index != null ? wellness.index / 5 : 0;
   return (
     <>
+      {/*
+        No ring here any more. It carried the wellness index at 23px with the
+        label "Wellness" directly under an anchor already reading "Wellness
+        index" — the same value twice, a few pixels apart, which is the §1
+        defect this rewrite keeps finding. The three stats beside it were never
+        the redundant part, so they get the whole card and the width to breathe.
+      */}
       <Stagger data-tour="progress-hero">
-        <Card className="relative flex items-center gap-5 overflow-hidden">
+        <Card className="relative space-y-3 overflow-hidden">
           <div className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full bg-cardio/10 blur-3xl" />
-          <ProgressRing size={116} strokeWidth={11} tone="cardio" progress={idxPct || 0.001} value={wellness.index != null ? wellness.index.toFixed(1) : "—"} label="Wellness" sublabel="/ 5" softTrack tintValue />
-          <div className="relative min-w-0 flex-1 space-y-2.5">
+          <div className="relative space-y-3">
             <MiniStat icon={Flame} tone="calories" label="Check-in streak" value={`${consistency.streak}`} sub={consistency.streak === 1 ? "day" : "days"} />
             <MiniStat icon={Gauge} tone="activity" label="Consistency" value={`${consistency.consistencyPct}`} sub="%" />
-            <MiniStat icon={METRICS.weight.icon} tone="cardio" label="Weight trend" value={body.deltas.weight ? `${body.deltas.weight.delta > 0 ? "+" : ""}${kgToDisplay(body.deltas.weight.delta, units).toFixed(1)}` : "—"} sub={body.deltas.weight ? weightLabel(units) : ""} />
+            <MiniStat icon={METRICS.weight.icon} tone="cardio" label="Weight trend" value={body.deltas.weight ? `${body.deltas.weight.delta > 0 ? "+" : ""}${kgToDisplay(body.deltas.weight.delta, units).toFixed(1)}` : null} sub={weightLabel(units)} />
           </div>
         </Card>
       </Stagger>
@@ -228,7 +238,7 @@ function Overview({ data, units, dateLabel, canNutrition, canTraining }: { data:
       {/* Calorie adherence is a nutrition report (`nutritionReports`). */}
       {canNutrition && (
       <Stagger>
-        <ChartCard title="Calorie adherence" icon={METRICS.calories.icon} tone="calories" value={nutrition.adherencePct != null ? nutrition.adherencePct : "—"} unit={nutrition.adherencePct != null ? "%" : undefined} delta={nutrition.targets.targetCalories ? <Badge tone="neutral">target {fmtEnergy(nutrition.targets.targetCalories, units)}</Badge> : undefined}>
+        <ChartCard title="Calorie adherence" icon={METRICS.calories.icon} tone="calories" value={nutrition.adherencePct ?? undefined} unit="%" delta={nutrition.targets.targetCalories ? <Badge tone="neutral">target {fmtEnergy(nutrition.targets.targetCalories, units)}</Badge> : undefined}>
           <AreaChart values={cals} tone="calories" targetSeries={calTargets} target={nutrition.targets.targetCalories} trend label={dateLabel} format={(v) => `${kcalToDisplay(v, units)}`} />
         </ChartCard>
       </Stagger>
@@ -264,7 +274,7 @@ function Body({ data, units, dateLabel, clientId, canBodyScan }: { data: Progres
 
       {/* Hero — weight is the anchor metric, kept full-width. */}
       <Stagger>
-        <ChartCard title="Weight" icon={METRICS.weight.icon} tone="cardio" value={body.latest.weightKg != null ? kgToDisplay(body.latest.weightKg, units).toFixed(1) : "—"} unit={wl} delta={<span className="flex flex-wrap items-center gap-1.5"><DeltaBadge d={body.deltas.weight} convert={(v) => kgToDisplay(v, units)} unit={wl} /><RangeChip status={body.latest.weightStatus} range={body.ranges?.weightKg} convert={(v) => kgToDisplay(v, units)} unit={wl} /></span>}>
+        <ChartCard title="Weight" icon={METRICS.weight.icon} tone="cardio" value={body.latest.weightKg != null ? kgToDisplay(body.latest.weightKg, units).toFixed(1) : undefined} unit={wl} delta={<span className="flex flex-wrap items-center gap-1.5"><DeltaBadge d={body.deltas.weight} convert={(v) => kgToDisplay(v, units)} unit={wl} /><RangeChip status={body.latest.weightStatus} range={body.ranges?.weightKg} convert={(v) => kgToDisplay(v, units)} unit={wl} /></span>}>
           <AreaChart values={weightVals} tone="cardio" trend label={dateLabel} format={(v) => v.toFixed(1)} />
         </ChartCard>
       </Stagger>
@@ -321,7 +331,7 @@ function Body({ data, units, dateLabel, clientId, canBodyScan }: { data: Progres
       {canBodyScan && body.posture.length > 0 && (
         <Stagger>
           <ChartCard title="Posture" icon={METRICS.posture.icon} tone={METRICS.posture.tone}
-            value={body.latest.postureCva != null ? body.latest.postureCva.toFixed(0) : "—"} unit="° neck angle"
+            value={body.latest.postureCva != null ? body.latest.postureCva.toFixed(0) : undefined} unit="° neck angle"
             delta={body.latest.postureSeverity ? <Badge tone={POSTURE_SEVERITY_TONE[body.latest.postureSeverity]}>{capp(body.latest.postureSeverity)}</Badge> : undefined}>
             <AreaChart values={dense(body.posture, days)} tone={METRICS.posture.tone} trend label={dateLabel} format={(v) => `${v.toFixed(0)}°`} />
           </ChartCard>
@@ -375,7 +385,7 @@ function Training({ data, units }: { data: ProgressData; units: ReturnType<typeo
 
       {/* Weekly training — volume bars + a sets sparkline in one card (two forms). */}
       <Stagger>
-        <ChartCard title="Weekly volume" icon={Dumbbell} tone="activity" value={training.weekly.length ? Math.round(kgToDisplay(training.weekly.at(-1)!.tonnage, units)).toLocaleString() : "—"} unit={wl} delta={<Badge tone="neutral">last week</Badge>}>
+        <ChartCard title="Weekly volume" icon={Dumbbell} tone="activity" value={training.weekly.length ? Math.round(kgToDisplay(training.weekly.at(-1)!.tonnage, units)).toLocaleString() : undefined} unit={wl} delta={<Badge tone="neutral">last week</Badge>}>
           {training.weekly.length >= 2 ? (
             <div className="space-y-4">
               <BarChart values={tonnageVals} labels={weekLabels} tone="activity" format={(v) => `${v.toLocaleString()} ${wl}`} />
@@ -434,7 +444,7 @@ function Wellness({ data }: { data: ProgressData }) {
   return (
     <>
       <Stagger>
-        <ChartCard title="Wellness balance" icon={HeartPulse} tone="cardio" value={wellness.index != null ? wellness.index.toFixed(1) : "—"} unit={wellness.index != null ? "/ 5" : undefined}>
+        <ChartCard title="Wellness balance" icon={HeartPulse} tone="cardio" value={wellness.index != null ? wellness.index.toFixed(1) : undefined} unit="/ 5">
           {hasRadar ? <RadarChart axes={axes} tone="cardio" size={230} /> : <EmptyMini label="Check in with mood, energy & sleep to build your radar" />}
         </ChartCard>
       </Stagger>
@@ -442,10 +452,10 @@ function Wellness({ data }: { data: ProgressData }) {
       <section className="space-y-2">
         <Eyebrow>Averages</Eyebrow>
         <Stagger className="grid grid-cols-2 gap-3">
-          <StatCard stack label="Avg mood" value={wellness.averages.mood ?? "—"} unit="/ 5" icon={Smile} tone="nutrition" />
-          <StatCard stack label="Avg energy" value={wellness.averages.energy ?? "—"} unit="/ 5" icon={Zap} tone="warning" />
-          <StatCard stack label="Avg sleep" value={wellness.averages.sleepHours ?? "—"} unit="h" icon={Moon} tone="sleep" />
-          <StatCard stack label="Avg stress" value={wellness.averages.stress ?? "—"} unit="/ 5" icon={Gauge} tone="danger" />
+          <StatCard stack label="Avg mood" value={wellness.averages.mood ?? null} unit="/ 5" icon={Smile} tone="nutrition" />
+          <StatCard stack label="Avg energy" value={wellness.averages.energy ?? null} unit="/ 5" icon={Zap} tone="warning" />
+          <StatCard stack label="Avg sleep" value={wellness.averages.sleepHours ?? null} unit="h" icon={Moon} tone="sleep" />
+          <StatCard stack label="Avg stress" value={wellness.averages.stress ?? null} unit="/ 5" icon={Gauge} tone="danger" />
         </Stagger>
       </section>
 
@@ -470,7 +480,9 @@ function TrendRow({ icon: Icon, tone, label, value, unit, values }: { icon: Luci
     <div className="flex items-center justify-between gap-3">
       <div className="min-w-0">
         <div className="flex items-center gap-2 text-sm text-muted-foreground"><Icon className="size-4 shrink-0" style={{ color: toneVar[tone] }} />{label}</div>
-        <div className="numeral mt-1 text-xl font-bold leading-none">{value != null ? value.toFixed(1) : "—"}{value != null && <span className="ml-1 text-sm font-medium text-muted-foreground">{unit}</span>}</div>
+        {value == null
+        ? <div className="mt-1"><NoData className="text-xs">Not yet</NoData></div>
+        : <div className="numeral mt-1 text-xl font-bold leading-none">{value.toFixed(1)}<span className="ml-1 text-sm font-medium text-muted-foreground">{unit}</span></div>}
       </div>
       {values.length >= 2 ? <div className="overflow-hidden"><Sparkline values={values} tone={tone} width={150} height={44} /></div> : <span className="text-xs text-muted-foreground">Not enough data</span>}
     </div>
@@ -515,12 +527,14 @@ function DatePill({ value, min, max, label, onChange }: { value: string; min?: s
   );
 }
 
-function MiniStat({ icon: Icon, tone, label, value, sub }: { icon: LucideIcon; tone: Tone; label: string; value: string; sub?: string }) {
+function MiniStat({ icon: Icon, tone, label, value, sub }: { icon: LucideIcon; tone: Tone; label: string; value: string | null; sub?: string }) {
   return (
     <div className="flex items-center gap-2.5">
       <Icon className="size-4 shrink-0" style={{ color: toneVar[tone] }} />
       <span className="flex-1 truncate text-xs text-muted-foreground">{label}</span>
-      <span className="numeral text-sm font-bold">{value}{sub && <span className="ml-0.5 text-xs font-medium text-muted-foreground">{sub}</span>}</span>
+      {value == null
+        ? <NoData className="text-xs">Not yet</NoData>
+        : <span className="numeral text-sm font-bold">{value}{sub && <span className="ml-0.5 text-xs font-medium text-muted-foreground">{sub}</span>}</span>}
     </div>
   );
 }
@@ -548,7 +562,9 @@ function MeasChip({ label, value, units }: { label: string; value: number | null
   return (
     <div className="rounded-xl bg-surface-2 px-3 py-2.5">
       <div className="text-xs font-medium text-muted-foreground">{label}</div>
-      <div className="numeral mt-0.5 text-sm font-bold">{value != null ? `${cmToLengthDisplay(value, units).toFixed(1)}` : "—"}<span className="ml-0.5 text-xs font-medium text-muted-foreground">{value != null ? lengthLabel(units) : ""}</span></div>
+      {value == null
+        ? <div className="mt-0.5"><NoData className="text-xs">Not yet</NoData></div>
+        : <div className="numeral mt-0.5 text-sm font-bold">{cmToLengthDisplay(value, units).toFixed(1)}<span className="ml-0.5 text-xs font-medium text-muted-foreground">{lengthLabel(units)}</span></div>}
     </div>
   );
 }

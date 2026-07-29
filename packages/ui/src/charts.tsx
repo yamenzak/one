@@ -15,6 +15,7 @@
 import { motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { toneVar, toneSoft, type Tone } from "./primitives.js";
+import { NoData } from "./metrics.js";
 import { cn } from "./lib/utils.js";
 
 /** Measure a container's width so an SVG viewBox can fill it responsively. */
@@ -330,6 +331,11 @@ export function CalendarHeatmap({ days, today, tone = "activity", weeks = 16, ma
 
 export function ChartCard({ title, icon: Icon, tone = "primary", value, unit, delta, action, children, className }: {
   title: string; icon?: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; tone?: Tone;
+  /**
+   * Three states, deliberately distinct: omit it and the card has no headline
+   * number at all; pass `null` and the card says there isn't one yet; pass a
+   * value and it's set as a numeral. Never pass a dash — see `NoData` (§5).
+   */
   value?: ReactNode; unit?: string; delta?: ReactNode; action?: ReactNode; children: ReactNode; className?: string;
 }) {
   return (
@@ -342,6 +348,7 @@ export function ChartCard({ title, icon: Icon, tone = "primary", value, unit, de
           {Icon && <span className={cn("grid size-8 shrink-0 place-items-center rounded-xl", toneSoft[tone])}><Icon className="size-4" /></span>}
           <div>
             <div className="text-sm font-semibold">{title}</div>
+            {value === null && <div className="mt-0.5"><NoData className="text-xs" /></div>}
             {value != null && <div className="numeral text-xl font-bold leading-tight">{value}{unit && <span className="ml-1 text-xs font-medium text-muted-foreground">{unit}</span>}{delta && <span className="ml-2 align-middle text-xs">{delta}</span>}</div>}
           </div>
         </div>

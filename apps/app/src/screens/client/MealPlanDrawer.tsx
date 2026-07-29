@@ -460,7 +460,7 @@ function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, on
           <div className="absolute inset-x-0 bottom-0 p-3">
             <div className="truncate font-semibold text-white">{opt.mealName || (opt.isFree ? "Free meal" : `Option ${index + 1}`)}</div>
             {opt.isFree ? (
-              <div className="numeral truncate text-xs text-white/85">≤ {opt.freeMealMaxCalories != null ? fmtEnergy(opt.freeMealMaxCalories, units) : "—"}</div>
+              <div className="numeral truncate text-xs text-white/85">{opt.freeMealMaxCalories != null ? `≤ ${fmtEnergy(opt.freeMealMaxCalories, units)}` : "No cap"}</div>
             ) : (
               <div className="mt-0.5 flex items-center gap-2">
                 <span className="numeral shrink-0 text-xs font-semibold text-white">{fmtEnergy(totals.calories, units)}</span>

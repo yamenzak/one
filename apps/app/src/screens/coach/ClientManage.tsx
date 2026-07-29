@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@kova/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, personaLabel, personaTone } from "@kova/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, personaLabel, personaTone, NoData } from "@kova/ui";
 import { api, errorText, todayLocal } from "../../api.js";
 import { FeatureLock, useCan } from "../../FeatureLock.js";
 import { useSession } from "../../session.js";
@@ -165,7 +165,7 @@ export function ClientManage({ clientId, clientName }: { clientId: string; clien
             <GlanceStrip items={[
               { icon: Check, tone: "activity", value: "Active", label: "Status" },
               { icon: Ticket, tone: "primary", value: active.daysRemaining, label: "Days left" },
-              { icon: ClipboardList, tone: "neutral", value: activePkg?.name ?? "—", label: "Plan" },
+              { icon: ClipboardList, tone: "neutral", value: activePkg?.name ?? null, label: "Plan" },
             ]} />
           ) : (
             <Card><p className="text-sm text-muted-foreground">No active subscription. Grant a package (or a $0 comp) to unlock features.</p></Card>
@@ -1111,11 +1111,11 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
             <Metric label="Workouts" value={report.compliance.workoutDays} />
             <Metric label="Streak" value={report.compliance.currentStreak} />
             <Metric label="Consistency" value={`${report.compliance.checkInConsistencyPct}%`} />
-            <Metric label="Cal adherence" value={report.compliance.calorieAdherencePct != null ? `${report.compliance.calorieAdherencePct}%` : "—"} />
-            <Metric label="Weight Δ" value={wDelta != null ? `${wDelta > 0 ? "+" : ""}${wDelta} ${weightLabel(units)}` : "—"} />
-            <Metric label="Body-fat Δ" value={bfDelta != null ? `${bfDelta > 0 ? "+" : ""}${bfDelta}%` : "—"} />
-            <Metric label="Avg mood" value={report.averages.mood ?? "—"} />
-            <Metric label="Avg sleep" value={report.averages.sleepHours != null ? `${report.averages.sleepHours}h` : "—"} />
+            <Metric label="Cal adherence" value={report.compliance.calorieAdherencePct != null ? `${report.compliance.calorieAdherencePct}%` : null} />
+            <Metric label="Weight Δ" value={wDelta != null ? `${wDelta > 0 ? "+" : ""}${wDelta} ${weightLabel(units)}` : null} />
+            <Metric label="Body-fat Δ" value={bfDelta != null ? `${bfDelta > 0 ? "+" : ""}${bfDelta}%` : null} />
+            <Metric label="Avg mood" value={report.averages.mood ?? null} />
+            <Metric label="Avg sleep" value={report.averages.sleepHours != null ? `${report.averages.sleepHours}h` : null} />
             <Metric label="Tonnage" value={`${Math.round(kgToDisplay(report.totalTonnage, units) / 1000).toLocaleString()}k ${weightLabel(units)}`} />
           </div>
           {report.prs.length > 0 && (
@@ -1132,6 +1132,11 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
   );
 }
 
-function Metric({ label, value }: { label: string; value: string | number }) {
-  return <div className="rounded-xl bg-secondary p-3"><div className="numeral text-lg font-semibold">{value}</div><div className="text-xs text-muted-foreground">{label}</div></div>;
+function Metric({ label, value }: { label: string; value: string | number | null }) {
+  return (
+    <div className="rounded-xl bg-secondary p-3">
+      {value == null ? <NoData className="block text-xs">Not yet</NoData> : <div className="numeral text-lg font-semibold">{value}</div>}
+      <div className="text-xs text-muted-foreground">{label}</div>
+    </div>
+  );
 }

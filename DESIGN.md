@@ -42,20 +42,29 @@ compact billing banner. See UI-LANGUAGE §13 for the component registry.
 
 **Screens on the spine:** the four doorways · sign-in · the three-step studio
 wizard · client Today · client Eat · client Train · client Progress (per-lens) ·
-client Shop · coach Today · coach Clients.
+client Wellness · client Shop · coach Today · coach Clients.
 
 **Screens still to do**, with what each one's anchor should be — the question is
 always "what is this screen about, in one noun":
 
 | Screen | Candidate anchor | Note |
 |---|---|---|
-| `client/Wellness` | — | **Needs a product decision, not a rename.** It is sleep + mood + water + fasting on one surface, which by §1's own test is four subjects. Either it splits, or one of them is promoted and the rest become sections. Do not force an anchor on it before that is decided. |
 | `client/WorkoutPlayer` | the set you are on | Full-bleed; likely opts out of the content column. |
 | `coach/Business` | this month's revenue, or credits left | Tabbed — one anchor per tab (§1). |
 | `coach/Library` | items in the library | List-shaped: `Group` of `Row`s. |
 | `coach/ClientManage` | the client | Tabbed. |
 | `coach/Packages`, `coach/Staff`, `coach/Sessions` | count of each | All list-shaped. |
 | `Settings`, `AdminConsole` | — | Settings surfaces are lists, not anchored screens: `SettingsList` / `Group` of `Row`s, no display numeral. |
+
+**`client/Wellness` — resolved.** It looked like four subjects on one surface
+(sleep + mood + water + fasting) and so like a §1 violation waiting for a product
+decision. It isn't: those four are the *inputs*, and the **wellness score** is
+the one noun they add up to — the tour has said exactly that since it was
+written ("one number for how you're really doing"), it just wasn't the largest
+thing on the screen. The score is now the anchor, `WellnessScoreCard` became
+`WellnessPillars` (T3, and no longer restates the number), and the quick-log
+chip row became the action cluster. A brand-new client scores `0`, which the
+anchor renders as the band's words rather than a giant zero — see §5.
 
 **Still not conformant:** the overlay family (`Sheet`, `FixedDrawer`, `Dialog`,
 `DropdownMenu`, `SegmentedControl`, `Select`, `Tooltip`) — they take the radius,
@@ -71,9 +80,9 @@ by design (§7 `Tile` vs `Row`).
 Follow the order in UI-LANGUAGE.md §14: tokens → `Row`/`Group` → `Atmosphere`/
 `Anchor` → motion → screen by screen.
 
-## Three enforcement layers
+## Four enforcement layers
 
-The language is only worth what a screen cannot quietly opt out of. Three things
+The language is only worth what a screen cannot quietly opt out of. Four things
 are now checked rather than agreed:
 
 | Guard | Lives in | Catches |
@@ -81,8 +90,9 @@ are now checked rather than agreed:
 | Contrast | `packages/ui/test/contrast.test.ts` | any token pair below WCAG AA, in both themes, with the oklch→sRGB maths pinned against known ratios |
 | Radius · elevation · hairlines | `apps/app/src/design-tokens.conformance.test.ts` | a hard-coded visual value that cannot follow a tenant's brand |
 | Type scale | `apps/app/src/type-scale.conformance.test.ts` | a hand-rolled spelling of a role the scale already names |
+| Empty values | `apps/app/src/no-data.conformance.test.ts` | a dash reaching a value slot, where at numeral sizes it reads as a horizontal rule (§5) |
 
-All three scan `packages/ui` as well as the app — the design system is where a
+All four scan `packages/ui` as well as the app — the design system is where a
 bypass does the most damage, and each of these found real violations there.
 Each has an escape hatch that requires a written reason.
 
