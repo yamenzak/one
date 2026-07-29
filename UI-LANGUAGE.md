@@ -65,6 +65,18 @@ placed above its true tier is the single most common way a screen rots.**
   the page's own title drops to an eyebrow, because the tab bar already says it
   and a title is navigation rather than content. This is the honest reading of
   "one anchor per screen" — not an exception to it.
+- **Some surfaces have no T1, and that is the correct answer.** Two kinds:
+  **list surfaces** (settings, admin consoles) — a screen that is only a set of
+  rows has no single value to promote, and forcing one gives you a display
+  numeral counting something nobody came to count. And **task surfaces** — a
+  workout player mid-session, a plan builder, a camera flow. A task surface's
+  subject *changes as you work through it*, so a fixed T1 would be stale by the
+  second interaction; its progress belongs in persistent chrome, where it stays
+  visible, rather than at the top of a spine that scrolls away. Reach for this
+  deliberately, not as an excuse: a browse surface that merely *feels* busy
+  still has an anchor, and finding it is the work. The workout player is both in
+  one file — its day picker is a browse surface and has an anchor; its session
+  view is a task surface and does not.
 - **T2 tops out at five.** Four is better. The fifth slot, when needed, is
   always **More** — never a fifth real action.
 - **T2 has a floor of three.** A cluster of one is a single circle adrift in the

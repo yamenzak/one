@@ -10,6 +10,7 @@ import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmt
 import {
   Button, Card, Badge, Field, Input, Label, Sheet, SubCard, ProgressRing, EmptyState,
   Reveal, Skeleton, SkeletonLine, SkeletonList, useModalOverlay,
+  TierAnchor, CountUp, Atmosphere, stagger, rowStagger, rowIn, DUR, EASE_OUT,
   AlertTriangle, ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, LifeBuoy, Plus, Minus, RotateCcw, cn,
 } from "@kova/ui";
 import { api, todayLocal, errorText } from "../../api.js";
@@ -203,41 +204,47 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   if (dayIndex === null || !plan.body.days[dayIndex]) {
     const trainingDays = active ? active.body.days.filter((d) => !d.isRestDay).length : 0;
     return (
-      <PlanShell onEscape={onExit}>
-        <HeaderBar title={isPast ? "Past plan" : "Workout plan"} subtitle={active?.name} onBack={onExit}
+      <PlanShell onEscape={onExit} atmosphere>
+        <HeaderBar title={isPast ? "Past plan" : "Workout plan"} onBack={onExit}
           right={
             <div className="flex items-center gap-2">
               <button onClick={() => startTour("workout")} aria-label="Replay workout plan tour" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><LifeBuoy /></button>
               {pastPlans.length > 0 && <button onClick={() => setHistOpen(true)} aria-label="Past plans" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><History /></button>}
             </div>
           } />
-        <div className="mx-auto max-w-xl space-y-5 p-4 pb-28">
-        {/* Hero — the plan at a glance. */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <Card className="relative overflow-hidden">
-            <div className="pointer-events-none absolute -right-10 -top-10 size-36 rounded-full bg-primary/10 blur-2xl" />
-            <div className="relative">
-              <div className={cn("text-micro uppercase", isPast ? "text-muted-foreground" : "text-activity")}>{isPast ? "Past plan" : "Your plan"}</div>
-              <h2 className="mt-0.5 text-title-3">{active?.name}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{trainingDays} training day{trainingDays === 1 ? "" : "s"}{active?.publishedAt ? ` · ${new Date(active.publishedAt).toLocaleDateString()}` : ""}</p>
-              {isPast ? (
-                <button onClick={() => pickPlan(null)} className="mt-3 inline-flex items-center gap-1 rounded-full bg-activity-soft px-3 py-1 text-xs font-semibold text-activity [&_svg]:size-3.5"><ArrowLeft /> Back to current plan</button>
-              ) : (
-                <p className="mt-3 text-sm text-muted-foreground">{isPast ? "" : "Pick a day to train."}</p>
-              )}
-            </div>
-          </Card>
-        </motion.div>
+        <motion.div variants={stagger} initial="hidden" animate="show" className="mx-auto max-w-xl space-y-5 p-4 pb-28">
+        {/*
+          T1 — THE ANCHOR (UI-LANGUAGE §1).
 
-        {/* Day covers — 2 per row, branded art, recommended highlighted. */}
-        <div className="grid grid-cols-2 gap-3">
+          The picker is a browse surface and its subject is the plan, so the
+          plan's NAME is the eyebrow and its shape is the number: how many days
+          of training this is. A name cannot be the anchor value — "Upper / Lower
+          Split A" at 56px wraps to three lines and stops being a numeral — but
+          it is exactly what an eyebrow is for.
+        */}
+        <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
+          <p className={cn("text-caption", isPast ? "text-muted-foreground" : "text-activity")}>{isPast ? "Past plan" : active?.name}</p>
+          <p className="numeral text-display"><CountUp value={trainingDays} /></p>
+          <p className="text-caption text-muted-foreground">
+            {trainingDays === 1 ? "training day" : "training days"}
+            {active?.publishedAt ? ` · from ${new Date(active.publishedAt).toLocaleDateString()}` : ""}
+          </p>
+          {isPast && (
+            <button onClick={() => pickPlan(null)} className="mt-2 inline-flex items-center gap-1 rounded-full bg-activity-soft px-3 py-1 text-xs font-semibold text-activity [&_svg]:size-3.5"><ArrowLeft /> Back to current plan</button>
+          )}
+        </TierAnchor>
+
+        {/* Day covers — 2 per row, branded art, recommended highlighted. A day is
+            browsed, not scanned, so these are tiles rather than rows (§7). */}
+        <p className="px-1 text-micro uppercase text-muted-foreground">{isPast ? "Days in this plan" : "Pick a day to train"}</p>
+        <motion.div variants={rowStagger} className="grid grid-cols-2 gap-3">
           {(active?.body.days ?? []).map((day, i) => {
             const sets = day.isRestDay ? 0 : countSets(day);
             const exercises = day.isRestDay ? 0 : day.blocks.reduce((n, b) => n + b.slots.length, 0);
             const rec = !isPast && recommendedDay === i && !day.isRestDay;
             const onPick = () => { if (day.isRestDay) return; if (isPast) setPreview({ day, index: i }); else setDayIndex(i); };
             return (
-              <motion.button key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} onClick={onPick} disabled={day.isRestDay} className="text-left disabled:opacity-80">
+              <motion.button key={i} variants={rowIn} onClick={onPick} disabled={day.isRestDay} className="text-left disabled:opacity-80">
                 <div className={`relative aspect-[4/5] overflow-hidden rounded-2xl bg-card transition-transform ${day.isRestDay ? "" : "active:scale-[0.98]"} ${rec ? "ring-2 ring-activity ring-offset-2 ring-offset-background" : ""}`}>
                   {day.imageUrl ? <img src={day.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className={`absolute inset-0 ${day.isRestDay ? "bg-gradient-to-br from-sleep/20 to-surface-2" : "bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2"}`} />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
@@ -251,8 +258,8 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
               </motion.button>
             );
           })}
-        </div>
-        </div>
+        </motion.div>
+        </motion.div>
 
         {histOpen && (
           <Sheet open onClose={() => setHistOpen(false)} title="Past plans">
@@ -474,10 +481,25 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
 /** Full-screen focused plan overlay — covers the app chrome (top bar + tab bar)
  *  and owns its own scroll, exactly like the meal-plan drawer, so a plan is a
  *  distraction-free surface rather than a page inside the shell. */
-function PlanShell({ children, onEscape }: { children: ReactNode; onEscape?: () => void }) {
+function PlanShell({ children, onEscape, atmosphere }: { children: ReactNode; onEscape?: () => void; atmosphere?: boolean }) {
   const ref = useModalOverlay(onEscape);
   return (
-    <motion.div ref={ref} role="dialog" aria-modal="true" aria-label="Workout plan" tabIndex={-1} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-background outline-none">
+    <motion.div
+      ref={ref}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Workout plan"
+      tabIndex={-1}
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: DUR.slow, ease: EASE_OUT }}
+      className="fixed inset-0 z-50 isolate overflow-y-auto overscroll-contain bg-background outline-none"
+    >
+      {/* The player is a full-screen surface, so it owns its own atmosphere —
+          without it the day picker was the one anchored screen in the product
+          sitting on flat canvas (§3). Only on the picker: the session view is a
+          task surface with no anchor for a wash to sit behind. */}
+      {atmosphere && <Atmosphere />}
       {children}
     </motion.div>
   );
@@ -489,7 +511,7 @@ function HeaderBar({ title, subtitle, onBack, right }: { title: string; subtitle
   return (
     <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-border/40 bg-background/85 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 backdrop-blur-xl">
       {onBack && <button onClick={onBack} aria-label="Back" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><ArrowLeft /></button>}
-      <div className="min-w-0 flex-1"><div className="truncate text-base font-bold tracking-tight">{title}</div>{subtitle != null && <div className="truncate text-xs text-muted-foreground">{subtitle}</div>}</div>
+      <div className="min-w-0 flex-1"><div className="truncate text-body-lg">{title}</div>{subtitle != null && <div className="truncate text-caption text-muted-foreground">{subtitle}</div>}</div>
       {right}
     </div>
   );
