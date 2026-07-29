@@ -10,7 +10,7 @@ import {
   Button, Field, Textarea, Sheet, Chip, IconBadge, Switch,
   Utensils, Footprints, Droplet, Weight, Ruler, Moon, Smile, ClipboardList, Camera, Angry, Frown, Meh, Laugh, Search, Timer, HeartPulse, MapPin, Flame, Dumbbell,
   cn, toneVar, type LucideIcon, type Tone,
-} from "@kova/ui";
+} from "@4dl/ui";
 import { api, errorText, isQueued, todayLocal, uploadMedia } from "../../api.js";
 import { QueuedNotice } from "../../notices.js";
 import { useCan } from "../../FeatureLock.js";

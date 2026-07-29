@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Dumbbell, Info, cn } from "@kova/ui";
+import { Dumbbell, Info, cn } from "@4dl/ui";
 
 // ── Shared frame ticker ──────────────────────────────────────────────────────
 // One global interval drives every animated thumbnail in sync, so a whole

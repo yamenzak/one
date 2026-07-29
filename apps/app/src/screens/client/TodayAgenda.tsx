@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Card, IconBadge, cn, Check, ClipboardList, Dumbbell, Utensils, Pill, ChevronRight, ChevronDown, type LucideIcon, type Tone, SPRING_SNAP, SPRING_SOFT, DUR,
-} from "@kova/ui";
+} from "@4dl/ui";
 import { api, isQueued, errorText } from "../../api.js";
 import { QueuedNotice } from "../../notices.js";
 import type { TodayBundle } from "./Today.js";

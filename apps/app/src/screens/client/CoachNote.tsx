@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { DUR } from "@kova/ui";
+import { DUR } from "@4dl/ui";
 import { api, todayLocal } from "../../api.js";
 import { AiAvatar, useAiIdentity } from "../../AiAvatar.js";
 import { Markdown } from "../../Markdown.js";

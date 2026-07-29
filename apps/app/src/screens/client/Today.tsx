@@ -4,13 +4,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtVolume, fmtEnergy, fmtWeight, featureEnabled, type UnitPrefs } from "@kova/domain";
-import {
-  Button, Card, Skeleton, MacroBar, IconBadge, Sheet, EmptyState, ProgressRing,
-  Reveal, SkeletonHero, SkeletonList, SkeletonHeader,
-  Page, Stagger, Anchor, ActionCluster, CountUp, Unit, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
-  Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Send, Info, Utensils, Croissant, Soup, Apple,
-  Store, Ticket, AlertTriangle, ShieldCheck, toneVar, ChevronLeft, ChevronRight, Target, ScanLine, Calendar, BookOpen, Group, Row, User, type Tone, type LucideIcon,
-} from "@kova/ui";
+import { Button, Card, Skeleton, IconBadge, Sheet, EmptyState, ProgressRing, Reveal, SkeletonHero, SkeletonList, SkeletonHeader, Page, Stagger, Anchor, ActionCluster, CountUp, Unit, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock, Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Send, Info, Utensils, Croissant, Soup, Apple, Store, Ticket, AlertTriangle, ShieldCheck, toneVar, ChevronLeft, ChevronRight, Target, ScanLine, Calendar, BookOpen, Group, Row, User, type Tone, type LucideIcon } from "@4dl/ui";
+import { MacroBar } from "../../registry/index.js";
 import type { WidgetItem } from "@kova/protocol";
 import { useNavigate } from "react-router-dom";
 import { api, todayLocal, shiftDay } from "../../api.js";

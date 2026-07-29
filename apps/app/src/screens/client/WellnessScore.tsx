@@ -8,7 +8,7 @@
  * pillar is lifting the number and which is dragging it.
  */
 
-import { toneVar, IconBadge, Dumbbell, Utensils, Bed, ListChecks, Droplet, Smile, Pill, Scale, HeartPulse, Skeleton, type Tone, type LucideIcon } from "@kova/ui";
+import { toneVar, IconBadge, Dumbbell, Utensils, Bed, ListChecks, Droplet, Smile, Pill, Scale, HeartPulse, Skeleton, type Tone, type LucideIcon } from "@4dl/ui";
 
 export interface WellnessPillar { key: string; label: string; score: number | null; weight: number; available: boolean }
 export interface WellnessScoreResult { score: number; band: "start" | "building" | "solid" | "strong" | "peak"; pillars: WellnessPillar[] }

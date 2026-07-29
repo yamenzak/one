@@ -6,7 +6,7 @@
  * wherever a persona appears.
  */
 
-import type { Tone } from "../primitives.js";
+import type { Tone } from "@4dl/ui";
 
 /** The internal role ids (match @kova/domain TENANT_ROLES + Better Auth). */
 export type PersonaRole = "owner" | "trainer" | "assistant" | "client" | "member";

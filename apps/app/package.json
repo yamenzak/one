@@ -17,7 +17,7 @@
     "@mediapipe/tasks-vision": "^0.10.35",
     "@kova/domain": "workspace:*",
     "@kova/protocol": "workspace:*",
-    "@kova/ui": "workspace:*",
+    "@4dl/ui": "workspace:*",
     "@simplewebauthn/browser": "^13.3.0",
     "@zxing/browser": "^0.2.1",
     "@zxing/library": "^0.23.0",

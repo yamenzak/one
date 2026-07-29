@@ -10,7 +10,7 @@ import type { NotifType } from "@kova/domain";
 import {
   ClipboardList, BadgeCheck, Scale, Target, FlaskConical, Pill, ArrowLeftRight,
   BookOpen, Calendar, CreditCard, AlertTriangle, Archive, Bell, Trophy, type LucideIcon, type Tone,
-} from "@kova/ui";
+} from "@4dl/ui";
 
 export interface NotifCoding { icon: LucideIcon; tone: Tone }
 

@@ -5,7 +5,7 @@
  */
 
 import { motion, AnimatePresence } from "motion/react";
-import { cn, toneSoft, Check, ChevronRight, type Tone, SPRING_SNAP, DUR} from "@kova/ui";
+import { cn, toneSoft, Check, ChevronRight, type Tone, SPRING_SNAP, DUR} from "@4dl/ui";
 import type { ReactNode } from "react";
 
 /**

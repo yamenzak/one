@@ -7,10 +7,8 @@
  */
 
 import { fmtWeight, fmtVolume } from "@kova/domain";
-import {
-  Sheet, SubCard, Badge, IconBadge, PhotoGrid, cn, toneVar, METRICS, type Photo, type Tone, type LucideIcon,
-  ImageIcon, FlaskConical, ClipboardList, Calendar, Camera, HeartPulse,
-} from "@kova/ui";
+import { Sheet, SubCard, Badge, IconBadge, PhotoGrid, cn, toneVar, type Photo, type Tone, type LucideIcon, ImageIcon, FlaskConical, ClipboardList, Calendar, Camera, HeartPulse } from "@4dl/ui";
+import { METRICS } from "../../registry/index.js";
 import { useUnits } from "../../units.js";
 import type { UnitPrefs } from "@kova/domain";
 import { SCALES, scaleWord } from "./scales.js";

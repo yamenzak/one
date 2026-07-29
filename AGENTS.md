@@ -398,7 +398,7 @@ Americas. This applies to every date-only column, including `lab_tests.due_by`.
 **Units.** Store metric, convert at display via `@kova/domain` `units.ts` and the
 `useUnits()` hook. Never post a display-unit number.
 
-**Design system.** Use `@kova/ui` primitives, never raw palette classes. **Text
+**Design system.** Use `@4dl/ui` primitives, never raw palette classes. **Text
 or icons on a solid domain tone must be `text-[var(--tone-foreground)]`, never
 `text-white`** — tones invert per mode, so white-on-tone is ~1.9:1 in dark. Never
 add `[color-scheme:dark]` to an element; `tokens.css` owns it at the root.

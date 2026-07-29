@@ -13,9 +13,16 @@ inventory Kova is modeled on is in
 interface language — hierarchy, layout, tokens, motion, copy, component grammar —
 written product-agnostically because it is the extraction target for the shared
 UI package other 4DL apps will consume. [DESIGN.md](DESIGN.md) maps Kova's
-screens onto it. **When they disagree, UI-LANGUAGE.md wins.** `packages/ui` today
-predates the language and is not yet conformant; DESIGN.md lists the deltas and
-UI-LANGUAGE.md §13 gives the order to close them.
+screens onto it. **When they disagree, UI-LANGUAGE.md wins.** DESIGN.md lists the
+remaining deltas and UI-LANGUAGE.md §13 gives the order to close them.
+
+**The design system is `@4dl/ui`, not Kova's.** It is shared across 4DL apps, so
+it carries no product vocabulary: no clients, workouts, meals, or coaches, and no
+router. Kova's registries (`METRICS`, `MACRO_KEYS`, `FASTING_ZONES`, personas,
+`MetricChip`/`MacroBar`) live in `apps/app/src/registry/`, and
+`registry.conformance.test.ts` keeps them there. The boundary rule — plus the one
+documented leak (`Tone`) — is in [packages/ui/README.md](packages/ui/README.md).
+Read it before adding anything to that package.
 
 ## Stack
 
@@ -36,7 +43,8 @@ packages/
   domain/    # pure logic (no I/O): credits, entitlements, perms, budgets,
              # nutrition/TDEE, body-fat, activity/workout math, progress. Tested.
   protocol/  # zod wire schemas shared api <-> app (plan bodies, log payloads, context)
-  ui/        # the design system (tokens + identity components)
+  ui/        # @4dl/ui — the SHARED design system: tokens + product-agnostic
+             # primitives. No product vocabulary, no router. See its README.
   brand/     # (reserved) logos, illustrations
 ```
 

@@ -38,7 +38,7 @@ import {
   TierAnchor,
   TierContent,
   motion,
-} from "@kova/ui";
+} from "@4dl/ui";
 import { api, ApiError } from "../api.js";
 import { useSession } from "../session.js";
 import { passkeySupported, signInWithPasskey, conditionalPasskeyAvailable } from "../passkey.js";

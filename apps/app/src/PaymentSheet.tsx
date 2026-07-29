@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Button, Sheet } from "@kova/ui";
+import { Button, Sheet } from "@4dl/ui";
 import { loadStripe, type StripeElements, type StripeInstance } from "./stripe.js";
 
 export interface CheckoutIntent {

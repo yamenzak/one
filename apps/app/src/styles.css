@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "@kova/ui/tokens.css";
+@import "@4dl/ui/tokens.css";
 
 /* Tailwind v4: scan the workspace UI package for class names. */
 @source "../../../packages/ui/src";

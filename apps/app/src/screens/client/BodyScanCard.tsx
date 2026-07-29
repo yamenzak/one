@@ -11,10 +11,8 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  Card, Button, Badge, Spinner, IconBadge, EmptyState, SegmentedControl, cn, toneVar, POSTURE_SEVERITY_TONE,
-  AreaChart, ScanLine, Camera, Percent, History, RotateCcw, ChevronRight,
-} from "@kova/ui";
+import { Card, Button, Badge, Spinner, IconBadge, EmptyState, SegmentedControl, cn, toneVar, AreaChart, ScanLine, Camera, Percent, History, RotateCcw, ChevronRight } from "@4dl/ui";
+import { POSTURE_SEVERITY_TONE } from "../../registry/index.js";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";

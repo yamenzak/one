@@ -9,10 +9,8 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { cmToLengthDisplay, lengthLabel, kgToDisplay, weightLabel, bodyComposition, type UnitPrefs } from "@kova/domain";
-import {
-  Button, Badge, IconBadge, SegmentedControl, AreaChart, cn, toneVar, useModalOverlay, POSTURE_SEVERITY_TONE,
-  ScanLine, X, Percent, RotateCcw, User, motion, stagger, popIn, CountUp, NoData,
-} from "@kova/ui";
+import { Button, Badge, IconBadge, SegmentedControl, AreaChart, cn, toneVar, useModalOverlay, ScanLine, X, Percent, RotateCcw, User, motion, stagger, popIn, CountUp, NoData } from "@4dl/ui";
+import { POSTURE_SEVERITY_TONE } from "../../../registry/index.js";
 import { Silhouette } from "./Silhouette.js";
 import { Body3D } from "./Body3D.js";
 import { scanProfile, modelSilhouette } from "./model.js";

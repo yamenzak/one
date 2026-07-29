@@ -6,7 +6,7 @@
  * "bottts" robot seeded per studio, named "Coach".
  */
 
-import { dicebearUrl, cn } from "@kova/ui";
+import { dicebearUrl, cn } from "@4dl/ui";
 import { useSession } from "./session.js";
 
 export function aiAvatarSrc(uploaded: string | null | undefined, seed: string): string {

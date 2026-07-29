@@ -2,12 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fmtEnergy, fmtVolume, volumeDisplayToMl, kcalToDisplay } from "@kova/domain";
-import {
-  Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MacroBar, MetricChip, MetricPill, ProgressRing, METRICS, toneSoft, Eyebrow, Page, Stagger, EmptyState, motion, ConfirmDialog,
-  Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
-  Plus, Utensils, Croissant, Soup, Apple, Dumbbell, Trash2, AlertTriangle, type LucideIcon,
-  Anchor, CountUp, Droplet, SPRING_SOFT, cn,
-} from "@kova/ui";
+import { Button, Card, Field, Chip, Sheet, Skeleton, IconBadge, MetricPill, ProgressRing, toneSoft, Eyebrow, Page, Stagger, EmptyState, motion, ConfirmDialog, Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine, Plus, Utensils, Croissant, Soup, Apple, Dumbbell, Trash2, AlertTriangle, type LucideIcon, Anchor, CountUp, Droplet, SPRING_SOFT, cn } from "@4dl/ui";
+import { MacroBar, MetricChip, METRICS } from "../../registry/index.js";
 import type { UnitPrefs } from "@kova/domain";
 import { api, errorText, isQueued, todayLocal } from "../../api.js";
 import { QueuedNotice } from "../../notices.js";

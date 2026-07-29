@@ -11,7 +11,7 @@ import {
   ChevronDown,
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
   Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Hand, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, toneVar, type TabDef, type Tone,
-} from "@kova/ui";
+} from "@4dl/ui";
 import { resolveStanding, studioStandingOfGate } from "@kova/domain";
 import { useSession, useActiveClientId, adminUrl } from "./session.js";
 import { useTheme } from "./theme.js";

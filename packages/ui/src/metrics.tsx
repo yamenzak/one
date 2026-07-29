@@ -8,7 +8,6 @@ import type { ReactNode } from "react";
 import { cn } from "./lib/utils.js";
 import { toneSoft, toneText, toneVar, type Tone } from "./primitives.js";
 import { Check, type LucideIcon } from "./lib/icons.js";
-import { METRICS, MACRO_KEYS, type MetricKey } from "./lib/metric-coding.js";
 import { SPRING_SNAP , DUR} from "./lib/animation.js";
 
 interface MetricPillProps {
@@ -180,63 +179,6 @@ export function StatCard({ label, value, emptyText, unit, badge, chart, icon: Ic
 // ── Metric coding: consistent chip + macro breakdown ────────────────────────
 
 /** A small metric chip — icon + value in the metric's canonical color. */
-export function MetricChip({ metric, value, className }: { metric: MetricKey; value: ReactNode; className?: string }) {
-  const m = METRICS[metric];
-  return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", toneSoft[m.tone], className)}>
-      <m.icon className="size-3.5" />
-      <span className="numeral">{value}</span>
-    </span>
-  );
-}
-
-/** Compact inline macros — a colored icon + grams for protein/carbs/fat. */
-export function MacroInline({ proteinG, carbsG, fatG, className }: { proteinG: number; carbsG: number; fatG: number; className?: string }) {
-  const grams = { protein: proteinG, carbs: carbsG, fat: fatG };
-  return (
-    <span className={cn("numeral inline-flex items-center gap-2 font-medium", className)}>
-      {MACRO_KEYS.map((k) => {
-        const M = METRICS[k];
-        return (
-          <span key={k} className={cn("inline-flex items-center gap-1", toneText[M.tone])}>
-            <M.icon className="size-3.5" />{Math.round(grams[k])}
-          </span>
-        );
-      })}
-    </span>
-  );
-}
-
-/** The protein/carbs/fat triad, colored + iconed from the registry. */
-export function MacroBar({ proteinG, carbsG, fatG, targets, className }: { proteinG: number; carbsG: number; fatG: number; targets?: { proteinG?: number; carbsG?: number; fatG?: number } | null; className?: string }) {
-  const grams = { protein: proteinG, carbs: carbsG, fat: fatG };
-  const tgt: Record<string, number | undefined> = { protein: targets?.proteinG, carbs: targets?.carbsG, fat: targets?.fatG };
-  return (
-    <div className={cn("grid grid-cols-3 gap-2", className)}>
-      {MACRO_KEYS.map((k) => {
-        const m = METRICS[k];
-        const t = tgt[k];
-        return (
-          <div key={k} className={cn("relative flex items-center gap-2 overflow-hidden rounded-xl px-2.5 py-2", toneSoft[m.tone])}>
-            {t ? <span aria-hidden className="absolute inset-y-0 left-0 bg-current opacity-[0.12]" style={{ width: `${Math.min(100, (grams[k] / t) * 100)}%` }} /> : null}
-            <m.icon className="relative size-4 shrink-0" style={{ color: toneVar[m.tone] }} />
-            {/* `truncate`, not wrap. "Protein / 165" in a third of a phone
-                wrapped to two lines and pushed the chip taller than its two
-                neighbours, so a row designed as three equal pills rendered as
-                two pills and a box. Losing the tail of a target is a smaller
-                cost than losing the rhythm of the row. */}
-            <span className="relative min-w-0">
-              <span className="numeral block text-sm font-bold leading-none">{Math.round(grams[k])}<span className="text-xs font-medium opacity-70"> g</span></span>
-              <span className="block truncate text-xs font-medium leading-tight opacity-70">{m.label}{t ? ` / ${t}` : ""}</span>
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Sparkline (dot-line + optional dotted target) ────────────────────────────
 export function Sparkline({ values, width = 120, height = 52, tone = "activity", target, className }: { values: number[]; width?: number; height?: number; tone?: Tone; target?: number; className?: string }) {
   if (values.length < 2) return null;
   const all = target !== undefined ? [...values, target] : values;

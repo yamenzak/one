@@ -12,7 +12,8 @@ import {
   PRIMARY_GOAL_LABELS, ACTIVITY_LEVEL_LABELS, DIETARY_APPROACH_LABELS, WORKOUT_LOCATION_LABELS, BMI_CATEGORY_LABELS,
   type ClientPreferences, type BmiCategory, type CalculatorInputs, type Gender, type ActivityLevel, type PrimaryGoal, type DietaryApproach, type UnitPrefs,
 } from "@kova/domain";
-import { Button, Card, Badge, Field, Select, Reveal, SkeletonStatGrid, SkeletonList, Page, Stagger, Eyebrow, EmptyState, GlanceStrip, METRICS, toneVar, Target, Activity, Scale, Flame, AlertTriangle, Calculator, ArrowRight, Calendar, type MetricKey, NoData } from "@kova/ui";
+import { Button, Card, Badge, Field, Select, Reveal, SkeletonStatGrid, SkeletonList, Page, Stagger, Eyebrow, EmptyState, GlanceStrip, toneVar, Target, Activity, Scale, Flame, AlertTriangle, Calculator, ArrowRight, Calendar, NoData } from "@4dl/ui";
+import { METRICS, type MetricKey } from "../../registry/index.js";
 import { api, errorText } from "../../api.js";
 import { useUnits } from "../../units.js";
 

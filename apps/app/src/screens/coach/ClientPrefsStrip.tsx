@@ -10,7 +10,7 @@ import {
   PRIMARY_GOAL_LABELS, ACTIVITY_LEVEL_LABELS, DIETARY_APPROACH_LABELS, WORKOUT_LOCATION_LABELS,
   type ClientPreferences,
 } from "@kova/domain";
-import { Card, Target, Dumbbell, Utensils, MapPin, type LucideIcon } from "@kova/ui";
+import { Card, Target, Dumbbell, Utensils, MapPin, type LucideIcon } from "@4dl/ui";
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 

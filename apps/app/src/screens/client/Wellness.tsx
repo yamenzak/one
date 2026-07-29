@@ -10,11 +10,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { fmtVolume, volumeLabel, volumeDisplayToMl, POSTURE_GUIDANCE } from "@kova/domain";
-import {
-  Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, StatCard, WeekDots, Sparkline, MiniBars, EmptyState, cn, toneVar,
-  Reveal, SkeletonStatGrid, SkeletonList, Anchor, ActionCluster, CountUp,
-  ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Flame, Plus, ChevronRight, Upload, HeartPulse, AlertTriangle, METRICS, POSTURE_SEVERITY_TONE, FASTING_ZONES, type FastingZone, type Tone,
-} from "@kova/ui";
+import { Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, StatCard, WeekDots, Sparkline, MiniBars, EmptyState, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonList, Anchor, ActionCluster, CountUp, ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Flame, Plus, ChevronRight, Upload, HeartPulse, AlertTriangle, type Tone } from "@4dl/ui";
+import { METRICS, POSTURE_SEVERITY_TONE, FASTING_ZONES, type FastingZone } from "../../registry/index.js";
 
 interface PostureScan {
   date: string;
@@ -47,7 +44,7 @@ interface Session { id: string; scheduled_at: string; duration_minutes: number; 
 interface Today { waterMl: number; goal: { targets: { targetWaterMl?: number } | null } | null; checkInDates: string[] }
 
 type Zone = FastingZone;
-const ZONES = FASTING_ZONES; // SSOT — @kova/ui
+const ZONES = FASTING_ZONES; // SSOT — @4dl/ui
 const zoneAt = (h: number): Zone => ZONES.find((z) => h < z.max) ?? ZONES[ZONES.length - 1]!;
 const nextZone = (h: number): Zone | null => { const i = ZONES.indexOf(zoneAt(h)); return i < ZONES.length - 1 ? ZONES[i + 1]! : null; };
 const hoursToNext = (h: number): string => { const rem = Math.max(0, zoneAt(h).max - h); const hh = Math.floor(rem); const mm = Math.round((rem - hh) * 60); return hh > 0 ? `${hh}h ${mm}m` : `${mm}m`; };

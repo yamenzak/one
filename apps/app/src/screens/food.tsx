@@ -12,7 +12,8 @@
 
 import type { ReactNode } from "react";
 import { fmtEnergy } from "@kova/domain";
-import { MacroInline, cn, Utensils } from "@kova/ui";
+import { cn, Utensils } from "@4dl/ui";
+import { MacroInline } from "../registry/index.js";
 import { useUnits } from "../units.js";
 
 /** The canonical, casing-agnostic shape a food row renders from. */

@@ -12,7 +12,7 @@ import {
   Reveal, Skeleton, SkeletonLine, SkeletonList, useModalOverlay,
   Anchor, CountUp, Atmosphere, stagger, rowStagger, rowIn, DUR, EASE_OUT,
   AlertTriangle, ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, LifeBuoy, Plus, Minus, RotateCcw, cn,
-} from "@kova/ui";
+} from "@4dl/ui";
 import { api, todayLocal, errorText } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
