@@ -149,3 +149,60 @@ export function SettingsPage({
     </div>
   );
 }
+
+/**
+ * A section that is itself several sections: an index of sub-pages, one open at
+ * a time.
+ *
+ * **Controlled, and router-free on purpose.** This package has no router
+ * dependency and must not gain one — a design system that imports one cannot be
+ * consumed by an app using a different one. So the open key is a prop and the
+ * product binds it to whatever its navigation is (Kova uses a query param, so
+ * Back steps out of a sub-page before it leaves the section).
+ *
+ * Each row states its CURRENT VALUE, exactly as one level up: that is what
+ * makes an index worth a tap, because you can check what a thing is set to
+ * without opening it and therefore without risking changing it.
+ *
+ * `footer` renders under the index AND every sub-page. Pass one only when the
+ * sub-pages share form state and must share a submit — a split that gives each
+ * sub-page its own save can leave a half-applied configuration behind. Sections
+ * whose parts save independently pass nothing.
+ */
+export function SectionDetail({
+  subs,
+  openKey,
+  onOpen,
+  footer,
+}: {
+  subs: (SettingsEntry & { render: () => ReactNode })[];
+  openKey: string | null;
+  onOpen: (key: string | null) => void;
+  footer?: ReactNode;
+}) {
+  const open = subs.find((x) => x.key === openKey) ?? null;
+  if (open) {
+    return (
+      <section className="space-y-5">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => onOpen(null)}
+            aria-label="Back"
+            className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 focus-visible:ring-2 focus-visible:ring-ring/70 [&_svg]:size-[1.1rem]"
+          >
+            <ChevronRight className="rotate-180" />
+          </button>
+          <h2 className="min-w-0 flex-1 truncate text-title-3">{open.label}</h2>
+        </div>
+        {open.render()}
+        {footer}
+      </section>
+    );
+  }
+  return (
+    <section className="space-y-5">
+      <SettingsIndex groups={[{ rows: subs.map(({ render: _r, ...row }) => ({ ...row, onClick: () => onOpen(row.key) })) }]} />
+      {footer}
+    </section>
+  );
+}
