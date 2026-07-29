@@ -466,7 +466,12 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                 {d.isRestDay && <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-[0.6rem] font-semibold text-sleep">Rest</span>}
                 <div className="absolute inset-x-0 bottom-0 p-2.5">
                   <div className="truncate text-sm font-semibold text-white">{d.name || `Day ${i + 1}`}</div>
-                  <div className="truncate text-xs text-[var(--tone-foreground)]/70">{sub}</div>
+                  {/* Over the black scrim this must be white, like its twins in
+                      Train and the player. `--tone-foreground` is the ink for a
+                      TONE-COLOURED surface (a `bg-activity` pill) — it is dark on
+                      a light-primary theme, so at 70% over `from-black/75` the
+                      set count was invisible. */}
+                  <div className="truncate text-xs text-white/75">{sub}</div>
                 </div>
               </button>
             );

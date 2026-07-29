@@ -655,8 +655,13 @@ effect; the entrance ladder means nothing to something that never ends).
 | `FixedDrawer` | A multi-step form where an accidental dismiss would lose input. Title is `title-3`: it sits in a header bar and is chrome. | Anything dismissible. | ✅ |
 | `Dialog` / `ConfirmDialog` | **Deciding** — a confirmation, ≥`md`. | Forms. | ✅ |
 | `DropdownMenu` | A short list of actions on an element. | Navigation between sections. | ✅ |
-| `SegmentedControl` | 2–4 mutually exclusive views of the same data. | More than 4 — that is a `Select`. | ✅ |
+| `SegmentedControl` | 2–4 mutually exclusive views of the same data. | More than 4 — above the cap it truncates its own labels. Use `IconTabs`. | ✅ |
+| `IconTabs` | 5+ tabs on one surface. Every tab is its icon; only the active one keeps its label, and the label grows in beside it — the same grammar as the bottom nav, so it needs no explaining. | Two or three tabs, where labels fit and icons are just decoration. | ✅ |
 | `Select` · `Tooltip` · `Tabs` · `Avatar` | As named. | — | ✅ |
+
+`IconTabs` generates its own `layoutId`: two instances sharing a projection id
+makes the pill fly between them. Every item needs a real `label` — it is the
+accessible name and the tooltip, and an icon alone is not a name.
 
 All of them share one `overlayCls` scrim and one `FOCUS` ring constant. Both
 exist because the alternative was tried: the `Sheet` hard-coded its own scrim

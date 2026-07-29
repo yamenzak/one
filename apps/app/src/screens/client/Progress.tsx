@@ -18,7 +18,7 @@ import {
   Reveal, SkeletonHero, SkeletonChart,
   AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, METRICS, POSTURE_SEVERITY_TONE, cn, toneVar,
   Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, Calendar, Scale,
-  TierAnchor, CountUp, type Tone, type LucideIcon, NoData, SPRING_SNAP, DUR,
+  TierAnchor, CountUp, type Tone, type LucideIcon, NoData, IconTabs, DUR,
 } from "@kova/ui";
 import { api, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
@@ -115,7 +115,7 @@ export function Progress({ clientId }: { clientId: string }) {
           so the whole row — tabs + range — fits the Progress column. "Custom"
           is a calendar icon; picking it reveals the start→end pickers below. */}
       <div className="flex flex-wrap items-center gap-2">
-        <LensTabs lenses={lenses} tab={tab} onChange={setTab} />
+        <IconTabs items={lenses} value={tab} onChange={setTab} />
         <SegmentedControl className="ml-auto" value={range} onChange={(v) => setRange(v as RangePreset | "custom")}
           options={[
             { value: "7d", label: "7d" }, { value: "30d", label: "30d" }, { value: "90d", label: "90d" },
@@ -499,23 +499,6 @@ const LENSES: { value: Tab; label: string; icon: LucideIcon }[] = [
   { value: "wellness", label: "Wellness", icon: HeartPulse },
 ];
 
-function LensTabs({ lenses, tab, onChange }: { lenses: typeof LENSES; tab: Tab; onChange: (t: Tab) => void }) {
-  return (
-    <div className="relative flex items-center gap-0.5 rounded-full bg-secondary p-1">
-      {lenses.map((l) => {
-        const on = tab === l.value;
-        return (
-          <button key={l.value} onClick={() => onChange(l.value)} aria-current={on ? "page" : undefined} title={l.label}
-            className={cn("relative z-10 flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium transition-colors", on ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-            {on && <motion.span layoutId="progress-lens-pill" initial={false} transition={SPRING_SNAP} className="absolute inset-0 rounded-full bg-primary" />}
-            <l.icon className="relative size-4 shrink-0" strokeWidth={on ? 2.4 : 2} />
-            {on && <motion.span initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: "auto" }} transition={{ duration: DUR.base }} className="relative overflow-hidden whitespace-nowrap">{l.label}</motion.span>}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 /** A date pill wrapping a native date input — the custom-range endpoints. */
 function DatePill({ value, min, max, label, onChange }: { value: string; min?: string; max?: string; label: string; onChange: (v: string) => void }) {
