@@ -151,12 +151,22 @@ export function Progress({ clientId }: { clientId: string }) {
               <>
                 <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-1 text-center">
                   <p className="text-caption text-muted-foreground">Wellness index</p>
-                  <p className="numeral text-display">
-                    {data.wellness.index == null ? "—" : <CountUp value={Math.round(data.wellness.index)} />}
-                  </p>
-                  <p className="text-caption text-muted-foreground">
-                    {data.wellness.index == null ? "Log how you feel to see this" : "out of 100"}
-                  </p>
+                  {/* An em-dash at `display` size is not a placeholder, it is a
+                      horizontal rule — 56px, weight 700, tracking −0.03em. It read
+                      as a divider with a caption under it. When there is no value
+                      the anchor says so in words at title size instead; a screen
+                      with nothing to show should look empty, not broken. */}
+                  {data.wellness.index == null ? (
+                    <>
+                      <p className="text-title-1">Not yet</p>
+                      <p className="text-caption text-muted-foreground">Log how you feel to see this</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="numeral text-display"><CountUp value={Math.round(data.wellness.index)} /></p>
+                      <p className="text-caption text-muted-foreground">out of 100</p>
+                    </>
+                  )}
                 </TierAnchor>
                 <Overview data={data} units={units} dateLabel={dateLabel} canNutrition={canNutrition} canTraining={canTraining} />
               </>

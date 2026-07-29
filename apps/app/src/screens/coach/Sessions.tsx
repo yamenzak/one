@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Card, Badge, Field, Sheet, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonList, Avatar, Calendar, Clock, CheckCheck, X, User, Plus, Ticket, CreditCard, History, RotateCcw } from "@kova/ui";
+import { Button, Card, Badge, Field, Sheet, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonList, Avatar, Calendar, Clock, CheckCheck, X, User, Plus, Ticket, CreditCard, History, RotateCcw , Group, Row } from "@kova/ui";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
 import { FeatureLock } from "../../FeatureLock.js";
@@ -135,13 +135,13 @@ export function Sessions() {
             {types.length === 0 ? (
               <p className="text-sm text-muted-foreground">{isOwner ? "Consultation types you can schedule against a client's add-on balance." : "No add-on types yet — ask the studio owner to add one."}</p>
             ) : (
-              <Stagger className="space-y-2">
+              <Group>
                 {types.map((t) => (
-                  <Card key={t.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5"><IconBadge icon={Calendar} tone="primary" size="sm" /><div><div className="font-semibold">{t.label}</div><div className="text-xs text-muted-foreground">{t.duration_minutes} min{t.standalone_price_cents != null ? ` · ${fmtPrice(t.standalone_price_cents)}` : ""}</div></div></div>
-                  </Card>
+                  <Row key={t.id} icon={Calendar} sub={`${t.duration_minutes} min${t.standalone_price_cents != null ? ` · ${fmtPrice(t.standalone_price_cents)}` : ""}`}>
+                    {t.label}
+                  </Row>
                 ))}
-              </Stagger>
+              </Group>
             )}
           </>
           )}

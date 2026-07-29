@@ -1,7 +1,7 @@
 /** Package editor + redemption codes + promo codes. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Textarea, Switch, Sheet, Chip, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonHeader, SkeletonList, CreditCard, Ticket, Tag, Trash2, Plus, X, PencilLine, Archive, RotateCcw, AlertTriangle } from "@kova/ui";
+import { Button, Card, Badge, Field, Textarea, Switch, Sheet, Chip, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonHeader, SkeletonList, CreditCard, Ticket, Tag, Trash2, Plus, X, PencilLine, Archive, RotateCcw, AlertTriangle , Group, Row } from "@kova/ui";
 import { CLIENT_FLAG_META, CLIENT_FLAG_CATEGORIES, SELLABLE_CLIENT_FLAG_KEYS, DEFAULT_CLIENT_FLAGS, type ClientFlags } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -157,41 +157,58 @@ export function Packages() {
         <>
           <SectionHeader className="pt-2" icon={Archive} tone="neutral" title="Archived" count={archived.length} />
           <p className="px-1 text-xs text-muted-foreground">Off sale and hidden from every client&rsquo;s Shop. Clients who already bought one keep the days they paid for.</p>
-          <Stagger className="space-y-2">
+          <Group>
             {archived.map((p) => (
-              <Card key={p.id} className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="truncate font-semibold text-muted-foreground">{p.name}</div>
-                  <div className="numeral text-xs text-muted-foreground">{priceLabel(p)}</div>
-                </div>
-                <Button size="sm" variant="secondary" disabled={rowBusy === p.id} onClick={() => void restorePkg(p)}><RotateCcw /> {rowBusy === p.id ? "Restoring…" : "Put back on sale"}</Button>
-              </Card>
+              <Row
+                key={p.id}
+                sub={priceLabel(p)}
+                trailing={
+                  <Button size="sm" variant="secondary" disabled={rowBusy === p.id} onClick={() => void restorePkg(p)}>
+                    <RotateCcw /> {rowBusy === p.id ? "Restoring…" : "Put back on sale"}
+                  </Button>
+                }
+              >
+                {p.name}
+              </Row>
             ))}
-          </Stagger>
+          </Group>
         </>
       )}
 
       <SectionHeader className="pt-2" icon={Ticket} tone="primary" title="Redemption codes" action={<Button size="sm" onClick={() => setCodeOpen(true)}><Plus /> Code</Button>} />
       {codes.length === 0 ? <p className="text-sm text-muted-foreground">One-off access codes you can hand to a client to redeem.</p> : (
-        <Stagger className="space-y-2">
+        <Group>
           {codes.map((c) => (
-            <Card key={c.id} className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5"><IconBadge icon={Ticket} tone="primary" size="sm" /><div><div className="font-mono font-semibold">{c.code}</div><div className="text-xs text-muted-foreground">{c.days_to_add}d {c.target_feature} · used {c.used_count}/{c.max_uses}</div></div></div>
-            </Card>
+            <Row
+              key={c.id}
+              icon={Ticket}
+              sub={`${c.days_to_add}d ${c.target_feature} · used ${c.used_count}/${c.max_uses}`}
+            >
+              <span className="font-mono">{c.code}</span>
+            </Row>
           ))}
-        </Stagger>
+        </Group>
       )}
 
       <SectionHeader className="pt-2" icon={Tag} tone="nutrition" title="Promo codes" action={<Button size="sm" onClick={() => setPromoOpen(true)}><Plus /> Promo</Button>} />
       {promos.length === 0 ? <p className="text-sm text-muted-foreground">Discount codes applied at checkout.</p> : (
-        <Stagger className="space-y-2">
+        <Group>
           {promos.map((p) => (
-            <Card key={p.id} className={`flex items-center justify-between ${p.active ? "" : "opacity-50"}`}>
-              <div className="flex items-center gap-2.5"><IconBadge icon={Tag} tone="nutrition" size="sm" /><div><div className="font-mono font-semibold">{p.code}</div><div className="text-xs text-muted-foreground">{p.discount_type === "percent" ? `${p.percent_off}% off` : `${fmtPrice(p.amount_off_cents ?? 0)} off`} · used {p.redemption_count}{p.max_redemptions ? `/${p.max_redemptions}` : ""}</div></div></div>
-              {p.active ? <button type="button" onClick={() => setPromoToDelete(p)} disabled={rowBusy === p.id} aria-label={`Delete promo code ${p.code}`} className="grid size-12 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-50 [&_svg]:size-4"><Trash2 /></button> : <Badge tone="neutral">inactive</Badge>}
-            </Card>
+            <Row
+              key={p.id}
+              icon={Tag}
+              className={p.active ? "" : "opacity-50"}
+              sub={`${p.discount_type === "percent" ? `${p.percent_off}% off` : `${fmtPrice(p.amount_off_cents ?? 0)} off`} · used ${p.redemption_count}${p.max_redemptions ? `/${p.max_redemptions}` : ""}`}
+              trailing={
+                p.active ? (
+                  <button type="button" onClick={() => setPromoToDelete(p)} disabled={rowBusy === p.id} aria-label={`Delete promo code ${p.code}`} className="grid size-12 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-50 [&_svg]:size-4"><Trash2 /></button>
+                ) : <Badge tone="neutral">inactive</Badge>
+              }
+            >
+              <span className="font-mono">{p.code}</span>
+            </Row>
           ))}
-        </Stagger>
+        </Group>
       )}
         </>
         )}

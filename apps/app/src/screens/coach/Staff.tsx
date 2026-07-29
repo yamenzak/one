@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PERMISSION_CATALOG } from "@kova/domain";
-import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, Plus, personaLabel, personaTone } from "@kova/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, Plus, personaLabel, personaTone , Group, Row } from "@kova/ui";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useCan } from "../../FeatureLock.js";
@@ -77,26 +77,30 @@ export function Staff() {
       }>
         {members && (
         <>
-          <Stagger className="space-y-2">
+          <Group>
             {members.filter((m) => m.role !== "client").map((m) => (
-              <Card key={m.userId} className="flex items-center gap-3">
-                <Avatar name={m.name || m.email || "?"} seed={m.email ?? m.userId} className="size-10" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate font-medium">{m.name || m.email}</span>
-                    <Badge tone={personaTone(m.role, { self: m.userId === myUserId })}>{personaLabel(m.role, { self: m.userId === myUserId })}</Badge>
-                    {m.customGrant && <Badge tone="warning">Custom</Badge>}
-                  </div>
-                  <div className="truncate text-xs text-muted-foreground">{m.email}</div>
-                </div>
-                {m.role !== "owner" && <Button size="icon" variant="secondary" aria-label="Permissions" onClick={() => setPermMember(m)}><ShieldCheck /></Button>}
-                {/* `Select` has no disabled prop, so gate the mutation itself on
-                    `busy` — a second role change mid-flight would race the roster
-                    reload and show a stale role. */}
-                <div className="w-28"><Select aria-label="Role" value={m.role} onChange={(v) => v !== m.role && !busy && setPendingRole({ member: m, role: v })} options={rolesFor(m.role)} /></div>
-              </Card>
+              <Row
+                key={m.userId}
+                leading={<Avatar name={m.name || m.email || "?"} seed={m.email ?? m.userId} className="size-10" />}
+                sub={m.email}
+                trailing={
+                  <>
+                    {m.role !== "owner" && <Button size="icon" variant="secondary" aria-label={`Permissions for ${m.name || m.email}`} onClick={() => setPermMember(m)}><ShieldCheck /></Button>}
+                    {/* `Select` has no disabled prop, so gate the mutation itself on
+                        `busy` — a second role change mid-flight would race the roster
+                        reload and show a stale role. */}
+                    <div className="w-28"><Select aria-label={`Role for ${m.name || m.email}`} value={m.role} onChange={(v) => v !== m.role && !busy && setPendingRole({ member: m, role: v })} options={rolesFor(m.role)} /></div>
+                  </>
+                }
+              >
+                <span className="flex items-center gap-2">
+                  <span className="truncate">{m.name || m.email}</span>
+                  <Badge tone={personaTone(m.role, { self: m.userId === myUserId })}>{personaLabel(m.role, { self: m.userId === myUserId })}</Badge>
+                  {m.customGrant && <Badge tone="warning">Custom</Badge>}
+                </span>
+              </Row>
             ))}
-          </Stagger>
+          </Group>
           <p className="pt-1 text-xs text-muted-foreground">Clients appear in the Clients tab, not here.</p>
         </>
         )}
