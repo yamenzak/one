@@ -116,7 +116,12 @@ export function Shell() {
     <ErrorBoundary resetKey={loc.pathname}>
     <Routes>
       {/* Full-screen surfaces (no tab chrome). */}
-      <Route path="/settings" element={<SettingsRoute view="studio" />} />
+      {/* Studio settings is owner-only, and the menu only offers it to owners —
+          but a deep link, a bookmark or a shared URL doesn't know that, and
+          landing a client on "Studio settings are available to studio owners."
+          with nothing but a back arrow is a dead end. Send them where they were
+          almost certainly trying to go: their own settings. */}
+      <Route path="/settings" element={<OwnerOnly><SettingsRoute view="studio" /></OwnerOnly>} />
       <Route path="/profile" element={<SettingsRoute view="profile" />} />
       <Route path="/preferences" element={<SettingsRoute view="preferences" />} />
       {/* The personal Appearance page is gone — its two studio-wide toggles moved
@@ -582,6 +587,13 @@ function NoClient() {
       <Button className="mt-4" onClick={() => void enter()}>Create my training space</Button>
     </div>
   );
+}
+
+/** Owner-gated route wrapper. Redirects rather than stranding — see /settings. */
+function OwnerOnly({ children }: { children: ReactNode }) {
+  const { ctx } = useSession();
+  if (!ctx) return null;
+  return ctx.active?.role === "owner" ? <>{children}</> : <Navigate to="/preferences" replace />;
 }
 
 function SettingsRoute({ view }: { view: import("./screens/Settings.js").SettingsView }) {

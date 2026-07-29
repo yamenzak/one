@@ -46,9 +46,12 @@ client Wellness · client Shop · client WorkoutPlayer (day picker) · client
 MealPlanDrawer · coach Today · coach Clients · coach Business · coach Staff ·
 coach ClientManage.
 
-**Screens still to do:** `coach/WorkoutBuilder` and `coach/MealBuilder` — both
-task surfaces (§1), so the work there is chrome and type conformance rather than
-finding an anchor.
+**Every screen is done.** The builders were the last two, and as predicted they
+are task surfaces (§1) with no anchor to find — what they needed was chrome:
+the workout builder's day cards set their subtitle in `--tone-foreground`, the
+ink for a tone-COLOURED surface, over a `from-black/75` scrim. On a
+light-primary theme that is dark text at 70% opacity on black, so the set count
+was invisible. Its twins in Train and the player both had it right.
 
 **Resolved, and the resolutions are the useful part.** The ledger used to say
 "anchor = count of each" for the list-shaped coach screens. That was wrong, and

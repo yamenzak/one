@@ -12,11 +12,11 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
 import { Drawer } from "vaul";
 import { motion } from "motion/react";
-import { SPRING } from "./lib/animation.js";
-import { Check, ChevronDown, X } from "./lib/icons.js";
+import { SPRING, SPRING_SNAP, DUR } from "./lib/animation.js";
+import { Check, ChevronDown, X, type LucideIcon } from "./lib/icons.js";
 import { cn } from "./lib/utils.js";
 import { Button } from "./primitives.js";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 /**
  * The house focus ring (§12). Every focusable control in this file sets
@@ -325,6 +325,74 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
           {o.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Icon tabs — the answer when a tabbed surface has more segments than a
+ * `SegmentedControl` can label (§7 caps that at four).
+ *
+ * Every tab is its icon; only the ACTIVE one keeps its label, and the label
+ * grows in beside it. That is the navbar grammar the bottom tabs already use,
+ * so it needs no explaining, and it means six tabs fit a phone at full
+ * legibility instead of six truncated to "Prog…", "Repo…", "Man…" — which is
+ * what a six-item `fill` segmented control degrades to, and it shipped on the
+ * coach's client detail.
+ *
+ * The `layoutId` is generated per instance: two of these on one screen sharing
+ * a projection id makes the pill fly between them.
+ *
+ * **Give every item a real `label`.** It is the accessible name and the tooltip;
+ * an icon alone is not a name.
+ */
+export function IconTabs<T extends string>({
+  items,
+  value,
+  onChange,
+  className,
+}: {
+  items: readonly { value: T; label: string; icon: LucideIcon }[];
+  value: T;
+  onChange: (v: T) => void;
+  className?: string;
+}) {
+  const pillId = useId();
+  return (
+    <div className={cn("relative flex items-center gap-0.5 rounded-full bg-secondary p-1", className)} role="tablist">
+      {items.map((it) => {
+        const on = value === it.value;
+        const Icon = it.icon;
+        return (
+          <button
+            key={it.value}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            aria-label={it.label}
+            title={it.label}
+            onClick={() => onChange(it.value)}
+            className={cn(
+              "relative z-10 flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium outline-none transition-colors",
+              FOCUS,
+              on ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {on && <motion.span layoutId={pillId} initial={false} transition={SPRING_SNAP} className="absolute inset-0 rounded-full bg-primary" />}
+            <Icon aria-hidden className="relative size-4 shrink-0" strokeWidth={on ? 2.4 : 2} />
+            {on && (
+              <motion.span
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: "auto" }}
+                transition={{ duration: DUR.base }}
+                className="relative overflow-hidden whitespace-nowrap"
+              >
+                {it.label}
+              </motion.span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

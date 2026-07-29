@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Sheet, Avatar, SegmentedControl, Page, Stagger, EmptyState, Reveal, SkeletonList, ConfirmDialog, toneVar, Users, Mail, User, ArrowLeft, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle , TierAnchor, CountUp, Group, Row } from "@kova/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, IconTabs, Page, Stagger, EmptyState, Reveal, SkeletonList, ConfirmDialog, toneVar, Users, Mail, User, ArrowLeft, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle, TierAnchor, CountUp, Group, Row, Sun, ClipboardList, Target, TrendingUp, BarChart3, Settings as SettingsIcon } from "@kova/ui";
 import type { AttentionSeverity } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -269,13 +269,19 @@ function InviteSheet({ invite, onClose }: { invite: Invite; onClose: () => void 
   );
 }
 
+/**
+ * Six tabs. A `fill` SegmentedControl truncated half of them at phone width —
+ * "Prog…", "Repo…", "Man…" — which is what §7's 2-to-4 cap is warning about.
+ * `IconTabs` is the answer above that cap: every tab is its icon, only the
+ * active one keeps its label, exactly like the bottom nav.
+ */
 const TABS = [
-  { value: "today", label: "Today" },
-  { value: "plans", label: "Plans" },
-  { value: "goals", label: "Goals" },
-  { value: "progress", label: "Progress" },
-  { value: "report", label: "Report" },
-  { value: "manage", label: "Manage" },
+  { value: "today", label: "Today", icon: Sun },
+  { value: "plans", label: "Plans", icon: ClipboardList },
+  { value: "goals", label: "Goals", icon: Target },
+  { value: "progress", label: "Progress", icon: TrendingUp },
+  { value: "report", label: "Report", icon: BarChart3 },
+  { value: "manage", label: "Manage", icon: SettingsIcon },
 ] as const;
 type Tab = (typeof TABS)[number]["value"];
 
@@ -310,7 +316,7 @@ export function ClientDetail() {
           </div>
         </div>
         <div className="mx-auto max-w-xl">
-          <SegmentedControl fill options={TABS.map((t) => ({ value: t.value, label: t.label }))} value={tab} onChange={(v) => nav(`/clients/${clientId}/${v}`)} />
+          <IconTabs items={TABS} value={tab} onChange={(v) => nav(`/clients/${clientId}/${v}`)} />
         </div>
       </div>
       {tab === "today" && <Today key={clientId} clientId={clientId} />}
