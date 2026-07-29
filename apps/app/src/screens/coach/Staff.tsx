@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PERMISSION_CATALOG } from "@kova/domain";
-import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, Plus, personaLabel, personaTone, Group, Row, TierAnchor, CountUp } from "@kova/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, Plus, personaLabel, personaTone, Group, Row, Anchor, CountUp } from "@kova/ui";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useCan } from "../../FeatureLock.js";
@@ -77,21 +77,19 @@ export function Staff() {
   return (
     <Page className="column space-y-3 p-4 pb-28">
       {/* T1 — the tab's anchor (§1: a tabbed surface is N screens sharing chrome). */}
-      <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-1 text-center">
-        <p className="text-caption text-muted-foreground">Staff seats</p>
-        {seatsUsed == null ? (
-          <p className="text-title-1">Loading…</p>
-        ) : (
-          <>
-            <p className="numeral text-display"><CountUp value={seatsUsed} /></p>
-            <p className="text-caption text-muted-foreground">
-              {seatCap == null ? (seatsUsed === 1 ? "person on the team" : "people on the team")
-                : seatsLeft === 0 ? `of ${seatCap} · none left`
-                : `of ${seatCap} · ${seatsLeft} left`}
-            </p>
-          </>
-        )}
-      </TierAnchor>
+      {seatsUsed == null ? (
+        <Anchor eyebrow="Staff seats" word="Loading…" className="pt-1" />
+      ) : (
+        <Anchor
+          eyebrow="Staff seats"
+          className="pt-1"
+          sub={seatCap == null ? (seatsUsed === 1 ? "person on the team" : "people on the team")
+            : seatsLeft === 0 ? `of ${seatCap} · none left`
+            : `of ${seatCap} · ${seatsLeft} left`}
+        >
+          <CountUp value={seatsUsed} />
+        </Anchor>
+      )}
       <SectionHeader icon={Users} tone="cardio" title="Team" action={<Button size="sm" onClick={() => setInviteOpen(true)}><Plus /> Invite</Button>} />
       {msg && <p role="status" aria-live="polite" className="text-sm text-muted-foreground">{msg}</p>}
       <Reveal loading={!members} className="space-y-3" skeleton={
@@ -141,14 +139,13 @@ export function Staff() {
         )}
       </Reveal>
 
-      <Sheet open={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite staff">
+      <Sheet open={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite staff" footer={<Button size="lg" className="w-full" disabled={!email.includes("@") || busy} onClick={() => void invite()}>{busy ? "Sending…" : "Send invite"}</Button>}>
         <div className="space-y-4">
           <Field label="Email" icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <div className="flex gap-2">
             <Chip selected={role === "trainer"} onClick={() => setRole("trainer")}>{personaLabel("trainer")}</Chip>
             {canAssistant && <Chip selected={role === "assistant"} onClick={() => setRole("assistant")}>{personaLabel("assistant")}</Chip>}
           </div>
-          <Button size="lg" className="w-full" disabled={!email.includes("@") || busy} onClick={() => void invite()}>{busy ? "Sending…" : "Send invite"}</Button>
           <p className="text-xs text-muted-foreground">They sign in with a code — no password to set.</p>
         </div>
       </Sheet>
@@ -184,7 +181,7 @@ function PermissionSheet({ member, onClose, onSaved }: { member: Member; onClose
     finally { setBusy(false); }
   };
   return (
-    <Sheet open onClose={onClose} title={`Access — ${member.name || member.email}`}>
+    <Sheet open onClose={onClose} title={`Access — ${member.name || member.email}`} footer={<Button size="lg" className="w-full" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save access"}</Button>}>
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">Override the role's defaults with a custom grant. Clear everything to fall back to the {personaLabel(member.role)} role.</p>
         <div className="max-h-[55vh] space-y-3 overflow-y-auto">
@@ -195,7 +192,6 @@ function PermissionSheet({ member, onClose, onSaved }: { member: Member; onClose
             </div>
           ))}
         </div>
-        <Button size="lg" className="w-full" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save access"}</Button>
       </div>
     </Sheet>
   );

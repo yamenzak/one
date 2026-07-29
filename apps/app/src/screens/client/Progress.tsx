@@ -18,7 +18,7 @@ import {
   Reveal, SkeletonHero, SkeletonChart,
   AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, METRICS, POSTURE_SEVERITY_TONE, cn, toneVar,
   Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, Calendar, Scale,
-  TierAnchor, CountUp, type Tone, type LucideIcon, NoData, IconTabs, DUR,
+  Anchor, CountUp, type Tone, type LucideIcon, NoData, IconTabs, DUR,
 } from "@kova/ui";
 import { api, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
@@ -149,30 +149,22 @@ export function Progress({ clientId }: { clientId: string }) {
           <motion.div key={tab} variants={stagger} initial="hidden" animate="show" className={cn("space-y-4 transition-opacity", loading && "pointer-events-none opacity-50")}>
             {tab === "overview" && (
               <>
-                <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-1 text-center">
-                  <p className="text-caption text-muted-foreground">Wellness index</p>
-                  {/* An em-dash at `display` size is not a placeholder, it is a
-                      horizontal rule — 56px, weight 700, tracking −0.03em. It read
-                      as a divider with a caption under it. When there is no value
-                      the anchor says so in words at title size instead; a screen
-                      with nothing to show should look empty, not broken. */}
-                  {data.wellness.index == null ? (
-                    <>
-                      <p className="text-title-1">Not yet</p>
-                      <p className="text-caption text-muted-foreground">Log how you feel to see this</p>
-                    </>
-                  ) : (
-                    <>
-                      {/* `wellnessIndex` is a 1–5 scale (domain/progress.ts), not a
-                          percentage. Rounding it to an integer and captioning it
-                          "out of 100" turned a healthy 4.2 into a giant "4" over
-                          the word hundred — the scale has to come from the same
-                          place the number does. */}
-                      <p className="numeral text-display"><CountUp value={data.wellness.index} decimals={1} /></p>
-                      <p className="text-caption text-muted-foreground">out of 5</p>
-                    </>
-                  )}
-                </TierAnchor>
+                {/* An em-dash at `display` size is not a placeholder, it is a
+                    horizontal rule — 56px, weight 700, tracking −0.03em. It read
+                    as a divider with a caption under it. `word` is the sanctioned
+                    way out: no value means the anchor says so at title size, and
+                    a screen with nothing to show looks empty, not broken.
+                    `wellnessIndex` is a 1–5 scale (domain/progress.ts), not a
+                    percentage — rounding it and captioning it "out of 100" turned
+                    a healthy 4.2 into a giant "4" over the word hundred. */}
+                <Anchor
+                  eyebrow="Wellness index"
+                  className="pt-1"
+                  word={data.wellness.index == null ? "Not yet" : undefined}
+                  sub={data.wellness.index == null ? "Log how you feel to see this" : "out of 5"}
+                >
+                  {data.wellness.index != null && <CountUp value={data.wellness.index} decimals={1} />}
+                </Anchor>
                 <Overview data={data} units={units} dateLabel={dateLabel} canNutrition={canNutrition} canTraining={canTraining} />
               </>
             )}

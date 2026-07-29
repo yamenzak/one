@@ -20,7 +20,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Card, Badge, Field, Sheet, Select, Page, Stagger, EmptyState, SectionHeader, ConfirmDialog, Reveal, SkeletonList, Avatar, TierAnchor, CountUp, Calendar, Clock, CheckCheck, X, User, Plus, Ticket, CreditCard, History, RotateCcw , Group, Row } from "@kova/ui";
+import { Button, Card, Badge, Field, Sheet, Select, Page, Stagger, EmptyState, SectionHeader, ConfirmDialog, Reveal, SkeletonList, Avatar, Anchor, CountUp, Calendar, Clock, CheckCheck, X, User, Plus, Ticket, CreditCard, History, RotateCcw , Group, Row } from "@kova/ui";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
 import { FeatureLock } from "../../FeatureLock.js";
@@ -132,11 +132,9 @@ export function Sessions() {
             {/* T1 (§1). A front desk has exactly one question on arrival: what is
                 booked. The old screen opened with a section header and two large
                 empty regions and nothing to read. */}
-            <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
-              <p className="text-caption text-muted-foreground">Booked in</p>
-              <p className="numeral text-display"><CountUp value={upcoming.length} /></p>
-              <p className="text-caption text-muted-foreground">{anchorSub}</p>
-            </TierAnchor>
+            <Anchor eyebrow={"Booked in"} sub={anchorSub}>
+        <CountUp value={upcoming.length} />
+      </Anchor>
 
             <Stagger className="pb-1">
               <Button size="lg" className="w-full" disabled={clients.length === 0} onClick={() => setScheduleOpen(true)}><Plus /> Book a session</Button>
@@ -276,7 +274,7 @@ function ScheduleSheet({ clients, types, onClose, onSaved }: { clients: ClientSu
     finally { setBusy(false); }
   };
   return (
-    <Sheet open onClose={onClose} title="Book a session">
+    <Sheet open onClose={onClose} title="Book a session" footer={<Button size="lg" className="w-full" disabled={!clientId || !addOnTypeId || !when || busy} onClick={() => void save()}>{busy ? "Booking…" : "Book session"}</Button>}>
       <div className="space-y-4">
         <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Client</span><Select aria-label="Client" value={clientId} onChange={setClientId} options={[{ value: "", label: "Choose a client…" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} /></div>
         <div className="space-y-1.5"><span className="text-sm text-muted-foreground">What for</span><Select aria-label="What for" value={addOnTypeId} onChange={setAddOnTypeId} options={types.map((t) => ({ value: t.id, label: `${t.label} · ${t.duration_minutes} min` }))} /></div>
@@ -289,7 +287,6 @@ function ScheduleSheet({ clients, types, onClose, onSaved }: { clients: ClientSu
         {/* What the button is about to cost the client, said before it's spent —
             not after, in an error. */}
         <p className="text-xs text-muted-foreground">Booking holds the slot. It only uses one of their prepaid sessions when you mark it complete or a no-show.</p>
-        <Button size="lg" className="w-full" disabled={!clientId || !addOnTypeId || !when || busy} onClick={() => void save()}>{busy ? "Booking…" : "Book session"}</Button>
       </div>
     </Sheet>
   );
@@ -313,13 +310,12 @@ function AddOnTypeSheet({ onClose, onSaved }: { onClose: () => void; onSaved: ()
     finally { setBusy(false); }
   };
   return (
-    <Sheet open onClose={onClose} title="New session type">
+    <Sheet open onClose={onClose} title="New session type" footer={<Button size="lg" className="w-full" disabled={label.trim().length < 2 || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create session type"}</Button>}>
       <div className="space-y-4">
         <Field label="Name" icon={Ticket} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nutrition consultation" hint="What you'd call it to a client." />
         <Field label="How long" icon={Clock} value={duration} inputMode="numeric" onChange={(e) => setDuration(e.target.value.replace(/\D/g, ""))} hint="In minutes." />
         <Field label="Price on its own (optional)" icon={CreditCard} value={price} inputMode="decimal" onChange={(e) => setPrice(e.target.value)} hint="USD. What one costs when it isn't already in a package — set it and your team can still book a client who's used theirs up." />
         {err && <p role="status" aria-live="polite" className="text-sm text-danger">{err}</p>}
-        <Button size="lg" className="w-full" disabled={label.trim().length < 2 || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create session type"}</Button>
       </div>
     </Sheet>
   );

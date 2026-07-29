@@ -145,6 +145,7 @@ are now checked rather than agreed:
 | Empty values | `apps/app/src/no-data.conformance.test.ts` | a dash reaching a value slot, where at numeral sizes it reads as a horizontal rule (§5) |
 | Motion | `apps/app/src/motion.conformance.test.ts` | a spring or a raw duration written at a call site instead of taken from `lib/animation.ts` (§8) |
 | Visible focus | `apps/app/src/focus.conformance.test.ts` | a form control that sets `outline-none` and replaces it with nothing (§12) |
+| Primitive adoption | `apps/app/src/primitive-adoption.conformance.test.ts` | a screen hand-assembling a composition a component already owns — the anchor's `numeral text-display` slot outside `packages/ui` |
 
 All six scan `packages/ui` as well as the app — the design system is where a
 bypass does the most damage, and each of these found real violations there.

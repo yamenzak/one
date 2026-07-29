@@ -10,7 +10,7 @@ import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmt
 import {
   Button, Card, Badge, Field, Input, Label, Sheet, SubCard, ProgressRing, EmptyState,
   Reveal, Skeleton, SkeletonLine, SkeletonList, useModalOverlay,
-  TierAnchor, CountUp, Atmosphere, stagger, rowStagger, rowIn, DUR, EASE_OUT,
+  Anchor, CountUp, Atmosphere, stagger, rowStagger, rowIn, DUR, EASE_OUT,
   AlertTriangle, ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, LifeBuoy, Plus, Minus, RotateCcw, cn,
 } from "@kova/ui";
 import { api, todayLocal, errorText } from "../../api.js";
@@ -222,17 +222,15 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
           Split A" at 56px wraps to three lines and stops being a numeral — but
           it is exactly what an eyebrow is for.
         */}
-        <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
-          <p className={cn("text-caption", isPast ? "text-muted-foreground" : "text-activity")}>{isPast ? "Past plan" : active?.name}</p>
-          <p className="numeral text-display"><CountUp value={trainingDays} /></p>
-          <p className="text-caption text-muted-foreground">
-            {trainingDays === 1 ? "training day" : "training days"}
-            {active?.publishedAt ? ` · from ${new Date(active.publishedAt).toLocaleDateString()}` : ""}
-          </p>
-          {isPast && (
-            <button onClick={() => pickPlan(null)} className="mt-2 inline-flex items-center gap-1 rounded-full bg-activity-soft px-3 py-1 text-xs font-semibold text-activity [&_svg]:size-3.5"><ArrowLeft /> Back to current plan</button>
-          )}
-        </TierAnchor>
+        <Anchor
+          eyebrow={<span className={isPast ? undefined : "text-activity"}>{isPast ? "Past plan" : active?.name}</span>}
+          sub={`${trainingDays === 1 ? "training day" : "training days"}${active?.publishedAt ? ` · from ${new Date(active.publishedAt).toLocaleDateString()}` : ""}`}
+          below={isPast ? (
+            <button onClick={() => pickPlan(null)} className="inline-flex items-center gap-1 rounded-full bg-activity-soft px-3 py-1 text-xs font-semibold text-activity [&_svg]:size-3.5"><ArrowLeft /> Back to current plan</button>
+          ) : undefined}
+        >
+          <CountUp value={trainingDays} />
+        </Anchor>
 
         {/* Day covers — 2 per row, branded art, recommended highlighted. A day is
             browsed, not scanned, so these are tiles rather than rows (§7). */}
@@ -708,7 +706,7 @@ function SetLogDrawer({ slot, exerciseId, exerciseName, logged, fetchLast, onClo
   const target = prescribed ? measurePart(prescribed, mode) : "";
 
   return (
-    <Sheet open onClose={onClose} title={exerciseName}>
+    <Sheet open onClose={onClose} title={exerciseName} footer={<Button size="lg" className="w-full" onClick={() => void save()} disabled={!canLog || busy}>{editing ? `Update set ${setIndex + 1}` : setIndex >= slot.sets.length ? "All sets logged" : "Log set"}</Button>}>
       <div className="space-y-4">
         {completed.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -747,7 +745,6 @@ function SetLogDrawer({ slot, exerciseId, exerciseName, logged, fetchLast, onClo
             ))}
           </div>
         </div>
-        <Button size="lg" className="w-full" onClick={() => void save()} disabled={!canLog || busy}>{editing ? `Update set ${setIndex + 1}` : setIndex >= slot.sets.length ? "All sets logged" : "Log set"}</Button>
       </div>
     </Sheet>
   );
@@ -820,7 +817,7 @@ function RoundLogDrawer({ block, roundIndex, exercises, fetchLast, onClose, onSa
   };
 
   return (
-    <Sheet open onClose={onClose} title={`Round ${roundIndex + 1} of ${rounds}`}>
+    <Sheet open onClose={onClose} title={`Round ${roundIndex + 1} of ${rounds}`} footer={<Button size="lg" className="w-full" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Complete round"}</Button>}>
       <div className="space-y-3">
         <div className="text-sm text-muted-foreground">Log one set of each — then rest and come back for the next round.</div>
         {block.slots.map((slot, si) => {
@@ -848,7 +845,6 @@ function RoundLogDrawer({ block, roundIndex, exercises, fetchLast, onClose, onSa
             </SubCard>
           );
         })}
-        <Button size="lg" className="w-full" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Complete round"}</Button>
       </div>
     </Sheet>
   );

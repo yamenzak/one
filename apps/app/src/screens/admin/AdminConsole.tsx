@@ -630,7 +630,9 @@ function PlanEditSheet({ plan, meta, onClose, onSaved }: { plan: PlanFull; meta:
     }, "Couldn't save the plan — nothing was changed.");
 
   return (
-    <Sheet open onClose={onClose} title={`Edit ${plan.name}`}>
+    <Sheet open onClose={onClose} title={`Edit ${plan.name}`} footer={<Button size="lg" className="w-full" disabled={act.busy !== null} onClick={() => void save()}>
+          {act.busy === "save" ? <><Spinner className="size-5" /> Saving…</> : "Save plan"}
+        </Button>}>
       <div className="space-y-5">
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge tone={plan.active ? "success" : "neutral"}>{plan.active ? "on sale" : "not sold"}</Badge>
@@ -656,9 +658,6 @@ function PlanEditSheet({ plan, meta, onClose, onSaved }: { plan: PlanFull; meta:
         <EntitlementFields ent={ent} meta={meta} onChange={setEnt} />
 
         <ActionResult msg={act.msg} err={act.err} />
-        <Button size="lg" className="w-full" disabled={act.busy !== null} onClick={() => void save()}>
-          {act.busy === "save" ? <><Spinner className="size-5" /> Saving…</> : "Save plan"}
-        </Button>
       </div>
     </Sheet>
   );
@@ -2588,7 +2587,9 @@ function PlatformPromoSheet({ onClose, onSaved }: { onClose: () => void; onSaved
     }, "Couldn't create that code — it may already exist.");
 
   return (
-    <Sheet open onClose={onClose} title="New platform promo">
+    <Sheet open onClose={onClose} title="New platform promo" footer={<Button size="lg" className="w-full" disabled={!valid || act.busy !== null} onClick={() => void save()}>
+          {act.busy === "save" ? <><Spinner className="size-5" /> Creating…</> : "Create promo"}
+        </Button>}>
       <div className="space-y-4">
         <p className="text-xs leading-relaxed text-muted-foreground">
           Applies to a studio&apos;s credit-pack purchase on the platform rail. Codes are stored upper-case and can be
@@ -2614,9 +2615,6 @@ function PlatformPromoSheet({ onClose, onSaved }: { onClose: () => void; onSaved
         />
         <Field label="Max redemptions" value={maxRedemptions} inputMode="numeric" onChange={(e) => setMaxRedemptions(e.target.value.replace(/\D/g, ""))} hint="Blank = unlimited" />
         {act.err && <Callout tone="danger" icon={AlertTriangle} live="alert">{act.err}</Callout>}
-        <Button size="lg" className="w-full" disabled={!valid || act.busy !== null} onClick={() => void save()}>
-          {act.busy === "save" ? <><Spinner className="size-5" /> Creating…</> : "Create promo"}
-        </Button>
       </div>
     </Sheet>
   );

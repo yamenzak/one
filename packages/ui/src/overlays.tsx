@@ -186,32 +186,86 @@ export function FixedDrawer({ open, onClose, dismissible = true, title, headerAc
 /**
  * The bottom sheet — the mobile default for **doing** (§7). Drag-to-dismiss.
  *
+ * ── Three parts, and why the height is quantized ────────────────────────────
+ *
+ * A sheet is a **header, a scrolling body, and a pinned footer**. Only the body
+ * scrolls. That is the whole design, and it exists because of what the app
+ * looked like without it:
+ *
+ *  • **Heights ranged from ~25vh to 92vh**, set by whatever the content
+ *    happened to be. Opening three sheets in a row moved the surface under your
+ *    thumb by half a screen each time. Now every sheet lands between a FLOOR
+ *    and a CEILING — a two-field form reads as a deliberate surface instead of
+ *    a popup, and nothing ever quite reaches the top of the display.
+ *  • **The primary action was the last element of the scroll area** in 48 of
+ *    the 69 sheets, so on a long form it sat below the fold and the way to
+ *    submit was to scroll past everything you had just filled in. Pinned, it is
+ *    always in the same place, and the body scrolls behind it.
+ *  • The header scrolled away with the content, so half-way down a picker there
+ *    was nothing on screen saying which sheet you were in.
+ *
+ * `size="tall"` fixes the height at the ceiling — for pickers and lists, where
+ * a sheet that resizes as you filter is worse than one that doesn't.
+ *
+ * The header takes its hairline **on scroll only**, exactly like the `AppBar`
+ * (§7): chrome recedes until it has something to separate.
+ *
  * Its title is `title-2` while `FixedDrawer`'s is `title-3`, which looks like
- * drift and isn't: a sheet's title sits in the CONTENT, where it names the
- * subject of the surface, and a fixed drawer's sits in a compact header BAR,
- * where it is chrome around a form that carries its own headings. Same rule as
- * everywhere else — a component never decides its own importance, its container
- * does. Set them equal and one of the two stops reading correctly.
+ * drift and isn't: a sheet's title names the SUBJECT of the surface, and a
+ * fixed drawer's is chrome around a form that carries its own headings. Same
+ * rule as everywhere else — a component never decides its own importance, its
+ * container does. Set them equal and one of the two stops reading correctly.
  */
 // ── Sheet (bottom drawer, drag-to-dismiss) ──────────────────────────────────
-export function Sheet({ open, onClose, title, titleAction, children }: { open: boolean; onClose: () => void; title?: string; titleAction?: ReactNode; children: ReactNode }) {
+export function Sheet({ open, onClose, title, titleAction, footer, size = "default", children }: {
+  open: boolean; onClose: () => void; title?: string; titleAction?: ReactNode;
+  /** Pinned below the scroll area. The sheet's primary action belongs here. */
+  footer?: ReactNode;
+  /** `tall` pins the height at the ceiling — for pickers and filterable lists. */
+  size?: "default" | "tall";
+  children: ReactNode;
+}) {
   const kb = useKeyboardInset(open);
+  const [scrolled, setScrolled] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  // Re-arm on every open: the same node is reused across openings, so a sheet
+  // closed mid-scroll would otherwise reopen wearing a hairline it hasn't
+  // earned.
+  useEffect(() => { if (!open) setScrolled(false); }, [open]);
   return (
     <Drawer.Root open={open} onOpenChange={(o) => !o && onClose()} repositionInputs={false}>
       <Drawer.Portal>
         <Drawer.Overlay className={overlayCls} />
         <Drawer.Content
           style={{ bottom: kb || undefined, maxHeight: kb ? `calc(100dvh - ${kb}px)` : undefined }}
-          className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92vh] max-w-xl flex-col rounded-t-[--radius-sheet] border-t border-border/60 bg-popover outline-none transition-[max-height,bottom] duration-200 ease-out"
+          className={cn(
+            "fixed inset-x-0 bottom-0 z-50 mx-auto flex w-full max-w-xl flex-col rounded-t-[--radius-sheet] border-t border-border/60 bg-popover outline-none transition-[max-height,bottom] duration-200 ease-out",
+            // The keyboard already clamps maxHeight inline; a `tall` sheet must
+            // yield to it rather than fight it for the space.
+            size === "tall" && !kb ? "h-[86dvh]" : "max-h-[86dvh] min-h-[40dvh]",
+          )}
         >
           <div className="mx-auto mt-3 h-1.5 w-10 shrink-0 rounded-full bg-surface-3" />
-          <div className="overflow-y-auto overscroll-contain px-5 pt-4" style={{ paddingBottom: kb ? "1.5rem" : "calc(1.5rem + env(safe-area-inset-bottom))" }}>
-            <div className={cn("flex items-center justify-between gap-3", (title || titleAction) && "mb-4")}>
-              <Drawer.Title className={cn("text-title-2", !title && "sr-only")}>{title ?? "Sheet"}</Drawer.Title>
-              {titleAction}
-            </div>
+          <div className={cn("flex shrink-0 items-center justify-between gap-3 px-5 pb-3 pt-4 transition-colors", scrolled && "border-b border-border/50")}>
+            <Drawer.Title className={cn("min-w-0 truncate text-title-2", !title && "sr-only")}>{title ?? "Sheet"}</Drawer.Title>
+            {titleAction}
+          </div>
+          <div
+            ref={bodyRef}
+            onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 4)}
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-1"
+            style={{ paddingBottom: footer ? "1rem" : kb ? "1.5rem" : "calc(1.5rem + env(safe-area-inset-bottom))" }}
+          >
             {children}
           </div>
+          {footer && (
+            <div
+              className="shrink-0 border-t border-border/50 px-5 pt-3"
+              style={{ paddingBottom: kb ? "0.75rem" : "calc(0.75rem + env(safe-area-inset-bottom))" }}
+            >
+              {footer}
+            </div>
+          )}
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>

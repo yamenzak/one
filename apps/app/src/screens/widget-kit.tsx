@@ -123,7 +123,7 @@ export function WidgetCustomizeSheet<D>({ catalog, items, defaults, onClose, onS
   const add = (id: string) => setList((l) => [...l, { id, size: "small" }]);
 
   return (
-    <Sheet open onClose={onClose} title="Customize hero">
+    <Sheet open onClose={onClose} title="Customize hero" footer={<Button size="lg" className="w-full" onClick={() => { onSave(list); onClose(); }}><LayoutGrid /> Save layout</Button>}>
       <div className="space-y-4">
         <div className="mb-1.5 text-micro uppercase text-muted-foreground">Showing · ring or card</div>
         <div className="space-y-1.5">
@@ -155,7 +155,6 @@ export function WidgetCustomizeSheet<D>({ catalog, items, defaults, onClose, onS
             </div>
           </div>
         )}
-        <Button size="lg" className="w-full" onClick={() => { onSave(list); onClose(); }}><LayoutGrid /> Save layout</Button>
       </div>
     </Sheet>
   );

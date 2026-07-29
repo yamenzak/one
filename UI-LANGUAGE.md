@@ -412,6 +412,35 @@ mobile) · `Dialog` (centred, ≥md only, for confirmations) · `Menu` · `Popov
 **One rule governs all overlays:** a sheet is for *doing*, a dialog is for
 *deciding*. If it has inputs, it is a sheet.
 
+### The sheet is three parts, and its height is quantized
+
+A sheet is a **pinned header, a scrolling body, and a pinned footer**. Only the
+body scrolls. Every part of that is load-bearing:
+
+- **The primary action lives in the footer, never at the end of the body.** On a
+  long form an unpinned action sits below the fold, so the way to submit is to
+  scroll back past everything you just filled in. Pinned, it is in the same
+  place in every sheet in the product — which is the actual definition of
+  consistency here: not that the sheets are the same size, but that your thumb
+  lands on the same spot.
+- **The footer follows the branch.** A sheet that is two surfaces sharing a
+  frame — a confirmation then a receipt, a form then a "saved" state — gets a
+  conditional footer. Hoisting one branch's button into a shared footer makes it
+  render in the other branch too, which is a silent bug: it type-checks, and it
+  only shows up on screen.
+- **A floor and a ceiling, not a content-driven height.** Heights used to range
+  from ~25vh to 92vh depending on what was inside, so opening three sheets in a
+  row moved the surface by half a screen each time. The floor stops a two-field
+  form reading as a popup; the ceiling stops anything touching the top of the
+  display. `size="tall"` pins the height at the ceiling for pickers and
+  filterable lists, where a sheet that resizes as you type is worse than one
+  that doesn't.
+- **The header takes its hairline on scroll only**, exactly like the `AppBar`.
+  Chrome recedes until it has something to separate.
+- **The sheet owns the title.** A form that renders its own `<h2>` inside the
+  body has two headings — one of them invisible to the accessibility tree — and
+  once the header is pinned, the visible one scrolls away under an empty bar.
+
 ### Two rules about repetition
 
 - **A glyph repeated down a list is texture, not identity.** An icon earns its

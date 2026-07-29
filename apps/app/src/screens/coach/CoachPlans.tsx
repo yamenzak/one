@@ -117,11 +117,10 @@ export function CoachPlans({ clientId }: { clientId: string }) {
         </button>
       )}
 
-      <Sheet open={createOpen} onClose={() => { setCreateOpen(false); setCreateErr(null); }} title={`New ${kind} plan${liveLanes.length > 0 ? ` · ${laneName}` : ""}`}>
+      <Sheet open={createOpen} onClose={() => { setCreateOpen(false); setCreateErr(null); }} title={`New ${kind} plan${liveLanes.length > 0 ? ` · ${laneName}` : ""}`} footer={<Button size="lg" className="w-full" disabled={name.trim().length < 2 || creating} onClick={() => void create()}>{creating ? "Creating…" : <>Create &amp; build</>}</Button>}>
         <div className="space-y-4">
           <Field label="Plan name" icon={kind === "workout" ? Dumbbell : Utensils} value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "workout" ? "Push Pull Legs" : "Cutting Plan"} />
           {liveLanes.length > 0 && <p className="text-xs text-muted-foreground">Lands in the <span className="font-medium text-foreground">{laneName}</span> schedule.</p>}
-          <Button size="lg" className="w-full" disabled={name.trim().length < 2 || creating} onClick={() => void create()}>{creating ? "Creating…" : <>Create &amp; build</>}</Button>
           {createErr && <p className="text-sm text-warning" role="alert">{createErr}</p>}
         </div>
       </Sheet>

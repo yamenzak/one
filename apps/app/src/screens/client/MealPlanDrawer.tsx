@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MealBody, MealOption } from "@kova/protocol";
 import { optionMacroTotals, type FoodLike } from "@kova/protocol";
 import { fmtEnergy, kcalToDisplay, featureEnabled } from "@kova/domain";
-import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, ConfirmDialog, useModalOverlay, Utensils, ShoppingCart, Plus, Minus, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw, TierAnchor, CountUp, Atmosphere, DUR, EASE_OUT } from "@kova/ui";
+import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, MacroInline, METRICS, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, ConfirmDialog, useModalOverlay, Utensils, ShoppingCart, Plus, Minus, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw, Anchor, CountUp, Atmosphere, DUR, EASE_OUT } from "@kova/ui";
 import { api, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
@@ -278,21 +278,21 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
               The daily targets stay directly beneath as the `below` slot — they
               are context for the number, not a competing one.
             */}
-            <TierAnchor data-tour="mp-hero" className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
-              <p className={cn("text-caption", isPast ? "text-muted-foreground" : "text-nutrition")}>{isPast ? "Past plan" : active?.name}</p>
-              <p className="numeral text-display"><CountUp value={groups.length} /></p>
-              <p className="text-caption text-muted-foreground">
-                {groups.length === 1 ? "meal a day" : "meals a day"} · {active?.body.mealOptions?.length ?? 0} option{(active?.body.mealOptions?.length ?? 0) === 1 ? "" : "s"}
-              </p>
-              {isPast ? (
-                <button onClick={() => pickPlan(null)} className="mt-2 inline-flex items-center gap-1 rounded-full bg-nutrition-soft px-3 py-1 text-xs font-semibold text-nutrition [&_svg]:size-3.5"><ArrowLeft /> Back to current plan</button>
+            <Anchor
+              data-tour="mp-hero"
+              eyebrow={<span className={isPast ? undefined : "text-nutrition"}>{isPast ? "Past plan" : active?.name}</span>}
+              sub={`${groups.length === 1 ? "meal a day" : "meals a day"} · ${active?.body.mealOptions?.length ?? 0} option${(active?.body.mealOptions?.length ?? 0) === 1 ? "" : "s"}`}
+              below={isPast ? (
+                <button onClick={() => pickPlan(null)} className="inline-flex items-center gap-1 rounded-full bg-nutrition-soft px-3 py-1 text-xs font-semibold text-nutrition [&_svg]:size-3.5"><ArrowLeft /> Back to current plan</button>
               ) : (targets?.targetCalories || targets?.targetProteinG) ? (
-                <div className="mt-2 flex flex-wrap justify-center gap-2">
+                <div className="flex flex-wrap justify-center gap-2">
                   {targets?.targetCalories ? <span className="rounded-full bg-calories-soft px-2.5 py-1 text-xs font-semibold text-calories">{fmtEnergy(targets.targetCalories, units)} / day</span> : null}
                   {targets?.targetProteinG ? <span className="rounded-full bg-protein-soft px-2.5 py-1 text-xs font-semibold text-protein">{targets.targetProteinG} g protein</span> : null}
                 </div>
-              ) : null}
-            </TierAnchor>
+              ) : undefined}
+            >
+              <CountUp value={groups.length} />
+            </Anchor>
 
             <div data-tour="mp-tabs"><SegmentedControl options={[{ value: "plan", label: "My meals" }, { value: "shop", label: "Shopping list" }]} value={view} onChange={setView} /></div>
 

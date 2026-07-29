@@ -7,7 +7,7 @@ import { fmtVolume, fmtEnergy, fmtWeight, featureEnabled, type UnitPrefs } from 
 import {
   Button, Card, Skeleton, MacroBar, IconBadge, Sheet, EmptyState, ProgressRing,
   Reveal, SkeletonHero, SkeletonList, SkeletonHeader,
-  Page, Stagger, TierAnchor, ActionCluster, CountUp, Unit, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
+  Page, Stagger, Anchor, ActionCluster, CountUp, Unit, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock,
   Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Send, Info, Utensils, Croissant, Soup, Apple,
   Store, Ticket, AlertTriangle, ShieldCheck, toneVar, ChevronLeft, ChevronRight, Target, ScanLine, Calendar, BookOpen, Group, Row, User, type Tone, type LucideIcon,
 } from "@kova/ui";
@@ -268,14 +268,10 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
 
             Net of what you burned, because that is the number a client acts on.
           */}
-          <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
-            <p className="text-caption text-muted-foreground">{energyAnchor.label}</p>
-            <p className="numeral text-display">
-              <CountUp value={energyAnchor.value} />
+          <Anchor eyebrow={energyAnchor.label} sub={energyAnchor.sub}>
+        <CountUp value={energyAnchor.value} />
               {energyAnchor.unit && <Unit>{energyAnchor.unit}</Unit>}
-            </p>
-            <p className="text-caption text-muted-foreground">{energyAnchor.sub}</p>
-          </TierAnchor>
+      </Anchor>
 
           {/*
             T2 — what you came here to DO. Circular icon + label, never a row of

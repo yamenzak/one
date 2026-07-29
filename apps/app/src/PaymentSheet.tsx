@@ -129,14 +129,13 @@ export function PaymentSheet({
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title={title}>
+    <Sheet open={open} onClose={onClose} title={title} footer={<Button size="lg" className="w-full" disabled={!ready || busy} onClick={() => void pay()}>
+          {busy ? "Processing…" : submitLabel}
+        </Button>}>
       <div className="space-y-4">
         <div ref={mountRef} className="min-h-[180px]" />
         {!ready && !error && <p className="text-sm text-muted-foreground">Loading secure payment form…</p>}
         {error && <p className="text-sm text-danger" role="alert">{error}</p>}
-        <Button size="lg" className="w-full" disabled={!ready || busy} onClick={() => void pay()}>
-          {busy ? "Processing…" : submitLabel}
-        </Button>
         <p className="text-xs text-muted-foreground">Payments are processed securely by Stripe.</p>
       </div>
     </Sheet>

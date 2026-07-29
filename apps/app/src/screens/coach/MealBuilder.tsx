@@ -340,7 +340,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
 
       {foodPicker && <FoodSearchSheet onClose={() => setFoodPicker(null)} onPick={(id, name) => { mutate((d) => d[foodPicker.optIdx]!.foods.push({ foodId: id, quantity: 100, unit: "g" })); setNames((p) => new Map(p).set(id, name)); setFoodPicker(null); void refreshFoods(); }} />}
       {aiOpen && <AiMealSheet onClose={() => setAiOpen(false)} onRun={runAi} />}
-      <Sheet open={typeOpen} onClose={() => setTypeOpen(false)} title="Add meal type">
+      <Sheet open={typeOpen} onClose={() => setTypeOpen(false)} title="Add meal type" footer={<Button size="lg" className="w-full" disabled={newType.trim().length < 2} onClick={addCustomType}>Add meal type</Button>}>
         <div className="space-y-4">
           {restorable.length > 0 && (
             <div className="space-y-1.5">
@@ -351,7 +351,6 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
             </div>
           )}
           <Field label="Or add a custom meal" icon={Utensils} value={newType} onChange={(e) => setNewType(e.target.value)} placeholder="e.g. Second breakfast" autoFocus />
-          <Button size="lg" className="w-full" disabled={newType.trim().length < 2} onClick={addCustomType}>Add meal type</Button>
         </div>
       </Sheet>
       {seedTemplateOpen && <SeedTemplateSheet onClose={() => setSeedTemplateOpen(false)} onPick={(body, name) => { setSeedTemplateOpen(false); seedDraft(name, body); }} />}
@@ -583,11 +582,10 @@ function AiMealSheet({ onClose, onRun }: { onClose: () => void; onRun: (i: strin
   const [dropped, setDropped] = useState<string[] | null>(null);
   const run = async () => { setBusy(true); setErr(null); setDropped(null); try { const d = await onRun(instructions); if (d.length) setDropped(d); } catch (e) { setErr(e); } finally { setBusy(false); } };
   return (
-    <Sheet open onClose={onClose} title="AI meal draft">
+    <Sheet open onClose={onClose} title="AI meal draft" footer={<Button size="lg" className="w-full" disabled={busy} onClick={() => void run()}>{busy ? "Drafting…" : "Generate options"}</Button>}>
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">Drafts meal options from this client's targets, body and dietary preferences — every food comes from your library. You'll review before publishing.</p>
         <Field label="Instructions (optional)" icon={PencilLine} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="e.g. high-protein, no dairy, 4 meals" />
-        <Button size="lg" className="w-full" disabled={busy} onClick={() => void run()}>{busy ? "Drafting…" : "Generate options"}</Button>
         {dropped ? <div className="rounded-xl border border-border/60 bg-surface-2 p-3 text-xs text-muted-foreground">Options added. {dropped.length} suggested food{dropped.length === 1 ? "" : "s"} weren't in your library and {dropped.length === 1 ? "was" : "were"} skipped: {dropped.join(", ")}. Add {dropped.length === 1 ? "it" : "them"} to your library to include next time.</div> : null}
         {err ? <AiErrorBox error={err} /> : null}
       </div>

@@ -357,7 +357,9 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
   };
 
   return (
-    <Sheet open onClose={onClose} title={editing ? "Edit package" : "New package"}>
+    <Sheet open onClose={onClose} title={editing ? "Edit package" : "New package"} footer={<Button size="lg" className="w-full" disabled={!canSave || busy} onClick={() => void save()}>
+          {busy ? (editing ? "Saving…" : "Creating…") : editing ? "Save changes" : "Create package"}
+        </Button>}>
       <div className="space-y-4">
         {editing && <p className="text-sm text-muted-foreground">Changes apply to the Shop right away. Clients who already bought this package keep the access they paid for — editing never touches a live subscription.</p>}
         <Field label="Name" icon={CreditCard} value={name} onChange={(e) => setName(e.target.value)} />
@@ -453,9 +455,6 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
           )}
         </div>
         {error && <p role="status" aria-live="polite" className="text-sm text-danger">{error}</p>}
-        <Button size="lg" className="w-full" disabled={!canSave || busy} onClick={() => void save()}>
-          {busy ? (editing ? "Saving…" : "Creating…") : editing ? "Save changes" : "Create package"}
-        </Button>
       </div>
     </Sheet>
   );
@@ -495,7 +494,7 @@ function PromoSheet({ packages, clients, onClose, onSaved }: { packages: Pkg[]; 
     } catch (e) { setError(errorText(e, "That code already exists.")); } finally { setBusy(false); }
   };
   return (
-    <Sheet open onClose={onClose} title="New promo code">
+    <Sheet open onClose={onClose} title="New promo code" footer={<Button size="lg" className="w-full" disabled={!canSave || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create promo"}</Button>}>
       <div className="space-y-4">
         <Field label="Code" icon={Tag} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="SUMMER20" />
         <div className="flex gap-2">{(["percent", "amount"] as const).map((t) => <Chip key={t} selected={discountType === t} onClick={() => setDiscountType(t)}>{t === "percent" ? "% off" : "$ off"}</Chip>)}</div>
@@ -504,7 +503,6 @@ function PromoSheet({ packages, clients, onClose, onSaved }: { packages: Pkg[]; 
         <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Limit to a package (optional)</span><Select aria-label="Package" value={restrictedPackageId} onChange={setRestrictedPackageId} options={[{ value: "", label: "Any package" }, ...packages.map((p) => ({ value: p.id, label: p.name }))]} /></div>
         <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Limit to a client (optional)</span><Select aria-label="Client" value={restrictedClientId} onChange={setRestrictedClientId} options={[{ value: "", label: "Any client" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} /></div>
         {error && <p role="status" aria-live="polite" className="text-sm text-danger">{error}</p>}
-        <Button size="lg" className="w-full" disabled={!canSave || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create promo"}</Button>
       </div>
     </Sheet>
   );
@@ -531,7 +529,7 @@ function CodeSheet({ packages, clients, onClose, onSaved }: { packages: Pkg[]; c
     } catch (e) { setError(errorText(e, "Couldn't create that code — it may already exist.")); } finally { setBusy(false); }
   };
   return (
-    <Sheet open onClose={onClose} title="New redemption code">
+    <Sheet open onClose={onClose} title="New redemption code" footer={<Button size="lg" className="w-full" disabled={!canSave || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create code"}</Button>}>
       <div className="space-y-4">
         <Field label="Code" icon={Ticket} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="WELCOME7" />
         <Field label="Days to add" value={days} inputMode="numeric" onChange={(e) => setDays(e.target.value.replace(/\D/g, ""))} error={daysError ?? undefined} />
@@ -540,7 +538,6 @@ function CodeSheet({ packages, clients, onClose, onSaved }: { packages: Pkg[]; c
         <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Only for holders of a package (optional)</span><Select aria-label="Package" value={restrictedPackageId} onChange={setRestrictedPackageId} options={[{ value: "", label: "Any package" }, ...packages.map((p) => ({ value: p.id, label: p.name }))]} /></div>
         <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Only for one client (optional)</span><Select aria-label="Client" value={restrictedClientId} onChange={setRestrictedClientId} options={[{ value: "", label: "Any client" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} /></div>
         {error && <p role="status" aria-live="polite" className="text-sm text-danger">{error}</p>}
-        <Button size="lg" className="w-full" disabled={!canSave || busy} onClick={() => void save()}>{busy ? "Creating…" : "Create code"}</Button>
       </div>
     </Sheet>
   );

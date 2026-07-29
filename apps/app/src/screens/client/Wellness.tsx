@@ -12,7 +12,7 @@ import { useSearchParams } from "react-router-dom";
 import { fmtVolume, volumeLabel, volumeDisplayToMl, POSTURE_GUIDANCE } from "@kova/domain";
 import {
   Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, StatCard, WeekDots, Sparkline, MiniBars, EmptyState, cn, toneVar,
-  Reveal, SkeletonStatGrid, SkeletonList, TierAnchor, ActionCluster, CountUp,
+  Reveal, SkeletonStatGrid, SkeletonList, Anchor, ActionCluster, CountUp,
   ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Flame, Plus, ChevronRight, Upload, HeartPulse, AlertTriangle, METRICS, POSTURE_SEVERITY_TONE, FASTING_ZONES, type FastingZone, type Tone,
 } from "@kova/ui";
 
@@ -319,20 +319,16 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         reads as a verdict on the person. The band already has the right sentence
         for that state, so say it instead and keep the numeral for a real number.
       */}
-      <TierAnchor data-tour="wellness-hero" className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
-        <p className="text-caption text-muted-foreground">Wellness score</p>
-        {score && score.score > 0 ? (
-          <>
-            <p className="numeral text-display"><CountUp value={score.score} /></p>
-            <p className="text-caption text-muted-foreground">{WELLNESS_BAND[score.band].label} · {WELLNESS_BAND[score.band].blurb}</p>
-          </>
-        ) : (
-          <>
-            <p className="text-title-1">{score ? WELLNESS_BAND[score.band].label : "Not scored yet"}</p>
-            <p className="text-caption text-muted-foreground">{score ? WELLNESS_BAND[score.band].blurb : "Log a few things this week and your score appears here."}</p>
-          </>
-        )}
-      </TierAnchor>
+      <Anchor
+        data-tour="wellness-hero"
+        eyebrow="Wellness score"
+        word={score && score.score > 0 ? undefined : score ? WELLNESS_BAND[score.band].label : "Not scored yet"}
+        sub={score && score.score > 0
+          ? `${WELLNESS_BAND[score.band].label} · ${WELLNESS_BAND[score.band].blurb}`
+          : score ? WELLNESS_BAND[score.band].blurb : "Log a few things this week and your score appears here."}
+      >
+        {score && score.score > 0 && <CountUp value={score.score} />}
+      </Anchor>
 
       {/*
         T2 — what you came here to DO. The same verbs the chip row carried, but

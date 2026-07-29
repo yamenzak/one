@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Badge, SegmentedControl, Field, Sheet, SubCard, Page, Stagger, ChartCard, SectionHeader, Eyebrow, GlanceStrip, IconBadge, EmptyState, Spinner, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Wallet, Gauge, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, TrendingDown, CheckCheck, Check, Lock, Tag, TierAnchor, CountUp, Group, Row } from "@kova/ui";
+import { Button, Card, Badge, SegmentedControl, Field, Sheet, SubCard, Page, Stagger, ChartCard, SectionHeader, Eyebrow, GlanceStrip, IconBadge, EmptyState, Spinner, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Wallet, Gauge, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, TrendingDown, CheckCheck, Check, Lock, Tag, Anchor, CountUp, Group, Row } from "@kova/ui";
 import { FEATURE_KEYS, FEATURE_META, QUOTA_KEYS, QUOTA_META, type Entitlements } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -239,21 +239,13 @@ function Overview() {
               are the number an owner checks, and the one that stops the AI suite
               dead when it hits zero — so it is the anchor rather than a tile in a
               grid of four. */}
-          <TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-1 text-center">
-            <p className="text-caption text-muted-foreground">AI credits left</p>
-            <p className="numeral text-display"><CountUp value={billing.balance.available} /></p>
-            {/* Zero credits means two completely different things, and the screen
-                used to say the actionable one in both cases: a studio whose plan
-                doesn't include the AI suite was told to "top up", which would
-                have bought credits it still couldn't spend. */}
-            <p className="text-caption text-muted-foreground">
-              {billing.balance.available > 0
+          <Anchor eyebrow={"AI credits left"} sub={billing.balance.available > 0
                 ? "across monthly and purchased"
                 : ctx?.entitlements?.features?.aiSuite
                   ? "The AI suite is paused until you top up"
-                  : "The AI suite isn't in your plan"}
-            </p>
-          </TierAnchor>
+                  : "The AI suite isn't in your plan"}>
+        <CountUp value={billing.balance.available} />
+      </Anchor>
           {/* No live subscription. Distinct from dunning: a past-due studio HAS a
               subscription and a card to fix; this one is either sitting on the free
               baseline or holding a plan whose checkout never completed. The Shell
@@ -635,7 +627,19 @@ function DowngradeSheet({ planId, onClose, onDone, onCheckout, onPortal }: {
   const fmtCeiling = (b: Blocker) => (b.ceiling < 0 ? "unlimited" : `${b.ceiling.toLocaleString()}${b.unit ? ` ${b.unit}` : ""}`);
 
   return (
-    <Sheet open onClose={onClose} title={report ? `Switch to ${report.planName}` : "Switch plan"}>
+    <Sheet
+      open
+      onClose={onClose}
+      title={report ? `Switch to ${report.planName}` : "Switch plan"}
+      /* No footer until the check has come back: while it is loading, or when it
+         failed, there is nothing to submit and a dead button pinned to the
+         bottom of the sheet would be the loudest thing on it. */
+      footer={report ? (
+        <Button size="lg" className="w-full" disabled={!report.eligible || submitting} onClick={() => void submit()}>
+          {submitting ? <><Spinner /> Switching…</> : report.eligible ? `Switch to ${report.planName}` : "Not ready yet"}
+        </Button>
+      ) : undefined}
+    >
       {loadErr && !report ? (
         <EmptyState icon={AlertTriangle} title="Couldn't check that plan" description="We couldn't reach the server to see whether you're ready to switch." action={<Button onClick={() => void check()}>{checking ? "Checking…" : "Try again"}</Button>} />
       ) : (
@@ -704,9 +708,6 @@ function DowngradeSheet({ planId, onClose, onDone, onCheckout, onPortal }: {
               {err && <p className="text-sm text-warning" role="alert">{err}</p>}
 
               <div className="space-y-2">
-                <Button size="lg" className="w-full" disabled={!report.eligible || submitting} onClick={() => void submit()}>
-                  {submitting ? <><Spinner /> Switching…</> : report.eligible ? `Switch to ${report.planName}` : "Not ready yet"}
-                </Button>
                 <Button size="lg" variant="secondary" className="w-full" disabled={checking || submitting} onClick={() => void check()}>
                   {checking ? <><Spinner /> Re-checking…</> : "Re-check"}
                 </Button>
