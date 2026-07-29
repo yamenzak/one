@@ -499,6 +499,21 @@ The shape every phone OS converged on, and why each half works:
 - **One header per screen.** When a surface renders its own back + title for a
   section, its container must not render another — the two stack into a pair of
   back buttons, one of which goes somewhere the user did not ask for.
+- **The page already has a title. Nothing inside it may say the title again.**
+  The storefront page carried, in order: its own title, a page description, a
+  `MARKETPLACE` eyebrow, a "Studio" scope badge, and a card headed "Your Shop"
+  with its own two-line description — five layers of chrome and three different
+  names for one thing, above the two switches you came for. A section header
+  belongs on a page that genuinely holds more than one section, and nowhere
+  else.
+- **A scope badge is a symptom of a merged screen.** "Studio" on every studio
+  section made sense while studio and personal settings shared a surface. Once
+  each has its own titled page reached through its own door, the badge answers a
+  question nobody is asking.
+- **A settings screen configures what exists.** A card with an icon, a "Coming
+  later" badge and four lines about an unbuilt feature is a roadmap entry taking
+  a third of a page. If the absence needs explaining, explain it in one muted
+  line at the bottom.
 - **The ways out are rows, like everything else.** "Sign out" as a row beside
   "Delete my account" as a card with a heading, a paragraph and a button is two
   spellings of one idea. The consequence belongs on the confirmation, at the
