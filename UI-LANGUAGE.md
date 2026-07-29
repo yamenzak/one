@@ -60,6 +60,11 @@ placed above its true tier is the single most common way a screen rots.**
 - **T1 is singular and non-negotiable.** Two competing hero elements means the
   screen has two jobs and should be two screens. If you cannot name the anchor
   in one noun, the screen is unclear.
+- **A tabbed surface is N screens sharing chrome**, so the anchor belongs to the
+  TAB, not to the page. Each tab names its own subject and gets its own anchor;
+  the page's own title drops to an eyebrow, because the tab bar already says it
+  and a title is navigation rather than content. This is the honest reading of
+  "one anchor per screen" — not an exception to it.
 - **T2 tops out at five.** Four is better. The fifth slot, when needed, is
   always **More** — never a fifth real action.
 - **T2 has a floor of three.** A cluster of one is a single circle adrift in the

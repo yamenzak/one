@@ -37,9 +37,29 @@ work list for the rewrite:
 
 **Closed so far:** tokens (type scale, radius ladder, motion, atmosphere
 opacity), `lib/animation.ts`, the spine components, `Choice`, wizard chrome,
-overlay keyframes and radii, shell chrome + scroll-away wash + content column.
-Screens rebuilt: the four doorways, sign-in, the three-step studio wizard, and
-the client's Today anchor. See UI-LANGUAGE §13 for the component registry.
+overlay keyframes and radii, shell chrome + scroll-away wash + content column +
+compact billing banner. See UI-LANGUAGE §13 for the component registry.
+
+**Screens on the spine:** the four doorways · sign-in · the three-step studio
+wizard · client Today · client Eat · client Train · client Progress (per-lens) ·
+client Shop · coach Today · coach Clients.
+
+**Screens still to do**, with what each one's anchor should be — the question is
+always "what is this screen about, in one noun":
+
+| Screen | Candidate anchor | Note |
+|---|---|---|
+| `client/Wellness` | — | **Needs a product decision, not a rename.** It is sleep + mood + water + fasting on one surface, which by §1's own test is four subjects. Either it splits, or one of them is promoted and the rest become sections. Do not force an anchor on it before that is decided. |
+| `client/WorkoutPlayer` | the set you are on | Full-bleed; likely opts out of the content column. |
+| `coach/Business` | this month's revenue, or credits left | Tabbed — one anchor per tab (§1). |
+| `coach/Library` | items in the library | List-shaped: `Group` of `Row`s. |
+| `coach/ClientManage` | the client | Tabbed. |
+| `coach/Packages`, `coach/Staff`, `coach/Sessions` | count of each | All list-shaped. |
+| `Settings`, `AdminConsole` | — | Settings surfaces are lists, not anchored screens: `SettingsList` / `Group` of `Row`s, no display numeral. |
+
+**Still not conformant anywhere:** `EmptyState`, `SettingsList`, `InsightCard`,
+`WavyDivider` and the overlay family predate the language (registry marks them
+`◻︎`). The card-stack → `Group`/`Row` conversion is done on Clients only.
 
 Follow the order in UI-LANGUAGE.md §14: tokens → `Row`/`Group` → `Atmosphere`/
 `Anchor` → motion → screen by screen.
