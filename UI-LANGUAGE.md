@@ -252,6 +252,12 @@ overline.** Never a weight above 700.
 **Numerals:** `tabular-nums` and `−0.02em` on every number, always. A number
 that reflows as it ticks is a bug.
 
+**Never render a dash as a `display` value.** An em-dash at 56px/700 with
+−0.03em tracking is not a placeholder, it is a horizontal rule — it reads as a
+divider with a caption under it, which looks broken rather than empty. When the
+anchor has no value, say so in words at `title-1` ("Not yet", "Nothing active").
+A dash is fine as a row value, where it is small and conventional.
+
 **Units are subordinate:** render the unit at ~55% of the value's size and in
 `muted-foreground`, on the same baseline. `1,905` `GBP`, never `1,905 GBP` at
 one size.

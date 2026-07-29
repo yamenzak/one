@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, cn, Reveal, SkeletonRow, SkeletonLine, MacroInline, Avatar, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, List, PencilLine, ArrowLeftRight, Ellipsis, Send, History } from "@kova/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, cn, Reveal, SkeletonRow, SkeletonLine, MacroInline, Avatar, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, List, PencilLine, ArrowLeftRight, Ellipsis, Send, History , Group, Row } from "@kova/ui";
 import { api } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { AiAvatar } from "../../AiAvatar.js";
@@ -25,7 +25,7 @@ export function Library() {
   const tab = (TABS.includes(tabParam as Tab) ? tabParam : "exercises") as Tab;
   return (
     <Page className="mx-auto max-w-xl space-y-4 p-4 pb-28">
-      <h1 className="text-title-2">Library</h1>
+      <p className="px-1 text-caption text-muted-foreground">Library</p>
       <SegmentedControl options={[{ value: "exercises", label: "Exercises" }, { value: "foods", label: "Foods" }, { value: "templates", label: "Templates" }, { value: "content", label: "Content" }]} value={tab} onChange={(v) => nav(`/library/${v}`)} />
       {tab === "exercises" && <Exercises />}
       {tab === "foods" && <Foods />}
@@ -368,15 +368,20 @@ function Templates() {
         ))}</div>
       }>
         {items && (items.length === 0 ? <EmptyState icon={LayoutGrid} title="No templates yet" description="Save any plan as a template from its builder to reuse it across clients." /> : (
-        <Stagger className="space-y-2">{items.map((t) => (
-          <Card key={t.id} className="flex items-center justify-between gap-2 py-3">
-            <div className="min-w-0"><div className="truncate font-medium">{t.name}</div><div className="text-xs text-muted-foreground">{t.visibility === "tenant" ? "Shared with team" : "Private"}</div></div>
-            <div className="flex shrink-0 items-center gap-1">
-              <Button size="sm" variant="tonal" onClick={() => setUseFor(t)}><Send className="size-4" /> Use</Button>
-              <button onClick={() => void remove(t.id)} aria-label="Delete template" className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button>
-            </div>
-          </Card>
-        ))}</Stagger>
+        <Group>{items.map((t) => (
+          <Row
+            key={t.id}
+            sub={t.visibility === "tenant" ? "Shared with team" : "Private"}
+            trailing={
+              <>
+                <Button size="sm" variant="tonal" onClick={() => setUseFor(t)}><Send className="size-4" /> Use</Button>
+                <button onClick={() => void remove(t.id)} aria-label={`Delete template ${t.name}`} className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button>
+              </>
+            }
+          >
+            {t.name}
+          </Row>
+        ))}</Group>
         ))}
       </Reveal>
       {useFor && (

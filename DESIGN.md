@@ -59,7 +59,13 @@ always "what is this screen about, in one noun":
 
 **Still not conformant anywhere:** `EmptyState`, `SettingsList`, `InsightCard`,
 `WavyDivider` and the overlay family predate the language (registry marks them
-`◻︎`). The card-stack → `Group`/`Row` conversion is done on Clients only.
+`◻︎`).
+
+**Card-stack → `Group`/`Row` done on:** Clients · Staff · Packages (archived,
+redemption codes, promo codes) · Sessions (add-on types) · Library (templates).
+Remaining stacks are the ones whose items are genuinely browsable cards
+(exercise/food tiles with media) rather than scannable rows — those stay cards
+by design (§7 `Tile` vs `Row`).
 
 Follow the order in UI-LANGUAGE.md §14: tokens → `Row`/`Group` → `Atmosphere`/
 `Anchor` → motion → screen by screen.
