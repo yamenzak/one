@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The multi-tenant SaaS substrate, shared across 4DL apps: host/tenancy classification, custom-domain DCV, AI credit metering, promo math, tenant standing, the AI mock-lane decision. Pure, no I/O, no product vocabulary — see README.md.",
+  "description": "The multi-tenant SaaS substrate, shared across 4DL apps: host/tenancy classification, custom-domain DCV, AI credit metering, promo math, tenant standing, the AI mock-lane decision. Pure, no I/O, no product vocabulary \u2014 see README.md.",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "@4dl/core": "workspace:*"
   }
 }

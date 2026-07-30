@@ -13,6 +13,7 @@
     "clean": "rm -rf .turbo .wrangler dist *.tsbuildinfo"
   },
   "dependencies": {
+    "@4dl/core": "workspace:*",
     "@4dl/platform": "workspace:*",
     "@better-auth/passkey": "1.6.23",
     "@kova/domain": "workspace:*",

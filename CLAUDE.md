@@ -46,6 +46,10 @@ apps/
   www/   # marketing site (dependency-free static generator)
   e2e/   # Playwright — the golden paths, in a browser against the real worker
 packages/
+  core/      # @4dl/core — the floor every 4DL package stands on: ids, defensive
+             # JSON columns, the STRUCTURAL BINDINGS CONTRACT (HasDb/HasMedia/…)
+             # and the COMPOSED SCHEMA RUNNER (SchemaModule/applySchema), plus
+             # the boundary checker at @4dl/core/boundary. See its README.
   platform/  # @4dl/platform — the SHARED multi-tenant substrate (pure, no I/O):
              # hosts/tenancy, custom-domain DCV, AI credit metering, promo math,
              # tenant standing, the AI mock-lane decision. See its README.
@@ -175,10 +179,14 @@ remote bindings without editing the config (this is what the E2E suite does).
   logged from the log drawer never appeared on the Progress chart, the wellness
   score double-counted a day rated in both places, and `check_ins.sleep_quality`
   was read by Progress while nothing ever wrote it.
-- **Adding DDL means bumping `SCHEMA_VERSION` in `db.ts`.** The marker row
-  short-circuits the entire DDL block, so a new `CREATE TABLE IF NOT EXISTS`
+- **Adding DDL means bumping `KOVA_SCHEMA.version` in `db.ts`.** The marker row
+  short-circuits the entire module, so a new `CREATE TABLE IF NOT EXISTS`
   without a bump is invisible on a fresh database and fatal on every existing
-  one — the table is never created and every route touching it 500s.
+  one — the table is never created and every route touching it 500s. The schema
+  is now a `SchemaModule` in `@4dl/core`'s composed runner; the other rules its
+  statements must satisfy (terminate with `;`, no `--`, ALTERs are ADD COLUMN
+  only) are asserted by `apps/api/test/schema-module.test.ts` because every one
+  of them fails silently. Read `packages/core/README.md` before editing the DDL.
 - Store metric, convert at display (`@kova/domain` units.ts). Day-bucketed
   rows use the client's local date (`date_local`, YYYY-MM-DD) from the device.
 - Plan/meal bodies are JSON columns validated by `@kova/protocol` at the route.
@@ -191,9 +199,15 @@ remote bindings without editing the config (this is what the E2E suite does).
 Be conservative here: this section is read as ground truth by future agents, so
 an over-claim costs more than an under-claim. Verify before editing it.
 
+**The platform extraction is under way** — [docs/PLATFORM-EXTRACTION.md](docs/PLATFORM-EXTRACTION.md)
+is the audit and the staged plan for turning this repo from "Kova with two shared
+packages" into "the 4DL platform, on which Kova is the first app". Three more apps
+are queued. **Stage 0 (the mechanisms) is done**; stages 1–9 are not. Read it
+before moving anything between `apps/api` and `packages/`.
+
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured most recently, per package: **465 API + 206 domain + 98 platform +
-61 ui + 38 app + 7 protocol** (875 total, 38 skipped). Domain used to read 304;
+moves. Measured most recently, per package: **478 API + 212 domain + 101 platform +
+64 ui + 52 app + 14 core + 7 protocol** (928 total, 38 skipped). Domain used to read 304;
 98 of those are now `@4dl/platform` — the split moved tests, it did not add any.
 The pricing and normalizer suites live
 in `apps/api/test` and are already *inside* the API count — the older
