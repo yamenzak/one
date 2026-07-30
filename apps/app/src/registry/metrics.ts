@@ -11,7 +11,8 @@
 import type { Tone } from "@4dl/ui";
 import {
   Flame, Beef, Wheat, Droplets, Droplet, Salad, Weight, Percent, Footprints,
-  Moon, Smile, Zap, Activity, Dumbbell, Timer, Ruler, HeartPulse, type LucideIcon,
+  Moon, Smile, Zap, Activity, Dumbbell, Timer, Ruler, HeartPulse, Pill, FlaskConical,
+  ClipboardList, type LucideIcon,
 } from "@4dl/ui";
 
 /** The unit dimension a metric is stored/converted in (matches @kova/domain
@@ -59,6 +60,16 @@ export const METRICS = {
   streak: { label: "Streak", unit: "d", noConvert: true, icon: Flame, tone: "calories" },
   fasting: { label: "Fasting", unit: "h", noConvert: true, icon: Timer, tone: "sleep" },
   heartRate: { label: "Heart rate", unit: "bpm", noConvert: true, icon: HeartPulse, tone: "cardio" },
+  // Added for the home hero, which was hard-coding a tone literal for each of
+  // these — twice over, once on the widget definition (which colours the picker
+  // and the builder toolbar) and again inside its renderer. Two copies of a
+  // colour is how a metric ends up amber in one place and blue in another.
+  tonnage: { label: "Volume lifted", unit: "kg", unitDimension: "weight", icon: Dumbbell, tone: "activity" },
+  activeMinutes: { label: "Active minutes", unit: "min", noConvert: true, icon: Activity, tone: "cardio" },
+  wellness: { label: "Wellness", unit: "", noConvert: true, icon: HeartPulse, tone: "sleep" },
+  supplements: { label: "Supplements", unit: "", noConvert: true, icon: Pill, tone: "supplement" },
+  labs: { label: "Labs", unit: "", noConvert: true, icon: FlaskConical, tone: "lab" },
+  checkins: { label: "Check-ins", unit: "", noConvert: true, icon: ClipboardList, tone: "calories" },
 } satisfies Record<string, MetricDef>;
 
 export type MetricKey = keyof typeof METRICS;
