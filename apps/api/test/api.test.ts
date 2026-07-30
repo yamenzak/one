@@ -2869,6 +2869,40 @@ describe("client preferences + body metrics + goal staleness", () => {
     expect(day2.metrics?.activeMinutes).toBe(0);
   });
 
+  it("a day rated in BOTH the log drawer and the check-in counts once, not twice", async () => {
+    // The regression: the wellness score concatenated check_ins and mood_logs
+    // with no date de-duplication (unlike the sleep block five lines above,
+    // which guards), so one day rated twice got double the weight of every
+    // other day in the mood, energy and stress pillars.
+    const id = await mkClient();
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Same day, two doors, deliberately different numbers.
+    await SELF.fetch(`${ORIGIN}/api/check-ins`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, data: { date: today, mood: 5, energy: 5, stress: 1 } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/mood`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, data: { date: today, mood: 2, energy: 2, stress: 4 } }) });
+
+    const out = (await (await SELF.fetch(`${ORIGIN}/api/wellness/score?clientId=${id}`, { headers: H() })).json()) as {
+      input: { avgMood: number | null; avgEnergy: number | null; avgStress: number | null };
+    };
+    // One reading for the day, and the dedicated table wins — NOT (5+2)/2 = 3.5.
+    expect(out.input.avgMood).toBe(2);
+    expect(out.input.avgEnergy).toBe(2);
+    expect(out.input.avgStress).toBe(4);
+  });
+
+  it("mood merges per FIELD, so a day split across both doors keeps both halves", async () => {
+    // A wholesale per-date preference would drop the check-in's stress here.
+    const id = await mkClient();
+    const today = new Date().toISOString().slice(0, 10);
+    await SELF.fetch(`${ORIGIN}/api/check-ins`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, data: { date: today, stress: 3 } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/mood`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, data: { date: today, mood: 4 } }) });
+    const out = (await (await SELF.fetch(`${ORIGIN}/api/wellness/score?clientId=${id}`, { headers: H() })).json()) as {
+      input: { avgMood: number | null; avgStress: number | null };
+    };
+    expect(out.input.avgMood).toBe(4);
+    expect(out.input.avgStress).toBe(3);
+  });
+
   it("Today bundle reports profile completeness", async () => {
     const id = await mkClient();
     const before = (await (await SELF.fetch(`${ORIGIN}/api/today?clientId=${id}&date=2026-01-10`, { headers: H() })).json()) as { profile: { complete: boolean; gaps: string[] } };
