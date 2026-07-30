@@ -14,7 +14,7 @@
 import { betterAuth, APIError } from "better-auth";
 import { organization, emailOTP } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
-import { cookieDomainFor, isDevRoot, rpIdFor, type HostShape } from "@4dl/platform";
+import { cookieDomainFor, isDevRoot, rpIdFor, type HostShape } from "@4dl/tenancy";
 import type { Env } from "./env.js";
 import { ac, roles } from "./access.js";
 import { withinQuota, hasFeature } from "./billing-store.js";

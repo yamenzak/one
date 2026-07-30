@@ -1,7 +1,7 @@
 /**
  * STANDING — what a person may do in ONE tenancy, decided in one place.
  *
- * A client's position in a studio is not one flag, it is the intersection of
+ * A client's position in a tenant is not one flag, it is the intersection of
  * several independent ones, and before this each consumer combined them by hand:
  * the Shell had its own access-gate condition, `requireClientAccess` had its own
  * archived rule, the Today banner had a third reading. Three implementations of
@@ -17,17 +17,17 @@
  *                 none            no client record (staff-only persona)
  *                 pending_signup  reserved by a self-signup, address unverified
  *                 active          a client
- *                 archived        off the roster; the studio ended it
+ *                 archived        off the roster; the tenant ended it
  *   access      whether a live plan/package covers them, and whether this
- *               studio requires one at all
- *   studio      the STUDIO's own standing with Kova (ok / grace / suspended)
+ *               tenant requires one at all
+ *   tenant      the TENANT's own standing with the platform (ok / grace / suspended)
  *
  * ── The rules, in precedence order ──────────────────────────────────────────
  *
- * 1. A SUSPENDED STUDIO is closed. Its whole subdomain drops to read-only — see
+ * 1. A SUSPENDED TENANT is closed. Its whole subdomain drops to read-only — see
  *    `resolveHostGate` below, which is where that is enforced once for every
  *    route rather than re-derived per handler. Nobody loses sight of their own
- *    data; nobody writes to a studio that is not paying to run. Grace
+ *    data; nobody writes to a tenant that is not paying to run. Grace
  *    (`past_due`) is full service by definition and changes nothing for anyone
  *    but the owner, who is being dunned.
  * 2. ARCHIVED outranks access. The relationship is over, so there is nothing to
@@ -38,14 +38,14 @@
  * ── Isolation ───────────────────────────────────────────────────────────────
  *
  * Every one of these facts is per-tenancy, and so is every answer. A person
- * archived at studio A, locked out at studio B and training happily at studio C
+ * archived at tenant A, locked out at tenant B and training happily at tenant C
  * holds three different standings at once, and nothing here can mix them: the
  * caller passes one tenancy's facts and gets that tenancy's answer. This is the
- * property that makes multi-studio identity safe, so it is asserted directly.
+ * property that makes multi-tenant identity safe, so it is asserted directly.
  */
 
 /**
- * The STUDIO's own standing with Kova. Three states, not two, because the
+ * The TENANT's own standing with the platform. Three states, not two, because the
  * lifecycle has a grace window and collapsing it loses the whole point of one:
  *
  *   ok         paid up.
@@ -57,14 +57,14 @@
  *              client's capability is `entitlements ∩ clientFlags`, that passes
  *              through with no per-client bookkeeping: their AI, commerce, body
  *              scan and external search all stop. What survives is logging their
- *              own data, which costs the studio nothing and is theirs anyway.
+ *              own data, which costs the tenant nothing and is theirs anyway.
  *
- * So a suspended studio's clients do NOT carry on "as if nothing" — they lose
+ * So a suspended tenant's clients do NOT carry on "as if nothing" — they lose
  * every paid feature. They keep their own record and their own logbook, which is
- * the line this module draws: Kova withholds what Kova sells, and does not hold
+ * the line this module draws: the platform withholds what the platform sells, and does not hold
  * a client's own history hostage over their coach's invoice.
  */
-export type StudioStanding = "ok" | "grace" | "suspended" | "blocked";
+export type TenantStanding = "ok" | "grace" | "suspended" | "blocked";
 
 /** The client record's status in this tenancy. */
 export type Membership = "none" | "pending_signup" | "active" | "archived";
@@ -73,10 +73,10 @@ export interface StandingFacts {
   membership: Membership;
   /** A live plan/package covers them right now. */
   accessActive: boolean;
-  /** This studio requires a live plan/package to use the app at all. */
+  /** This tenant requires a live plan/package to use the app at all. */
   accessRequired: boolean;
-  /** The STUDIO's standing with Kova: paid, in dunning grace, or suspended. */
-  studio: StudioStanding;
+  /** The TENANT's standing with the platform: paid, in dunning grace, or suspended. */
+  tenant: TenantStanding;
 }
 
 export interface Standing {
@@ -84,7 +84,7 @@ export interface Standing {
   canRead: boolean;
   /** Log, check in, edit their own data. */
   canWrite: boolean;
-  /** Buy or redeem access at this studio. */
+  /** Buy or redeem access at this tenant. */
   canPurchase: boolean;
   /** The app must replace itself with the storefront. */
   lockedToStorefront: boolean;
@@ -95,7 +95,7 @@ export interface Standing {
     | "unclaimed"
     | "archived"
     | "needs_access"
-    | "studio_suspended";
+    | "tenant_suspended";
 }
 
 /**
@@ -119,17 +119,17 @@ export function resolveStanding(f: StandingFacts): Standing {
 
   // Archived: the data is theirs to read, and the relationship is over — so no
   // writes, and crucially NOT a storefront. Buying would not un-archive them, and
-  // being sold to by a studio that just let you go is insulting.
+  // being sold to by a tenant that just let you go is insulting.
   if (f.membership === "archived") {
     return { canRead: true, canWrite: false, canPurchase: false, lockedToStorefront: false, reason: "archived" };
   }
 
   // Grace is deliberately invisible here: `past_due` means dunning is running and
-  // the studio still has full service, so there is nothing for the client to see
+  // the tenant still has full service, so there is nothing for the client to see
   // or lose. Only the owner is told (billing_past_due). Falling through to the
   // normal rules below is the correct behaviour, not an omission.
 
-  // Grace expired: the studio is closed, and its whole subdomain is read-only.
+  // Grace expired: the tenant is closed, and its whole subdomain is read-only.
   //
   // Paid features are already gone by a separate mechanism —
   // `clampEntitlementsForStatus` drops the tenant to free and the client inherits
@@ -137,24 +137,24 @@ export function resolveStanding(f: StandingFacts): Standing {
   // search stop with no per-client work. What is decided HERE is the client's own
   // data, and the line is: it stays readable, and it stops being writable.
   //
-  // Writes are off because a write is the studio continuing to operate. Letting
-  // clients keep logging into a studio that stopped paying means the product runs
+  // Writes are off because a write is the tenant continuing to operate. Letting
+  // clients keep logging into a tenant that stopped paying means the product runs
   // indefinitely for free, and it also creates data the coach cannot act on (they
   // are locked out of the same host). Reads stay on because a person's own
   // training history is theirs and must never be held hostage over their coach's
   // invoice — the same principle that governs `archived` above.
   //
-  // Purchasing is off: the storefront is a paid feature the studio no longer has,
-  // and no amount of client spending would settle the studio's own bill.
+  // Purchasing is off: the storefront is a paid feature the tenant no longer has,
+  // and no amount of client spending would settle the tenant's own bill.
   //
   // `blocked` is the next rung and lands here too: it withholds the APP, which
   // the host gate does, but a person's own data stays readable behind it for
   // exactly the reason above. Nothing about the debt makes their logbook ours.
-  if (f.studio === "suspended" || f.studio === "blocked") {
-    return { canRead: true, canWrite: false, canPurchase: false, lockedToStorefront: false, reason: "studio_suspended" };
+  if (f.tenant === "suspended" || f.tenant === "blocked") {
+    return { canRead: true, canWrite: false, canPurchase: false, lockedToStorefront: false, reason: "tenant_suspended" };
   }
 
-  // Gated studio, no live access → the storefront, which they CAN buy from.
+  // Gated tenant, no live access → the storefront, which they CAN buy from.
   if (f.accessRequired && !f.accessActive) {
     return { canRead: false, canWrite: false, canPurchase: true, lockedToStorefront: true, reason: "needs_access" };
   }
@@ -166,21 +166,21 @@ export function resolveStanding(f: StandingFacts): Standing {
  * ── THE HOST GATE ───────────────────────────────────────────────────────────
  *
  * `resolveStanding` above answers "what may this PERSON do in this tenancy".
- * This answers the question one level up: "does this STUDIO's host serve a
+ * This answers the question one level up: "does this TENANT's host serve a
  * working app at all". They are separate because they have different inputs and
- * different blast radii — the host gate depends only on the studio's own
+ * different blast radii — the host gate depends only on the tenant's own
  * subscription, applies identically to everyone who lands there, and is enforced
  * once in the route guard rather than in each of ~200 handlers.
  *
- * Splitting it out is what makes "a suspended studio is closed" a real property
- * instead of an aspiration. Previously the studio axis existed in `StandingFacts`
- * and BOTH callers passed `studio: "ok"` — a hardcoded literal in `clients.ts`
- * and in the app's `Shell` — so a suspended studio's clients were never actually
+ * Splitting it out is what makes "a suspended tenant is closed" a real property
+ * instead of an aspiration. Previously the tenant axis existed in `StandingFacts`
+ * and BOTH callers passed `tenant: "ok"` — a hardcoded literal in `clients.ts`
+ * and in the app's `Shell` — so a suspended tenant's clients were never actually
  * treated as suspended by this module at all. The entitlement clamp was doing the
  * entire job, which is why paid features stopped but ordinary logging did not.
  */
 
-/** A studio's subscription state, as the billing tables record it. */
+/** A tenant's subscription state, as the billing tables record it. */
 export type SubscriptionStatus =
   | "active" | "trialing" | "past_due" | "suspended" | "blocked" | "unpaid" | "canceled" | "closing";
 
@@ -194,12 +194,12 @@ export type HostGateReason = "ok" | "grace" | "suspended" | "blocked" | "closing
  * Friday or lose everything) is how you delete a customer who was on holiday.
  *
  *   0    → GRACE     full service, dunning notices only
- *   7    → READ_ONLY the studio and every client drop to read-only
- *   30   → BLOCKED   the app is replaced by "<Studio> is suspended"
+ *   7    → READ_ONLY the tenant and every client drop to read-only
+ *   30   → BLOCKED   the app is replaced by "<Tenant> is suspended"
  *   37   → PURGE     tenant and members hard-deleted
  *
  * BLOCKED is the rung this ladder was missing. Suspension used to mean
- * read-only all the way to the end, so a studio that had not paid in a month
+ * read-only all the way to the end, so a tenant that had not paid in a month
  * looked identical to one that had not paid in a week, and the last thing before
  * permanent deletion was a banner.
  */
@@ -217,7 +217,7 @@ export interface HostGate {
   /** Every write on this host is refused. Reads are unaffected — always. */
   readOnly: boolean;
   /**
-   * The app itself is withheld: one screen saying the studio is suspended, and
+   * The app itself is withheld: one screen saying the tenant is suspended, and
    * nothing else. Distinct from `readOnly`, which still shows the whole app.
    *
    * Reads are STILL served to the person's own record behind this — blocking is
@@ -228,7 +228,7 @@ export interface HostGate {
   /**
    * The billing surface stays writable even while `readOnly`, so the one action
    * that fixes the situation is reachable from inside it. Without this a lapsed
-   * studio would be locked out of paying, which is an unrecoverable state.
+   * tenant would be locked out of paying, which is an unrecoverable state.
    * Combine with a `billing:manage` permission check — this flag says the HOST
    * permits it, not that the caller is entitled to it.
    */
@@ -238,15 +238,15 @@ export interface HostGate {
 }
 
 /**
- * Map a subscription status onto the studio's standing.
+ * Map a subscription status onto the tenant's standing.
  *
- * A MISSING subscription row resolves to `ok`, deliberately: a studio is created
+ * A MISSING subscription row resolves to `ok`, deliberately: a tenant is created
  * before its plan is chosen, and gating the host on a row that the onboarding
- * wizard has not written yet would brick studio creation at step one. Onboarding
- * enforces plan selection itself (a studio cannot leave the wizard without one);
+ * wizard has not written yet would brick tenant creation at step one. Onboarding
+ * enforces plan selection itself (a tenant cannot leave the wizard without one);
  * this function's job is the steady state.
  */
-export function studioStandingOf(status: SubscriptionStatus | string | null | undefined): StudioStanding {
+export function tenantStandingOf(status: SubscriptionStatus | string | null | undefined): TenantStanding {
   switch (status) {
     case "past_due":
       return "grace";
@@ -264,13 +264,13 @@ export function studioStandingOf(status: SubscriptionStatus | string | null | un
 }
 
 /**
- * Does this studio's host serve a working app?
+ * Does this tenant's host serve a working app?
  *
  * `closing` is reported separately from `suspended` even though both are
- * read-only, because the copy has to differ: a suspended studio is told to pay,
+ * read-only, because the copy has to differ: a suspended tenant is told to pay,
  * a closing one is told its data is scheduled for deletion and how to stop that.
- * Passing the raw status rather than a `StudioStanding` is what preserves the
- * distinction — `studioStandingOf` folds them together, and this must not.
+ * Passing the raw status rather than a `TenantStanding` is what preserves the
+ * distinction — `tenantStandingOf` folds them together, and this must not.
  */
 export function resolveHostGate(status: SubscriptionStatus | string | null | undefined): HostGate {
   if (status === "closing") {
@@ -280,12 +280,12 @@ export function resolveHostGate(status: SubscriptionStatus | string | null | und
   if (status === "blocked") {
     return { readOnly: true, blocked: true, billingWritable: true, reason: "blocked" };
   }
-  if (studioStandingOf(status) === "suspended") {
+  if (tenantStandingOf(status) === "suspended") {
     return { readOnly: true, blocked: false, billingWritable: true, reason: "suspended" };
   }
   if (status === "past_due") {
     // Grace is FULL service. That is the entire purpose of a grace window: the
-    // owner gets dunning notices, and nothing about the studio changes for anyone
+    // owner gets dunning notices, and nothing about the tenant changes for anyone
     // until the window closes. Reported so the owner's UI can show the warning.
     return { readOnly: false, blocked: false, billingWritable: true, reason: "grace" };
   }
@@ -293,14 +293,14 @@ export function resolveHostGate(status: SubscriptionStatus | string | null | und
 }
 
 /**
- * A gate reason back to a studio standing, for the app.
+ * A gate reason back to a tenant standing, for the app.
  *
  * The client never sees the raw subscription status — `/api/host` hands it the
- * gate — so this is how the UI feeds the same studio axis into `resolveStanding`
+ * gate — so this is how the UI feeds the same tenant axis into `resolveStanding`
  * that the server feeds it from `subscriptions.status`. Both paths therefore agree
  * by construction rather than by two hand-written mappings staying in step.
  */
-export function studioStandingOfGate(reason: HostGateReason | null | undefined): StudioStanding {
+export function tenantStandingOfGate(reason: HostGateReason | null | undefined): TenantStanding {
   if (reason === "blocked") return "blocked";
   if (reason === "suspended" || reason === "closing") return "suspended";
   if (reason === "grace") return "grace";
@@ -312,5 +312,5 @@ export const STANDING_AXES = {
   membership: ["none", "pending_signup", "active", "archived"] as Membership[],
   accessActive: [true, false],
   accessRequired: [true, false],
-  studio: ["ok", "grace", "suspended", "blocked"] as StudioStanding[],
+  tenant: ["ok", "grace", "suspended", "blocked"] as TenantStanding[],
 };

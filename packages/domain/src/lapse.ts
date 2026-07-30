@@ -4,7 +4,7 @@
  * This is the second of two independent rails and they must not be confused:
  *
  *   Kova → tenant   the studio has not paid Kova. Kova decides. Read-only at 7
- *                   days, blocked at 30, purged at 37. `@4dl/platform`
+ *                   days, blocked at 30, purged at 37. `@4dl/tenancy`
  *                   `standing.ts`, `DUNNING_DAYS`.
  *   tenant → client THIS file. The client's package ran out. The STUDIO decides,
  *                   because it is their commercial relationship, not ours.

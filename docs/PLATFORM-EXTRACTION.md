@@ -90,7 +90,7 @@ its own domain instead of 22,000 including infrastructure.
 
 Found by grepping `packages/{ui,platform}/src` for product nouns:
 
-**`@4dl/platform`**
+**`@4dl/platform`** *(fixed in Stage 1, on the way into `@4dl/tenancy`)*
 - `StudioStanding`, `studioStandingOf`, `studioStandingOfGate`, and the
   `StandingFacts.studio` field. "Studio" is Kova's word for a tenant. A warehouse
   is not a studio.
@@ -101,7 +101,7 @@ Found by grepping `packages/{ui,platform}/src` for product nouns:
 - User-facing copy: `"Pick an address for your studio."`
 - `promo.ts` `restrictedClientId`.
 
-**`@4dl/ui`**
+**`@4dl/ui`** *(still open — Stage 0b)*
 - `Tone` carries `activity | nutrition | sleep | cardio | hydration | supplement
   | lab` — documented in the README as "the one known leak", still a leak. An
   inventory app has no `nutrition` tone.
@@ -245,8 +245,8 @@ the new app being written against untested extractions.
 
 | Stage | What moves | Why here |
 |---|---|---|
-| **0** | `@4dl/core` (ids, helpers, bindings contract, **schema-module runner**) · boundary conformance test in every `@4dl/*` package · fix the §1.4 leaks | Nothing can move until schema can be composed and the boundary is machine-checked. The runner ships with Kova's DDL as a single module, byte-identical to today. |
-| **1** | `@4dl/tenancy` — dissolve `@4dl/platform`; absorb `host-context`, `cloudflare`, `domain-routes`, `org-guard`; rename the studio vocabulary | Everything else takes a tenant id. This is the root of the graph. |
+| **0** ✅ | `@4dl/core` (ids, helpers, bindings contract, **schema-module runner**, `app_config`) · boundary conformance test in every `@4dl/*` package | Nothing can move until schema can be composed and the boundary is machine-checked. The runner shipped with Kova's DDL as a single module, byte-identical to today. |
+| **1** ✅ | `@4dl/tenancy` — `hosts`, `dcv`, `standing`, `host-context`, `cloudflare`; the studio→tenant rename; `tenant_domains` + `tenant_settings` as the first non-app schema module | Everything else takes a tenant id. This is the root of the graph. `domain-routes` and `org-guard` stayed behind: they need the auth context, so they move in Stage 2. |
 | **2** | `@4dl/auth` — Better Auth factory, auth context, route-guard engine, RBAC, guards, seats | Depends only on tenancy + core. Unlocks a second app doing *nothing* but auth. |
 | **3** | `@4dl/billing` — entitlement engine, plans, subs, both Stripe rails, credit DO, dunning | The biggest single win and the highest risk (money + a DO with live storage). |
 | **4** | `@4dl/commerce` — packages, budgets, codes, promos, add-ons, lapse ladder | Sits on billing; separable so an app can take billing without commerce. |

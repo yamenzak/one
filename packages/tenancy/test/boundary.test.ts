@@ -2,21 +2,19 @@ import { describe, expect, it } from "vitest";
 import { findBoundaryViolations, formatViolations, violationKeys } from "@4dl/core/boundary";
 
 /**
- * What is LEFT of `@4dl/platform`, and its remaining debt.
+ * CLEAN. Zero entries, and that is the point of this file.
  *
- * This package is now a holding pen, not a destination. `hosts`, `dcv` and
- * `standing` moved to `@4dl/tenancy` in Stage 1; `credits` goes to
- * `@4dl/billing` in Stage 3, `promo` to `@4dl/commerce` in Stage 4 and
- * `ai-mock` to `@4dl/ai` in Stage 5, at which point it is deleted.
+ * `@4dl/tenancy` was carved out of `@4dl/platform`, which named a tenant a
+ * "studio" in its own TYPE names — `StudioStanding`, `studioStandingOf`,
+ * `StandingFacts.studio` — and hard-coded the first app's brand into a security
+ * control (`RESERVED_LABELS`). Type names are the worst place for product
+ * vocabulary: every consuming app is forced to adopt the word.
  *
- *   promo.ts:client  `PromoCode.restrictedClientId`, `PromoContext.clientId` and
- *                    the `wrong_client` failure. The math is generic — "this code
- *                    is reserved for one buyer" — and the noun is not. It becomes
- *                    `subjectId` when the file moves, so the rename is paid once.
+ * The rename rode along with the move, so this package starts at zero. An empty
+ * ALLOW list is a load-bearing assertion, not a placeholder — the next leak fails
+ * the build instead of quietly joining a list.
  */
-const ALLOW: readonly string[] = [
-  "src/promo.ts:client",
-];
+const ALLOW: readonly string[] = [];
 
 const dir = new URL("..", import.meta.url).pathname;
 

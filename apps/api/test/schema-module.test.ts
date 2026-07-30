@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { schemaStatements } from "@4dl/core";
+import { TENANCY_SCHEMA } from "@4dl/tenancy";
 import { KOVA_SCHEMA } from "../src/db.js";
 
 /**
@@ -51,18 +52,57 @@ describe("the Kova schema module", () => {
     // A guard against an extraction quietly dropping statements on the way out.
     // These numbers go DOWN as tables move into @4dl/* packages — when they do,
     // update them here in the same commit as the move, so a silent loss can't
-    // hide behind a passing suite.
+    // hide behind a passing suite. Stage 1 took `tenant_domains` and
+    // `tenant_settings` (2 tables, 1 index, 4 ALTERs) into @4dl/tenancy.
     const ddl = schemaStatements(KOVA_SCHEMA);
-    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(66);
-    expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(40);
+    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(64);
+    expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(39);
     expect(ddl.filter((s) => s.startsWith("CREATE UNIQUE INDEX"))).toHaveLength(8);
     expect(ddl.filter((s) => s.startsWith("DROP INDEX"))).toHaveLength(1);
-    expect(KOVA_SCHEMA.alters ?? []).toHaveLength(52);
+    expect(KOVA_SCHEMA.alters ?? []).toHaveLength(48);
   });
 
   it("names every backfill", () => {
     // Backfills are best-effort and only ever surface in a log line, so an
     // unnamed one is unattributable when it fails.
     for (const b of KOVA_SCHEMA.backfills ?? []) expect(b.name).toBeTruthy();
+  });
+});
+
+describe("the composed schema", () => {
+  it("declares one module per owner, with no table claimed twice", () => {
+    // Two modules creating the same table would each apply it under their own
+    // marker: harmless while both agree (`IF NOT EXISTS`) and silently divergent
+    // the moment one is edited. Ownership has to be exclusive.
+    const tableOf = (s: string) => /CREATE TABLE IF NOT EXISTS "?(\w+)"?/.exec(s)?.[1];
+    const owned = new Map<string, string>();
+    for (const m of [TENANCY_SCHEMA, KOVA_SCHEMA]) {
+      for (const sql of schemaStatements(m)) {
+        const t = tableOf(sql);
+        if (!t) continue;
+        expect(owned.get(t), `${t} is claimed by both ${owned.get(t)} and ${m.id}`).toBeUndefined();
+        owned.set(t, m.id);
+      }
+    }
+    expect(owned.get("tenant_domains")).toBe("tenancy");
+    expect(owned.get("tenant_settings")).toBe("tenancy");
+    expect(owned.get("clients")).toBe("kova");
+  });
+
+  it("lets a later module extend an earlier module's table", () => {
+    // `tenant_settings` is tenancy's row, and billing/AI/email/commerce each own
+    // columns on it. That works ONLY because tenancy applies first — so this
+    // asserts the ordering the app relies on, not just the ALTERs themselves.
+    const kovaAlters = (KOVA_SCHEMA.alters ?? []).filter((s) => s.includes("tenant_settings"));
+    expect(kovaAlters.length).toBeGreaterThan(0);
+    expect(schemaStatements(TENANCY_SCHEMA).some((s) => s.includes("CREATE TABLE IF NOT EXISTS tenant_settings"))).toBe(true);
+  });
+
+  it("declares what a tenant purge must clear", () => {
+    // Stage 7 derives the erasure cascade from these, replacing the two
+    // hand-maintained inventories in purge.ts that must currently be kept in
+    // step with the DDL by hand.
+    expect(TENANCY_SCHEMA.scoped?.tenantColumn).toBe("tenant_id");
+    expect(TENANCY_SCHEMA.scoped?.tenantTables).toContain("tenant_domains");
   });
 });

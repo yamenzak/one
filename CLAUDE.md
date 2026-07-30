@@ -50,9 +50,12 @@ packages/
              # JSON columns, the STRUCTURAL BINDINGS CONTRACT (HasDb/HasMedia/…)
              # and the COMPOSED SCHEMA RUNNER (SchemaModule/applySchema), plus
              # the boundary checker at @4dl/core/boundary. See its README.
-  platform/  # @4dl/platform — the SHARED multi-tenant substrate (pure, no I/O):
-             # hosts/tenancy, custom-domain DCV, AI credit metering, promo math,
-             # tenant standing, the AI mock-lane decision. See its README.
+  tenancy/   # @4dl/tenancy — multi-tenant ADDRESSING: the five doors, host→tenant
+             # resolution + KV cache, custom domains (Cloudflare for SaaS + DCV),
+             # the standing/host-gate model. `@4dl/tenancy/model` is the pure half
+             # the browser may import. See its README.
+  platform/  # @4dl/platform — BEING DISSOLVED (credits→billing, promo→commerce,
+             # ai-mock→ai). Do not add to it. See its README.
   domain/    # @kova/domain — Kova's pure logic (no I/O): nutrition/TDEE, body-fat,
              # activity/workout math, progress, plus the product registries
              # (entitlements, perms, budgets, notifications, features). Tested.
@@ -113,7 +116,7 @@ remote bindings without editing the config (this is what the E2E suite does).
   the security invariant; never bypass it.
 - **Credits**: `TenantBillingDO` (`billing-do.ts`) is the authoritative balance;
   AI goes through `ai.ts` `generate()` = reserve → run (Workers AI | mock) →
-  settle. Metering math is pure in `@4dl/platform` credits.ts.
+  settle. Metering math is pure in `@4dl/platform` credits.ts (moves to `@4dl/billing` in Stage 3).
 - **Access economy**: `commerce-routes.ts` + `@kova/domain` budgets.ts —
   budgets carry `expiresAt`, days derive at read time, purchases QUEUE not sum,
   status reconciles lazily on read. No domain cron.
@@ -121,17 +124,22 @@ remote bindings without editing the config (this is what the E2E suite does).
   Kova, `entitlements.ts`) vs per-package client flags (client bought from the
   tenant, `clientFlags.ts`). Client capability = the intersection.
 - **The host IS the tenancy** (read this before touching routing or auth).
-  `@4dl/platform` `hosts.ts` classifies every hostname into five doors:
+  `@4dl/tenancy` `hosts.ts` classifies every hostname into five doors:
   `kova.4dl.app` = a signpost (not an app, refuses to send a sign-in code),
   `setup.` = the only place a studio is created, `admin.` = the operator console
   (`/api/admin/*` answers there and nowhere else), `<slug>.` = a studio, a tenant's
   own domain = the same studio. Anything else under the root 404s. `host-context.ts`
   turns that into a tenant; `auth-context.ts` pins the tenancy from it, so a session
   pointed at the wrong studio grants nothing. `/t/<slug>` is gone.
-  - Studio slugs are DNS LABELS: validated server-side in `org-guard.ts` against
-    `RESERVED_LABELS`, which is a security control (a studio at `admin.` or
-    `autodiscover.` would be a takeover). Adding a label is cheap; removing one
-    changes a live studio's URL.
+  - Studio slugs are DNS LABELS: validated server-side in `org-guard.ts`, which
+    is a security control (a studio at `admin.` or `autodiscover.` would be a
+    takeover). The list is in TWO halves and both are load-bearing:
+    `RESERVED_LABELS` in `@4dl/tenancy` (universal — other doors, mail
+    autoconfig, ACME, Workers plumbing, money words) plus `KOVA_RESERVED_LABELS`
+    in `host-context.ts` (our brand names, which mean nothing to another app).
+    `org-guard.ts` is the one place they meet; `apps/api/test/tenancy-adapter.test.ts`
+    keeps the brand half covered. Adding a label is cheap; removing one changes a
+    live studio's URL.
   - One passkey and one session across every door under the root (`rpIdFor`,
     `cookieDomainFor`). A custom domain gets its own — WebAuthn allows nothing else.
   - The console is reachable at `admin.` and NOWHERE else. There used to be an
@@ -144,7 +152,7 @@ remote bindings without editing the config (this is what the E2E suite does).
     every door onto the root. The two production routes are a dashboard step
     (DEPLOY.md §11). Read the header comment before adding them back.
 - **Two access ladders, and they must not be confused.**
-  - **Kova → tenant** (`@4dl/platform` standing.ts, `DUNNING_DAYS`): past_due →
+  - **Kova → tenant** (`@4dl/tenancy` standing.ts, `DUNNING_DAYS`): past_due →
     **7d read-only** → **30d blocked** → **37d purged**, all anchored on
     `past_due_at` and driven by `dailySweep`. `resolveHostGate` turns the status
     into a gate that `route-guard.ts` enforces once for every route; `readOnly`
@@ -202,13 +210,14 @@ an over-claim costs more than an under-claim. Verify before editing it.
 **The platform extraction is under way** — [docs/PLATFORM-EXTRACTION.md](docs/PLATFORM-EXTRACTION.md)
 is the audit and the staged plan for turning this repo from "Kova with two shared
 packages" into "the 4DL platform, on which Kova is the first app". Three more apps
-are queued. **Stage 0 (the mechanisms) is done**; stages 1–9 are not. Read it
+are queued. **Stages 0 (the mechanisms) and 1 (`@4dl/tenancy`) are done**; stages 2–9 are not. Read it
 before moving anything between `apps/api` and `packages/`.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured most recently, per package: **478 API + 212 domain + 101 platform +
-64 ui + 52 app + 14 core + 7 protocol** (928 total, 38 skipped). Domain used to read 304;
-98 of those are now `@4dl/platform` — the split moved tests, it did not add any.
+moves. Measured most recently, per package: **485 API + 212 domain + 73 tenancy +
+64 ui + 52 app + 33 platform + 14 core + 7 protocol** (940 total, 38 skipped).
+Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
+`@4dl/platform` to `@4dl/tenancy`; the split moves tests, it does not add any.
 The pricing and normalizer suites live
 in `apps/api/test` and are already *inside* the API count — the older
 "protocol/pricing/normalizer" phrasing double-counted them. **E2E is separate**

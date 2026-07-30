@@ -22,7 +22,8 @@ import { recordAudit } from "./audit.js";
 import { canonicalHost, shapeOf } from "./host-context.js";
 import { parseJson, j } from "./db.js";
 import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps, rangeStatus, auditLabel, canAccessClient, seesWholeRoster } from "@kova/domain";
-import { resolveStanding, studioStandingOf } from "@4dl/platform";
+import { tenantStandingOf } from "@4dl/tenancy";
+import { resolveStanding } from "@4dl/tenancy";
 
 export interface ClientRow {
   id: string;
@@ -199,8 +200,8 @@ export async function requireClientAccess(
       // the studio axis existed in the type and was dead in practice. The host gate
       // in route-guard.ts is the outer wall for a suspended studio; passing the
       // truth here keeps the two answers consistent, so a client's own persona
-      // reports "studio_suspended" rather than claiming everything is fine.
-      studio: studioStandingOf(c.get("host").tenant?.subscriptionStatus),
+      // reports "tenant_suspended" rather than claiming everything is fine.
+      tenant: tenantStandingOf(c.get("host").tenant?.subscriptionStatus),
     });
     const writing = c.req.method !== "GET";
     if (writing && !standing.canWrite) {
@@ -209,11 +210,11 @@ export async function requireClientAccess(
       // Telling an archived client "the studio needs to renew" would send them to
       // their coach about the wrong thing entirely.
       const message =
-        standing.reason === "studio_suspended"
+        standing.reason === "tenant_suspended"
           ? "This studio is paused, so nothing new can be saved right now. You can still read everything on your record."
           : "Your record at this studio is archived — you can still read your history, but not add to it. Ask the studio to reactivate you.";
       // 402 for a billing state, 403 for a membership one — the app branches on it.
-      return { response: c.json({ error: standing.reason, message }, standing.reason === "studio_suspended" ? 402 : 403) };
+      return { response: c.json({ error: standing.reason, message }, standing.reason === "tenant_suspended" ? 402 : 403) };
     }
     if (!writing && !standing.canRead) return { response: c.json({ error: standing.reason }, 403) };
   }

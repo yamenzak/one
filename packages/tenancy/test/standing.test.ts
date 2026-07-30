@@ -5,12 +5,12 @@
  * the policy is documented by execution rather than by a comment that drifts.
  * The reason each cell holds is spelled out where it is not obvious, because the
  * non-obvious ones are the bugs this file exists to prevent: asking an archived
- * person to buy, punishing a client for their studio's unpaid invoice, letting a
- * lockout at one studio reach another.
+ * person to buy, punishing a client for their tenant's unpaid invoice, letting a
+ * lockout at one tenant reach another.
  */
 
 import { describe, expect, it } from "vitest";
-import { resolveHostGate, resolveStanding, studioStandingOf, STANDING_AXES, type StandingFacts, type Membership } from "../src/standing.js";
+import { resolveHostGate, resolveStanding, tenantStandingOf, STANDING_AXES, type StandingFacts, type Membership } from "../src/standing.js";
 
 /** All 48 cells. */
 function everyCell(): StandingFacts[] {
@@ -18,13 +18,13 @@ function everyCell(): StandingFacts[] {
   for (const membership of STANDING_AXES.membership)
     for (const accessActive of STANDING_AXES.accessActive)
       for (const accessRequired of STANDING_AXES.accessRequired)
-        for (const studio of STANDING_AXES.studio)
-          out.push({ membership, accessActive, accessRequired, studio });
+        for (const tenant of STANDING_AXES.tenant)
+          out.push({ membership, accessActive, accessRequired, tenant });
   return out;
 }
 
 const facts = (m: Membership, over: Partial<StandingFacts> = {}): StandingFacts => ({
-  membership: m, accessActive: true, accessRequired: false, studio: "ok", ...over,
+  membership: m, accessActive: true, accessRequired: false, tenant: "ok", ...over,
 });
 
 describe("standing — the matrix is total", () => {
@@ -63,8 +63,8 @@ describe("standing — archived", () => {
 
   it("outranks the access gate — a gated studio does not greet them with a shop", () => {
     // The bug this prevents: the Shell's access gate fired on `required && !active`
-    // without checking archived, so a studio that had just let someone go met them
-    // with a screen selling that studio's packages. Buying one would not un-archive
+    // without checking archived, so a tenant that had just let someone go met them
+    // with a screen selling that tenant's packages. Buying one would not un-archive
     // them either, so the storefront was not even a way out.
     for (const accessActive of [true, false]) {
       for (const accessRequired of [true, false]) {
@@ -77,17 +77,17 @@ describe("standing — archived", () => {
   });
 
   it("stays read-only even while the studio is suspended", () => {
-    const s = resolveStanding(facts("archived", { studio: "suspended" }));
+    const s = resolveStanding(facts("archived", { tenant: "suspended" }));
     expect(s.reason).toBe("archived"); // archived is the more specific truth
     expect(s.canRead).toBe(true);
     expect(s.canWrite).toBe(false);
   });
 });
 
-describe("standing — a studio that stops paying Kova", () => {
+describe("standing — a tenant that stops paying the platform", () => {
   /**
    * The lifecycle is two-staged and the stages differ, which is the whole reason
-   * `studio` is three states rather than a `delinquent` boolean:
+   * `tenant` is three states rather than a `delinquent` boolean:
    *
    *   payment fails → `past_due` + GRACE_DAYS (7) of FULL service, owner dunned
    *   grace expires → `suspended`, entitlements clamped to free, owner told that
@@ -97,13 +97,13 @@ describe("standing — a studio that stops paying Kova", () => {
   it("GRACE changes nothing for the client — that is what a grace window is", () => {
     // Only the owner is notified during dunning. A client whose coach's card
     // failed this morning must not see a degraded app.
-    expect(resolveStanding(facts("active", { studio: "grace" })))
-      .toEqual(resolveStanding(facts("active", { studio: "ok" })));
+    expect(resolveStanding(facts("active", { tenant: "grace" })))
+      .toEqual(resolveStanding(facts("active", { tenant: "ok" })));
   });
 
   it("grace still locks a gated client with no plan — for the usual reason, not the studio's", () => {
     // Grace must not accidentally become a bypass for the CLIENT-side gate.
-    const s = resolveStanding(facts("active", { studio: "grace", accessRequired: true, accessActive: false }));
+    const s = resolveStanding(facts("active", { tenant: "grace", accessRequired: true, accessActive: false }));
     expect(s.reason).toBe("needs_access");
     expect(s.lockedToStorefront).toBe(true);
   });
@@ -114,36 +114,36 @@ describe("standing — a studio that stops paying Kova", () => {
     // the client loses AI, commerce, body scan and external search with no
     // per-client bookkeeping. What this module decides is the remainder: their own
     // record and their own logbook.
-    const s = resolveStanding(facts("active", { studio: "suspended" }));
-    expect(s.reason).toBe("studio_suspended");
+    const s = resolveStanding(facts("active", { tenant: "suspended" }));
+    expect(s.reason).toBe("tenant_suspended");
     expect(s.canPurchase).toBe(false); // the storefront IS a paid feature
   });
 
   it("closes the studio: read your history, write nothing", () => {
-    // A suspended studio is CLOSED, and the whole subdomain goes read-only —
+    // A suspended tenant is CLOSED, and the whole subdomain goes read-only —
     // enforced once by `resolveHostGate` in the route guard rather than re-derived
-    // per handler. Writes are the studio operating, and a studio that stopped
+    // per handler. Writes are the tenant operating, and a tenant that stopped
     // paying does not keep operating.
-    const s = resolveStanding(facts("active", { studio: "suspended" }));
+    const s = resolveStanding(facts("active", { tenant: "suspended" }));
     expect(s.canWrite).toBe(false);
   });
 
   it("but it never takes away a client's own data", () => {
-    // The line this module draws: Kova withholds what Kova sells and closes the
-    // studio, but it does not hold a client's training history hostage over their
+    // The line this module draws: the platform withholds what the platform sells and closes the
+    // tenant, but it does not hold a client's training history hostage over their
     // coach's invoice — the client owes nobody. Same principle as `archived`.
-    const s = resolveStanding(facts("active", { studio: "suspended" }));
+    const s = resolveStanding(facts("active", { tenant: "suspended" }));
     expect(s.canRead).toBe(true);
   });
 
   it("suspension outranks the access gate rather than stacking with it", () => {
-    // A storefront would be a dead end: the studio has lost `commerce`, and no
-    // purchase a client makes would fix the studio's own subscription.
+    // A storefront would be a dead end: the tenant has lost `commerce`, and no
+    // purchase a client makes would fix the tenant's own subscription.
     for (const accessRequired of [true, false]) {
       for (const accessActive of [true, false]) {
-        const s = resolveStanding(facts("active", { studio: "suspended", accessRequired, accessActive }));
+        const s = resolveStanding(facts("active", { tenant: "suspended", accessRequired, accessActive }));
         expect(s.lockedToStorefront, `suspended + required:${accessRequired}`).toBe(false);
-        expect(s.reason).toBe("studio_suspended");
+        expect(s.reason).toBe("tenant_suspended");
       }
     }
   });
@@ -178,9 +178,9 @@ describe("standing — nothing to stand on", () => {
   });
 });
 
-describe("standing — multi-studio isolation", () => {
+describe("standing — multi-tenant isolation", () => {
   it("three standings at once cannot mix", () => {
-    // THE property that makes one identity across many studios safe. A person
+    // THE property that makes one identity across many tenants safe. A person
     // archived at A, locked out at B and training at C holds three different
     // standings simultaneously, and each is computed from one tenancy's facts.
     const atA = resolveStanding(facts("archived"));
@@ -195,21 +195,21 @@ describe("standing — multi-studio isolation", () => {
     expect(atC.canWrite).toBe(true);
     // …and being locked out at B does not either. This is what the locked
     // storefront screen must respect: it replaces the whole app, so without a way
-    // to switch studios from it, B's unpaid access strands someone who has paid at
-    // C. (See StudioListCard, rendered there for exactly this reason.)
+    // to switch tenants from it, B's unpaid access strands someone who has paid at
+    // C. (See TenantListCard, rendered there for exactly this reason.)
     expect(atC.lockedToStorefront).toBe(false);
   });
 
-  it("a suspended studio does not reach the studios that are paid up", () => {
-    const atSuspended = resolveStanding(facts("active", { studio: "suspended" }));
+  it("a suspended tenant does not reach the tenants that are paid up", () => {
+    const atSuspended = resolveStanding(facts("active", { tenant: "suspended" }));
     const atHealthy = resolveStanding(facts("active"));
-    expect(atSuspended.reason).toBe("studio_suspended");
+    expect(atSuspended.reason).toBe("tenant_suspended");
     expect(atHealthy.reason).toBe("ok");
     expect(atHealthy.canPurchase).toBe(true); // unaffected by the other studio
   });
 
   it("the same facts always give the same answer — no hidden state", () => {
-    // Pure, so a switch between studios can never leave residue behind.
+    // Pure, so a switch between tenants can never leave residue behind.
     for (const f of everyCell()) {
       expect(resolveStanding(f)).toEqual(resolveStanding({ ...f }));
     }
@@ -217,31 +217,31 @@ describe("standing — multi-studio isolation", () => {
 });
 
 /**
- * The HOST gate — one level up from a person's standing: does this studio's
+ * The HOST gate — one level up from a person's standing: does this tenant's
  * subdomain serve a working app at all.
  */
 describe("host gate — a suspended studio's subdomain is read-only", () => {
   it("maps every subscription status onto a studio standing", () => {
-    expect(studioStandingOf("active")).toBe("ok");
-    expect(studioStandingOf("trialing")).toBe("ok");
-    expect(studioStandingOf("past_due")).toBe("grace");
+    expect(tenantStandingOf("active")).toBe("ok");
+    expect(tenantStandingOf("trialing")).toBe("ok");
+    expect(tenantStandingOf("past_due")).toBe("grace");
     for (const s of ["suspended", "unpaid", "canceled", "closing"]) {
-      expect(studioStandingOf(s), s).toBe("suspended");
+      expect(tenantStandingOf(s), s).toBe("suspended");
     }
   });
 
   it("treats a MISSING subscription row as ok, so studio creation is not bricked", () => {
-    // A studio exists before its plan is chosen. Gating the host on a row the
+    // A tenant exists before its plan is chosen. Gating the host on a row the
     // onboarding wizard has not written yet would fail at step one, and the wizard
     // enforces plan selection itself.
-    expect(studioStandingOf(null)).toBe("ok");
-    expect(studioStandingOf(undefined)).toBe("ok");
+    expect(tenantStandingOf(null)).toBe("ok");
+    expect(tenantStandingOf(undefined)).toBe("ok");
     expect(resolveHostGate(null).readOnly).toBe(false);
   });
 
   it("treats an unknown future Stripe status as ok rather than locking everyone out", () => {
     // Failing OPEN is right here and failing closed is not: a status Stripe adds
-    // later must not silently take every studio on the platform offline.
+    // later must not silently take every tenant on the platform offline.
     expect(resolveHostGate("some_status_stripe_invents_in_2027").readOnly).toBe(false);
   });
 
@@ -276,8 +276,8 @@ describe("host gate — a suspended studio's subdomain is read-only", () => {
 
   it("agrees with the client-side standing: suspended means no writes in both", () => {
     // The two live in one file precisely so they cannot drift. If a future edit
-    // makes a suspended studio writable in one and not the other, this fails.
+    // makes a suspended tenant writable in one and not the other, this fails.
     expect(resolveHostGate("suspended").readOnly).toBe(true);
-    expect(resolveStanding(facts("active", { studio: "suspended" })).canWrite).toBe(false);
+    expect(resolveStanding(facts("active", { tenant: "suspended" })).canWrite).toBe(false);
   });
 });

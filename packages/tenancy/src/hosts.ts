@@ -1,10 +1,10 @@
 /**
  * HOSTS — what a hostname *is*, decided in one pure place.
  *
- * Kova is subdomain-first: a studio is not a path inside a shared app, it is its
- * own origin. `acme.kova.4dl.app` IS Acme's studio, and `kova.4dl.app` by itself
- * is nothing at all. That single decision is what buys us the three properties
- * the `/t/<slug>` model could never have:
+ * 4DL apps are subdomain-first: a tenant is not a path inside a shared app, it is
+ * its own origin. `acme.<root>` IS Acme's workspace, and the bare root is nothing
+ * at all. That single decision is what buys the three properties a `/t/<slug>`
+ * model could never have:
  *
  *   • **One passkey, every studio.** WebAuthn lets `rpID` be any ancestor of the
  *     origin down to (not including) the public suffix, so every tenant host
@@ -60,13 +60,13 @@ export interface HostShape {
   hostname: string;
   /** The subdomain label, for `role === "tenant"`. Null for every other role. */
   slug: string | null;
-  /** The root domain this was classified against (`kova.4dl.app`, `localhost`). */
+  /** The root domain this was classified against (the apex, or `localhost`). */
   root: string;
   /** True when the host sits inside our own root domain (any role but `custom`). */
   underRoot: boolean;
 }
 
-/** The setup door's label — where studios are created, and nowhere else. */
+/** The setup door's label — where tenants are created, and nowhere else. */
 export const SETUP_LABEL = "setup";
 /** The platform-operator console's label. */
 export const ADMIN_LABEL = "admin";
@@ -82,7 +82,11 @@ export const ADMIN_LABEL = "admin";
  * claimed `_acme-challenge` or `autodiscover` would interfere with certificate
  * issuance and mail autoconfiguration for the whole zone.
  *
- * It is deliberately over-broad. The cost of reserving a label a studio wanted
+ * It does NOT include the product's or company's own names — those differ per
+ * app and arrive through `checkSlug`'s `reserved` option. Everything here is
+ * true for any multi-tenant product on any zone.
+ *
+ * It is deliberately over-broad. The cost of reserving a label a tenant wanted
  * is one extra character in their slug; the cost of releasing one we later need
  * is a migration that changes a live tenant's URL, breaks their passkeys (rpID
  * is per-host for custom domains) and invalidates every link their clients have.
@@ -91,8 +95,6 @@ export const ADMIN_LABEL = "admin";
 export const RESERVED_LABELS: ReadonlySet<string> = new Set([
   // The other doors. Claiming one of these is a takeover, not a name clash.
   SETUP_LABEL, ADMIN_LABEL, "administrator", "console", "operator", "platform", "root", "system",
-  // The product and the company, in every form we might publish under.
-  "kova", "kova", "fourdegrees", "fourdegreelabs", "4dl", "labs",
   // Web infrastructure conventions.
   "www", "www1", "www2", "web", "api", "apis", "app", "apps", "cdn", "cdn-cgi", "static",
   "assets", "media", "img", "images", "files", "file", "download", "downloads", "upload",
@@ -140,8 +142,8 @@ export const RESERVED_LABELS: ReadonlySet<string> = new Set([
   "dashboard", "portal", "home", "index", "search", "static-assets",
 ]);
 
-/** DNS labels are capped at 63 octets; we cap slugs shorter so there is headroom
- *  for prefixes and so a hostname stays readable in an address bar. */
+/** DNS labels are capped at 63 octets; slugs are capped shorter so there is
+ *  headroom for prefixes and so a hostname stays readable in an address bar. */
 export const SLUG_MAX = 40;
 /** Two characters is a squattable namespace and reads as a country code or an
  *  abbreviation of ours; three is the floor for something that looks like a name. */
@@ -158,14 +160,24 @@ export type SlugRejection =
 
 export type SlugCheck = { ok: true; slug: string } | { ok: false; reason: SlugRejection };
 
+export interface SlugOptions {
+  /**
+   * Labels this APP reserves on top of the universal list — its product name,
+   * its company, anything it publishes under. Kept out of the shared constant
+   * because "kova" means nothing to a warehouse app, and a shared list that
+   * accumulates every app's brand names is a list nobody can safely edit.
+   */
+  reserved?: ReadonlySet<string>;
+}
+
 /**
- * Is this string usable as a studio's DNS label?
+ * Is this string usable as a tenant's DNS label?
  *
- * Enforced on the SERVER, at the one place a slug is set. The app slugifies as a
- * convenience, but the create call is a plain HTTP POST that Better Auth stores
- * as sent — so shape validation in the client is a hint, not a control.
+ * Enforced on the SERVER, at the one place a slug is set. A client may slugify as
+ * a convenience, but the create call is a plain HTTP POST stored as sent — so
+ * shape validation in the browser is a hint, not a control.
  */
-export function checkSlug(raw: string | null | undefined): SlugCheck {
+export function checkSlug(raw: string | null | undefined, opts: SlugOptions = {}): SlugCheck {
   const slug = (raw ?? "").trim().toLowerCase();
   if (!slug) return { ok: false, reason: "empty" };
   if (slug.length < SLUG_MIN) return { ok: false, reason: "too_short" };
@@ -180,14 +192,19 @@ export function checkSlug(raw: string | null | undefined): SlugCheck {
   // `xn--` is the live one; the rest are reserved for future use, and a label
   // shaped like an encoding can be re-interpreted by intermediaries.
   if (slug.length >= 4 && slug[2] === "-" && slug[3] === "-") return { ok: false, reason: "punycode" };
-  if (RESERVED_LABELS.has(slug)) return { ok: false, reason: "reserved" };
+  if (RESERVED_LABELS.has(slug) || opts.reserved?.has(slug)) return { ok: false, reason: "reserved" };
   return { ok: true, slug };
 }
 
-/** Human-readable reason a slug was refused, for the owner who typed it. */
-export function slugRejectionMessage(reason: SlugRejection): string {
+/**
+ * Human-readable reason a slug was refused, for the owner who typed it.
+ *
+ * `noun` is what this app calls a tenant — "studio", "warehouse", "workspace".
+ * Only the empty case needs it, but it is the case an owner sees first.
+ */
+export function slugRejectionMessage(reason: SlugRejection, noun = "workspace"): string {
   switch (reason) {
-    case "empty": return "Pick an address for your studio.";
+    case "empty": return `Pick an address for your ${noun}.`;
     case "too_short": return `Use at least ${SLUG_MIN} characters.`;
     case "too_long": return `Use at most ${SLUG_MAX} characters.`;
     case "bad_charset": return "Use lowercase letters, numbers and hyphens only.";
@@ -220,7 +237,7 @@ function isLoopback(h: string): boolean {
  * configured root, so `pnpm dev` and the integration suite exercise the real
  * topology (`setup.localhost`, `acme.localhost`) without needing a deployed zone.
  */
-export function classifyHost(rawHostname: string, rawRoot: string): HostShape {
+export function classifyHost(rawHostname: string, rawRoot: string, opts: SlugOptions = {}): HostShape {
   const hostname = normalizeHostname(rawHostname);
   const configuredRoot = normalizeHostname(rawRoot);
   const root = isLoopback(hostname) ? "localhost" : configuredRoot;
@@ -251,13 +268,13 @@ export function classifyHost(rawHostname: string, rawRoot: string): HostShape {
 
   // A reserved label under our root is NOT a candidate custom domain — see the
   // module header. It serves nothing.
-  const check = checkSlug(label);
+  const check = checkSlug(label, opts);
   if (!check.ok) return { ...base, role: "invalid", slug: null, underRoot: true };
 
   return { ...base, role: "tenant", slug: check.slug, underRoot: true };
 }
 
-/** The hostname a studio with this slug is served at. */
+/** The hostname a tenant with this slug is served at. */
 export function tenantHostname(slug: string, root: string): string {
   return `${slug.toLowerCase()}.${normalizeHostname(root)}`;
 }

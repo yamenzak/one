@@ -19,6 +19,6 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@4dl/platform": "workspace:*"
+    "@4dl/tenancy": "workspace:*"
   }
 }

@@ -15,6 +15,7 @@
   "dependencies": {
     "@4dl/core": "workspace:*",
     "@4dl/platform": "workspace:*",
+    "@4dl/tenancy": "workspace:*",
     "@better-auth/passkey": "1.6.23",
     "@kova/domain": "workspace:*",
     "@kova/protocol": "workspace:*",

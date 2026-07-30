@@ -112,7 +112,7 @@ describe("checkSlug — a slug is a DNS label now", () => {
     if (!r.ok) expect(r.reason).toBe(reason);
   };
 
-  it("accepts what a studio name reasonably slugifies to", () => {
+  it("accepts what a tenant name reasonably slugifies to", () => {
     for (const s of ["zenith", "acme-gym", "iron-house-2", "365fitness"]) {
       expect(checkSlug(s), s).toEqual({ ok: true, slug: s });
     }
@@ -122,11 +122,31 @@ describe("checkSlug — a slug is a DNS label now", () => {
     expect(checkSlug("  Acme-Gym  ")).toEqual({ ok: true, slug: "acme-gym" });
   });
 
-  it("refuses every reserved label", () => {
+  it("refuses the labels the APP reserves, and classifies with them", () => {
+    // The brand half of the security control. It has to reach `classifyHost`
+    // too, not just `checkSlug`: a reserved label under our root must resolve to
+    // `invalid` rather than falling through to the custom-domain lookup, which
+    // is keyed on a column an owner can write to.
+    const reserved = new Set(["acme", "acmecorp"]);
+    expect(checkSlug("acme")).toEqual({ ok: true, slug: "acme" });
+    expect(checkSlug("acme", { reserved })).toEqual({ ok: false, reason: "reserved" });
+    expect(classifyHost("acme.example.test", "example.test").role).toBe("tenant");
+    expect(classifyHost("acme.example.test", "example.test", { reserved }).role).toBe("invalid");
+  });
+
+  it("names the tenant the way the app does when refusing an empty slug", () => {
+    expect(slugRejectionMessage("empty")).toBe("Pick an address for your workspace.");
+    expect(slugRejectionMessage("empty", "studio")).toBe("Pick an address for your studio.");
+  });
+
+  it("refuses every UNIVERSALLY reserved label", () => {
+    // The list here is what is true of any multi-tenant product on any zone. An
+    // app's own brand names are not — they arrive through the `reserved` option
+    // below, because "kova" means nothing to a warehouse app and a shared list
+    // that accumulates every app's brands is one nobody can safely edit.
     reject("admin", "reserved");
     reject("setup", "reserved");
     reject("www", "reserved");
-    reject("kova", "reserved");
     reject("autodiscover", "reserved");
   });
 

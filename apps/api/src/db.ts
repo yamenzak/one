@@ -34,6 +34,7 @@
  */
 
 import { schemaGate, type SchemaModule } from "@4dl/core";
+import { TENANCY_SCHEMA } from "@4dl/tenancy";
 
 export const KOVA_SCHEMA: SchemaModule = {
   id: "kova",
@@ -210,7 +211,6 @@ export const KOVA_SCHEMA: SchemaModule = {
     "CREATE TABLE IF NOT EXISTS digest_sent (user_id TEXT, period TEXT, kind TEXT, at TEXT, PRIMARY KEY (user_id, period, kind));",
 
     // ── Tenant settings (branding, AI toggles, marketplace, Connect) ───
-    "CREATE TABLE IF NOT EXISTS tenant_settings (tenant_id TEXT PRIMARY KEY, branding_json TEXT, ai_toggles_json TEXT, marketplace_json TEXT, integrations_json TEXT, stripe_account_id TEXT, updated_at TEXT);",
 
     // ── Tenant hostnames — the Host→tenant table (SPEC §14.1) ──────────
     // Keyed by hostname because that is the lookup on every single request.
@@ -229,8 +229,6 @@ export const KOVA_SCHEMA: SchemaModule = {
     //
     // `kind` defaults to 'custom' so pre-existing rows (all of which were
     // custom domains) keep their meaning without a data migration.
-    "CREATE TABLE IF NOT EXISTS tenant_domains (hostname TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, kind TEXT DEFAULT 'custom', cf_hostname_id TEXT, cf_route_id TEXT, status TEXT DEFAULT 'pending', ssl_status TEXT, verify_name TEXT, verify_value TEXT, verify_json TEXT, cf_errors TEXT, cname_target TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
-    "CREATE INDEX IF NOT EXISTS idx_tenant_domains_tenant ON tenant_domains(tenant_id);",
 
     // ── Coach-action audit log (SPEC §9; REGISTRY-PLAN Phase 3) ────────
     // Durable, queryable record of STAFF actions on a client's record. The
@@ -285,26 +283,6 @@ export const KOVA_SCHEMA: SchemaModule = {
     "CREATE INDEX IF NOT EXISTS idx_plan_variants_client ON plan_variants(client_id);",
   ],
   alters: [
-    // Cloudflare for SaaS: the worker route created alongside a custom
-    // hostname. Stored so removal deletes the exact route rather than
-    // searching by pattern — see cloudflare.ts for why the route is
-    // per-hostname instead of a zone-wide `*/*`.
-    "ALTER TABLE tenant_domains ADD COLUMN cf_route_id TEXT",
-    // EVERY DCV record Cloudflare asked for, not just the first. It can
-    // demand two `_acme-challenge` TXTs at one name (different values) when
-    // issuing more than one certificate, and all must exist before any
-    // validates. The singular columns stay for back-compat.
-    "ALTER TABLE tenant_domains ADD COLUMN verify_json TEXT",
-    // Cloudflare's own validation errors. We fetched them and threw them
-    // away, so a domain stuck on a CAA block showed the records to add and
-    // no hint that DNS was refusing to let the certificate issue — the
-    // owner's only route to the truth was a dashboard they cannot see.
-    "ALTER TABLE tenant_domains ADD COLUMN cf_errors TEXT",
-    // 'subdomain' | 'custom'. Defaults to 'custom' precisely so existing
-    // rows — which are all custom domains — need no backfill. The studio's
-    // own `<slug>.<root>` row is inserted with kind='subdomain' and is
-    // system-owned; see the CREATE TABLE comment.
-    "ALTER TABLE tenant_domains ADD COLUMN kind TEXT DEFAULT 'custom'",
     "ALTER TABLE clients ADD COLUMN avatar_url TEXT",
     "ALTER TABLE clients ADD COLUMN avatar_seed TEXT",
     // Rich micronutrients on foods (ByShujaa parity).
@@ -437,7 +415,10 @@ export const KOVA_SCHEMA: SchemaModule = {
  * Kept as a `(db)` call rather than `(env)` because ~40 call sites pass a bare
  * D1 handle; the gate underneath takes the bindings slice.
  */
-const gate = schemaGate([KOVA_SCHEMA]);
+// Dependency order, and the app last. `tenant_settings` is created by tenancy;
+// the ALTERs that add billing's, AI's, email's and commerce's columns to it are
+// still in Kova's module below and move out with those packages.
+const gate = schemaGate([TENANCY_SCHEMA, KOVA_SCHEMA]);
 export const ensureSchema = (db: D1Database): Promise<void> => gate({ DB: db });
 
 /** Small helpers shared by stores — re-exported so every existing call site

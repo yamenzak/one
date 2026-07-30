@@ -25,7 +25,18 @@
  */
 
 import type { MiddlewareHandler } from "hono";
-import { checkSlug, slugRejectionMessage, type SlugRejection } from "@4dl/platform";
+import { checkSlug, slugRejectionMessage, type SlugRejection } from "@4dl/tenancy";
+import { KOVA_RESERVED_LABELS } from "./host-context.js";
+
+/**
+ * Kova's slug rules = the universal DNS/infrastructure reservations in
+ * `@4dl/tenancy` PLUS our own brand labels, which the package cannot know.
+ *
+ * Both halves are load-bearing and this is the one place they meet: a studio
+ * that claimed `admin` gets the operator console's URL, and one that claimed
+ * `kova` gets an address more official-looking than ours.
+ */
+const SLUG_OPTS = { reserved: KOVA_RESERVED_LABELS } as const;
 import type { AppEnv } from "./auth-context.js";
 import { moveSubdomain, provisionSubdomain } from "./host-context.js";
 
@@ -52,7 +63,7 @@ async function peekResponse(res: Response): Promise<Record<string, unknown> | nu
  * error handling renders it. `code` is stable for the UI to branch on.
  */
 function rejection(reason: SlugRejection) {
-  return { code: "INVALID_SLUG", message: slugRejectionMessage(reason), reason } as const;
+  return { code: "INVALID_SLUG", message: slugRejectionMessage(reason, "studio"), reason } as const;
 }
 
 /**
@@ -66,7 +77,7 @@ function rejection(reason: SlugRejection) {
  */
 export const orgCreateGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
   const body = await peekBody(c);
-  const check = checkSlug(typeof body.slug === "string" ? body.slug : null);
+  const check = checkSlug(typeof body.slug === "string" ? body.slug : null, SLUG_OPTS);
   if (!check.ok) return c.json(rejection(check.reason), 400);
 
   await next();
@@ -102,7 +113,7 @@ export const orgUpdateGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
   const data = (body.data ?? body) as Record<string, unknown>;
   const wanted = typeof data.slug === "string" ? data.slug : null;
   if (wanted !== null) {
-    const check = checkSlug(wanted);
+    const check = checkSlug(wanted, SLUG_OPTS);
     if (!check.ok) return c.json(rejection(check.reason), 400);
   }
 

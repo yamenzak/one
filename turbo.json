@@ -28,6 +28,7 @@
       "passThroughEnv": ["PLAYWRIGHT_*", "CI", "E2E_SERVER_LOGS", "NODE_OPTIONS"]
     },
     "@4dl/core#build": { "outputs": [] },
+    "@4dl/tenancy#build": { "outputs": [] },
     "@kova/domain#build": { "outputs": [] },
     "@kova/protocol#build": { "outputs": [] },
     "@4dl/ui#build": { "outputs": [] },
