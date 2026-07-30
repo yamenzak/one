@@ -139,10 +139,27 @@ remote bindings without editing the config (this is what the E2E suite does).
     `wrangler dev` rewrite the incoming Host to the route's hostname, which collapses
     every door onto the root. The two production routes are a dashboard step
     (DEPLOY.md §11). Read the header comment before adding them back.
-- **Suspension closes a studio**: `resolveHostGate` (standing.ts) makes a
-  suspended/closing tenant's whole subdomain read-only, enforced once in
-  `route-guard.ts`. Stripe webhooks are explicitly exempt — blocking them would make
-  suspension unrecoverable. Reads are never gated.
+- **Two access ladders, and they must not be confused.**
+  - **Kova → tenant** (`@4dl/platform` standing.ts, `DUNNING_DAYS`): past_due →
+    **7d read-only** → **30d blocked** → **37d purged**, all anchored on
+    `past_due_at` and driven by `dailySweep`. `resolveHostGate` turns the status
+    into a gate that `route-guard.ts` enforces once for every route; `readOnly`
+    still serves the whole app, `blocked` makes the Shell replace it with
+    `StudioBlocked`. Reads are NEVER gated, at any rung — withholding the product
+    is not the same as holding a client's logbook over their coach's invoice.
+    Stripe webhooks are exempt (blocking them would make suspension
+    unrecoverable), and so are `/api/me/*` and `/api/tenant/close`: **leaving is
+    always allowed.** Paying must be a way out, not the only one.
+  - **tenant → client** (`@kova/domain` lapse.ts): the STUDIO's own rule for a
+    client whose package ran out — read_only / blocked / archive / delete after N
+    days, in studio settings. `archive` KEEPS a client seat, `delete` FREES one.
+    The destructive pair carries a 14-day floor, and the sweep **freezes this
+    whole rail unless the studio is itself in good standing** — a studio Kova
+    suspended must not be shredding a roster it can no longer see.
+  - Serialise the gate by spreading it (`{ ...host.gate }`). Hand-picking fields
+    is how `blocked` reached the model, the resolver and the Shell while
+    `/api/host` still sent only `{ readOnly, reason }`, so the app read
+    `gate.blocked` as undefined and rendered the ordinary read-only app.
 - **One UI, three roles**: `apps/app/src/Shell.tsx` swaps nav by persona + mode;
   the trainer's client-detail renders the *same* client surfaces scoped to that
   client. Role changes scope + powers + nav, never screens.

@@ -143,7 +143,7 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   const [reloadKey, setReloadKey] = useState(0);
   const units = useUnits();
   const nav = useNavigate();
-  const { ctx } = useSession();
+  const { ctx, host } = useSession();
   const pk = usePasskey();
   const ownView = ctx?.active?.clientId === clientId;
   // Today is date-navigable: the whole day (macros + agenda + feed) rewinds to any
@@ -151,6 +151,16 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
   const today = todayLocal();
   const [date, setDate] = useState(today);
   const isToday = date === today;
+  /**
+   * Nothing on this screen can be written right now.
+   *
+   * Sourced from the host gate rather than guessed: the same flag `route-guard`
+   * enforces with, so the buttons and the server cannot disagree about whether a
+   * tap will work. A read-only studio, a closing one and a blocked one all land
+   * here — blocked never renders Today at all (the Shell replaces it), but the
+   * flag stays honest for the other two.
+   */
+  const frozen = !!host?.gate?.readOnly;
 
   // Offer only the widgets this plan unlocks — a widget tagged with a FEATURES
   // key is filtered out when the tenant/client lacks it, so the hero and its
@@ -322,13 +332,25 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
             text buttons: a circle reads as an action, and four of them read as a
             set of choices rather than one shouted primary and its runners-up.
           */}
+          {/*
+            T2 follows the STATE, including a state where none of it can succeed.
+            Every one of these four is a write, so on a read-only host all four
+            402 — and an inviting circle that fails on tap is precisely the "the
+            app is broken" reading the paused banner exists to prevent. The banner
+            names the state; these have to agree with it.
+
+            Disabled rather than hidden, for the same reason the day switcher's
+            forward arrow disables at today: a dimmed control teaches the boundary,
+            a missing one teaches nothing. It also keeps the cluster's floor of
+            three intact (§1) instead of collapsing it to nothing.
+          */}
           {isToday && ownView && (
             <ActionCluster
               items={[
-                { icon: Plus, label: "Log", onClick: () => setLogOpen(true) },
-                { icon: Play, label: "Start", onClick: onStart, disabled: !data.publishedWorkoutPlan },
-                { icon: ClipboardList, label: "Check in", onClick: () => setCheckInOpen(true) },
-                { icon: PencilLine, label: "Customise", onClick: () => setWidgetsOpen(true) },
+                { icon: Plus, label: "Log", onClick: () => setLogOpen(true), disabled: frozen },
+                { icon: Play, label: "Start", onClick: onStart, disabled: frozen || !data.publishedWorkoutPlan },
+                { icon: ClipboardList, label: "Check in", onClick: () => setCheckInOpen(true), disabled: frozen },
+                { icon: PencilLine, label: "Customise", onClick: () => setWidgetsOpen(true), disabled: frozen },
               ]}
             />
           )}

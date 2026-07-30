@@ -906,7 +906,7 @@ async function handlePlatformEvent(
       const tenantId = meta.kova_tenant ?? (await tenantByCustomer(db, obj.customer));
       // Seed the grace window; never clobber a later suspend/cancel.
       if (tenantId) {
-        await db.prepare("UPDATE subscriptions SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?) WHERE tenant_id = ? AND status NOT IN ('suspended','canceled')").bind(nowIso(), tenantId).run();
+        await db.prepare("UPDATE subscriptions SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?) WHERE tenant_id = ? AND status NOT IN ('suspended','blocked','canceled')").bind(nowIso(), tenantId).run();
         await notifyOwners(env, tenantId, {
           type: "billing_past_due",
           message: "We couldn't charge your card. Update your payment method to keep your studio running — you have a short grace period before features pause.",
@@ -1063,7 +1063,7 @@ async function syncStripeSubscription(db: D1Database, obj: Record<string, unknow
       await db.prepare("UPDATE subscriptions SET status = 'unpaid' WHERE tenant_id = ?").bind(tenantId).run();
       break;
     case "past_due":
-      await db.prepare("UPDATE subscriptions SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?) WHERE tenant_id = ? AND status NOT IN ('suspended','canceled')").bind(now, tenantId).run();
+      await db.prepare("UPDATE subscriptions SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?) WHERE tenant_id = ? AND status NOT IN ('suspended','blocked','canceled')").bind(now, tenantId).run();
       break;
     case "active":
     case "trialing": {

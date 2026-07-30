@@ -8,7 +8,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { AI_TONES, TTS_VOICES, TTS_VOICE_IDS } from "@kova/protocol";
-import { categoriesForRole, resolveAllChannels, parseNotifPrefs, NOTIF_CATEGORIES, parseNotifPolicy, resolveEmailPolicy, sanitizeEmailPolicy, NOTIF_TYPES, notifTemplateOf, notifVarsOf, notifCategoryOf, notifTitleOf, type NotifRole, type NotifType, type StoredNotifPrefs } from "@kova/domain";
+import { categoriesForRole, resolveAllChannels, parseNotifPrefs, NOTIF_CATEGORIES, parseNotifPolicy, resolveEmailPolicy, sanitizeEmailPolicy, NOTIF_TYPES, notifTemplateOf, notifVarsOf, notifCategoryOf, notifTitleOf, type NotifRole, type NotifType, type StoredNotifPrefs, checkLapsePolicy, DEFAULT_LAPSE_POLICY, type LapsePolicy } from "@kova/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { tenantEntitlements, getConfig } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
@@ -28,7 +28,7 @@ export const settingsRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const row = await c.env.DB.prepare("SELECT * FROM tenant_settings WHERE tenant_id = ?")
       .bind(who.tenantId)
-      .first<{ branding_json: string | null; ai_toggles_json: string | null; marketplace_json: string | null; integrations_json: string | null; email_config_json: string | null; notif_policy_json: string | null; stripe_account_id: string | null }>();
+      .first<{ branding_json: string | null; ai_toggles_json: string | null; marketplace_json: string | null; integrations_json: string | null; email_config_json: string | null; notif_policy_json: string | null; lapse_json: string | null; stripe_account_id: string | null }>();
     const ent = await tenantEntitlements(c.env.DB, who.tenantId);
     const platformFrom = (await getConfig(c.env.DB))["email.platform_from"] || PLATFORM_FROM_DEFAULT;
     return c.json({
@@ -37,6 +37,9 @@ export const settingsRoutes = new Hono<AppEnv>()
       marketplace: parseJson(row?.marketplace_json, { enabled: false, selfRegister: false, requireActiveAccess: false }),
       integrations: maskIntegrations(resolveIntegrations(parseJson(row?.integrations_json ?? null, {}))),
       integrationProviders: PROVIDERS,
+      // Absent ⇒ the gentle default, so a studio that never opens this setting is
+      // never silently deleting its lapsed clients.
+      lapse: { ...DEFAULT_LAPSE_POLICY, ...parseJson<Partial<LapsePolicy>>(row?.lapse_json ?? null, {}) },
       email: maskEmailConfig(resolveEmailConfig(parseJson(row?.email_config_json ?? null, {}))),
       emailPlatformFrom: platformFrom,
       // What ONE email costs on the Kova lane. Brevo is the studio's own
@@ -112,6 +115,16 @@ export const settingsRoutes = new Hono<AppEnv>()
           senderEmail: z.string().max(200).optional(),
           senderName: z.string().max(120).optional(),
         }).optional(),
+        /**
+         * What the STUDIO does with a client whose access lapsed. Validated by
+         * the same `checkLapsePolicy` the settings screen shows errors from, so a
+         * hand-rolled request cannot store a rule the UI would refuse — the floor
+         * under archive/delete is a real guard, not a hint.
+         */
+        lapse: z.object({
+          action: z.enum(["read_only", "blocked", "archive", "delete"]),
+          graceDays: z.number().int().min(0).max(365),
+        }).optional(),
         // Studio-wide email allow-list, per audience: category → may email.
         notifPolicy: z.object({
           client: z.record(z.string(), z.boolean()).optional(),
@@ -159,6 +172,14 @@ export const settingsRoutes = new Hono<AppEnv>()
     // sign-up on left the studio's public door still refusing strangers for a
     // minute, with nothing to explain why.
     if (d.branding || d.marketplace) await invalidateTenantHosts(c.env, c.env.DB, who.tenantId);
+
+    if (d.lapse) {
+      const verdict = checkLapsePolicy(d.lapse);
+      if (!verdict.ok) return c.json({ error: verdict.error ?? "invalid policy" }, 400);
+      await c.env.DB.prepare("UPDATE tenant_settings SET lapse_json = ?, updated_at = ? WHERE tenant_id = ?")
+        .bind(j(d.lapse), nowIso(), who.tenantId)
+        .run();
+    }
 
     // Email provider config, merged so a blank key doesn't wipe a set one unless
     // explicitly cleared (empty string clears; undefined keeps).

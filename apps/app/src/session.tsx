@@ -100,7 +100,13 @@ export interface HostInfo {
   tenant: { tenantId: string; name: string; slug: string; branding: TenantBranding | null; allowSignup: boolean } | null;
   /** The studio's billing gate. `readOnly` means every write on this host refuses,
    *  so the app says so up front rather than on the first failed save. */
-  gate?: { readOnly: boolean; reason: "ok" | "grace" | "suspended" | "closing" } | null;
+  gate?: {
+    readOnly: boolean;
+    /** The app itself is withheld — see `StudioBlocked`. Reads still resolve so
+     *  export and delete keep working behind it. */
+    blocked: boolean;
+    reason: "ok" | "grace" | "suspended" | "blocked" | "closing";
+  } | null;
   /** Cloudflare Turnstile — the login renders the widget when a site key is set
    *  and `enabled` (a server secret is configured, so codes are gated on it). */
   turnstile?: { siteKey: string | null; enabled: boolean } | null;

@@ -2147,14 +2147,14 @@ describe("custom domains (SPEC §14.1) — Host pins the tenant", () => {
 
   it("reports the studio's billing gate so the app can say 'paused' up front", async () => {
     const db = env.DB as D1Database;
-    const before = (await (await SELF.fetch("http://studio-one.localhost:8787/api/host")).json()) as { gate: { readOnly: boolean; reason: string } | null };
+    const before = (await (await SELF.fetch("http://studio-one.localhost:8787/api/host")).json()) as { gate: { readOnly: boolean; blocked: boolean; reason: string } | null };
     expect(before.gate?.readOnly).toBe(false);
 
     const prior = await db.prepare("SELECT status FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<{ status: string }>();
     await db.prepare("UPDATE subscriptions SET status = 'suspended' WHERE tenant_id = ?").bind(tenantId).run();
     try {
-      const paused = (await (await SELF.fetch("http://studio-one.localhost:8787/api/host")).json()) as { gate: { readOnly: boolean; reason: string } | null };
-      expect(paused.gate).toEqual({ readOnly: true, reason: "suspended" });
+      const paused = (await (await SELF.fetch("http://studio-one.localhost:8787/api/host")).json()) as { gate: { readOnly: boolean; blocked: boolean; reason: string } | null };
+      expect(paused.gate).toEqual({ readOnly: true, blocked: false, billingWritable: true, reason: "suspended" });
 
       // The gate is not cached with the identity, so a suspension bites at once —
       // and a payment lifts it at once, which is the direction that matters.
@@ -2176,6 +2176,22 @@ describe("custom domains (SPEC §14.1) — Host pins the tenant", () => {
         method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: "{}",
       });
       expect(close.status, "an owner must be able to close a suspended studio").not.toBe(402);
+
+      // BLOCKED is the next rung and the app must be able to see it. This is not
+      // a formality: the model, the resolver and the Shell all carried `blocked`
+      // while `/api/host` hand-picked `{ readOnly, reason }` out of the gate — so
+      // the client read `gate.blocked` as undefined and rendered the ordinary
+      // read-only app for a studio whose access was withheld.
+      await db.prepare("UPDATE subscriptions SET status = 'blocked' WHERE tenant_id = ?").bind(tenantId).run();
+      const blocked = (await (await SELF.fetch("http://studio-one.localhost:8787/api/host")).json()) as {
+        gate: { readOnly: boolean; blocked: boolean; reason: string } | null;
+      };
+      expect(blocked.gate).toEqual({ readOnly: true, blocked: true, billingWritable: true, reason: "blocked" });
+
+      // Still read-only rather than no-access at the API: withholding the app is
+      // not the same as holding someone's data, and export/delete must work.
+      const blockedRead = await SELF.fetch("http://studio-one.localhost:8787/api/clients", { headers: auth(ownerCookie) });
+      expect(blockedRead.status).toBe(200);
 
       // And a client may always delete their own account.
       const mine = await SELF.fetch("http://studio-one.localhost:8787/api/me/delete/request-otp", {

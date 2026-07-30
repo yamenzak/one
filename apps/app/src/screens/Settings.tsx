@@ -6,10 +6,10 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { useSearchParams } from "react-router-dom";
-import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon } from "@4dl/ui";
+import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
 import { personaLabel, personaTone } from "../registry/index.js";
 import type { LoginBranding, TenantBranding } from "@kova/protocol";
-import { resolveUnits, cmToFeetInches, feetInchesToCm, STUDIO_SETTINGS_SECTIONS, settingsSectionVisible } from "@kova/domain";
+import { resolveUnits, cmToFeetInches, feetInchesToCm, STUDIO_SETTINGS_SECTIONS, settingsSectionVisible, LAPSE_ACTIONS, LAPSE_META, DEFAULT_LAPSE_POLICY, MIN_DESTRUCTIVE_GRACE_DAYS, checkLapsePolicy, isDestructive, type LapsePolicy } from "@kova/domain";
 import { useUnits } from "../units.js";
 import { useSession } from "../session.js";
 import { PreferencesEditorCard } from "./PreferencesEditor.js";
@@ -282,6 +282,7 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
     ai: () => <AiConfigSection />,
     messaging: () => <MessagingSettings />,
     marketplace: () => <MarketplaceSection />,
+    lapse: () => <LapseSection />,
     integrations: () => <IntegrationsSection />,
     danger: () => <CloseStudioSection />,
   };
@@ -298,6 +299,7 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
     ai: "Which model answers each AI action, what it costs your balance, and the voice it writes in.",
     messaging: "How email leaves your studio — who sends it, which categories are allowed, what it says.",
     marketplace: "Whether your storefront is open, and whether clients can sign themselves up.",
+    lapse: "Your rule for a client whose package ran out. It applies automatically, and only while your own studio is in good standing.",
     integrations: "Outside food and exercise databases, and the keys they use.",
     danger: "Billing stops immediately, your data is held for seven days, then everything is erased — for you and for every member.",
   };
@@ -352,13 +354,115 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
  *  can aim at from memory rather than a list you re-read. */
 const STUDIO_SECTION_ICON: Record<string, LucideIcon> = {
   brand: Palette, signin: KeyRound, ai: Wand2, messaging: Mail,
-  marketplace: Store, integrations: Plug,
+  marketplace: Store, lapse: Clock, integrations: Plug,
 };
 const STUDIO_SECTION_TONE: Record<string, Tone> = {
   brand: "primary", signin: "activity", ai: "nutrition", messaging: "cardio",
   // A grey badge in a row of toned ones reads as disabled, not as neutral.
-  marketplace: "supplement", integrations: "sleep",
+  marketplace: "supplement", lapse: "warning", integrations: "sleep",
 };
+
+/**
+ * "When access runs out" — the studio's own rule for a lapsed client.
+ *
+ * The second of two independent ladders, and the copy has to keep them apart:
+ * this one is the STUDIO deciding about its client. The other is Kova deciding
+ * about the studio, which the owner does not configure and is told about in
+ * Billing instead.
+ *
+ * Two things this screen exists to make unmissable:
+ *
+ *  1. **The seat consequence.** Archiving KEEPS a client seat, deleting FREES
+ *     one. A studio at its plan limit that archives everyone will hit the ceiling
+ *     and have no idea why, so the seat line sits on the option itself rather
+ *     than in help text nobody opens.
+ *  2. **Destructive means destructive.** archive/delete cannot be undone by the
+ *     client, so they carry a minimum grace window enforced by
+ *     `checkLapsePolicy` — the same function the route validates with, so the
+ *     screen can never promise something the server will refuse.
+ */
+function LapseSection() {
+  const [policy, setPolicy] = useState<LapsePolicy | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    void api.get<{ lapse: LapsePolicy }>("/api/settings").then((r) => setPolicy(r.lapse)).catch(() => setPolicy(DEFAULT_LAPSE_POLICY));
+  }, []);
+
+  if (!policy) return <SkeletonList rows={4} card />;
+
+  const verdict = checkLapsePolicy(policy);
+  const save = async () => {
+    setBusy(true); setErr(null);
+    try {
+      await api.patch("/api/settings", { lapse: policy });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      setErr(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        {LAPSE_ACTIONS.map((a) => {
+          const meta = LAPSE_META[a];
+          const on = policy.action === a;
+          return (
+            <button
+              key={a}
+              onClick={() => setPolicy((p) => ({
+                action: a,
+                // Lift the grace to the floor when switching to a destructive
+                // option, rather than showing an error the user has to fix.
+                graceDays: isDestructive(a) ? Math.max(p!.graceDays, MIN_DESTRUCTIVE_GRACE_DAYS) : p!.graceDays,
+              }))}
+              className={cn(
+                "flex w-full items-start gap-3 rounded-2xl p-3 text-left transition-colors",
+                on ? "bg-primary/12 ring-1 ring-primary" : "bg-surface-2 hover:bg-surface-3",
+              )}
+            >
+              <span className={cn("mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2", on ? "border-primary bg-primary" : "border-border")}>
+                {on && <Check className="size-3 text-primary-foreground" />}
+              </span>
+              <span className="min-w-0 flex-1 space-y-0.5">
+                <span className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">{meta.label}</span>
+                  {meta.destructive && <Badge tone="danger">Can't be undone</Badge>}
+                </span>
+                <span className="block text-caption text-muted-foreground">{meta.effect}</span>
+                {meta.seat && <span className="block text-caption font-medium text-warning">{meta.seat}</span>}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <Field
+        label="Wait this many days after their access ends"
+        inputMode="numeric"
+        value={String(policy.graceDays)}
+        onChange={(e) => setPolicy((p) => ({ ...p!, graceDays: Number(e.target.value.replace(/\D/g, "") || 0) }))}
+        hint={
+          isDestructive(policy.action)
+            ? `At least ${MIN_DESTRUCTIVE_GRACE_DAYS} days — this one can't be undone by the client.`
+            : "0 applies it the moment their access ends."
+        }
+      />
+      {!verdict.ok && <p className="text-caption text-danger">{verdict.error}</p>}
+      {err && <p className="text-caption text-danger">{err}</p>}
+
+      <Button size="lg" className="w-full" disabled={busy || !verdict.ok} onClick={() => void save()}>
+        {saved ? <><Check /> Saved</> : busy ? "Saving…" : "Save rule"}
+      </Button>
+    </div>
+  );
+}
 
 /** Owner danger zone — close the studio: cancels billing now, holds data 7 days,
  *  then wipes everything (R2 + D1) for the studio and its members. OTP-confirmed. */

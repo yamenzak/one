@@ -66,6 +66,22 @@ function read<T>(fn: (db: DatabaseSync) => T): T {
  * matched loosely (`\d{6}` anywhere in the value) so a change to that encoding
  * degrades into a clear failure rather than a wrong code.
  */
+/**
+ * Run one statement against the local D1, read-WRITE.
+ *
+ * Only for putting the worker into a state no HTTP surface will produce on
+ * demand — the billing ladder is driven by a daily cron, and a spec cannot wait
+ * 30 days to see the blocked screen. Everything else must go through the API.
+ */
+export function d1Exec(sql: string): void {
+  const db = new DatabaseSync(d1File());
+  try {
+    db.exec(sql);
+  } finally {
+    db.close();
+  }
+}
+
 export function latestSignInOtp(email: string): string | null {
   const row = read((db) =>
     db
