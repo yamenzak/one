@@ -934,6 +934,13 @@ that does not draw one.
 the rule above is structural rather than a convention to remember: a metric with
 no target has no `ring` in its `forms`, and there is no way to select one.
 
+**A tile's colour comes from a registry, never from the tile.** Kova's widgets
+read `METRICS[...].tone`, and the coach tiles that count an attention type read
+`attentionCoding()` — the same SSOT the roster feed uses, because the hero and
+the feed sit on one screen and one number must not have two colours. Enforced by
+`widget-coding.conformance.test.ts`; note that every tone it was written to catch
+was already a legal token, so the check is provenance, not validity.
+
 **A form the page cannot fit is offered greyed, with the reason.** `fits()`
 answers whether a form still has room; a disabled chip with no explanation is a
 dead end (switch a ring to a card and the way back becomes invisible), so the

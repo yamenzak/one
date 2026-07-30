@@ -157,15 +157,15 @@ export const CLIENT_WIDGETS: ClientWidgetDef[] = [
   },
   {
     id: "tonnage", title: "Volume lifted", blurb: "Total weight moved — reps × load",
-    icon: Dumbbell, tone: "activity", feature: "exerciseReport", lane: "workout",
+    icon: METRICS.tonnage.icon, tone: METRICS.tonnage.tone, feature: "exerciseReport", lane: "workout",
     forms: ["stat", "card"],
     available: (d) => (d.bundle.workout.tonnageKg ?? 0) > 0,
     render: (form, d) => {
       const kg = d.bundle.workout.tonnageKg ?? 0;
       const v = Math.round(kgToDisplay(kg, d.units)).toLocaleString();
       return form === "card"
-        ? <TileCard icon={Dumbbell} tone="activity" label="Volume" value={v} unit={weightLabel(d.units)} />
-        : <TileStat icon={Dumbbell} tone="activity" label="Volume lifted" value={v} unit={weightLabel(d.units)} />;
+        ? <TileCard icon={METRICS.tonnage.icon} tone={METRICS.tonnage.tone} label="Volume" value={v} unit={weightLabel(d.units)} />
+        : <TileStat icon={METRICS.tonnage.icon} tone={METRICS.tonnage.tone} label="Volume lifted" value={v} unit={weightLabel(d.units)} />;
     },
   },
   {
@@ -181,14 +181,14 @@ export const CLIENT_WIDGETS: ClientWidgetDef[] = [
   },
   {
     id: "active", title: "Active minutes", blurb: "Time spent in logged activities",
-    icon: Activity, tone: "cardio", feature: "extraWorkouts",
+    icon: METRICS.activeMinutes.icon, tone: METRICS.activeMinutes.tone, feature: "extraWorkouts",
     forms: ["card", "stat"],
     render: (form, d) => {
       const m = d.bundle.metrics?.activeMinutes ?? 0;
       const n = d.bundle.metrics?.activityCount ?? 0;
       return form === "stat"
-        ? <TileStat icon={Activity} tone="cardio" label="Active minutes" value={m} unit="min" delta={n ? `${n} ${n === 1 ? "activity" : "activities"}` : null} />
-        : <TileCard icon={Activity} tone="cardio" label="Active" value={m} unit="min" />;
+        ? <TileStat icon={METRICS.activeMinutes.icon} tone={METRICS.activeMinutes.tone} label="Active minutes" value={m} unit="min" delta={n ? `${n} ${n === 1 ? "activity" : "activities"}` : null} />
+        : <TileCard icon={METRICS.activeMinutes.icon} tone={METRICS.activeMinutes.tone} label="Active" value={m} unit="min" />;
     },
   },
   {
@@ -198,8 +198,8 @@ export const CLIENT_WIDGETS: ClientWidgetDef[] = [
     render: (form, d) => {
       const v = d.bundle.metrics?.steps ?? null;
       return form === "stat"
-        ? <TileStat icon={Footprints} tone={METRICS.steps.tone} label="Steps" value={v?.toLocaleString() ?? null} />
-        : <TileCard icon={Footprints} tone={METRICS.steps.tone} label="Steps" value={v?.toLocaleString() ?? null} />;
+        ? <TileStat icon={METRICS.steps.icon} tone={METRICS.steps.tone} label="Steps" value={v?.toLocaleString() ?? null} />
+        : <TileCard icon={METRICS.steps.icon} tone={METRICS.steps.tone} label="Steps" value={v?.toLocaleString() ?? null} />;
     },
   },
 
@@ -240,8 +240,8 @@ export const CLIENT_WIDGETS: ClientWidgetDef[] = [
       const cm = d.bundle.metrics?.waistCm ?? null;
       const v = cm != null ? fmtLength(cm, d.units, false) : null;
       return form === "stat"
-        ? <TileStat icon={Ruler} tone={METRICS.waist.tone} label="Waist" value={v} unit={lengthLabel(d.units)} />
-        : <TileCard icon={Ruler} tone={METRICS.waist.tone} label="Waist" value={v} unit={lengthLabel(d.units)} />;
+        ? <TileStat icon={METRICS.waist.icon} tone={METRICS.waist.tone} label="Waist" value={v} unit={lengthLabel(d.units)} />
+        : <TileCard icon={METRICS.waist.icon} tone={METRICS.waist.tone} label="Waist" value={v} unit={lengthLabel(d.units)} />;
     },
   },
 
@@ -264,7 +264,7 @@ export const CLIENT_WIDGETS: ClientWidgetDef[] = [
   { id: "stress", title: "Stress", blurb: "How stressed you felt", icon: METRICS.stress.icon, tone: METRICS.stress.tone, feature: "moodLogging", forms: ["card", "stat", "ring"], render: (f, d) => scale5(f, d, "stress", "Stress") },
   {
     id: "wellness", title: "Wellness score", blurb: "Your overall score across every pillar",
-    icon: HeartPulse, tone: "sleep",
+    icon: METRICS.wellness.icon, tone: METRICS.wellness.tone,
     forms: ["ring", "card"],
     render: (form, d) => <WellnessWidget clientId={d.clientId} date={d.bundle.date} form={form} />,
   },
@@ -272,13 +272,13 @@ export const CLIENT_WIDGETS: ClientWidgetDef[] = [
   // ── Consistency ────────────────────────────────────────────────────────────
   {
     id: "checkins", title: "Check-in week", blurb: "Which days this week you checked in",
-    icon: ClipboardList, tone: METRICS.streak.tone, feature: "checkIns",
+    icon: METRICS.checkins.icon, tone: METRICS.checkins.tone, feature: "checkIns",
     forms: ["week"],
     render: (_f, d) => {
       const done = new Set(d.bundle.checkInDates ?? []);
       const days = weekEnding(d.bundle.date);
       const n = days.filter((x) => done.has(x)).length;
-      return <TileWeek icon={ClipboardList} tone={METRICS.streak.tone} label="Check-ins" value={`${n}/7`} days={days.map((x) => done.has(x))} todayIndex={6} />;
+      return <TileWeek icon={METRICS.checkins.icon} tone={METRICS.checkins.tone} label="Check-ins" value={`${n}/7`} days={days.map((x) => done.has(x))} todayIndex={6} />;
     },
   },
   {
@@ -296,7 +296,7 @@ export const CLIENT_WIDGETS: ClientWidgetDef[] = [
   // ── Supplements & labs ─────────────────────────────────────────────────────
   {
     id: "supplements", title: "Supplements", blurb: "How many of the day's doses you took",
-    icon: Pill, tone: "supplement", feature: "supplementsLabs",
+    icon: METRICS.supplements.icon, tone: METRICS.supplements.tone, feature: "supplementsLabs",
     forms: ["ring", "card"],
     available: (d) => (d.bundle.metrics?.supplementsTotal ?? 0) > 0,
     render: (form, d) => {
@@ -304,24 +304,24 @@ export const CLIENT_WIDGETS: ClientWidgetDef[] = [
       const total = d.bundle.metrics?.supplementsTotal ?? 0;
       const p = total ? taken / total : undefined;
       return form === "ring"
-        ? <TileRing tone="supplement" progress={p ?? 0.001} value={`${taken}/${total}`} label="Supplements" sublabel="taken" />
-        : <TileCard icon={Pill} tone="supplement" label="Supplements" value={`${taken}/${total}`} progress={p} />;
+        ? <TileRing tone={METRICS.supplements.tone} progress={p ?? 0.001} value={`${taken}/${total}`} label="Supplements" sublabel="taken" />
+        : <TileCard icon={METRICS.supplements.icon} tone={METRICS.supplements.tone} label="Supplements" value={`${taken}/${total}`} progress={p} />;
     },
   },
   {
     id: "labs", title: "Labs due", blurb: "Lab tests waiting on you",
-    icon: FlaskConical, tone: "lab", feature: "supplementsLabs",
+    icon: METRICS.labs.icon, tone: METRICS.labs.tone, feature: "supplementsLabs",
     forms: ["card", "stat"],
     available: (d) => (d.bundle.pendingLabs ?? 0) > 0,
     render: (form, d) => form === "stat"
-      ? <TileStat icon={FlaskConical} tone="lab" label="Labs due" value={d.bundle.pendingLabs ?? 0} delta="waiting on you" />
-      : <TileCard icon={FlaskConical} tone="lab" label="Labs due" value={d.bundle.pendingLabs ?? 0} />,
+      ? <TileStat icon={METRICS.labs.icon} tone={METRICS.labs.tone} label="Labs due" value={d.bundle.pendingLabs ?? 0} delta="waiting on you" />
+      : <TileCard icon={METRICS.labs.icon} tone={METRICS.labs.tone} label="Labs due" value={d.bundle.pendingLabs ?? 0} />,
   },
 
   // ── Fasting (live only — see the file header) ───────────────────────────────
   {
     id: "fasting", title: "Fasting timer", blurb: "Start, watch and end a fast",
-    icon: Timer, tone: "sleep", feature: "fastingTimer",
+    icon: METRICS.fasting.icon, tone: METRICS.fasting.tone, feature: "fastingTimer",
     forms: ["ring", "card"],
     available: (d) => d.isToday,
     render: (form, d) => <FastingWidget clientId={d.clientId} form={form} />,
@@ -338,8 +338,8 @@ function WellnessWidget({ clientId, date, form }: { clientId: string; date: stri
   useEffect(() => { setRes(null); void api.get<ScoreResult>(`/api/wellness/score?clientId=${clientId}&today=${date}`).then(setRes).catch(() => setRes({ score: 0, band: "start" })); }, [clientId, date]);
   if (!res) return <div className="h-full animate-pulse rounded-2xl bg-surface-2" />;
   return form === "ring"
-    ? <TileRing tone="sleep" progress={res.score / 100 || 0.001} value={res.score} label="Wellness" sublabel={BAND_LABEL[res.band] ?? "this week"} />
-    : <TileCard icon={HeartPulse} tone="sleep" label="Wellness" value={res.score} progress={res.score / 100} />;
+    ? <TileRing tone={METRICS.wellness.tone} progress={res.score / 100 || 0.001} value={res.score} label="Wellness" sublabel={BAND_LABEL[res.band] ?? "this week"} />
+    : <TileCard icon={METRICS.wellness.icon} tone={METRICS.wellness.tone} label="Wellness" value={res.score} progress={res.score / 100} />;
 }
 
 // ── Live fasting tracker ─────────────────────────────────────────────────────
@@ -367,8 +367,8 @@ function FastingWidget({ clientId, form }: { clientId: string; form: TileForm })
   if (!fast) return <div className="h-full animate-pulse rounded-2xl bg-surface-2" />;
 
   if (form !== "ring") {
-    if (!active) return <TileCard icon={Timer} tone="sleep" label="Fasting" value="Start 16h" onClick={() => void start(16)} />;
-    return <TileCard icon={Timer} tone={zone.tone} label={`Fasting · ${zone.label}`} value={<span className="tabular-nums">{h}:{pad(m)}</span>} progress={pct} />;
+    if (!active) return <TileCard icon={METRICS.fasting.icon} tone={METRICS.fasting.tone} label="Fasting" value="Start 16h" onClick={() => void start(16)} />;
+    return <TileCard icon={METRICS.fasting.icon} tone={zone.tone} label={`Fasting · ${zone.label}`} value={<span className="tabular-nums">{h}:{pad(m)}</span>} progress={pct} />;
   }
 
   return (
@@ -380,7 +380,7 @@ function FastingWidget({ clientId, form }: { clientId: string; form: TileForm })
         </>
       ) : (
         <>
-          <div className="relative flex items-center gap-2"><IconBadge icon={Timer} tone="sleep" size="sm" /><span className="font-semibold">Fasting</span></div>
+          <div className="relative flex items-center gap-2"><IconBadge icon={METRICS.fasting.icon} tone={METRICS.fasting.tone} size="sm" /><span className="font-semibold">Fasting</span></div>
           <div className="relative flex flex-wrap justify-center gap-1.5">{[16, 18, 20, 24].map((hh) => <Chip key={hh} selected={target === hh} onClick={() => setTarget(hh)}>{hh}h</Chip>)}</div>
           <Button size="sm" variant="tonal" className="relative w-full" disabled={busy} onClick={() => void start(target)}>Start {target}h fast</Button>
         </>

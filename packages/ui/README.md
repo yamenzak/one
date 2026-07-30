@@ -47,6 +47,13 @@ adding that app's tone names next to Kova's here.
 
 ## Conformance
 
-Seven layers, all scanning `apps/app/src` **and** `packages/ui/src`: contrast,
-design-tokens, type-scale, no-data, motion, focus, primitive-adoption. Each has
-an escape hatch that requires a written reason on the line. See UI-LANGUAGE.md §13.
+Eight layers: contrast, design-tokens, type-scale, no-data, motion, focus,
+primitive-adoption, widget-coding. Each has an escape hatch that requires a
+written reason on the line. See UI-LANGUAGE.md §13.
+
+The last one is worth understanding because it is not about tokens. Every tone
+it caught was a *legal* tone from this package — the defect was that the colour
+was written down twice, and the two copies disagreed. A coach tile counting
+"clients gone quiet" was sleep-blue while the roster feed on the same screen
+drew the same number danger-red. So the check is not "is this a valid tone" but
+"does this colour come from the one registry that owns it".
