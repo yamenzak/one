@@ -187,31 +187,12 @@ export type SubscriptionStatus =
 export type HostGateReason = "ok" | "grace" | "suspended" | "blocked" | "closing";
 
 /**
- * The platform dunning ladder, in days from the first missed payment.
- *
- * Three rungs, and the gap between them is the point: each one takes something
- * more away, and the owner is told before every step. A single cliff (pay by
- * Friday or lose everything) is how you delete a customer who was on holiday.
- *
- *   0    → GRACE     full service, dunning notices only
- *   7    → READ_ONLY the tenant and every client drop to read-only
- *   30   → BLOCKED   the app is replaced by "<Tenant> is suspended"
- *   37   → PURGE     tenant and members hard-deleted
- *
- * BLOCKED is the rung this ladder was missing. Suspension used to mean
- * read-only all the way to the end, so a tenant that had not paid in a month
- * looked identical to one that had not paid in a week, and the last thing before
- * permanent deletion was a banner.
+ * The dunning ladder itself lives in `@4dl/billing` (`DUNNING_DAYS`,
+ * `dunningRung`): it is a PAYMENT lifecycle, and an app that never bills its
+ * tenants has no dunning while still having a host gate. What tenancy owns is
+ * the mapping from whatever status the ladder produced onto what the host serves
+ * — which is the part every app needs, billing or not.
  */
-export const DUNNING_DAYS = { readOnly: 7, blocked: 30, purge: 37 } as const;
-
-/** Which rung `daysPastDue` has reached. Pure, so the sweep and the UI agree. */
-export function dunningRung(daysPastDue: number): "grace" | "read_only" | "blocked" | "purge" {
-  if (daysPastDue >= DUNNING_DAYS.purge) return "purge";
-  if (daysPastDue >= DUNNING_DAYS.blocked) return "blocked";
-  if (daysPastDue >= DUNNING_DAYS.readOnly) return "read_only";
-  return "grace";
-}
 
 export interface HostGate {
   /** Every write on this host is refused. Reads are unaffected — always. */

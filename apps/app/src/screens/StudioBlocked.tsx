@@ -1,7 +1,7 @@
 /**
  * The studio is closed for non-payment — the whole app, replaced by one screen.
  *
- * This is rung two of the platform ladder (`@4dl/tenancy` `DUNNING_DAYS`):
+ * This is rung two of the platform ladder (`@4dl/billing` `DUNNING_DAYS`):
  * read-only at 7 days, blocked at 30, deleted at 37. Read-only still shows the
  * app and refuses writes; this withholds it.
  *
@@ -28,7 +28,7 @@
 
 import { Button, Card, IconBadge, AlertTriangle, ArrowRight, TierAnchor, Page, Stagger } from "@4dl/ui";
 import { useNavigate } from "react-router-dom";
-import { DUNNING_DAYS } from "@4dl/tenancy/model";
+import { DUNNING_DAYS } from "@4dl/billing/model";
 import type { PersonaRole } from "../registry/index.js";
 
 const PURGE_WINDOW = DUNNING_DAYS.purge - DUNNING_DAYS.blocked;

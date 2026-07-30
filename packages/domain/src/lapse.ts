@@ -5,7 +5,7 @@
  *
  *   Kova → tenant   the studio has not paid Kova. Kova decides. Read-only at 7
  *                   days, blocked at 30, purged at 37. `@4dl/tenancy`
- *                   `standing.ts`, `DUNNING_DAYS`.
+ *                   `@4dl/billing` dunning.ts, `DUNNING_DAYS`.
  *   tenant → client THIS file. The client's package ran out. The STUDIO decides,
  *                   because it is their commercial relationship, not ours.
  *

@@ -16,7 +16,7 @@ import {
   resolveEntitlements, type NotifType,
   DEFAULT_LAPSE_POLICY, checkLapsePolicy, isDestructive, isFullyExpired, type LapsePolicy,
 } from "@kova/domain";
-import { DUNNING_DAYS } from "@4dl/tenancy";
+import { DUNNING_DAYS } from "@4dl/billing";
 import { periodKey } from "./ids.js";
 import { contextRoutes } from "./context-routes.js";
 import { billingRoutes, adminRoutes } from "./billing-routes.js";

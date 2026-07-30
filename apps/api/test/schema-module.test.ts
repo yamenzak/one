@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { schemaStatements } from "@4dl/core";
 import { AUTH_SCHEMA } from "@4dl/auth";
+import { BILLING_SCHEMA } from "@4dl/billing";
 import { TENANCY_SCHEMA } from "@4dl/tenancy";
 import { KOVA_SCHEMA } from "../src/db.js";
 
@@ -56,10 +57,12 @@ describe("the Kova schema module", () => {
     // hide behind a passing suite. Stage 1 took `tenant_domains` and
     // `tenant_settings` (2 tables, 1 index, 4 ALTERs) into @4dl/tenancy; Stage 2
     // took Better Auth's eight plus `auth_logs` and `action_otps` (10 tables,
-    // 2 indexes) into @4dl/auth.
+    // 2 indexes) into @4dl/auth; Stage 3 took plans, subscriptions,
+    // credit_packs, credit_ledger and stripe_events (5 tables, 3 indexes) into
+    // @4dl/billing.
     const ddl = schemaStatements(KOVA_SCHEMA);
-    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(54);
-    expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(37);
+    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(49);
+    expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(34);
     expect(ddl.filter((s) => s.startsWith("CREATE UNIQUE INDEX"))).toHaveLength(8);
     expect(ddl.filter((s) => s.startsWith("DROP INDEX"))).toHaveLength(1);
     expect(KOVA_SCHEMA.alters ?? []).toHaveLength(48);
@@ -79,7 +82,7 @@ describe("the composed schema", () => {
     // the moment one is edited. Ownership has to be exclusive.
     const tableOf = (s: string) => /CREATE TABLE IF NOT EXISTS "?(\w+)"?/.exec(s)?.[1];
     const owned = new Map<string, string>();
-    for (const m of [AUTH_SCHEMA, TENANCY_SCHEMA, KOVA_SCHEMA]) {
+    for (const m of [AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, KOVA_SCHEMA]) {
       for (const sql of schemaStatements(m)) {
         const t = tableOf(sql);
         if (!t) continue;
@@ -92,6 +95,8 @@ describe("the composed schema", () => {
     expect(owned.get("action_otps")).toBe("auth");
     expect(owned.get("tenant_domains")).toBe("tenancy");
     expect(owned.get("tenant_settings")).toBe("tenancy");
+    expect(owned.get("subscriptions")).toBe("billing");
+    expect(owned.get("credit_ledger")).toBe("billing");
     expect(owned.get("clients")).toBe("kova");
   });
 
@@ -115,6 +120,15 @@ describe("the composed schema", () => {
     for (const identity of ["user", "session", "account", "verification", "passkey"]) {
       expect(t, identity).not.toContain(identity);
     }
+  });
+
+  it("keeps the PLATFORM catalog out of the tenant cascade", () => {
+    // `plans`, `credit_packs` and `stripe_events` belong to the platform, not to
+    // any one tenant. Sweeping them with a tenant purge would delete the catalog
+    // every OTHER tenant is subscribed to — the loudest possible way to discover
+    // that a scope declaration was copied without being read.
+    const t = BILLING_SCHEMA.scoped?.tenantTables ?? [];
+    expect(t).toEqual(["subscriptions", "credit_ledger"]);
   });
 
   it("declares what a tenant purge must clear", () => {

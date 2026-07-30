@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { CloudOff, Lock, RefreshCw, WifiOff, X, cn } from "@4dl/ui";
-import { DUNNING_DAYS } from "@4dl/tenancy/model";
+import { DUNNING_DAYS } from "@4dl/billing/model";
 import { useSession } from "./session.js";
 
 /**

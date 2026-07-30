@@ -20,7 +20,7 @@
  * an operator sees the gap instead of a silently short catalog.
  */
 
-import { NEURON_COST_USD } from "@4dl/platform";
+import { NEURON_COST_USD } from "@4dl/billing";
 
 /**
  * A catalog lane. The first five are lanes the product can actually execute

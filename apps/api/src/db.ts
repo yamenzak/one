@@ -35,6 +35,7 @@
 
 import { schemaGate, type SchemaModule } from "@4dl/core";
 import { AUTH_SCHEMA } from "@4dl/auth";
+import { BILLING_SCHEMA } from "@4dl/billing";
 import { TENANCY_SCHEMA } from "@4dl/tenancy";
 
 export const KOVA_SCHEMA: SchemaModule = {
@@ -42,19 +43,7 @@ export const KOVA_SCHEMA: SchemaModule = {
   version: "2026-07-30c",
   ddl: [
 
-    // ── Platform billing (SPEC §5, §6) ─────────────────────────────────
-    "CREATE TABLE IF NOT EXISTS plans (id TEXT PRIMARY KEY, name TEXT, price_usd_month REAL, entitlements_json TEXT, stripe_product_id TEXT, stripe_price_id TEXT, ord INTEGER, active INTEGER DEFAULT 1);",
-    "CREATE TABLE IF NOT EXISTS subscriptions (tenant_id TEXT PRIMARY KEY, plan_id TEXT, status TEXT, comp INTEGER DEFAULT 0, stripe_customer_id TEXT, stripe_sub_id TEXT, pending_plan_id TEXT, current_period_end TEXT, past_due_at TEXT, suspend_at TEXT, delete_at TEXT, overrides_json TEXT, updated_at TEXT);",
-    // dailySweep scans by status (grant to active/trialing tenants).
-    "CREATE INDEX IF NOT EXISTS idx_subs_status ON subscriptions(status);",
-    "CREATE INDEX IF NOT EXISTS idx_subs_customer ON subscriptions(stripe_customer_id);",
-    "CREATE TABLE IF NOT EXISTS credit_packs (id TEXT PRIMARY KEY, name TEXT, credits INTEGER, price_usd REAL, stripe_product_id TEXT, stripe_price_id TEXT, ord INTEGER, active INTEGER DEFAULT 1);",
-    "CREATE TABLE IF NOT EXISTS credit_ledger (id TEXT PRIMARY KEY, tenant_id TEXT, delta INTEGER, balance INTEGER, reason TEXT, ref TEXT, at INTEGER);",
-    "CREATE INDEX IF NOT EXISTS idx_ledger_tenant ON credit_ledger(tenant_id, at);",
     "CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT);",
-    // Webhook idempotency — first insert of a Stripe event id wins; a
-    // redelivery is a no-op (changes = 0), so no handler double-applies.
-    "CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, at INTEGER);",
 
     // ── AI suite (SPEC §6) ─────────────────────────────────────────────
     "CREATE TABLE IF NOT EXISTS ai_models (id TEXT PRIMARY KEY, task TEXT, label TEXT, provider TEXT, input_rate REAL, output_rate REAL, unit_rate REAL, unit_kind TEXT, markup REAL, enabled INTEGER DEFAULT 1, is_default INTEGER DEFAULT 0);",
@@ -396,7 +385,7 @@ export const KOVA_SCHEMA: SchemaModule = {
 // Dependency order, and the app last. `tenant_settings` is created by tenancy;
 // the ALTERs that add billing's, AI's, email's and commerce's columns to it are
 // still in Kova's module below and move out with those packages.
-const gate = schemaGate([AUTH_SCHEMA, TENANCY_SCHEMA, KOVA_SCHEMA]);
+const gate = schemaGate([AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, KOVA_SCHEMA]);
 export const ensureSchema = (db: D1Database): Promise<void> => gate({ DB: db });
 
 /** Small helpers shared by stores — re-exported so every existing call site

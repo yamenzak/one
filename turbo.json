@@ -30,6 +30,7 @@
     "@4dl/core#build": { "outputs": [] },
     "@4dl/tenancy#build": { "outputs": [] },
     "@4dl/auth#build": { "outputs": [] },
+    "@4dl/billing#build": { "outputs": [] },
     "@kova/domain#build": { "outputs": [] },
     "@kova/protocol#build": { "outputs": [] },
     "@4dl/ui#build": { "outputs": [] },
