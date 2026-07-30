@@ -21,6 +21,7 @@
   "dependencies": {
     "@4dl/auth": "workspace:*",
     "@4dl/billing": "workspace:*",
+    "@4dl/commerce": "workspace:*",
     "@4dl/tenancy": "workspace:*"
   }
 }

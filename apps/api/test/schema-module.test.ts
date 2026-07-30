@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { schemaStatements } from "@4dl/core";
 import { AUTH_SCHEMA } from "@4dl/auth";
 import { BILLING_SCHEMA } from "@4dl/billing";
+import { COMMERCE_SCHEMA } from "@4dl/commerce";
 import { TENANCY_SCHEMA } from "@4dl/tenancy";
 import { KOVA_SCHEMA } from "../src/db.js";
 
@@ -59,13 +60,15 @@ describe("the Kova schema module", () => {
     // took Better Auth's eight plus `auth_logs` and `action_otps` (10 tables,
     // 2 indexes) into @4dl/auth; Stage 3 took plans, subscriptions,
     // credit_packs, credit_ledger and stripe_events (5 tables, 3 indexes) into
-    // @4dl/billing.
+    // @4dl/billing; Stage 4 took packages, client_subscriptions, redemption_codes,
+    // redemption_uses, promo_codes and addon_types (6 tables, 6 indexes,
+    // 4 ALTERs) into @4dl/commerce.
     const ddl = schemaStatements(KOVA_SCHEMA);
-    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(49);
-    expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(34);
-    expect(ddl.filter((s) => s.startsWith("CREATE UNIQUE INDEX"))).toHaveLength(8);
+    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(43);
+    expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(30);
+    expect(ddl.filter((s) => s.startsWith("CREATE UNIQUE INDEX"))).toHaveLength(6);
     expect(ddl.filter((s) => s.startsWith("DROP INDEX"))).toHaveLength(1);
-    expect(KOVA_SCHEMA.alters ?? []).toHaveLength(48);
+    expect(KOVA_SCHEMA.alters ?? []).toHaveLength(44);
   });
 
   it("names every backfill", () => {
@@ -82,7 +85,7 @@ describe("the composed schema", () => {
     // the moment one is edited. Ownership has to be exclusive.
     const tableOf = (s: string) => /CREATE TABLE IF NOT EXISTS "?(\w+)"?/.exec(s)?.[1];
     const owned = new Map<string, string>();
-    for (const m of [AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, KOVA_SCHEMA]) {
+    for (const m of [AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, COMMERCE_SCHEMA, KOVA_SCHEMA]) {
       for (const sql of schemaStatements(m)) {
         const t = tableOf(sql);
         if (!t) continue;
@@ -97,6 +100,8 @@ describe("the composed schema", () => {
     expect(owned.get("tenant_settings")).toBe("tenancy");
     expect(owned.get("subscriptions")).toBe("billing");
     expect(owned.get("credit_ledger")).toBe("billing");
+    expect(owned.get("packages")).toBe("commerce");
+    expect(owned.get("client_subscriptions")).toBe("commerce");
     expect(owned.get("clients")).toBe("kova");
   });
 
@@ -129,6 +134,17 @@ describe("the composed schema", () => {
     // that a scope declaration was copied without being read.
     const t = BILLING_SCHEMA.scoped?.tenantTables ?? [];
     expect(t).toEqual(["subscriptions", "credit_ledger"]);
+  });
+
+  it("declares the SUBJECT scope too, not just the tenant one", () => {
+    // Commerce is the first module with rows keyed on an individual rather than
+    // on a tenant, and the two cascades are different operations: closing a
+    // tenant clears everything, while one customer exercising erasure clears
+    // only theirs. `redemption_uses` has no tenant column at all — it is reached
+    // through its codes one way and through the subject the other.
+    expect(COMMERCE_SCHEMA.scoped?.subjectColumn).toBe("client_id");
+    expect(COMMERCE_SCHEMA.scoped?.subjectTables).toContain("redemption_uses");
+    expect(COMMERCE_SCHEMA.scoped?.tenantTables).not.toContain("redemption_uses");
   });
 
   it("declares what a tenant purge must clear", () => {

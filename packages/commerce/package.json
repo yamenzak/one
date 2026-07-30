@@ -1,0 +1,28 @@
+{
+  "name": "@4dl/commerce",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The access economy: selling timed access to capabilities. Budget math (queue, never sum), the customer-lapse ladder, website-native discount codes, and the tables behind them. No product vocabulary \u2014 see README.md.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./model": "./src/model.ts",
+    "./lapse": "./src/lapse-export.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@4dl/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@4dl/core": "workspace:*",
+    "@cloudflare/workers-types": "^4.20251001.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

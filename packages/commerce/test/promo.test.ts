@@ -27,15 +27,15 @@ describe("applyPromo", () => {
   });
 
   it("enforces per-package and per-client exclusivity", () => {
-    const scoped: PromoCode = { ...base, restrictedPackageId: "pkg_1", restrictedClientId: "cl_1" };
-    expect(applyPromo(1000, scoped, { ...ctx, targetId: "pkg_2", clientId: "cl_1" })).toEqual({ ok: false, reason: "wrong_package" });
-    expect(applyPromo(1000, scoped, { ...ctx, targetId: "pkg_1", clientId: "cl_2" })).toEqual({ ok: false, reason: "wrong_client" });
-    const r = applyPromo(1000, scoped, { ...ctx, targetId: "pkg_1", clientId: "cl_1" });
+    const scoped: PromoCode = { ...base, restrictedPackageId: "pkg_1", restrictedSubjectId: "cl_1" };
+    expect(applyPromo(1000, scoped, { ...ctx, targetId: "pkg_2", subjectId: "cl_1" })).toEqual({ ok: false, reason: "wrong_package" });
+    expect(applyPromo(1000, scoped, { ...ctx, targetId: "pkg_1", subjectId: "cl_2" })).toEqual({ ok: false, reason: "wrong_subject" });
+    const r = applyPromo(1000, scoped, { ...ctx, targetId: "pkg_1", subjectId: "cl_1" });
     expect(r.ok).toBe(true);
   });
 
   it("an unrestricted code applies regardless of package/client", () => {
-    const r = applyPromo(2000, base, { ...ctx, targetId: "anything", clientId: "anyone" });
+    const r = applyPromo(2000, base, { ...ctx, targetId: "anything", subjectId: "anyone" });
     expect(r).toEqual({ ok: true, discountCents: 400, finalCents: 1600 });
   });
 });

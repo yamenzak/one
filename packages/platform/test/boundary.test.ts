@@ -2,21 +2,18 @@ import { describe, expect, it } from "vitest";
 import { findBoundaryViolations, formatViolations, violationKeys } from "@4dl/core/boundary";
 
 /**
- * What is LEFT of `@4dl/platform`, and its remaining debt.
+ * ONE MODULE LEFT, and no debt.
  *
- * This package is now a holding pen, not a destination. `hosts`, `dcv` and
- * `standing` moved to `@4dl/tenancy` in Stage 1; `credits` goes to
- * `@4dl/billing` in Stage 3, `promo` to `@4dl/commerce` in Stage 4 and
- * `ai-mock` to `@4dl/ai` in Stage 5, at which point it is deleted.
+ * `hosts`/`dcv`/`standing` went to `@4dl/tenancy` (Stage 1), `credits` to
+ * `@4dl/billing` (Stage 3), `promo` to `@4dl/commerce` (Stage 4). Only `ai-mock`
+ * remains; it goes to `@4dl/ai` in Stage 5 and this package is then DELETED.
  *
- *   promo.ts:client  `PromoCode.restrictedClientId`, `PromoContext.clientId` and
- *                    the `wrong_client` failure. The math is generic — "this code
- *                    is reserved for one buyer" — and the noun is not. It becomes
- *                    `subjectId` when the file moves, so the rename is paid once.
+ * The empty list below was earned by the third test in this file. `promo.ts`
+ * carried an exemption, and when the file moved out the exemption stayed —
+ * "keeps the frozen list honest" failed on the next run, which is exactly what a
+ * ratchet is for: a stale entry is a lie that quietly widens the check.
  */
-const ALLOW: readonly string[] = [
-  "src/promo.ts:client",
-];
+const ALLOW: readonly string[] = [];
 
 const dir = new URL("..", import.meta.url).pathname;
 

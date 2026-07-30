@@ -76,7 +76,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
   // One-time packages check out inline (Payment Element) on the tenant's account.
   const [checkout, setCheckout] = useState<{ intent: CheckoutIntent; name: string; price: string } | null>(null);
   const [buyPromo, setBuyPromo] = useState("");
-  const promoMsg = (m: string): string => ({ not_found: "That promo code isn't valid.", inactive: "That code is no longer active.", expired: "That code has expired.", exhausted: "That code has been fully used.", wrong_package: "That code doesn't apply to this package.", wrong_client: "That code isn't available on your account." }[m.replace("promo_", "")] ?? "That promo code can't be applied.");
+  const promoMsg = (m: string): string => ({ not_found: "That promo code isn't valid.", inactive: "That code is no longer active.", expired: "That code has expired.", exhausted: "That code has been fully used.", wrong_package: "That code doesn't apply to this package.", wrong_subject: "That code isn't available on your account." }[m.replace("promo_", "")] ?? "That promo code can't be applied.");
   const buyInline = async (p: Pkg) => {
     if (buying) return;
     setBuying(true); setMsg(null);

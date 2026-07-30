@@ -26,6 +26,9 @@ importers:
       '@4dl/billing':
         specifier: workspace:*
         version: link:../../packages/billing
+      '@4dl/commerce':
+        specifier: workspace:*
+        version: link:../../packages/commerce
       '@4dl/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -217,6 +220,22 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)
 
+  packages/commerce:
+    dependencies:
+      '@4dl/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20251001.0
+        version: 4.20260702.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)
+
   packages/core:
     devDependencies:
       '@cloudflare/workers-types':
@@ -237,6 +256,9 @@ importers:
       '@4dl/billing':
         specifier: workspace:*
         version: link:../billing
+      '@4dl/commerce':
+        specifier: workspace:*
+        version: link:../commerce
       '@4dl/tenancy':
         specifier: workspace:*
         version: link:../tenancy

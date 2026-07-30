@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  LAPSE_ACTIONS, LAPSE_META, DEFAULT_LAPSE_POLICY, MIN_DESTRUCTIVE_GRACE_DAYS, MAX_GRACE_DAYS,
+  LAPSE_ACTIONS, DEFAULT_LAPSE_POLICY, DEFAULT_LAPSE_LABELS, MIN_DESTRUCTIVE_GRACE_DAYS, MAX_GRACE_DAYS,
   checkLapsePolicy, lapseActionDue, lapseStanding, isDestructive, type LapseAction,
 } from "../src/lapse.js";
 
@@ -13,19 +13,16 @@ describe("client lapse policy", () => {
     expect(checkLapsePolicy(DEFAULT_LAPSE_POLICY).ok).toBe(true);
   });
 
-  it("every action has copy, and only the destructive pair says so", () => {
-    for (const a of LAPSE_ACTIONS) {
-      const m = LAPSE_META[a];
-      expect(m.label, a).toBeTruthy();
-      expect(m.effect, a).toBeTruthy();
-      expect(m.destructive, a).toBe(isDestructive(a));
-    }
-    // The seat rule is the one people get wrong, so it must be stated on both
-    // actions that touch a seat — and in opposite directions.
-    expect(LAPSE_META.archive.seat).toMatch(/keeps/i);
-    expect(LAPSE_META.delete.seat).toMatch(/frees/i);
-    expect(LAPSE_META.read_only.seat).toBeNull();
-    expect(LAPSE_META.blocked.seat).toBeNull();
+  it("names every action, so a refusal is never about `undefined`", () => {
+    // The real COPY belongs to the app (see @kova/domain lapse.ts); what this
+    // package must guarantee is that an app which supplies none still produces a
+    // readable message rather than "undefined needs at least 14 days' grace".
+    for (const a of LAPSE_ACTIONS) expect(DEFAULT_LAPSE_LABELS(a), a).toBeTruthy();
+  });
+
+  it("puts the action's name in the refusal, in the app's words", () => {
+    const bad = checkLapsePolicy({ action: "delete", graceDays: 1 }, () => "Shred it");
+    expect(bad.error).toMatch(/^Shred it needs at least/);
   });
 
   it("refuses a destructive policy with too little grace", () => {

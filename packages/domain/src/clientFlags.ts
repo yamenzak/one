@@ -10,8 +10,8 @@
  *      Kova didn't sell them)
  */
 
-import type { Budget, BudgetFeature } from "./budgets.js";
-import { hasActiveBudget } from "./budgets.js";
+import type { Budget, BudgetFeature } from "@4dl/commerce/model";
+import { hasActiveBudget } from "@4dl/commerce/model";
 import type { Entitlements } from "./entitlements.js";
 
 export interface ClientFlags {

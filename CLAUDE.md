@@ -54,6 +54,9 @@ packages/
              # factory (email OTP + passkeys, org = tenant), the request identity,
              # the five-gate route-guard ENGINE, the grant algebra, staff seats,
              # step-up codes. Nothing here depends on billing. See its README.
+  commerce/  # @4dl/commerce — the ACCESS ECONOMY a tenant sells to its own
+             # customers: budgets (queue, never sum), the customer-lapse ladder,
+             # website-native discount codes. See its README.
   billing/   # @4dl/billing — the entitlement ENGINE (quotas/gates/grants, keys
              # injected), credit metering, the per-tenant credit Durable Object
              # (CreditLedgerDO — the class NAME is load-bearing), the Stripe
@@ -62,8 +65,8 @@ packages/
              # resolution + KV cache, custom domains (Cloudflare for SaaS + DCV),
              # the standing/host-gate model. `@4dl/tenancy/model` is the pure half
              # the browser may import. See its README.
-  platform/  # @4dl/platform — BEING DISSOLVED; only promo (→commerce) and
-             # ai-mock (→ai) remain. Do not add to it. See its README.
+  platform/  # @4dl/platform — ONE MODULE LEFT (ai-mock → @4dl/ai in Stage 5),
+             # then it is deleted. Do not add to it.
   domain/    # @kova/domain — Kova's pure logic (no I/O): nutrition/TDEE, body-fat,
              # activity/workout math, progress, plus the product registries
              # (entitlements, perms, budgets, notifications, features). Tested.
@@ -131,7 +134,8 @@ remote bindings without editing the config (this is what the E2E suite does).
   settle. Metering math and the DO base class are `@4dl/billing`; Kova's
   `TenantBillingDO` is a subclass and **its class name must never change** —
   `wrangler.jsonc` migrations bind it to durable storage.
-- **Access economy**: `commerce-routes.ts` + `@kova/domain` budgets.ts —
+- **Access economy**: `commerce-routes.ts` + `@4dl/commerce` (Kova's scopes are
+  bound in `@kova/domain` budgets.ts) —
   budgets carry `expiresAt`, days derive at read time, purchases QUEUE not sum,
   status reconciles lazily on read. No domain cron.
 - **Two flag systems** (don't merge): platform entitlements (tenant bought from
@@ -176,7 +180,8 @@ remote bindings without editing the config (this is what the E2E suite does).
     Stripe webhooks are exempt (blocking them would make suspension
     unrecoverable), and so are `/api/me/*` and `/api/tenant/close`: **leaving is
     always allowed.** Paying must be a way out, not the only one.
-  - **tenant → client** (`@kova/domain` lapse.ts): the STUDIO's own rule for a
+  - **tenant → client** (`@4dl/commerce` lapse.ts; Kova's copy in
+    `@kova/domain` lapse.ts): the STUDIO's own rule for a
     client whose package ran out — read_only / blocked / archive / delete after N
     days, in studio settings. `archive` KEEPS a client seat, `delete` FREES one.
     The destructive pair carries a 14-day floor, and the sweep **freezes this
@@ -224,14 +229,14 @@ an over-claim costs more than an under-claim. Verify before editing it.
 **The platform extraction is under way** — [docs/PLATFORM-EXTRACTION.md](docs/PLATFORM-EXTRACTION.md)
 is the audit and the staged plan for turning this repo from "Kova with two shared
 packages" into "the 4DL platform, on which Kova is the first app". Three more apps
-are queued. **Stages 0 (the mechanisms), 1 (`@4dl/tenancy`), 2 (`@4dl/auth`) and 3
-(`@4dl/billing`) are done**; stages 4–9 are not. Read it
+are queued. **Stages 0 (the mechanisms), 1 (`@4dl/tenancy`), 2 (`@4dl/auth`), 3
+(`@4dl/billing`) and 4 (`@4dl/commerce`) are done**; stages 5–9 are not. Read it
 before moving anything between `apps/api` and `packages/`.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured most recently, per package: **487 API + 212 domain + 73 tenancy +
-64 ui + 52 app + 21 billing + 15 platform + 14 core + 12 auth + 7 protocol**
-(957 total, 38 skipped).
+moves. Measured most recently, per package: **488 API + 197 domain + 73 tenancy +
+64 ui + 52 app + 25 commerce + 21 billing + 14 core + 12 auth + 9 platform +
+7 protocol** (962 total, 38 skipped).
 Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
 `@4dl/platform` to `@4dl/tenancy`; the split moves tests, it does not add any.
 The pricing and normalizer suites live
