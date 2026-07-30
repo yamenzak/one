@@ -24,7 +24,7 @@ let schemaReady: Promise<void> | null = null;
 // whole DDL block, so the new table is simply never created and every route
 // touching it 500s with "no such table". The E2E suite caught exactly that,
 // because it runs against a persisted .wrangler D1 rather than a clean one.
-const SCHEMA_VERSION = "2026-07-30b";
+const SCHEMA_VERSION = "2026-07-30c";
 
 export function ensureSchema(db: D1Database): Promise<void> {
   if (!schemaReady) {
@@ -346,6 +346,9 @@ async function applySchema(db: D1Database): Promise<void> {
           // refresh). `charges_enabled` is the truth gate for selling — a row's
           // mere existence no longer means the account can accept payments.
           "ALTER TABLE tenant_settings ADD COLUMN charges_enabled INTEGER DEFAULT 0",
+          // What the STUDIO does with a client whose access lapsed (@kova/domain
+          // lapse.ts). Absent ⇒ DEFAULT_LAPSE_POLICY, which loses nobody anything.
+          "ALTER TABLE tenant_settings ADD COLUMN lapse_json TEXT",
           "ALTER TABLE tenant_settings ADD COLUMN payouts_enabled INTEGER DEFAULT 0",
           "ALTER TABLE tenant_settings ADD COLUMN details_submitted INTEGER DEFAULT 0",
           // Per-tenant email provider (platform-metered | brevo | off).

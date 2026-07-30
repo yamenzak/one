@@ -12,7 +12,11 @@ import { sessionMiddleware, type AppEnv } from "./auth-context.js";
 import { routeGuard } from "./route-guard.js";
 import { ensureSchema, parseJson } from "./db.js";
 import { seedBilling, listPlans, getSubscription } from "./billing-store.js";
-import { resolveEntitlements, type NotifType } from "@kova/domain";
+import {
+  resolveEntitlements, type NotifType,
+  DEFAULT_LAPSE_POLICY, checkLapsePolicy, isDestructive, isFullyExpired, type LapsePolicy,
+} from "@kova/domain";
+import { DUNNING_DAYS } from "@4dl/platform";
 import { periodKey } from "./ids.js";
 import { contextRoutes } from "./context-routes.js";
 import { billingRoutes, adminRoutes } from "./billing-routes.js";
@@ -40,7 +44,8 @@ import { mediaLibraryRoutes } from "./media-library-routes.js";
 import { accountRoutes } from "./account-routes.js";
 import { tenantCloseRoutes } from "./tenant-close-routes.js";
 import { nuclearRoutes } from "./nuclear-routes.js";
-import { purgeTenant } from "./purge.js";
+import { purgeTenant, purgeClient } from "./purge.js";
+import { loadClientAccessRows, accessBudgetsOf, REPORTED_ACCESS_STATUSES } from "./client-flags.js";
 import { sessionRoutes, promoRoutes } from "./session-routes.js";
 import { domainRoutes, domainAdminRoutes } from "./domain-routes.js";
 import { onboardingRoutes } from "./onboarding-routes.js";
@@ -160,14 +165,118 @@ app.notFound((c) =>
   c.req.path.startsWith("/api/") ? c.json({ error: "not found" }, 404) : c.text("not found", 404),
 );
 
-const GRACE_DAYS = 7; // past_due → suspended
-const DELETE_DAYS = 30; // suspended → data wipe
+// The rungs live in @4dl/platform so the sweep, the gate and the UI copy cannot
+// drift; `DUNNING_DAYS` is days from `past_due_at`, not from the previous rung.
+const dunningCutoff = (nowMs: number, days: number) => new Date(nowMs - days * 86_400_000).toISOString();
 
 /**
- * Daily cron (00:10 UTC): idempotent monthly credit grants + the platform
- * dunning lifecycle (SPEC §7): past_due → (7d) suspended → (30d) deleted.
- * Comped tenants are exempt.
+ * Daily cron (00:10 UTC): idempotent monthly credit grants + BOTH access ladders.
+ *
+ *   Kova → tenant   past_due → (7d) read-only → (30d) blocked → (37d) PURGED.
+ *                   Anchored on `past_due_at`, which is written once
+ *                   (`COALESCE(past_due_at, ?)`) and cleared on recovery, so it
+ *                   is a stable clock rather than a per-transition timestamp.
+ *                   Comped tenants are exempt at every rung.
+ *   tenant → client each studio's own `lapse_json` policy, applied to clients
+ *                   whose package ran out. FROZEN while the studio itself is not
+ *                   in good standing — see the phase comment.
  */
+/**
+ * Tell every client of a studio that their data is days from deletion.
+ *
+ * They are not party to the invoice and cannot settle it, so the only thing this
+ * can honestly offer is the exit: export or delete on their own terms, now,
+ * rather than losing everything to someone else's lapse. Inbox rather than email
+ * because the mailer is tenant-configured and a lapsed studio's may not be.
+ */
+async function warnClientsOfPurge(env: Env, tenantId: string): Promise<void> {
+  const days = DUNNING_DAYS.purge - DUNNING_DAYS.blocked;
+  const rows = await env.DB
+    .prepare("SELECT user_id FROM clients WHERE tenant_id = ? AND user_id IS NOT NULL AND status != 'archived'")
+    .bind(tenantId)
+    .all<{ user_id: string }>()
+    .catch(() => ({ results: [] as { user_id: string }[] }));
+  for (const r of rows.results ?? []) {
+    await notify(env, {
+      tenantId,
+      userId: r.user_id,
+      type: "sub_expiring",
+      title: "This studio is closing",
+      message: `Your coach's studio has been suspended and everything in it — including your logs and history — is scheduled for deletion in ${days} days. You can delete your account yourself at any time.`,
+      link: "/profile",
+    }).catch(() => undefined);
+  }
+}
+
+/**
+ * Apply each studio's own lapse policy to its lapsed clients.
+ *
+ * Only `archive` and `delete` are performed here, because only they are EVENTS.
+ * `read_only` and `blocked` are STATES the client sits in for as long as the
+ * lapse lasts, and they are resolved live from the same policy — writing them
+ * into the record would make "renewed" a second migration instead of just a
+ * fact that changes.
+ */
+async function applyClientLapsePolicies(env: Env, nowMs: number): Promise<void> {
+  const nowIsoStr = new Date(nowMs).toISOString();
+  const tenants = await env.DB
+    .prepare(
+      // GOOD STANDING ONLY. A studio Kova suspended, blocked or is closing must
+      // not be deleting clients — the lapses are partly its own doing.
+      `SELECT s.tenant_id, t.lapse_json
+         FROM subscriptions s LEFT JOIN tenant_settings t ON t.tenant_id = s.tenant_id
+        WHERE s.status IN ('active','trialing','past_due')`,
+    )
+    .all<{ tenant_id: string; lapse_json: string | null }>()
+    .catch(() => ({ results: [] as { tenant_id: string; lapse_json: string | null }[] }));
+
+  for (const t of tenants.results ?? []) {
+    const policy = { ...DEFAULT_LAPSE_POLICY, ...parseJson<Partial<LapsePolicy>>(t.lapse_json, {}) } as LapsePolicy;
+    // A stored policy that no longer validates (a floor was raised under it) is
+    // ignored rather than applied — never destroy data on a rule we would refuse
+    // to accept today.
+    if (!checkLapsePolicy(policy).ok) continue;
+    if (!isDestructive(policy.action)) continue; // read_only / blocked resolve live
+
+    // Access lives in each subscription's `budgets_json` (expiresAt per budget,
+    // days derived at read time — CLAUDE.md, the access economy), NOT in a column,
+    // so lapse is decided by the SAME pure helpers the app and the routes use.
+    // Any SQL shortcut here would be a fourth opinion about who has access.
+    const cutoffIso = new Date(nowMs - policy.graceDays * 86_400_000).toISOString();
+    const candidates = await env.DB
+      .prepare("SELECT id FROM clients WHERE tenant_id = ? AND status = 'active'")
+      .bind(t.tenant_id)
+      .all<{ id: string }>()
+      .catch(() => ({ results: [] as { id: string }[] }));
+
+    const due: string[] = [];
+    for (const c of candidates.results ?? []) {
+      const rows = await loadClientAccessRows(env.DB, t.tenant_id, c.id, REPORTED_ACCESS_STATUSES);
+      // Never sold anything: not a lapse, just a client the studio has not
+      // charged. Deleting those would empty the roster of every free client.
+      if (rows.length === 0) continue;
+      const budgets = accessBudgetsOf(rows);
+      if (budgets.length === 0) continue;
+      // Still covered today, or lapsed but inside grace.
+      if (!isFullyExpired(budgets, nowIsoStr)) continue;
+      if (!isFullyExpired(budgets, cutoffIso)) continue;
+      due.push(c.id);
+    }
+
+    for (const id of due) {
+      if (policy.action === "delete") {
+        await purgeClient(env, t.tenant_id, id).catch((e) => console.error(`[dailySweep] lapse delete ${id}:`, e));
+      } else {
+        await env.DB
+          .prepare("UPDATE clients SET status = 'archived' WHERE id = ? AND tenant_id = ? AND status = 'active'")
+          .bind(id, t.tenant_id)
+          .run()
+          .catch((e) => console.error(`[dailySweep] lapse archive ${id}:`, e));
+      }
+    }
+  }
+}
+
 async function dailySweep(env: Env): Promise<void> {
   // Every phase below is independent, so each is isolated: this sweep is the only
   // thing that grants monthly credits, advances the dunning lifecycle, executes
@@ -207,47 +316,78 @@ async function dailySweep(env: Env): Promise<void> {
     }
   });
 
-  // 2) Dunning: past_due older than the grace window → suspended. Select first
-  //    so we can notify each owner that their studio just went dark.
-  await step("dunning-suspend", async () => {
-  const graceCutoff = new Date(nowMs - GRACE_DAYS * 86_400_000).toISOString();
-  const toSuspend = await env.DB.prepare(
-    "SELECT tenant_id FROM subscriptions WHERE status = 'past_due' AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?",
-  ).bind(graceCutoff).all<{ tenant_id: string }>().catch(() => ({ results: [] as { tenant_id: string }[] }));
-  await env.DB.prepare(
-    "UPDATE subscriptions SET status = 'suspended', suspend_at = ?, delete_at = ? WHERE status = 'past_due' AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?",
-  )
-    .bind(nowIso, new Date(nowMs + DELETE_DAYS * 86_400_000).toISOString(), graceCutoff)
-    .run()
-    .catch((e) => console.error("[dailySweep] dunning suspend UPDATE failed:", e));
-  for (const s of toSuspend.results ?? []) {
-    await notifyOwners(env, s.tenant_id, {
-      type: "billing_suspended",
-      message: "Your Kova subscription lapsed, so paid features are paused for you and your clients. Update your payment to restore everything.",
-      dedupeKey: `susp_${s.tenant_id}`,
-    });
-  }
+  // 2) Rung one — read-only. The studio and every client keep the whole app and
+  //    lose the ability to write to it. Owners are told; clients are not, because
+  //    at this point the studio can still fix it inside a day.
+  await step("dunning-read-only", async () => {
+    const cutoff = dunningCutoff(nowMs, DUNNING_DAYS.readOnly);
+    const rows = await env.DB.prepare(
+      "SELECT tenant_id FROM subscriptions WHERE status = 'past_due' AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?",
+    ).bind(cutoff).all<{ tenant_id: string }>().catch(() => ({ results: [] as { tenant_id: string }[] }));
+    await env.DB.prepare(
+      "UPDATE subscriptions SET status = 'suspended', suspend_at = ? WHERE status = 'past_due' AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?",
+    ).bind(nowIso, cutoff).run().catch((e) => console.error("[dailySweep] read-only UPDATE failed:", e));
+    for (const s of rows.results ?? []) {
+      await notifyOwners(env, s.tenant_id, {
+        type: "billing_suspended",
+        message: `Your Kova subscription lapsed, so your studio is read-only for you and your clients. Update your payment to restore everything. Access is withheld after ${DUNNING_DAYS.blocked} days.`,
+        dedupeKey: `susp_${s.tenant_id}`,
+      });
+    }
   });
 
-  // 3) Suspended past the delete window → drop to free (data-wipe hook lives
-  //    here; v1 resets the plan, retaining coaching data until wired).
-  await step("dunning-cancel", async () => {
-  const toCancel = await env.DB.prepare(
-    "SELECT tenant_id FROM subscriptions WHERE status = 'suspended' AND comp = 0 AND delete_at IS NOT NULL AND delete_at < ?",
-  ).bind(nowIso).all<{ tenant_id: string }>().catch(() => ({ results: [] as { tenant_id: string }[] }));
-  await env.DB.prepare(
-    "UPDATE subscriptions SET status = 'canceled', plan_id = 'free', suspend_at = NULL, delete_at = NULL WHERE status = 'suspended' AND comp = 0 AND delete_at IS NOT NULL AND delete_at < ?",
-  )
-    .bind(nowIso)
-    .run()
-    .catch((e) => console.error("[dailySweep] dunning cancel UPDATE failed:", e));
-  for (const s of toCancel.results ?? []) {
-    await notifyOwners(env, s.tenant_id, {
-      type: "billing_canceled",
-      message: "Your studio dropped to the free plan after non-payment. Resubscribe any time to bring back paid features.",
-      dedupeKey: `cancel_${s.tenant_id}`,
-    });
-  }
+  // 3) Rung two — blocked. The app itself is withheld. This rung did not exist:
+  //    a studio unpaid for a month looked exactly like one unpaid for a week, and
+  //    the only thing between a customer and permanent deletion was a banner.
+  await step("dunning-blocked", async () => {
+    const cutoff = dunningCutoff(nowMs, DUNNING_DAYS.blocked);
+    const rows = await env.DB.prepare(
+      "SELECT tenant_id FROM subscriptions WHERE status = 'suspended' AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?",
+    ).bind(cutoff).all<{ tenant_id: string }>().catch(() => ({ results: [] as { tenant_id: string }[] }));
+    await env.DB.prepare(
+      "UPDATE subscriptions SET status = 'blocked', delete_at = ? WHERE status = 'suspended' AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?",
+    )
+      .bind(new Date(nowMs + (DUNNING_DAYS.purge - DUNNING_DAYS.blocked) * 86_400_000).toISOString(), cutoff)
+      .run()
+      .catch((e) => console.error("[dailySweep] blocked UPDATE failed:", e));
+    for (const s of rows.results ?? []) {
+      await notifyOwners(env, s.tenant_id, {
+        type: "billing_suspended",
+        message: `Your studio is now closed to you and your clients. Everything is deleted permanently in ${DUNNING_DAYS.purge - DUNNING_DAYS.blocked} days unless you pay. You can still export or close your studio.`,
+        dedupeKey: `blocked_${s.tenant_id}`,
+      });
+      // The clients are told too. Their training history is about to be deleted
+      // over an invoice they had no part in and no way to settle — being told
+      // only by the coach who stopped paying is not good enough.
+      await warnClientsOfPurge(env, s.tenant_id).catch((e) => console.error("[dailySweep] purge warning failed:", e));
+    }
+  });
+
+  // 4) Rung three — PURGE. Tenant, members and every client record.
+  //
+  //    This is the rung the lifecycle documented and never performed: the old
+  //    phase set `status='canceled', plan_id='free'` and kept all coaching data
+  //    indefinitely, while the function's own header claimed "(30d) deleted".
+  //    It deletes now, 37 days after the first missed payment, after warnings at
+  //    days 7 and 30 to the owner and at day 30 to every client.
+  await step("dunning-purge", async () => {
+    const cutoff = dunningCutoff(nowMs, DUNNING_DAYS.purge);
+    const rows = await env.DB.prepare(
+      "SELECT tenant_id FROM subscriptions WHERE status = 'blocked' AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?",
+    ).bind(cutoff).all<{ tenant_id: string }>().catch(() => ({ results: [] as { tenant_id: string }[] }));
+    for (const s of rows.results ?? []) {
+      await purgeTenant(env, s.tenant_id).catch((e) => console.error(`[dailySweep] dunning purge failed for ${s.tenant_id}:`, e));
+    }
+  });
+
+  // 5) Each studio's OWN policy for a client whose package ran out.
+  //
+  //    Frozen unless the studio is in good standing. A studio Kova has suspended
+  //    or blocked has no working relationship with its clients — letting its
+  //    `delete` policy keep firing would have it quietly shredding a roster it
+  //    can no longer even see, for lapses caused by its own outage.
+  await step("client-lapse", async () => {
+    await applyClientLapsePolicies(env, nowMs);
   });
 
   // 4) Owner-initiated studio closures past their 7-day hold → full hard purge
