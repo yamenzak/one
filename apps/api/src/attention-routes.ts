@@ -58,9 +58,9 @@ export async function rollupAttention(db: D1Database, clients: AttentionClientRo
     // `clients` also pins each row to its client's OWN tenant, so a mis-tenanted
     // row can't feed this rollup (the batched read is per-roster, hence SQL here
     // rather than the per-client `loadClientAccessRows` helper).
-    db.prepare(`SELECT s.client_id, s.budgets_json FROM client_subscriptions s
-        JOIN clients c ON c.id = s.client_id AND c.tenant_id = s.tenant_id
-        WHERE s.client_id IN (${ph}) AND s.status IN (${REPORTED_ACCESS_STATUSES.map(() => "?").join(",")})`).bind(...ids, ...REPORTED_ACCESS_STATUSES).all<{ client_id: string; budgets_json: string | null }>(),
+    db.prepare(`SELECT s.subject_id, s.budgets_json FROM subject_subscriptions s
+        JOIN clients c ON c.id = s.subject_id AND c.tenant_id = s.tenant_id
+        WHERE s.subject_id IN (${ph}) AND s.status IN (${REPORTED_ACCESS_STATUSES.map(() => "?").join(",")})`).bind(...ids, ...REPORTED_ACCESS_STATUSES).all<{ subject_id: string; budgets_json: string | null }>(),
     db.prepare(`SELECT client_id, date_local, SUM(calories) AS cal, MAX(target_calories) AS tcal FROM food_entries WHERE client_id IN (${ph}) AND date_local >= ? GROUP BY client_id, date_local`).bind(...ids, since14).all<{ client_id: string; date_local: string; cal: number; tcal: number | null }>(),
     db.prepare(`SELECT DISTINCT client_id FROM workout_plans WHERE client_id IN (${ph}) AND status = 'published'`).bind(...ids).all<{ client_id: string }>(),
     db.prepare(`SELECT DISTINCT client_id FROM meal_plans WHERE client_id IN (${ph}) AND status = 'published'`).bind(...ids).all<{ client_id: string }>(),
@@ -82,7 +82,7 @@ export async function rollupAttention(db: D1Database, clients: AttentionClientRo
   // its own expiry, so the engine derives remaining days from the whole set).
   const subBy = new Map<string, Budget[]>();
   for (const r of subRows.results ?? []) {
-    subBy.set(r.client_id, [...(subBy.get(r.client_id) ?? []), ...parseJson<Budget[]>(r.budgets_json, [])]);
+    subBy.set(r.subject_id, [...(subBy.get(r.subject_id) ?? []), ...parseJson<Budget[]>(r.budgets_json, [])]);
   }
   const hasWorkout = new Set((wPlanRows.results ?? []).map((r) => r.client_id));
   const hasMeal = new Set((mPlanRows.results ?? []).map((r) => r.client_id));

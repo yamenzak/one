@@ -40,18 +40,28 @@ in a footgun note: redemption routes use the former.
 | **Scopes** | The package holds no scope list. `BudgetFeature` is `string` and the wildcard defaults to `"all"`; the concrete list is needed in exactly one place — expanding a wildcard — so the app binds it once (`@kova/domain` `budgets.ts`) rather than passing it at nine call sites. |
 | **Lapse copy** | `LAPSE_META` — "Keeps using a client seat" — is the app's wording, in the app. The package takes a `label` resolver. A settings screen that reads a shared package's copy is one that will one day say the wrong noun to a real customer. |
 
-## Naming, and one deliberate inconsistency
+## Naming
 
-The TypeScript says `subjectId`; the SQL still says `client_id`. That is not an
-oversight. A column name is **live data** — renaming it is a migration over every
-tenant's purchase history — and it buys nothing, because a second app compiles
-against the TypeScript, not against Kova's column labels. The boundary test
-carries one frozen entry for exactly this, with the reason written down, rather
-than silently excluding the file.
+`subject`, everywhere — TypeScript, SQL columns, table names, wire codes:
 
-`wrong_client` → `wrong_subject` *was* worth changing: it is a wire code the app
-maps to user-facing copy, so it would have been inherited by every future app's
-client. That rename landed in two screens alongside the package.
+| Was | Is |
+|---|---|
+| `client_subscriptions` | `subject_subscriptions` |
+| `client_id` | `subject_id` |
+| `restricted_client_id` | `restricted_subject_id` |
+| `wrong_client` (wire code) | `wrong_subject` |
+
+The SQL rename was frozen as debt at first — "a column name is live data,
+renaming it is a migration for a cosmetic gain" — which is true, and true only
+**after a deploy**. Kova had not deployed yet, so the window was open exactly
+once and it was paid rather than documented.
+
+⚠️ **The rename is not a migration.** Bumping `COMMERCE_SCHEMA.version` creates
+the new tables; nothing moves rows out of the old ones and nothing drops them. On
+a database that already held `client_subscriptions`, the old table survives with
+its data while the app reads the new, empty one. Correct for a fresh deploy,
+wrong for anything else — which is how the E2E suite found it, running against a
+persisted local D1 whose marker said commerce was already applied.
 
 ## The lapse ladder is not the dunning ladder
 

@@ -60,7 +60,7 @@ describe("the Kova schema module", () => {
     // took Better Auth's eight plus `auth_logs` and `action_otps` (10 tables,
     // 2 indexes) into @4dl/auth; Stage 3 took plans, subscriptions,
     // credit_packs, credit_ledger and stripe_events (5 tables, 3 indexes) into
-    // @4dl/billing; Stage 4 took packages, client_subscriptions, redemption_codes,
+    // @4dl/billing; Stage 4 took packages, subject_subscriptions, redemption_codes,
     // redemption_uses, promo_codes and addon_types (6 tables, 6 indexes,
     // 4 ALTERs) into @4dl/commerce.
     const ddl = schemaStatements(KOVA_SCHEMA);
@@ -101,7 +101,7 @@ describe("the composed schema", () => {
     expect(owned.get("subscriptions")).toBe("billing");
     expect(owned.get("credit_ledger")).toBe("billing");
     expect(owned.get("packages")).toBe("commerce");
-    expect(owned.get("client_subscriptions")).toBe("commerce");
+    expect(owned.get("subject_subscriptions")).toBe("commerce");
     expect(owned.get("clients")).toBe("kova");
   });
 
@@ -142,7 +142,7 @@ describe("the composed schema", () => {
     // tenant clears everything, while one customer exercising erasure clears
     // only theirs. `redemption_uses` has no tenant column at all — it is reached
     // through its codes one way and through the subject the other.
-    expect(COMMERCE_SCHEMA.scoped?.subjectColumn).toBe("client_id");
+    expect(COMMERCE_SCHEMA.scoped?.subjectColumn).toBe("subject_id");
     expect(COMMERCE_SCHEMA.scoped?.subjectTables).toContain("redemption_uses");
     expect(COMMERCE_SCHEMA.scoped?.tenantTables).not.toContain("redemption_uses");
   });

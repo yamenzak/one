@@ -420,8 +420,8 @@ async function reminderSweep(env: Env): Promise<void> {
   await ensureSchema(env.DB);
   const soon = Date.now() + 3 * 86_400_000;
   const subs = await env.DB.prepare(
-    "SELECT id, tenant_id, client_id, budgets_json, notes FROM client_subscriptions WHERE status = 'active'",
-  ).all<{ id: string; tenant_id: string; client_id: string; budgets_json: string | null; notes: string | null }>();
+    "SELECT id, tenant_id, subject_id, budgets_json, notes FROM subject_subscriptions WHERE status = 'active'",
+  ).all<{ id: string; tenant_id: string; subject_id: string; budgets_json: string | null; notes: string | null }>();
   const now = Date.now();
   for (const sub of subs.results ?? []) {
    try {
@@ -432,14 +432,14 @@ async function reminderSweep(env: Env): Promise<void> {
     if (!budgets.length) continue;
     const latest = Math.max(0, ...budgets.map((b) => Date.parse(b.expiresAt)));
     const nudge = async (type: NotifType, message: string, marker: string, vars?: Record<string, string | number>) => {
-      const client = await env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(sub.client_id).first<{ user_id: string | null }>();
+      const client = await env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(sub.subject_id).first<{ user_id: string | null }>();
       if (client?.user_id) {
         // Title + link (/shop) come from the type's record; `studioName` is auto.
         await notify(env, { tenantId: sub.tenant_id, userId: client.user_id, type, message, dedupeKey: `${marker}_${sub.id}`, vars });
       }
       // CAS on the notes we read: two overlapping sweeps (or a coach saving a
       // note) must not clobber each other's marker and re-nudge the client.
-      await env.DB.prepare("UPDATE client_subscriptions SET notes = ? WHERE id = ? AND notes IS ?").bind(`${notes} ${marker}`.trim(), sub.id, sub.notes ?? null).run().catch(() => undefined);
+      await env.DB.prepare("UPDATE subject_subscriptions SET notes = ? WHERE id = ? AND notes IS ?").bind(`${notes} ${marker}`.trim(), sub.id, sub.notes ?? null).run().catch(() => undefined);
     };
     // Fully lapsed → one "expired" nudge, and reconcile the status.
     if (latest > 0 && latest <= now) {
@@ -455,7 +455,7 @@ async function reminderSweep(env: Env): Promise<void> {
         // flips expired→active, the client has paid and is locked out of every
         // budget-gated capability until their next invoice.
         await env.DB
-          .prepare("UPDATE client_subscriptions SET status = 'expired' WHERE id = ? AND status = 'active' AND budgets_json IS ?")
+          .prepare("UPDATE subject_subscriptions SET status = 'expired' WHERE id = ? AND status = 'active' AND budgets_json IS ?")
           .bind(sub.id, sub.budgets_json ?? null)
           .run()
           .catch(() => undefined);

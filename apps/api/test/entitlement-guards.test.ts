@@ -108,7 +108,7 @@ describe("session add-on balances are enforced", () => {
     const addOnTypeId = ((await typeRes.json()) as { id: string }).id;
     const subId = `csub_${tag}`;
     await db
-      .prepare("INSERT INTO client_subscriptions (id, tenant_id, client_id, status, budgets_json, addons_json, started_at) VALUES (?, ?, ?, 'active', '[]', ?, ?)")
+      .prepare("INSERT INTO subject_subscriptions (id, tenant_id, subject_id, status, budgets_json, addons_json, started_at) VALUES (?, ?, ?, 'active', '[]', ?, ?)")
       .bind(subId, tenantId, clientId, JSON.stringify([{ addOnTypeId, quantityTotal: included, quantityUsed: 0 }]), new Date().toISOString())
       .run();
     return { db, owner, tenantId, clientId, addOnTypeId, subId };
@@ -125,7 +125,7 @@ describe("session add-on balances are enforced", () => {
     SELF.fetch(`${B}/api/sessions/${id}`, { method: "PATCH", headers: J(owner), body: JSON.stringify({ status }) });
 
   const usedUnits = async (db: D1Database, subId: string, addOnTypeId: string): Promise<number> => {
-    const row = (await db.prepare("SELECT addons_json FROM client_subscriptions WHERE id = ?").bind(subId).first<{ addons_json: string }>())!;
+    const row = (await db.prepare("SELECT addons_json FROM subject_subscriptions WHERE id = ?").bind(subId).first<{ addons_json: string }>())!;
     return (JSON.parse(row.addons_json) as { addOnTypeId: string; quantityUsed: number }[]).find((b) => b.addOnTypeId === addOnTypeId)!.quantityUsed;
   };
 
@@ -210,7 +210,7 @@ describe("session add-on balances are enforced", () => {
     const id = ((await (await book(owner, clientId, addOnTypeId, "2026-09-01T10:00:00Z")).json()) as { id: string }).id;
     // The balance entry disappears (a package rewrite / bad migration). Before the
     // fix the completion silently no-op'd the ledger and reported success.
-    await db.prepare("UPDATE client_subscriptions SET addons_json = '[]' WHERE id = ?").bind(subId).run();
+    await db.prepare("UPDATE subject_subscriptions SET addons_json = '[]' WHERE id = ?").bind(subId).run();
     const res = await patch(owner, id, "completed");
     expect(res.status).toBe(409);
     expect((await db.prepare("SELECT status FROM trainer_sessions WHERE id = ?").bind(id).first<{ status: string }>())!.status).toBe("scheduled");

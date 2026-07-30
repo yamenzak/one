@@ -15,7 +15,7 @@ interface PromoRow {
   percent_off: number | null;
   amount_off_cents: number | null;
   restricted_package_id: string | null;
-  restricted_client_id: string | null;
+  restricted_subject_id: string | null;
   max_redemptions: number | null;
   redemption_count: number;
   expires_at: string | null;
@@ -27,9 +27,9 @@ const toDomain = (r: PromoRow): PromoCode => ({
   percentOff: r.percent_off,
   amountOffCents: r.amount_off_cents,
   restrictedPackageId: r.restricted_package_id,
-  // `restricted_client_id` is the COLUMN (live data, not renamed); the package
+  // `restricted_subject_id` is the COLUMN (live data, not renamed); the package
   // calls the buyer a subject, because a warehouse app has no clients.
-  restrictedSubjectId: r.restricted_client_id,
+  restrictedSubjectId: r.restricted_subject_id,
   maxRedemptions: r.max_redemptions,
   redemptionCount: r.redemption_count,
   expiresAt: r.expires_at,

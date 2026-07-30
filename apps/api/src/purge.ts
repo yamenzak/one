@@ -26,8 +26,8 @@ import { DEFAULT_PLANS } from "./billing-store.js";
  *  Verified against db.ts: this is EVERY table with a literal `client_id` column.
  *  Deliberately absent (they reference a client by a *different* column and are
  *  tenant-owned assets, so deleting the row would destroy the studio's property):
- *  `packages.restricted_client_id`, `redemption_codes.restricted_client_id` +
- *  `used_by_json`, `promo_codes.restricted_client_id`, `resources.assigned_json`,
+ *  `packages.restricted_subject_id`, `redemption_codes.restricted_subject_id` +
+ *  `used_by_json`, `promo_codes.restricted_subject_id`, `resources.assigned_json`,
  *  and `notifications.link` (`/clients/<id>` deep-links). Those keep a dangling
  *  reference after a purge; each one reads as "no longer applies" rather than
  *  leaking data (an offer restricted to a deleted client is unreachable), so they
@@ -36,10 +36,22 @@ const CLIENT_TABLES = [
   "client_goals", "client_trainers", "workout_plans", "swap_requests", "meal_plans",
   "meal_arrangements", "exercise_logs", "exercise_prs", "activity_logs", "food_entries",
   "water_logs", "sleep_logs", "mood_logs", "steps_logs", "measurements", "body_scans", "check_ins",
-  "fasting_sessions", "supplements", "supplement_logs", "lab_tests", "client_subscriptions",
-  "redemption_uses", "trainer_sessions", "audit_log", "plan_variants", "ai_generations",
+  "fasting_sessions", "supplements", "supplement_logs", "lab_tests",
+  "trainer_sessions", "audit_log", "plan_variants", "ai_generations",
   "media_assets",
 ] as const;
+
+/**
+ * Commerce's tables key the buyer as `subject_id`, not `client_id`.
+ *
+ * They came out of the list above when `@4dl/commerce` renamed its columns: the
+ * loop below interpolates the table but hard-codes the COLUMN, so leaving them
+ * in would have issued `DELETE FROM subject_subscriptions WHERE client_id = ?`
+ * — a "no such column" that `run()` swallows, leaving a purged client's
+ * purchase history behind with nothing reported. Stage 7 removes both lists by
+ * deriving the cascade from each module's `scoped` declaration.
+ */
+const SUBJECT_TABLES = ["subject_subscriptions", "redemption_uses"] as const;
 
 /** Tables that carry a `tenant_id` — everything a studio owns (plus the two by
  *  their own keys, handled separately: redemption_uses, member/org). */
@@ -50,7 +62,7 @@ const TENANT_TABLES = [
   "meal_arrangements", "exercise_logs", "exercise_prs", "activity_logs", "food_entries",
   "water_logs", "sleep_logs", "mood_logs", "steps_logs", "measurements", "body_scans", "tts_cues",
   "check_ins", "fasting_sessions", "supplements", "supplement_logs", "lab_tests", "packages",
-  "client_subscriptions", "redemption_codes", "promo_codes", "addon_types", "trainer_sessions",
+  "subject_subscriptions", "redemption_codes", "promo_codes", "addon_types", "trainer_sessions",
   "email_templates", "resources", "notifications", "tenant_settings", "tenant_domains",
   "audit_log", "plan_variants", "media_assets",
 ] as const;
@@ -112,7 +124,7 @@ function mediaKeyFromUrl(url: string | null | undefined, tenantId: string): stri
  *     at it. Now swept via the ledger, by key, wherever it lives.
  */
 export async function purgeClient(env: Env, tenantId: string, clientId: string): Promise<ClientPurgeResult> {
-  // Stop their card first. `client_subscriptions` rows are about to be deleted, so
+  // Stop their card first. `subject_subscriptions` rows are about to be deleted, so
   // after this point there is nothing left that names the Stripe subscription and
   // it would bill on forever, unreachable from any surface we own.
   await cancelClientStripe(env, tenantId, clientId);
@@ -156,6 +168,7 @@ export async function purgeClient(env: Env, tenantId: string, clientId: string):
   objects += strays.size;
 
   for (const table of CLIENT_TABLES) await run(env.DB, `DELETE FROM ${table} WHERE client_id = ?`, clientId);
+  for (const table of SUBJECT_TABLES) await run(env.DB, `DELETE FROM ${table} WHERE subject_id = ?`, clientId);
   await run(env.DB, "DELETE FROM clients WHERE id = ?", clientId);
 
   // A deleted client must also lose their way in: without this the `member` row
@@ -227,8 +240,8 @@ async function cancelClientStripe(env: Env, tenantId: string, clientId?: string)
 
     const rows = (await env.DB
       .prepare(
-        "SELECT id, stripe_sub_id FROM client_subscriptions WHERE tenant_id = ? AND stripe_sub_id IS NOT NULL" +
-          (clientId ? " AND client_id = ?" : ""),
+        "SELECT id, stripe_sub_id FROM subject_subscriptions WHERE tenant_id = ? AND stripe_sub_id IS NOT NULL" +
+          (clientId ? " AND subject_id = ?" : ""),
       )
       .bind(...(clientId ? [tenantId, clientId] : [tenantId]))
       .all<{ id: string; stripe_sub_id: string }>()

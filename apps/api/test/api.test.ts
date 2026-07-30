@@ -321,12 +321,12 @@ describe("connect rail — webhook idempotency + grant", () => {
 
     const r1 = await post();
     expect(r1.status).toBe(200);
-    const n1 = (await db.prepare("SELECT COUNT(*) AS n FROM client_subscriptions WHERE client_id = ? AND status = 'active'").bind(client.id).first<{ n: number }>())!.n;
+    const n1 = (await db.prepare("SELECT COUNT(*) AS n FROM subject_subscriptions WHERE subject_id = ? AND status = 'active'").bind(client.id).first<{ n: number }>())!.n;
     expect(n1).toBe(1); // granted
 
     const r2 = await post();
     expect((await r2.json() as { duplicate?: boolean }).duplicate).toBe(true); // dedup fired
-    const n2 = (await db.prepare("SELECT COUNT(*) AS n FROM client_subscriptions WHERE client_id = ? AND status = 'active'").bind(client.id).first<{ n: number }>())!.n;
+    const n2 = (await db.prepare("SELECT COUNT(*) AS n FROM subject_subscriptions WHERE subject_id = ? AND status = 'active'").bind(client.id).first<{ n: number }>())!.n;
     expect(n2).toBe(1); // no double grant
 
     // A bad signature is rejected outright.
@@ -3226,19 +3226,19 @@ describe("installments — limited-term subscription (per-cycle unlock)", () => 
 
     // Period one via installment-mode checkout (N=3).
     await post(JSON.stringify({ id: "evt_inst_create", account: "acct_install_1", type: "checkout.session.completed", data: { object: { id: "cs_inst_1", mode: "subscription", subscription: subId, metadata: { kova_tenant: tenantId, kova_client: "cl_install_1", kova_package: pkgId, kova_installments: "3" } } } }));
-    let row = (await db.prepare("SELECT installments_total, installments_paid, payment_status, stripe_sub_id, budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ installments_total: number; installments_paid: number; payment_status: string; stripe_sub_id: string | null; budgets_json: string }>())!;
+    let row = (await db.prepare("SELECT installments_total, installments_paid, payment_status, stripe_sub_id, budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ installments_total: number; installments_paid: number; payment_status: string; stripe_sub_id: string | null; budgets_json: string }>())!;
     expect([row.installments_total, row.installments_paid]).toEqual([3, 1]);
     const cycleBudgets = JSON.parse(row.budgets_json).length; // 'all' → workout+meal = 2 per cycle
 
     // Cycle two (still billing, so keyed by the Stripe sub id).
     await post(JSON.stringify({ id: "evt_inst_c2", account: "acct_install_1", type: "invoice.paid", data: { object: { subscription: subId, billing_reason: "subscription_cycle" } } }));
-    row = (await db.prepare("SELECT installments_total, installments_paid, payment_status, stripe_sub_id, budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first())!;
+    row = (await db.prepare("SELECT installments_total, installments_paid, payment_status, stripe_sub_id, budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first())!;
     expect(row.installments_paid).toBe(2);
     expect(JSON.parse(row.budgets_json).length).toBe(cycleBudgets * 2); // another period queued
 
     // Final cycle → completed, billing stopped (stripe_sub_id cleared).
     await post(JSON.stringify({ id: "evt_inst_c3", account: "acct_install_1", type: "invoice.paid", data: { object: { subscription: subId, billing_reason: "subscription_cycle" } } }));
-    row = (await db.prepare("SELECT installments_paid, payment_status, stripe_sub_id, budgets_json FROM client_subscriptions WHERE package_id = ? LIMIT 1").bind(pkgId).first())!;
+    row = (await db.prepare("SELECT installments_paid, payment_status, stripe_sub_id, budgets_json FROM subject_subscriptions WHERE package_id = ? LIMIT 1").bind(pkgId).first())!;
     expect(row.installments_paid).toBe(3);
     expect(row.payment_status).toBe("completed");
     expect(row.stripe_sub_id).toBeNull();
@@ -3332,7 +3332,7 @@ describe("package lifecycle + redemption scoping", () => {
     const a = await mk("LifeA");
     const b = await mk("LifeB");
     const mkPkg = async (id: string, visibility: string, restricted: string | null) =>
-      db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, visibility, restricted_client_id, active, created_at) VALUES (?, ?, ?, 4000, ?, 'usd', ?, ?, 1, ?)")
+      db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, visibility, restricted_subject_id, active, created_at) VALUES (?, ?, ?, 4000, ?, 'usd', ?, ?, 1, ?)")
         .bind(id, ctx.active.tenantId, id, JSON.stringify([{ feature: "all", days: 30 }]), visibility, restricted, new Date().toISOString()).run();
 
     // A `private` package is grant-only — not client-purchasable.
@@ -3939,7 +3939,7 @@ describe("row-level scope on client-owned rows (round-4 audit)", () => {
     });
     const addons = JSON.stringify([{ addOnTypeId: "aot_consult", quantity: 4, quantityUsed: 0 }]);
     const seed = async (id: string, clientId: string, subId: string) => {
-      await db.prepare("INSERT INTO client_subscriptions (id, tenant_id, client_id, status, addons_json, started_at) VALUES (?, ?, ?, 'active', ?, ?)")
+      await db.prepare("INSERT INTO subject_subscriptions (id, tenant_id, subject_id, status, addons_json, started_at) VALUES (?, ?, ?, 'active', ?, ?)")
         .bind(subId, tenantId, clientId, addons, new Date().toISOString()).run();
       await db.prepare("INSERT INTO trainer_sessions (id, tenant_id, client_id, subscription_id, addon_type_id, scheduled_at, duration_minutes, status, notes, created_at) VALUES (?, ?, ?, ?, 'aot_consult', '2026-08-01T10:00:00Z', 30, 'scheduled', 'coach-only note', ?)")
         .bind(id, tenantId, clientId, subId, new Date().toISOString()).run();
@@ -3952,14 +3952,14 @@ describe("row-level scope on client-owned rows (round-4 audit)", () => {
     // Completing burns one of the victim's paid units — must be refused outright.
     expect((await patch("sess_r4_b", "completed")).status).toBe(403);
     expect((await db.prepare("SELECT status FROM trainer_sessions WHERE id = 'sess_r4_b'").first<{ status: string }>())!.status).toBe("scheduled");
-    const bal = (await db.prepare("SELECT addons_json FROM client_subscriptions WHERE id = 'csub_r4_b'").first<{ addons_json: string }>())!;
+    const bal = (await db.prepare("SELECT addons_json FROM subject_subscriptions WHERE id = 'csub_r4_b'").first<{ addons_json: string }>())!;
     expect(JSON.parse(bal.addons_json)[0].quantityUsed).toBe(0); // no unit consumed
     // Cancelling would also fire a cancellation notification at them.
     expect((await patch("sess_r4_b", "cancelled")).status).toBe(403);
 
     // Assigned client: the transition works and consumes exactly one unit.
     expect((await patch("sess_r4_a", "completed")).status).toBe(200);
-    const okBal = (await db.prepare("SELECT addons_json FROM client_subscriptions WHERE id = 'csub_r4_a'").first<{ addons_json: string }>())!;
+    const okBal = (await db.prepare("SELECT addons_json FROM subject_subscriptions WHERE id = 'csub_r4_a'").first<{ addons_json: string }>())!;
     expect(JSON.parse(okBal.addons_json)[0].quantityUsed).toBe(1);
 
     // GET /api/sessions with no clientId (the front-desk schedule) is roster-scoped:
@@ -4181,7 +4181,7 @@ describe("client flags union across concurrent access rows", () => {
     // subscription owns its own row; the one-time purchase sits in the
     // non-recurring row and is NEWER (so "newest row wins" would pick it).
     const mk = (id: string, pkg: string, budgets: unknown, flags: string, subId: string | null, startedAt: string) =>
-      db.prepare("INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, flags_json, source, stripe_sub_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, 'stripe', ?, ?, ?)")
+      db.prepare("INSERT INTO subject_subscriptions (id, tenant_id, subject_id, package_id, status, payment_status, budgets_json, flags_json, source, stripe_sub_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, 'stripe', ?, ?, ?)")
         .bind(id, tenantId, client.id, pkg, JSON.stringify(budgets), flags, subId, startedAt, startedAt).run();
     await mk("csub_union_memb", "pkg_union_memb", [{ feature: "all", daysTotal: 30, startedAt: iso(-10), expiresAt: iso(20) }], JSON.stringify({ canTrackFasting: true }), "sub_union_1", iso(-10));
     await mk("csub_union_ot", "pkg_union_ot", [{ feature: "workout", daysTotal: 30, startedAt: iso(-1), expiresAt: iso(29) }], JSON.stringify({ canTrackFasting: false }), null, iso(-1));
@@ -4224,7 +4224,7 @@ describe("connect rail — Basil-shaped invoices still renew", () => {
 
     // Period one (subscription-mode checkout).
     await post(JSON.stringify({ id: "evt_basil_create", account: "acct_basil_1", type: "checkout.session.completed", data: { object: { id: "cs_basil_1", mode: "subscription", subscription: subId, metadata: { kova_tenant: tenantId, kova_client: "cl_basil_1", kova_package: pkgId } } } }));
-    const budgetsAfterCreate = JSON.parse((await db.prepare("SELECT budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
+    const budgetsAfterCreate = JSON.parse((await db.prepare("SELECT budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
     expect(budgetsAfterCreate).toBeGreaterThan(0);
 
     // A Basil-shaped renewal: NO `subscription` at the invoice root.
@@ -4235,7 +4235,7 @@ describe("connect rail — Basil-shaped invoices still renew", () => {
       data: { object: { id: "in_basil_1", billing_reason: "subscription_cycle", parent: { type: "subscription_details", subscription_details: { subscription: subId } }, lines: { data: [{ id: "il_1" }] } } },
     });
     expect((await post(basil)).status).toBe(200);
-    const after = JSON.parse((await db.prepare("SELECT budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
+    const after = JSON.parse((await db.prepare("SELECT budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
     expect(after).toBeGreaterThan(budgetsAfterCreate); // another period queued
   });
 
@@ -4249,7 +4249,7 @@ describe("connect rail — Basil-shaped invoices still renew", () => {
       .bind(pkgId, tenantId, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
     await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_basil_2', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_basil_2'").bind(tenantId, new Date().toISOString()).run();
     await post(JSON.stringify({ id: "evt_basil2_create", account: "acct_basil_2", type: "checkout.session.completed", data: { object: { id: "cs_basil_2", mode: "subscription", subscription: subId, metadata: { kova_tenant: tenantId, kova_client: "cl_basil_2", kova_package: pkgId } } } }));
-    const before = JSON.parse((await db.prepare("SELECT budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
+    const before = JSON.parse((await db.prepare("SELECT budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
 
     const lineOnly = JSON.stringify({
       id: "evt_basil2_cycle",
@@ -4258,7 +4258,7 @@ describe("connect rail — Basil-shaped invoices still renew", () => {
       data: { object: { id: "in_basil_2", billing_reason: "subscription_cycle", lines: { data: [{ id: "il_2", parent: { subscription_item_details: { subscription: subId } } }] } } },
     });
     expect((await post(lineOnly)).status).toBe(200);
-    const after = JSON.parse((await db.prepare("SELECT budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
+    const after = JSON.parse((await db.prepare("SELECT budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
     expect(after).toBeGreaterThan(before);
   });
 });

@@ -321,7 +321,7 @@ export const stripeRoutes = new Hono<AppEnv>()
     if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
     // The account must actually be able to accept charges (onboarding done).
     if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
-    const pkg = await c.env.DB.prepare("SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_client_id: string | null; once_per_customer: number | null }>();
+    const pkg = await c.env.DB.prepare("SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_subject_id: string | null; once_per_customer: number | null }>();
     if (!pkg || purchaseBlocked(pkg, access.client.id)) return c.json({ error: "package not found" }, 404);
     // The Packages editor offers a `once_per_customer` toggle, so it must actually
     // bind on the PAID paths too — until now only the free staff grant checked it,
@@ -400,7 +400,7 @@ export const stripeRoutes = new Hono<AppEnv>()
     const settings = await c.env.DB.prepare("SELECT stripe_account_id, charges_enabled FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null }>();
     if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
     if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
-    const pkg = await c.env.DB.prepare("SELECT id, name, one_time_price_cents, monthly_price_cents, installment_months, currency, visibility, restricted_client_id, once_per_customer FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_client_id: string | null; once_per_customer: number | null }>();
+    const pkg = await c.env.DB.prepare("SELECT id, name, one_time_price_cents, monthly_price_cents, installment_months, currency, visibility, restricted_subject_id, once_per_customer FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_subject_id: string | null; once_per_customer: number | null }>();
     if (!pkg || purchaseBlocked(pkg, access.client.id)) return c.json({ error: "package not found" }, 404);
     // Same once-per-customer rule as the hosted path (and re-checked in
     // grantClientPackage, the last gate before days are written).
@@ -483,8 +483,8 @@ export const stripeRoutes = new Hono<AppEnv>()
     // packages, so "cancel the newest" would silently cancel the wrong one),
     // else the most recent auto-renewing one.
     const sub = body.data.subscriptionId
-      ? await c.env.DB.prepare("SELECT id, stripe_sub_id FROM client_subscriptions WHERE id = ? AND client_id = ? AND status = 'active' AND stripe_sub_id IS NOT NULL").bind(body.data.subscriptionId, access.client.id).first<{ id: string; stripe_sub_id: string | null }>()
-      : await c.env.DB.prepare("SELECT id, stripe_sub_id FROM client_subscriptions WHERE client_id = ? AND status = 'active' AND stripe_sub_id IS NOT NULL ORDER BY started_at DESC LIMIT 1").bind(access.client.id).first<{ id: string; stripe_sub_id: string | null }>();
+      ? await c.env.DB.prepare("SELECT id, stripe_sub_id FROM subject_subscriptions WHERE id = ? AND subject_id = ? AND status = 'active' AND stripe_sub_id IS NOT NULL").bind(body.data.subscriptionId, access.client.id).first<{ id: string; stripe_sub_id: string | null }>()
+      : await c.env.DB.prepare("SELECT id, stripe_sub_id FROM subject_subscriptions WHERE subject_id = ? AND status = 'active' AND stripe_sub_id IS NOT NULL ORDER BY started_at DESC LIMIT 1").bind(access.client.id).first<{ id: string; stripe_sub_id: string | null }>();
     if (!sub?.stripe_sub_id) return c.json({ error: "no auto-renewing subscription" }, 404);
     const settings = await c.env.DB.prepare("SELECT stripe_account_id FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null }>();
     const cfg = await stripeConfig(c.env.DB);
@@ -501,7 +501,7 @@ export const stripeRoutes = new Hono<AppEnv>()
       if (!canceled) return c.json({ error: "could not cancel subscription — please try again" }, 502);
     }
     // Clear the renewal marker; access continues until the current budget lapses.
-    await c.env.DB.prepare("UPDATE client_subscriptions SET stripe_sub_id = NULL, payment_status = 'canceled', updated_at = ? WHERE id = ?").bind(nowIso(), sub.id).run();
+    await c.env.DB.prepare("UPDATE subject_subscriptions SET stripe_sub_id = NULL, payment_status = 'canceled', updated_at = ? WHERE id = ?").bind(nowIso(), sub.id).run();
     return c.json({ ok: true });
   })
 
@@ -585,10 +585,10 @@ export const stripeRoutes = new Hono<AppEnv>()
       // card. Access still runs until the current budget lapses (grace by design).
       const failedSubId = invoiceSubscriptionId(event.data.object);
       if (failedSubId) {
-        const row = await c.env.DB.prepare("SELECT id, tenant_id, client_id FROM client_subscriptions WHERE stripe_sub_id = ? LIMIT 1").bind(failedSubId).first<{ id: string; tenant_id: string; client_id: string }>();
+        const row = await c.env.DB.prepare("SELECT id, tenant_id, subject_id FROM subject_subscriptions WHERE stripe_sub_id = ? LIMIT 1").bind(failedSubId).first<{ id: string; tenant_id: string; subject_id: string }>();
         if (row) {
-          await c.env.DB.prepare("UPDATE client_subscriptions SET payment_status = 'past_due', updated_at = ? WHERE id = ?").bind(nowIso(), row.id).run();
-          const cl = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null }>();
+          await c.env.DB.prepare("UPDATE subject_subscriptions SET payment_status = 'past_due', updated_at = ? WHERE id = ?").bind(nowIso(), row.id).run();
+          const cl = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.subject_id).first<{ user_id: string | null }>();
           if (cl?.user_id) await notify(c.env, { tenantId: row.tenant_id, userId: cl.user_id, type: "sub_payment_failed", message: "Update your card to keep your plan from pausing.", dedupeKey: `pf_${row.id}` });
         }
       }
@@ -596,7 +596,7 @@ export const stripeRoutes = new Hono<AppEnv>()
       // Auto-renew ended (client canceled or Stripe gave up). No more top-ups;
       // the current budget simply runs out. Clear the renewal marker.
       const subObj = event.data.object as { id?: string };
-      if (subObj.id) await c.env.DB.prepare("UPDATE client_subscriptions SET stripe_sub_id = NULL, payment_status = 'canceled', updated_at = ? WHERE stripe_sub_id = ?").bind(nowIso(), subObj.id).run();
+      if (subObj.id) await c.env.DB.prepare("UPDATE subject_subscriptions SET stripe_sub_id = NULL, payment_status = 'canceled', updated_at = ? WHERE stripe_sub_id = ?").bind(nowIso(), subObj.id).run();
     } else if (event.type === "account.updated") {
       // Onboarding / capability changes for a connected account.
       const a = event.data.object as { id?: string; charges_enabled?: boolean; payouts_enabled?: boolean; details_submitted?: boolean };
@@ -630,9 +630,9 @@ export const stripeRoutes = new Hono<AppEnv>()
  *  packages are public; a client_specific package only its own client; `private`
  *  packages are grant-only (staff assigns them, never client-purchasable). A
  *  blocked package reads as "not found" at checkout — no oracle. */
-function purchaseBlocked(pkg: { visibility: string; restricted_client_id: string | null }, clientId: string): boolean {
+function purchaseBlocked(pkg: { visibility: string; restricted_subject_id: string | null }, clientId: string): boolean {
   if (pkg.visibility === "marketplace") return false;
-  if (pkg.visibility === "client_specific") return !(pkg.restricted_client_id && pkg.restricted_client_id === clientId);
+  if (pkg.visibility === "client_specific") return !(pkg.restricted_subject_id && pkg.restricted_subject_id === clientId);
   return true;
 }
 
@@ -1364,7 +1364,7 @@ async function cancelInstallmentSub(db: D1Database, tenantId: string, stripeSubI
       .then(() => true)
       .catch(() => false);
   }
-  if (canceled) await db.prepare("UPDATE client_subscriptions SET stripe_sub_id = NULL WHERE id = ?").bind(rowId).run();
+  if (canceled) await db.prepare("UPDATE subject_subscriptions SET stripe_sub_id = NULL WHERE id = ?").bind(rowId).run();
 }
 
 /**
@@ -1379,8 +1379,8 @@ async function cancelInstallmentSub(db: D1Database, tenantId: string, stripeSubI
  */
 async function hasPriorPurchase(db: D1Database, clientId: string, packageId: string, excludeSubId: string | null = null): Promise<boolean> {
   const row = excludeSubId
-    ? await db.prepare("SELECT 1 AS x FROM client_subscriptions WHERE client_id = ? AND package_id = ? AND (stripe_sub_id IS NULL OR stripe_sub_id <> ?) LIMIT 1").bind(clientId, packageId, excludeSubId).first()
-    : await db.prepare("SELECT 1 AS x FROM client_subscriptions WHERE client_id = ? AND package_id = ? LIMIT 1").bind(clientId, packageId).first();
+    ? await db.prepare("SELECT 1 AS x FROM subject_subscriptions WHERE subject_id = ? AND package_id = ? AND (stripe_sub_id IS NULL OR stripe_sub_id <> ?) LIMIT 1").bind(clientId, packageId, excludeSubId).first()
+    : await db.prepare("SELECT 1 AS x FROM subject_subscriptions WHERE subject_id = ? AND package_id = ? LIMIT 1").bind(clientId, packageId).first();
   return !!row;
 }
 
@@ -1415,7 +1415,7 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
   // pre-existing active row would drop the new sub id (COALESCE) and renew off
   // the wrong package — the client would be charged monthly with no top-up.
   if (subId) {
-    const bySub = await db.prepare("SELECT id FROM client_subscriptions WHERE stripe_sub_id = ? LIMIT 1").bind(subId).first<{ id: string }>();
+    const bySub = await db.prepare("SELECT id FROM subject_subscriptions WHERE stripe_sub_id = ? LIMIT 1").bind(subId).first<{ id: string }>();
     if (bySub) {
       // A redelivered checkout for this same sub (before firstSeen dedup) — top
       // up its own runway rather than create a duplicate. CAS so a concurrent
@@ -1431,7 +1431,7 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
       if (!ok) throw new Error(`grantClientPackage: runway CAS failed for ${bySub.id}`);
     } else {
       await db.prepare(
-        "INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, installments_total, installments_paid, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, 'stripe', ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO subject_subscriptions (id, tenant_id, subject_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, installments_total, installments_paid, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, 'stripe', ?, ?, ?, ?, ?, ?)",
       )
         .bind(newId("csub"), tenantId, clientId, packageId, n > 1 ? "installments" : "paid", j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, subId, n > 1 ? n : null, n > 1 ? 1 : null, now, now)
         .run();
@@ -1441,7 +1441,7 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
 
   // One-time purchase: fold into the client's active NON-recurring runway (never
   // a recurring row — that row belongs to its own Stripe subscription).
-  const current = await db.prepare("SELECT id FROM client_subscriptions WHERE client_id = ? AND status = 'active' AND stripe_sub_id IS NULL ORDER BY started_at DESC LIMIT 1").bind(clientId).first<{ id: string }>();
+  const current = await db.prepare("SELECT id FROM subject_subscriptions WHERE subject_id = ? AND status = 'active' AND stripe_sub_id IS NULL ORDER BY started_at DESC LIMIT 1").bind(clientId).first<{ id: string }>();
   if (current) {
     // CAS so a concurrent staff grant / redeem on the same row can't clobber
     // these paid-for days.
@@ -1453,7 +1453,7 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
     if (!ok) throw new Error(`grantClientPackage: runway CAS failed for ${current.id}`);
   } else {
     await db.prepare(
-      "INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, ?, 'stripe', ?, ?, ?, ?)",
+      "INSERT INTO subject_subscriptions (id, tenant_id, subject_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, ?, 'stripe', ?, ?, ?, ?)",
     )
       .bind(newId("csub"), tenantId, clientId, packageId, j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, null, now, now)
       .run();
@@ -1467,7 +1467,7 @@ async function renewClientSubscription(db: D1Database, stripeSubId: string, expe
   // Resolve the row scoped to the account's tenant (the webhook verified the
   // event's account → tenant), so a foreign connected account can't top up a
   // row it doesn't own.
-  const base = await db.prepare("SELECT id, tenant_id, package_id, installments_total FROM client_subscriptions WHERE stripe_sub_id = ? AND tenant_id = ? ORDER BY started_at DESC LIMIT 1").bind(stripeSubId, expectedTenantId).first<{ id: string; tenant_id: string; package_id: string | null; installments_total: number | null }>();
+  const base = await db.prepare("SELECT id, tenant_id, package_id, installments_total FROM subject_subscriptions WHERE stripe_sub_id = ? AND tenant_id = ? ORDER BY started_at DESC LIMIT 1").bind(stripeSubId, expectedTenantId).first<{ id: string; tenant_id: string; package_id: string | null; installments_total: number | null }>();
   if (!base?.package_id) return;
   const pkg = await db.prepare("SELECT budgets_json, addons_json FROM packages WHERE id = ? AND tenant_id = ?").bind(base.package_id, base.tenant_id).first<{ budgets_json: string | null; addons_json: string | null }>();
   if (!pkg) return;
@@ -1480,7 +1480,7 @@ async function renewClientSubscription(db: D1Database, stripeSubId: string, expe
   // so the counter is recomputed from the last committed value, never double-
   // counted). Guards against a concurrent writer losing a paid renewal period.
   for (let attempt = 1; attempt <= 5; attempt++) {
-    const row = await db.prepare("SELECT budgets_json, addons_json, installments_paid FROM client_subscriptions WHERE id = ?").bind(base.id).first<{ budgets_json: string | null; addons_json: string | null; installments_paid: number | null }>();
+    const row = await db.prepare("SELECT budgets_json, addons_json, installments_paid FROM subject_subscriptions WHERE id = ?").bind(base.id).first<{ budgets_json: string | null; addons_json: string | null; installments_paid: number | null }>();
     if (!row) return;
     const prevB = row.budgets_json ?? null;
     const prevA = row.addons_json ?? null;
@@ -1505,7 +1505,7 @@ async function renewClientSubscription(db: D1Database, stripeSubId: string, expe
       // `stripe_sub_id` is left intact here and only cleared once the Stripe
       // cancel is confirmed (below), so a post-completion stray invoice still
       // resolves this row and hits the `alreadyDone` guard.
-      const w = await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, status = 'active', payment_status = ?, installments_paid = ?, updated_at = ? WHERE id = ? AND budgets_json IS ? AND addons_json IS ?")
+      const w = await db.prepare("UPDATE subject_subscriptions SET budgets_json = ?, addons_json = ?, status = 'active', payment_status = ?, installments_paid = ?, updated_at = ? WHERE id = ? AND budgets_json IS ? AND addons_json IS ?")
         .bind(j(nextBudgets), j(nextAddons), done ? "completed" : "installments", paid, now, base.id, prevB, prevA)
         .run();
       if ((w.meta?.changes ?? 0) > 0) {
@@ -1514,7 +1514,7 @@ async function renewClientSubscription(db: D1Database, stripeSubId: string, expe
       }
       continue; // raced — re-read and retry
     }
-    const w = await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, status = 'active', payment_status = 'paid', updated_at = ? WHERE id = ? AND budgets_json IS ? AND addons_json IS ?").bind(j(nextBudgets), j(nextAddons), now, base.id, prevB, prevA).run();
+    const w = await db.prepare("UPDATE subject_subscriptions SET budgets_json = ?, addons_json = ?, status = 'active', payment_status = 'paid', updated_at = ? WHERE id = ? AND budgets_json IS ? AND addons_json IS ?").bind(j(nextBudgets), j(nextAddons), now, base.id, prevB, prevA).run();
     if ((w.meta?.changes ?? 0) > 0) return;
   }
   // Every attempt raced out on a PAID renewal cycle: the client was charged and

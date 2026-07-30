@@ -135,7 +135,9 @@ remote bindings without editing the config (this is what the E2E suite does).
   `TenantBillingDO` is a subclass and **its class name must never change** —
   `wrangler.jsonc` migrations bind it to durable storage.
 - **Access economy**: `commerce-routes.ts` + `@4dl/commerce` (Kova's scopes are
-  bound in `@kova/domain` budgets.ts) —
+  bound in `@kova/domain` budgets.ts). The buyer is a `subject` there —
+  `subject_subscriptions.subject_id` — while Kova's own tables keep `client_id`.
+  Both are correct: one is a shared package's vocabulary, the other is Kova's. —
   budgets carry `expiresAt`, days derive at read time, purchases QUEUE not sum,
   status reconciles lazily on read. No domain cron.
 - **Two flag systems** (don't merge): platform entitlements (tenant bought from

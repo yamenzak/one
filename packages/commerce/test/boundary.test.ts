@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { findBoundaryViolations, formatViolations, violationKeys } from "@4dl/core/boundary";
 
 /**
- * ONE entry, and it is the interesting one.
+ * CLEAN — the last entry went before the first deploy.
  *
  * Three things had to change on the way in, and each was a different kind:
  *
@@ -16,15 +16,15 @@ import { findBoundaryViolations, formatViolations, violationKeys } from "@4dl/co
  *              belongs to the app. The package takes a `label` resolver, so a
  *              settings screen can never inherit another product's wording.
  *
- *   schema.ts  the SQL still says `client_id`, and stays that way. A column name
- *              is LIVE DATA: renaming it is a migration over every tenant's
- *              purchase history, for zero benefit — a second app compiles
- *              against the TypeScript, not against Kova's column labels, and
- *              that surface is clean. This is the one place the checker's
- *              answer and the right answer differ, so it is written down rather
- *              than silently excluded.
+ *   schema.ts  `client_subscriptions` → `subject_subscriptions`, `client_id` →
+ *              `subject_id`, `restricted_client_id` → `restricted_subject_id`.
+ *              This entry was frozen with the reasoning "a column name is live
+ *              data, renaming it is a migration for a cosmetic gain" — true, and
+ *              true only AFTER a deploy. Kova had not deployed yet, so the
+ *              window was open exactly once and the debt was paid instead of
+ *              documented.
  */
-const ALLOW: readonly string[] = ["src/schema.ts:client"];
+const ALLOW: readonly string[] = [];
 
 const dir = new URL("..", import.meta.url).pathname;
 

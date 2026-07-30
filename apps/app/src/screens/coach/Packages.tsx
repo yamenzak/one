@@ -23,13 +23,13 @@ interface Pkg {
   addOns?: { addOnTypeId: string; quantity: number }[] | null;
   flags?: PkgFlags | null;
   visibility: string;
-  restricted_client_id?: string | null;
+  restricted_subject_id?: string | null;
   once_per_customer?: number | null;
 }
 interface ClientOpt { id: string; displayName: string }
 interface AddOnType { id: string; label: string; duration_minutes: number }
-interface Code { id: string; code: string; days_to_add: number; target_feature: string; used_count: number; max_uses: number; restricted_package_id?: string | null; restricted_client_id?: string | null }
-interface Promo { id: string; code: string; discount_type: string; percent_off: number | null; amount_off_cents: number | null; redemption_count: number; max_redemptions: number | null; restricted_package_id?: string | null; restricted_client_id?: string | null; active: number }
+interface Code { id: string; code: string; days_to_add: number; target_feature: string; used_count: number; max_uses: number; restricted_package_id?: string | null; restricted_subject_id?: string | null }
+interface Promo { id: string; code: string; discount_type: string; percent_off: number | null; amount_off_cents: number | null; redemption_count: number; max_redemptions: number | null; restricted_package_id?: string | null; restricted_subject_id?: string | null; active: number }
 
 /** `marketplace` is what puts a package in every client's in-app Shop, where it
  *  can actually be bought — so it's labelled for that, not "Public" (there is no
@@ -89,7 +89,7 @@ export function Packages() {
   };
   // DELETE /packages/:id is an archive, not an erase: it flips `active = 0`, which
   // removes the package from the Shop and both checkout lanes but leaves every
-  // client_subscriptions row alone.
+  // subject_subscriptions row alone.
   const archivePkg = async (p: Pkg) => {
     setRowBusy(p.id); setActionErr(null);
     try { await api.del(`/api/packages/${p.id}`); await load(); }
@@ -297,7 +297,7 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
   const [visibility, setVisibility] = useState<"private" | "marketplace" | "client_specific">(
     pkg?.visibility === "private" || pkg?.visibility === "client_specific" ? pkg.visibility : "marketplace",
   );
-  const [restrictedClientId, setRestrictedClientId] = useState(pkg?.restricted_client_id ?? "");
+  const [restrictedClientId, setRestrictedClientId] = useState(pkg?.restricted_subject_id ?? "");
   const [oncePerCustomer, setOncePerCustomer] = useState(!!pkg?.once_per_customer);
   // Only keys the tenant explicitly toggled land here — untouched flags fall
   // back to the client defaults at resolve time (so a package needn't restate

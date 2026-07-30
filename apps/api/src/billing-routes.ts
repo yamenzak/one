@@ -62,7 +62,7 @@ export const billingRoutes = new Hono<AppEnv>()
     const cfg = await stripeConfig(c.env.DB);
     const [connectRow, csubs] = await Promise.all([
       c.env.DB.prepare("SELECT stripe_account_id, charges_enabled, details_submitted FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null; details_submitted: number | null }>(),
-      c.env.DB.prepare("SELECT budgets_json FROM client_subscriptions WHERE tenant_id = ? AND status IN ('active','paused')").bind(who.tenantId).all<{ budgets_json: string | null }>(),
+      c.env.DB.prepare("SELECT budgets_json FROM subject_subscriptions WHERE tenant_id = ? AND status IN ('active','paused')").bind(who.tenantId).all<{ budgets_json: string | null }>(),
     ]);
     const now = nowIso();
     let lapsed = 0, expiringSoon = 0;
@@ -180,7 +180,7 @@ export const billingRoutes = new Hono<AppEnv>()
         (await count("SELECT COUNT(*) AS n FROM meal_templates WHERE tenant_id = ?")),
       storageMb: Math.round((await tenantStorageBytes(db, who.tenantId)) / (1024 * 1024)),
       activeCommerceSubs: await count(
-        "SELECT COUNT(*) AS n FROM client_subscriptions WHERE tenant_id = ? AND status = 'active' AND payment_status IN ('paid','installments')",
+        "SELECT COUNT(*) AS n FROM subject_subscriptions WHERE tenant_id = ? AND status = 'active' AND payment_status IN ('paid','installments')",
       ),
     };
     return c.json(checkDowngrade(usage, resolveEntitlements(target.entitlements_json)));

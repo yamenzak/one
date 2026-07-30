@@ -1,5 +1,5 @@
 /**
- * Optimistic-concurrency (CAS) writes for a `client_subscriptions` row's
+ * Optimistic-concurrency (CAS) writes for a `subject_subscriptions` row's
  * `budgets_json` / `addons_json` runway columns.
  *
  * These JSON columns are mutated read-modify-write by FOUR uncoordinated
@@ -45,7 +45,7 @@ export async function updateSubscriptionRunway(
 ): Promise<boolean> {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const row = await db
-      .prepare("SELECT budgets_json, addons_json FROM client_subscriptions WHERE id = ?")
+      .prepare("SELECT budgets_json, addons_json FROM subject_subscriptions WHERE id = ?")
       .bind(rowId)
       .first<{ budgets_json: string | null; addons_json: string | null }>();
     if (!row) return false;
@@ -56,7 +56,7 @@ export async function updateSubscriptionRunway(
     const extraBinds = next.extra?.binds ?? [];
     const w = await db
       .prepare(
-        `UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?${extraSql} WHERE id = ? AND budgets_json IS ? AND addons_json IS ?`,
+        `UPDATE subject_subscriptions SET budgets_json = ?, addons_json = ?${extraSql} WHERE id = ? AND budgets_json IS ? AND addons_json IS ?`,
       )
       .bind(j(next.budgets), j(next.addOns), ...extraBinds, rowId, prevB, prevA)
       .run();
