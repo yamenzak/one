@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { schemaStatements } from "@4dl/core";
+import { AUTH_SCHEMA } from "@4dl/auth";
 import { TENANCY_SCHEMA } from "@4dl/tenancy";
 import { KOVA_SCHEMA } from "../src/db.js";
 
@@ -53,10 +54,12 @@ describe("the Kova schema module", () => {
     // These numbers go DOWN as tables move into @4dl/* packages — when they do,
     // update them here in the same commit as the move, so a silent loss can't
     // hide behind a passing suite. Stage 1 took `tenant_domains` and
-    // `tenant_settings` (2 tables, 1 index, 4 ALTERs) into @4dl/tenancy.
+    // `tenant_settings` (2 tables, 1 index, 4 ALTERs) into @4dl/tenancy; Stage 2
+    // took Better Auth's eight plus `auth_logs` and `action_otps` (10 tables,
+    // 2 indexes) into @4dl/auth.
     const ddl = schemaStatements(KOVA_SCHEMA);
-    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(64);
-    expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(39);
+    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(54);
+    expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(37);
     expect(ddl.filter((s) => s.startsWith("CREATE UNIQUE INDEX"))).toHaveLength(8);
     expect(ddl.filter((s) => s.startsWith("DROP INDEX"))).toHaveLength(1);
     expect(KOVA_SCHEMA.alters ?? []).toHaveLength(48);
@@ -76,7 +79,7 @@ describe("the composed schema", () => {
     // the moment one is edited. Ownership has to be exclusive.
     const tableOf = (s: string) => /CREATE TABLE IF NOT EXISTS "?(\w+)"?/.exec(s)?.[1];
     const owned = new Map<string, string>();
-    for (const m of [TENANCY_SCHEMA, KOVA_SCHEMA]) {
+    for (const m of [AUTH_SCHEMA, TENANCY_SCHEMA, KOVA_SCHEMA]) {
       for (const sql of schemaStatements(m)) {
         const t = tableOf(sql);
         if (!t) continue;
@@ -84,6 +87,9 @@ describe("the composed schema", () => {
         owned.set(t, m.id);
       }
     }
+    expect(owned.get("user")).toBe("auth");
+    expect(owned.get("member")).toBe("auth");
+    expect(owned.get("action_otps")).toBe("auth");
     expect(owned.get("tenant_domains")).toBe("tenancy");
     expect(owned.get("tenant_settings")).toBe("tenancy");
     expect(owned.get("clients")).toBe("kova");
@@ -96,6 +102,19 @@ describe("the composed schema", () => {
     const kovaAlters = (KOVA_SCHEMA.alters ?? []).filter((s) => s.includes("tenant_settings"));
     expect(kovaAlters.length).toBeGreaterThan(0);
     expect(schemaStatements(TENANCY_SCHEMA).some((s) => s.includes("CREATE TABLE IF NOT EXISTS tenant_settings"))).toBe(true);
+  });
+
+  it("keeps identity OUT of the tenant cascade", () => {
+    // `user`, `session`, `account`, `verification` and `passkey` are keyed on a
+    // USER, who is cross-tenant: a person in two tenants keeps their identity
+    // when one is purged. Sweeping them with the tenant would delete a stranger's
+    // account as a side effect of someone else closing theirs.
+    const t = AUTH_SCHEMA.scoped?.tenantTables ?? [];
+    expect(t).toContain("member");
+    expect(t).toContain("invitation");
+    for (const identity of ["user", "session", "account", "verification", "passkey"]) {
+      expect(t, identity).not.toContain(identity);
+    }
   });
 
   it("declares what a tenant purge must clear", () => {

@@ -1,13 +1,20 @@
 /**
- * Per-member permissions (SPEC §4) — pure.
+ * Per-member permissions (SPEC §4) — Kova's REGISTRY, over `@4dl/auth`'s algebra.
  *
- * A member's authorization is a `{ resource: action[] }` grant map. Roles are
- * convenient PRESETS that fill the grant; owners may attach a custom per-member
- * grant (`member.permissions_json`) — the "assigned level" dial beyond roster
- * scoping. Row-level scoping (trainer -> assigned clients only, client -> own
- * record only) is enforced separately by the route layer; this module answers
- * "may this role touch this resource kind at all".
+ * The set algebra (sanitize, intersect, satisfy, resolve-bounded-by-role) is
+ * product-agnostic and lives in `@4dl/auth` `grants.ts`. What is Kova's is the
+ * vocabulary below: which resources exist, which actions they carry, and what
+ * each role starts with. Row-level scoping (trainer → assigned clients only,
+ * client → own record only) is enforced by the route layer; this answers "may
+ * this role touch this resource kind at all".
+ *
+ * The wrappers at the bottom bind the registry once so every call site keeps the
+ * signature it always had.
  */
+
+import { bindGrants, grantSatisfies, intersectGrant, sanitizeGrant, type Grant } from "@4dl/auth/model";
+
+export { grantSatisfies, intersectGrant, type Grant };
 
 export const TENANT_ROLES = ["owner", "trainer", "assistant", "client"] as const;
 export type TenantRole = (typeof TENANT_ROLES)[number];
@@ -31,7 +38,6 @@ export const PERMISSION_CATALOG: Record<string, string[]> = {
   ai: ["use"],
 };
 
-export type Grant = Record<string, string[]>;
 
 const full = (): Grant => {
   const g: Grant = {};
@@ -83,53 +89,27 @@ export const ROLE_PRESETS: Record<string, Grant> = {
   },
 };
 
-/** Keep only catalogue-valid resource/action pairs (drops anything unknown). */
-export function sanitizePermissions(input: unknown): Grant {
-  const out: Grant = {};
-  if (!input || typeof input !== "object") return out;
-  for (const [res, acts] of Object.entries(input as Record<string, unknown>)) {
-    const allowed = PERMISSION_CATALOG[res];
-    if (!allowed || !Array.isArray(acts)) continue;
-    const keep = acts.filter((a): a is string => typeof a === "string" && allowed.includes(a));
-    if (keep.length) out[res] = [...new Set(keep)];
-  }
-  return out;
-}
+/**
+ * Kova's registry, bound to the shared algebra.
+ *
+ * `owner` is the one unbounded role: a stored custom grant may narrow any other
+ * role within its preset, but an owner always holds the full grant. Letting a
+ * custom grant clip an owner is how a studio locks itself out of its own billing.
+ */
+const grants = bindGrants({
+  catalog: PERMISSION_CATALOG,
+  presets: ROLE_PRESETS,
+  fallbackRole: "client",
+  unboundedRoles: ["owner"],
+});
 
-/** Intersect a grant with a ceiling — keeps only (resource, action) pairs the
- *  ceiling also allows. The mechanism behind bounded custom grants. */
-export function intersectGrant(grant: Grant, ceiling: Grant): Grant {
-  const out: Grant = {};
-  for (const [res, acts] of Object.entries(grant)) {
-    const cap = ceiling[res];
-    if (!cap) continue;
-    const keep = acts.filter((a) => cap.includes(a));
-    if (keep.length) out[res] = keep;
-  }
-  return out;
-}
+/** Keep only catalogue-valid resource/action pairs (drops anything unknown). */
+export const sanitizePermissions = (input: unknown): Grant => grants.sanitize(input);
 
 /**
- * Effective grant. A custom per-member grant is **bounded by the role** — it may
- * narrow within the role's preset but never exceed it (so a custom grant can't
- * hand a trainer billing/settings powers their role doesn't carry). The owner is
- * the one unbounded role: they always hold the full grant, custom or not.
+ * Effective grant. A custom per-member grant is BOUNDED BY THE ROLE — it may
+ * narrow within the role's preset but never exceed it, so a custom grant cannot
+ * hand a trainer the billing or settings powers their role does not carry.
  */
-export function resolvePermissions(role: string | null, permsJson: string | null | undefined): Grant {
-  const preset = ROLE_PRESETS[role ?? "client"] ?? ROLE_PRESETS.client!;
-  if (role === "owner") return preset; // unbounded — full grant, nothing to exceed
-  if (permsJson) {
-    try {
-      const custom = sanitizePermissions(JSON.parse(permsJson));
-      if (Object.keys(custom).length) return intersectGrant(custom, preset);
-    } catch {
-      /* fall through to role preset */
-    }
-  }
-  return preset;
-}
-
-/** Does a grant satisfy a required `{ resource: action[] }` permission set? */
-export function grantSatisfies(grant: Grant, needed: Record<string, string[]>): boolean {
-  return Object.entries(needed).every(([res, acts]) => acts.every((a) => grant[res]?.includes(a)));
-}
+export const resolvePermissions = (role: string | null, permsJson: string | null | undefined): Grant =>
+  grants.resolve(role, permsJson);

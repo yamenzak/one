@@ -31,7 +31,7 @@ import { z } from "zod";
 import { type AppEnv, requireTenant, requirePermission, isPlatformAdmin } from "./auth-context.js";
 import { setConfig, getConfig } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
-import { turnstileConfig } from "./turnstile.js";
+import { turnstileConfig } from "@4dl/auth";
 import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostname, createWorkerRoute, deleteWorkerRoute, DEFAULT_WORKER_NAME, WORKER_NAME_RE, type CustomHostname } from "./cloudflare.js";
 import { canonicalHost, invalidateHostCache, isPlatformDoor, rootDomain, shapeOf } from "./host-context.js";
 import { nowIso } from "./ids.js";

@@ -13,6 +13,7 @@
     "clean": "rm -rf .turbo .wrangler dist *.tsbuildinfo"
   },
   "dependencies": {
+    "@4dl/auth": "workspace:*",
     "@4dl/core": "workspace:*",
     "@4dl/platform": "workspace:*",
     "@4dl/tenancy": "workspace:*",

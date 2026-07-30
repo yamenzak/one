@@ -2163,7 +2163,7 @@ describe("custom domains (SPEC §14.1) — Host pins the tenant", () => {
         body: JSON.stringify({ displayName: "During suspension" }),
       });
       expect(write.status).toBe(402);
-      expect(((await write.json()) as { error: string }).error).toBe("studio_read_only");
+      expect(((await write.json()) as { error: string }).error).toBe("tenant_read_only");
 
       // Reads are never gated: a person's own data is not collateral.
       const read = await SELF.fetch("http://studio-one.localhost:8787/api/clients", { headers: auth(ownerCookie) });

@@ -50,6 +50,10 @@ packages/
              # JSON columns, the STRUCTURAL BINDINGS CONTRACT (HasDb/HasMedia/…)
              # and the COMPOSED SCHEMA RUNNER (SchemaModule/applySchema), plus
              # the boundary checker at @4dl/core/boundary. See its README.
+  auth/      # @4dl/auth — PASSWORDLESS identity + authorization: the Better Auth
+             # factory (email OTP + passkeys, org = tenant), the request identity,
+             # the five-gate route-guard ENGINE, the grant algebra, staff seats,
+             # step-up codes. Nothing here depends on billing. See its README.
   tenancy/   # @4dl/tenancy — multi-tenant ADDRESSING: the five doors, host→tenant
              # resolution + KV cache, custom domains (Cloudflare for SaaS + DCV),
              # the standing/host-gate model. `@4dl/tenancy/model` is the pure half
@@ -107,9 +111,13 @@ remote bindings without editing the config (this is what the E2E suite does).
 
 ## Architecture notes (read before changing these)
 
-- **Auth**: `apps/api/src/auth.ts` — Better Auth, org = tenant, OTP + passkey
-  plugins only (no password provider). `auth-context.ts` resolves the session;
-  `route-guard.ts` is the three-lane boundary (public / platform-admin / member).
+- **Auth**: the engine is `@4dl/auth`; `apps/api/src/auth.ts`, `auth-context.ts`,
+  `route-guard.ts`, `otp-guard.ts` and `action-otp.ts` are thin bindings that
+  supply Kova's RBAC registry, copy, seat quota and route tables. Org = tenant,
+  OTP + passkey only (no password provider). The route guard's STANDING gate is
+  injected (`gate: (c) => c.get("host").gate`), which is what keeps auth
+  independent of billing. Read `packages/auth/README.md` before changing any of
+  the five — particularly the three seat doors and the grant-bounding rule.
 - **Row-level scope**: every coaching route goes through
   `requireClientAccess(c, clientId)` in `clients.ts` — owner/assistant = tenant
   match, trainer = `client_trainers` assignment, client = own record. This is
@@ -210,12 +218,14 @@ an over-claim costs more than an under-claim. Verify before editing it.
 **The platform extraction is under way** — [docs/PLATFORM-EXTRACTION.md](docs/PLATFORM-EXTRACTION.md)
 is the audit and the staged plan for turning this repo from "Kova with two shared
 packages" into "the 4DL platform, on which Kova is the first app". Three more apps
-are queued. **Stages 0 (the mechanisms) and 1 (`@4dl/tenancy`) are done**; stages 2–9 are not. Read it
+are queued. **Stages 0 (the mechanisms), 1 (`@4dl/tenancy`) and 2 (`@4dl/auth`) are done**;
+stages 3–9 are not. Read it
 before moving anything between `apps/api` and `packages/`.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured most recently, per package: **485 API + 212 domain + 73 tenancy +
-64 ui + 52 app + 33 platform + 14 core + 7 protocol** (940 total, 38 skipped).
+moves. Measured most recently, per package: **486 API + 212 domain + 73 tenancy +
+64 ui + 52 app + 33 platform + 14 core + 12 auth + 7 protocol** (953 total,
+38 skipped).
 Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
 `@4dl/platform` to `@4dl/tenancy`; the split moves tests, it does not add any.
 The pricing and normalizer suites live

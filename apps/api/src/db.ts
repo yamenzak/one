@@ -34,25 +34,13 @@
  */
 
 import { schemaGate, type SchemaModule } from "@4dl/core";
+import { AUTH_SCHEMA } from "@4dl/auth";
 import { TENANCY_SCHEMA } from "@4dl/tenancy";
 
 export const KOVA_SCHEMA: SchemaModule = {
   id: "kova",
   version: "2026-07-30c",
   ddl: [
-    // ── Better Auth (org = tenant; 100% passwordless: OTP + passkey) ──
-    'CREATE TABLE IF NOT EXISTS "user" (id TEXT PRIMARY KEY, name TEXT, email TEXT UNIQUE, emailVerified INTEGER, image TEXT, createdAt DATE, updatedAt DATE);',
-    'CREATE TABLE IF NOT EXISTS "session" (id TEXT PRIMARY KEY, expiresAt DATE, token TEXT UNIQUE, createdAt DATE, updatedAt DATE, ipAddress TEXT, userAgent TEXT, userId TEXT, activeOrganizationId TEXT);',
-    'CREATE TABLE IF NOT EXISTS "account" (id TEXT PRIMARY KEY, accountId TEXT, providerId TEXT, userId TEXT, accessToken TEXT, refreshToken TEXT, idToken TEXT, accessTokenExpiresAt DATE, refreshTokenExpiresAt DATE, scope TEXT, password TEXT, createdAt DATE, updatedAt DATE);',
-    'CREATE TABLE IF NOT EXISTS "verification" (id TEXT PRIMARY KEY, identifier TEXT, value TEXT, expiresAt DATE, createdAt DATE, updatedAt DATE);',
-    'CREATE TABLE IF NOT EXISTS "organization" (id TEXT PRIMARY KEY, name TEXT, slug TEXT UNIQUE, logo TEXT, createdAt DATE, metadata TEXT);',
-    'CREATE TABLE IF NOT EXISTS "member" (id TEXT PRIMARY KEY, organizationId TEXT, userId TEXT, role TEXT, permissions_json TEXT, createdAt DATE);',
-    // Resolved on EVERY authenticated request (role + permissions lookup) —
-    // without this the member table is full-scanned per request.
-    'CREATE INDEX IF NOT EXISTS idx_member_org_user ON "member"(organizationId, userId);',
-    'CREATE TABLE IF NOT EXISTS "invitation" (id TEXT PRIMARY KEY, organizationId TEXT, email TEXT, role TEXT, status TEXT, expiresAt DATE, inviterId TEXT, createdAt DATE);',
-    // Passkey plugin (WebAuthn credentials; multiple per user).
-    'CREATE TABLE IF NOT EXISTS "passkey" (id TEXT PRIMARY KEY, name TEXT, publicKey TEXT, userId TEXT, credentialID TEXT, counter INTEGER, deviceType TEXT, backedUp INTEGER, transports TEXT, createdAt DATE, aaguid TEXT);',
 
     // ── Platform billing (SPEC §5, §6) ─────────────────────────────────
     "CREATE TABLE IF NOT EXISTS plans (id TEXT PRIMARY KEY, name TEXT, price_usd_month REAL, entitlements_json TEXT, stripe_product_id TEXT, stripe_price_id TEXT, ord INTEGER, active INTEGER DEFAULT 1);",
@@ -75,9 +63,6 @@ export const KOVA_SCHEMA: SchemaModule = {
     "CREATE TABLE IF NOT EXISTS ai_cache (prompt_hash TEXT PRIMARY KEY, feature TEXT, output_json TEXT, at INTEGER);",
     "CREATE TABLE IF NOT EXISTS insight_feedback (id TEXT PRIMARY KEY, tenant_id TEXT, user_id TEXT, insight_type TEXT, insight_ref TEXT, vote INTEGER, at INTEGER);",
 
-    // ── Auth security (SPEC §4) ────────────────────────────────────────
-    "CREATE TABLE IF NOT EXISTS auth_logs (id TEXT PRIMARY KEY, event TEXT, email TEXT, ip TEXT, user_agent TEXT, success INTEGER, at INTEGER);",
-    "CREATE INDEX IF NOT EXISTS idx_authlogs_email ON auth_logs(email, at);",
 
     // ── Tenancy domain: clients & staff scoping (SPEC §2) ──────────────
     "CREATE TABLE IF NOT EXISTS clients (id TEXT PRIMARY KEY, tenant_id TEXT, user_id TEXT, display_name TEXT, email TEXT, status TEXT DEFAULT 'active', gender TEXT, date_of_birth TEXT, height_cm REAL, timezone TEXT, weight_unit TEXT DEFAULT 'kg', length_unit TEXT DEFAULT 'cm', volume_unit TEXT DEFAULT 'ml', intake_json TEXT, dashboard_prefs_json TEXT, onboarding_complete INTEGER DEFAULT 0, avatar_url TEXT, avatar_seed TEXT, created_at TEXT, archived_at TEXT);",
@@ -262,13 +247,6 @@ export const KOVA_SCHEMA: SchemaModule = {
     "CREATE INDEX IF NOT EXISTS idx_media_client ON media_assets(client_id, deleted_at);",
     "CREATE INDEX IF NOT EXISTS idx_media_owner ON media_assets(owner_user_id, deleted_at);",
 
-    // ── Action OTPs (step-up confirmation for destructive flows) ────────
-    // A one-time 6-digit code emailed to confirm an irreversible action
-    // (wipe my data, close studio, platform nuclear reset) for an already
-    // signed-in user — decoupled from the sign-in OTP so confirming never
-    // mints a session. One live code per (subject, purpose); the hash is
-    // stored, never the code. `attempts` caps brute force.
-    "CREATE TABLE IF NOT EXISTS action_otps (subject TEXT, purpose TEXT, code_hash TEXT, expires_at INTEGER, attempts INTEGER DEFAULT 0, created_at INTEGER, PRIMARY KEY (subject, purpose));",
     // Plan lanes (variants) — moved here from `alters`, where it had been
     // creating a TABLE through the ADD-COLUMN path: harmless (`IF NOT EXISTS`)
     // but it meant `ddl` did not actually describe every table this module owns.
@@ -418,7 +396,7 @@ export const KOVA_SCHEMA: SchemaModule = {
 // Dependency order, and the app last. `tenant_settings` is created by tenancy;
 // the ALTERs that add billing's, AI's, email's and commerce's columns to it are
 // still in Kova's module below and move out with those packages.
-const gate = schemaGate([TENANCY_SCHEMA, KOVA_SCHEMA]);
+const gate = schemaGate([AUTH_SCHEMA, TENANCY_SCHEMA, KOVA_SCHEMA]);
 export const ensureSchema = (db: D1Database): Promise<void> => gate({ DB: db });
 
 /** Small helpers shared by stores — re-exported so every existing call site

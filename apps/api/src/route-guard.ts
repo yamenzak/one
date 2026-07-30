@@ -1,21 +1,22 @@
 /**
- * Central request guard (SPEC §4) — the auth boundary. Four gates, in order:
+ * KOVA'S ROUTE TABLES, over `@4dl/auth`'s guard engine.
  *
- *   1. HOST      → is this door allowed to answer this route at all?
- *   2. PUBLIC    → pass through (own auth or none)
- *   3. ADMIN     → platform super-admin, on the operator door only
- *   4. MEMBER    → authenticated member of the host's tenant, gated by
- *                  permissionFor(method, path)
- *   5. STANDING  → is the studio paid up, or is its subdomain read-only?
+ * The engine owns the order of the five gates, the status codes and the
+ * fail-closed defaults — the subtle part, which every app would otherwise
+ * re-derive. This file owns the part that cannot be shared: which of Kova's
+ * routes are public, which permission each one needs, which survive the root
+ * door, which survive a read-only studio.
  *
- * Row-level checks (trainer → assigned clients, client → own record) happen
- * in the handlers via requireClientAccess — this guard is the action-level
- * outer wall. There are NO unauthenticated mutation routes (the ByShujaa
- * lesson, SPEC §11).
+ * Row-level checks (trainer → assigned clients, client → own record) happen in
+ * the handlers via `requireClientAccess`. This is the action-level outer wall.
+ * There are NO unauthenticated mutation routes (the ByShujaa lesson, SPEC §11).
  */
 import type { MiddlewareHandler } from "hono";
-import { isDevRoot, type HostRole } from "@4dl/tenancy";
-import { type AppEnv, requireTenant, isPlatformAdmin, can } from "./auth-context.js";
+import { routeGuard as buildRouteGuard } from "@4dl/auth";
+import type { Env } from "./env.js";
+import type { Auth } from "./auth.js";
+import type { Branding } from "./host-context.js";
+import { type AppEnv, isPlatformAdmin } from "./auth-context.js";
 
 /** Routes reachable without a tenant session. */
 function isPublic(method: string, path: string): boolean {
@@ -242,107 +243,38 @@ function isBillingWrite(path: string): boolean {
   return path.startsWith("/api/billing") || path.startsWith("/api/stripe/") || path === "/api/connect/onboard";
 }
 
-const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
-export const routeGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
-  const path = c.req.path;
-  if (!path.startsWith("/api/") && path !== "/health") return next();
+/**
+ * The one route a well-formed subdomain owning NO studio may answer.
+ *
+ * Deliberately far narrower than `allowedOnRoot`. The root is ours and can serve
+ * identity and webhooks; an unclaimed hostname is nobody's. `/api/host` is the
+ * single exception, because it is how the app learns to render "no studio here".
+ */
+function allowedWithoutTenant(path: string): boolean {
+  return path === "/api/host";
+}
 
-  const method = c.req.method;
-  if (method === "OPTIONS") return next();
+/** Personal surfaces: they belong to the PERSON, not to a studio, so they work
+ *  for any signed-in user even before a tenant is chosen. */
+function isPersonal(path: string): boolean {
+  return (
+    path === "/api/context" ||
+    path === "/api/context/switch" ||
+    path.startsWith("/api/me/") ||
+    path.startsWith("/api/inbox/")
+  );
+}
 
-  const host = c.get("host");
-  const role: HostRole = host.shape.role;
-
-  // ── 1. The host gate ──────────────────────────────────────────────────────
-  //
-  // A hostname under our root that we do not serve (a reserved label, or nested
-  // deeper than the wildcard certificate covers) answers nothing. Fail closed and
-  // do not leak that the platform is here.
-  if (role === "invalid") return c.json({ error: "not_found" }, 404);
-
-  // The root is a signpost, not an app.
-  if (role === "root" && !allowedOnRoot(path)) return c.json({ error: "wrong_door" }, 404);
-
-  /**
-   * A hostname that resolves NO STUDIO serves nothing but `/api/host`.
-   *
-   * Two roles land here and both must be closed:
-   *
-   *  • `tenant` — a well-formed subdomain nobody owns. `/api/host` still answers,
-   *    because that is how the app learns to render "no studio here".
-   *  • `custom` — any hostname that reached this worker without an ACTIVE row in
-   *    `tenant_domains`. That is a custom domain still provisioning… and it is also
-   *    `kova.4dl.workers.dev`, which Cloudflare publishes for every worker and
-   *    which anyone can guess.
-   *
-   * The `custom` case is the one that mattered. `/api/auth/*` is a public lane, so
-   * on an unowned hostname a stranger could request a sign-in code, verify it, and
-   * POST `organization/create` — minting a studio on the platform from an address
-   * that appears nowhere and belongs to nobody. Closing it here covers every stray
-   * hostname uniformly rather than relying on `workers_dev: false` to hide one.
-   *
-   * `/health` stays open on purpose: it is dependency-free, reveals nothing, and is
-   * what uptime checks and `wrangler dev`'s readiness probe use.
-   */
-  if ((role === "tenant" || role === "custom") && !host.tenant && path !== "/api/host" && path !== "/health") {
-    return c.json({ error: "no_studio" }, 404);
-  }
-
-  if (method !== "OPTIONS" && isPublic(method, path)) return next();
-
-  // ── 2. The operator console ───────────────────────────────────────────────
-  //
-  // Restricted to the admin door, so a studio's subdomain cannot reach platform
-  // administration even when the caller genuinely IS a platform admin with a live
-  // cookie. That closes a real path: our cookie is now valid across every host
-  // under the root, so without this an operator's session would carry full
-  // platform powers onto every tenant subdomain they happened to visit.
-  //
-  // Dev has only one root and therefore no separate door, so the restriction
-  // cannot apply there — see `isDevRoot`.
-  if (path.startsWith("/api/admin/")) {
-    if (role !== "admin" && !isDevRoot(host.shape)) return c.json({ error: "wrong_door" }, 404);
-    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    return next();
-  }
-
-  // /api/context + personal /api/me/* + the personal inbox WS work for any
-  // signed-in user, even before a tenant is chosen (these are personal, not
-  // tenant-scoped).
-  if (path === "/api/context" || path === "/api/context/switch" || path.startsWith("/api/me/") || path.startsWith("/api/inbox/")) {
-    if (!c.get("user")) return c.json({ error: "unauthenticated" }, 401);
-    return next();
-  }
-
-  if (!requireTenant(c)) return c.json({ error: "unauthenticated" }, 401);
-
-  const perm = permissionFor(method, path);
-  if (perm && !isPlatformAdmin(c) && !can(c, perm)) {
-    return c.json({ error: "forbidden" }, 403);
-  }
-
-  // ── 5. The studio's standing ───────────────────────────────────────────────
-  //
-  // A suspended or closing studio is read-only for EVERYONE on its host — owner,
-  // coaches and clients alike. This is the one place it is enforced, which is the
-  // point: before this the studio axis existed in `resolveStanding` and both
-  // callers passed a hardcoded `studio: "ok"`, so nothing anywhere actually
-  // stopped a write to a lapsed studio.
-  //
-  // Reads are never gated. A person's own training history is theirs and is not
-  // collateral for their coach's invoice — the same principle that lets an
-  // archived client keep reading their record.
-  //
-  // 402 rather than 403: this is not an authorization failure, it is a billing
-  // state, and the app has to tell them apart to know whether to show "you don't
-  // have permission" or "this studio needs to renew".
-  const gate = c.get("host").gate;
-  if (gate?.readOnly && WRITE_METHODS.has(method) && !allowedWhileReadOnly(path)) {
-    const payingOwner = gate.billingWritable && isBillingWrite(path) && can(c, { billing: ["manage"] });
-    if (!payingOwner) {
-      return c.json({ error: "studio_read_only", reason: gate.reason, readOnly: true }, 402);
-    }
-  }
-  return next();
-};
+export const routeGuard: MiddlewareHandler<AppEnv> = buildRouteGuard<Env, Auth, Branding>({
+  isPublic,
+  permissionFor,
+  allowedOnRoot,
+  allowedWithoutTenant,
+  allowedWhileReadOnly,
+  isPersonal,
+  isBillingWrite,
+  billingPermission: { billing: ["manage"] },
+  isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+  gate: (c) => c.get("host").gate,
+}) as unknown as MiddlewareHandler<AppEnv>;

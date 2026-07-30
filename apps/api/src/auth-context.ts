@@ -1,154 +1,78 @@
 /**
- * Shared auth context for Hono routes (SPEC §4).
+ * Kova's auth adapter — where `@4dl/auth` learns it is Kova.
  *
- * `AppEnv` carries the per-request Better Auth instance plus the resolved
- * identity: `user`, the active-organization `tenantId`, the caller's `role`,
- * and their effective permission grant. Platform super-admin is a separate
- * axis (`isPlatformAdmin`, ADMIN_EMAILS).
+ * The package owns the ORDER of the identity resolution (host → session →
+ * membership of the host's tenant) and the fail-closed defaults. This file
+ * supplies the four things it cannot know: how to build the auth instance, how to
+ * resolve a host, how to turn a `member` row into a grant, and how to apply the
+ * schema.
+ *
+ * Everything below is re-exported at the shapes the ~60 call sites across the
+ * worker already use, so none of them changed.
  */
-import type { Context, MiddlewareHandler } from "hono";
-import { resolvePermissions, grantSatisfies, type Grant } from "@kova/domain";
+import type { Context } from "hono";
+import {
+  can as authCan,
+  isPlatformAdminFor,
+  owns as authOwns,
+  requireTenant as authRequireTenant,
+  sessionMiddleware as buildSessionMiddleware,
+  tenantOf as authTenantOf,
+  type AuthEnv,
+  type AuthUser,
+  type AuthVars,
+} from "@4dl/auth";
+import { resolvePermissions } from "@kova/domain";
 import type { Env } from "./env.js";
 import type { RoleName } from "./access.js";
 import { createAuth, type Auth } from "./auth.js";
 import { ensureSchema } from "./db.js";
-import { hostnameOf, resolveHost, shapeOf, type HostContext, type HostTenant } from "./host-context.js";
+import { hostnameOf, resolveHost, shapeOf, type Branding, type HostContext, type HostTenant } from "./host-context.js";
 
-export interface AuthUser {
-  id: string;
-  email: string;
-  name?: string | null;
-  image?: string | null;
-}
+export type { AuthUser, HostContext, HostTenant };
 
-export interface AuthVars {
-  auth: Auth;
-  user: AuthUser | null;
-  tenantId: string | null;
-  role: RoleName | null;
-  perms: Grant | null;
-  /**
-   * The tenant this HOST belongs to — its subdomain or its custom domain — or
-   * null on the root / setup / admin doors. When set, it (not the session) pins
-   * the tenant: only members of it get `tenantId`/role, so a stranger cannot
-   * reach another tenant's data by pointing a session at the wrong host.
-   */
-  hostTenant: HostTenant | null;
-  /**
-   * The full host resolution: which door, which studio, and that studio's gate.
-   * Every route that needs to know *where* it was called gets it from here rather
-   * than re-parsing the URL, so classification happens exactly once per request.
-   */
-  host: HostContext;
-}
-
-export type AppEnv = { Bindings: Env; Variables: AuthVars };
+/** Kova's request variables — the package's, with the role narrowed to ours. */
+export type KovaAuthVars = Omit<AuthVars<Auth, Branding>, "role"> & { role: RoleName | null };
+export type AppEnv = { Bindings: Env; Variables: KovaAuthVars };
 export type AppContext = Context<AppEnv>;
 
-/** Populate `auth`, `user`, `tenantId`, `role`, `perms` from the session cookie. */
-export const sessionMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
-  const hostname = hostnameOf(c.req.url);
-  c.set("user", null);
-  c.set("tenantId", null);
-  c.set("role", null);
-  c.set("perms", null);
-  c.set("hostTenant", null);
-  // Better Auth's tables must exist before its handler touches D1. ensureSchema
-  // is idempotent + cached per isolate.
-  await ensureSchema(c.env.DB).catch(() => undefined);
+/** The package's env shape for this app, for the generic helpers below. */
+type PkgEnv = AuthEnv<Env, Auth, Branding>;
 
-  // Where did this request arrive? One classification per request; everything
-  // downstream reads it off the context instead of re-parsing the URL.
-  const host = await resolveHost(c.env.DB, hostname, c.env).catch(
-    () => ({ hostname, shape: shapeOf(hostname, c.env), tenant: null, gate: null }) as HostContext,
-  );
-  c.set("host", host);
-  c.set("hostTenant", host.tenant);
+export const sessionMiddleware = buildSessionMiddleware<Env, Auth, Branding>({
+  createAuth: (env, origin, shape) => createAuth(env, origin, shape),
+  getSession: (auth, headers) => auth.api.getSession({ headers }),
+  resolveHost: (env, url) => resolveHost(env.DB, hostnameOf(url), env),
+  // Must not throw: a request whose host cannot be resolved still has to reach
+  // the route guard so the guard can refuse it, rather than 500 before it runs.
+  bareHost: (env, url) => {
+    const hostname = hostnameOf(url);
+    return { hostname, shape: shapeOf(hostname, env), tenant: null, gate: null };
+  },
+  resolveGrant: (role, json) => resolvePermissions(role, json),
+  ensureSchema: (env) => ensureSchema(env.DB),
+  db: (env) => env.DB,
+});
 
-  // Better Auth is constructed with the resolved host so the passkey RP ID and the
-  // session cookie's Domain follow the door — one credential and one session
-  // across every studio under our root, host-scoped on a custom domain.
-  const auth = createAuth(c.env, new URL(c.req.url).origin, host.shape);
-  c.set("auth", auth);
-
-  try {
-    const s = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (s?.user) {
-      c.set("user", { id: s.user.id, email: s.user.email, name: s.user.name, image: s.user.image });
-      // On any tenant host the Host pins the tenant; on the platform doors the
-      // session's active org decides. A stranger to the host tenant gets no scope.
-      const sessionOrg = (s.session as { activeOrganizationId?: string }).activeOrganizationId ?? null;
-      const orgId = host.tenant ? host.tenant.tenantId : sessionOrg;
-      if (orgId) {
-        const row = await c.env.DB.prepare(
-          'SELECT role, permissions_json FROM "member" WHERE organizationId = ? AND userId = ?',
-        )
-          .bind(orgId, s.user.id)
-          .first<{ role: string | null; permissions_json: string | null }>()
-          .catch(() => null);
-        if (row) {
-          c.set("tenantId", orgId);
-          c.set("role", (row.role as RoleName) ?? null);
-          c.set("perms", resolvePermissions(row.role, row.permissions_json));
-        }
-        // hostTenant + non-member ⇒ leave tenantId null: signed in, but no
-        // access to this domain's tenant (they can still self-register/switch).
-      }
-    }
-  } catch {
-    /* unauthenticated — leave nulls */
-  }
-  await next();
-};
+const asPkg = (c: AppContext): Context<PkgEnv> => c as unknown as Context<PkgEnv>;
 
 /** True when there's a signed-in user bound to an active organization. */
-export function requireTenant(c: AppContext): { userId: string; tenantId: string } | null {
-  const user = c.get("user");
-  const tenantId = c.get("tenantId");
-  if (!user || !tenantId) return null;
-  return { userId: user.id, tenantId };
-}
-
-export function tenantOf(c: AppContext): string | null {
-  return c.get("tenantId");
-}
+export const requireTenant = (c: AppContext) => authRequireTenant(asPkg(c));
+export const tenantOf = (c: AppContext) => authTenantOf(asPkg(c));
 
 /** Ownership guard: a D1 row belongs to the caller's tenant. */
-export function owns(c: AppContext, row: { tenant_id?: string | null } | null | undefined): boolean {
-  return Boolean(row && row.tenant_id && row.tenant_id === c.get("tenantId"));
-}
+export const owns = (c: AppContext, row: { tenant_id?: string | null } | null | undefined) => authOwns(asPkg(c), row);
 
 /** Action-level authorization against the caller's effective grant. */
-export function can(c: AppContext, permissions: Record<string, string[]>): boolean {
-  if (!c.get("user")) return false;
-  const perms = c.get("perms");
-  return perms ? grantSatisfies(perms, permissions) : false;
-}
+export const can = (c: AppContext, permissions: Record<string, string[]>) => authCan(asPkg(c), permissions);
 
-export function requirePermission(
-  c: AppContext,
-  permissions: Record<string, string[]>,
-): Response | null {
+export function requirePermission(c: AppContext, permissions: Record<string, string[]>): Response | null {
   if (!requireTenant(c)) return c.json({ error: "unauthenticated" }, 401);
   if (!can(c, permissions) && !isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
   return null;
 }
 
-/**
- * Platform super-admin — ADMIN_EMAILS allowlist, separate from tenant RBAC.
- * Requires a signed-in session. Fails CLOSED when the allowlist is empty: the
- * dev convenience (any signed-in user passes) is now gated on an explicit
- * ENVIRONMENT=development, not the mere absence of config — an unset/empty
- * ADMIN_EMAILS in production must never silently promote every user to platform
- * super-admin (full platform compromise from one missing env var).
- */
+/** Platform super-admin — ADMIN_EMAILS allowlist, separate from tenant RBAC. */
 export function isPlatformAdmin(c: AppContext): boolean {
-  const email = (c.get("user")?.email || "").trim().toLowerCase();
-  if (!email) return false;
-  const list = (c.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  if (list.length > 0) return list.includes(email);
-  return c.env.ENVIRONMENT === "development";
+  return isPlatformAdminFor(c.env, c.get("user")?.email);
 }

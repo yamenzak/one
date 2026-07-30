@@ -246,8 +246,8 @@ the new app being written against untested extractions.
 | Stage | What moves | Why here |
 |---|---|---|
 | **0** ✅ | `@4dl/core` (ids, helpers, bindings contract, **schema-module runner**, `app_config`) · boundary conformance test in every `@4dl/*` package | Nothing can move until schema can be composed and the boundary is machine-checked. The runner shipped with Kova's DDL as a single module, byte-identical to today. |
-| **1** ✅ | `@4dl/tenancy` — `hosts`, `dcv`, `standing`, `host-context`, `cloudflare`; the studio→tenant rename; `tenant_domains` + `tenant_settings` as the first non-app schema module | Everything else takes a tenant id. This is the root of the graph. `domain-routes` and `org-guard` stayed behind: they need the auth context, so they move in Stage 2. |
-| **2** | `@4dl/auth` — Better Auth factory, auth context, route-guard engine, RBAC, guards, seats | Depends only on tenancy + core. Unlocks a second app doing *nothing* but auth. |
+| **1** ✅ | `@4dl/tenancy` — `hosts`, `dcv`, `standing`, `host-context`, `cloudflare`; the studio→tenant rename; `tenant_domains` + `tenant_settings` as the first non-app schema module | Everything else takes a tenant id. This is the root of the graph. |
+| **2** ✅ | `@4dl/auth` — the auth factory, the request identity, the five-gate guard engine, the grant algebra, seats, step-up codes, Turnstile; Better Auth's 8 tables + `auth_logs` + `action_otps` as a schema module | Depends only on tenancy + core, and — critically — **not on billing**: the standing gate is injected, so an app that never takes a payment still gets the whole boundary. Unlocks a second app doing *nothing* but auth. |
 | **3** | `@4dl/billing` — entitlement engine, plans, subs, both Stripe rails, credit DO, dunning | The biggest single win and the highest risk (money + a DO with live storage). |
 | **4** | `@4dl/commerce` — packages, budgets, codes, promos, add-ons, lapse ladder | Sits on billing; separable so an app can take billing without commerce. |
 | **5** | `@4dl/ai` — runner, providers, pricing, admin console; Kova keeps its 21 prompts | Barcode/OCR/document extraction is exactly what the inventory and Bocca apps need. |
@@ -259,6 +259,18 @@ the new app being written against untested extractions.
 **Critical path for the inventory app:** 0 → 1 → 2 → 8, plus 6 (storage for
 photos/labels) and 5 if it needs barcode/OCR. Billing and commerce can trail if
 the app is internal.
+
+### 3.0 Two route modules that could not move yet
+
+`domain-routes.ts` (custom-domain binding) and `org-guard.ts` (slug validation)
+belong to tenancy by subject, but both need the request identity — and
+`@4dl/auth` depends on `@4dl/tenancy`, so putting them in tenancy is a cycle.
+
+They stay in `apps/api` until a route factory generic over the Hono environment
+lets tenancy declare only the context variables it reads (`host`, `user`,
+`tenantId`) structurally, without importing auth. That is a small piece of type
+work, scheduled with the template app in Stage 9 where the same pattern is needed
+for every other package's routes. Recorded here rather than left as a surprise.
 
 ### 3.1 Honest sizing
 

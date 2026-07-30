@@ -14,8 +14,8 @@
  * domain, provided the Turnstile widget lists (or allows) that domain.
  */
 
-import { getConfig } from "./billing-store.js";
-import type { Env } from "./env.js";
+import type { HasDb } from "@4dl/core";
+import { getConfig } from "@4dl/core";
 
 const SITEVERIFY = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
@@ -38,7 +38,7 @@ export interface TurnstileResult { ok: boolean; hostname?: string }
  * configured (disabled) so nothing is blocked before setup. When configured, a
  * missing/failed/host-mismatched token yields `{ ok: false }`.
  */
-export async function verifyTurnstile(env: Env, token: string | null, ip: string | undefined, host: string): Promise<TurnstileResult> {
+export async function verifyTurnstile(env: HasDb, token: string | null, ip: string | undefined, host: string): Promise<TurnstileResult> {
   const cfg = await getConfig(env.DB).catch(() => ({}) as Record<string, string>);
   const secret = cfg["turnstile.secret"];
   if (!secret) return { ok: true }; // disabled → pass
