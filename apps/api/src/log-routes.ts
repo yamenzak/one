@@ -110,6 +110,61 @@ function lastNDates(end: string, n: number): string[] {
 }
 const pt = (d: string, value: number): SeriesPoint => ({ date: d, label: shortDate(d), value });
 
+/**
+ * Fan a submitted check-in out to the per-metric tables the log drawer writes.
+ *
+ * Last write wins, deliberately: the check-in form pre-fills from these very
+ * tables, so an unchanged field submits the value it already held (a no-op) and
+ * a changed one is an intentional correction. `COALESCE(?, column)` guards the
+ * fields a partial submit omits, so sending a note does not erase a rating.
+ */
+async function writeThroughCheckIn(
+  db: D1Database,
+  client: { id: string; tenant_id: string },
+  d: {
+    date: string; weightKg?: number | null; sleepHours?: number | null; sleepQuality?: number | null;
+    mood?: number | null; energy?: number | null; stress?: number | null;
+  },
+): Promise<void> {
+  const now = nowIso();
+  const stmts: D1PreparedStatement[] = [];
+
+  if (d.weightKg != null) {
+    stmts.push(
+      db.prepare(
+        "INSERT INTO measurements (id, tenant_id, client_id, date_local, weight_kg, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(client_id, date_local) DO UPDATE SET weight_kg = excluded.weight_kg",
+      ).bind(newId("mea"), client.tenant_id, client.id, d.date, d.weightKg, now),
+    );
+  }
+  if (d.sleepHours != null || d.sleepQuality != null) {
+    const minutes = d.sleepHours != null ? Math.round(d.sleepHours * 60) : null;
+    stmts.push(
+      db.prepare(
+        `INSERT INTO sleep_logs (client_id, date_local, tenant_id, duration_minutes, quality, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(client_id, date_local) DO UPDATE SET
+           duration_minutes = COALESCE(excluded.duration_minutes, sleep_logs.duration_minutes),
+           quality = COALESCE(excluded.quality, sleep_logs.quality),
+           updated_at = excluded.updated_at`,
+      ).bind(client.id, d.date, client.tenant_id, minutes, d.sleepQuality ?? null, now),
+    );
+  }
+  if (d.mood != null || d.energy != null || d.stress != null) {
+    stmts.push(
+      db.prepare(
+        `INSERT INTO mood_logs (client_id, date_local, tenant_id, mood, energy, stress, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(client_id, date_local) DO UPDATE SET
+           mood = COALESCE(excluded.mood, mood_logs.mood),
+           energy = COALESCE(excluded.energy, mood_logs.energy),
+           stress = COALESCE(excluded.stress, mood_logs.stress),
+           updated_at = excluded.updated_at`,
+      ).bind(client.id, d.date, client.tenant_id, d.mood ?? null, d.energy ?? null, d.stress ?? null, now),
+    );
+  }
+  if (stmts.length) await db.batch(stmts);
+}
+
 export const logRoutes = new Hono<AppEnv>()
   // ── Structured workout sets: find-or-create one session per
   //    (client, plan, dayIndex, local day); upsert sets by setIndex. ─────────
@@ -1162,6 +1217,21 @@ export const logRoutes = new Hono<AppEnv>()
   })
 
   // ── Check-ins: one per local day; trainers write feedback. ────────────────
+  //
+  // A check-in is a REPORT, not a second place to store facts. Every metric it
+  // carries also has a purpose-built table, and for a long time only weight was
+  // mirrored across ("Mirror weight into measurements so progress prefers the
+  // dedicated table") — so sleep and mood lived in two independent stores, and
+  // each reader invented its own reconciliation: the home widget preferred the
+  // dedicated table, Progress read check_ins alone and therefore never showed a
+  // sleep logged from the log drawer, and the wellness score double-counted a
+  // day rated in both.
+  //
+  // `writeThroughCheckIn` closes that: the check-in writes every fact it holds
+  // into the same table the log drawer writes, and its own columns stay as a
+  // frozen as-at-submission SNAPSHOT for the coach's review. The snapshot is
+  // derived, so it cannot disagree with the logs the way an independently typed
+  // value could.
   .post("/check-ins", async (c) => {
     const parsed = withClient(SubmitCheckIn).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
@@ -1175,14 +1245,28 @@ export const logRoutes = new Hono<AppEnv>()
       .first<{ id: string }>();
     const photosJson = d.progressPhotos ? j(d.progressPhotos) : null;
     if (existing) {
+      // COALESCE, not a bare `?`: every column used to be set to `d.x ?? null`,
+      // so re-submitting a check-in to add a NOTE erased the mood, sleep and
+      // weight sent the first time. A field the caller omits now survives.
       await c.env.DB.prepare(
-        "UPDATE check_ins SET weight_kg = ?, mood = ?, energy = ?, stress = ?, sleep_quality = ?, sleep_hours = ?, water_ml = ?, steps_count = ?, notes = ?, photos_json = COALESCE(?, photos_json), updated_at = ? WHERE id = ?",
+        `UPDATE check_ins SET
+           weight_kg = COALESCE(?, weight_kg), mood = COALESCE(?, mood), energy = COALESCE(?, energy),
+           stress = COALESCE(?, stress), sleep_quality = COALESCE(?, sleep_quality),
+           sleep_hours = COALESCE(?, sleep_hours), water_ml = COALESCE(?, water_ml),
+           steps_count = COALESCE(?, steps_count), notes = COALESCE(?, notes),
+           photos_json = COALESCE(?, photos_json), updated_at = ?
+         WHERE id = ?`,
       )
         .bind(
           d.weightKg ?? null, d.mood ?? null, d.energy ?? null, d.stress ?? null, d.sleepQuality ?? null,
           d.sleepHours ?? null, d.waterMl ?? null, d.stepsCount ?? null, d.notes ?? null, photosJson, nowIso(), existing.id,
         )
         .run();
+      // The mirror used to run on the INSERT path only, so EDITING a check-in
+      // never reached the dedicated tables — the correction stayed invisible to
+      // Progress and to the wellness score.
+      await writeThroughCheckIn(c.env.DB, access.client, d);
+      if (d.weightKg != null) await recomputeBodyMetrics(c.env.DB, access.client, d.date);
       return c.json({ ok: true, id: existing.id, updated: true });
     }
     const id = newId("chk");
@@ -1210,15 +1294,9 @@ export const logRoutes = new Hono<AppEnv>()
     // day's row — treat that as an update, skipping the mirror + trainer notify
     // so a raced double-submit can't fire the "checked in" notification twice.
     if (rowId !== id) return c.json({ ok: true, id: rowId, updated: true });
-    // Mirror weight into measurements so progress prefers the dedicated table.
-    if (d.weightKg) {
-      await c.env.DB.prepare(
-        "INSERT INTO measurements (id, tenant_id, client_id, date_local, weight_kg, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(client_id, date_local) DO UPDATE SET weight_kg = COALESCE(measurements.weight_kg, excluded.weight_kg)",
-      )
-        .bind(newId("mea"), access.client.tenant_id, access.client.id, d.date, d.weightKg, nowIso())
-        .run();
-      await recomputeBodyMetrics(c.env.DB, access.client, d.date);
-    }
+    // Every fact the check-in carries, into the table that owns it.
+    await writeThroughCheckIn(c.env.DB, access.client, d);
+    if (d.weightKg != null) await recomputeBodyMetrics(c.env.DB, access.client, d.date);
     // Notify the primary trainer (fan-out fix: primary only, SPEC §2).
     const primary = await c.env.DB.prepare(
       "SELECT trainer_user_id FROM client_trainers WHERE client_id = ? ORDER BY is_primary DESC LIMIT 1",

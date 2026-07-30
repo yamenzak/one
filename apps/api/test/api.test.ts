@@ -2903,6 +2903,43 @@ describe("client preferences + body metrics + goal staleness", () => {
     expect(out.input.avgStress).toBe(3);
   });
 
+  it("sleep logged from the log drawer reaches the Progress chart", async () => {
+    // The regression this guards: Progress read `check_ins` ALONE, so a client
+    // who logged sleep from the log drawer saw it on Today and in their wellness
+    // score and then could not find it on their own sleep chart.
+    const id = await mkClient();
+    const today = new Date().toISOString().slice(0, 10);
+    await SELF.fetch(`${ORIGIN}/api/logs/sleep`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, data: { date: today, durationMinutes: 462, quality: 4 } }) });
+
+    const out = (await (await SELF.fetch(`${ORIGIN}/api/progress/${id}?range=30d`, { headers: H() })).json()) as {
+      wellness: { averages: { sleepHours: number | null; sleepQuality: number | null }; perDay: { date: string; sleepHours: number | null }[] };
+    };
+    expect(out.wellness.averages.sleepHours).toBe(7.7); // 462 min
+    // And sleep QUALITY, which nothing ever wrote into check_ins — so this
+    // pillar of the wellness index used to be permanently empty.
+    expect(out.wellness.averages.sleepQuality).toBe(4);
+    expect(out.wellness.perDay.find((d) => d.date === today)?.sleepHours).toBe(7.7);
+  });
+
+  it("a check-in writes through to the dedicated tables, and editing it still does", async () => {
+    const id = await mkClient();
+    const today = new Date().toISOString().slice(0, 10);
+
+    await SELF.fetch(`${ORIGIN}/api/check-ins`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, data: { date: today, sleepHours: 6, mood: 3, energy: 3 } }) });
+    const first = (await (await SELF.fetch(`${ORIGIN}/api/today?clientId=${id}&date=${today}`, { headers: H() })).json()) as { metrics: { sleepHours: number | null; mood: number | null } | null };
+    expect(first.metrics?.sleepHours).toBe(6);
+    expect(first.metrics?.mood).toBe(3);
+
+    // Re-submitting is an EDIT. The mirror used to run on insert only, so a
+    // correction never reached the dedicated tables.
+    await SELF.fetch(`${ORIGIN}/api/check-ins`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, data: { date: today, sleepHours: 8 } }) });
+    const after = (await (await SELF.fetch(`${ORIGIN}/api/today?clientId=${id}&date=${today}`, { headers: H() })).json()) as { metrics: { sleepHours: number | null; mood: number | null } | null };
+    expect(after.metrics?.sleepHours).toBe(8);
+    // …and the edit did not wipe the mood it never mentioned. The UPDATE used to
+    // set every column to `?? null`, so adding one field erased the others.
+    expect(after.metrics?.mood).toBe(3);
+  });
+
   it("Today bundle reports profile completeness", async () => {
     const id = await mkClient();
     const before = (await (await SELF.fetch(`${ORIGIN}/api/today?clientId=${id}&date=2026-01-10`, { headers: H() })).json()) as { profile: { complete: boolean; gaps: string[] } };
