@@ -224,7 +224,14 @@ function allowedWhileReadOnly(path: string): boolean {
     path.startsWith("/api/auth/") ||
     isStripeWebhook(path) ||
     path === "/api/context/switch" ||
+    // A person may always leave, and always take their data with them, whatever
+    // the studio owes. `/api/me/` covers a client deleting their own account.
     path.startsWith("/api/me/") ||
+    path.startsWith("/api/tenant/close") ||
+    // …and this covers the OWNER closing the studio. It was missing, which made
+    // a suspended studio a trap: every write refused, the copy saying "pay to
+    // restore", and no way to shut the thing down and end the relationship
+    // instead. Paying must be A way out, not the ONLY way out.
     path.startsWith("/api/inbox/")
   );
 }

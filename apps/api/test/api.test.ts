@@ -2168,6 +2168,20 @@ describe("custom domains (SPEC §14.1) — Host pins the tenant", () => {
       // Reads are never gated: a person's own data is not collateral.
       const read = await SELF.fetch("http://studio-one.localhost:8787/api/clients", { headers: auth(ownerCookie) });
       expect(read.status).toBe(200);
+
+      // LEAVING is always allowed. A suspended studio used to be a trap: every
+      // write refused, the copy saying "pay to restore", and no way to shut the
+      // studio down instead. Paying must be A way out, not the only one.
+      const close = await SELF.fetch("http://studio-one.localhost:8787/api/tenant/close/request-otp", {
+        method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: "{}",
+      });
+      expect(close.status, "an owner must be able to close a suspended studio").not.toBe(402);
+
+      // And a client may always delete their own account.
+      const mine = await SELF.fetch("http://studio-one.localhost:8787/api/me/delete/request-otp", {
+        method: "POST", headers: { "content-type": "application/json", ...auth(ownerCookie) }, body: "{}",
+      });
+      expect(mine.status).not.toBe(402);
     } finally {
       await db.prepare("UPDATE subscriptions SET status = ? WHERE tenant_id = ?").bind(prior?.status ?? "active", tenantId).run();
     }
