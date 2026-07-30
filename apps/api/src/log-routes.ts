@@ -14,6 +14,7 @@ import {
   LogMeasurement,
   LogMood,
   LogSleep,
+  LogSteps,
   LogWater,
   LogWorkoutSets,
   SubmitCheckIn,
@@ -123,7 +124,7 @@ async function writeThroughCheckIn(
   client: { id: string; tenant_id: string },
   d: {
     date: string; weightKg?: number | null; sleepHours?: number | null; sleepQuality?: number | null;
-    mood?: number | null; energy?: number | null; stress?: number | null;
+    mood?: number | null; energy?: number | null; stress?: number | null; stepsCount?: number | null;
   },
 ): Promise<void> {
   const now = nowIso();
@@ -160,6 +161,13 @@ async function writeThroughCheckIn(
            stress = COALESCE(excluded.stress, mood_logs.stress),
            updated_at = excluded.updated_at`,
       ).bind(client.id, d.date, client.tenant_id, d.mood ?? null, d.energy ?? null, d.stress ?? null, now),
+    );
+  }
+  if (d.stepsCount != null) {
+    stmts.push(
+      db.prepare(
+        "INSERT INTO steps_logs (client_id, date_local, tenant_id, steps, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(client_id, date_local) DO UPDATE SET steps = excluded.steps, updated_at = excluded.updated_at",
+      ).bind(client.id, d.date, client.tenant_id, d.stepsCount, now),
     );
   }
   if (stmts.length) await db.batch(stmts);
@@ -1124,6 +1132,21 @@ export const logRoutes = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
 
+  .post("/logs/steps", async (c) => {
+    const parsed = withClient(LogSteps).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, parsed.data.clientId);
+    if ("response" in access) return access.response;
+    { const g = await gateFeature(c, "wellnessLogging", access.client.id); if (g) return g; }
+    const d = parsed.data.data;
+    await c.env.DB.prepare(
+      "INSERT INTO steps_logs (client_id, date_local, tenant_id, steps, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(client_id, date_local) DO UPDATE SET steps = ?, updated_at = ?",
+    )
+      .bind(access.client.id, d.date, access.client.tenant_id, d.steps, nowIso(), d.steps, nowIso())
+      .run();
+    return c.json({ ok: true }, 201);
+  })
+
   .post("/logs/mood", async (c) => {
     const parsed = withClient(LogMood).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
@@ -1309,6 +1332,57 @@ export const logRoutes = new Hono<AppEnv>()
     return c.json({ ok: true, id }, 201);
   })
 
+  /**
+   * What the client has ALREADY logged for a day, so the check-in form can show
+   * it instead of asking again.
+   *
+   * The form used to open completely empty (`useState({})`), so a client who
+   * logged their sleep at 7am was handed a blank sleep box at 8pm. Worse, a
+   * blank was not neutral: submitting wrote NULL over the column Progress read
+   * as the truth. This endpoint is what lets the drawer become review-and-confirm
+   * — the common case is nothing to type at all.
+   *
+   * `source` is carried per field so the UI can say where a number came from. A
+   * value the client can see the provenance of is one they will trust rather
+   * than re-enter.
+   */
+  .get("/check-ins/prefill", async (c) => {
+    const clientId = c.req.query("clientId");
+    const date = c.req.query("date");
+    if (!clientId || !date) return c.json({ error: "clientId + date required" }, 400);
+    const access = await requireClientAccess(c, clientId);
+    if ("response" in access) return access.response;
+    const db = c.env.DB;
+    const [ci, sleep, mood, measure, water, stepsRow] = await Promise.all([
+      db.prepare("SELECT weight_kg, mood, energy, stress, sleep_quality, sleep_hours, steps_count, notes, photos_json FROM check_ins WHERE client_id = ? AND date_local = ?").bind(access.client.id, date).first<{ weight_kg: number | null; mood: number | null; energy: number | null; stress: number | null; sleep_quality: number | null; sleep_hours: number | null; steps_count: number | null; notes: string | null; photos_json: string | null }>(),
+      db.prepare("SELECT duration_minutes, quality FROM sleep_logs WHERE client_id = ? AND date_local = ?").bind(access.client.id, date).first<{ duration_minutes: number | null; quality: number | null }>(),
+      db.prepare("SELECT mood, energy, stress FROM mood_logs WHERE client_id = ? AND date_local = ?").bind(access.client.id, date).first<{ mood: number | null; energy: number | null; stress: number | null }>(),
+      db.prepare("SELECT weight_kg FROM measurements WHERE client_id = ? AND date_local = ?").bind(access.client.id, date).first<{ weight_kg: number | null }>(),
+      db.prepare("SELECT total_ml FROM water_logs WHERE client_id = ? AND date_local = ?").bind(access.client.id, date).first<{ total_ml: number | null }>(),
+      db.prepare("SELECT steps FROM steps_logs WHERE client_id = ? AND date_local = ?").bind(access.client.id, date).first<{ steps: number | null }>(),
+    ]);
+    // Dedicated table first, check-in snapshot as the fallback — the same
+    // precedence every other reader now uses.
+    const pick = <T,>(logged: T | null | undefined, snap: T | null | undefined): { value: T | null; source: "logged" | "checkin" | null } =>
+      logged != null ? { value: logged, source: "logged" } : snap != null ? { value: snap, source: "checkin" } : { value: null, source: null };
+
+    return c.json({
+      submitted: !!ci,
+      fields: {
+        weightKg: pick(measure?.weight_kg, ci?.weight_kg),
+        sleepHours: pick(sleep?.duration_minutes != null ? Math.round((sleep.duration_minutes / 60) * 10) / 10 : null, ci?.sleep_hours),
+        sleepQuality: pick(sleep?.quality, ci?.sleep_quality),
+        mood: pick(mood?.mood, ci?.mood),
+        energy: pick(mood?.energy, ci?.energy),
+        stress: pick(mood?.stress, ci?.stress),
+        steps: pick(stepsRow?.steps, ci?.steps_count),
+        waterMl: pick(water?.total_ml, null as number | null),
+      },
+      notes: ci?.notes ?? null,
+      photoCount: parseJson<string[]>(ci?.photos_json, []).length,
+    });
+  })
+
   .get("/check-ins", async (c) => {
     const clientId = c.req.query("clientId");
     if (!clientId) return c.json({ error: "clientId required" }, 400);
@@ -1452,7 +1526,7 @@ export const logRoutes = new Hono<AppEnv>()
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
     const db = c.env.DB;
-    const [food, water, workout, activities, checkIn, timeline, plans, checkInDates, pendingLabs, weights, sleep, mood, bodyMeasures, scans, suppTaken, supps] = await Promise.all([
+    const [food, water, workout, activities, checkIn, timeline, plans, checkInDates, pendingLabs, weights, sleep, mood, bodyMeasures, scans, stepsRow, suppTaken, supps] = await Promise.all([
       db
         .prepare(
           "SELECT COALESCE(SUM(calories),0) AS calories, COALESCE(SUM(protein_g),0) AS protein, COALESCE(SUM(carbs_g),0) AS carbs, COALESCE(SUM(fat_g),0) AS fat, MAX(target_calories) AS day_target_cal FROM food_entries WHERE client_id = ? AND date_local = ?",
@@ -1518,6 +1592,10 @@ export const logRoutes = new Hono<AppEnv>()
         .prepare("SELECT body_fat_percent, posture_severity, somatotype, date_local FROM body_scans WHERE client_id = ? AND date_local <= ? ORDER BY date_local DESC LIMIT 2")
         .bind(clientId, date)
         .all<{ body_fat_percent: number | null; posture_severity: string | null; somatotype: string | null; date_local: string }>(),
+      db
+        .prepare("SELECT steps FROM steps_logs WHERE client_id = ? AND date_local = ?")
+        .bind(clientId, date)
+        .first<{ steps: number | null }>(),
       db
         .prepare("SELECT COUNT(*) AS n FROM supplement_logs WHERE client_id = ? AND date_local = ?")
         .bind(clientId, date)
@@ -1625,7 +1703,7 @@ export const logRoutes = new Hono<AppEnv>()
         mood: mood?.mood ?? checkIn?.mood ?? null,
         energy: mood?.energy ?? checkIn?.energy ?? null,
         stress: mood?.stress ?? checkIn?.stress ?? null,
-        steps: checkIn?.steps_count ?? null,
+        steps: stepsRow?.steps ?? checkIn?.steps_count ?? null,
         activeMinutes: Math.round(activities?.minutes ?? 0),
         activityCount: activities?.n ?? 0,
         bodyFatPercent: bfNow?.body_fat_percent ?? null,

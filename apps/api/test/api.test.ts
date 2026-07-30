@@ -2940,6 +2940,40 @@ describe("client preferences + body metrics + goal staleness", () => {
     expect(after.metrics?.mood).toBe(3);
   });
 
+  it("the check-in prefill reports what was logged, with its provenance", async () => {
+    // This is what lets the drawer stop asking for facts the client already gave.
+    const id = await mkClient();
+    const today = new Date().toISOString().slice(0, 10);
+    await SELF.fetch(`${ORIGIN}/api/logs/sleep`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, data: { date: today, durationMinutes: 450, quality: 4 } }) });
+    await SELF.fetch(`${ORIGIN}/api/logs/steps`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, data: { date: today, steps: 8412 } }) });
+
+    const pre = (await (await SELF.fetch(`${ORIGIN}/api/check-ins/prefill?clientId=${id}&date=${today}`, { headers: H() })).json()) as {
+      submitted: boolean;
+      fields: Record<string, { value: number | null; source: string | null }>;
+    };
+    expect(pre.submitted).toBe(false);
+    expect(pre.fields.sleepHours).toEqual({ value: 7.5, source: "logged" });
+    expect(pre.fields.sleepQuality).toEqual({ value: 4, source: "logged" });
+    expect(pre.fields.steps).toEqual({ value: 8412, source: "logged" });
+    // Nothing recorded reads as null with no source — the one field that should
+    // actually ask for input.
+    expect(pre.fields.mood).toEqual({ value: null, source: null });
+  });
+
+  it("steps logged from the log drawer reach the Today bundle", async () => {
+    // Steps used to exist ONLY as check_ins.steps_count, so a client who never
+    // checked in could not record steps at all and the widget read "No data yet".
+    const id = await mkClient();
+    const today = new Date().toISOString().slice(0, 10);
+    await SELF.fetch(`${ORIGIN}/api/logs/steps`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, data: { date: today, steps: 9001 } }) });
+    const out = (await (await SELF.fetch(`${ORIGIN}/api/today?clientId=${id}&date=${today}`, { headers: H() })).json()) as { metrics: { steps: number | null } | null };
+    expect(out.metrics?.steps).toBe(9001);
+    // Re-logging REPLACES the day's total rather than adding to it.
+    await SELF.fetch(`${ORIGIN}/api/logs/steps`, { method: "POST", headers: H(), body: JSON.stringify({ clientId: id, data: { date: today, steps: 12000 } }) });
+    const again = (await (await SELF.fetch(`${ORIGIN}/api/today?clientId=${id}&date=${today}`, { headers: H() })).json()) as { metrics: { steps: number | null } | null };
+    expect(again.metrics?.steps).toBe(12000);
+  });
+
   it("Today bundle reports profile completeness", async () => {
     const id = await mkClient();
     const before = (await (await SELF.fetch(`${ORIGIN}/api/today?clientId=${id}&date=2026-01-10`, { headers: H() })).json()) as { profile: { complete: boolean; gaps: string[] } };

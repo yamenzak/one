@@ -84,6 +84,14 @@ export const LogSleep = z.object({
   notes: z.string().max(500).nullish(),
 });
 
+/** Steps: a daily total, replaced (not summed) on re-log — same as water's
+ *  total_ml. The device or the client reports the day's figure. */
+export const LogSteps = z.object({
+  date: LocalDate,
+  steps: z.number().int().min(0).max(200000),
+});
+export type LogSteps = z.infer<typeof LogSteps>;
+
 export const LogMood = z.object({
   date: LocalDate,
   mood: z.number().int().min(1).max(5).nullish(),
