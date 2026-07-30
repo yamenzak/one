@@ -68,7 +68,7 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
   const db = c.env.DB;
   const days = daysInRange(start, end);
 
-  const [measurements, checkIns, foods, sessions, activities, timeline, scans] = await Promise.all([
+  const [measurements, checkIns, foods, sessions, activities, timeline, scans, sleepRows, moodRows] = await Promise.all([
     db.prepare("SELECT date_local, weight_kg, body_fat_percent, waist_cm, neck_cm, hips_cm, chest_cm FROM measurements WHERE client_id=? AND date_local>=? AND date_local<=? ORDER BY date_local").bind(clientId, start, end).all<{ date_local: string; weight_kg: number | null; body_fat_percent: number | null; waist_cm: number | null; neck_cm: number | null; hips_cm: number | null; chest_cm: number | null }>(),
     db.prepare("SELECT date_local, mood, energy, stress, sleep_quality, sleep_hours FROM check_ins WHERE client_id=? AND date_local>=? AND date_local<=? ORDER BY date_local").bind(clientId, start, end).all<{ date_local: string; mood: number | null; energy: number | null; stress: number | null; sleep_quality: number | null; sleep_hours: number | null }>(),
     db.prepare("SELECT date_local, SUM(calories) AS calories, SUM(protein_g) AS protein, SUM(carbs_g) AS carbs, SUM(fat_g) AS fat, MAX(target_calories) AS day_target_cal FROM food_entries WHERE client_id=? AND date_local>=? AND date_local<=? GROUP BY date_local").bind(clientId, start, end).all<{ date_local: string; calories: number; protein: number; carbs: number; fat: number; day_target_cal: number | null }>(),
@@ -76,6 +76,14 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
     db.prepare("SELECT date_local, duration_min, calories FROM activity_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(clientId, start, end).all<{ date_local: string; duration_min: number | null; calories: number | null }>(),
     loadGoalTimeline(db, clientId),
     db.prepare("SELECT date_local, posture_cva_deg, posture_severity, somatotype FROM body_scans WHERE client_id=? AND date_local>=? AND date_local<=? ORDER BY date_local").bind(clientId, start, end).all<{ date_local: string; posture_cva_deg: number | null; posture_severity: string | null; somatotype: string | null }>(),
+    // The dedicated wellness stores. Progress used to read `check_ins` ALONE, so
+    // a sleep or mood logged from the log drawer never reached these charts —
+    // the client saw it on Today and in their wellness score, then could not
+    // find it here. The check-in writes through to both tables now, but a client
+    // who only ever uses the log drawer still has no `check_ins` row at all, so
+    // the charts have to read them directly.
+    db.prepare("SELECT date_local, duration_minutes, quality FROM sleep_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(clientId, start, end).all<{ date_local: string; duration_minutes: number | null; quality: number | null }>(),
+    db.prepare("SELECT date_local, mood, energy, stress FROM mood_logs WHERE client_id=? AND date_local>=? AND date_local<=?").bind(clientId, start, end).all<{ date_local: string; mood: number | null; energy: number | null; stress: number | null }>(),
   ]);
 
   const mRows = measurements.results ?? [];
@@ -156,12 +164,40 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
   const prs = [...bestByExercise.entries()].map(([id, v]) => ({ exerciseId: id, name: nameById.get(id)?.name ?? "Exercise", thumb: nameById.get(id)?.thumb ?? null, e1rm: Math.round(v.e1rm * 10) / 10, weight: v.weight, reps: v.reps })).sort((a, b) => b.e1rm - a.e1rm).slice(0, 12);
 
   // ── Wellness: per-day ratings, averages, radar, index ──
-  const wellnessPerDay = days.map((d) => { const r = ciRows.find((x) => x.date_local === d); return { date: d, mood: r?.mood ?? null, energy: r?.energy ?? null, stress: r?.stress ?? null, sleepQuality: r?.sleep_quality ?? null, sleepHours: r?.sleep_hours ?? null }; });
-  const avgMood = averageRating(ciRows.map((r) => r.mood));
-  const avgEnergy = averageRating(ciRows.map((r) => r.energy));
-  const avgStress = averageRating(ciRows.map((r) => r.stress));
-  const avgSleepQ = averageRating(ciRows.map((r) => r.sleep_quality));
-  const sleepH = ciRows.map((r) => r.sleep_hours).filter((h): h is number => h != null);
+  //
+  // ONE reading per day, merged per FIELD with the dedicated table winning —
+  // the same rule `/api/wellness/score` uses, so the chart and the score cannot
+  // tell different stories about the same week. Per-field rather than per-row
+  // because a day can legitimately have its mood from the log drawer and its
+  // stress from the check-in, and a wholesale preference would drop one of them.
+  //
+  // `sleep_quality` deserves a note: nothing writes `check_ins.sleep_quality`
+  // from the app, so before this the whole sleep-quality pillar of the index was
+  // permanently null and silently redistributed away. `sleep_logs.quality` is
+  // where the log drawer has always put it.
+  interface Well { mood: number | null; energy: number | null; stress: number | null; sleepQuality: number | null; sleepHours: number | null }
+  const wellByDay = new Map<string, Well>();
+  const blank = (): Well => ({ mood: null, energy: null, stress: null, sleepQuality: null, sleepHours: null });
+  const merge = (date: string, patch: Partial<Well>, wins: boolean) => {
+    const cur = wellByDay.get(date) ?? blank();
+    for (const k of ["mood", "energy", "stress", "sleepQuality", "sleepHours"] as const) {
+      const v = patch[k];
+      if (v == null) continue;
+      if (wins || cur[k] == null) cur[k] = v;
+    }
+    wellByDay.set(date, cur);
+  };
+  for (const r of ciRows) merge(r.date_local, { mood: r.mood, energy: r.energy, stress: r.stress, sleepQuality: r.sleep_quality, sleepHours: r.sleep_hours }, false);
+  for (const r of sleepRows.results ?? []) merge(r.date_local, { sleepQuality: r.quality, sleepHours: r.duration_minutes != null ? Math.round((r.duration_minutes / 60) * 10) / 10 : null }, true);
+  for (const r of moodRows.results ?? []) merge(r.date_local, { mood: r.mood, energy: r.energy, stress: r.stress }, true);
+
+  const wellnessPerDay = days.map((d) => ({ date: d, ...(wellByDay.get(d) ?? blank()) }));
+  const wellRows = [...wellByDay.values()];
+  const avgMood = averageRating(wellRows.map((r) => r.mood));
+  const avgEnergy = averageRating(wellRows.map((r) => r.energy));
+  const avgStress = averageRating(wellRows.map((r) => r.stress));
+  const avgSleepQ = averageRating(wellRows.map((r) => r.sleepQuality));
+  const sleepH = wellRows.map((r) => r.sleepHours).filter((h): h is number => h != null);
   const avgSleepHours = sleepH.length ? Math.round((sleepH.reduce((a, b) => a + b, 0) / sleepH.length) * 10) / 10 : null;
   const index = wellnessIndex({ mood: avgMood, energy: avgEnergy, sleepQuality: avgSleepQ, stress: avgStress });
 

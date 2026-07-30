@@ -4,8 +4,8 @@
  * and a rich check-in with progress photos + consent.
  */
 
-import { useState } from "react";
-import { ACTIVITIES, activitiesByCategory, activityTrack, weightLabel, lengthLabel, volumeLabel, energyLabel, displayToKg, lengthDisplayToCm, volumeDisplayToMl, displayToKcal, kcalToDisplay } from "@kova/domain";
+import { useEffect, useState } from "react";
+import { ACTIVITIES, activitiesByCategory, activityTrack, weightLabel, lengthLabel, volumeLabel, energyLabel, displayToKg, lengthDisplayToCm, volumeDisplayToMl, displayToKcal, kcalToDisplay, kgToDisplay } from "@kova/domain";
 import {
   Button, Field, Textarea, Sheet, Chip, IconBadge, Switch,
   Utensils, Footprints, Droplet, Weight, Ruler, Moon, Smile, ClipboardList, Camera, Angry, Frown, Meh, Laugh, Search, Timer, HeartPulse, MapPin, Flame, Dumbbell,
@@ -22,7 +22,7 @@ import { activityIcon } from "./activityIcons.js";
 import { SCALES, type ScaleKey } from "./scales.js";
 import { BodyScanLauncher } from "./bodyscan/BodyScanLauncher.js";
 
-type LogKind = "food" | "activity" | "water" | "weight" | "body" | "sleep" | "mood" | "checkin";
+type LogKind = "food" | "activity" | "water" | "weight" | "body" | "sleep" | "mood" | "steps" | "checkin";
 const CHIPS: { kind: LogKind; label: string; icon: LucideIcon; tone: Tone }[] = [
   { kind: "food", label: "Food", icon: Utensils, tone: "nutrition" },
   { kind: "activity", label: "Activity", icon: Footprints, tone: "cardio" },
@@ -31,6 +31,7 @@ const CHIPS: { kind: LogKind; label: string; icon: LucideIcon; tone: Tone }[] = 
   { kind: "body", label: "Body", icon: Ruler, tone: "cardio" },
   { kind: "sleep", label: "Sleep", icon: Moon, tone: "sleep" },
   { kind: "mood", label: "Mood", icon: Smile, tone: "nutrition" },
+  { kind: "steps", label: "Steps", icon: Footprints, tone: "activity" },
   { kind: "checkin", label: "Check-in", icon: ClipboardList, tone: "primary" },
 ];
 const MOOD_ICONS = [Angry, Frown, Meh, Smile, Laugh];
@@ -52,6 +53,7 @@ const KIND_TITLE: Record<LogKind, string> = {
   body: "Body measurements",
   sleep: "Log sleep",
   mood: "Log mood",
+  steps: "Log steps",
   checkin: "Daily check-in",
 };
 
@@ -96,6 +98,29 @@ function Rating({ label, scale, value, onChange }: { label: string; scale: Scale
   );
 }
 
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * Where a pre-filled number came from, in the field's hint slot.
+ *
+ * Provenance is what turns a pre-filled box from "did the app guess this?" into
+ * "yes, that's the one I logged" — without it a client re-types a correct value
+ * just to be sure, which is the double-entry problem wearing a different hat.
+ */
+function srcHint(pre: Prefill | null, key: keyof Prefill["fields"]): string | undefined {
+  const f = pre?.fields[key];
+  if (!f || f.value == null) return undefined;
+  return f.source === "logged" ? "From today's log" : "From your last check-in";
+}
+
+type PreField = { value: number | null; source: "logged" | "checkin" | null };
+interface Prefill {
+  submitted: boolean;
+  fields: Record<"weightKg" | "sleepHours" | "sleepQuality" | "mood" | "energy" | "stress" | "steps" | "waterMl", PreField>;
+  notes: string | null;
+  photoCount: number;
+}
+
 export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { open: boolean; onClose: () => void; clientId: string; onLogged: () => void; initialKind?: LogKind }) {
   const [kindState, setKind] = useState<LogKind | null>(initialKind ?? null);
   const [foodMode, setFoodMode] = useState(false);
@@ -111,6 +136,16 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
   // The write is parked in the service-worker queue — reassure, don't alarm.
   const [queued, setQueued] = useState(false);
   const [photoErr, setPhotoErr] = useState<string | null>(null);
+  /**
+   * What this day already holds, for the CHECK-IN form only.
+   *
+   * The check-in used to open completely empty, so a client who logged their
+   * sleep at 7am was handed a blank sleep box at 8pm — and leaving it blank was
+   * not neutral, it wrote NULL over the value Progress read as the truth. The
+   * check-in is a REPORT, so it now shows what you logged and only asks for what
+   * is missing. `source` per field is what lets it say so.
+   */
+  const [pre, setPre] = useState<Prefill | null>(null);
   const date = todayLocal();
   const units = useUnits();
   const ai = useAiIdentity();
@@ -200,6 +235,36 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
 
   // Guard decimal inputs before posting: [field, min, max, human label]. A blank
   // field is skipped; a set field must parse to a finite number in range.
+  // Load once, when the check-in form is actually opened — every other form
+  // needs nothing, so this never fires for them.
+  useEffect(() => {
+    if (kind !== "checkin") return;
+    let live = true;
+    void api.get<Prefill>(`/api/check-ins/prefill?clientId=${clientId}&date=${date}`)
+      .then((r) => {
+        if (!live) return;
+        setPre(r);
+        // Seed the form with what is already known, so an untouched field
+        // re-submits the value it held (a no-op) rather than a blank.
+        const v = r.fields;
+        setF((cur) => ({
+          ...cur,
+          ...(v.weightKg.value != null && cur.weight == null ? { weight: String(round1(kgToDisplay(v.weightKg.value, units))) } : {}),
+          ...(v.sleepHours.value != null && cur.sleepHours == null ? { sleepHours: String(v.sleepHours.value) } : {}),
+          ...(v.steps.value != null && cur.steps == null ? { steps: String(v.steps.value) } : {}),
+          ...(r.notes && cur.notes == null ? { notes: r.notes } : {}),
+        }));
+        setRatings((cur) => ({
+          mood: cur.mood ?? v.mood.value,
+          energy: cur.energy ?? v.energy.value,
+          stress: cur.stress ?? v.stress.value,
+          sleepQ: cur.sleepQ ?? v.sleepQuality.value,
+        }));
+      })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, [kind, clientId, date, units]);
+
   const decChecks = (): [string, number, number, string][] => {
     if (kind === "weight") return [["amount", 20, 1100, "weight"]];
     if (kind === "body") return [["weight", 20, 1100, "weight"], ["bf", 1, 75, "body fat %"], ["neck", 5, 400, "neck size"], ["waist", 5, 400, "waist size"], ["hips", 5, 400, "hip size"], ["chest", 5, 400, "chest size"]];
@@ -243,7 +308,8 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
       else if (kind === "mood") await api.post("/api/logs/mood", { clientId, data: { date, mood: ratings.mood ?? undefined, energy: ratings.energy ?? undefined, stress: ratings.stress ?? undefined, notes: f.notes || undefined } });
       // Only send what the form actually rendered — an un-asked-for field must
       // not arrive as a value the coach then sees on the check-in.
-      else if (kind === "checkin") await api.post("/api/check-ins", { clientId, data: { date, weightKg: ciMeasurements ? kg("weight") : undefined, mood: ciMood ? (ratings.mood ?? undefined) : undefined, energy: ciMood ? (ratings.energy ?? undefined) : undefined, stress: ciStress ? (ratings.stress ?? undefined) : undefined, sleepHours: ciSleep ? num("sleepHours") : undefined, stepsCount: num("steps"), notes: f.notes || undefined, progressPhotos: ciPhotos && photos.length ? photos : undefined } });
+      else if (kind === "steps") await api.post("/api/logs/steps", { clientId, data: { date, steps: Number(f.steps ?? 0) } });
+      else if (kind === "checkin") await api.post("/api/check-ins", { clientId, data: { date, weightKg: ciMeasurements ? kg("weight") : undefined, mood: ciMood ? (ratings.mood ?? undefined) : undefined, energy: ciMood ? (ratings.energy ?? undefined) : undefined, stress: ciStress ? (ratings.stress ?? undefined) : undefined, sleepHours: ciSleep ? num("sleepHours") : undefined, sleepQuality: ciSleep ? (ratings.sleepQ ?? undefined) : undefined, stepsCount: num("steps"), notes: f.notes || undefined, progressPhotos: ciPhotos && photos.length ? photos : undefined } });
       onLogged();
       close();
     } catch (e) {
@@ -395,21 +461,37 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
             <Field label="Hours slept" icon={Moon} inputMode="decimal" value={f.hours ?? ""} onChange={(e) => setDec("hours", e.target.value)} />
             <Rating label="Quality" scale="sleepQ" value={ratings.sleepQ} onChange={(n) => setRatings((r) => ({ ...r, sleepQ: n }))} />
           </>)}
+          {kind === "steps" && (
+            <Field label="Steps" inputMode="numeric" hint="Your total for the day — logging again replaces it." value={f.steps ?? ""} onChange={(e) => set("steps", e.target.value.replace(/\D/g, ""))} />
+          )}
           {kind === "mood" && (<>
             <Rating label="Mood" scale="mood" value={ratings.mood} onChange={(n) => setRatings((r) => ({ ...r, mood: n }))} />
             <Rating label="Energy" scale="energy" value={ratings.energy} onChange={(n) => setRatings((r) => ({ ...r, energy: n }))} />
             <Rating label="Stress" scale="stress" value={ratings.stress} onChange={(n) => setRatings((r) => ({ ...r, stress: n }))} />
           </>)}
           {kind === "checkin" && (<>
+            {/*
+              A check-in is a REPORT, not a second place to type facts.
+              Everything numeric here is pre-filled from what this day already
+              holds, so the common case is nothing to change — read it, add a
+              photo and a note, send. A field that came from a log says so; a
+              field with nothing in it is the only one asking for input.
+            */}
+            <p className="text-caption text-muted-foreground">
+              {pre?.submitted
+                ? "You already checked in today. Anything you change updates it."
+                : "Here's your day so far. Change anything that's off, then send it to your coach."}
+            </p>
             {/* Form composition from the package's check-in flags. */}
             <div className="grid grid-cols-2 gap-3">
-              {ciMeasurements && <Field label={`Weight (${weightLabel(units)})`} inputMode="decimal" value={f.weight ?? ""} onChange={(e) => setDec("weight", e.target.value)} />}
-              {ciSleep && <Field label="Sleep (hrs)" inputMode="decimal" value={f.sleepHours ?? ""} onChange={(e) => setDec("sleepHours", e.target.value)} />}
+              {ciMeasurements && <Field label={`Weight (${weightLabel(units)})`} hint={srcHint(pre, "weightKg")} inputMode="decimal" value={f.weight ?? ""} onChange={(e) => setDec("weight", e.target.value)} />}
+              {ciSleep && <Field label="Sleep (hrs)" hint={srcHint(pre, "sleepHours")} inputMode="decimal" value={f.sleepHours ?? ""} onChange={(e) => setDec("sleepHours", e.target.value)} />}
               {/* Steps is the odd one out of three, so it takes the whole row
                   rather than leaving a hole beside itself. When the package
                   drops weight or sleep it falls back into the pair. */}
-              <Field className={ciMeasurements !== ciSleep ? undefined : "col-span-2"} label="Steps" inputMode="numeric" value={f.steps ?? ""} onChange={(e) => set("steps", e.target.value.replace(/\D/g, ""))} />
+              <Field className={ciMeasurements !== ciSleep ? undefined : "col-span-2"} label="Steps" hint={srcHint(pre, "steps")} inputMode="numeric" value={f.steps ?? ""} onChange={(e) => set("steps", e.target.value.replace(/\D/g, ""))} />
             </div>
+            {ciSleep && <Rating label="Sleep quality" scale="sleepQ" value={ratings.sleepQ} onChange={(n) => setRatings((r) => ({ ...r, sleepQ: n }))} />}
             {ciMood && <Rating label="Mood" scale="mood" value={ratings.mood} onChange={(n) => setRatings((r) => ({ ...r, mood: n }))} />}
             {ciMood && <Rating label="Energy" scale="energy" value={ratings.energy} onChange={(n) => setRatings((r) => ({ ...r, energy: n }))} />}
             {ciStress && <Rating label="Stress" scale="stress" value={ratings.stress} onChange={(n) => setRatings((r) => ({ ...r, stress: n }))} />}

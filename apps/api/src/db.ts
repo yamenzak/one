@@ -19,7 +19,12 @@ let schemaReady: Promise<void> | null = null;
  *  isolate. A matching `schema_version` marker row lets subsequent cold starts
  *  skip the full DDL+ALTER+backfill (a single SELECT instead of ~110 DDL + ~45
  *  ALTER round-trips against live D1). */
-const SCHEMA_VERSION = "2026-07-30";
+// Bumped for `steps_logs`. Adding DDL WITHOUT bumping this is silent in dev on a
+// fresh database and fatal on any existing one — the marker short-circuits the
+// whole DDL block, so the new table is simply never created and every route
+// touching it 500s with "no such table". The E2E suite caught exactly that,
+// because it runs against a persisted .wrangler D1 rather than a clean one.
+const SCHEMA_VERSION = "2026-07-30b";
 
 export function ensureSchema(db: D1Database): Promise<void> {
   if (!schemaReady) {
@@ -139,6 +144,11 @@ async function applySchema(db: D1Database): Promise<void> {
           "CREATE TABLE IF NOT EXISTS food_entries (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, meal_type TEXT, food_id TEXT, label TEXT, quantity REAL, unit TEXT, calories REAL DEFAULT 0, protein_g REAL DEFAULT 0, carbs_g REAL DEFAULT 0, fat_g REAL DEFAULT 0, source TEXT DEFAULT 'self_logged', meal_plan_id TEXT, meal_option_index INTEGER, image_url TEXT, created_at TEXT);",
           "CREATE INDEX IF NOT EXISTS idx_fentries_client ON food_entries(client_id, date_local);",
           "CREATE TABLE IF NOT EXISTS water_logs (client_id TEXT, date_local TEXT, tenant_id TEXT, total_ml INTEGER DEFAULT 0, entries_json TEXT, updated_at TEXT, PRIMARY KEY (client_id, date_local));",
+          // Steps: a daily self-logged total, exactly the shape of water_logs.
+          // It existed ONLY as `check_ins.steps_count`, so a client who did not
+          // check in had no way to record steps at all — and the home Steps
+          // widget read "No data yet" for them permanently.
+          "CREATE TABLE IF NOT EXISTS steps_logs (client_id TEXT, date_local TEXT, tenant_id TEXT, steps INTEGER, updated_at TEXT, PRIMARY KEY (client_id, date_local));",
           "CREATE TABLE IF NOT EXISTS sleep_logs (client_id TEXT, date_local TEXT, tenant_id TEXT, duration_minutes INTEGER, quality INTEGER, notes TEXT, updated_at TEXT, PRIMARY KEY (client_id, date_local));",
           "CREATE TABLE IF NOT EXISTS mood_logs (client_id TEXT, date_local TEXT, tenant_id TEXT, mood INTEGER, energy INTEGER, stress INTEGER, notes TEXT, updated_at TEXT, PRIMARY KEY (client_id, date_local));",
           "CREATE TABLE IF NOT EXISTS measurements (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, weight_kg REAL, body_fat_percent REAL, neck_cm REAL, waist_cm REAL, hips_cm REAL, chest_cm REAL, notes TEXT, created_at TEXT);",

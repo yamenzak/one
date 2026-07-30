@@ -35,7 +35,7 @@ import { DEFAULT_PLANS } from "./billing-store.js";
 const CLIENT_TABLES = [
   "client_goals", "client_trainers", "workout_plans", "swap_requests", "meal_plans",
   "meal_arrangements", "exercise_logs", "exercise_prs", "activity_logs", "food_entries",
-  "water_logs", "sleep_logs", "mood_logs", "measurements", "body_scans", "check_ins",
+  "water_logs", "sleep_logs", "mood_logs", "steps_logs", "measurements", "body_scans", "check_ins",
   "fasting_sessions", "supplements", "supplement_logs", "lab_tests", "client_subscriptions",
   "redemption_uses", "trainer_sessions", "audit_log", "plan_variants", "ai_generations",
   "media_assets",
@@ -48,7 +48,7 @@ const TENANT_TABLES = [
   "client_trainers", "client_goals", "exercises", "exercise_alternatives", "workout_plans",
   "workout_templates", "swap_requests", "foods", "meal_plans", "meal_templates",
   "meal_arrangements", "exercise_logs", "exercise_prs", "activity_logs", "food_entries",
-  "water_logs", "sleep_logs", "mood_logs", "measurements", "body_scans", "tts_cues",
+  "water_logs", "sleep_logs", "mood_logs", "steps_logs", "measurements", "body_scans", "tts_cues",
   "check_ins", "fasting_sessions", "supplements", "supplement_logs", "lab_tests", "packages",
   "client_subscriptions", "redemption_codes", "promo_codes", "addon_types", "trainer_sessions",
   "email_templates", "resources", "notifications", "tenant_settings", "tenant_domains",

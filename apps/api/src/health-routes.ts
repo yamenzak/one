@@ -390,9 +390,36 @@ export const healthRoutes = new Hono<AppEnv>()
     for (const ci of checkins.results ?? []) if (ci.sleep_hours != null && !(sleeps.results ?? []).some((s) => s.date_local === ci.date_local)) sleepHours.push(ci.sleep_hours);
     const avgSleepHours = sleepHours.length ? sleepHours.reduce((a, b) => a + b, 0) / sleepHours.length : null;
 
-    // Mood/energy/stress: check-ins + mood logs.
+    /**
+     * Mood/energy/stress: ONE reading per day, whichever door it came through.
+     *
+     * This used to concatenate `check_ins` and `mood_logs` with no
+     * de-duplication — unlike the sleep block five lines above, which
+     * explicitly skips a check-in whose date already has a sleep log. So a
+     * client who rated their mood in the log drawer AND again at check-in had
+     * that day counted twice in the average, silently giving it double the
+     * weight of every other day in the mood, energy and stress pillars.
+     * Identical values hid it; different ones (a flat morning, a good evening)
+     * skewed the score.
+     *
+     * Merged per DATE and per FIELD, dedicated table winning: `mood_logs` is
+     * the purpose-built store, and a per-field merge means a day with mood in
+     * one place and energy in the other keeps both rather than dropping half.
+     */
+    const byDay = new Map<string, { mood: number | null; energy: number | null; stress: number | null }>();
+    const put = (date: string, r: { mood: number | null; energy: number | null; stress: number | null }, wins: boolean) => {
+      const cur = byDay.get(date) ?? { mood: null, energy: null, stress: null };
+      for (const k of ["mood", "energy", "stress"] as const) {
+        if (r[k] == null) continue;
+        if (wins || cur[k] == null) cur[k] = r[k];
+      }
+      byDay.set(date, cur);
+    };
+    for (const ci of checkins.results ?? []) put(ci.date_local, ci, false);
+    for (const m of moods.results ?? []) put(m.date_local, m, true);
+
     const moodV: number[] = [], enV: number[] = [], stV: number[] = [];
-    for (const r of [...(checkins.results ?? []), ...(moods.results ?? [])]) {
+    for (const r of byDay.values()) {
       if (r.mood != null) moodV.push(r.mood);
       if (r.energy != null) enV.push(r.energy);
       if (r.stress != null) stV.push(r.stress);

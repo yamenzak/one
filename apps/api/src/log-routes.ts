@@ -14,6 +14,7 @@ import {
   LogMeasurement,
   LogMood,
   LogSleep,
+  LogSteps,
   LogWater,
   LogWorkoutSets,
   SubmitCheckIn,
@@ -109,6 +110,68 @@ function lastNDates(end: string, n: number): string[] {
   return out;
 }
 const pt = (d: string, value: number): SeriesPoint => ({ date: d, label: shortDate(d), value });
+
+/**
+ * Fan a submitted check-in out to the per-metric tables the log drawer writes.
+ *
+ * Last write wins, deliberately: the check-in form pre-fills from these very
+ * tables, so an unchanged field submits the value it already held (a no-op) and
+ * a changed one is an intentional correction. `COALESCE(?, column)` guards the
+ * fields a partial submit omits, so sending a note does not erase a rating.
+ */
+async function writeThroughCheckIn(
+  db: D1Database,
+  client: { id: string; tenant_id: string },
+  d: {
+    date: string; weightKg?: number | null; sleepHours?: number | null; sleepQuality?: number | null;
+    mood?: number | null; energy?: number | null; stress?: number | null; stepsCount?: number | null;
+  },
+): Promise<void> {
+  const now = nowIso();
+  const stmts: D1PreparedStatement[] = [];
+
+  if (d.weightKg != null) {
+    stmts.push(
+      db.prepare(
+        "INSERT INTO measurements (id, tenant_id, client_id, date_local, weight_kg, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(client_id, date_local) DO UPDATE SET weight_kg = excluded.weight_kg",
+      ).bind(newId("mea"), client.tenant_id, client.id, d.date, d.weightKg, now),
+    );
+  }
+  if (d.sleepHours != null || d.sleepQuality != null) {
+    const minutes = d.sleepHours != null ? Math.round(d.sleepHours * 60) : null;
+    stmts.push(
+      db.prepare(
+        `INSERT INTO sleep_logs (client_id, date_local, tenant_id, duration_minutes, quality, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(client_id, date_local) DO UPDATE SET
+           duration_minutes = COALESCE(excluded.duration_minutes, sleep_logs.duration_minutes),
+           quality = COALESCE(excluded.quality, sleep_logs.quality),
+           updated_at = excluded.updated_at`,
+      ).bind(client.id, d.date, client.tenant_id, minutes, d.sleepQuality ?? null, now),
+    );
+  }
+  if (d.mood != null || d.energy != null || d.stress != null) {
+    stmts.push(
+      db.prepare(
+        `INSERT INTO mood_logs (client_id, date_local, tenant_id, mood, energy, stress, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(client_id, date_local) DO UPDATE SET
+           mood = COALESCE(excluded.mood, mood_logs.mood),
+           energy = COALESCE(excluded.energy, mood_logs.energy),
+           stress = COALESCE(excluded.stress, mood_logs.stress),
+           updated_at = excluded.updated_at`,
+      ).bind(client.id, d.date, client.tenant_id, d.mood ?? null, d.energy ?? null, d.stress ?? null, now),
+    );
+  }
+  if (d.stepsCount != null) {
+    stmts.push(
+      db.prepare(
+        "INSERT INTO steps_logs (client_id, date_local, tenant_id, steps, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(client_id, date_local) DO UPDATE SET steps = excluded.steps, updated_at = excluded.updated_at",
+      ).bind(client.id, d.date, client.tenant_id, d.stepsCount, now),
+    );
+  }
+  if (stmts.length) await db.batch(stmts);
+}
 
 export const logRoutes = new Hono<AppEnv>()
   // ── Structured workout sets: find-or-create one session per
@@ -1069,6 +1132,21 @@ export const logRoutes = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
 
+  .post("/logs/steps", async (c) => {
+    const parsed = withClient(LogSteps).safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
+    const access = await requireClientAccess(c, parsed.data.clientId);
+    if ("response" in access) return access.response;
+    { const g = await gateFeature(c, "wellnessLogging", access.client.id); if (g) return g; }
+    const d = parsed.data.data;
+    await c.env.DB.prepare(
+      "INSERT INTO steps_logs (client_id, date_local, tenant_id, steps, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(client_id, date_local) DO UPDATE SET steps = ?, updated_at = ?",
+    )
+      .bind(access.client.id, d.date, access.client.tenant_id, d.steps, nowIso(), d.steps, nowIso())
+      .run();
+    return c.json({ ok: true }, 201);
+  })
+
   .post("/logs/mood", async (c) => {
     const parsed = withClient(LogMood).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
@@ -1162,6 +1240,21 @@ export const logRoutes = new Hono<AppEnv>()
   })
 
   // ── Check-ins: one per local day; trainers write feedback. ────────────────
+  //
+  // A check-in is a REPORT, not a second place to store facts. Every metric it
+  // carries also has a purpose-built table, and for a long time only weight was
+  // mirrored across ("Mirror weight into measurements so progress prefers the
+  // dedicated table") — so sleep and mood lived in two independent stores, and
+  // each reader invented its own reconciliation: the home widget preferred the
+  // dedicated table, Progress read check_ins alone and therefore never showed a
+  // sleep logged from the log drawer, and the wellness score double-counted a
+  // day rated in both.
+  //
+  // `writeThroughCheckIn` closes that: the check-in writes every fact it holds
+  // into the same table the log drawer writes, and its own columns stay as a
+  // frozen as-at-submission SNAPSHOT for the coach's review. The snapshot is
+  // derived, so it cannot disagree with the logs the way an independently typed
+  // value could.
   .post("/check-ins", async (c) => {
     const parsed = withClient(SubmitCheckIn).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
@@ -1175,14 +1268,28 @@ export const logRoutes = new Hono<AppEnv>()
       .first<{ id: string }>();
     const photosJson = d.progressPhotos ? j(d.progressPhotos) : null;
     if (existing) {
+      // COALESCE, not a bare `?`: every column used to be set to `d.x ?? null`,
+      // so re-submitting a check-in to add a NOTE erased the mood, sleep and
+      // weight sent the first time. A field the caller omits now survives.
       await c.env.DB.prepare(
-        "UPDATE check_ins SET weight_kg = ?, mood = ?, energy = ?, stress = ?, sleep_quality = ?, sleep_hours = ?, water_ml = ?, steps_count = ?, notes = ?, photos_json = COALESCE(?, photos_json), updated_at = ? WHERE id = ?",
+        `UPDATE check_ins SET
+           weight_kg = COALESCE(?, weight_kg), mood = COALESCE(?, mood), energy = COALESCE(?, energy),
+           stress = COALESCE(?, stress), sleep_quality = COALESCE(?, sleep_quality),
+           sleep_hours = COALESCE(?, sleep_hours), water_ml = COALESCE(?, water_ml),
+           steps_count = COALESCE(?, steps_count), notes = COALESCE(?, notes),
+           photos_json = COALESCE(?, photos_json), updated_at = ?
+         WHERE id = ?`,
       )
         .bind(
           d.weightKg ?? null, d.mood ?? null, d.energy ?? null, d.stress ?? null, d.sleepQuality ?? null,
           d.sleepHours ?? null, d.waterMl ?? null, d.stepsCount ?? null, d.notes ?? null, photosJson, nowIso(), existing.id,
         )
         .run();
+      // The mirror used to run on the INSERT path only, so EDITING a check-in
+      // never reached the dedicated tables — the correction stayed invisible to
+      // Progress and to the wellness score.
+      await writeThroughCheckIn(c.env.DB, access.client, d);
+      if (d.weightKg != null) await recomputeBodyMetrics(c.env.DB, access.client, d.date);
       return c.json({ ok: true, id: existing.id, updated: true });
     }
     const id = newId("chk");
@@ -1210,15 +1317,9 @@ export const logRoutes = new Hono<AppEnv>()
     // day's row — treat that as an update, skipping the mirror + trainer notify
     // so a raced double-submit can't fire the "checked in" notification twice.
     if (rowId !== id) return c.json({ ok: true, id: rowId, updated: true });
-    // Mirror weight into measurements so progress prefers the dedicated table.
-    if (d.weightKg) {
-      await c.env.DB.prepare(
-        "INSERT INTO measurements (id, tenant_id, client_id, date_local, weight_kg, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(client_id, date_local) DO UPDATE SET weight_kg = COALESCE(measurements.weight_kg, excluded.weight_kg)",
-      )
-        .bind(newId("mea"), access.client.tenant_id, access.client.id, d.date, d.weightKg, nowIso())
-        .run();
-      await recomputeBodyMetrics(c.env.DB, access.client, d.date);
-    }
+    // Every fact the check-in carries, into the table that owns it.
+    await writeThroughCheckIn(c.env.DB, access.client, d);
+    if (d.weightKg != null) await recomputeBodyMetrics(c.env.DB, access.client, d.date);
     // Notify the primary trainer (fan-out fix: primary only, SPEC §2).
     const primary = await c.env.DB.prepare(
       "SELECT trainer_user_id FROM client_trainers WHERE client_id = ? ORDER BY is_primary DESC LIMIT 1",
@@ -1229,6 +1330,57 @@ export const logRoutes = new Hono<AppEnv>()
       await notify(c.env, { tenantId: access.client.tenant_id, userId: primary.trainer_user_id, type: "check_in", title: `${access.client.display_name} checked in`, message: d.notes ?? "", link: `/clients/${access.client.id}/manage?checkin=${id}` });
     }
     return c.json({ ok: true, id }, 201);
+  })
+
+  /**
+   * What the client has ALREADY logged for a day, so the check-in form can show
+   * it instead of asking again.
+   *
+   * The form used to open completely empty (`useState({})`), so a client who
+   * logged their sleep at 7am was handed a blank sleep box at 8pm. Worse, a
+   * blank was not neutral: submitting wrote NULL over the column Progress read
+   * as the truth. This endpoint is what lets the drawer become review-and-confirm
+   * — the common case is nothing to type at all.
+   *
+   * `source` is carried per field so the UI can say where a number came from. A
+   * value the client can see the provenance of is one they will trust rather
+   * than re-enter.
+   */
+  .get("/check-ins/prefill", async (c) => {
+    const clientId = c.req.query("clientId");
+    const date = c.req.query("date");
+    if (!clientId || !date) return c.json({ error: "clientId + date required" }, 400);
+    const access = await requireClientAccess(c, clientId);
+    if ("response" in access) return access.response;
+    const db = c.env.DB;
+    const [ci, sleep, mood, measure, water, stepsRow] = await Promise.all([
+      db.prepare("SELECT weight_kg, mood, energy, stress, sleep_quality, sleep_hours, steps_count, notes, photos_json FROM check_ins WHERE client_id = ? AND date_local = ?").bind(access.client.id, date).first<{ weight_kg: number | null; mood: number | null; energy: number | null; stress: number | null; sleep_quality: number | null; sleep_hours: number | null; steps_count: number | null; notes: string | null; photos_json: string | null }>(),
+      db.prepare("SELECT duration_minutes, quality FROM sleep_logs WHERE client_id = ? AND date_local = ?").bind(access.client.id, date).first<{ duration_minutes: number | null; quality: number | null }>(),
+      db.prepare("SELECT mood, energy, stress FROM mood_logs WHERE client_id = ? AND date_local = ?").bind(access.client.id, date).first<{ mood: number | null; energy: number | null; stress: number | null }>(),
+      db.prepare("SELECT weight_kg FROM measurements WHERE client_id = ? AND date_local = ?").bind(access.client.id, date).first<{ weight_kg: number | null }>(),
+      db.prepare("SELECT total_ml FROM water_logs WHERE client_id = ? AND date_local = ?").bind(access.client.id, date).first<{ total_ml: number | null }>(),
+      db.prepare("SELECT steps FROM steps_logs WHERE client_id = ? AND date_local = ?").bind(access.client.id, date).first<{ steps: number | null }>(),
+    ]);
+    // Dedicated table first, check-in snapshot as the fallback — the same
+    // precedence every other reader now uses.
+    const pick = <T,>(logged: T | null | undefined, snap: T | null | undefined): { value: T | null; source: "logged" | "checkin" | null } =>
+      logged != null ? { value: logged, source: "logged" } : snap != null ? { value: snap, source: "checkin" } : { value: null, source: null };
+
+    return c.json({
+      submitted: !!ci,
+      fields: {
+        weightKg: pick(measure?.weight_kg, ci?.weight_kg),
+        sleepHours: pick(sleep?.duration_minutes != null ? Math.round((sleep.duration_minutes / 60) * 10) / 10 : null, ci?.sleep_hours),
+        sleepQuality: pick(sleep?.quality, ci?.sleep_quality),
+        mood: pick(mood?.mood, ci?.mood),
+        energy: pick(mood?.energy, ci?.energy),
+        stress: pick(mood?.stress, ci?.stress),
+        steps: pick(stepsRow?.steps, ci?.steps_count),
+        waterMl: pick(water?.total_ml, null as number | null),
+      },
+      notes: ci?.notes ?? null,
+      photoCount: parseJson<string[]>(ci?.photos_json, []).length,
+    });
   })
 
   .get("/check-ins", async (c) => {
@@ -1374,7 +1526,7 @@ export const logRoutes = new Hono<AppEnv>()
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
     const db = c.env.DB;
-    const [food, water, workout, activities, checkIn, timeline, plans, checkInDates, pendingLabs, weights, sleep, mood, bodyMeasures, scans, suppTaken, supps] = await Promise.all([
+    const [food, water, workout, activities, checkIn, timeline, plans, checkInDates, pendingLabs, weights, sleep, mood, bodyMeasures, scans, stepsRow, suppTaken, supps] = await Promise.all([
       db
         .prepare(
           "SELECT COALESCE(SUM(calories),0) AS calories, COALESCE(SUM(protein_g),0) AS protein, COALESCE(SUM(carbs_g),0) AS carbs, COALESCE(SUM(fat_g),0) AS fat, MAX(target_calories) AS day_target_cal FROM food_entries WHERE client_id = ? AND date_local = ?",
@@ -1440,6 +1592,10 @@ export const logRoutes = new Hono<AppEnv>()
         .prepare("SELECT body_fat_percent, posture_severity, somatotype, date_local FROM body_scans WHERE client_id = ? AND date_local <= ? ORDER BY date_local DESC LIMIT 2")
         .bind(clientId, date)
         .all<{ body_fat_percent: number | null; posture_severity: string | null; somatotype: string | null; date_local: string }>(),
+      db
+        .prepare("SELECT steps FROM steps_logs WHERE client_id = ? AND date_local = ?")
+        .bind(clientId, date)
+        .first<{ steps: number | null }>(),
       db
         .prepare("SELECT COUNT(*) AS n FROM supplement_logs WHERE client_id = ? AND date_local = ?")
         .bind(clientId, date)
@@ -1547,7 +1703,7 @@ export const logRoutes = new Hono<AppEnv>()
         mood: mood?.mood ?? checkIn?.mood ?? null,
         energy: mood?.energy ?? checkIn?.energy ?? null,
         stress: mood?.stress ?? checkIn?.stress ?? null,
-        steps: checkIn?.steps_count ?? null,
+        steps: stepsRow?.steps ?? checkIn?.steps_count ?? null,
         activeMinutes: Math.round(activities?.minutes ?? 0),
         activityCount: activities?.n ?? 0,
         bodyFatPercent: bfNow?.body_fat_percent ?? null,

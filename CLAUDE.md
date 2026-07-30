@@ -149,6 +149,19 @@ remote bindings without editing the config (this is what the E2E suite does).
 
 ## Conventions
 
+- **One fact, one home.** A metric a client can record has exactly one owning
+  table (`sleep_logs`, `mood_logs`, `steps_logs`, `water_logs`, `measurements`),
+  and a check-in is a REPORT that writes THROUGH to those (`writeThroughCheckIn`
+  in log-routes.ts) while keeping its own columns as a frozen as-at-submission
+  snapshot for the coach. Readers merge per DATE and per FIELD with the dedicated
+  table winning. This is not stylistic: when only weight was mirrored, sleep
+  logged from the log drawer never appeared on the Progress chart, the wellness
+  score double-counted a day rated in both places, and `check_ins.sleep_quality`
+  was read by Progress while nothing ever wrote it.
+- **Adding DDL means bumping `SCHEMA_VERSION` in `db.ts`.** The marker row
+  short-circuits the entire DDL block, so a new `CREATE TABLE IF NOT EXISTS`
+  without a bump is invisible on a fresh database and fatal on every existing
+  one — the table is never created and every route touching it 500s.
 - Store metric, convert at display (`@kova/domain` units.ts). Day-bucketed
   rows use the client's local date (`date_local`, YYYY-MM-DD) from the device.
 - Plan/meal bodies are JSON columns validated by `@kova/protocol` at the route.
