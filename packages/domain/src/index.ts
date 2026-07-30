@@ -2,6 +2,7 @@ export * from "./entitlements.js";
 export * from "./perms.js";
 export * from "./budgets.js";
 export * from "./clientFlags.js";
+export * from "./lapse.js";
 export * from "./nutrition.js";
 export * from "./body.js";
 export * from "./bodyfat.js";

@@ -64,7 +64,7 @@
  * the line this module draws: Kova withholds what Kova sells, and does not hold
  * a client's own history hostage over their coach's invoice.
  */
-export type StudioStanding = "ok" | "grace" | "suspended";
+export type StudioStanding = "ok" | "grace" | "suspended" | "blocked";
 
 /** The client record's status in this tenancy. */
 export type Membership = "none" | "pending_signup" | "active" | "archived";
@@ -146,7 +146,11 @@ export function resolveStanding(f: StandingFacts): Standing {
   //
   // Purchasing is off: the storefront is a paid feature the studio no longer has,
   // and no amount of client spending would settle the studio's own bill.
-  if (f.studio === "suspended") {
+  //
+  // `blocked` is the next rung and lands here too: it withholds the APP, which
+  // the host gate does, but a person's own data stays readable behind it for
+  // exactly the reason above. Nothing about the debt makes their logbook ours.
+  if (f.studio === "suspended" || f.studio === "blocked") {
     return { canRead: true, canWrite: false, canPurchase: false, lockedToStorefront: false, reason: "studio_suspended" };
   }
 
@@ -178,13 +182,49 @@ export function resolveStanding(f: StandingFacts): Standing {
 
 /** A studio's subscription state, as the billing tables record it. */
 export type SubscriptionStatus =
-  | "active" | "trialing" | "past_due" | "suspended" | "unpaid" | "canceled" | "closing";
+  | "active" | "trialing" | "past_due" | "suspended" | "blocked" | "unpaid" | "canceled" | "closing";
 
-export type HostGateReason = "ok" | "grace" | "suspended" | "closing";
+export type HostGateReason = "ok" | "grace" | "suspended" | "blocked" | "closing";
+
+/**
+ * The platform dunning ladder, in days from the first missed payment.
+ *
+ * Three rungs, and the gap between them is the point: each one takes something
+ * more away, and the owner is told before every step. A single cliff (pay by
+ * Friday or lose everything) is how you delete a customer who was on holiday.
+ *
+ *   0    → GRACE     full service, dunning notices only
+ *   7    → READ_ONLY the studio and every client drop to read-only
+ *   30   → BLOCKED   the app is replaced by "<Studio> is suspended"
+ *   37   → PURGE     tenant and members hard-deleted
+ *
+ * BLOCKED is the rung this ladder was missing. Suspension used to mean
+ * read-only all the way to the end, so a studio that had not paid in a month
+ * looked identical to one that had not paid in a week, and the last thing before
+ * permanent deletion was a banner.
+ */
+export const DUNNING_DAYS = { readOnly: 7, blocked: 30, purge: 37 } as const;
+
+/** Which rung `daysPastDue` has reached. Pure, so the sweep and the UI agree. */
+export function dunningRung(daysPastDue: number): "grace" | "read_only" | "blocked" | "purge" {
+  if (daysPastDue >= DUNNING_DAYS.purge) return "purge";
+  if (daysPastDue >= DUNNING_DAYS.blocked) return "blocked";
+  if (daysPastDue >= DUNNING_DAYS.readOnly) return "read_only";
+  return "grace";
+}
 
 export interface HostGate {
   /** Every write on this host is refused. Reads are unaffected — always. */
   readOnly: boolean;
+  /**
+   * The app itself is withheld: one screen saying the studio is suspended, and
+   * nothing else. Distinct from `readOnly`, which still shows the whole app.
+   *
+   * Reads are STILL served to the person's own record behind this — blocking is
+   * about withholding the product, not about holding a client's history hostage
+   * over their coach's invoice, and the export/delete paths must keep working.
+   */
+  blocked: boolean;
   /**
    * The billing surface stays writable even while `readOnly`, so the one action
    * that fixes the situation is reachable from inside it. Without this a lapsed
@@ -210,6 +250,8 @@ export function studioStandingOf(status: SubscriptionStatus | string | null | un
   switch (status) {
     case "past_due":
       return "grace";
+    case "blocked":
+      return "blocked";
     case "suspended":
     case "unpaid":
     case "canceled":
@@ -232,18 +274,22 @@ export function studioStandingOf(status: SubscriptionStatus | string | null | un
  */
 export function resolveHostGate(status: SubscriptionStatus | string | null | undefined): HostGate {
   if (status === "closing") {
-    return { readOnly: true, billingWritable: true, reason: "closing" };
+    return { readOnly: true, blocked: false, billingWritable: true, reason: "closing" };
+  }
+  // Blocked outranks suspended: it is the same debt, one rung further along.
+  if (status === "blocked") {
+    return { readOnly: true, blocked: true, billingWritable: true, reason: "blocked" };
   }
   if (studioStandingOf(status) === "suspended") {
-    return { readOnly: true, billingWritable: true, reason: "suspended" };
+    return { readOnly: true, blocked: false, billingWritable: true, reason: "suspended" };
   }
   if (status === "past_due") {
     // Grace is FULL service. That is the entire purpose of a grace window: the
     // owner gets dunning notices, and nothing about the studio changes for anyone
     // until the window closes. Reported so the owner's UI can show the warning.
-    return { readOnly: false, billingWritable: true, reason: "grace" };
+    return { readOnly: false, blocked: false, billingWritable: true, reason: "grace" };
   }
-  return { readOnly: false, billingWritable: true, reason: "ok" };
+  return { readOnly: false, blocked: false, billingWritable: true, reason: "ok" };
 }
 
 /**
@@ -255,6 +301,7 @@ export function resolveHostGate(status: SubscriptionStatus | string | null | und
  * by construction rather than by two hand-written mappings staying in step.
  */
 export function studioStandingOfGate(reason: HostGateReason | null | undefined): StudioStanding {
+  if (reason === "blocked") return "blocked";
   if (reason === "suspended" || reason === "closing") return "suspended";
   if (reason === "grace") return "grace";
   return "ok";
@@ -265,5 +312,5 @@ export const STANDING_AXES = {
   membership: ["none", "pending_signup", "active", "archived"] as Membership[],
   accessActive: [true, false],
   accessRequired: [true, false],
-  studio: ["ok", "grace", "suspended"] as StudioStanding[],
+  studio: ["ok", "grace", "suspended", "blocked"] as StudioStanding[],
 };

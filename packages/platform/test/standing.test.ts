@@ -30,7 +30,7 @@ const facts = (m: Membership, over: Partial<StandingFacts> = {}): StandingFacts 
 describe("standing — the matrix is total", () => {
   it("covers all 48 combinations and never throws", () => {
     const cells = everyCell();
-    expect(cells.length).toBe(48); // 4 membership × 2 × 2 × 3 studio states
+    expect(cells.length).toBe(64); // 4 membership × 2 × 2 × 4 studio states
     for (const f of cells) {
       const s = resolveStanding(f);
       expect(typeof s.reason, JSON.stringify(f)).toBe("string");
@@ -254,8 +254,10 @@ describe("host gate — a suspended studio's subdomain is read-only", () => {
   it("suspended and closing are both read-only, but report differently", () => {
     // Both lock writes; the copy has to differ, because one is asked to pay and the
     // other is told its data is scheduled for deletion.
-    expect(resolveHostGate("suspended")).toEqual({ readOnly: true, billingWritable: true, reason: "suspended" });
-    expect(resolveHostGate("closing")).toEqual({ readOnly: true, billingWritable: true, reason: "closing" });
+    expect(resolveHostGate("suspended")).toEqual({ readOnly: true, blocked: false, billingWritable: true, reason: "suspended" });
+    expect(resolveHostGate("closing")).toEqual({ readOnly: true, blocked: false, billingWritable: true, reason: "closing" });
+    // The next rung: still read-only, but the app itself is withheld.
+    expect(resolveHostGate("blocked")).toEqual({ readOnly: true, blocked: true, billingWritable: true, reason: "blocked" });
   });
 
   it("always leaves billing writable, so a lapsed studio can pay its way out", () => {
@@ -267,8 +269,8 @@ describe("host gate — a suspended studio's subdomain is read-only", () => {
 
   it("never gates reads — the gate only ever concerns writes", () => {
     // Asserted structurally: `HostGate` has no read flag to get wrong.
-    for (const s of ["active", "past_due", "suspended", "closing", null]) {
-      expect(Object.keys(resolveHostGate(s)).sort()).toEqual(["billingWritable", "readOnly", "reason"]);
+    for (const s of ["active", "past_due", "suspended", "blocked", "closing", null]) {
+      expect(Object.keys(resolveHostGate(s)).sort()).toEqual(["billingWritable", "blocked", "readOnly", "reason"]);
     }
   });
 
