@@ -34,6 +34,7 @@ import { Inbox } from "./screens/Inbox.js";
 import { MediaLibrary } from "./screens/MediaLibrary.js";
 import { Wellness } from "./screens/client/Wellness.js";
 import { Onboarding } from "./screens/client/Onboarding.js";
+import { StudioBlocked } from "./screens/StudioBlocked.js";
 import { Shop } from "./screens/client/Shop.js";
 import { Explore } from "./screens/client/Explore.js";
 import { AcceptInvite } from "./screens/AcceptInvite.js";
@@ -80,6 +81,23 @@ export function Shell() {
   // app renders for a frame before we know whether to show the intake wizard.
   if (gateClientId && needsOnboarding === null) return <div className="grid min-h-dvh place-items-center"><Spinner /></div>;
   if (gateClientId && needsOnboarding) return <Onboarding clientId={gateClientId} displayName={ctx!.user.name || "there"} onDone={() => setNeedsOnboarding(false)} />;
+
+  /**
+   * BLOCKED — the studio's own bill, one rung past read-only.
+   *
+   * This is deliberately the FIRST gate, above onboarding and above access: when
+   * the app itself is withheld there is nothing to onboard into and nothing to
+   * sell. `readOnly` still shows the whole app with writes refused; `blocked`
+   * replaces it. Both are the same debt, and the difference is what the person
+   * sees, which is why the gate reports them separately.
+   *
+   * Everyone lands here, staff included — the owner most of all, since they are
+   * the one who can fix it. `StudioBlocked` keeps the two doors that must never
+   * close: paying, and leaving with your data.
+   */
+  if (host?.gate?.blocked) {
+    return <StudioBlocked studioName={host.tenant?.name ?? "This studio"} role={active.role} />;
+  }
 
   /**
    * Access gate: on a tenant that requires a live plan/package, a client with no

@@ -139,7 +139,12 @@ export const domainRoutes = new Hono<AppEnv>()
       tenant: t
         ? { tenantId: t.tenantId, name: t.name, slug: t.slug, branding: t.branding, allowSignup: t.allowSignup }
         : null,
-      gate: host.gate ? { readOnly: host.gate.readOnly, reason: host.gate.reason } : null,
+      // The WHOLE gate, not a hand-picked pair. Listing fields here meant adding
+      // `blocked` to the model, the resolver and the app, and still shipping a
+      // client that never saw it — the app read `gate.blocked` as undefined and
+      // rendered the read-only app for a studio whose access was withheld. There
+      // is nothing private in a HostGate; spread it.
+      gate: host.gate ? { ...host.gate } : null,
       turnstile: await turnstileConfig(c.env.DB),
     });
   })

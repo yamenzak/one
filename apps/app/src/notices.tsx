@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { CloudOff, Lock, RefreshCw, WifiOff, X, cn } from "@4dl/ui";
+import { DUNNING_DAYS } from "@4dl/platform";
 import { useSession } from "./session.js";
 
 /**
@@ -21,10 +22,15 @@ import { useSession } from "./session.js";
  * of the whole surface, and it stops being true only when the studio renews.
  */
 export function StudioPausedBanner() {
-  const { host } = useSession();
+  const { host, ctx } = useSession();
   const reason = host?.gate?.reason;
   if (!host?.gate?.readOnly) return null;
   const closing = reason === "closing";
+  // The OWNER gets the next rung's deadline. Every step of the platform ladder is
+  // announced before it lands — a single cliff is how you lose a customer who was
+  // on holiday — and read-only is the rung where saying so still changes the
+  // outcome. Clients are not told a date they cannot act on.
+  const owner = ctx?.active?.role === "owner";
   return (
     /* The STRIP is full-bleed — it describes the whole surface, so a floating
        card would understate it — but its TEXT sits in the content column. A
@@ -41,6 +47,14 @@ export function StudioPausedBanner() {
         {closing
           ? "Everything is readable, but nothing new can be saved. The owner can still cancel the closure from Billing."
           : "Everything is readable, but nothing new can be saved until the studio renews."}
+        {!closing && owner && (
+          <>
+            {" "}
+            <span className="font-semibold">
+              Access is withheld for everyone {DUNNING_DAYS.blocked} days after the missed payment, and the studio is deleted at {DUNNING_DAYS.purge}.
+            </span>
+          </>
+        )}
       </span>
       </div>
     </div>

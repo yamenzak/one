@@ -45,6 +45,7 @@ export const STUDIO_SETTINGS_SECTIONS: SettingsSectionMeta[] = [
   // Closing the studio is irreversible, so it gets its own destination rather
   // than sitting under whichever tab an owner happened to be reading. Last in
   // the row, and never the default.
+  { key: "lapse", label: "When access runs out", scope: "studio", blurb: "What happens to a client whose plan expired" },
   { key: "danger", label: "Close your studio", scope: "studio", blurb: "Cancel billing and erase everything" },
 ];
 
