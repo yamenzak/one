@@ -60,22 +60,34 @@ describe("deriveTokens — one colour re-skins everything", () => {
     }
   });
 
-  it("leaves status colours and domain accents alone", () => {
+  it("leaves status colours alone", () => {
     // Deliberate, not an omission: a "danger" red that drifts brand-warm stops
-    // reading as danger, and the domain accents (activity, nutrition, sleep…) are
-    // identity colours a studio picks per-token if it wants them changed.
+    // reading as danger.
     const t = deriveTokens({ primary: BLUE, neutral: "warm" });
-    for (const key of ["--destructive", "--success", "--warning", "--danger", "--activity", "--nutrition", "--sleep"]) {
+    for (const key of ["--destructive", "--success", "--warning", "--danger"]) {
       expect(t.dark?.[key], `${key} should not be generated`).toBeUndefined();
       expect(t.light?.[key], `${key} should not be generated`).toBeUndefined();
     }
   });
 
-  it("does generate the macro accents, which ARE brand-derived", () => {
+  it("generates NO accents unless the app asks for them", () => {
+    // The accent spec is the app's. An app with none still gets a complete,
+    // coherent token set — which is the whole reason it is a parameter and not
+    // a list of macronutrients baked into the design system.
     const t = deriveTokens({ primary: BLUE });
-    for (const key of ["--calories", "--protein", "--carbs", "--fat"]) {
+    expect(Object.keys(t.dark ?? {}).some((k) => k.includes("cal"))).toBe(false);
+  });
+
+  it("derives the accents it IS given, in both modes, tinted toward the brand", () => {
+    const spec = [{ name: "alpha", hue: 45, c: 0.16, dL: 0.78, lL: 0.53 }];
+    const t = deriveTokens({ primary: BLUE, accents: spec });
+    for (const key of ["--alpha", "--alpha-soft"]) {
       expect(t.dark?.[key], key).toBeTruthy();
+      expect(t.light?.[key], key).toBeTruthy();
     }
+    // Pulled 12% toward the brand hue rather than left at its canonical one.
+    const hue = Number(/oklch\([\d.]+ [\d.]+ ([\d.]+)\)/.exec(t.dark!["--alpha"]!)![1]);
+    expect(hue).not.toBe(45);
   });
 });
 

@@ -30,20 +30,46 @@ are therefore *controlled* — `SectionDetail` takes `openKey` / `onOpen` and th
 app supplies the glue (`apps/app/src/screens/SectionSplit.tsx` binds it to
 `useSearchParams`). Keep new navigational primitives controlled the same way.
 
-### The one known leak: `Tone`
+### Tones: five are ours, the rest are the app's
 
-`Tone` in `primitives.tsx` still carries fitness-flavoured members —
-`nutrition`, `cardio`, `hydration`, `supplement`, `lab` — alongside the neutral
-ones (`success` `warning` `danger` `primary` `neutral`) and the macro set
-(`calories` `protein` `carbs` `fat`).
+`Tone` used to be a closed union carrying `nutrition`, `cardio`, `hydration`,
+`supplement`, `lab`, `calories`, `protein`, `carbs`, `fat` — the README called
+that "the one known leak" and left it. It is closed.
 
-This is left as-is on purpose. The *machinery* is product-agnostic (a tone is a
-name bound to a CSS custom property in `tokens.css`); only the member list is
-Kova's. Making it generic means a type parameter threaded through every
-component that accepts a tone, which is a large churn for no current consumer.
-**When the second app lands**, resolve it by making the palette per-product
-config — the app declares its tone names and the package accepts them — not by
-adding that app's tone names next to Kova's here.
+The package now owns exactly the five STATUS tones: `success`, `warning`,
+`danger`, `primary`, `neutral`. Every product has those. Anything else is an
+ACCENT the app registers, and it is resolved by CONVENTION:
+
+```
+tone "foo"  →  text-foo · bg-foo-soft text-foo · var(--foo)
+```
+
+`toneText` / `toneSoft` / `toneVar` are Proxy-backed so `toneText[tone]` and
+`toneVar.danger` read exactly as they always did — the maps were already a
+convention written out by hand, and this just stops writing it out.
+
+**Registering an accent takes two things, both in the app** (Kova's are in
+`apps/app/src/registry/tones.ts` and `tokens.accents.css`):
+
+1. define `--foo` and `--foo-soft` for both modes, and map them in the app's own
+   `@theme` block;
+2. spell the class LITERALS out somewhere the app's Tailwind scan reaches.
+   Tailwind cannot follow `text-${tone}` built at runtime, so without the
+   literals the utility is never generated — the chip renders grey and nothing
+   warns. This is the reason the literals cannot live in this package.
+
+The token VALUES moved with them. `tokens.css` keeps surfaces, brand, radius,
+elevation and the four status colours; `DEFAULT_TOKENS` and `THEME_TOKEN_GROUPS`
+likewise cover only those, and an app concatenates its own. `deriveTokens` takes
+an `accents` spec instead of knowing what a macronutrient is.
+
+Splitting them found a real defect immediately: the light-mode accent values in
+`DEFAULT_TOKENS` had drifted from `tokens.css`, which had been darkened so
+tone-coloured text clears AA on its own pale tint. The branding editor was
+showing a lighter swatch than the app painted, and a studio "restoring the
+default" from the displayed value would have set a colour that fails AA. Nothing
+had checked, because both copies lived here. Kova's now
+(`apps/app/src/tokens.accents.test.ts`).
 
 ## Conformance
 

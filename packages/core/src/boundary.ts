@@ -75,6 +75,9 @@ const EXEMPT_IDENTIFIERS: readonly string[] = [
   "getBoundingClientRect", "ClientRect", "clientInformation",
   "client_secret", "clientSecret",
   "clientExtensionResults",
+  // lucide's own component name for the glyph. Case-sensitive on purpose: the
+  // vendor's `Barcode` is exempt, a field called `barcode` is still a leak.
+  "Barcode",
 ];
 
 const EXEMPT_RE = new RegExp(EXEMPT_IDENTIFIERS.join("|"), "g");

@@ -8,6 +8,19 @@ import { motion } from "motion/react";
 import { useSearchParams } from "react-router-dom";
 import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
 import { personaLabel, personaTone } from "../registry/index.js";
+import { KOVA_TOKEN_GROUPS, DEFAULT_ACCENT_TOKENS, MACRO_SPEC } from "../registry/tones.js";
+
+/**
+ * The advanced token editor lists the design system's own groups first, then
+ * Kova's accents. `@4dl/ui` cannot ship the second half: "Macros" and "Domain
+ * accents" name what this product measures, and another 4DL app measures
+ * something else.
+ */
+const TOKEN_GROUPS = [...THEME_TOKEN_GROUPS, ...KOVA_TOKEN_GROUPS];
+const ALL_DEFAULT_TOKENS = {
+  light: { ...DEFAULT_TOKENS.light, ...DEFAULT_ACCENT_TOKENS.light },
+  dark: { ...DEFAULT_TOKENS.dark, ...DEFAULT_ACCENT_TOKENS.dark },
+};
 import type { LoginBranding, TenantBranding } from "@kova/protocol";
 import { resolveUnits, cmToFeetInches, feetInchesToCm, STUDIO_SETTINGS_SECTIONS, settingsSectionVisible, LAPSE_ACTIONS, LAPSE_META, DEFAULT_LAPSE_POLICY, MIN_DESTRUCTIVE_GRACE_DAYS, checkLapsePolicy, isDestructive, type LapsePolicy } from "@kova/domain";
 import { useUnits } from "../units.js";
@@ -1836,7 +1849,7 @@ function BrandingEditor(props: { initial: Branding | null; onPreview: (b: Brandi
 function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding | null; onPreview: (b: Branding | null) => void; onSaved: () => void }) {
   const [params, setParams] = useSearchParams();
   const { ctx } = useSession();
-  const [tokens, setTokens] = useState<BrandTokens>(() => (initial?.tokens && hasTokens(initial.tokens) ? initial.tokens : deriveTokens({ primary: seedFrom(initial) })));
+  const [tokens, setTokens] = useState<BrandTokens>(() => (initial?.tokens && hasTokens(initial.tokens) ? initial.tokens : deriveTokens({ primary: seedFrom(initial), accents: MACRO_SPEC })));
   const [seed, setSeed] = useState<string>(seedFrom(initial));
   // Seeded from what was saved, not hardcoded. Two things broke when it was not:
   // the chip always read "Brand" on a reload however the app actually looked, and
@@ -1868,7 +1881,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   useEffect(() => { onPreview({ tokens, radius, shadow, borderColor: borderColor || null, borderWidth, logoUrl, iconUrl }); }, [JSON.stringify(tokens), radius, shadow, borderColor, borderWidth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Generate a full palette from one color (the smart path).
-  const generate = (color: string, tint: NeutralTint = neutral) => { setSeed(color); setNeutral(tint); setTokens(deriveTokens({ primary: color, neutral: tint })); };
+  const generate = (color: string, tint: NeutralTint = neutral) => { setSeed(color); setNeutral(tint); setTokens(deriveTokens({ primary: color, neutral: tint, accents: MACRO_SPEC })); };
 
   const uploadAsset = async (file: File, setter: (url: string) => void) => {
     setMsg(null);
@@ -2181,7 +2194,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
 function TokenGrid({ tokens, onSet }: { tokens: BrandTokens; onSet: (mode: "light" | "dark", key: string, value: string) => void }) {
   return (
     <div className="space-y-4">
-      {THEME_TOKEN_GROUPS.map((g) => (
+      {TOKEN_GROUPS.map((g) => (
         <div key={g.label}>
           <div className="mb-1.5 text-micro uppercaser text-muted-foreground">{g.label}</div>
           <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1">
@@ -2193,8 +2206,8 @@ function TokenGrid({ tokens, onSet }: { tokens: BrandTokens; onSet: (mode: "ligh
               return (
                 <Fragment key={name}>
                   <code className="truncate text-xs text-muted-foreground">{name}</code>
-                  <TokenCell mode="light" tokenKey={key} value={tokens.light?.[key] ?? ""} def={DEFAULT_TOKENS.light?.[key] ?? ""} onSet={onSet} />
-                  <TokenCell mode="dark" tokenKey={key} value={tokens.dark?.[key] ?? ""} def={DEFAULT_TOKENS.dark?.[key] ?? ""} onSet={onSet} />
+                  <TokenCell mode="light" tokenKey={key} value={tokens.light?.[key] ?? ""} def={ALL_DEFAULT_TOKENS.light[key] ?? ""} onSet={onSet} />
+                  <TokenCell mode="dark" tokenKey={key} value={tokens.dark?.[key] ?? ""} def={ALL_DEFAULT_TOKENS.dark[key] ?? ""} onSet={onSet} />
                 </Fragment>
               );
             })}

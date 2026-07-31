@@ -1021,6 +1021,33 @@ async function supersedePlatformSub(db: D1Database, secretKey: string, tenantId:
 }
 
 /**
+ * Statuses the LADDER or the CLOSE flow owns. A payment-state webhook may never
+ * overwrite one.
+ *
+ * This is the whole reason the two halves can coexist. Stripe owns the raw
+ * payment state; `dailySweep` owns the escalation layered on `past_due_at`, and
+ * every rung selects on the PREVIOUS rung's status:
+ *
+ *   past_due  --7d-->  suspended  --30d-->  blocked  --37d-->  purged
+ *
+ * so a webhook that rewrites the current rung breaks the chain permanently.
+ * Stripe's own retry schedule exhausts around day 21 and flips the subscription
+ * to `unpaid` — squarely between the 7-day and 30-day rungs. Writing that
+ * unconditionally overwrote `suspended`, so `WHERE status = 'suspended'` never
+ * matched again and the ladder stalled at read-only forever: the tenant was
+ * never blocked, never purged, and their storage was never reclaimed. It failed
+ * SAFE (still read-only, nothing deleted) and therefore silently.
+ *
+ * `closing` is here for the same structural reason from the other direction. It
+ * is an OWNER decision carrying its own `delete_at`, and `scheduleTenantClose`
+ * cancels the Stripe subscription — which fires `canceled` right back at us. The
+ * race was real: land after the UPDATE and the close became a plain
+ * cancellation, `WHERE status = 'closing'` stopped matching, and a studio the
+ * owner asked us to delete was kept indefinitely.
+ */
+const LADDER_OWNED = "'suspended','blocked','canceled','closing'";
+
+/**
  * Reconcile our subscription row against Stripe's authoritative subscription
  * object (fired on `customer.subscription.created|updated`). Stripe owns the raw
  * payment state (active / past_due / unpaid / canceled); our daily cron owns the
@@ -1057,13 +1084,13 @@ async function syncStripeSubscription(db: D1Database, obj: Record<string, unknow
   await db.prepare("UPDATE subscriptions SET stripe_sub_id = COALESCE(?, stripe_sub_id), current_period_end = COALESCE(?, current_period_end), updated_at = ? WHERE tenant_id = ?").bind(subId, cpe, now, tenantId).run();
   switch (obj.status as string) {
     case "canceled":
-      await db.prepare("UPDATE subscriptions SET status = 'canceled', plan_id = 'free' WHERE tenant_id = ?").bind(tenantId).run();
+      await db.prepare(`UPDATE subscriptions SET status = 'canceled', plan_id = 'free' WHERE tenant_id = ? AND status NOT IN (${LADDER_OWNED})`).bind(tenantId).run();
       break;
     case "unpaid":
-      await db.prepare("UPDATE subscriptions SET status = 'unpaid' WHERE tenant_id = ?").bind(tenantId).run();
+      await db.prepare(`UPDATE subscriptions SET status = 'unpaid' WHERE tenant_id = ? AND status NOT IN (${LADDER_OWNED})`).bind(tenantId).run();
       break;
     case "past_due":
-      await db.prepare("UPDATE subscriptions SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?) WHERE tenant_id = ? AND status NOT IN ('suspended','blocked','canceled')").bind(now, tenantId).run();
+      await db.prepare(`UPDATE subscriptions SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?) WHERE tenant_id = ? AND status NOT IN (${LADDER_OWNED})`).bind(now, tenantId).run();
       break;
     case "active":
     case "trialing": {
@@ -1076,7 +1103,12 @@ async function syncStripeSubscription(db: D1Database, obj: Record<string, unknow
       // `customer.subscription.updated`.
       const st = obj.status as string;
       if (st === "trialing" && !hasPaymentMethod(obj)) break;
-      await db.prepare("UPDATE subscriptions SET status = ?, past_due_at = NULL, suspend_at = NULL, delete_at = NULL WHERE tenant_id = ?").bind(st === "trialing" ? "trialing" : "active", tenantId).run();
+      // RECOVERY may overwrite every dunning rung — paying is exactly how a
+      // suspended or blocked studio comes back, and clearing all three markers
+      // is the point. `closing` is the one exception: that is an OWNER decision
+      // with its own 7-day hold and its own undo (`cancelTenantClose`), and a
+      // late webhook must not silently cancel it.
+      await db.prepare("UPDATE subscriptions SET status = ?, past_due_at = NULL, suspend_at = NULL, delete_at = NULL WHERE tenant_id = ? AND status != 'closing'").bind(st === "trialing" ? "trialing" : "active", tenantId).run();
       break;
     }
     // incomplete / incomplete_expired / paused → leave status untouched.

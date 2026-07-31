@@ -26,9 +26,11 @@ remaining deltas and UI-LANGUAGE.md §13 gives the order to close them.
 it carries no product vocabulary: no clients, workouts, meals, or coaches, and no
 router. Kova's registries (`METRICS`, `MACRO_KEYS`, `FASTING_ZONES`, personas,
 `MetricChip`/`MacroBar`) live in `apps/app/src/registry/`, and
-`registry.conformance.test.ts` keeps them there. The boundary rule — plus the one
-documented leak (`Tone`) — is in [packages/ui/README.md](packages/ui/README.md).
-Read it before adding anything to that package.
+`registry.conformance.test.ts` keeps them there. `Tone` is now five STATUS tones
+plus anything the app registers by convention — Kova's eleven accents and their
+tokens live in `apps/app/src/registry/tones.ts` + `tokens.accents.css`. The
+package's boundary ALLOW list is EMPTY. Read
+[packages/ui/README.md](packages/ui/README.md) before adding anything to it.
 
 ## Stack
 
@@ -268,10 +270,12 @@ integration suite (`apps/_template/README.md` §"What this template does NOT
 include").
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured most recently, per package: **493 API + 197 domain + 73 tenancy +
-64 ui + 52 app + 25 commerce + 21 billing + 14 core + 14 purge + 12 ai +
+moves. Measured most recently, per package: **499 API + 197 domain + 78 app +
+73 tenancy + 43 ui + 25 commerce + 21 billing + 14 core + 14 purge + 12 ai +
 12 auth + 11 template + 7 protocol + 3 app-kit + 3 storage + 3 email + 3 notify**
-(1,007 total, 38 skipped).
+(1,018 total, 38 skipped). The ui count DROPPED and the app count rose by the
+same shape: Stage 0b moved Kova's eleven accent tones — and the contrast tests
+that guard them — out of `@4dl/ui` and into the app.
 Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
 `@4dl/platform` to `@4dl/tenancy`; the split moves tests, it does not add any.
 The pricing and normalizer suites live

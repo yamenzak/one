@@ -5,8 +5,21 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { applyBranding, applyMode, resolveMode, oklchStringToHex, type Branding, type ThemeMode } from "@4dl/ui";
+import { applyBranding, applyMode, configureTheme, resolveMode, oklchStringToHex, type Branding, type ThemeMode } from "@4dl/ui";
 import { useSession } from "./session.js";
+
+/**
+ * The two names `@4dl/ui` writes into the document and local storage.
+ *
+ * Bound at module load, BEFORE anything calls `resolveMode` — the provider
+ * reads the stored mode in its initial state, so a `configureTheme` inside a
+ * component would run too late and every user would see the default once.
+ *
+ * `kova-theme` is load-bearing: it is the key a user's light/dark choice
+ * survives sign-out in (`KEEP_ON_SIGN_OUT` in session.tsx names it too), so
+ * changing it would silently reset the preference for everyone.
+ */
+configureTheme({ storageKey: "kova-theme", styleId: "kova-branding" });
 
 interface ThemeCtx {
   mode: ThemeMode;

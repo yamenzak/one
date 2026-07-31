@@ -85,7 +85,7 @@ function niceStep(raw: number): number {
 export function AreaChart({ values, tone = "activity", height = 180, target, targetSeries, trend, grid = 4, format = (v) => `${Math.round(v)}`, label, className }: AreaChartProps) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [active, setActive] = useState<number | null>(null);
-  const color = toneVar[tone];
+  const color = toneVar[tone]!; // total for any string key — see `toneMap`
   const padX = 10, padTop = 14, padBot = 22;
   const pts = values.map((v, i) => ({ i, v })).filter((p): p is { i: number; v: number } => p.v != null);
 
@@ -199,7 +199,7 @@ interface BarChartProps {
 export function BarChart({ values, labels, tone = "activity", height = 160, target, format = (v) => `${Math.round(v)}`, className }: BarChartProps) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [active, setActive] = useState<number | null>(null);
-  const color = toneVar[tone];
+  const color = toneVar[tone]!; // total for any string key — see `toneMap`
   const padBot = labels ? 18 : 6, padTop = 12;
   const max = Math.max(...values, target ?? 0, 1);
   const gap = values.length > 20 ? 2 : 5;
@@ -248,7 +248,7 @@ export function BarChart({ values, labels, tone = "activity", height = 160, targ
 export interface RadarAxis { label: string; value: number; /** 0..1 */ }
 
 export function RadarChart({ axes, tone = "cardio", size = 220, rings = 3, className }: { axes: RadarAxis[]; tone?: Tone; size?: number; rings?: number; className?: string }) {
-  const color = toneVar[tone];
+  const color = toneVar[tone]!; // total for any string key — see `toneMap`
   const cx = size / 2, cy = size / 2;
   const r = size / 2 - 34;
   const N = axes.length;
@@ -295,7 +295,7 @@ const localDay = (d: Date): string =>
 /** GitHub-style contribution grid. `days` maps YYYY-MM-DD → intensity (0..max);
  *  renders the trailing `weeks` columns ending on `today`. */
 export function CalendarHeatmap({ days, today, tone = "activity", weeks = 16, max, legend = true, className }: { days: Record<string, number>; today: string; tone?: Tone; weeks?: number; max?: number; legend?: boolean; className?: string }) {
-  const color = toneVar[tone];
+  const color = toneVar[tone]!; // total for any string key — see `toneMap`
   const cell = 13, gap = 3;
   // End on the Sunday of this week so the last column is complete-ish.
   const end = new Date(`${today}T00:00:00`);

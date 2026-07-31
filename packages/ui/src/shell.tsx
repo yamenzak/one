@@ -24,7 +24,10 @@ const pillTween = { backgroundColor: { type: "tween" as const, duration: DUR.slo
 /** The active tab's tint colour — its domain token when tinting is on, else the brand accent. */
 const activeColor = (tabs: TabDef[], active: string, tinted?: boolean): string => {
   const tone = tabs.find((t) => t.key === active)?.tone;
-  return tinted && tone ? toneVar[tone] : "var(--primary)";
+  // `!` because the tone maps are TOTAL for any string key (see `toneMap` in
+  // primitives.tsx) — `noUncheckedIndexedAccess` cannot know that now that a
+  // tone may be any accent name the app registered.
+  return tinted && tone ? toneVar[tone]! : "var(--primary)";
 };
 
 export function AppBar({ leading, title, trailing, bare, scrolled }: { leading?: ReactNode; title?: ReactNode; trailing?: ReactNode; bare?: boolean; scrolled?: boolean }) {

@@ -101,7 +101,7 @@ Found by grepping `packages/{ui,platform}/src` for product nouns:
 - User-facing copy: `"Pick an address for your studio."`
 - `promo.ts` `restrictedClientId`.
 
-**`@4dl/ui`** *(still open — Stage 0b)*
+**`@4dl/ui`** *(closed — Stage 0b, after Stage 9)*
 - `Tone` carries `activity | nutrition | sleep | cardio | hydration | supplement
   | lab` — documented in the README as "the one known leak", still a leak. An
   inventory app has no `nutrition` tone.
@@ -111,6 +111,17 @@ Found by grepping `packages/{ui,platform}/src` for product nouns:
 
 None of these break Kova. All of them would be inherited verbatim by the
 inventory app. **Fixing them is Stage 0**, not a footnote.
+
+**Stage 0b, done.** `Tone` is now the five STATUS tones plus anything the app
+registers by convention (`foo` → `text-foo` / `bg-foo-soft` / `var(--foo)`);
+`Domain`/`domainIcon` are deleted (nothing imported them); the theme's storage
+key and style-element id are injected via `configureTheme`; `deriveTokens` takes
+an `accents` spec; and the accent TOKENS, their editor defaults and their
+contrast tests moved to `apps/app`. The ALLOW list is empty. The split
+immediately surfaced a live defect: every light-mode accent default had drifted
+from the stylesheet, which had been darkened for AA — so the branding editor
+displayed a swatch the app never painted, and restoring "the default" from it
+would have set a failing colour.
 
 ### 1.5 The five things that actually decide whether this works
 

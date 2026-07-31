@@ -27,21 +27,16 @@ import { findBoundaryViolations, formatViolations, violationKeys } from "@4dl/co
  * Scheduled for Stage 0b of docs/PLATFORM-EXTRACTION.md — before any app but Kova
  * consumes this package.
  */
-const ALLOW = [
-  "src/lib/icons.tsx:barcode",
-  "src/lib/icons.tsx:hydration",
-  "src/lib/icons.tsx:nutrition",
-  "src/lib/theme.ts:calorie",
-  "src/lib/theme.ts:hydration",
-  "src/lib/theme.ts:kova",
-  "src/lib/theme.ts:macro",
-  "src/lib/theme.ts:nutrition",
-  "src/lib/theme.ts:supplement",
-  "src/primitives.tsx:calorie",
-  "src/primitives.tsx:hydration",
-  "src/primitives.tsx:nutrition",
-  "src/primitives.tsx:supplement",
-];
+/**
+ * EMPTY. It was thirteen entries — `nutrition`, `hydration`, `calorie`,
+ * `macro`, `supplement`, `barcode` and `kova`, spread across the tone maps, the
+ * icon registry and the theme module — and the README called them "the one
+ * known leak" for long enough that they had stopped reading as a defect.
+ *
+ * Keep it empty. Anything that needs an entry is product vocabulary that
+ * belongs in the app, and the app has a place for it: `apps/app/src/registry/`.
+ */
+const ALLOW: readonly string[] = [];
 
 describe("package boundary", () => {
   it("imports nothing from an app", () => {
