@@ -4,6 +4,8 @@ import { AUTH_SCHEMA } from "@4dl/auth";
 import { BILLING_SCHEMA } from "@4dl/billing";
 import { AI_SCHEMA } from "@4dl/ai";
 import { COMMERCE_SCHEMA } from "@4dl/commerce";
+import { EMAIL_SCHEMA } from "@4dl/email";
+import { NOTIFY_SCHEMA } from "@4dl/notify";
 import { STORAGE_SCHEMA } from "@4dl/storage";
 import { TENANCY_SCHEMA } from "@4dl/tenancy";
 import { KOVA_SCHEMA } from "../src/db.js";
@@ -66,13 +68,16 @@ describe("the Kova schema module", () => {
     // redemption_uses, promo_codes and addon_types (6 tables, 6 indexes,
     // 4 ALTERs) into @4dl/commerce; Stage 5 took media_assets (1 table,
     // 3 indexes) into @4dl/storage and ai_models, ai_generations, ai_cache and
-    // insight_feedback (4 tables, 1 index) into @4dl/ai.
+    // insight_feedback (4 tables, 1 index) into @4dl/ai. Stage 6 took
+    // email_templates (1 table, 1 ALTER) into @4dl/email and user_prefs,
+    // notifications and digest_sent (3 tables, 2 indexes, 4 ALTERs) into
+    // @4dl/notify.
     const ddl = schemaStatements(KOVA_SCHEMA);
-    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(38);
-    expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(26);
+    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(34);
+    expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(24);
     expect(ddl.filter((s) => s.startsWith("CREATE UNIQUE INDEX"))).toHaveLength(6);
     expect(ddl.filter((s) => s.startsWith("DROP INDEX"))).toHaveLength(1);
-    expect(KOVA_SCHEMA.alters ?? []).toHaveLength(44);
+    expect(KOVA_SCHEMA.alters ?? []).toHaveLength(39);
   });
 
   it("names every backfill", () => {
@@ -89,7 +94,7 @@ describe("the composed schema", () => {
     // the moment one is edited. Ownership has to be exclusive.
     const tableOf = (s: string) => /CREATE TABLE IF NOT EXISTS "?(\w+)"?/.exec(s)?.[1];
     const owned = new Map<string, string>();
-    for (const m of [AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, COMMERCE_SCHEMA, STORAGE_SCHEMA, AI_SCHEMA, KOVA_SCHEMA]) {
+    for (const m of [AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, COMMERCE_SCHEMA, STORAGE_SCHEMA, AI_SCHEMA, EMAIL_SCHEMA, NOTIFY_SCHEMA, KOVA_SCHEMA]) {
       for (const sql of schemaStatements(m)) {
         const t = tableOf(sql);
         if (!t) continue;
@@ -108,16 +113,24 @@ describe("the composed schema", () => {
     expect(owned.get("subject_subscriptions")).toBe("commerce");
     expect(owned.get("media_assets")).toBe("storage");
     expect(owned.get("ai_models")).toBe("ai");
+    expect(owned.get("email_templates")).toBe("email");
+    expect(owned.get("notifications")).toBe("notify");
     expect(owned.get("clients")).toBe("kova");
   });
 
   it("lets a later module extend an earlier module's table", () => {
-    // `tenant_settings` is tenancy's row, and billing/AI/email/commerce each own
-    // columns on it. That works ONLY because tenancy applies first — so this
-    // asserts the ordering the app relies on, not just the ALTERs themselves.
+    // `tenant_settings` is tenancy's row, and billing/AI/email/notify/commerce
+    // each own columns on it. That works ONLY because tenancy applies first — so
+    // this asserts the ordering the app relies on, not just the ALTERs.
     const kovaAlters = (KOVA_SCHEMA.alters ?? []).filter((s) => s.includes("tenant_settings"));
     expect(kovaAlters.length).toBeGreaterThan(0);
     expect(schemaStatements(TENANCY_SCHEMA).some((s) => s.includes("CREATE TABLE IF NOT EXISTS tenant_settings"))).toBe(true);
+    // Stage 6 is the first time a PACKAGE (rather than the app) alters another
+    // package's table. Asserted by name because the failure is silent: an
+    // ADD COLUMN that runs before the CREATE TABLE raises "no such table",
+    // which the runner does NOT tolerate — it only swallows "duplicate column".
+    expect(EMAIL_SCHEMA.alters ?? []).toContain("ALTER TABLE tenant_settings ADD COLUMN email_config_json TEXT");
+    expect(NOTIFY_SCHEMA.alters ?? []).toContain("ALTER TABLE tenant_settings ADD COLUMN notif_policy_json TEXT");
   });
 
   it("keeps identity OUT of the tenant cascade", () => {
@@ -159,6 +172,17 @@ describe("the composed schema", () => {
     // the same shape of mistake as sweeping the plan list with a subscription.
     const t = AI_SCHEMA.scoped?.tenantTables ?? [];
     expect(t).toEqual(["ai_generations", "insight_feedback"]);
+  });
+
+  it("keeps per-USER rows out of the tenant cascade, in notify too", () => {
+    // Same rule as auth's, one level up the stack and easy to get wrong here
+    // because these tables sit beside `notifications`, which IS tenant-scoped.
+    // `user_prefs` (units, widgets, channel switches) and `digest_sent` (send
+    // idempotency) are keyed on a user and carry no `tenant_id` to cascade on —
+    // a purge that named them would issue `WHERE tenant_id = ?` against a column
+    // that does not exist, and D1's error would be swallowed by the sweep.
+    const t = NOTIFY_SCHEMA.scoped?.tenantTables ?? [];
+    expect(t).toEqual(["notifications"]);
   });
 
   it("declares what a tenant purge must clear", () => {

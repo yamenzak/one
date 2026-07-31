@@ -34,6 +34,8 @@
     "@4dl/commerce#build": { "outputs": [] },
     "@4dl/storage#build": { "outputs": [] },
     "@4dl/ai#build": { "outputs": [] },
+    "@4dl/email#build": { "outputs": [] },
+    "@4dl/notify#build": { "outputs": [] },
     "@kova/domain#build": { "outputs": [] },
     "@kova/protocol#build": { "outputs": [] },
     "@4dl/ui#build": { "outputs": [] },

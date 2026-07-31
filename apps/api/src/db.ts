@@ -38,6 +38,8 @@ import { AUTH_SCHEMA } from "@4dl/auth";
 import { BILLING_SCHEMA } from "@4dl/billing";
 import { AI_SCHEMA } from "@4dl/ai";
 import { COMMERCE_SCHEMA } from "@4dl/commerce";
+import { EMAIL_SCHEMA } from "@4dl/email";
+import { NOTIFY_SCHEMA } from "@4dl/notify";
 import { STORAGE_SCHEMA } from "@4dl/storage";
 import { TENANCY_SCHEMA } from "@4dl/tenancy";
 
@@ -137,12 +139,6 @@ export const KOVA_SCHEMA: SchemaModule = {
     // Per-client lab list + the roster scans (client_id IN …, filter status).
     "CREATE INDEX IF NOT EXISTS idx_labtests_client ON lab_tests(client_id, status);",
 
-    // Per-tenant email template overrides (white-label): a tenant rewrites a
-    // notification type's subject/body ({{variables}}); enabled=0 mutes the
-    // email for that type. Absent row = the registry default template.
-    "CREATE TABLE IF NOT EXISTS email_templates (tenant_id TEXT, type TEXT, subject TEXT, body TEXT, enabled INTEGER DEFAULT 1, updated_at TEXT, PRIMARY KEY (tenant_id, type));",
-    // Personal unit preferences, per user (cross-tenant).
-    "CREATE TABLE IF NOT EXISTS user_prefs (user_id TEXT PRIMARY KEY, units_json TEXT, updated_at TEXT);",
     "CREATE TABLE IF NOT EXISTS trainer_sessions (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, trainer_user_id TEXT, subscription_id TEXT, addon_type_id TEXT, scheduled_at TEXT, duration_minutes INTEGER, status TEXT DEFAULT 'scheduled', completed_at TEXT, notes TEXT, created_at TEXT);",
     // Per-client session history (WHERE client_id = ?) + the tenant calendar
     // scan (WHERE tenant_id = ? AND status = 'scheduled' ORDER BY scheduled_at).
@@ -152,15 +148,6 @@ export const KOVA_SCHEMA: SchemaModule = {
     // ── Content hub + notifications (SPEC §8.10) ───────────────────────
     "CREATE TABLE IF NOT EXISTS resources (id TEXT PRIMARY KEY, tenant_id TEXT, type TEXT DEFAULT 'article', title TEXT, summary TEXT, body_md TEXT, cover_url TEXT, topics TEXT, muscle_groups TEXT, duration_minutes INTEGER, audience TEXT DEFAULT 'clients', assigned_json TEXT, status TEXT DEFAULT 'draft', author_user_id TEXT, published_at TEXT, created_at TEXT, updated_at TEXT);",
     "CREATE INDEX IF NOT EXISTS idx_resources_tenant ON resources(tenant_id, status);",
-    "CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, tenant_id TEXT, recipient_user_id TEXT, type TEXT, title TEXT, message TEXT, link TEXT, read INTEGER DEFAULT 0, created_at TEXT);",
-    "CREATE INDEX IF NOT EXISTS idx_notif_recipient ON notifications(recipient_user_id, read);",
-    // The bell lists a recipient's notifications ORDER BY created_at DESC.
-    "CREATE INDEX IF NOT EXISTS idx_notif_recipient_time ON notifications(recipient_user_id, created_at);",
-    // Weekly-digest idempotency: one row per (user, week, role) gates the
-    // send, so an at-least-once cron redelivery can't re-email — and a run
-    // that timed out mid-sweep resumes on the next fire (already-sent users
-    // are skipped) instead of starting over.
-    "CREATE TABLE IF NOT EXISTS digest_sent (user_id TEXT, period TEXT, kind TEXT, at TEXT, PRIMARY KEY (user_id, period, kind));",
 
     // ── Tenant settings (branding, AI toggles, marketplace, Connect) ───
 
@@ -235,8 +222,6 @@ export const KOVA_SCHEMA: SchemaModule = {
     "ALTER TABLE foods ADD COLUMN visibility TEXT DEFAULT 'tenant'",
     // Tenant integration settings (provider enable + API keys).
     "ALTER TABLE tenant_settings ADD COLUMN integrations_json TEXT",
-    // Per-user home-screen widget layout (client + coach surfaces).
-    "ALTER TABLE user_prefs ADD COLUMN widgets_json TEXT",
     // Tenant AI config: per-feature model/prompt/enable + house tone.
     "ALTER TABLE tenant_settings ADD COLUMN ai_config_json TEXT",
     // Client profile: blood type + contact number.
@@ -264,14 +249,6 @@ export const KOVA_SCHEMA: SchemaModule = {
     "ALTER TABLE tenant_settings ADD COLUMN lapse_json TEXT",
     "ALTER TABLE tenant_settings ADD COLUMN payouts_enabled INTEGER DEFAULT 0",
     "ALTER TABLE tenant_settings ADD COLUMN details_submitted INTEGER DEFAULT 0",
-    // Per-tenant email provider (platform-metered | brevo | off).
-    "ALTER TABLE tenant_settings ADD COLUMN email_config_json TEXT",
-    // Notification category → channel preferences (per user).
-    "ALTER TABLE user_prefs ADD COLUMN notif_json TEXT",
-    // Notification category (check-ins | plans-goals | billing | …).
-    "ALTER TABLE notifications ADD COLUMN category TEXT",
-    // Owner-set tenant policy: which categories members may be EMAILED.
-    "ALTER TABLE tenant_settings ADD COLUMN notif_policy_json TEXT",
     // Body scan: sagittal posture screen (from the side view) + somatotype.
     "ALTER TABLE body_scans ADD COLUMN posture_cva_deg REAL",
     "ALTER TABLE body_scans ADD COLUMN posture_tilt_deg REAL",
@@ -343,10 +320,16 @@ export const KOVA_SCHEMA: SchemaModule = {
  * Kept as a `(db)` call rather than `(env)` because ~40 call sites pass a bare
  * D1 handle; the gate underneath takes the bindings slice.
  */
-// Dependency order, and the app last. `tenant_settings` is created by tenancy;
-// the ALTERs that add billing's, AI's, email's and commerce's columns to it are
-// still in Kova's module below and move out with those packages.
-const gate = schemaGate([AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, COMMERCE_SCHEMA, STORAGE_SCHEMA, AI_SCHEMA, KOVA_SCHEMA]);
+// Dependency order, and the app last. `tenant_settings` is created by TENANCY
+// and then composed onto: email adds `email_config_json`, notify adds
+// `notif_policy_json`. That is why both must follow tenancy here, and why an
+// ADD COLUMN in a package is safe — one table, many owners, no settings table
+// per package. The ALTERs that add billing's and AI's columns to it are still in
+// Kova's module above and move out with those packages.
+const gate = schemaGate([
+  AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, COMMERCE_SCHEMA,
+  STORAGE_SCHEMA, AI_SCHEMA, EMAIL_SCHEMA, NOTIFY_SCHEMA, KOVA_SCHEMA,
+]);
 export const ensureSchema = (db: D1Database): Promise<void> => gate({ DB: db });
 
 /** Small helpers shared by stores — re-exported so every existing call site

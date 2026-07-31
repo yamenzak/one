@@ -1,0 +1,27 @@
+{
+  "name": "@4dl/notify",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "In-app notifications: the WebSocket push Durable Object, per-user channel preferences, and template rendering. The notification TYPES are the app's registry.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./model": "./src/model.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@4dl/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@4dl/core": "workspace:*",
+    "@cloudflare/workers-types": "^4.20251001.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
