@@ -78,3 +78,32 @@ removes it and **frees one**. That is the rule people get wrong, so it is stated
 on both actions and in opposite directions. The destructive pair carries a
 14-day floor: a tenant cannot configure same-day deletion of someone who was one
 day late.
+
+## `connect.ts` — the connected-account rail's own half
+
+The questions that arise when a tenant sells to its own customers on its own
+provider account, and nowhere else: may this subject buy this package, have they
+bought it before, how does an N-installment plan split one package's runway, and
+how is an installment subscription cancelled once it is paid off.
+
+It came out of the app alongside the platform rail's reconciliation
+(`@4dl/billing/webhook.ts`). Splitting them is what makes that file's two halves
+legible — one bills the tenant, the other lets the tenant bill someone else, and
+they were interleaved.
+
+**`cancelInstallmentSub` takes the canceller as a PARAMETER.** This package sits
+BESIDE `@4dl/billing`, never on it: an app can sell access to its own customers
+without billing its own tenants for the privilege. The Stripe client lives in
+billing because that is where the platform rail is, so reaching for it here would
+make every commerce app depend on a payment provider for a rail it may not run.
+
+**`purchaseBlocked` takes the restricted visibility as a parameter**, and its
+default matches nothing. Those strings are DATA — rows in an app's
+`packages.visibility` column — so renaming one is a migration, not an edit. A
+default that matched would risk opening a package to everyone; one that matches
+nothing means an app which forgets to pass it gets grant-only, which fails
+closed. Kova passes `"client_specific"`.
+
+That parameter also exposed a test gap worth repeating: the suite asserted only
+that the *wrong* subject was refused, which passes just as happily when the rule
+fails closed and nobody can buy at all. Both halves are asserted now.

@@ -3341,6 +3341,13 @@ describe("package lifecycle + redemption scoping", () => {
     // A `client_specific` package is purchasable only by its own client.
     await mkPkg("pkg_cs", "client_specific", a);
     expect((await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: b, packageId: "pkg_cs" }) })).status).toBe(404);
+    // …and BOTH halves are asserted. Only checking that B is refused passes just
+    // as happily when the rule fails CLOSED and nobody can buy it at all — which
+    // is exactly what a wrong `restrictedVisibility` produces now that the value
+    // is a parameter. A is not expected to complete a charge here (no Stripe
+    // account is connected in this suite); what matters is that the visibility
+    // check let them THROUGH, so anything but the 404 is the pass.
+    expect((await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: a, packageId: "pkg_cs" }) })).status).not.toBe(404);
 
     // Redemption code locked to client A: B is rejected, A succeeds.
     await SELF.fetch(`${ORIGIN}/api/redemption-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "LOCKEDA", daysToAdd: 10, restrictedClientId: a }) });

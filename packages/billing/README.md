@@ -91,3 +91,38 @@ that owns half a flow. They move in Stage 4.
 Empty ALLOW list. The last thing to leave was the Stripe metadata prefix
 described above — the one leak in this package that was live data rather than a
 display string.
+
+## `webhook.ts` — the reconciliation, not the reaction
+
+A provider webhook handler is two things wearing one coat, and Kova's had them
+interleaved across 1,556 lines.
+
+**Reconciliation** reads a provider payload against our own row: event
+idempotency, the shape of an id, which subscription an invoice belongs to,
+whether an incoming status may overwrite the one we hold, how much of a refund
+reverses how many credits. None of it knows what the app sells. That is here.
+
+**Reaction** decides what to TELL people and what to GRANT them. That is the
+app's registry, and it stayed there.
+
+Two things in this module are subtle and both were learned the hard way:
+
+`invoiceSubscriptionId` reads **three** places. Stripe's Basil API version
+(2025-03-31+) moved `subscription` off the invoice root onto the line items, and
+webhook payloads render at the **endpoint's** dashboard API version — not the one
+this code pins for its own requests. Reading only the root silently produced
+`null` on a real account.
+
+`LADDER_OWNED` is why a payment webhook cannot stall a dunning ladder. Every rung
+selects on the previous rung's status, and Stripe's retries exhaust around day 21
+and flip the subscription to `unpaid` — squarely between the 7-day and 30-day
+rungs. Writing that unconditionally overwrote `suspended`, the ladder stalled at
+read-only forever, and it failed SAFE and therefore silently. Read its comment
+before touching the status switch.
+
+**The route trees did NOT move.** Both rails' handlers are woven through the
+app's notification registry, its entitlement gates and its row-level scope
+(`requireClientAccess`), and the `@4dl/tenancy` route seam would carry them only
+after each of those became an injection too. That is a larger design job than
+this one, on the one path where a mistake costs real money, and it is not started
+rather than half-done.
