@@ -84,5 +84,5 @@ Stripe's `client_secret`) are exempt by name.
 
 Current frozen debt: 8 keys in `@4dl/platform`'s neighbourhood (`hosts.ts`,
 `promo.ts`, `standing.ts`) and 13 in `@4dl/ui` (`primitives.tsx`, `icons.tsx`,
-`theme.ts`). See `docs/PLATFORM-EXTRACTION.md` §1.4 for what each one is and
+`theme.ts`). See `PLATFORM.md` §1.4 for what each one is and
 which stage retires it.

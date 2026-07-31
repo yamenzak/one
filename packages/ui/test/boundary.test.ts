@@ -24,7 +24,7 @@ import { findBoundaryViolations, formatViolations, violationKeys } from "@4dl/co
  * theme.ts's `kova-*` keys are the cheapest and most urgent: two apps served from
  * the same origin would fight over one storage key.
  *
- * Scheduled for Stage 0b of docs/PLATFORM-EXTRACTION.md — before any app but Kova
+ * Scheduled for Stage 0b of PLATFORM.md — before any app but Kova
  * consumes this package.
  */
 /**

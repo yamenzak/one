@@ -1,5 +1,5 @@
 /**
- * Role-adaptive shell (DESIGN.md §5) — one app, nav by persona + mode, now
+ * Role-adaptive shell (KOVA.md Part II §5) — one app, nav by persona + mode, now
  * URL-routed (React Router). Tabs + overlays are real routes so refresh and
  * deep-links work: /today /train /eat /progress · /clients/:id/:tab · /library
  * /business · /settings /wellness /shop /explore /admin.

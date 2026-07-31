@@ -193,7 +193,7 @@ export function escapeHtml(s: string): string {
 }
 
 // ── Branded email system ─────────────────────────────────────────────────────
-// Dark-first to match the app (DESIGN.md: near-black canvas, one-step-lighter
+// Dark-first to match the app (UI-LANGUAGE.md §3–4: near-black canvas, one-step-lighter
 // cards, very round corners, one tonal primary). Table-based + fully inline so
 // it renders consistently across Gmail / Apple Mail / Outlook. Every surface is
 // the tenant's: accent, logo (or wordmark), and name — a real white-label.
@@ -243,7 +243,7 @@ export function safeColor(value: string | null | undefined, fallback: string): s
   return ok ? v : fallback;
 }
 
-// Palette lifted from the app tokens (DESIGN.md): near-black canvas, cards one
+// Palette lifted from the app tokens (UI-LANGUAGE.md §3–4): near-black canvas, cards one
 // tonal step lighter, a nested step again. Separation is TONE, not borders.
 const T = {
   bg: "#0b0c0e", card: "#17191c", inset: "#1e2126",
@@ -264,7 +264,7 @@ export function emailButton(label: string, href: string, brand: BrandKit = platf
  *  caller; `brand` skins it; `preheader` is the inbox preview line; `eyebrow` is
  *  an optional muted kicker above the heading; `footnote` overrides the small
  *  print. Dark-first, borderless, left-aligned — the app's own surface language
- *  (DESIGN.md), not a generic centered template. */
+ *  (UI-LANGUAGE.md §3–4), not a generic centered template. */
 export function emailShell(
   heading: string,
   bodyHtml: string,

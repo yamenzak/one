@@ -3,7 +3,7 @@
  * one macro split bar, one normalizer, and one canonical FoodRow so a food reads
  * identically everywhere it appears: the diary, search, the meal plan, the
  * library, the builder, and plan history. Update the look here → it updates
- * app-wide (DESIGN.md metric-coding; SPEC §7 nutrition).
+ * app-wide (KOVA.md Part II metric-coding; SPEC §7 nutrition).
  *
  * Foods reach the UI in two casings — snake_case from the DB/log routes and
  * camelCase from the protocol/external providers. `normFood()` folds both into a

@@ -432,7 +432,7 @@ endpoint means adding it to that regex** or it is silently lost offline. The
 plugin enqueues *and re-throws*, so treat network-class errors as "queued", not
 "failed" — otherwise the user retries and double-logs.
 
-**Accessibility floors** (DESIGN.md §2.2): 48px tap targets, text ≥13px, an
+**Accessibility floors** (KOVA.md Part II §2.2): 48px tap targets, text ≥13px, an
 `aria-label` on every icon-only control, `aria-pressed`/`role="radio"` for
 selection state, `role="status" aria-live="polite"` for async and toast states. A
 clickable `Card` must go through the `onClick` path in `primitives.tsx` or be

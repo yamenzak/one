@@ -5,11 +5,11 @@ Guidance for Claude Code working in this repository.
 ## Project
 
 **Kova** — a multi-tenant, multi-trainer platform for personal-training
-businesses. Product + technical spec in [SPEC.md](SPEC.md); the ByShujaa feature
-inventory Kova is modeled on is in
-[docs/BY-SHUJAA-FEATURES.md](docs/BY-SHUJAA-FEATURES.md).
+businesses, and the first app on this repo's shared platform. Everything Kova is
+lives in **[KOVA.md](KOVA.md)**: Part I the product + technical spec, Part II the
+design mapping, Part III the screen index, Part IV the body-scan design.
 
-**Looking for the file that draws a screen?** [docs/SCREENS.md](docs/SCREENS.md)
+**Looking for the file that draws a screen?** [KOVA.md](KOVA.md) **Part III**
 maps every surface — routes, sub-tabs, and the sheets/drawers that aren't routes
 — to `file:line`, per persona. Grepping for a screen's name usually fails: one
 path renders different files per persona, and most surfaces live inside their
@@ -18,8 +18,8 @@ parent's file. **Update it in the same commit as any screen you add or move.**
 **UI: two files, and the order matters.** [UI-LANGUAGE.md](UI-LANGUAGE.md) is the
 interface language — hierarchy, layout, tokens, motion, copy, component grammar —
 written product-agnostically because it is the extraction target for the shared
-UI package other 4DL apps will consume. [DESIGN.md](DESIGN.md) maps Kova's
-screens onto it. **When they disagree, UI-LANGUAGE.md wins.** DESIGN.md lists the
+UI package other 4DL apps will consume. [KOVA.md](KOVA.md) Part II maps Kova's
+screens onto it. **When they disagree, UI-LANGUAGE.md wins.** Part II lists the
 remaining deltas and UI-LANGUAGE.md §13 gives the order to close them.
 
 **The design system is `@4dl/ui`, not Kova's.** It is shared across 4DL apps, so
@@ -280,25 +280,25 @@ remote bindings without editing the config (this is what the E2E suite does).
 Be conservative here: this section is read as ground truth by future agents, so
 an over-claim costs more than an under-claim. Verify before editing it.
 
-**The platform extraction is under way** — [docs/PLATFORM-EXTRACTION.md](docs/PLATFORM-EXTRACTION.md)
-is the audit and the staged plan for turning this repo from "Kova with two shared
-packages" into "the 4DL platform, on which Kova is the first app". Three more apps
-are queued. **All ten stages are done** — the mechanisms, `@4dl/tenancy`,
-`@4dl/auth`, `@4dl/billing`, `@4dl/commerce`, `@4dl/ai` + `@4dl/storage`,
-`@4dl/email` + `@4dl/notify`, `@4dl/purge`, `@4dl/app-kit`, `apps/_template`
-+ [PLATFORM.md](PLATFORM.md), and Stage 10's four sweeps below.
-`@4dl/platform` is gone. Read the extraction doc
-before moving anything between `apps/api` and `packages/`; **[PLATFORM.md](PLATFORM.md)
-is the index** — the four mechanisms and the five invariants, in one place.
+**The platform extraction is DONE.** All ten stages landed: the mechanisms,
+`@4dl/tenancy`, `@4dl/auth`, `@4dl/billing`, `@4dl/commerce`, `@4dl/ai` +
+`@4dl/storage`, `@4dl/email` + `@4dl/notify`, `@4dl/purge`, `@4dl/app-kit`,
+`apps/_template`, and Stage 10's four sweeps — the route seam
+(`domainRoutes`/`orgSlugGuards` in `@4dl/tenancy`, `turnstileAdminRoutes` in
+`@4dl/auth`; `RouteEnv`/`RouteGuards` is what broke the tenancy↔auth cycle), the
+frontend runtime (`createSession`, `ThemeProvider`, the notices, `useInbox` in
+`@4dl/app-kit`), the Stripe split (`@4dl/billing/webhook.ts` +
+`@4dl/commerce/connect.ts`), and the template's custom-domain routes +
+integration suite. `@4dl/platform` is gone. Since then: `@4dl/admin` (the
+operator console shell) and `@4dl/billing-rail` (one Stripe account, many apps).
 
-**Stage 10 closed the four things Stage 9 deliberately left**, so "done" now means
-more than it did: the route seam (`domainRoutes`/`orgSlugGuards` in
-`@4dl/tenancy`, `turnstileAdminRoutes` in `@4dl/auth` — `RouteEnv`/`RouteGuards`
-is what broke the tenancy↔auth cycle), the frontend runtime (`createSession`,
-`ThemeProvider`, the notices, `useInbox` — all in `@4dl/app-kit`), the Stripe
-split (`@4dl/billing/webhook.ts` for the platform rail, `@4dl/commerce/connect.ts`
-for the connected-account rail), and the template's own custom-domain routes +
-integration suite.
+**[PLATFORM.md](PLATFORM.md) is the index** — the fourteen packages, the four
+mechanisms, the five invariants, and the CONTRIBUTION RULES for moving anything
+between an app and a package. Read it before you move code.
+**[docs/SHIPPING-AN-APP.md](docs/SHIPPING-AN-APP.md)** is the walkthrough for a
+new app. The staged extraction plan, the three pre-release audits and the
+billing/notifications/registry design plans are finished work and live in git
+history.
 
 Three things are still Kova's on purpose, and each README says why: `Shell.tsx`
 (role-adaptive nav is a product decision, extraction plan §3.2), the presentation

@@ -3,7 +3,7 @@
 > The interface language for every app Four Degree Labs ships. Product-agnostic
 > on purpose: **nothing in this file may mention a domain** — no clients, no
 > workouts, no invoices. Kova maps its screens onto this language in
-> [DESIGN.md](DESIGN.md); Scena and Bocca will map theirs. When this file and a
+> [KOVA.md](KOVA.md) Part II; the next app will map its own. When this file and a
 > product file disagree, **this file wins**.
 >
 > This is the extraction target. Everything specified here belongs in the shared
@@ -816,7 +816,7 @@ anything, and add to it in the same commit that adds a component. A component
 that is not listed here does not exist as far as the next screen is concerned.
 
 Marked **✅** where the component is language-conformant today, **◻︎** where it
-works but predates the language and is still on the list (DESIGN.md tracks the
+works but predates the language and is still on the list (KOVA.md Part II tracks the
 deltas).
 
 ### Spine — `layout.tsx`

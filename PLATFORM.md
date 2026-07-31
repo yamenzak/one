@@ -121,9 +121,100 @@ accumulated three real defects before the derivation replaced them.
 
 ---
 
+## Contributing — where new code goes
+
+The ten stages that built this platform are done; what they taught is below. Each
+rule cost a real debugging session, and most of them describe a mistake that
+**typechecks perfectly**.
+
+### The one question, asked first
+
+> **Does this code know what the app sells?**
+
+If yes, it belongs in the app. If it only knows that *something* is sold, that
+*someone* is a tenant, that *some* capability is gated — it can be a package. The
+boundary test enforces the answer; you do not get to argue with it.
+
+When the answer is "mostly no, but it needs one product fact", that fact is a
+**parameter**, not an import. Every package here already does this: `bindGrants`,
+`bindEntitlements`, `configureAi`, `StorageQuota`, `EmailMeter`, `RouteGuards`,
+`ConsoleSection[]`, `RailApp[]`.
+
+### Moving code into a package
+
+**An extraction is a MOVE.** Anything retyped is a rewrite wearing a move's
+clothes, and it loses the bugs the original had already fixed. Copy the file,
+then delete the original — do not "port" it.
+
+1. **Take the tests with it.** A split moves tests; it does not add any. If the
+   count goes up, you rewrote something.
+2. **Declare a binding SLICE, never an app's `Env`** (`HasDb & HasMedia`). An
+   app's `Env` satisfies it by shape, so there is no import and no registration —
+   and a function typed `HasDb` cannot reach R2 by accident.
+3. **Ship schema as a `SchemaModule`, not a migration.** Own marker row, own
+   version. Statements must be idempotent, terminate with `;`, carry no `--`
+   comment and no newline, and ALTERs must be `ADD COLUMN` only. Every one of
+   those fails silently, which is why they are asserted by a test.
+4. **Declare `scoped`** so `@4dl/purge` derives erasure. Never hand-write a table
+   list: a purge must swallow delete errors, so a forgotten table and a renamed
+   column both read as a clean erasure. Kova kept three lists by hand and
+   accumulated three real defects.
+5. **Keep the ALLOW list empty.** If the boundary test wants an entry, the design
+   is wrong — the vocabulary belongs in the app. The one legitimate exemption is a
+   name a *spec or a vendor* chose (`clientExtensionResults` is WebAuthn's).
+6. **Write the README as you go**, and put the *failure* in it. Every README here
+   answers "what breaks if you get this wrong", because that is the part a reader
+   cannot reconstruct.
+
+### Shipping routes from a package
+
+The thing that blocked this for four stages: routes need the request identity,
+and `@4dl/auth` already depends on `@4dl/tenancy`, so importing it back is a
+cycle. The seam that dissolved it (`route-deps.ts`) is the pattern for every
+package that wants routes:
+
+- **`RouteEnv`** names only the context variables the routes *read*. Hono's
+  context is structurally typed, so an app with twenty more satisfies it by shape.
+- **`RouteGuards`** takes authorization as injected **functions**. The app supplies
+  its own; the package calls them without knowing what a permission is.
+
+At the binding site you will need `c as never` — the seam is structural but Hono's
+`Context` is invariant. That cast is the house idiom; threading a type parameter
+through every handler would force each call site to name the app's full env, which
+is the coupling the seam exists to avoid.
+
+### What must NOT move, and why
+
+- **`@kova/protocol`** — wire schemas are per-app by definition.
+- **`Shell.tsx` and navigation** — role-adaptive nav is a product decision.
+- **Presentation wrapped around a registry read** — a paused-studio banner, a
+  notification bell, a feature lock. Inject the registry and you are left with a
+  `Card` that takes a parameter, which is worse than the app owning it.
+- **Prompts, notification copy, digest content** — registries.
+- **A shared database.** Every app gets its own D1. Shared schema *modules*, never
+  shared data.
+- **The credit balance.** `TenantBillingDO` is per app. Routing crosses workers; a
+  metered reserve→settle must not.
+
+### Adding an app
+
+Copy `apps/_template` — it typechecks and its tests run in this workspace, so it
+cannot rot. Its README is the file-by-file guide;
+[`docs/SHIPPING-AN-APP.md`](docs/SHIPPING-AN-APP.md) is the walkthrough from
+nothing to deployed.
+
+### Before you push
+
+`pnpm typecheck && pnpm test` across the workspace, and `pnpm e2e` if you touched
+a golden path. The Miniflare suite needs the SPA built first — the root `pnpm test`
+handles it.
+
+---
+
 ## Where the history is
 
-[`docs/PLATFORM-EXTRACTION.md`](docs/PLATFORM-EXTRACTION.md) — the audit that
-started this, the nine stages, and what moved in each. Read it before moving
-anything between an app and a package. It also records what did **not** move and
-why, which is the more useful half.
+The audit that started the extraction, its ten stages and what moved in each were
+tracked in `PLATFORM.md`, alongside the round-1/2/3 pre-release
+audits and the billing, notifications and registry design plans. All of it is
+**in git history** — the work is finished and the durable lessons are above, in
+the package READMEs, and in the comments at the sites they describe.

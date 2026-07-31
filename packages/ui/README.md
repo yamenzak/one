@@ -4,7 +4,7 @@ The shared design system for 4DL apps. Kova is the first consumer, not the owner
 
 The interface language it implements is [UI-LANGUAGE.md](../../UI-LANGUAGE.md) —
 hierarchy, tokens, motion, copy, component grammar — which is written
-product-agnostically for exactly this reason. [DESIGN.md](../../DESIGN.md) maps
+product-agnostically for exactly this reason. [KOVA.md](../../KOVA.md) Part II maps
 Kova's screens onto it and lives outside this package.
 
 ## The boundary
