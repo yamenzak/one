@@ -72,19 +72,64 @@ renders the sign-in screen — which is the one place the write queue is
 unreachable. It is a **UI convenience only**: the session cookie is HttpOnly,
 every read and write is still authorized server-side, and a real 401 clears it.
 
+## The session is a FACTORY
+
+`createSession<Ctx, B>({ storage, tenantsOf })` returns `{ SessionProvider,
+useSession, useOnline }`. It owns the whole boot sequence and its failure modes:
+the host probe, `/api/context`, the offline-degraded fallback, the 401 handler,
+connectivity, sign-out, and crossing to another tenant. The app supplies only its
+context TYPE and two small readers.
+
+Generic over the payload rather than over a base interface, because an app's
+context is its own shape and nothing here reads into it except `tenantsOf` —
+which exists solely so `switchTenant` can build the target hostname.
+
+**The router stays out.** `useSearchParams` and friends would couple every 4DL
+app to one router, and the one place an app needs it — honouring a `?t=<tenantId>`
+hint on an emailed deep link — is ten lines that belong beside that app's own
+routes. `switchTenant` is exposed so the app can wire it.
+
+Two things it does that look like details and are not:
+
+- **A network failure is not a sign-out.** A cold start with no signal restores
+  the cached payload and renders the app degraded, because the sign-in screen is
+  precisely where the offline write queue becomes unreachable. A real 401 clears
+  both the state and the cache, so a signed-out user never looks signed in.
+- **Sign-out is not swallowed.** The session cookie is HttpOnly, so only the
+  server can clear it and the request has to land. A `.catch(() => undefined)`
+  plus an in-place reload silently re-authenticates whenever it does not — which
+  reads as "sign out does nothing". `finally` still resets and navigates.
+
+## `useInbox` — the transport, not the bell
+
+`@4dl/notify`'s DO pushes "refetch", never the notification, so the client half
+is: hold a socket, reload when told, keep a slow poll behind it. `useInbox<N>({
+online })` is that, generic in the row shape.
+
+`online` is not optional politeness. While offline the socket can only fail, so
+an ungated backoff-reconnect plus a 90-second poll grinds against a dead radio
+for an entire session — draining the battery in exactly the scenario the offline
+support exists for.
+
+The rendering, the surface filtering and the per-type icons stay in the app: they
+are a registry, and a hook that returned JSX would be the design system's job.
+
 ## What did NOT move, and why
 
-`session.tsx`, `theme.tsx`, `Shell.tsx`, `notices.tsx`, `NotificationBell`,
-`StudioSwitcher` and `FeatureLock` stayed in Kova. Each is a generic mechanism
-welded to a product registry — personas and coach/train mode, the notification
-type registry, the entitlement registry, the app's nav. Extracting them means
-designing the registry-injection seam for each, which is Stage 9's job alongside
-the template app. Moving them now would have meant retyping them, and an
-extraction that retypes code is a rewrite wearing a move's clothes.
+- **`Shell.tsx`** — role-adaptive nav is a product decision, and the extraction
+  plan says so explicitly (§3.2). It is not a candidate.
+- **`StudioPausedBanner`** — the mechanism is a coloured strip; everything else
+  about it is Kova's words, Kova's roles and Kova's dunning ladder. Remove the
+  copy and there is nothing left to share.
+- **`NotificationBell`'s rendering, `StudioSwitcher`, `FeatureLock`** — each is
+  mostly a registry read (notification surfaces and coding, persona labels and
+  tones, the entitlement catalog) wrapped around a few `@4dl/ui` primitives.
+  Injecting the registry would leave a component that is a `Card` with a
+  parameter, which is worse than the app owning it.
 
-Kova's `session.tsx` does now compose this package's `host` and `storage`
-halves, so the parts that were genuinely generic are here even though the
-provider is not.
+`theme.tsx` DID move, because the one thing tying it to the app was where
+branding came from — now a prop. The app resolves it (signed-in tenant wins,
+else the host's tenant so a sign-in screen is already branded) and passes it in.
 
 ## Boundary
 
