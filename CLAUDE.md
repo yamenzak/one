@@ -255,27 +255,40 @@ an over-claim costs more than an under-claim. Verify before editing it.
 **The platform extraction is under way** — [docs/PLATFORM-EXTRACTION.md](docs/PLATFORM-EXTRACTION.md)
 is the audit and the staged plan for turning this repo from "Kova with two shared
 packages" into "the 4DL platform, on which Kova is the first app". Three more apps
-are queued. **All nine stages are done** — the mechanisms, `@4dl/tenancy`,
+are queued. **All ten stages are done** — the mechanisms, `@4dl/tenancy`,
 `@4dl/auth`, `@4dl/billing`, `@4dl/commerce`, `@4dl/ai` + `@4dl/storage`,
-`@4dl/email` + `@4dl/notify`, `@4dl/purge`, `@4dl/app-kit`, and `apps/_template`
-+ [PLATFORM.md](PLATFORM.md). `@4dl/platform` is gone. Read the extraction doc
+`@4dl/email` + `@4dl/notify`, `@4dl/purge`, `@4dl/app-kit`, `apps/_template`
++ [PLATFORM.md](PLATFORM.md), and Stage 10's four sweeps below.
+`@4dl/platform` is gone. Read the extraction doc
 before moving anything between `apps/api` and `packages/`; **[PLATFORM.md](PLATFORM.md)
 is the index** — the four mechanisms and the five invariants, in one place.
 
-Two things Stage 9 deliberately did NOT do, so nobody reads "done" as "complete":
-the frontend session/theme/shell layer is still Kova's (each file is a generic
-mechanism welded to a product registry — `packages/app-kit/README.md` lists them
-and why), and the template ships no Stripe routes, no custom-domain routes and no
-integration suite (`apps/_template/README.md` §"What this template does NOT
-include").
+**Stage 10 closed the four things Stage 9 deliberately left**, so "done" now means
+more than it did: the route seam (`domainRoutes`/`orgSlugGuards` in
+`@4dl/tenancy`, `turnstileAdminRoutes` in `@4dl/auth` — `RouteEnv`/`RouteGuards`
+is what broke the tenancy↔auth cycle), the frontend runtime (`createSession`,
+`ThemeProvider`, the notices, `useInbox` — all in `@4dl/app-kit`), the Stripe
+split (`@4dl/billing/webhook.ts` for the platform rail, `@4dl/commerce/connect.ts`
+for the connected-account rail), and the template's own custom-domain routes +
+integration suite.
+
+Three things are still Kova's on purpose, and each README says why: `Shell.tsx`
+(role-adaptive nav is a product decision, extraction plan §3.2), the presentation
+halves of `StudioPausedBanner`/`NotificationBell`/`StudioSwitcher`/`FeatureLock`
+(a registry read wrapped around a few `@4dl/ui` primitives — injecting the
+registry leaves a `Card` with a parameter), and the Stripe **route trees**, whose
+handlers are woven through Kova's notification registry, entitlement gates and
+`requireClientAccess`. Only the reconciliation logic moved.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
 moves. Measured most recently, per package: **499 API + 197 domain + 78 app +
-73 tenancy + 43 ui + 25 commerce + 21 billing + 14 core + 14 purge + 12 ai +
-12 auth + 11 template + 7 protocol + 3 app-kit + 3 storage + 3 email + 3 notify**
-(1,018 total, 38 skipped). The ui count DROPPED and the app count rose by the
+73 tenancy + 43 ui + 25 commerce + 21 billing + 16 template + 14 core + 14 purge
++ 12 ai + 12 auth + 7 protocol + 3 app-kit + 3 storage + 3 email + 3 notify**
+(1,023 total, 38 skipped). The ui count DROPPED and the app count rose by the
 same shape: Stage 0b moved Kova's eleven accent tones — and the contrast tests
-that guard them — out of `@4dl/ui` and into the app.
+that guard them — out of `@4dl/ui` and into the app. The template's 16 are 11
+conformance (plain Node, no fixtures) + 5 integration (the real worker through
+Miniflare, on the real `*.localhost` host topology).
 Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
 `@4dl/platform` to `@4dl/tenancy`; the split moves tests, it does not add any.
 The pricing and normalizer suites live

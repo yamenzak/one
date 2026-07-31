@@ -266,22 +266,32 @@ the new app being written against untested extractions.
 | **7** ✅ | `@4dl/purge` — `tenantCascade`/`subjectCascade` derived from every module's `scoped` declaration, plus `undeclaredScopes` (a scoped table nobody clears) and `impossibleSteps` (a step whose column the table lacks). The three hand-maintained inventories in `purge.ts` are gone. Each step carries its OWN column, which is what the old loops did not. | Needs every module's `scoped` declaration, so it goes last of the API packages. |
 | **8** ✅ | `@4dl/app-kit` — the fetch layer (incl. the queued/offline/HTTP three-way), host resolution + the door URL builders, prefixed storage, the passkey ceremony, Stripe.js + `PaymentSheet`, `Turnstile`, `ErrorBoundary`, `hard-refresh`. `HostInfo.gate` is `@4dl/tenancy`'s `HostGate` rather than a re-declared copy. **`session.tsx`, `theme.tsx`, `Shell.tsx`, `notices.tsx`, `NotificationBell`, `StudioSwitcher` and `FeatureLock` did NOT move** — each is a generic mechanism welded to a product registry, and the injection seam for those is Stage 9's job with the template. `session.tsx` now composes the kit's host + storage halves. | Independent of 1–7; could be pulled forward if the inventory app needs a UI before a backend. |
 | **9** ✅ | `apps/_template` — a worker wired to every package (schema composition, auth + the route table, tenancy adapter, the credit DO, storage/AI/email/notify bindings, a derived purge) with **11 conformance tests that run in plain Node**, so a new app inherits the guardrails on its first commit. Plus `PLATFORM.md` (the four mechanisms, the five invariants) and the last two package READMEs. Two additions fell out of building it: `@4dl/billing/schema` and `@4dl/notify/schema` subpaths, because both roots export a Durable Object and `cloudflare:workers` made the conformance checks unloadable outside the Workers pool. **NOT included**: Stripe routes, custom-domain routes, an integration suite, or a frontend — each is called out in the template README rather than stubbed. | The template is what stops app #3 from respawning logic. |
+| **10** ✅ | The four things Stage 9 named as deliberately-left, closed in four sweeps. **10a — the route seam**: `RouteEnv`/`RouteGuards` in `@4dl/tenancy` (a package's routes name only the context variables they READ and take authorization as injected functions), which is what dissolved the cycle §3.0 describes; `domainRoutes`/`domainAdminRoutes` and `orgSlugGuards` moved, plus `turnstileAdminRoutes` into `@4dl/auth`. **10b — the frontend runtime**: `createSession<Ctx,B>`, `ThemeProvider` (branding as a prop), `OfflinePill`/`QueuedNotice`/`PwaUpdatePrompt`/`UnhandledErrorToast`, and `useInbox<N>` (the transport, not the bell). The router stays out — `useSearchParams` would couple every 4DL app to one router, so `switchTenant` is exposed and the app wires the `?t=` hint. **10c — the Stripe split**: `@4dl/billing/webhook.ts` (subscription sync, the `LADDER_OWNED` dunning clamp, idempotency, proportional refund reversal) and `@4dl/commerce/connect.ts` (`purchaseBlocked`, `hasPriorPurchase`, `scaleSpecs`, installment cancel with the cancel call INJECTED so commerce never leans on billing); `stripe-routes.ts` 1,556 → 1,241 lines. **10d — the template earns its keep**: its own `domain-routes.ts` + `org-guard.ts` adapters and a **5-test integration suite** against the real worker in Miniflare, on the real `*.localhost` topology. Template tests 11 → 16. | Each was left because its seam did not exist yet. Building the seam is the work; the move is the easy half. |
 
 **Critical path for the inventory app:** 0 → 1 → 2 → 8, plus 6 (storage for
 photos/labels) and 5 if it needs barcode/OCR. Billing and commerce can trail if
 the app is internal.
 
-### 3.0 Two route modules that could not move yet
+### 3.0 Two route modules that could not move yet — SOLVED in Stage 10a
 
 `domain-routes.ts` (custom-domain binding) and `org-guard.ts` (slug validation)
 belong to tenancy by subject, but both need the request identity — and
 `@4dl/auth` depends on `@4dl/tenancy`, so putting them in tenancy is a cycle.
 
-They stay in `apps/api` until a route factory generic over the Hono environment
-lets tenancy declare only the context variables it reads (`host`, `user`,
-`tenantId`) structurally, without importing auth. That is a small piece of type
-work, scheduled with the template app in Stage 9 where the same pattern is needed
-for every other package's routes. Recorded here rather than left as a surprise.
+The seam that dissolved it is `packages/tenancy/src/route-deps.ts`, and it is the
+pattern for **every** package that wants to ship routes:
+
+- **`RouteEnv`** names only the context variables the package's routes READ
+  (`host`, and an optional `user.id`) — structurally, so any app whose Hono env
+  is a superset satisfies it. Tenancy never imports auth's `AppEnv`.
+- **`RouteGuards`** takes authorization as injected FUNCTIONS —
+  `requireTenant`, `requirePermission`, `isPlatformAdmin`, and two optional ones
+  (`gateCustomDomain`, `turnstile`). The app supplies its own; the package calls
+  them without knowing what a permission is.
+
+`apps/api/src/domain-routes.ts` and `org-guard.ts` are now thin adapters, and the
+same shape carried `turnstileAdminRoutes` into `@4dl/auth`. `apps/_template` has
+its own pair, which is how a new app inherits custom domains for free.
 
 ### 3.1 Honest sizing
 

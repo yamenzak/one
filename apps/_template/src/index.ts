@@ -24,7 +24,8 @@ import { newId, nowIso } from "@4dl/core";
 import { sessionMiddleware, requirePermission, requireTenant, type AppEnv } from "./auth-context.js";
 import { createAuth } from "./auth.js";
 import { guard } from "./route-guard.js";
-import { isPlatformDoor, rootDomain } from "./host-context.js";
+import { domainAdminRoutes, domainRoutes } from "./domain-routes.js";
+import { orgCreateGuard, orgUpdateGuard } from "./org-guard.js";
 
 export { TenantBillingDO } from "./billing-do.js";
 export { InboxDO } from "./inbox-do.js";
@@ -37,28 +38,11 @@ app.use("*", guard);
 app.get("/health", (c) => c.json({ ok: true }));
 
 /**
- * WHICH DOOR IS THIS? The one public read the pre-auth client makes.
- *
- * Note `gate: { ...host.gate }` — the WHOLE gate, spread, never a hand-picked
- * pair of fields. Listing them is how a new rung reaches the model, the resolver
- * and the server while the client still reads the old shape and renders the
- * wrong state for a tenant whose access was withheld.
+ * A tenant's slug becomes an ORIGIN, so it is validated before Better Auth
+ * stores it — mounted AROUND the pass-through below, never instead of it.
  */
-app.get("/api/host", (c) => {
-  const host = c.get("host");
-  const t = host.tenant;
-  const here = new URL(c.req.url);
-  const root = host.shape.root;
-  const port = here.port ? `:${here.port}` : "";
-  return c.json({
-    role: host.shape.role,
-    platform: isPlatformDoor(host.shape),
-    rootDomain: root || rootDomain(c.env),
-    setupUrl: `${here.protocol}//setup.${root}${port}`,
-    tenant: t ? { tenantId: t.tenantId, name: t.name, slug: t.slug, branding: t.branding, allowSignup: t.allowSignup } : null,
-    gate: host.gate ? { ...host.gate } : null,
-  });
-});
+app.use("/api/auth/organization/create", orgCreateGuard);
+app.use("/api/auth/organization/update", orgUpdateGuard);
 
 /** Better Auth owns its whole lane: OTP, passkeys, sessions, organizations. */
 app.on(["GET", "POST"], "/api/auth/*", (c) => {
@@ -98,6 +82,16 @@ app.post("/api/records", async (c) => {
     .run();
   return c.json({ id }, 201);
 });
+
+/**
+ * `/api/host` — the one PUBLIC read the pre-auth client makes, and the custom-
+ * domain surface behind it. Both come from `@4dl/tenancy`, which is why this app
+ * does not hand-write a host probe: the door classification, the whole-gate
+ * spread and the 404-vs-network distinction are all decisions the package
+ * already made correctly.
+ */
+app.route("/api", domainRoutes);
+app.route("/api", domainAdminRoutes);
 
 app.notFound((c) => c.json({ error: "not_found" }, 404));
 

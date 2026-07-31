@@ -30,9 +30,12 @@ template that is not built is a template that rots.
 | `billing-do.ts` | the class name (once) | The credit authority. |
 | `inbox-do.ts` | no | Re-export only; wrangler needs the entry export. |
 | `storage.ts` `ai.ts` `mailer.ts` `email-provider.ts` | the registries | Where each package learns which app it is. |
+| `org-guard.ts` | the noun in the copy | A tenant's slug becomes an ORIGIN, so the DNS-label + reserved-label check is a security control, not validation. |
+| `domain-routes.ts` | the feature key gating it | Custom-domain binding: `@4dl/tenancy`'s routes, with authorization passed in. |
 | `purge.ts` | the non-D1 side effects | The D1 cascade is DERIVED. Do not add a table list. |
 | `index.ts` | **yes** — your routes | The worker. |
 | `test/conformance.test.ts` | **keep** | See below. |
+| `test/integration.test.ts` | **keep, and grow it** | See below. |
 
 ## Six things that will bite you
 
@@ -87,16 +90,51 @@ renamed columns that stayed. A purge swallows every delete error — it has to,
 since an old database may legitimately lack a table — so all three read as a
 clean erasure.
 
+## Keep the integration suite too
+
+`test/integration.test.ts` drives the real worker through Miniflare — the same
+Hono app, the same Better Auth, the same D1. The conformance tests read
+declarations; this one exercises the wiring, and that is a different class of
+bug. Every one of these **typechecks perfectly**:
+
+- a middleware in the wrong ORDER, so the guard runs before the identity
+- a route mounted on the wrong PREFIX, so it 404s on the door it needs
+- a schema module missing from the composed list, so a table never exists
+- an auth callback that throws, which Better Auth **swallows** while still
+  returning `200 {"success":true}` — the slug guard lives there
+
+The five it ships with are the golden path: the host probe answers with its door;
+an unowned hostname serves the probe and nothing else; sign-up → workspace create
+→ subdomain row → tenant door resolves → a scoped write lands and reads back; a
+slug that would take over `admin`/`setup`/`autodiscover` is refused; and an
+unauthenticated caller reaches the public lane only.
+
+Two things about the environment, both real rather than simulated:
+
+- **The host IS the tenancy, in tests too.** Miniflare preserves the Host header
+  and `*.localhost` resolves to loopback, so sign-in happens on
+  `setup.localhost` and tenant behaviour is asserted on `<slug>.localhost` —
+  the shipped topology. `vitest.config.ts` overrides `ROOT_DOMAIN` to
+  `localhost` for exactly this reason.
+- **Every test user is a platform admin** (`ADMIN_EMAILS: ""` +
+  `ENVIRONMENT: "development"`), so a route-guard action gate cannot be observed
+  failing there. Assert authorization through something that does not consult
+  platform-admin status: row-level scope, or an in-handler check.
+
+Read the sign-in code out of the `verification` table, never out of a log. The
+mock mailer prints it, but a test that scrapes stdout passes for the wrong reason
+the moment the provider changes.
+
 ## What this template does NOT include
 
 - **A frontend.** `@4dl/app-kit` + `@4dl/ui` are the runtime and the design
   system; the shell, nav and session provider are still per-app (see that
   package's README for exactly which files stayed in Kova and why).
-- **Stripe routes.** Both rails work, but the route module mixes the platform
-  rail with the connected-account rail and is Kova-shaped. Copy from
-  `apps/api/src/stripe-routes.ts` when the app starts charging.
-- **Custom-domain binding.** `@4dl/tenancy` has the whole mechanism; the routes
-  live in `apps/api/src/domain-routes.ts` and need the request identity, which
-  is a dependency cycle away from moving.
-- **An integration suite.** Add one against Miniflare early. Kova's exists and
-  still could not see the class of bug its three Playwright specs caught.
+- **Stripe routes.** Both rails' reconciliation logic is extracted —
+  `@4dl/billing/webhook.ts` is the platform rail (subscription sync, the dunning
+  clamp, refund reversal), `@4dl/commerce/connect.ts` is the connected-account
+  rail. What did NOT move is the route TREE: Kova's handlers are woven through
+  its notification registry, its entitlement gates and its row-level scope
+  function, and each of those has to become an injection first. Copy from
+  `apps/api/src/stripe-routes.ts` when the app starts charging, and take the two
+  packages rather than re-deriving what they already hold.

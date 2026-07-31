@@ -78,8 +78,16 @@
 
   // The binding NAMES are the contract (`@4dl/core` bindings.ts). Every shared
   // package matches on shape, so `DB`, `CACHE`, `MEDIA`, `AI`, `EMAIL` are fixed.
-  "kv_namespaces": [{ "binding": "CACHE", "id": "REPLACE_ME" }],
-  "d1_databases": [{ "binding": "DB", "database_id": "REPLACE_ME" }],
-  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "REPLACE_ME" }],
+  //
+  // The IDs below are placeholders and must be replaced before any remote
+  // deploy — `wrangler kv namespace create`, `wrangler d1 create`,
+  // `wrangler r2 bucket create`. They are deliberately VALID-SHAPED rather than
+  // `REPLACE_ME`: wrangler validates the config before Miniflare starts, so an
+  // invalid bucket name means `pnpm test` cannot even boot, and a template whose
+  // tests do not run is a template that rots. Local dev and the test suite
+  // simulate all three and never look at the values.
+  "kv_namespaces": [{ "binding": "CACHE", "id": "0000000000000000000000000000cafe" }],
+  "d1_databases": [{ "binding": "DB", "database_id": "00000000-0000-0000-0000-0000000000d1" }],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "template-media" }],
   "send_email": [{ "name": "EMAIL" }]
 }
