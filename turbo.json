@@ -36,6 +36,7 @@
     "@4dl/ai#build": { "outputs": [] },
     "@4dl/email#build": { "outputs": [] },
     "@4dl/notify#build": { "outputs": [] },
+    "@4dl/purge#build": { "outputs": [] },
     "@kova/domain#build": { "outputs": [] },
     "@kova/protocol#build": { "outputs": [] },
     "@4dl/ui#build": { "outputs": [] },

@@ -41,6 +41,9 @@ importers:
       '@4dl/notify':
         specifier: workspace:*
         version: link:../../packages/notify
+      '@4dl/purge':
+        specifier: workspace:*
+        version: link:../../packages/purge
       '@4dl/storage':
         specifier: workspace:*
         version: link:../../packages/storage
@@ -339,6 +342,22 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)
+
+  packages/purge:
+    dependencies:
+      '@4dl/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20251001.0
+        version: 4.20260702.1
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

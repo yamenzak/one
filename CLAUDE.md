@@ -73,6 +73,10 @@ packages/
   notify/    # @4dl/notify — the inbox: InboxDO (one DO per user, hibernating
              # WebSockets, push = "refetch"), notifications + per-user prefs.
              # The notification TYPES are the app's. See its README.
+  purge/     # @4dl/purge — ERASURE DERIVED from every module's `scoped`
+             # declaration, plus the two conformance checks that make a
+             # forgotten table and a renamed column test failures instead of
+             # silent no-ops. Pure. See its README.
   tenancy/   # @4dl/tenancy — multi-tenant ADDRESSING: the five doors, host→tenant
              # resolution + KV cache, custom domains (Cloudflare for SaaS + DCV),
              # the standing/host-gate model. `@4dl/tenancy/model` is the pure half
@@ -242,17 +246,17 @@ an over-claim costs more than an under-claim. Verify before editing it.
 **The platform extraction is under way** — [docs/PLATFORM-EXTRACTION.md](docs/PLATFORM-EXTRACTION.md)
 is the audit and the staged plan for turning this repo from "Kova with two shared
 packages" into "the 4DL platform, on which Kova is the first app". Three more apps
-are queued. **Stages 0–6 are done** — the mechanisms, `@4dl/tenancy`, `@4dl/auth`,
-`@4dl/billing`, `@4dl/commerce`, `@4dl/ai` + `@4dl/storage`, and
-`@4dl/email` + `@4dl/notify`. `@4dl/platform`
-is gone. Stages 7–9 (purge, the app kit, the template) are
+are queued. **Stages 0–7 are done** — the mechanisms, `@4dl/tenancy`, `@4dl/auth`,
+`@4dl/billing`, `@4dl/commerce`, `@4dl/ai` + `@4dl/storage`,
+`@4dl/email` + `@4dl/notify`, and `@4dl/purge`. `@4dl/platform`
+is gone. Stages 8–9 (the app kit, the template) are
 not. Read it
 before moving anything between `apps/api` and `packages/`.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured most recently, per package: **487 API + 197 domain + 73 tenancy +
-64 ui + 52 app + 25 commerce + 21 billing + 14 core + 12 ai + 12 auth +
-7 protocol + 3 storage + 3 email + 3 notify** (973 total, 38 skipped).
+moves. Measured most recently, per package: **493 API + 197 domain + 73 tenancy +
+64 ui + 52 app + 25 commerce + 21 billing + 14 core + 14 purge + 12 ai +
+12 auth + 7 protocol + 3 storage + 3 email + 3 notify** (993 total, 38 skipped).
 Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
 `@4dl/platform` to `@4dl/tenancy`; the split moves tests, it does not add any.
 The pricing and normalizer suites live

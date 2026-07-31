@@ -312,6 +312,46 @@ export const KOVA_SCHEMA: SchemaModule = {
              WHERE provider = 'workers-ai' AND task IN ('vision', 'image')`,
     },
   ],
+  /**
+   * What a purge must clear from Kova's own tables (`@4dl/purge` derives the
+   * cascade from this; `purge.ts` no longer keeps a list).
+   *
+   * Both lists are asserted COMPLETE by `purge-cascade.test.ts` against the DDL
+   * above — every table here declaring a `tenant_id` or a `client_id` must
+   * appear below or be exempted by name. That check found three live gaps the
+   * hand-maintained inventories had: `offboard_requests` was in none of them,
+   * and `ai_generations` + `media_assets` were deleted `WHERE client_id` long
+   * after both had been renamed to `subject_id`.
+   *
+   * Tables that reference a client by a DIFFERENT column are deliberately not
+   * here, and the reason is not an oversight: `packages.restricted_subject_id`,
+   * `redemption_codes.restricted_subject_id`/`used_by_json`,
+   * `promo_codes.restricted_subject_id`, `resources.assigned_json` and
+   * `notifications.link` (`/clients/<id>` deep-links) are the STUDIO's assets.
+   * Deleting the row would destroy the studio's property; the dangling
+   * reference reads as "no longer applies" (an offer restricted to a deleted
+   * client is simply unreachable) rather than leaking anything.
+   */
+  scoped: {
+    tenantColumn: "tenant_id",
+    tenantTables: [
+      "clients", "client_trainers", "client_goals", "exercises", "exercise_alternatives",
+      "workout_plans", "workout_templates", "swap_requests", "foods", "meal_plans",
+      "meal_templates", "meal_arrangements", "exercise_logs", "exercise_prs", "activity_logs",
+      "food_entries", "water_logs", "sleep_logs", "mood_logs", "steps_logs", "measurements",
+      "body_scans", "tts_cues", "check_ins", "fasting_sessions", "supplements",
+      "supplement_logs", "lab_tests", "trainer_sessions", "resources", "audit_log",
+      "offboard_requests", "plan_variants",
+    ],
+    subjectColumn: "client_id",
+    subjectTables: [
+      "client_trainers", "client_goals", "workout_plans", "swap_requests", "meal_plans",
+      "meal_arrangements", "exercise_logs", "exercise_prs", "activity_logs", "food_entries",
+      "water_logs", "sleep_logs", "mood_logs", "steps_logs", "measurements", "body_scans",
+      "check_ins", "fasting_sessions", "supplements", "supplement_logs", "lab_tests",
+      "trainer_sessions", "audit_log", "offboard_requests", "plan_variants",
+    ],
+  },
 };
 
 /**
@@ -326,10 +366,12 @@ export const KOVA_SCHEMA: SchemaModule = {
 // ADD COLUMN in a package is safe — one table, many owners, no settings table
 // per package. The ALTERs that add billing's and AI's columns to it are still in
 // Kova's module above and move out with those packages.
-const gate = schemaGate([
+export const SCHEMA_MODULES: readonly SchemaModule[] = [
   AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, COMMERCE_SCHEMA,
   STORAGE_SCHEMA, AI_SCHEMA, EMAIL_SCHEMA, NOTIFY_SCHEMA, KOVA_SCHEMA,
-]);
+];
+
+const gate = schemaGate(SCHEMA_MODULES);
 export const ensureSchema = (db: D1Database): Promise<void> => gate({ DB: db });
 
 /** Small helpers shared by stores — re-exported so every existing call site

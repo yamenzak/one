@@ -20,6 +20,7 @@
     "@4dl/core": "workspace:*",
     "@4dl/email": "workspace:*",
     "@4dl/notify": "workspace:*",
+    "@4dl/purge": "workspace:*",
     "@4dl/storage": "workspace:*",
     "@4dl/tenancy": "workspace:*",
     "@better-auth/passkey": "1.6.23",
