@@ -36,6 +36,7 @@
 import { schemaGate, type SchemaModule } from "@4dl/core";
 import { AUTH_SCHEMA } from "@4dl/auth";
 import { BILLING_SCHEMA } from "@4dl/billing";
+import { BILLING_RAIL_SCHEMA } from "@4dl/billing-rail/schema";
 import { AI_SCHEMA } from "@4dl/ai";
 import { COMMERCE_SCHEMA } from "@4dl/commerce";
 import { EMAIL_SCHEMA } from "@4dl/email";
@@ -367,7 +368,7 @@ export const KOVA_SCHEMA: SchemaModule = {
 // per package. The ALTERs that add billing's and AI's columns to it are still in
 // Kova's module above and move out with those packages.
 export const SCHEMA_MODULES: readonly SchemaModule[] = [
-  AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, COMMERCE_SCHEMA,
+  AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, BILLING_RAIL_SCHEMA, COMMERCE_SCHEMA,
   STORAGE_SCHEMA, AI_SCHEMA, EMAIL_SCHEMA, NOTIFY_SCHEMA, KOVA_SCHEMA,
 ];
 

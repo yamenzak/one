@@ -28,7 +28,8 @@
     "@kova/protocol": "workspace:*",
     "better-auth": "^1.6.23",
     "hono": "^4.9.10",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@4dl/billing-rail": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.8.55",

@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./model": "./src/model.ts",
-    "./schema": "./src/schema.ts"
+    "./schema": "./src/schema.ts",
+    "./stripe": "./src/stripe.ts"
   },
   "types": "./src/index.ts",
   "scripts": {

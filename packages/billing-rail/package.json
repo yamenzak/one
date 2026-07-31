@@ -1,0 +1,28 @@
+{
+  "name": "@4dl/billing-rail",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "One Stripe account, many 4DL apps: event->app routing, the app-tagged product catalog, and a dispatcher where an event belonging to no known app parks loudly instead of being silently accepted.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@4dl/core": "workspace:*",
+    "@4dl/billing": "workspace:*",
+    "hono": "^4.9.10"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251001.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

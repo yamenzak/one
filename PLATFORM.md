@@ -1,6 +1,6 @@
 # The 4DL platform
 
-Thirteen shared packages, and one rule that decides what goes in them:
+Fourteen shared packages, and one rule that decides what goes in them:
 
 > **A `@4dl/*` package may not know what the app sells.** It may know that
 > *something* is sold, that *someone* is a tenant, that *some* capability is
@@ -8,7 +8,7 @@ Thirteen shared packages, and one rule that decides what goes in them:
 
 That rule is machine-checked. Every package has a boundary test
 (`@4dl/core/boundary`) that fails on a product noun or an app-scope import, with
-a frozen ALLOW list that can only shrink. Twelve of the thirteen are empty —
+a frozen ALLOW list that can only shrink. Thirteen of the fourteen are empty —
 `@4dl/core`'s is the only one with entries.
 
 **Starting a new app?** → [`apps/_template/README.md`](apps/_template/README.md).
@@ -33,6 +33,7 @@ It typechecks and its tests pass in this workspace, so it cannot rot.
 | [`@4dl/ui`](packages/ui/README.md) | the design system: tokens + product-agnostic primitives | its own registries and router |
 | [`@4dl/app-kit`](packages/app-kit/README.md) | the browser runtime: fetch + the three-way offline outcome, host resolution, prefixed storage, passkeys, Stripe.js, Turnstile | the queued-write pattern, the shell |
 | [`@4dl/admin`](packages/admin/README.md) | the operator console on the `admin.` door: the router-free section-registry shell, and panels for config a shared package owns (email delivery) | the SECTION LIST — every section names something the app manages |
+| [`@4dl/billing-rail`](packages/billing-rail/README.md) | one Stripe account, many apps: event→app attribution, the app-tagged catalog, and a dead-letter queue for what it cannot attribute | the app list, and a `claims` lookup for events its own metadata does not name |
 
 Kova keeps [`@kova/domain`](packages/domain/README.md) (its math and its
 registries) and [`@kova/protocol`](packages/protocol/README.md) (its wire

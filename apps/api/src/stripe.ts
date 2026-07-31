@@ -21,6 +21,17 @@ import { ensureCustomer as ensureCustomerFor, syncCatalog as syncCatalogFor, typ
  */
 export const STRIPE_BRANDING: StripeBranding = { metadataPrefix: "kova", productPrefix: "Kova" };
 
+/**
+ * This app's slug on the shared Stripe rail — the value of `metadata.app`.
+ *
+ * Same permanence as `metadataPrefix` and for the same reason: once products and
+ * subscriptions carry it, it is what attributes their events. It happens to
+ * equal the prefix today; they are separate constants because the prefix is a
+ * legacy key SHAPE (`kova_tenant`) and this is an explicit VALUE, and a future
+ * app may need one without the other.
+ */
+export const KOVA_APP = "kova";
+
 export const ensureCustomer = (db: D1Database, secretKey: string, tenantId: string, email?: string) =>
   ensureCustomerFor(db, secretKey, tenantId, STRIPE_BRANDING, email);
 

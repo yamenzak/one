@@ -4911,3 +4911,91 @@ describe("platform email configuration is reachable and validated", () => {
    * checks the route table, and the `admin.`-door restriction has its own tests.
    */
 });
+
+/**
+ * ONE STRIPE ACCOUNT, MANY APPS — and the event that belongs to none of them.
+ *
+ * `handlePlatformEvent` is a switch whose branches are guarded on `meta.kova_*`.
+ * An event carrying another 4DL app's metadata matched nothing, fell out of the
+ * switch, and this endpoint answered `200 {received: true}` — with the event id
+ * ALREADY claimed in `stripe_events`, so Stripe never retried it. Money
+ * captured, nothing granted, and not one line of signal.
+ *
+ * That is harmless while Kova is the only app on the account, which is exactly
+ * why it would have survived until the day it wasn't. `@4dl/billing-rail` routes
+ * the delivery first and parks what it cannot attribute.
+ */
+describe("the platform webhook attributes before it handles", () => {
+  const SECRET = "whsec_rail_test";
+  async function sig(payload: string, secret: string): Promise<string> {
+    const t = Math.floor(Date.now() / 1000);
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${payload}`));
+    return `t=${t},v1=${[...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+  }
+  const post = async (payload: string) =>
+    SELF.fetch(`${ORIGIN}/api/stripe/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await sig(payload, SECRET) }, body: payload });
+
+  beforeAll(async () => {
+    await (env.DB as D1Database)
+      .prepare("INSERT INTO app_config (key, value) VALUES ('stripe.webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .bind(SECRET)
+      .run();
+  });
+
+  it("parks an event belonging to another app instead of silently accepting it", async () => {
+    const db = env.DB as D1Database;
+    const payload = JSON.stringify({
+      id: `evt_foreign_${crypto.randomUUID().slice(0, 8)}`,
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_foreign", metadata: { inventory_tenant: "t_other", inventory_pack: "p1" } } },
+    });
+    const r = await post(payload);
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ parked: true });
+
+    const row = await db.prepare("SELECT reason, payload FROM rail_parked_events WHERE event_id = ?").bind(JSON.parse(payload).id).first<{ reason: string; payload: string }>();
+    expect(row?.reason).toBe("no-app-marker");
+    // The payload is kept so the event can be replayed once the cause is fixed.
+    expect(row?.payload).toBe(payload);
+  });
+
+  it("does NOT claim a parked event's id, so the replay is not a duplicate", async () => {
+    const db = env.DB as D1Database;
+    const id = `evt_foreign_${crypto.randomUUID().slice(0, 8)}`;
+    await post(JSON.stringify({ id, type: "checkout.session.completed", data: { object: { metadata: { bocca_tenant: "t_x" } } } }));
+    const claimed = await db.prepare("SELECT id FROM stripe_events WHERE id = ?").bind(id).first();
+    expect(claimed, "an unroutable event must not be marked processed").toBeNull();
+  });
+
+  it("still handles Kova's own events, by metadata", async () => {
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const payload = JSON.stringify({
+      id: `evt_mine_${crypto.randomUUID().slice(0, 8)}`,
+      type: "invoice.payment_failed",
+      data: { object: { id: "in_mine", metadata: { kova_tenant: ctx.active.tenantId } } },
+    });
+    const r = await post(payload);
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ app: "kova", via: "prefix" });
+  });
+
+  it("still handles an event with NO metadata, by recognising the customer", async () => {
+    // The regression the `claims` hook exists to prevent: `invoice.paid` resolves
+    // the tenant with `tenantByCustomer` when metadata is absent, and it is a
+    // path that works today. Metadata-only routing would have parked it.
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const customer = `cus_rail_${crypto.randomUUID().slice(0, 8)}`;
+    await db.prepare("UPDATE subscriptions SET stripe_customer_id = ? WHERE tenant_id = ?").bind(customer, ctx.active.tenantId).run();
+
+    const payload = JSON.stringify({
+      id: `evt_bycust_${crypto.randomUUID().slice(0, 8)}`,
+      type: "invoice.payment_failed",
+      data: { object: { id: "in_bycust", customer } },
+    });
+    const r = await post(payload);
+    expect(r.status).toBe(200);
+    expect(await r.json(), "an event resolvable by customer must not park").toMatchObject({ app: "kova", via: "claim" });
+  });
+});

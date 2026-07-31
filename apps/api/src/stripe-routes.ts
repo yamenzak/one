@@ -7,6 +7,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
+import { dispatchEvent } from "@4dl/billing-rail";
 import { resolveEntitlements, trialPeriodDays, buildBudgetsForPurchase, mergeAddOnBalances, type Budget, type AddOnBalance } from "@kova/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { getSubscription, listPacks, listPlans, seedBilling, getConfig, getPlan } from "./billing-store.js";
@@ -29,6 +30,8 @@ import {
   verifyWebhook,
   setConfig,
   STRIPE_CREDENTIALS,
+  STRIPE_BRANDING,
+  KOVA_APP,
   type StripeCredential,
   type StripeLane,
 } from "./stripe.js";
@@ -306,26 +309,50 @@ export const stripeRoutes = new Hono<AppEnv>()
   })
 
   // Platform webhook (public lane; signature-verified).
+  /**
+   * The platform webhook, on `@4dl/billing-rail`.
+   *
+   * The rail's job here is the case this handler used to get silently wrong. The
+   * switch inside `handlePlatformEvent` is guarded on `meta.kova_*`, so an event
+   * belonging to ANOTHER app on the same Stripe account matched no branch, fell
+   * out, and was answered `200 {received: true}` — with its id already claimed,
+   * so Stripe never retried. Money captured, nothing granted, no signal.
+   *
+   * That is harmless while Kova is the only app on the account, which is exactly
+   * why it would have survived until it wasn't. Now an unattributable event
+   * parks in `rail_parked_events` with its payload, and the operator console
+   * counts it.
+   *
+   * `claims` is what stops this being a regression: several event types here
+   * carry no Kova metadata at all and are resolved by Stripe customer id
+   * (`invoice.paid` → `tenantByCustomer`). Metadata-only routing would have
+   * parked events that work today.
+   */
   .post("/stripe/webhook", async (c) => {
     const cfg = await stripeConfig(c.env.DB);
     const payload = await c.req.text();
     const sig = c.req.header("stripe-signature") ?? "";
-    if (!cfg.webhookSecret || !(await verifyWebhook(payload, sig, cfg.webhookSecret))) {
-      return c.json({ error: "bad signature" }, 400);
-    }
-    const event = JSON.parse(payload) as { id?: string; type: string; data: { object: Record<string, unknown> } };
-    if (!(await firstSeen(c.env.DB, event.id))) return c.json({ received: true, duplicate: true });
-    try {
-      await handlePlatformEvent(c.env, event, cfg.secretKey);
-    } catch (err) {
-      // We claimed the event id before processing; a failure here (DO/D1
-      // transient) must NOT leave it marked seen, or Stripe's retry would be
-      // dropped as a duplicate — money captured, nothing granted. Release the
-      // claim and 500 so Stripe redelivers and we process it cleanly.
-      await unmarkSeen(c.env.DB, event.id);
-      throw err;
-    }
-    return c.json({ received: true });
+    const outcome = await dispatchEvent(
+      { DB: c.env.DB },
+      {
+        apps: [{
+          slug: KOVA_APP,
+          metadataPrefix: STRIPE_BRANDING.metadataPrefix,
+          claims: async (e) => !!(await tenantByCustomer(c.env.DB, (e.data.object as { customer?: unknown }).customer)),
+          handle: (e) => handlePlatformEvent(c.env, e, cfg.secretKey),
+        }],
+        firstSeen: (id) => firstSeen(c.env.DB, id),
+        // A failure inside the handler (DO/D1 transient) must NOT leave the id
+        // marked seen, or Stripe's retry is dropped as a duplicate. The rail
+        // releases the claim and rethrows, so the worker 500s and Stripe
+        // redelivers.
+        release: (id) => unmarkSeen(c.env.DB, id),
+      },
+      payload,
+      sig,
+      cfg.webhookSecret,
+    );
+    return c.json(outcome.body, outcome.status as 200);
   })
 
   // ── Connect rail (tenant ↔ client, no application fee) ─────────────────────

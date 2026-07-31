@@ -91,6 +91,11 @@ packages/
   protocol/  # zod wire schemas shared api <-> app (plan bodies, log payloads, context)
   ui/        # @4dl/ui — the SHARED design system: tokens + product-agnostic
              # primitives. No product vocabulary, no router. See its README.
+  billing-rail/ # @4dl/billing-rail — ONE STRIPE ACCOUNT, MANY APPS: event→app
+             # attribution (metadata.app, legacy <prefix>_* keys, or an app's own
+             # `claims` lookup), the app-tagged catalog, and rail_parked_events —
+             # the dead letter an unattributable event lands in INSTEAD of being
+             # answered 200 and forgotten. See its README.
   admin/     # @4dl/admin — the OPERATOR CONSOLE on every app's `admin.` door:
              # the router-free section-registry shell, plus panels for config a
              # shared package owns (email delivery). The SECTIONS are the app's.
@@ -156,6 +161,16 @@ remote bindings without editing the config (this is what the E2E suite does).
   `requireClientAccess(c, clientId)` in `clients.ts` — owner/assistant = tenant
   match, trainer = `client_trainers` assignment, client = own record. This is
   the security invariant; never bypass it.
+- **The Stripe rail is shared; the BALANCE is not.** `@4dl/billing-rail` sits in
+  front of `/api/stripe/webhook`: it verifies once, attributes the event to an
+  app, and parks what it cannot attribute in `rail_parked_events` — because the
+  old handler answered an unattributable event `200 {received: true}` with its id
+  already claimed, so Stripe never retried (money captured, nothing granted).
+  Attribution is `metadata.app` → a legacy `<prefix>_*` key → the app's own
+  `claims` lookup, and a claim resolves SILENCE, never a contradiction. Kova's
+  `claims` is `tenantByCustomer`, which is load-bearing: `invoice.paid` often
+  carries no Kova metadata at all. Credits stay in `TenantBillingDO` per app —
+  routing crosses workers, a metered reserve→settle must not.
 - **Credits**: `TenantBillingDO` (`billing-do.ts`) is the authoritative balance;
   AI goes through `@4dl/ai` `generate()` = reserve → run (Workers AI | Gemini |
   the dev-only mock) → settle; `apps/api/src/ai.ts` binds Kova's feature registry
@@ -294,10 +309,10 @@ handlers are woven through Kova's notification registry, entitlement gates and
 `requireClientAccess`. Only the reconciliation logic moved.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured most recently, per package: **504 API + 197 domain + 83 app +
-73 tenancy + 43 ui + 25 commerce + 21 billing + 16 template + 14 core + 14 purge
-+ 12 ai + 12 auth + 7 protocol + 3 admin + 3 app-kit + 3 storage + 3 email +
-3 notify** (1,036 total, 38 skipped). The ui count DROPPED and the app count rose by the
+moves. Measured most recently, per package: **508 API + 197 domain + 83 app +
+73 tenancy + 43 ui + 35 billing-rail + 25 commerce + 21 billing + 16 template +
+14 core + 14 purge + 12 ai + 12 auth + 7 protocol + 3 admin + 3 app-kit +
+3 storage + 3 email + 3 notify** (1,075 total, 38 skipped). The ui count DROPPED and the app count rose by the
 same shape: Stage 0b moved Kova's eleven accent tones — and the contrast tests
 that guard them — out of `@4dl/ui` and into the app. The template's 16 are 11
 conformance (plain Node, no fixtures) + 5 integration (the real worker through
