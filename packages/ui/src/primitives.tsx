@@ -19,23 +19,38 @@ import {
 import { cn } from "./lib/utils.js";
 import type { LucideIcon } from "./lib/icons.js";
 
-export type Tone =
-  | "activity" | "nutrition" | "sleep" | "cardio" | "hydration" | "supplement" | "lab"
-  | "calories" | "protein" | "carbs" | "fat"
-  | "success" | "warning" | "danger" | "primary" | "neutral";
+/**
+ * ── TONE ────────────────────────────────────────────────────────────────────
+ *
+ * The five STATUS tones are universal: every product has a success, a warning,
+ * a danger, its brand primary, and a neutral. Those are closed, spelled out,
+ * and typo-checked.
+ *
+ * Everything else is an ACCENT the app owns. This used to be a closed union
+ * carrying `nutrition | sleep | cardio | hydration | supplement | lab |
+ * calories | protein | carbs | fat` — a warehouse app has none of those, and
+ * adding an eleventh meant editing the design system. So an accent is now any
+ * name, resolved by CONVENTION:
+ *
+ *     tone "foo"  →  text-foo · bg-foo-soft text-foo · var(--foo)
+ *
+ * Two things an app does to register one, and both are in the app:
+ *
+ *   1. define `--foo` and `--foo-soft` for both modes, and map them in its own
+ *      `@theme` block (Kova: `apps/app/src/tokens.accents.css`).
+ *   2. make the class LITERALS visible to its Tailwind scan, or Tailwind never
+ *      generates `text-foo` — a utility built by string concatenation at
+ *      runtime is invisible to a scanner. Kova does this in
+ *      `apps/app/src/registry/tones.ts`, which is also where the accents are
+ *      documented. This is the whole reason the literals cannot live here.
+ */
+export type StatusTone = "success" | "warning" | "danger" | "primary" | "neutral";
 
-export const toneText: Record<Tone, string> = {
-  activity: "text-activity",
-  nutrition: "text-nutrition",
-  sleep: "text-sleep",
-  cardio: "text-cardio",
-  hydration: "text-hydration",
-  supplement: "text-supplement",
-  lab: "text-lab",
-  calories: "text-calories",
-  protein: "text-protein",
-  carbs: "text-carbs",
-  fat: "text-fat",
+/** A status tone, or any accent the app has registered. */
+// eslint-disable-next-line @typescript-eslint/ban-types
+export type Tone = StatusTone | (string & {});
+
+const STATUS_TEXT: Record<StatusTone, string> = {
   success: "text-success",
   warning: "text-warning",
   danger: "text-danger",
@@ -43,18 +58,7 @@ export const toneText: Record<Tone, string> = {
   neutral: "text-muted-foreground",
 };
 
-export const toneSoft: Record<Tone, string> = {
-  activity: "bg-activity-soft text-activity",
-  nutrition: "bg-nutrition-soft text-nutrition",
-  sleep: "bg-sleep-soft text-sleep",
-  cardio: "bg-cardio-soft text-cardio",
-  hydration: "bg-hydration-soft text-hydration",
-  supplement: "bg-supplement-soft text-supplement",
-  lab: "bg-lab-soft text-lab",
-  calories: "bg-calories-soft text-calories",
-  protein: "bg-protein-soft text-protein",
-  carbs: "bg-carbs-soft text-carbs",
-  fat: "bg-fat-soft text-fat",
+const STATUS_SOFT: Record<StatusTone, string> = {
   success: "bg-success-soft text-success",
   warning: "bg-warning-soft text-warning",
   danger: "bg-danger-soft text-danger",
@@ -62,24 +66,32 @@ export const toneSoft: Record<Tone, string> = {
   neutral: "bg-secondary text-muted-foreground",
 };
 
-export const toneVar: Record<Tone, string> = {
-  activity: "var(--activity)",
-  nutrition: "var(--nutrition)",
-  sleep: "var(--sleep)",
-  cardio: "var(--cardio)",
-  hydration: "var(--hydration)",
-  supplement: "var(--supplement)",
-  lab: "var(--lab)",
-  calories: "var(--calories)",
-  protein: "var(--protein)",
-  carbs: "var(--carbs)",
-  fat: "var(--fat)",
+const STATUS_VAR: Record<StatusTone, string> = {
   success: "var(--success)",
   warning: "var(--warning)",
   danger: "var(--danger)",
   primary: "var(--primary)",
   neutral: "var(--muted-foreground)",
 };
+
+/**
+ * Look up a tone, falling back to the naming convention.
+ *
+ * A Proxy rather than a function so the ~56 existing `toneText[tone]` and
+ * `toneVar.danger` call sites read exactly as they always did. It encodes a
+ * convention, which is what the hand-written map already was — every one of its
+ * entries followed the same rule.
+ */
+const toneMap = (status: Record<StatusTone, string>, accent: (t: string) => string): Record<Tone, string> =>
+  new Proxy({} as Record<Tone, string>, {
+    get: (_t, key: string | symbol) =>
+      typeof key === "string" ? (status[key as StatusTone] ?? accent(key)) : undefined,
+    has: () => true,
+  });
+
+export const toneText: Record<Tone, string> = toneMap(STATUS_TEXT, (t) => `text-${t}`);
+export const toneSoft: Record<Tone, string> = toneMap(STATUS_SOFT, (t) => `bg-${t}-soft text-${t}`);
+export const toneVar: Record<Tone, string> = toneMap(STATUS_VAR, (t) => `var(--${t})`);
 
 // ── Button ─────────────────────────────────────────────────────────────────
 const buttonVariants = cva(

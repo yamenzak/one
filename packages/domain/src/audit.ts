@@ -1,5 +1,5 @@
 /**
- * Coach-action audit vocabulary (docs/REGISTRY-PLAN.md Phase 3).
+ * Coach-action audit vocabulary (KOVA.md).
  *
  * The registry of AUDITABLE staff actions on a client's record — who did what,
  * so a client (or an owner reviewing a coach) has an accountable history. Each

@@ -85,7 +85,7 @@ async function reconcile(db: D1Database, row: SubRow, now: string): Promise<SubR
     // (someone changed the row under us) leave it active — the next read
     // reconciles correctly.
     const r = await db
-      .prepare("UPDATE client_subscriptions SET status = 'expired', updated_at = ? WHERE id = ? AND status = 'active' AND budgets_json IS ?")
+      .prepare("UPDATE subject_subscriptions SET status = 'expired', updated_at = ? WHERE id = ? AND status = 'active' AND budgets_json IS ?")
       .bind(now, row.id, row.budgets_json ?? null)
       .run()
       .catch(() => undefined);
@@ -148,7 +148,7 @@ export const commerceRoutes = new Hono<AppEnv>()
     const d = parsed.data;
     const id = newId("pkg");
     await c.env.DB.prepare(
-      `INSERT INTO packages (id, tenant_id, name, description, one_time_price_cents, monthly_price_cents, installment_months, budgets_json, addons_json, flags_json, visibility, restricted_client_id, once_per_customer, created_at)
+      `INSERT INTO packages (id, tenant_id, name, description, one_time_price_cents, monthly_price_cents, installment_months, budgets_json, addons_json, flags_json, visibility, restricted_subject_id, once_per_customer, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
@@ -182,7 +182,7 @@ export const commerceRoutes = new Hono<AppEnv>()
     if (d.addOns !== undefined) put("addons_json", d.addOns ? j(d.addOns) : null);
     if (d.flags !== undefined) put("flags_json", d.flags ? j(d.flags) : null);
     if (d.visibility !== undefined) put("visibility", d.visibility);
-    if (d.restrictedClientId !== undefined) put("restricted_client_id", d.restrictedClientId);
+    if (d.restrictedClientId !== undefined) put("restricted_subject_id", d.restrictedClientId);
     if (d.oncePerCustomer !== undefined) put("once_per_customer", d.oncePerCustomer ? 1 : 0);
     if (d.active !== undefined) put("active", d.active ? 1 : 0);
     if (sets.length === 0) return c.json({ ok: true });
@@ -195,7 +195,7 @@ export const commerceRoutes = new Hono<AppEnv>()
   /**
    * Archive, not erase. `active = 0` drops the package out of GET /packages, the
    * client Shop, the public marketplace payload and both Stripe checkout lanes
-   * (all of which require `active = 1`) — but `client_subscriptions` rows are
+   * (all of which require `active = 1`) — but `subject_subscriptions` rows are
    * untouched, so anyone who already bought it keeps the exact budget days they
    * paid for. PATCH `{ active: true }` puts it back on sale.
    */
@@ -216,7 +216,7 @@ export const commerceRoutes = new Hono<AppEnv>()
     if ("response" in access) return access.response;
     const now = nowIso();
     const rows = await c.env.DB.prepare(
-      "SELECT * FROM client_subscriptions WHERE client_id = ? ORDER BY started_at DESC",
+      "SELECT * FROM subject_subscriptions WHERE subject_id = ? ORDER BY started_at DESC",
     )
       .bind(clientId)
       .all<SubRow>();
@@ -246,18 +246,18 @@ export const commerceRoutes = new Hono<AppEnv>()
       "SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1",
     )
       .bind(parsed.data.packageId, who.tenantId)
-      .first<{ id: string; name: string; budgets_json: string | null; addons_json: string | null; flags_json: string | null; once_per_customer: number; visibility: string; restricted_client_id: string | null }>();
+      .first<{ id: string; name: string; budgets_json: string | null; addons_json: string | null; flags_json: string | null; once_per_customer: number; visibility: string; restricted_subject_id: string | null }>();
     if (!pkg) return c.json({ error: "package not found" }, 404);
     // A client-specific package can only be granted to its own client (staff may
     // still grant `private` grant-only packages to anyone).
-    if (pkg.visibility === "client_specific" && pkg.restricted_client_id && pkg.restricted_client_id !== access.client.id) {
+    if (pkg.visibility === "client_specific" && pkg.restricted_subject_id && pkg.restricted_subject_id !== access.client.id) {
       return c.json({ error: "package is private to another client" }, 403);
     }
 
     const now = nowIso();
     if (pkg.once_per_customer) {
       const prior = await c.env.DB.prepare(
-        "SELECT 1 AS x FROM client_subscriptions WHERE client_id = ? AND package_id = ?",
+        "SELECT 1 AS x FROM subject_subscriptions WHERE subject_id = ? AND package_id = ?",
       )
         .bind(access.client.id, pkg.id)
         .first();
@@ -269,7 +269,7 @@ export const commerceRoutes = new Hono<AppEnv>()
     // subscription (they renew off their own package) — never fold a manual grant
     // into one, matching grantClientPackage.
     const current = await c.env.DB.prepare(
-      "SELECT * FROM client_subscriptions WHERE client_id = ? AND status = 'active' AND stripe_sub_id IS NULL ORDER BY started_at DESC LIMIT 1",
+      "SELECT * FROM subject_subscriptions WHERE subject_id = ? AND status = 'active' AND stripe_sub_id IS NULL ORDER BY started_at DESC LIMIT 1",
     )
       .bind(access.client.id)
       .first<SubRow>();
@@ -295,7 +295,7 @@ export const commerceRoutes = new Hono<AppEnv>()
     const id = newId("csub");
     const budgets = buildBudgetsForPurchase([], specs, now);
     await c.env.DB.prepare(
-      `INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, started_at, updated_at)
+      `INSERT INTO subject_subscriptions (id, tenant_id, subject_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, started_at, updated_at)
        VALUES (?, ?, ?, ?, 'active', 'none', ?, ?, ?, 'admin', ?, ?)`,
     )
       .bind(
@@ -314,7 +314,7 @@ export const commerceRoutes = new Hono<AppEnv>()
   .get("/redemption-codes", async (c) => {
     const who = requireTenant(c)!;
     const rows = await c.env.DB.prepare(
-      "SELECT id, code, days_to_add, target_feature, max_uses, used_count, restricted_package_id, restricted_client_id, expires_at, active FROM redemption_codes WHERE tenant_id = ? ORDER BY created_at DESC",
+      "SELECT id, code, days_to_add, target_feature, max_uses, used_count, restricted_package_id, restricted_subject_id, expires_at, active FROM redemption_codes WHERE tenant_id = ? ORDER BY created_at DESC",
     )
       .bind(who.tenantId)
       .all();
@@ -342,7 +342,7 @@ export const commerceRoutes = new Hono<AppEnv>()
     const id = newId("code");
     try {
       await c.env.DB.prepare(
-        "INSERT INTO redemption_codes (id, tenant_id, code, days_to_add, target_feature, max_uses, used_by_json, restricted_package_id, restricted_client_id, expires_at, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, '[]', ?, ?, ?, ?, ?)",
+        "INSERT INTO redemption_codes (id, tenant_id, code, days_to_add, target_feature, max_uses, used_by_json, restricted_package_id, restricted_subject_id, expires_at, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, '[]', ?, ?, ?, ?, ?)",
       )
         .bind(id, who.tenantId, d.code.toUpperCase(), d.daysToAdd, d.targetFeature, d.maxUses, d.restrictedPackageId ?? null, d.restrictedClientId ?? null, d.expiresAt ?? null, who.userId, nowIso())
         .run();
@@ -367,15 +367,15 @@ export const commerceRoutes = new Hono<AppEnv>()
       "SELECT * FROM redemption_codes WHERE tenant_id = ? AND code = ? AND active = 1",
     )
       .bind(who.tenantId, parsed.data.code.toUpperCase())
-      .first<{ id: string; days_to_add: number; target_feature: Budget["feature"]; max_uses: number; used_count: number; used_by_json: string | null; restricted_package_id: string | null; restricted_client_id: string | null; expires_at: string | null }>();
+      .first<{ id: string; days_to_add: number; target_feature: Budget["feature"]; max_uses: number; used_count: number; used_by_json: string | null; restricted_package_id: string | null; restricted_subject_id: string | null; expires_at: string | null }>();
     // Disabled/unknown/expired/out-of-scope all read as "not found" — no oracle.
     if (!code) return c.json({ error: "code not found" }, 404);
     if (code.expires_at && code.expires_at < now) return c.json({ error: "code not found" }, 404);
     // Per-client lock: only the named client may redeem this code.
-    if (code.restricted_client_id && code.restricted_client_id !== access.client.id) return c.json({ error: "code not found" }, 404);
+    if (code.restricted_subject_id && code.restricted_subject_id !== access.client.id) return c.json({ error: "code not found" }, 404);
     // Per-package lock: only a client who holds that package may redeem.
     if (code.restricted_package_id) {
-      const owns = await c.env.DB.prepare("SELECT 1 AS x FROM client_subscriptions WHERE client_id = ? AND package_id = ? LIMIT 1").bind(access.client.id, code.restricted_package_id).first();
+      const owns = await c.env.DB.prepare("SELECT 1 AS x FROM subject_subscriptions WHERE subject_id = ? AND package_id = ? LIMIT 1").bind(access.client.id, code.restricted_package_id).first();
       if (!owns) return c.json({ error: "code not found" }, 404);
     }
 
@@ -383,7 +383,7 @@ export const commerceRoutes = new Hono<AppEnv>()
     // a second redemption by the same client without a lost-update on a JSON
     // array — a concurrent double-submit inserts once, the loser gets changes=0.
     const claim = await c.env.DB.prepare(
-      "INSERT OR IGNORE INTO redemption_uses (code_id, client_id, at) VALUES (?, ?, ?)",
+      "INSERT OR IGNORE INTO redemption_uses (code_id, subject_id, at) VALUES (?, ?, ?)",
     )
       .bind(code.id, access.client.id, now)
       .run();
@@ -399,7 +399,7 @@ export const commerceRoutes = new Hono<AppEnv>()
       .bind(code.id)
       .run();
     if ((slot.meta?.changes ?? 0) === 0) {
-      await c.env.DB.prepare("DELETE FROM redemption_uses WHERE code_id = ? AND client_id = ?")
+      await c.env.DB.prepare("DELETE FROM redemption_uses WHERE code_id = ? AND subject_id = ?")
         .bind(code.id, access.client.id)
         .run()
         .catch(() => undefined);
@@ -416,7 +416,7 @@ export const commerceRoutes = new Hono<AppEnv>()
       // Fold into the client's active/expired NON-recurring runway (recurring
       // rows renew off their own Stripe subscription — leave them owned by it).
       const current = await c.env.DB.prepare(
-        "SELECT * FROM client_subscriptions WHERE client_id = ? AND status IN ('active','expired') AND stripe_sub_id IS NULL ORDER BY started_at DESC LIMIT 1",
+        "SELECT * FROM subject_subscriptions WHERE subject_id = ? AND status IN ('active','expired') AND stripe_sub_id IS NULL ORDER BY started_at DESC LIMIT 1",
       )
         .bind(access.client.id)
         .first<SubRow>();
@@ -433,7 +433,7 @@ export const commerceRoutes = new Hono<AppEnv>()
         if (!ok) throw new Error("redeem_cas_failed");
       } else {
         await c.env.DB.prepare(
-          `INSERT INTO client_subscriptions (id, tenant_id, client_id, status, payment_status, budgets_json, addons_json, source, started_at, updated_at)
+          `INSERT INTO subject_subscriptions (id, tenant_id, subject_id, status, payment_status, budgets_json, addons_json, source, started_at, updated_at)
            VALUES (?, ?, ?, 'active', 'none', ?, '[]', 'redemption', ?, ?)`,
         )
           .bind(
@@ -444,7 +444,7 @@ export const commerceRoutes = new Hono<AppEnv>()
       }
     } catch (err) {
       await c.env.DB.prepare("UPDATE redemption_codes SET used_count = used_count - 1 WHERE id = ? AND used_count > 0").bind(code.id).run().catch(() => undefined);
-      await c.env.DB.prepare("DELETE FROM redemption_uses WHERE code_id = ? AND client_id = ?").bind(code.id, access.client.id).run().catch(() => undefined);
+      await c.env.DB.prepare("DELETE FROM redemption_uses WHERE code_id = ? AND subject_id = ?").bind(code.id, access.client.id).run().catch(() => undefined);
       throw err;
     }
     // Mirror the client into used_by_json for display (atomic append via

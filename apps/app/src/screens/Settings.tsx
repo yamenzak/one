@@ -6,8 +6,21 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { useSearchParams } from "react-router-dom";
-import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
+import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, SaveBar, useAction as useActionBase, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
 import { personaLabel, personaTone } from "../registry/index.js";
+import { KOVA_TOKEN_GROUPS, DEFAULT_ACCENT_TOKENS, MACRO_SPEC } from "../registry/tones.js";
+
+/**
+ * The advanced token editor lists the design system's own groups first, then
+ * Kova's accents. `@4dl/ui` cannot ship the second half: "Macros" and "Domain
+ * accents" name what this product measures, and another 4DL app measures
+ * something else.
+ */
+const TOKEN_GROUPS = [...THEME_TOKEN_GROUPS, ...KOVA_TOKEN_GROUPS];
+const ALL_DEFAULT_TOKENS = {
+  light: { ...DEFAULT_TOKENS.light, ...DEFAULT_ACCENT_TOKENS.light },
+  dark: { ...DEFAULT_TOKENS.dark, ...DEFAULT_ACCENT_TOKENS.dark },
+};
 import type { LoginBranding, TenantBranding } from "@kova/protocol";
 import { resolveUnits, cmToFeetInches, feetInchesToCm, STUDIO_SETTINGS_SECTIONS, settingsSectionVisible, LAPSE_ACTIONS, LAPSE_META, DEFAULT_LAPSE_POLICY, MIN_DESTRUCTIVE_GRACE_DAYS, checkLapsePolicy, isDestructive, type LapsePolicy } from "@kova/domain";
 import { useUnits } from "../units.js";
@@ -43,6 +56,20 @@ function SectionHead({ title, icon: Icon, tone = "primary" }: { title: string; i
     </div>
   );
 }
+
+/**
+ * The design system's action hook, bound to this app's HTTP error formatter —
+ * the same one-line binding the platform console makes.
+ *
+ * Every mutating control on this screen goes through it, and that is not a
+ * tidiness rule. The hand-rolled shape it replaced was `try { await api…() }
+ * finally { setBusy(false) }` with NO catch: on a refused save the rejection
+ * escaped `void save()` and surfaced as the runtime's generic "Something didn't
+ * load. Check your connection, then try again." — wrong words, wrong place, and
+ * indistinguishable from a failed read. `run` cannot leave a rejection unhandled
+ * or a button stuck busy.
+ */
+const useAction = () => useActionBase(errorText);
 
 /**
  * A section whose read failed. Every settings section loads independently, and a
@@ -488,7 +515,18 @@ function CloseStudioSection() {
     catch (e) { setErr((e as { status?: number })?.status === 403 ? "That code is wrong or has expired." : "Couldn't close the studio. Try again."); }
     finally { setBusy(false); }
   };
-  const keepStudio = async () => { setBusy(true); try { await api.post("/api/tenant/close/cancel"); await load(); } finally { setBusy(false); } };
+  /**
+   * The way BACK from a scheduled deletion, so a silent failure here is the
+   * worst one on this screen: the owner taps "Keep my studio", the spinner
+   * stops, the card still says "scheduled for deletion", and nothing says
+   * whether the cancel landed. It had no catch at all.
+   */
+  const keepStudio = async () => {
+    setBusy(true); setErr(null);
+    try { await api.post("/api/tenant/close/cancel"); await load(); }
+    catch (e) { setErr(errorText(e, "Couldn't cancel the deletion — your studio is still scheduled. Try again.")); }
+    finally { setBusy(false); }
+  };
 
   const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }) : "");
 
@@ -499,6 +537,9 @@ function CloseStudioSection() {
           <div className="flex items-center gap-2 font-medium text-danger"><AlertTriangle className="size-4" /> Studio scheduled for deletion</div>
           <p className="text-sm text-muted-foreground">Billing is canceled. Your studio and all its data will be permanently erased on <span className="font-medium text-foreground">{fmt(status.deleteAt)}</span>. You can still undo this before then.</p>
           <Button variant="secondary" className="w-full" disabled={busy} onClick={() => void keepStudio()}>{busy ? <><Spinner /> …</> : "Keep my studio"}</Button>
+          {/* `err` was only ever rendered inside the confirmation sheet, so a
+              failed cancel out here had nowhere to appear. */}
+          <ActionResult msg={null} err={err} />
         </Card>
       ) : (
         <Card className="space-y-2.5">
@@ -637,26 +678,27 @@ function LoginCustomizeSection({ initial, logoUrl, onSaved }: { initial: LoginBr
   const [subtext, setSubtext] = useState(initial?.subtext ?? "");
   const [bgImageUrl, setBgImageUrl] = useState<string | null>(initial?.bgImageUrl ?? null);
   const [showPasskey, setShowPasskey] = useState(initial?.showPasskey !== false);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const act = useAction();
 
-  const upload = async (file: File) => {
-    setMsg(null);
-    try { const key = await uploadMedia(file, "brand", file.name); setBgImageUrl(`/api/media/${key}`); }
-    catch { setMsg("Couldn't upload that image — try again."); }
-  };
-  const save = async () => {
-    setSaving(true); setMsg(null);
-    const login: LoginBranding = {
-      tagline: tagline.trim() || null,
-      headline: headline.trim() || null,
-      subtext: subtext.trim() || null,
-      bgImageUrl: bgImageUrl || null,
-      showPasskey,
-    };
-    try { await api.patch("/api/settings", { branding: { login } }); onSaved(); setMsg("Sign-in screen saved."); }
-    finally { setSaving(false); }
-  };
+  const upload = (file: File) =>
+    act.run("upload", async () => {
+      const key = await uploadMedia(file, "brand", file.name);
+      setBgImageUrl(`/api/media/${key}`);
+    }, "Couldn't upload that image — try again.");
+
+  const save = () =>
+    act.run("save", async () => {
+      const login: LoginBranding = {
+        tagline: tagline.trim() || null,
+        headline: headline.trim() || null,
+        subtext: subtext.trim() || null,
+        bgImageUrl: bgImageUrl || null,
+        showPasskey,
+      };
+      await api.patch("/api/settings", { branding: { login } });
+      onSaved();
+      return "Sign-in screen saved.";
+    }, "Couldn't save the sign-in screen — it's unchanged.");
 
   return (
     <section>
@@ -689,8 +731,7 @@ function LoginCustomizeSection({ initial, logoUrl, onSaved }: { initial: LoginBr
 
         <ToggleRow icon={KeyRound} title="Passkey shortcut" desc="Show the one-tap “Sign in with a passkey” option." checked={showPasskey} onChange={setShowPasskey} />
 
-        <ActionResult msg={msg} err={null} />
-        <Button className="w-full" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save sign-in screen"}</Button>
+        <SaveBar label="Save sign-in screen" saving={act.busy === "save"} msg={act.msg} err={act.err} onSave={() => void save()} />
       </Card>
     </section>
   );
@@ -934,10 +975,22 @@ function EmailTemplateRow({ tpl, open, onToggle, onSaved }: { tpl: EmailTemplate
   const [subject, setSubject] = useState(tpl.subject);
   const [body, setBody] = useState(tpl.body);
   const [enabled, setEnabled] = useState(tpl.enabled);
-  const [busy, setBusy] = useState(false);
+  const act = useAction();
+  const busy = act.busy !== null;
   const dirty = subject !== tpl.subject || body !== tpl.body || enabled !== tpl.enabled;
-  const save = async () => { setBusy(true); try { await api.put(`/api/email-templates/${tpl.type}`, { subject, body, enabled }); onSaved(); } finally { setBusy(false); } };
-  const reset = async () => { setBusy(true); try { await api.del(`/api/email-templates/${tpl.type}`); setSubject(tpl.defaultSubject); setBody(tpl.defaultBody); setEnabled(true); onSaved(); } finally { setBusy(false); } };
+  const save = () =>
+    act.run("save", async () => {
+      await api.put(`/api/email-templates/${tpl.type}`, { subject, body, enabled });
+      onSaved();
+    }, "Couldn't save this template — it's unchanged.");
+  const reset = () =>
+    act.run("reset", async () => {
+      await api.del(`/api/email-templates/${tpl.type}`);
+      // Only after the delete lands. Resetting the fields first would show the
+      // default copy for a template the server still has customised.
+      setSubject(tpl.defaultSubject); setBody(tpl.defaultBody); setEnabled(true);
+      onSaved();
+    }, "Couldn't restore the default — this template is unchanged.");
   return (
     <Card className="p-0">
       <button onClick={onToggle} className="flex w-full items-center justify-between gap-3 p-4 text-left">
@@ -955,11 +1008,12 @@ function EmailTemplateRow({ tpl, open, onToggle, onSaved }: { tpl: EmailTemplate
             <span className="text-xs text-muted-foreground">Variables:</span>
             {tpl.vars.map((v) => <Chip key={v} onClick={() => setBody((b) => `${b}{{${v}}}`)}>{`{{${v}}}`}</Chip>)}
           </div>
+          <ActionResult msg={act.msg} err={act.err} />
           <div className="flex items-center justify-between gap-3">
             <label className="flex items-center gap-2 text-sm"><Switch checked={enabled} onCheckedChange={setEnabled} /> Send this email</label>
             <div className="flex gap-2">
-              {tpl.customized && <Button size="sm" variant="ghost" disabled={busy} onClick={() => void reset()}>Reset</Button>}
-              <Button size="sm" disabled={busy || !dirty} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</Button>
+              {tpl.customized && <Button size="sm" variant="ghost" disabled={busy} onClick={() => void reset()}>{act.busy === "reset" ? "Resetting…" : "Reset"}</Button>}
+              <Button size="sm" disabled={busy || !dirty} onClick={() => void save()}>{act.busy === "save" ? "Saving…" : "Save"}</Button>
             </div>
           </div>
         </div>
@@ -1078,7 +1132,8 @@ function EmailSection() {
   const [brevoKey, setBrevoKey] = useState("");
   const [senderEmail, setSenderEmail] = useState("");
   const [senderName, setSenderName] = useState("");
-  const [busy, setBusy] = useState(false);
+  const act = useAction();
+  const busy = act.busy !== null;
   const [error, setError] = useState(false);
   const load = useCallback(async () => {
     setError(false);
@@ -1098,18 +1153,29 @@ function EmailSection() {
   );
   if (!cfg) return null;
   const provider = cfg.email.provider;
-  const setProvider = async (p: string) => { setCfg((c) => (c ? { ...c, email: { ...c.email, provider: p } } : c)); await api.patch("/api/settings", { email: { provider: p } }).catch(() => void load()); };
+  /** The lane switch is instant, so a refusal has to both put the control back
+   *  (that is what the reload does) and SAY so — the reload alone looked like the
+   *  segmented control spontaneously changing its mind. */
+  const setProvider = (p: string) =>
+    act.run("provider", async () => {
+      setCfg((c) => (c ? { ...c, email: { ...c.email, provider: p } } : c));
+      try { await api.patch("/api/settings", { email: { provider: p } }); }
+      catch (e) { await load(); throw e; }
+    }, "Couldn't change who your email comes from.");
   /** Sender name only — the platform lane has nothing else to save. */
-  const saveSender = async () => {
-    setBusy(true);
-    try { await api.patch("/api/settings", { email: { senderName } }); await load(); }
-    finally { setBusy(false); }
-  };
-  const saveBrevo = async () => {
-    setBusy(true);
-    try { await api.patch("/api/settings", { email: { senderEmail, senderName, ...(brevoKey ? { brevoApiKey: brevoKey } : {}) } }); setBrevoKey(""); await load(); }
-    finally { setBusy(false); }
-  };
+  const saveSender = () =>
+    act.run("sender", async () => {
+      await api.patch("/api/settings", { email: { senderName } });
+      await load();
+      return "Sender name saved.";
+    }, "Couldn't save the sender name.");
+  const saveBrevo = () =>
+    act.run("brevo", async () => {
+      await api.patch("/api/settings", { email: { senderEmail, senderName, ...(brevoKey ? { brevoApiKey: brevoKey } : {}) } });
+      setBrevoKey("");
+      await load();
+      return "Brevo settings saved.";
+    }, "Couldn't save your Brevo settings — nothing was changed.");
   return (
     <section>
       <Card className="space-y-3">
@@ -1163,6 +1229,9 @@ function EmailSection() {
             </div>
           </div>
         )}
+        {/* One outcome line for all three controls — the lane switch, the sender
+            name and the Brevo credentials share a card, so they share a result. */}
+        <ActionResult msg={act.msg} err={act.err} />
       </Card>
     </section>
   );
@@ -1264,8 +1333,7 @@ const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
  *  Email is read-only (changes go through the studio). */
 function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; email: string; onSaved: () => void }) {
   const [p, setP] = useState<ClientProfile | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const act = useAction();
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const units = useUnits();
@@ -1283,22 +1351,21 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
   }, [clientId, reloadKey]);
   const set = (patch: Partial<ClientProfile>) => setP((c) => (c ? { ...c, ...patch } : c));
   const hFt = p?.heightCm != null ? cmToFeetInches(p.heightCm) : null;
-  const uploadAvatar = async (file: File) => {
-    setMsg(null);
-    try {
+  const uploadAvatar = (file: File) =>
+    act.run("avatar", async () => {
       const key = await uploadMedia(file, "avatar");
       const url = `/api/media/${key}`;
       await api.post(`/api/clients/${clientId}/avatar`, { avatarUrl: url });
       set({ avatarUrl: url, avatarSeed: null });
       onSaved();
-    } catch {
-      setMsg("Couldn't upload that image — try again.");
-    }
-  };
-  const save = async () => {
-    if (!p) return; setSaving(true); setMsg(null);
-    try { await api.patch(`/api/clients/${clientId}`, { displayName: p.displayName, gender: p.gender ?? undefined, dateOfBirth: p.dateOfBirth ?? undefined, heightCm: p.heightCm ?? undefined, bloodType: p.bloodType ?? undefined, phone: p.phone ?? undefined }); setMsg("Profile saved."); onSaved(); }
-    finally { setSaving(false); }
+    }, "Couldn't upload that image — try again.");
+  const save = () => {
+    if (!p) return;
+    return act.run("save", async () => {
+      await api.patch(`/api/clients/${clientId}`, { displayName: p.displayName, gender: p.gender ?? undefined, dateOfBirth: p.dateOfBirth ?? undefined, heightCm: p.heightCm ?? undefined, bloodType: p.bloodType ?? undefined, phone: p.phone ?? undefined });
+      onSaved();
+      return "Profile saved.";
+    }, "Couldn't save your profile — it's unchanged.");
   };
   return (
     <section>
@@ -1346,8 +1413,14 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
           <div className="flex flex-wrap gap-2">{BLOOD_TYPES.map((b) => <Chip key={b} selected={p.bloodType === b} onClick={() => set({ bloodType: p.bloodType === b ? null : b })}>{b}</Chip>)}</div>
         </div>
         <Field label="Contact number" type="tel" inputMode="tel" value={p.phone ?? ""} onChange={(e) => set({ phone: e.target.value || null })} placeholder="+1 555 000 0000" />
-        <Button size="lg" className="w-full" disabled={saving || p.displayName.trim().length < 1} onClick={() => void save()}>{saving ? "Saving…" : "Save profile"}</Button>
-        <ActionResult msg={msg} err={null} />
+        <SaveBar
+          label="Save profile"
+          saving={act.busy === "save"}
+          disabled={p.displayName.trim().length < 1}
+          msg={act.msg}
+          err={act.err}
+          onSave={() => void save()}
+        />
       </Card>
         )}
       </Reveal>
@@ -1379,8 +1452,13 @@ const UNIT_ROWS: { key: string; label: string; options: { value: string; label: 
 function UnitsSection() {
   const { ctx, refresh } = useSession();
   const units = resolveUnits(ctx?.user.units) as unknown as Record<string, string>;
-  const [busy, setBusy] = useState(false);
-  const set = async (patch: Record<string, string>) => { setBusy(true); try { await api.patch("/api/me/units", patch); await refresh(); } finally { setBusy(false); } };
+  const act = useAction();
+  const busy = act.busy !== null;
+  // The displayed value comes from the session, not from local state, so a
+  // refused write cannot show the wrong unit — it just used to say nothing at
+  // all, leaving the control silently ignoring the tap.
+  const set = (patch: Record<string, string>) =>
+    act.run("units", async () => { await api.patch("/api/me/units", patch); await refresh(); }, "Couldn't change your units.");
   return (
     <section>
       <Card className="space-y-3">
@@ -1390,6 +1468,7 @@ function UnitsSection() {
             <SegmentedControl options={r.options} value={units[r.key]!} onChange={(v) => void set({ [r.key]: v })} className={busy ? "pointer-events-none opacity-70" : ""} />
           </div>
         ))}
+        <ActionResult msg={null} err={act.err} />
       </Card>
     </section>
   );
@@ -1836,7 +1915,7 @@ function BrandingEditor(props: { initial: Branding | null; onPreview: (b: Brandi
 function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding | null; onPreview: (b: Branding | null) => void; onSaved: () => void }) {
   const [params, setParams] = useSearchParams();
   const { ctx } = useSession();
-  const [tokens, setTokens] = useState<BrandTokens>(() => (initial?.tokens && hasTokens(initial.tokens) ? initial.tokens : deriveTokens({ primary: seedFrom(initial) })));
+  const [tokens, setTokens] = useState<BrandTokens>(() => (initial?.tokens && hasTokens(initial.tokens) ? initial.tokens : deriveTokens({ primary: seedFrom(initial), accents: MACRO_SPEC })));
   const [seed, setSeed] = useState<string>(seedFrom(initial));
   // Seeded from what was saved, not hardcoded. Two things broke when it was not:
   // the chip always read "Brand" on a reload however the app actually looked, and
@@ -1861,14 +1940,18 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   const [aiName, setAiName] = useState<string>(initial?.aiName ?? "");
   const [advanced, setAdvanced] = useState(false);
   const [themeCss, setThemeCss] = useState("");
-  const [saving, setSaving] = useState(false);
+  const act = useAction();
+  // `msg` stays, for this editor's NOTES — "Palette generated from your logo",
+  // "Theme applied — save to keep it". Those are not the outcome of a write, and
+  // folding them into the action's result would let a stale note sit where a save
+  // confirmation goes.
   const [msg, setMsg] = useState<string | null>(null);
 
   // Live-preview whenever the tokens or radius change (logo isn't a token).
   useEffect(() => { onPreview({ tokens, radius, shadow, borderColor: borderColor || null, borderWidth, logoUrl, iconUrl }); }, [JSON.stringify(tokens), radius, shadow, borderColor, borderWidth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Generate a full palette from one color (the smart path).
-  const generate = (color: string, tint: NeutralTint = neutral) => { setSeed(color); setNeutral(tint); setTokens(deriveTokens({ primary: color, neutral: tint })); };
+  const generate = (color: string, tint: NeutralTint = neutral) => { setSeed(color); setNeutral(tint); setTokens(deriveTokens({ primary: color, neutral: tint, accents: MACRO_SPEC })); };
 
   const uploadAsset = async (file: File, setter: (url: string) => void) => {
     setMsg(null);
@@ -1903,12 +1986,14 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
     return { ...t, [m]: side };
   });
 
-  const save = async () => {
-    setSaving(true);
-    // Tokens carry everything now — null out legacy preset/primary fields.
-    try { await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, borderWidth, neutral, tintedNav, ambient, logoUrl, iconUrl, aiAvatarUrl, aiName: aiName.trim() || null, preset: null, primary: null, primaryForeground: null } }); onSaved(); setMsg("Branding saved."); }
-    finally { setSaving(false); }
-  };
+  const save = () =>
+    act.run("save", async () => {
+      // Tokens carry everything now — null out legacy preset/primary fields.
+      await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, borderWidth, neutral, tintedNav, ambient, logoUrl, iconUrl, aiAvatarUrl, aiName: aiName.trim() || null, preset: null, primary: null, primaryForeground: null } });
+      onSaved();
+      setMsg(null);
+      return "Branding saved.";
+    }, "Couldn't save your branding — the studio still looks the way it did.");
 
   const seedHex = oklchStringToHex(seed.startsWith("#") ? hexToOklchString(seed) : seed);
 
@@ -2149,8 +2234,10 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
 
   const saveBar = (
     <div className="space-y-3">
+      {/* The editor's own notes sit above the bar; the bar carries the outcome
+          of the save itself. Two lines, because they answer two questions. */}
       <ActionResult msg={msg} err={null} />
-      <Button size="lg" className="w-full" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save branding"}</Button>
+      <SaveBar label="Save branding" saving={act.busy === "save"} msg={act.msg} err={act.err} onSave={() => void save()} />
     </div>
   );
 
@@ -2181,7 +2268,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
 function TokenGrid({ tokens, onSet }: { tokens: BrandTokens; onSet: (mode: "light" | "dark", key: string, value: string) => void }) {
   return (
     <div className="space-y-4">
-      {THEME_TOKEN_GROUPS.map((g) => (
+      {TOKEN_GROUPS.map((g) => (
         <div key={g.label}>
           <div className="mb-1.5 text-micro uppercaser text-muted-foreground">{g.label}</div>
           <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1">
@@ -2193,8 +2280,8 @@ function TokenGrid({ tokens, onSet }: { tokens: BrandTokens; onSet: (mode: "ligh
               return (
                 <Fragment key={name}>
                   <code className="truncate text-xs text-muted-foreground">{name}</code>
-                  <TokenCell mode="light" tokenKey={key} value={tokens.light?.[key] ?? ""} def={DEFAULT_TOKENS.light?.[key] ?? ""} onSet={onSet} />
-                  <TokenCell mode="dark" tokenKey={key} value={tokens.dark?.[key] ?? ""} def={DEFAULT_TOKENS.dark?.[key] ?? ""} onSet={onSet} />
+                  <TokenCell mode="light" tokenKey={key} value={tokens.light?.[key] ?? ""} def={ALL_DEFAULT_TOKENS.light[key] ?? ""} onSet={onSet} />
+                  <TokenCell mode="dark" tokenKey={key} value={tokens.dark?.[key] ?? ""} def={ALL_DEFAULT_TOKENS.dark[key] ?? ""} onSet={onSet} />
                 </Fragment>
               );
             })}

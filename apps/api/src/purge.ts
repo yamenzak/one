@@ -5,14 +5,19 @@
  * user is removed from D1, R2 (via the storage ledger's prefix purge), the
  * billing Durable Object, and — best-effort — Stripe.
  *
- * The table inventory below is the SSOT for "what a purge must clear"; keep it in
- * step with db.ts. Global seed rows (exercises/foods with tenant_id IS NULL) are
+ * WHAT a purge must clear is no longer written here. `@4dl/purge` derives both
+ * cascades from every schema module's `scoped` declaration, so a table is swept
+ * because the module that creates it says who owns its rows — see
+ * `packages/purge/README.md` for the three live gaps the hand-maintained lists
+ * had accumulated. Global seed rows (exercises/foods with tenant_id IS NULL) are
  * naturally excluded by the `WHERE tenant_id = ?` filter. Users are cross-tenant:
  * a user in more than one studio keeps their identity; only their membership +
  * their client data in the purged tenant go.
  */
 
+import { applyCascade, cascadeTables, subjectCascade, tenantCascade } from "@4dl/purge";
 import type { Env } from "./env.js";
+import { SCHEMA_MODULES } from "./db.js";
 import { purgePrefix, deleteMedia } from "./storage.js";
 import { nowIso } from "./ids.js";
 import { stripeConfig, stripeEnabled, stripeCall } from "./stripe.js";
@@ -21,39 +26,19 @@ import { saasConfig, deleteCustomHostname } from "./cloudflare.js";
 import { invalidateHostCache } from "./host-context.js";
 import { DEFAULT_PLANS } from "./billing-store.js";
 
-/** Tables that carry a `client_id` — everything a single client's record owns.
+/**
+ * The two cascades, derived once at module load.
  *
- *  Verified against db.ts: this is EVERY table with a literal `client_id` column.
- *  Deliberately absent (they reference a client by a *different* column and are
- *  tenant-owned assets, so deleting the row would destroy the studio's property):
- *  `packages.restricted_client_id`, `redemption_codes.restricted_client_id` +
- *  `used_by_json`, `promo_codes.restricted_client_id`, `resources.assigned_json`,
- *  and `notifications.link` (`/clients/<id>` deep-links). Those keep a dangling
- *  reference after a purge; each one reads as "no longer applies" rather than
- *  leaking data (an offer restricted to a deleted client is unreachable), so they
- *  are left in place on purpose. */
-const CLIENT_TABLES = [
-  "client_goals", "client_trainers", "workout_plans", "swap_requests", "meal_plans",
-  "meal_arrangements", "exercise_logs", "exercise_prs", "activity_logs", "food_entries",
-  "water_logs", "sleep_logs", "mood_logs", "steps_logs", "measurements", "body_scans", "check_ins",
-  "fasting_sessions", "supplements", "supplement_logs", "lab_tests", "client_subscriptions",
-  "redemption_uses", "trainer_sessions", "audit_log", "plan_variants", "ai_generations",
-  "media_assets",
-] as const;
-
-/** Tables that carry a `tenant_id` — everything a studio owns (plus the two by
- *  their own keys, handled separately: redemption_uses, member/org). */
-const TENANT_TABLES = [
-  "subscriptions", "credit_ledger", "ai_generations", "insight_feedback", "clients",
-  "client_trainers", "client_goals", "exercises", "exercise_alternatives", "workout_plans",
-  "workout_templates", "swap_requests", "foods", "meal_plans", "meal_templates",
-  "meal_arrangements", "exercise_logs", "exercise_prs", "activity_logs", "food_entries",
-  "water_logs", "sleep_logs", "mood_logs", "steps_logs", "measurements", "body_scans", "tts_cues",
-  "check_ins", "fasting_sessions", "supplements", "supplement_logs", "lab_tests", "packages",
-  "client_subscriptions", "redemption_codes", "promo_codes", "addon_types", "trainer_sessions",
-  "email_templates", "resources", "notifications", "tenant_settings", "tenant_domains",
-  "audit_log", "plan_variants", "media_assets",
-] as const;
+ * `TENANT_CASCADE` carries `tenant_id` for every 4DL module and Kova's own
+ * tables, and `organizationId` for auth's `member`/`invitation`.
+ * `SUBJECT_CASCADE` mixes columns on purpose: Kova's tables key an individual as
+ * `client_id`, while commerce, AI and storage renamed theirs to `subject_id`.
+ * Each step carries its OWN column, which is precisely what the old loops did
+ * not — they interpolated the table and hard-coded the column, so a rename
+ * produced a "no such column" that the purge's `.catch()` swallowed.
+ */
+const TENANT_CASCADE = tenantCascade(SCHEMA_MODULES);
+const SUBJECT_CASCADE = subjectCascade(SCHEMA_MODULES);
 
 async function run(db: D1Database, sql: string, ...binds: unknown[]): Promise<void> {
   await db.prepare(sql).bind(...binds).run().catch(() => undefined);
@@ -107,12 +92,12 @@ function mediaKeyFromUrl(url: string | null | undefined, tenantId: string): stri
  *     `DELETE … WHERE client_id = ?` missed it, so the object *and* its billed
  *     bytes outlived the client. Resolved from `clients.avatar_url` below.
  *   • **AI images generated for them** — `ai.ts` stores at `t/<tenant>/ai/…`
- *     while stamping `media_assets.client_id`. The row was hard-deleted (so the
+ *     while stamping `media_assets.subject_id`. The row was hard-deleted (so the
  *     meter dropped) but the R2 object was orphaned with nothing left pointing
  *     at it. Now swept via the ledger, by key, wherever it lives.
  */
 export async function purgeClient(env: Env, tenantId: string, clientId: string): Promise<ClientPurgeResult> {
-  // Stop their card first. `client_subscriptions` rows are about to be deleted, so
+  // Stop their card first. `subject_subscriptions` rows are about to be deleted, so
   // after this point there is nothing left that names the Stripe subscription and
   // it would bill on forever, unreachable from any surface we own.
   await cancelClientStripe(env, tenantId, clientId);
@@ -128,7 +113,7 @@ export async function purgeClient(env: Env, tenantId: string, clientId: string):
   const live = (
     await env.DB
       .prepare(
-        `SELECT r2_key, size_bytes FROM media_assets WHERE deleted_at IS NULL AND (client_id = ? OR ${PREFIX_MATCH} OR r2_key = ?)`,
+        `SELECT r2_key, size_bytes FROM media_assets WHERE deleted_at IS NULL AND (subject_id = ? OR ${PREFIX_MATCH} OR r2_key = ?)`,
       )
       .bind(clientId, prefix.length, prefix, avatarKey ?? "")
       .all<{ r2_key: string; size_bytes: number | null }>()
@@ -155,7 +140,7 @@ export async function purgeClient(env: Env, tenantId: string, clientId: string):
   for (const key of strays) await deleteMedia(env, key);
   objects += strays.size;
 
-  for (const table of CLIENT_TABLES) await run(env.DB, `DELETE FROM ${table} WHERE client_id = ?`, clientId);
+  await applyCascade(SUBJECT_CASCADE, clientId, (sql, id) => run(env.DB, sql, id));
   await run(env.DB, "DELETE FROM clients WHERE id = ?", clientId);
 
   // A deleted client must also lose their way in: without this the `member` row
@@ -227,8 +212,8 @@ async function cancelClientStripe(env: Env, tenantId: string, clientId?: string)
 
     const rows = (await env.DB
       .prepare(
-        "SELECT id, stripe_sub_id FROM client_subscriptions WHERE tenant_id = ? AND stripe_sub_id IS NOT NULL" +
-          (clientId ? " AND client_id = ?" : ""),
+        "SELECT id, stripe_sub_id FROM subject_subscriptions WHERE tenant_id = ? AND stripe_sub_id IS NOT NULL" +
+          (clientId ? " AND subject_id = ?" : ""),
       )
       .bind(...(clientId ? [tenantId, clientId] : [tenantId]))
       .all<{ id: string; stripe_sub_id: string }>()
@@ -322,12 +307,13 @@ export async function purgeTenant(env: Env, tenantId: string): Promise<{ clientS
   await env.BILLING.get(env.BILLING.idFromName(tenantId)).wipe().catch(() => undefined);
 
   // Child rows without a tenant_id: redemption_uses keyed by this tenant's codes.
+  // Declared by commerce as subject-scoped only, precisely because it has no
+  // tenant column — the tenant reaches it through the codes, which is this.
   await run(env.DB, "DELETE FROM redemption_uses WHERE code_id IN (SELECT id FROM redemption_codes WHERE tenant_id = ?)", tenantId);
-  for (const table of TENANT_TABLES) await run(env.DB, `DELETE FROM ${table} WHERE tenant_id = ?`, tenantId);
-
-  // Org membership + the org itself.
-  await run(env.DB, 'DELETE FROM "member" WHERE organizationId = ?', tenantId);
-  await run(env.DB, 'DELETE FROM "invitation" WHERE organizationId = ?', tenantId);
+  // Includes auth's `member`/`invitation` (keyed `organizationId`, which is why
+  // each step carries its own column) — so the two lines that used to follow are
+  // now part of the cascade rather than a hand-written afterthought.
+  await applyCascade(TENANT_CASCADE, tenantId, (sql, id) => run(env.DB, sql, id));
   await run(env.DB, 'DELETE FROM "organization" WHERE id = ?', tenantId);
 
   // Users whose only membership was this tenant get fully erased; others keep
@@ -377,9 +363,15 @@ export async function purgeEverything(env: Env): Promise<{ tenants: number; subs
   // Wipe every remaining tenant-data + identity row (a user with no org, a
   // dangling child row). Platform config tables are intentionally NOT listed.
   const wipe = [
-    ...TENANT_TABLES.map((t) => `DELETE FROM ${t}`),
+    // Every table either cascade touches — the scope column is irrelevant here
+    // because everything goes. `member`/`invitation` arrive through auth's
+    // declaration, so they are already in this list.
+    ...cascadeTables(SCHEMA_MODULES).map((t) => `DELETE FROM "${t}"`),
     "DELETE FROM redemption_uses",
-    'DELETE FROM "member"', 'DELETE FROM "invitation"', 'DELETE FROM "organization"',
+    'DELETE FROM "organization"',
+    // Identity and the per-USER rows, which are deliberately NOT in any tenant
+    // cascade (a user outlives any one tenant) and so have to be named here —
+    // this is a reset of the whole install, not of a tenant.
     'DELETE FROM "user"', 'DELETE FROM "session"', 'DELETE FROM "account"', 'DELETE FROM "passkey"',
     "DELETE FROM user_prefs", "DELETE FROM digest_sent", "DELETE FROM action_otps",
     "DELETE FROM auth_logs", "DELETE FROM verification", "DELETE FROM stripe_events", "DELETE FROM ai_cache",

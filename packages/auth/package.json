@@ -1,0 +1,32 @@
+{
+  "name": "@4dl/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Passwordless auth and authorization: the Better Auth instance (email OTP + passkeys, org = tenant), the request identity, the route-guard engine, the grant algebra, staff seats, step-up confirmation codes. No product vocabulary \u2014 see README.md.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./model": "./src/model.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@4dl/core": "workspace:*",
+    "@4dl/tenancy": "workspace:*",
+    "@better-auth/passkey": "1.6.23",
+    "better-auth": "^1.6.23",
+    "hono": "^4.9.10",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251001.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "@4dl/core": "workspace:*"
+  }
+}

@@ -7,7 +7,7 @@
  * loads the row and, on a successful charge, bumps the redemption counter.
  */
 
-import { applyPromo, type PromoCode, type PromoResult } from "@4dl/platform";
+import { applyPromo, type PromoCode, type PromoResult } from "@4dl/commerce";
 
 interface PromoRow {
   id: string;
@@ -15,7 +15,7 @@ interface PromoRow {
   percent_off: number | null;
   amount_off_cents: number | null;
   restricted_package_id: string | null;
-  restricted_client_id: string | null;
+  restricted_subject_id: string | null;
   max_redemptions: number | null;
   redemption_count: number;
   expires_at: string | null;
@@ -27,7 +27,9 @@ const toDomain = (r: PromoRow): PromoCode => ({
   percentOff: r.percent_off,
   amountOffCents: r.amount_off_cents,
   restrictedPackageId: r.restricted_package_id,
-  restrictedClientId: r.restricted_client_id,
+  // `restricted_subject_id` is the COLUMN (live data, not renamed); the package
+  // calls the buyer a subject, because a warehouse app has no clients.
+  restrictedSubjectId: r.restricted_subject_id,
   maxRedemptions: r.max_redemptions,
   redemptionCount: r.redemption_count,
   expiresAt: r.expires_at,
@@ -44,7 +46,7 @@ export async function resolveAndApplyPromo(
     .prepare("SELECT * FROM promo_codes WHERE tenant_id = ? AND code = ? AND scope = ?")
     .bind(opts.scope === "platform" ? "" : opts.tenantId, opts.code.toUpperCase(), opts.scope)
     .first<PromoRow>();
-  const res = applyPromo(opts.amountCents, row ? toDomain(row) : null, { nowIso: opts.nowIso, targetId: opts.targetId, clientId: opts.clientId });
+  const res = applyPromo(opts.amountCents, row ? toDomain(row) : null, { nowIso: opts.nowIso, targetId: opts.targetId, subjectId: opts.clientId });
   if (!res.ok) return res;
   return { id: row!.id, ...res };
 }

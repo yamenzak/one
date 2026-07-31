@@ -1,0 +1,26 @@
+{
+  "name": "@4dl/storage",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "R2 object storage with per-tenant accounting: the media ledger, the quota gate, prefix purges. The quota resolver is injected, so this does not depend on billing.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@4dl/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@4dl/core": "workspace:*",
+    "@cloudflare/workers-types": "^4.20251001.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

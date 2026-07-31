@@ -1,435 +1,293 @@
 /**
- * D1 schema (SPEC §9) — applied lazily + idempotently (CREATE TABLE IF NOT
- * EXISTS, once per isolate) so local `wrangler dev` is frictionless.
+ * Kova's D1 schema — ONE `SchemaModule` in the composed runner (`@4dl/core`).
  *
- * Conventions: text ids (time-sortable, see ids.ts); ISO-8601 UTC instants in
- * TEXT columns; day-bucketed rows carry the CLIENT'S local date as
- * `date_local` (YYYY-MM-DD — the app computes it device-side, SPEC §8.6);
- * deep structures (plan bodies, budgets, targets) are JSON columns validated
- * by @kova/protocol schemas at the route boundary.
+ * Conventions: text ids (time-sortable, see `@4dl/core` ids.ts); ISO-8601 UTC
+ * instants in TEXT columns; day-bucketed rows carry the CLIENT'S local date as
+ * `date_local` (YYYY-MM-DD — the app computes it device-side, SPEC §8.6); deep
+ * structures (plan bodies, budgets, targets) are JSON columns validated by
+ * @kova/protocol schemas at the route boundary.
  *
  * Better Auth's tables are mirrored 1:1 from its SQLite schema (string→TEXT,
  * boolean→INTEGER, date→DATE) so its adapter reads/writes them natively. An
  * `organization` IS a Kova tenant.
+ *
+ * ── Why this is a module and not a function ─────────────────────────────────
+ *
+ * The runner lives in `@4dl/core` so several packages can own tables in one D1
+ * without knowing about each other (see its header). Today Kova declares all 66
+ * tables as a single module; the extraction moves them out a package at a time,
+ * and each move is a diff of THIS list plus a new module — not a rewrite of the
+ * apply logic.
+ *
+ * ⚠️ **Adding DDL means bumping `version` below.** The marker row short-circuits
+ * the whole module, so a new `CREATE TABLE IF NOT EXISTS` without a bump is
+ * invisible on a fresh database and fatal on every existing one — the table is
+ * never created and every route touching it 500s. That shipped once
+ * (`steps_logs`); the E2E suite caught it only because it runs against a
+ * persisted `.wrangler` D1 rather than a clean one.
+ *
+ * ⚠️ **One-time re-apply.** The marker key moved from `schema_version` to
+ * `schema:kova` when this became a module, so the first request against an
+ * existing database re-runs the DDL once. Every statement is `IF NOT EXISTS` or
+ * a duplicate-column-tolerant ALTER, so that is a no-op — but it is the reason
+ * the version string below is unchanged from the single-marker era.
  */
 
-let schemaReady: Promise<void> | null = null;
+import { schemaGate, type SchemaModule } from "@4dl/core";
+import { AUTH_SCHEMA } from "@4dl/auth";
+import { BILLING_SCHEMA } from "@4dl/billing";
+import { BILLING_RAIL_SCHEMA } from "@4dl/billing-rail/schema";
+import { AI_SCHEMA } from "@4dl/ai";
+import { COMMERCE_SCHEMA } from "@4dl/commerce";
+import { EMAIL_SCHEMA } from "@4dl/email";
+import { NOTIFY_SCHEMA } from "@4dl/notify";
+import { STORAGE_SCHEMA } from "@4dl/storage";
+import { TENANCY_SCHEMA } from "@4dl/tenancy";
 
-/** Bump when the DDL or `alters` below change, to force one re-run across every
- *  isolate. A matching `schema_version` marker row lets subsequent cold starts
- *  skip the full DDL+ALTER+backfill (a single SELECT instead of ~110 DDL + ~45
- *  ALTER round-trips against live D1). */
-// Bumped for `steps_logs`. Adding DDL WITHOUT bumping this is silent in dev on a
-// fresh database and fatal on any existing one — the marker short-circuits the
-// whole DDL block, so the new table is simply never created and every route
-// touching it 500s with "no such table". The E2E suite caught exactly that,
-// because it runs against a persisted .wrangler D1 rather than a clean one.
-const SCHEMA_VERSION = "2026-07-30c";
+export const KOVA_SCHEMA: SchemaModule = {
+  id: "kova",
+  version: "2026-07-30c",
+  ddl: [
 
-export function ensureSchema(db: D1Database): Promise<void> {
-  if (!schemaReady) {
-    schemaReady = applySchema(db).catch((err) => {
-      schemaReady = null; // allow retry on next request
-      throw err;
-    });
-  }
-  return schemaReady;
-}
+    "CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT);",
 
-async function applySchema(db: D1Database): Promise<void> {
-  // Fast path: the marker row records the last fully-applied schema version. If
-  // it matches, the DDL + ALTER + backfill already ran against this D1 — skip it
-  // (best-effort read: on a brand-new database app_config may not exist yet).
-  const applied = await db
-    .prepare("SELECT value FROM app_config WHERE key = 'schema_version'")
-    .first<{ value: string }>()
-    .catch(() => null);
-  if (applied?.value === SCHEMA_VERSION) return;
 
-  await db
-    .exec(
-        [
-          // ── Better Auth (org = tenant; 100% passwordless: OTP + passkey) ──
-          'CREATE TABLE IF NOT EXISTS "user" (id TEXT PRIMARY KEY, name TEXT, email TEXT UNIQUE, emailVerified INTEGER, image TEXT, createdAt DATE, updatedAt DATE);',
-          'CREATE TABLE IF NOT EXISTS "session" (id TEXT PRIMARY KEY, expiresAt DATE, token TEXT UNIQUE, createdAt DATE, updatedAt DATE, ipAddress TEXT, userAgent TEXT, userId TEXT, activeOrganizationId TEXT);',
-          'CREATE TABLE IF NOT EXISTS "account" (id TEXT PRIMARY KEY, accountId TEXT, providerId TEXT, userId TEXT, accessToken TEXT, refreshToken TEXT, idToken TEXT, accessTokenExpiresAt DATE, refreshTokenExpiresAt DATE, scope TEXT, password TEXT, createdAt DATE, updatedAt DATE);',
-          'CREATE TABLE IF NOT EXISTS "verification" (id TEXT PRIMARY KEY, identifier TEXT, value TEXT, expiresAt DATE, createdAt DATE, updatedAt DATE);',
-          'CREATE TABLE IF NOT EXISTS "organization" (id TEXT PRIMARY KEY, name TEXT, slug TEXT UNIQUE, logo TEXT, createdAt DATE, metadata TEXT);',
-          'CREATE TABLE IF NOT EXISTS "member" (id TEXT PRIMARY KEY, organizationId TEXT, userId TEXT, role TEXT, permissions_json TEXT, createdAt DATE);',
-          // Resolved on EVERY authenticated request (role + permissions lookup) —
-          // without this the member table is full-scanned per request.
-          'CREATE INDEX IF NOT EXISTS idx_member_org_user ON "member"(organizationId, userId);',
-          'CREATE TABLE IF NOT EXISTS "invitation" (id TEXT PRIMARY KEY, organizationId TEXT, email TEXT, role TEXT, status TEXT, expiresAt DATE, inviterId TEXT, createdAt DATE);',
-          // Passkey plugin (WebAuthn credentials; multiple per user).
-          'CREATE TABLE IF NOT EXISTS "passkey" (id TEXT PRIMARY KEY, name TEXT, publicKey TEXT, userId TEXT, credentialID TEXT, counter INTEGER, deviceType TEXT, backedUp INTEGER, transports TEXT, createdAt DATE, aaguid TEXT);',
 
-          // ── Platform billing (SPEC §5, §6) ─────────────────────────────────
-          "CREATE TABLE IF NOT EXISTS plans (id TEXT PRIMARY KEY, name TEXT, price_usd_month REAL, entitlements_json TEXT, stripe_product_id TEXT, stripe_price_id TEXT, ord INTEGER, active INTEGER DEFAULT 1);",
-          "CREATE TABLE IF NOT EXISTS subscriptions (tenant_id TEXT PRIMARY KEY, plan_id TEXT, status TEXT, comp INTEGER DEFAULT 0, stripe_customer_id TEXT, stripe_sub_id TEXT, pending_plan_id TEXT, current_period_end TEXT, past_due_at TEXT, suspend_at TEXT, delete_at TEXT, overrides_json TEXT, updated_at TEXT);",
-          // dailySweep scans by status (grant to active/trialing tenants).
-          "CREATE INDEX IF NOT EXISTS idx_subs_status ON subscriptions(status);",
-          "CREATE INDEX IF NOT EXISTS idx_subs_customer ON subscriptions(stripe_customer_id);",
-          "CREATE TABLE IF NOT EXISTS credit_packs (id TEXT PRIMARY KEY, name TEXT, credits INTEGER, price_usd REAL, stripe_product_id TEXT, stripe_price_id TEXT, ord INTEGER, active INTEGER DEFAULT 1);",
-          "CREATE TABLE IF NOT EXISTS credit_ledger (id TEXT PRIMARY KEY, tenant_id TEXT, delta INTEGER, balance INTEGER, reason TEXT, ref TEXT, at INTEGER);",
-          "CREATE INDEX IF NOT EXISTS idx_ledger_tenant ON credit_ledger(tenant_id, at);",
-          "CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT);",
-          // Webhook idempotency — first insert of a Stripe event id wins; a
-          // redelivery is a no-op (changes = 0), so no handler double-applies.
-          "CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, at INTEGER);",
+    // ── Tenancy domain: clients & staff scoping (SPEC §2) ──────────────
+    "CREATE TABLE IF NOT EXISTS clients (id TEXT PRIMARY KEY, tenant_id TEXT, user_id TEXT, display_name TEXT, email TEXT, status TEXT DEFAULT 'active', gender TEXT, date_of_birth TEXT, height_cm REAL, timezone TEXT, weight_unit TEXT DEFAULT 'kg', length_unit TEXT DEFAULT 'cm', volume_unit TEXT DEFAULT 'ml', intake_json TEXT, dashboard_prefs_json TEXT, onboarding_complete INTEGER DEFAULT 0, avatar_url TEXT, avatar_seed TEXT, created_at TEXT, archived_at TEXT);",
+    "CREATE INDEX IF NOT EXISTS idx_clients_tenant ON clients(tenant_id, status);",
+    "CREATE INDEX IF NOT EXISTS idx_clients_user ON clients(user_id);",
+    // /api/context auto-links an unclaimed client by lowercased email on
+    // every boot; an expression index makes that a lookup, not a full scan.
+    "CREATE INDEX IF NOT EXISTS idx_clients_email_lower ON clients(LOWER(email));",
+    "CREATE TABLE IF NOT EXISTS client_trainers (client_id TEXT, trainer_user_id TEXT, tenant_id TEXT, is_primary INTEGER DEFAULT 0, created_at TEXT, PRIMARY KEY (client_id, trainer_user_id));",
+    "CREATE INDEX IF NOT EXISTS idx_ct_trainer ON client_trainers(tenant_id, trainer_user_id);",
 
-          // ── AI suite (SPEC §6) ─────────────────────────────────────────────
-          "CREATE TABLE IF NOT EXISTS ai_models (id TEXT PRIMARY KEY, task TEXT, label TEXT, provider TEXT, input_rate REAL, output_rate REAL, unit_rate REAL, unit_kind TEXT, markup REAL, enabled INTEGER DEFAULT 1, is_default INTEGER DEFAULT 0);",
-          "CREATE TABLE IF NOT EXISTS ai_generations (id TEXT PRIMARY KEY, tenant_id TEXT, actor_user_id TEXT, client_id TEXT, feature TEXT, model TEXT, neurons REAL, credits INTEGER, ok INTEGER, error TEXT, at INTEGER);",
-          "CREATE INDEX IF NOT EXISTS idx_aigen_tenant ON ai_generations(tenant_id, at);",
-          "CREATE TABLE IF NOT EXISTS ai_cache (prompt_hash TEXT PRIMARY KEY, feature TEXT, output_json TEXT, at INTEGER);",
-          "CREATE TABLE IF NOT EXISTS insight_feedback (id TEXT PRIMARY KEY, tenant_id TEXT, user_id TEXT, insight_type TEXT, insight_ref TEXT, vote INTEGER, at INTEGER);",
+    // ── Goals (SPEC §8.2) ──────────────────────────────────────────────
+    "CREATE TABLE IF NOT EXISTS client_goals (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, label TEXT, status TEXT DEFAULT 'active', start_date TEXT, end_date TEXT, targets_json TEXT, ranges_json TEXT, derivation_json TEXT, weekly_load_target INTEGER, notes TEXT, created_by TEXT, created_at TEXT);",
+    "CREATE INDEX IF NOT EXISTS idx_goals_client ON client_goals(client_id, status);",
 
-          // ── Auth security (SPEC §4) ────────────────────────────────────────
-          "CREATE TABLE IF NOT EXISTS auth_logs (id TEXT PRIMARY KEY, event TEXT, email TEXT, ip TEXT, user_agent TEXT, success INTEGER, at INTEGER);",
-          "CREATE INDEX IF NOT EXISTS idx_authlogs_email ON auth_logs(email, at);",
+    // ── Workout system (SPEC §8.3) ─────────────────────────────────────
+    "CREATE TABLE IF NOT EXISTS exercises (id TEXT PRIMARY KEY, tenant_id TEXT, visibility TEXT DEFAULT 'tenant', name TEXT, slug TEXT, muscle_groups TEXT, secondary_muscle_groups TEXT, equipment TEXT, difficulty TEXT, force TEXT, mechanic TEXT, category TEXT, instructions_md TEXT, thumb_url TEXT, thumb2_url TEXT, video_url TEXT, source TEXT, source_id TEXT, active INTEGER DEFAULT 1, created_by TEXT, created_at TEXT);",
+    "CREATE INDEX IF NOT EXISTS idx_exercises_tenant ON exercises(tenant_id, active);",
+    // Dedup is PER TENANT (+ shared globals), so the uniqueness must include
+    // tenant_id — a global (source, source_id) unique index made per-tenant
+    // copies impossible and forced imports to share one tenant's row. DROP
+    // the old global index and recreate scoped. (The new index is strictly
+    // more permissive, so this can't fail on existing data.)
+    "DROP INDEX IF EXISTS idx_exercises_source;",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_exercises_source ON exercises(tenant_id, source, source_id) WHERE source_id IS NOT NULL;",
+    "CREATE TABLE IF NOT EXISTS exercise_alternatives (exercise_a TEXT, exercise_b TEXT, PRIMARY KEY (exercise_a, exercise_b));",
+    "CREATE TABLE IF NOT EXISTS workout_plans (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, name TEXT, description TEXT, status TEXT DEFAULT 'draft', published_at TEXT, target_goal_json TEXT, body_json TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
+    "CREATE INDEX IF NOT EXISTS idx_wplans_client ON workout_plans(client_id, status);",
+    "CREATE TABLE IF NOT EXISTS workout_templates (id TEXT PRIMARY KEY, tenant_id TEXT, visibility TEXT DEFAULT 'private', name TEXT, description TEXT, body_json TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
+    "CREATE TABLE IF NOT EXISTS swap_requests (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, workout_plan_id TEXT, day_index INTEGER, block_index INTEGER, slot_index INTEGER, current_exercise_id TEXT, suggested_exercise_id TEXT, reason TEXT, status TEXT DEFAULT 'pending', trainer_note TEXT, resolved_by TEXT, created_at TEXT, resolved_at TEXT);",
+    // Per-client swap list + the roster/attention scans (client_id IN …);
+    // the tenant queue reads WHERE tenant_id = ? AND status = 'pending'.
+    "CREATE INDEX IF NOT EXISTS idx_swaps_client ON swap_requests(client_id, status);",
+    "CREATE INDEX IF NOT EXISTS idx_swaps_tenant ON swap_requests(tenant_id, status);",
 
-          // ── Tenancy domain: clients & staff scoping (SPEC §2) ──────────────
-          "CREATE TABLE IF NOT EXISTS clients (id TEXT PRIMARY KEY, tenant_id TEXT, user_id TEXT, display_name TEXT, email TEXT, status TEXT DEFAULT 'active', gender TEXT, date_of_birth TEXT, height_cm REAL, timezone TEXT, weight_unit TEXT DEFAULT 'kg', length_unit TEXT DEFAULT 'cm', volume_unit TEXT DEFAULT 'ml', intake_json TEXT, dashboard_prefs_json TEXT, onboarding_complete INTEGER DEFAULT 0, avatar_url TEXT, avatar_seed TEXT, created_at TEXT, archived_at TEXT);",
-          "CREATE INDEX IF NOT EXISTS idx_clients_tenant ON clients(tenant_id, status);",
-          "CREATE INDEX IF NOT EXISTS idx_clients_user ON clients(user_id);",
-          // /api/context auto-links an unclaimed client by lowercased email on
-          // every boot; an expression index makes that a lookup, not a full scan.
-          "CREATE INDEX IF NOT EXISTS idx_clients_email_lower ON clients(LOWER(email));",
-          "CREATE TABLE IF NOT EXISTS client_trainers (client_id TEXT, trainer_user_id TEXT, tenant_id TEXT, is_primary INTEGER DEFAULT 0, created_at TEXT, PRIMARY KEY (client_id, trainer_user_id));",
-          "CREATE INDEX IF NOT EXISTS idx_ct_trainer ON client_trainers(tenant_id, trainer_user_id);",
+    // ── Nutrition system (SPEC §8.4) ───────────────────────────────────
+    "CREATE TABLE IF NOT EXISTS foods (id TEXT PRIMARY KEY, tenant_id TEXT, name TEXT, brand TEXT, barcode TEXT, serving_size REAL DEFAULT 100, serving_unit TEXT DEFAULT 'g', calories REAL DEFAULT 0, protein_g REAL DEFAULT 0, carbs_g REAL DEFAULT 0, fat_g REAL DEFAULT 0, fiber_g REAL DEFAULT 0, sugar_g REAL DEFAULT 0, sodium_mg REAL DEFAULT 0, saturated_fat_g REAL DEFAULT 0, cholesterol_mg REAL DEFAULT 0, potassium_mg REAL DEFAULT 0, calcium_mg REAL DEFAULT 0, iron_mg REAL DEFAULT 0, description TEXT, image_url TEXT, visibility TEXT DEFAULT 'tenant', source TEXT DEFAULT 'custom', source_id TEXT, verified INTEGER DEFAULT 0, active INTEGER DEFAULT 1, created_by TEXT, created_at TEXT);",
+    "CREATE INDEX IF NOT EXISTS idx_foods_tenant ON foods(tenant_id, active);",
+    "CREATE INDEX IF NOT EXISTS idx_foods_barcode ON foods(barcode);",
+    "CREATE TABLE IF NOT EXISTS meal_plans (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, name TEXT, description TEXT, status TEXT DEFAULT 'draft', published_at TEXT, target_goal_json TEXT, body_json TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
+    "CREATE INDEX IF NOT EXISTS idx_mplans_client ON meal_plans(client_id, status);",
+    "CREATE TABLE IF NOT EXISTS meal_templates (id TEXT PRIMARY KEY, tenant_id TEXT, visibility TEXT DEFAULT 'private', name TEXT, description TEXT, body_json TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
+    "CREATE TABLE IF NOT EXISTS meal_arrangements (client_id TEXT, meal_plan_id TEXT, tenant_id TEXT, slots_json TEXT, updated_at TEXT, PRIMARY KEY (client_id, meal_plan_id));",
 
-          // ── Goals (SPEC §8.2) ──────────────────────────────────────────────
-          "CREATE TABLE IF NOT EXISTS client_goals (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, label TEXT, status TEXT DEFAULT 'active', start_date TEXT, end_date TEXT, targets_json TEXT, ranges_json TEXT, derivation_json TEXT, weekly_load_target INTEGER, notes TEXT, created_by TEXT, created_at TEXT);",
-          "CREATE INDEX IF NOT EXISTS idx_goals_client ON client_goals(client_id, status);",
+    // ── Logging & tracking (SPEC §8.6) ─────────────────────────────────
+    "CREATE TABLE IF NOT EXISTS exercise_logs (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, workout_plan_id TEXT, plan_day_index INTEGER, entries_json TEXT, session_calories INTEGER, created_at TEXT, updated_at TEXT);",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_elogs_session ON exercise_logs(client_id, workout_plan_id, plan_day_index, date_local);",
+    "CREATE INDEX IF NOT EXISTS idx_elogs_client ON exercise_logs(client_id, date_local);",
+    // Per-exercise all-time best (e1RM) per client — the authoritative PR
+    // ledger. Updated transactionally on every logged set so PR detection
+    // is O(1) (no full-history fold) and drives the pr_achieved notify.
+    "CREATE TABLE IF NOT EXISTS exercise_prs (client_id TEXT, exercise_id TEXT, best_e1rm REAL, weight_kg REAL, reps INTEGER, tenant_id TEXT, achieved_on TEXT, updated_at TEXT, PRIMARY KEY (client_id, exercise_id));",
+    "CREATE TABLE IF NOT EXISTS activity_logs (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, activity_key TEXT, label TEXT, start_time TEXT, duration_min INTEGER, avg_hr_bpm INTEGER, calories INTEGER, calories_locked INTEGER DEFAULT 0, created_at TEXT);",
+    "CREATE INDEX IF NOT EXISTS idx_alogs_client ON activity_logs(client_id, date_local);",
+    "CREATE TABLE IF NOT EXISTS food_entries (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, meal_type TEXT, food_id TEXT, label TEXT, quantity REAL, unit TEXT, calories REAL DEFAULT 0, protein_g REAL DEFAULT 0, carbs_g REAL DEFAULT 0, fat_g REAL DEFAULT 0, source TEXT DEFAULT 'self_logged', meal_plan_id TEXT, meal_option_index INTEGER, image_url TEXT, created_at TEXT);",
+    "CREATE INDEX IF NOT EXISTS idx_fentries_client ON food_entries(client_id, date_local);",
+    "CREATE TABLE IF NOT EXISTS water_logs (client_id TEXT, date_local TEXT, tenant_id TEXT, total_ml INTEGER DEFAULT 0, entries_json TEXT, updated_at TEXT, PRIMARY KEY (client_id, date_local));",
+    // Steps: a daily self-logged total, exactly the shape of water_logs.
+    // It existed ONLY as `check_ins.steps_count`, so a client who did not
+    // check in had no way to record steps at all — and the home Steps
+    // widget read "No data yet" for them permanently.
+    "CREATE TABLE IF NOT EXISTS steps_logs (client_id TEXT, date_local TEXT, tenant_id TEXT, steps INTEGER, updated_at TEXT, PRIMARY KEY (client_id, date_local));",
+    "CREATE TABLE IF NOT EXISTS sleep_logs (client_id TEXT, date_local TEXT, tenant_id TEXT, duration_minutes INTEGER, quality INTEGER, notes TEXT, updated_at TEXT, PRIMARY KEY (client_id, date_local));",
+    "CREATE TABLE IF NOT EXISTS mood_logs (client_id TEXT, date_local TEXT, tenant_id TEXT, mood INTEGER, energy INTEGER, stress INTEGER, notes TEXT, updated_at TEXT, PRIMARY KEY (client_id, date_local));",
+    "CREATE TABLE IF NOT EXISTS measurements (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, weight_kg REAL, body_fat_percent REAL, neck_cm REAL, waist_cm REAL, hips_cm REAL, chest_cm REAL, notes TEXT, created_at TEXT);",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_meas_day ON measurements(client_id, date_local);",
+    // Camera body-scan history (SPEC §8.5). Circumferences + the ensemble
+    // result + confidence; contour_*_json are de-identified outlines kept
+    // only on consent (for the progress morph). One scan per client-day.
+    "CREATE TABLE IF NOT EXISTS body_scans (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, body_fat_percent REAL, low REAL, high REAL, confidence TEXT, neck_cm REAL, waist_cm REAL, hips_cm REAL, chest_cm REAL, weight_kg REAL, height_cm REAL, methods_json TEXT, contour_front_json TEXT, contour_side_json TEXT, posture_cva_deg REAL, posture_tilt_deg REAL, posture_severity TEXT, somatotype TEXT, created_at TEXT);",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_body_scans_day ON body_scans(client_id, date_local);",
+    // Tenant-cached TTS cue audio (generate once via Gemini, reuse forever).
+    // Key = (tenant, voice, lang, phrase id, version) → an R2 media key.
+    "CREATE TABLE IF NOT EXISTS tts_cues (tenant_id TEXT, voice TEXT, lang TEXT, phrase_id TEXT, version INTEGER DEFAULT 1, media_key TEXT, created_at TEXT, PRIMARY KEY (tenant_id, voice, lang, phrase_id, version));",
+    "CREATE TABLE IF NOT EXISTS check_ins (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, weight_kg REAL, mood INTEGER, energy INTEGER, stress INTEGER, sleep_quality INTEGER, sleep_hours REAL, water_ml INTEGER, steps_count INTEGER, notes TEXT, photos_json TEXT, trainer_feedback TEXT, feedback_by TEXT, feedback_at TEXT, created_at TEXT, updated_at TEXT);",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_checkins_day ON check_ins(client_id, date_local);",
+    "CREATE TABLE IF NOT EXISTS fasting_sessions (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, started_at TEXT, ended_at TEXT, duration_minutes INTEGER, target_hours INTEGER DEFAULT 16, created_at TEXT);",
+    "CREATE INDEX IF NOT EXISTS idx_fasting_client ON fasting_sessions(client_id, started_at);",
 
-          // ── Workout system (SPEC §8.3) ─────────────────────────────────────
-          "CREATE TABLE IF NOT EXISTS exercises (id TEXT PRIMARY KEY, tenant_id TEXT, visibility TEXT DEFAULT 'tenant', name TEXT, slug TEXT, muscle_groups TEXT, secondary_muscle_groups TEXT, equipment TEXT, difficulty TEXT, force TEXT, mechanic TEXT, category TEXT, instructions_md TEXT, thumb_url TEXT, thumb2_url TEXT, video_url TEXT, source TEXT, source_id TEXT, active INTEGER DEFAULT 1, created_by TEXT, created_at TEXT);",
-          "CREATE INDEX IF NOT EXISTS idx_exercises_tenant ON exercises(tenant_id, active);",
-          // Dedup is PER TENANT (+ shared globals), so the uniqueness must include
-          // tenant_id — a global (source, source_id) unique index made per-tenant
-          // copies impossible and forced imports to share one tenant's row. DROP
-          // the old global index and recreate scoped. (The new index is strictly
-          // more permissive, so this can't fail on existing data.)
-          "DROP INDEX IF EXISTS idx_exercises_source;",
-          "CREATE UNIQUE INDEX IF NOT EXISTS idx_exercises_source ON exercises(tenant_id, source, source_id) WHERE source_id IS NOT NULL;",
-          "CREATE TABLE IF NOT EXISTS exercise_alternatives (exercise_a TEXT, exercise_b TEXT, PRIMARY KEY (exercise_a, exercise_b));",
-          "CREATE TABLE IF NOT EXISTS workout_plans (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, name TEXT, description TEXT, status TEXT DEFAULT 'draft', published_at TEXT, target_goal_json TEXT, body_json TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
-          "CREATE INDEX IF NOT EXISTS idx_wplans_client ON workout_plans(client_id, status);",
-          "CREATE TABLE IF NOT EXISTS workout_templates (id TEXT PRIMARY KEY, tenant_id TEXT, visibility TEXT DEFAULT 'private', name TEXT, description TEXT, body_json TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
-          "CREATE TABLE IF NOT EXISTS swap_requests (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, workout_plan_id TEXT, day_index INTEGER, block_index INTEGER, slot_index INTEGER, current_exercise_id TEXT, suggested_exercise_id TEXT, reason TEXT, status TEXT DEFAULT 'pending', trainer_note TEXT, resolved_by TEXT, created_at TEXT, resolved_at TEXT);",
-          // Per-client swap list + the roster/attention scans (client_id IN …);
-          // the tenant queue reads WHERE tenant_id = ? AND status = 'pending'.
-          "CREATE INDEX IF NOT EXISTS idx_swaps_client ON swap_requests(client_id, status);",
-          "CREATE INDEX IF NOT EXISTS idx_swaps_tenant ON swap_requests(tenant_id, status);",
+    // ── Supplements & labs (SPEC §8.8) ─────────────────────────────────
+    "CREATE TABLE IF NOT EXISTS supplements (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, prescribed_by TEXT, name TEXT, brand TEXT, kind TEXT, dose TEXT, schedule_json TEXT, notes TEXT, linked_lab_id TEXT, start_date TEXT, end_date TEXT, status TEXT DEFAULT 'active', created_at TEXT);",
+    // Every supplements read is per-client (WHERE client_id = ? AND status).
+    "CREATE INDEX IF NOT EXISTS idx_supplements_client ON supplements(client_id, status);",
+    "CREATE TABLE IF NOT EXISTS supplement_logs (client_id TEXT, supplement_id TEXT, date_local TEXT, slot TEXT, tenant_id TEXT, taken_at TEXT, PRIMARY KEY (client_id, supplement_id, date_local, slot));",
+    "CREATE TABLE IF NOT EXISTS lab_tests (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, requested_by TEXT, type TEXT, custom_type TEXT, display_name TEXT, instructions TEXT, due_by TEXT, status TEXT DEFAULT 'requested', file_key TEXT, uploaded_at TEXT, values_json TEXT, client_notes TEXT, trainer_feedback TEXT, reviewed_at TEXT, created_at TEXT);",
+    // Per-client lab list + the roster scans (client_id IN …, filter status).
+    "CREATE INDEX IF NOT EXISTS idx_labtests_client ON lab_tests(client_id, status);",
 
-          // ── Nutrition system (SPEC §8.4) ───────────────────────────────────
-          "CREATE TABLE IF NOT EXISTS foods (id TEXT PRIMARY KEY, tenant_id TEXT, name TEXT, brand TEXT, barcode TEXT, serving_size REAL DEFAULT 100, serving_unit TEXT DEFAULT 'g', calories REAL DEFAULT 0, protein_g REAL DEFAULT 0, carbs_g REAL DEFAULT 0, fat_g REAL DEFAULT 0, fiber_g REAL DEFAULT 0, sugar_g REAL DEFAULT 0, sodium_mg REAL DEFAULT 0, saturated_fat_g REAL DEFAULT 0, cholesterol_mg REAL DEFAULT 0, potassium_mg REAL DEFAULT 0, calcium_mg REAL DEFAULT 0, iron_mg REAL DEFAULT 0, description TEXT, image_url TEXT, visibility TEXT DEFAULT 'tenant', source TEXT DEFAULT 'custom', source_id TEXT, verified INTEGER DEFAULT 0, active INTEGER DEFAULT 1, created_by TEXT, created_at TEXT);",
-          "CREATE INDEX IF NOT EXISTS idx_foods_tenant ON foods(tenant_id, active);",
-          "CREATE INDEX IF NOT EXISTS idx_foods_barcode ON foods(barcode);",
-          "CREATE TABLE IF NOT EXISTS meal_plans (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, name TEXT, description TEXT, status TEXT DEFAULT 'draft', published_at TEXT, target_goal_json TEXT, body_json TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
-          "CREATE INDEX IF NOT EXISTS idx_mplans_client ON meal_plans(client_id, status);",
-          "CREATE TABLE IF NOT EXISTS meal_templates (id TEXT PRIMARY KEY, tenant_id TEXT, visibility TEXT DEFAULT 'private', name TEXT, description TEXT, body_json TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
-          "CREATE TABLE IF NOT EXISTS meal_arrangements (client_id TEXT, meal_plan_id TEXT, tenant_id TEXT, slots_json TEXT, updated_at TEXT, PRIMARY KEY (client_id, meal_plan_id));",
+    "CREATE TABLE IF NOT EXISTS trainer_sessions (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, trainer_user_id TEXT, subscription_id TEXT, addon_type_id TEXT, scheduled_at TEXT, duration_minutes INTEGER, status TEXT DEFAULT 'scheduled', completed_at TEXT, notes TEXT, created_at TEXT);",
+    // Per-client session history (WHERE client_id = ?) + the tenant calendar
+    // scan (WHERE tenant_id = ? AND status = 'scheduled' ORDER BY scheduled_at).
+    "CREATE INDEX IF NOT EXISTS idx_tsessions_client ON trainer_sessions(client_id, scheduled_at);",
+    "CREATE INDEX IF NOT EXISTS idx_tsessions_tenant ON trainer_sessions(tenant_id, status);",
 
-          // ── Logging & tracking (SPEC §8.6) ─────────────────────────────────
-          "CREATE TABLE IF NOT EXISTS exercise_logs (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, workout_plan_id TEXT, plan_day_index INTEGER, entries_json TEXT, session_calories INTEGER, created_at TEXT, updated_at TEXT);",
-          "CREATE UNIQUE INDEX IF NOT EXISTS idx_elogs_session ON exercise_logs(client_id, workout_plan_id, plan_day_index, date_local);",
-          "CREATE INDEX IF NOT EXISTS idx_elogs_client ON exercise_logs(client_id, date_local);",
-          // Per-exercise all-time best (e1RM) per client — the authoritative PR
-          // ledger. Updated transactionally on every logged set so PR detection
-          // is O(1) (no full-history fold) and drives the pr_achieved notify.
-          "CREATE TABLE IF NOT EXISTS exercise_prs (client_id TEXT, exercise_id TEXT, best_e1rm REAL, weight_kg REAL, reps INTEGER, tenant_id TEXT, achieved_on TEXT, updated_at TEXT, PRIMARY KEY (client_id, exercise_id));",
-          "CREATE TABLE IF NOT EXISTS activity_logs (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, activity_key TEXT, label TEXT, start_time TEXT, duration_min INTEGER, avg_hr_bpm INTEGER, calories INTEGER, calories_locked INTEGER DEFAULT 0, created_at TEXT);",
-          "CREATE INDEX IF NOT EXISTS idx_alogs_client ON activity_logs(client_id, date_local);",
-          "CREATE TABLE IF NOT EXISTS food_entries (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, meal_type TEXT, food_id TEXT, label TEXT, quantity REAL, unit TEXT, calories REAL DEFAULT 0, protein_g REAL DEFAULT 0, carbs_g REAL DEFAULT 0, fat_g REAL DEFAULT 0, source TEXT DEFAULT 'self_logged', meal_plan_id TEXT, meal_option_index INTEGER, image_url TEXT, created_at TEXT);",
-          "CREATE INDEX IF NOT EXISTS idx_fentries_client ON food_entries(client_id, date_local);",
-          "CREATE TABLE IF NOT EXISTS water_logs (client_id TEXT, date_local TEXT, tenant_id TEXT, total_ml INTEGER DEFAULT 0, entries_json TEXT, updated_at TEXT, PRIMARY KEY (client_id, date_local));",
-          // Steps: a daily self-logged total, exactly the shape of water_logs.
-          // It existed ONLY as `check_ins.steps_count`, so a client who did not
-          // check in had no way to record steps at all — and the home Steps
-          // widget read "No data yet" for them permanently.
-          "CREATE TABLE IF NOT EXISTS steps_logs (client_id TEXT, date_local TEXT, tenant_id TEXT, steps INTEGER, updated_at TEXT, PRIMARY KEY (client_id, date_local));",
-          "CREATE TABLE IF NOT EXISTS sleep_logs (client_id TEXT, date_local TEXT, tenant_id TEXT, duration_minutes INTEGER, quality INTEGER, notes TEXT, updated_at TEXT, PRIMARY KEY (client_id, date_local));",
-          "CREATE TABLE IF NOT EXISTS mood_logs (client_id TEXT, date_local TEXT, tenant_id TEXT, mood INTEGER, energy INTEGER, stress INTEGER, notes TEXT, updated_at TEXT, PRIMARY KEY (client_id, date_local));",
-          "CREATE TABLE IF NOT EXISTS measurements (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, weight_kg REAL, body_fat_percent REAL, neck_cm REAL, waist_cm REAL, hips_cm REAL, chest_cm REAL, notes TEXT, created_at TEXT);",
-          "CREATE UNIQUE INDEX IF NOT EXISTS idx_meas_day ON measurements(client_id, date_local);",
-          // Camera body-scan history (SPEC §8.5). Circumferences + the ensemble
-          // result + confidence; contour_*_json are de-identified outlines kept
-          // only on consent (for the progress morph). One scan per client-day.
-          "CREATE TABLE IF NOT EXISTS body_scans (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, body_fat_percent REAL, low REAL, high REAL, confidence TEXT, neck_cm REAL, waist_cm REAL, hips_cm REAL, chest_cm REAL, weight_kg REAL, height_cm REAL, methods_json TEXT, contour_front_json TEXT, contour_side_json TEXT, posture_cva_deg REAL, posture_tilt_deg REAL, posture_severity TEXT, somatotype TEXT, created_at TEXT);",
-          "CREATE UNIQUE INDEX IF NOT EXISTS idx_body_scans_day ON body_scans(client_id, date_local);",
-          // Tenant-cached TTS cue audio (generate once via Gemini, reuse forever).
-          // Key = (tenant, voice, lang, phrase id, version) → an R2 media key.
-          "CREATE TABLE IF NOT EXISTS tts_cues (tenant_id TEXT, voice TEXT, lang TEXT, phrase_id TEXT, version INTEGER DEFAULT 1, media_key TEXT, created_at TEXT, PRIMARY KEY (tenant_id, voice, lang, phrase_id, version));",
-          "CREATE TABLE IF NOT EXISTS check_ins (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, date_local TEXT, weight_kg REAL, mood INTEGER, energy INTEGER, stress INTEGER, sleep_quality INTEGER, sleep_hours REAL, water_ml INTEGER, steps_count INTEGER, notes TEXT, photos_json TEXT, trainer_feedback TEXT, feedback_by TEXT, feedback_at TEXT, created_at TEXT, updated_at TEXT);",
-          "CREATE UNIQUE INDEX IF NOT EXISTS idx_checkins_day ON check_ins(client_id, date_local);",
-          "CREATE TABLE IF NOT EXISTS fasting_sessions (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, started_at TEXT, ended_at TEXT, duration_minutes INTEGER, target_hours INTEGER DEFAULT 16, created_at TEXT);",
-          "CREATE INDEX IF NOT EXISTS idx_fasting_client ON fasting_sessions(client_id, started_at);",
+    // ── Content hub + notifications (SPEC §8.10) ───────────────────────
+    "CREATE TABLE IF NOT EXISTS resources (id TEXT PRIMARY KEY, tenant_id TEXT, type TEXT DEFAULT 'article', title TEXT, summary TEXT, body_md TEXT, cover_url TEXT, topics TEXT, muscle_groups TEXT, duration_minutes INTEGER, audience TEXT DEFAULT 'clients', assigned_json TEXT, status TEXT DEFAULT 'draft', author_user_id TEXT, published_at TEXT, created_at TEXT, updated_at TEXT);",
+    "CREATE INDEX IF NOT EXISTS idx_resources_tenant ON resources(tenant_id, status);",
 
-          // ── Supplements & labs (SPEC §8.8) ─────────────────────────────────
-          "CREATE TABLE IF NOT EXISTS supplements (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, prescribed_by TEXT, name TEXT, brand TEXT, kind TEXT, dose TEXT, schedule_json TEXT, notes TEXT, linked_lab_id TEXT, start_date TEXT, end_date TEXT, status TEXT DEFAULT 'active', created_at TEXT);",
-          // Every supplements read is per-client (WHERE client_id = ? AND status).
-          "CREATE INDEX IF NOT EXISTS idx_supplements_client ON supplements(client_id, status);",
-          "CREATE TABLE IF NOT EXISTS supplement_logs (client_id TEXT, supplement_id TEXT, date_local TEXT, slot TEXT, tenant_id TEXT, taken_at TEXT, PRIMARY KEY (client_id, supplement_id, date_local, slot));",
-          "CREATE TABLE IF NOT EXISTS lab_tests (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, requested_by TEXT, type TEXT, custom_type TEXT, display_name TEXT, instructions TEXT, due_by TEXT, status TEXT DEFAULT 'requested', file_key TEXT, uploaded_at TEXT, values_json TEXT, client_notes TEXT, trainer_feedback TEXT, reviewed_at TEXT, created_at TEXT);",
-          // Per-client lab list + the roster scans (client_id IN …, filter status).
-          "CREATE INDEX IF NOT EXISTS idx_labtests_client ON lab_tests(client_id, status);",
+    // ── Tenant settings (branding, AI toggles, marketplace, Connect) ───
 
-          // ── Commerce: the access economy (SPEC §7) ─────────────────────────
-          "CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, tenant_id TEXT, name TEXT, description TEXT, one_time_price_cents INTEGER, monthly_price_cents INTEGER, installment_months INTEGER, currency TEXT DEFAULT 'usd', budgets_json TEXT, addons_json TEXT, flags_json TEXT, visibility TEXT DEFAULT 'private', restricted_client_id TEXT, once_per_customer INTEGER DEFAULT 0, stripe_product_id TEXT, stripe_price_id TEXT, stripe_monthly_price_id TEXT, active INTEGER DEFAULT 1, created_at TEXT);",
-          "CREATE INDEX IF NOT EXISTS idx_packages_tenant ON packages(tenant_id, active);",
-          "CREATE TABLE IF NOT EXISTS client_subscriptions (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, package_id TEXT, status TEXT DEFAULT 'active', payment_status TEXT DEFAULT 'none', budgets_json TEXT, addons_json TEXT, flags_json TEXT, source TEXT DEFAULT 'admin', installments_paid INTEGER, installments_total INTEGER, stripe_sub_id TEXT, stripe_checkout_id TEXT, started_at TEXT, updated_at TEXT, notes TEXT);",
-          "CREATE INDEX IF NOT EXISTS idx_csubs_client ON client_subscriptions(client_id, status);",
-          // reminderSweep scans active subs platform-wide; renew/cancel resolve by
-          // the Stripe subscription id.
-          "CREATE INDEX IF NOT EXISTS idx_csubs_status ON client_subscriptions(status);",
-          "CREATE INDEX IF NOT EXISTS idx_csubs_stripe_sub ON client_subscriptions(stripe_sub_id);",
-          "CREATE TABLE IF NOT EXISTS redemption_codes (id TEXT PRIMARY KEY, tenant_id TEXT, code TEXT, days_to_add INTEGER, target_feature TEXT DEFAULT 'all', max_uses INTEGER DEFAULT 1, used_count INTEGER DEFAULT 0, used_by_json TEXT, expires_at TEXT, active INTEGER DEFAULT 1, restricted_package_id TEXT, restricted_client_id TEXT, created_by TEXT, created_at TEXT);",
-          "CREATE UNIQUE INDEX IF NOT EXISTS idx_redemption_code ON redemption_codes(tenant_id, code);",
-          // Per-(code,client) redemption claim — the UNIQUE PK is what atomically
-          // dedupes a client's second redemption (see /redeem), replacing the
-          // lost-update-prone used_by_json array check.
-          "CREATE TABLE IF NOT EXISTS redemption_uses (code_id TEXT, client_id TEXT, at TEXT, PRIMARY KEY (code_id, client_id));",
-          // Promo codes = Stripe checkout discounts (distinct from redemption day top-ups).
-          "CREATE TABLE IF NOT EXISTS promo_codes (id TEXT PRIMARY KEY, tenant_id TEXT, code TEXT, discount_type TEXT DEFAULT 'percent', percent_off INTEGER, amount_off_cents INTEGER, restricted_package_id TEXT, restricted_client_id TEXT, scope TEXT DEFAULT 'tenant', max_redemptions INTEGER, redemption_count INTEGER DEFAULT 0, expires_at TEXT, active INTEGER DEFAULT 1, stripe_coupon_id TEXT, stripe_promo_id TEXT, created_by TEXT, created_at TEXT);",
-          "CREATE UNIQUE INDEX IF NOT EXISTS idx_promo_code ON promo_codes(tenant_id, code);",
-          // Per-tenant email template overrides (white-label): a tenant rewrites a
-          // notification type's subject/body ({{variables}}); enabled=0 mutes the
-          // email for that type. Absent row = the registry default template.
-          "CREATE TABLE IF NOT EXISTS email_templates (tenant_id TEXT, type TEXT, subject TEXT, body TEXT, enabled INTEGER DEFAULT 1, updated_at TEXT, PRIMARY KEY (tenant_id, type));",
-          // Personal unit preferences, per user (cross-tenant).
-          "CREATE TABLE IF NOT EXISTS user_prefs (user_id TEXT PRIMARY KEY, units_json TEXT, updated_at TEXT);",
-          "CREATE TABLE IF NOT EXISTS addon_types (id TEXT PRIMARY KEY, tenant_id TEXT, slug TEXT, label TEXT, kind TEXT DEFAULT 'consultation', duration_minutes INTEGER, standalone_price_cents INTEGER, active INTEGER DEFAULT 1);",
-          "CREATE TABLE IF NOT EXISTS trainer_sessions (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, trainer_user_id TEXT, subscription_id TEXT, addon_type_id TEXT, scheduled_at TEXT, duration_minutes INTEGER, status TEXT DEFAULT 'scheduled', completed_at TEXT, notes TEXT, created_at TEXT);",
-          // Per-client session history (WHERE client_id = ?) + the tenant calendar
-          // scan (WHERE tenant_id = ? AND status = 'scheduled' ORDER BY scheduled_at).
-          "CREATE INDEX IF NOT EXISTS idx_tsessions_client ON trainer_sessions(client_id, scheduled_at);",
-          "CREATE INDEX IF NOT EXISTS idx_tsessions_tenant ON trainer_sessions(tenant_id, status);",
+    // ── Tenant hostnames — the Host→tenant table (SPEC §14.1) ──────────
+    // Keyed by hostname because that is the lookup on every single request.
+    //
+    // TWO KINDS of row live here, and the distinction is load-bearing:
+    //
+    //  'subdomain'  `<slug>.kova.4dl.app`. Created with the studio, always
+    //               `active`, no Cloudflare call and no DCV — the wildcard
+    //               certificate, wildcard DNS record and wildcard worker
+    //               route already cover it. System-owned: it is not listed
+    //               in the owner's domains UI and cannot be deleted there,
+    //               because deleting it would make the studio unreachable.
+    //  'custom'     a domain the tenant owns. Provisioned through
+    //               Cloudflare for SaaS; carries cf ids, DCV records and
+    //               validation errors.
+    //
+    // `kind` defaults to 'custom' so pre-existing rows (all of which were
+    // custom domains) keep their meaning without a data migration.
 
-          // ── Content hub + notifications (SPEC §8.10) ───────────────────────
-          "CREATE TABLE IF NOT EXISTS resources (id TEXT PRIMARY KEY, tenant_id TEXT, type TEXT DEFAULT 'article', title TEXT, summary TEXT, body_md TEXT, cover_url TEXT, topics TEXT, muscle_groups TEXT, duration_minutes INTEGER, audience TEXT DEFAULT 'clients', assigned_json TEXT, status TEXT DEFAULT 'draft', author_user_id TEXT, published_at TEXT, created_at TEXT, updated_at TEXT);",
-          "CREATE INDEX IF NOT EXISTS idx_resources_tenant ON resources(tenant_id, status);",
-          "CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, tenant_id TEXT, recipient_user_id TEXT, type TEXT, title TEXT, message TEXT, link TEXT, read INTEGER DEFAULT 0, created_at TEXT);",
-          "CREATE INDEX IF NOT EXISTS idx_notif_recipient ON notifications(recipient_user_id, read);",
-          // The bell lists a recipient's notifications ORDER BY created_at DESC.
-          "CREATE INDEX IF NOT EXISTS idx_notif_recipient_time ON notifications(recipient_user_id, created_at);",
-          // Weekly-digest idempotency: one row per (user, week, role) gates the
-          // send, so an at-least-once cron redelivery can't re-email — and a run
-          // that timed out mid-sweep resumes on the next fire (already-sent users
-          // are skipped) instead of starting over.
-          "CREATE TABLE IF NOT EXISTS digest_sent (user_id TEXT, period TEXT, kind TEXT, at TEXT, PRIMARY KEY (user_id, period, kind));",
+    // ── Coach-action audit log (SPEC §9; REGISTRY-PLAN Phase 3) ────────
+    // Durable, queryable record of STAFF actions on a client's record. The
+    // action id keys into @kova/domain AUDIT_ACTIONS; summary is a short
+    // human line; ref points at the affected row. Listed newest-first per
+    // client, so the index is (client_id, at DESC).
+    "CREATE TABLE IF NOT EXISTS audit_log (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, actor_user_id TEXT, action TEXT, summary TEXT, ref TEXT, at INTEGER);",
 
-          // ── Tenant settings (branding, AI toggles, marketplace, Connect) ───
-          "CREATE TABLE IF NOT EXISTS tenant_settings (tenant_id TEXT PRIMARY KEY, branding_json TEXT, ai_toggles_json TEXT, marketplace_json TEXT, integrations_json TEXT, stripe_account_id TEXT, updated_at TEXT);",
+    // Offboarding requests. Archiving and deleting a client are owner-only
+    // (they end the studio's relationship with someone and, for delete,
+    // erase their data irreversibly), but the coach who actually works with
+    // that client is the one who knows they should go. This is the hand-off:
+    // a coach asks with a reason, the owner approves or declines, and the
+    // approval is what performs the action. `kind` is 'archive' | 'delete';
+    // `status` is 'pending' | 'approved' | 'declined'.
+    "CREATE TABLE IF NOT EXISTS offboard_requests (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, kind TEXT, reason TEXT, status TEXT DEFAULT 'pending', requested_by TEXT, decided_by TEXT, decided_at TEXT, decision_note TEXT, created_at TEXT);",
+    "CREATE INDEX IF NOT EXISTS idx_offboard_pending ON offboard_requests(tenant_id, status);",
+    // One live request per client — a second ask while one is pending is the
+    // same ask, not a queue to work through.
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_offboard_one_pending ON offboard_requests(client_id) WHERE status = 'pending';",
+    "CREATE INDEX IF NOT EXISTS idx_audit_client ON audit_log(client_id, at);",
 
-          // ── Tenant hostnames — the Host→tenant table (SPEC §14.1) ──────────
-          // Keyed by hostname because that is the lookup on every single request.
-          //
-          // TWO KINDS of row live here, and the distinction is load-bearing:
-          //
-          //  'subdomain'  `<slug>.kova.4dl.app`. Created with the studio, always
-          //               `active`, no Cloudflare call and no DCV — the wildcard
-          //               certificate, wildcard DNS record and wildcard worker
-          //               route already cover it. System-owned: it is not listed
-          //               in the owner's domains UI and cannot be deleted there,
-          //               because deleting it would make the studio unreachable.
-          //  'custom'     a domain the tenant owns. Provisioned through
-          //               Cloudflare for SaaS; carries cf ids, DCV records and
-          //               validation errors.
-          //
-          // `kind` defaults to 'custom' so pre-existing rows (all of which were
-          // custom domains) keep their meaning without a data migration.
-          "CREATE TABLE IF NOT EXISTS tenant_domains (hostname TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, kind TEXT DEFAULT 'custom', cf_hostname_id TEXT, cf_route_id TEXT, status TEXT DEFAULT 'pending', ssl_status TEXT, verify_name TEXT, verify_value TEXT, verify_json TEXT, cf_errors TEXT, cname_target TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);",
-          "CREATE INDEX IF NOT EXISTS idx_tenant_domains_tenant ON tenant_domains(tenant_id);",
 
-          // ── Coach-action audit log (SPEC §9; REGISTRY-PLAN Phase 3) ────────
-          // Durable, queryable record of STAFF actions on a client's record. The
-          // action id keys into @kova/domain AUDIT_ACTIONS; summary is a short
-          // human line; ref points at the affected row. Listed newest-first per
-          // client, so the index is (client_id, at DESC).
-          "CREATE TABLE IF NOT EXISTS audit_log (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, actor_user_id TEXT, action TEXT, summary TEXT, ref TEXT, at INTEGER);",
-
-          // Offboarding requests. Archiving and deleting a client are owner-only
-          // (they end the studio's relationship with someone and, for delete,
-          // erase their data irreversibly), but the coach who actually works with
-          // that client is the one who knows they should go. This is the hand-off:
-          // a coach asks with a reason, the owner approves or declines, and the
-          // approval is what performs the action. `kind` is 'archive' | 'delete';
-          // `status` is 'pending' | 'approved' | 'declined'.
-          "CREATE TABLE IF NOT EXISTS offboard_requests (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, kind TEXT, reason TEXT, status TEXT DEFAULT 'pending', requested_by TEXT, decided_by TEXT, decided_at TEXT, decision_note TEXT, created_at TEXT);",
-          "CREATE INDEX IF NOT EXISTS idx_offboard_pending ON offboard_requests(tenant_id, status);",
-          // One live request per client — a second ask while one is pending is the
-          // same ask, not a queue to work through.
-          "CREATE UNIQUE INDEX IF NOT EXISTS idx_offboard_one_pending ON offboard_requests(client_id) WHERE status = 'pending';",
-          "CREATE INDEX IF NOT EXISTS idx_audit_client ON audit_log(client_id, at);",
-
-          // ── R2 media ledger (storage accounting + the media library) ────────
-          // The SSOT for every object stored in the MEDIA bucket: who owns it,
-          // which tenant/client it belongs to, its byte size, and — on removal —
-          // when + by whom it was deleted (soft tombstone). Live usage for the
-          // per-tenant storage quota is SUM(size_bytes) WHERE deleted_at IS NULL.
-          // Every MEDIA.put funnels through storage.ts putMedia to write a row.
-          "CREATE TABLE IF NOT EXISTS media_assets (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, owner_user_id TEXT, r2_key TEXT UNIQUE, purpose TEXT, content_type TEXT, size_bytes INTEGER DEFAULT 0, created_at TEXT, deleted_at TEXT, deleted_by TEXT);",
-          "CREATE INDEX IF NOT EXISTS idx_media_tenant ON media_assets(tenant_id, deleted_at);",
-          "CREATE INDEX IF NOT EXISTS idx_media_client ON media_assets(client_id, deleted_at);",
-          "CREATE INDEX IF NOT EXISTS idx_media_owner ON media_assets(owner_user_id, deleted_at);",
-
-          // ── Action OTPs (step-up confirmation for destructive flows) ────────
-          // A one-time 6-digit code emailed to confirm an irreversible action
-          // (wipe my data, close studio, platform nuclear reset) for an already
-          // signed-in user — decoupled from the sign-in OTP so confirming never
-          // mints a session. One live code per (subject, purpose); the hash is
-          // stored, never the code. `attempts` caps brute force.
-          "CREATE TABLE IF NOT EXISTS action_otps (subject TEXT, purpose TEXT, code_hash TEXT, expires_at INTEGER, attempts INTEGER DEFAULT 0, created_at INTEGER, PRIMARY KEY (subject, purpose));",
-        ].join(" "),
-    );
-  // Best-effort column migrations for tables that predate a column.
-  const alters = [
-          // Cloudflare for SaaS: the worker route created alongside a custom
-          // hostname. Stored so removal deletes the exact route rather than
-          // searching by pattern — see cloudflare.ts for why the route is
-          // per-hostname instead of a zone-wide `*/*`.
-          "ALTER TABLE tenant_domains ADD COLUMN cf_route_id TEXT",
-          // EVERY DCV record Cloudflare asked for, not just the first. It can
-          // demand two `_acme-challenge` TXTs at one name (different values) when
-          // issuing more than one certificate, and all must exist before any
-          // validates. The singular columns stay for back-compat.
-          "ALTER TABLE tenant_domains ADD COLUMN verify_json TEXT",
-          // Cloudflare's own validation errors. We fetched them and threw them
-          // away, so a domain stuck on a CAA block showed the records to add and
-          // no hint that DNS was refusing to let the certificate issue — the
-          // owner's only route to the truth was a dashboard they cannot see.
-          "ALTER TABLE tenant_domains ADD COLUMN cf_errors TEXT",
-          // 'subdomain' | 'custom'. Defaults to 'custom' precisely so existing
-          // rows — which are all custom domains — need no backfill. The studio's
-          // own `<slug>.<root>` row is inserted with kind='subdomain' and is
-          // system-owned; see the CREATE TABLE comment.
-          "ALTER TABLE tenant_domains ADD COLUMN kind TEXT DEFAULT 'custom'",
-          "ALTER TABLE clients ADD COLUMN avatar_url TEXT",
-          "ALTER TABLE clients ADD COLUMN avatar_seed TEXT",
-          // Rich micronutrients on foods (ByShujaa parity).
-          "ALTER TABLE foods ADD COLUMN saturated_fat_g REAL DEFAULT 0",
-          "ALTER TABLE foods ADD COLUMN cholesterol_mg REAL DEFAULT 0",
-          "ALTER TABLE foods ADD COLUMN potassium_mg REAL DEFAULT 0",
-          "ALTER TABLE foods ADD COLUMN calcium_mg REAL DEFAULT 0",
-          "ALTER TABLE foods ADD COLUMN iron_mg REAL DEFAULT 0",
-          "ALTER TABLE foods ADD COLUMN description TEXT",
-          "ALTER TABLE food_entries ADD COLUMN image_url TEXT",
-          // Exercise alternatives are per-tenant (a studio's own swap map).
-          "ALTER TABLE exercise_alternatives ADD COLUMN tenant_id TEXT",
-          // Food ownership visibility (SPEC §8): tenant (shared) | private
-          // (creator only). Platform-seed rows stay tenant_id NULL = global.
-          "ALTER TABLE foods ADD COLUMN visibility TEXT DEFAULT 'tenant'",
-          // Tenant integration settings (provider enable + API keys).
-          "ALTER TABLE tenant_settings ADD COLUMN integrations_json TEXT",
-          // Per-user home-screen widget layout (client + coach surfaces).
-          "ALTER TABLE user_prefs ADD COLUMN widgets_json TEXT",
-          // Tenant AI config: per-feature model/prompt/enable + house tone.
-          "ALTER TABLE tenant_settings ADD COLUMN ai_config_json TEXT",
-          // Client profile: blood type + contact number.
-          "ALTER TABLE clients ADD COLUMN blood_type TEXT",
-          "ALTER TABLE clients ADD COLUMN phone TEXT",
-          // Content: a single category + a URL slug for headless/public fetch.
-          "ALTER TABLE resources ADD COLUMN category TEXT",
-          "ALTER TABLE resources ADD COLUMN slug TEXT",
-          // Scheduled publish (SPEC §8.10): a published resource with a future
-          // publish_at stays hidden from every client/public read until the time
-          // passes (honored on read — no cron needed). NULL = live immediately.
-          "ALTER TABLE resources ADD COLUMN publish_at TEXT",
-          // Client preferences (settings-managed profile: target weight, goal,
-          // activity, workouts/week, meals/day, workout location, dietary).
-          "ALTER TABLE clients ADD COLUMN preferences_json TEXT",
-          // Body composition recomputed on every weight/body-fat entry.
-          "ALTER TABLE measurements ADD COLUMN bmi REAL",
-          "ALTER TABLE measurements ADD COLUMN bmr REAL",
-          // Stripe Connect account status (synced from account.updated + a live
-          // refresh). `charges_enabled` is the truth gate for selling — a row's
-          // mere existence no longer means the account can accept payments.
-          "ALTER TABLE tenant_settings ADD COLUMN charges_enabled INTEGER DEFAULT 0",
-          // What the STUDIO does with a client whose access lapsed (@kova/domain
-          // lapse.ts). Absent ⇒ DEFAULT_LAPSE_POLICY, which loses nobody anything.
-          "ALTER TABLE tenant_settings ADD COLUMN lapse_json TEXT",
-          "ALTER TABLE tenant_settings ADD COLUMN payouts_enabled INTEGER DEFAULT 0",
-          "ALTER TABLE tenant_settings ADD COLUMN details_submitted INTEGER DEFAULT 0",
-          // Per-tenant email provider (platform-metered | brevo | off).
-          "ALTER TABLE tenant_settings ADD COLUMN email_config_json TEXT",
-          // Notification category → channel preferences (per user).
-          "ALTER TABLE user_prefs ADD COLUMN notif_json TEXT",
-          // Notification category (check-ins | plans-goals | billing | …).
-          "ALTER TABLE notifications ADD COLUMN category TEXT",
-          // Owner-set tenant policy: which categories members may be EMAILED.
-          "ALTER TABLE tenant_settings ADD COLUMN notif_policy_json TEXT",
-          // Body scan: sagittal posture screen (from the side view) + somatotype.
-          "ALTER TABLE body_scans ADD COLUMN posture_cva_deg REAL",
-          "ALTER TABLE body_scans ADD COLUMN posture_tilt_deg REAL",
-          "ALTER TABLE body_scans ADD COLUMN posture_severity TEXT",
-          "ALTER TABLE body_scans ADD COLUMN somatotype TEXT",
-          // Promo codes (billing centralization): per-client exclusivity + a
-          // rail discriminator ('tenant' = tenant→client, 'platform' = Kova→tenant).
-          "ALTER TABLE promo_codes ADD COLUMN restricted_client_id TEXT",
-          "ALTER TABLE promo_codes ADD COLUMN scope TEXT DEFAULT 'tenant'",
-          // Redemption codes: optional per-package + per-client scoping.
-          "ALTER TABLE redemption_codes ADD COLUMN restricted_package_id TEXT",
-          "ALTER TABLE redemption_codes ADD COLUMN restricted_client_id TEXT",
-          // Tenant email white-label: a global signature appended to every email.
-          "ALTER TABLE tenant_settings ADD COLUMN email_signature TEXT",
-          // Per-log goal snapshot: the calorie/protein target in force when the
-          // food was logged, frozen onto the row so adherence for a past day
-          // never re-grades when the goal later changes. NULL on historical rows
-          // (resolved from the goal timeline instead).
-          "ALTER TABLE food_entries ADD COLUMN target_calories REAL",
-          "ALTER TABLE food_entries ADD COLUMN target_protein_g REAL",
-          // Plan lanes (variants): a client can run parallel plan tracks — e.g.
-          // "Work week" vs "Off week", or "Night shift" vs "Morning shift". Each
-          // plan belongs to a lane (NULL = the single default lane, = today's
-          // behavior); publishing supersedes only within its own lane, so there
-          // is one published plan PER lane. `current_variant_id` is the lane the
-          // client is on right now (NULL = default). Lanes are client-level, so
-          // one switch flips both the workout and meal surfaces.
-          "CREATE TABLE IF NOT EXISTS plan_variants (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, label TEXT, ord INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT)",
-          "CREATE INDEX IF NOT EXISTS idx_plan_variants_client ON plan_variants(client_id)",
-          "ALTER TABLE clients ADD COLUMN current_variant_id TEXT",
-          // Custom display name for the default (NULL) lane — e.g. rename "Main"
-          // to "Regular week". The lane is still the NULL variant; only its label
-          // is stored. NULL → shown as "Main".
-          "ALTER TABLE clients ADD COLUMN default_lane_label TEXT",
-          "ALTER TABLE workout_plans ADD COLUMN variant_id TEXT",
-          "ALTER TABLE meal_plans ADD COLUMN variant_id TEXT",
-          // Activity logging: distance (metres, stored metric like everything
-          // else) + a free-text note, so a wearable-sourced session (Whoop /
-          // Apple Health / Fitbit) can carry its distance and any context.
-          "ALTER TABLE activity_logs ADD COLUMN distance_m REAL",
-          "ALTER TABLE activity_logs ADD COLUMN notes TEXT",
-          // Rep count for bodyweight moves logged as activities (push-ups →
-          // reps rather than distance/duration).
-          "ALTER TABLE activity_logs ADD COLUMN reps INTEGER",
-        ];
-        // A "duplicate column" error means the column already exists (expected —
-        // swallow); ANY OTHER error is a real migration failure (D1 timeout /
-        // transient) that must NOT be silently skipped — it would otherwise 500
-        // every write referencing the missing column for the isolate's lifetime.
-        const failures: string[] = [];
-        for (const sql of alters) {
-          try {
-            await db.exec(sql);
-          } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e);
-            if (/duplicate column/i.test(msg)) continue;
-            failures.push(`${sql.slice(0, 64)} → ${msg}`);
-          }
-        }
-        if (failures.length) {
-          console.error("[ensureSchema] migration failures:", failures);
-          throw new Error(`schema migration failed (${failures.length})`);
-        }
-        // Backfill: older body scans mirrored only weight + body-fat into
-        // measurements, so the Body progress "latest" showed empty waist/neck/
-        // hips/chest. Carry the circumferences across for any day that has a
-        // scan but a measurement row still missing them. The WHERE guard makes
-        // this a no-op once every scan-day is filled.
-        await db
-          .prepare(
-            `UPDATE measurements SET
+    // Plan lanes (variants) — moved here from `alters`, where it had been
+    // creating a TABLE through the ADD-COLUMN path: harmless (`IF NOT EXISTS`)
+    // but it meant `ddl` did not actually describe every table this module owns.
+    // Plan lanes: a client can run parallel plan tracks — e.g.
+    // "Work week" vs "Off week", or "Night shift" vs "Morning shift". Each
+    // plan belongs to a lane (NULL = the single default lane, = today's
+    // behavior); publishing supersedes only within its own lane, so there
+    // is one published plan PER lane. `current_variant_id` is the lane the
+    // client is on right now (NULL = default). Lanes are client-level, so
+    // one switch flips both the workout and meal surfaces.
+    "CREATE TABLE IF NOT EXISTS plan_variants (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, label TEXT, ord INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, created_at TEXT);",
+    "CREATE INDEX IF NOT EXISTS idx_plan_variants_client ON plan_variants(client_id);",
+  ],
+  alters: [
+    "ALTER TABLE clients ADD COLUMN avatar_url TEXT",
+    "ALTER TABLE clients ADD COLUMN avatar_seed TEXT",
+    // Rich micronutrients on foods (ByShujaa parity).
+    "ALTER TABLE foods ADD COLUMN saturated_fat_g REAL DEFAULT 0",
+    "ALTER TABLE foods ADD COLUMN cholesterol_mg REAL DEFAULT 0",
+    "ALTER TABLE foods ADD COLUMN potassium_mg REAL DEFAULT 0",
+    "ALTER TABLE foods ADD COLUMN calcium_mg REAL DEFAULT 0",
+    "ALTER TABLE foods ADD COLUMN iron_mg REAL DEFAULT 0",
+    "ALTER TABLE foods ADD COLUMN description TEXT",
+    "ALTER TABLE food_entries ADD COLUMN image_url TEXT",
+    // Exercise alternatives are per-tenant (a studio's own swap map).
+    "ALTER TABLE exercise_alternatives ADD COLUMN tenant_id TEXT",
+    // Food ownership visibility (SPEC §8): tenant (shared) | private
+    // (creator only). Platform-seed rows stay tenant_id NULL = global.
+    "ALTER TABLE foods ADD COLUMN visibility TEXT DEFAULT 'tenant'",
+    // Tenant integration settings (provider enable + API keys).
+    "ALTER TABLE tenant_settings ADD COLUMN integrations_json TEXT",
+    // Tenant AI config: per-feature model/prompt/enable + house tone.
+    "ALTER TABLE tenant_settings ADD COLUMN ai_config_json TEXT",
+    // Client profile: blood type + contact number.
+    "ALTER TABLE clients ADD COLUMN blood_type TEXT",
+    "ALTER TABLE clients ADD COLUMN phone TEXT",
+    // Content: a single category + a URL slug for headless/public fetch.
+    "ALTER TABLE resources ADD COLUMN category TEXT",
+    "ALTER TABLE resources ADD COLUMN slug TEXT",
+    // Scheduled publish (SPEC §8.10): a published resource with a future
+    // publish_at stays hidden from every client/public read until the time
+    // passes (honored on read — no cron needed). NULL = live immediately.
+    "ALTER TABLE resources ADD COLUMN publish_at TEXT",
+    // Client preferences (settings-managed profile: target weight, goal,
+    // activity, workouts/week, meals/day, workout location, dietary).
+    "ALTER TABLE clients ADD COLUMN preferences_json TEXT",
+    // Body composition recomputed on every weight/body-fat entry.
+    "ALTER TABLE measurements ADD COLUMN bmi REAL",
+    "ALTER TABLE measurements ADD COLUMN bmr REAL",
+    // Stripe Connect account status (synced from account.updated + a live
+    // refresh). `charges_enabled` is the truth gate for selling — a row's
+    // mere existence no longer means the account can accept payments.
+    "ALTER TABLE tenant_settings ADD COLUMN charges_enabled INTEGER DEFAULT 0",
+    // What the STUDIO does with a client whose access lapsed (@kova/domain
+    // lapse.ts). Absent ⇒ DEFAULT_LAPSE_POLICY, which loses nobody anything.
+    "ALTER TABLE tenant_settings ADD COLUMN lapse_json TEXT",
+    "ALTER TABLE tenant_settings ADD COLUMN payouts_enabled INTEGER DEFAULT 0",
+    "ALTER TABLE tenant_settings ADD COLUMN details_submitted INTEGER DEFAULT 0",
+    // Body scan: sagittal posture screen (from the side view) + somatotype.
+    "ALTER TABLE body_scans ADD COLUMN posture_cva_deg REAL",
+    "ALTER TABLE body_scans ADD COLUMN posture_tilt_deg REAL",
+    "ALTER TABLE body_scans ADD COLUMN posture_severity TEXT",
+    "ALTER TABLE body_scans ADD COLUMN somatotype TEXT",
+    // Tenant email white-label: a global signature appended to every email.
+    "ALTER TABLE tenant_settings ADD COLUMN email_signature TEXT",
+    // Per-log goal snapshot: the calorie/protein target in force when the
+    // food was logged, frozen onto the row so adherence for a past day
+    // never re-grades when the goal later changes. NULL on historical rows
+    // (resolved from the goal timeline instead).
+    "ALTER TABLE food_entries ADD COLUMN target_calories REAL",
+    "ALTER TABLE food_entries ADD COLUMN target_protein_g REAL",
+    "ALTER TABLE clients ADD COLUMN current_variant_id TEXT",
+    // Custom display name for the default (NULL) lane — e.g. rename "Main"
+    // to "Regular week". The lane is still the NULL variant; only its label
+    // is stored. NULL → shown as "Main".
+    "ALTER TABLE clients ADD COLUMN default_lane_label TEXT",
+    "ALTER TABLE workout_plans ADD COLUMN variant_id TEXT",
+    "ALTER TABLE meal_plans ADD COLUMN variant_id TEXT",
+    // Activity logging: distance (metres, stored metric like everything
+    // else) + a free-text note, so a wearable-sourced session (Whoop /
+    // Apple Health / Fitbit) can carry its distance and any context.
+    "ALTER TABLE activity_logs ADD COLUMN distance_m REAL",
+    "ALTER TABLE activity_logs ADD COLUMN notes TEXT",
+    // Rep count for bodyweight moves logged as activities (push-ups →
+    // reps rather than distance/duration).
+    "ALTER TABLE activity_logs ADD COLUMN reps INTEGER",
+  ],
+  backfills: [
+    {
+      // Older body scans mirrored only weight + body-fat into measurements, so
+      // the Body progress "latest" showed empty waist/neck/hips/chest. Carry the
+      // circumferences across for any day that has a scan but a measurement row
+      // still missing them. The WHERE guard makes this a no-op once every
+      // scan-day is filled.
+      name: "measurements-from-body-scans",
+      sql: `UPDATE measurements SET
                neck_cm  = COALESCE(neck_cm,  (SELECT bs.neck_cm  FROM body_scans bs WHERE bs.client_id=measurements.client_id AND bs.date_local=measurements.date_local)),
                waist_cm = COALESCE(waist_cm, (SELECT bs.waist_cm FROM body_scans bs WHERE bs.client_id=measurements.client_id AND bs.date_local=measurements.date_local)),
                hips_cm  = COALESCE(hips_cm,  (SELECT bs.hips_cm  FROM body_scans bs WHERE bs.client_id=measurements.client_id AND bs.date_local=measurements.date_local)),
@@ -437,44 +295,86 @@ async function applySchema(db: D1Database): Promise<void> {
              WHERE (measurements.neck_cm IS NULL OR measurements.waist_cm IS NULL OR measurements.hips_cm IS NULL OR measurements.chest_cm IS NULL)
                AND EXISTS (SELECT 1 FROM body_scans bs WHERE bs.client_id=measurements.client_id AND bs.date_local=measurements.date_local
                             AND (bs.neck_cm IS NOT NULL OR bs.waist_cm IS NOT NULL OR bs.hips_cm IS NOT NULL OR bs.chest_cm IS NOT NULL))`,
-          )
-          .run()
-          .catch(() => undefined);
-        // Correction: a Workers AI model whose id says "vision"
-        // (`@cf/meta/llama-3.2-11b-vision-instruct`) used to be catalogued as
-        // `task = 'vision'`. Nothing here can run it that way — the Workers AI
-        // branch of `generate()` has no image path and the guard above it
-        // refuses the call — so the row was a pickable Snap-a-Meal model that
-        // failed every time with "model cannot read images", and the sync's
-        // cheapest-per-lane default election could crown it and break the lane
-        // outright. Vision is Gemini-only here (see `modelSupportsTask`). These
-        // are good TEXT models, so move them to a lane where they work rather
-        // than disabling them; `is_default` is cleared so the correction can
-        // never leave a stale vision default pointing at them.
-        await db
-          .prepare(
-            `UPDATE ai_models SET task = 'text', is_default = 0
+    },
+    {
+      // A Workers AI model whose id says "vision"
+      // (`@cf/meta/llama-3.2-11b-vision-instruct`) used to be catalogued as
+      // `task = 'vision'`. Nothing here can run it that way — the Workers AI
+      // branch of `generate()` has no image path and the guard above it refuses
+      // the call — so the row was a pickable Snap-a-Meal model that failed every
+      // time with "model cannot read images", and the sync's cheapest-per-lane
+      // default election could crown it and break the lane outright. Vision is
+      // Gemini-only here (see `modelSupportsTask`). These are good TEXT models,
+      // so move them to a lane where they work rather than disabling them;
+      // `is_default` is cleared so the correction can never leave a stale vision
+      // default pointing at them.
+      name: "workers-ai-vision-to-text",
+      sql: `UPDATE ai_models SET task = 'text', is_default = 0
              WHERE provider = 'workers-ai' AND task IN ('vision', 'image')`,
-          )
-          .run()
-          .catch(() => undefined);
+    },
+  ],
+  /**
+   * What a purge must clear from Kova's own tables (`@4dl/purge` derives the
+   * cascade from this; `purge.ts` no longer keeps a list).
+   *
+   * Both lists are asserted COMPLETE by `purge-cascade.test.ts` against the DDL
+   * above — every table here declaring a `tenant_id` or a `client_id` must
+   * appear below or be exempted by name. That check found three live gaps the
+   * hand-maintained inventories had: `offboard_requests` was in none of them,
+   * and `ai_generations` + `media_assets` were deleted `WHERE client_id` long
+   * after both had been renamed to `subject_id`.
+   *
+   * Tables that reference a client by a DIFFERENT column are deliberately not
+   * here, and the reason is not an oversight: `packages.restricted_subject_id`,
+   * `redemption_codes.restricted_subject_id`/`used_by_json`,
+   * `promo_codes.restricted_subject_id`, `resources.assigned_json` and
+   * `notifications.link` (`/clients/<id>` deep-links) are the STUDIO's assets.
+   * Deleting the row would destroy the studio's property; the dangling
+   * reference reads as "no longer applies" (an offer restricted to a deleted
+   * client is simply unreachable) rather than leaking anything.
+   */
+  scoped: {
+    tenantColumn: "tenant_id",
+    tenantTables: [
+      "clients", "client_trainers", "client_goals", "exercises", "exercise_alternatives",
+      "workout_plans", "workout_templates", "swap_requests", "foods", "meal_plans",
+      "meal_templates", "meal_arrangements", "exercise_logs", "exercise_prs", "activity_logs",
+      "food_entries", "water_logs", "sleep_logs", "mood_logs", "steps_logs", "measurements",
+      "body_scans", "tts_cues", "check_ins", "fasting_sessions", "supplements",
+      "supplement_logs", "lab_tests", "trainer_sessions", "resources", "audit_log",
+      "offboard_requests", "plan_variants",
+    ],
+    subjectColumn: "client_id",
+    subjectTables: [
+      "client_trainers", "client_goals", "workout_plans", "swap_requests", "meal_plans",
+      "meal_arrangements", "exercise_logs", "exercise_prs", "activity_logs", "food_entries",
+      "water_logs", "sleep_logs", "mood_logs", "steps_logs", "measurements", "body_scans",
+      "check_ins", "fasting_sessions", "supplements", "supplement_logs", "lab_tests",
+      "trainer_sessions", "audit_log", "offboard_requests", "plan_variants",
+    ],
+  },
+};
 
-  // Stamp the version LAST — only a fully-applied schema records the marker, so
-  // a failed run retries on the next request instead of being marked done.
-  await db
-    .prepare("INSERT INTO app_config (key, value) VALUES ('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
-    .bind(SCHEMA_VERSION)
-    .run()
-    .catch(() => undefined);
-}
+/**
+ * Apply the schema once per isolate, retrying on failure.
+ *
+ * Kept as a `(db)` call rather than `(env)` because ~40 call sites pass a bare
+ * D1 handle; the gate underneath takes the bindings slice.
+ */
+// Dependency order, and the app last. `tenant_settings` is created by TENANCY
+// and then composed onto: email adds `email_config_json`, notify adds
+// `notif_policy_json`. That is why both must follow tenancy here, and why an
+// ADD COLUMN in a package is safe — one table, many owners, no settings table
+// per package. The ALTERs that add billing's and AI's columns to it are still in
+// Kova's module above and move out with those packages.
+export const SCHEMA_MODULES: readonly SchemaModule[] = [
+  AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, BILLING_RAIL_SCHEMA, COMMERCE_SCHEMA,
+  STORAGE_SCHEMA, AI_SCHEMA, EMAIL_SCHEMA, NOTIFY_SCHEMA, KOVA_SCHEMA,
+];
 
-/** Small helpers shared by stores. */
-export const j = (v: unknown): string => JSON.stringify(v);
-export function parseJson<T>(raw: string | null | undefined, fallback: T): T {
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
+const gate = schemaGate(SCHEMA_MODULES);
+export const ensureSchema = (db: D1Database): Promise<void> => gate({ DB: db });
+
+/** Small helpers shared by stores — re-exported so every existing call site
+ *  keeps importing them from here rather than churning ~60 files. */
+export { j, parseJson } from "@4dl/core";

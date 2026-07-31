@@ -13,13 +13,23 @@
     "clean": "rm -rf .turbo .wrangler dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@4dl/platform": "workspace:*",
+    "@4dl/ai": "workspace:*",
+    "@4dl/auth": "workspace:*",
+    "@4dl/billing": "workspace:*",
+    "@4dl/commerce": "workspace:*",
+    "@4dl/core": "workspace:*",
+    "@4dl/email": "workspace:*",
+    "@4dl/notify": "workspace:*",
+    "@4dl/purge": "workspace:*",
+    "@4dl/storage": "workspace:*",
+    "@4dl/tenancy": "workspace:*",
     "@better-auth/passkey": "1.6.23",
     "@kova/domain": "workspace:*",
     "@kova/protocol": "workspace:*",
     "better-auth": "^1.6.23",
     "hono": "^4.9.10",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@4dl/billing-rail": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.8.55",

@@ -110,7 +110,7 @@ export const BORDER_WIDTHS: { value: number; label: string }[] = [
 export const SHADOW_PRESETS: { id: ShadowPreset; label: string; hint: string }[] = [
   { id: "none", label: "Flat", hint: "No shadows at all — hairlines carry the layering." },
   { id: "subtle", label: "Subtle", hint: "Barely-there lift. Clean and clinical." },
-  { id: "soft", label: "Soft", hint: "The Kova default — grounded but quiet." },
+  { id: "soft", label: "Soft", hint: "The default — grounded but quiet." },
   { id: "dramatic", label: "Dramatic", hint: "Deep, high-contrast elevation." },
 ];
 
@@ -135,17 +135,27 @@ const SHADOW_SCALE: Record<ShadowPreset, [string, string, string]> = {
   ],
 };
 
-/** Every themeable token, grouped for the advanced editor (bare names). */
+/**
+ * Every token the design system itself owns, grouped for the advanced editor.
+ *
+ * An app appends its OWN accent groups (Kova: `KOVA_TOKEN_GROUPS` in
+ * `registry/tones.ts`). The groups that used to be here — "Macros" and "Domain
+ * accents" — were the only part of the editor that knew what protein is.
+ */
 export const THEME_TOKEN_GROUPS: { label: string; tokens: string[] }[] = [
   { label: "Surfaces", tokens: ["background", "foreground", "card", "card-foreground", "surface-2", "surface-3", "popover", "popover-foreground", "scrim"] },
   { label: "Brand & UI", tokens: ["primary", "primary-foreground", "secondary", "secondary-foreground", "muted", "muted-foreground", "accent", "accent-foreground", "border", "input", "ring"] },
   { label: "Status", tokens: ["destructive", "destructive-foreground", "success", "success-soft", "warning", "warning-soft", "danger", "danger-soft"] },
-  { label: "Macros", tokens: ["calories", "calories-soft", "protein", "protein-soft", "carbs", "carbs-soft", "fat", "fat-soft"] },
-  { label: "Domain accents", tokens: ["activity", "activity-soft", "nutrition", "nutrition-soft", "sleep", "sleep-soft", "cardio", "cardio-soft", "hydration", "hydration-soft", "supplement", "supplement-soft", "lab", "lab-soft"] },
 ];
 
-/** The shipped token values (mirrors tokens.css) — used for editor placeholders
- *  + swatch defaults so a blank field visibly falls back to the default. */
+/**
+ * The shipped token values (mirrors tokens.css) — editor placeholders and swatch
+ * defaults, so a blank field visibly falls back to the default.
+ *
+ * The design system's own tokens only. An app merges its accent defaults in
+ * (Kova: `DEFAULT_ACCENT_TOKENS` in `registry/tones.ts`), for the same reason
+ * the accents themselves are not in `tokens.css`.
+ */
 export const DEFAULT_TOKENS: BrandTokens = {
   dark: {
     "--background": "oklch(0.165 0.006 285)", "--foreground": "oklch(0.975 0.003 285)",
@@ -161,17 +171,6 @@ export const DEFAULT_TOKENS: BrandTokens = {
     "--success": "oklch(0.76 0.14 158)", "--success-soft": "oklch(0.34 0.06 158)",
     "--warning": "oklch(0.82 0.13 88)", "--warning-soft": "oklch(0.36 0.06 88)",
     "--danger": "oklch(0.66 0.19 24)", "--danger-soft": "oklch(0.34 0.08 24)",
-    "--calories": "oklch(0.78 0.16 45)", "--calories-soft": "oklch(0.35 0.07 45)",
-    "--protein": "oklch(0.72 0.16 350)", "--protein-soft": "oklch(0.34 0.07 350)",
-    "--carbs": "oklch(0.82 0.15 90)", "--carbs-soft": "oklch(0.36 0.06 90)",
-    "--fat": "oklch(0.7 0.14 275)", "--fat-soft": "oklch(0.34 0.06 275)",
-    "--activity": "oklch(0.78 0.13 164)", "--activity-soft": "oklch(0.34 0.06 164)",
-    "--nutrition": "oklch(0.8 0.13 68)", "--nutrition-soft": "oklch(0.36 0.06 68)",
-    "--sleep": "oklch(0.74 0.12 300)", "--sleep-soft": "oklch(0.34 0.06 300)",
-    "--cardio": "oklch(0.74 0.13 250)", "--cardio-soft": "oklch(0.34 0.06 250)",
-    "--hydration": "oklch(0.78 0.1 214)", "--hydration-soft": "oklch(0.34 0.05 214)",
-    "--supplement": "oklch(0.77 0.11 190)", "--supplement-soft": "oklch(0.34 0.05 190)",
-    "--lab": "oklch(0.74 0.14 322)", "--lab-soft": "oklch(0.34 0.06 322)",
   },
   light: {
     "--background": "oklch(0.985 0.002 285)", "--foreground": "oklch(0.2 0.01 285)",
@@ -187,17 +186,6 @@ export const DEFAULT_TOKENS: BrandTokens = {
     "--success": "oklch(0.58 0.15 158)", "--success-soft": "oklch(0.93 0.06 158)",
     "--warning": "oklch(0.7 0.14 78)", "--warning-soft": "oklch(0.95 0.08 88)",
     "--danger": "oklch(0.58 0.2 24)", "--danger-soft": "oklch(0.95 0.06 24)",
-    "--calories": "oklch(0.6 0.15 45)", "--calories-soft": "oklch(0.94 0.06 45)",
-    "--protein": "oklch(0.58 0.16 350)", "--protein-soft": "oklch(0.94 0.05 350)",
-    "--carbs": "oklch(0.66 0.14 90)", "--carbs-soft": "oklch(0.95 0.07 90)",
-    "--fat": "oklch(0.55 0.16 275)", "--fat-soft": "oklch(0.94 0.05 275)",
-    "--activity": "oklch(0.58 0.13 164)", "--activity-soft": "oklch(0.93 0.05 164)",
-    "--nutrition": "oklch(0.62 0.14 62)", "--nutrition-soft": "oklch(0.94 0.06 68)",
-    "--sleep": "oklch(0.55 0.15 300)", "--sleep-soft": "oklch(0.94 0.05 300)",
-    "--cardio": "oklch(0.55 0.16 250)", "--cardio-soft": "oklch(0.94 0.05 250)",
-    "--hydration": "oklch(0.58 0.12 214)", "--hydration-soft": "oklch(0.94 0.05 214)",
-    "--supplement": "oklch(0.56 0.1 190)", "--supplement-soft": "oklch(0.93 0.05 190)",
-    "--lab": "oklch(0.56 0.15 322)", "--lab-soft": "oklch(0.94 0.05 322)",
   },
 };
 
@@ -297,18 +285,43 @@ export function brandingCss(branding: Branding | null | undefined): string {
   return `:root{${rootExtra}${cssBlock(dark)}}` + `:root[data-theme="light"]{${cssBlock(light)}}`;
 }
 
+/**
+ * The two names this module writes into the DOCUMENT and into LOCAL STORAGE.
+ *
+ * Both used to be `kova-*`. They are the app's, not the design system's, and
+ * they are not cosmetic: the storage key is the one thing a user's chosen
+ * light/dark mode survives sign-out in, so changing it after launch silently
+ * resets everyone's preference. Pick once, at startup, and never again.
+ *
+ * The defaults are deliberately unbranded rather than a guess at a product
+ * name — two 4DL apps on the same origin would otherwise fight over one key.
+ */
+export interface ThemeNames {
+  /** `localStorage` key holding the user's light/dark choice. */
+  storageKey: string;
+  /** `id` of the injected `<style>` element carrying tenant branding. */
+  styleId: string;
+}
+
+let names: ThemeNames = { storageKey: "ui-theme", styleId: "ui-branding" };
+
+/** Bind the app's theme names once, before anything renders. */
+export function configureTheme(next: Partial<ThemeNames>): void {
+  names = { ...names, ...next };
+}
+
 /** Apply a tenant's branding by injecting/refreshing the branding stylesheet. */
 export function applyBranding(branding: Branding | null | undefined): void {
   if (typeof document === "undefined") return;
-  let el = document.getElementById("kova-branding") as HTMLStyleElement | null;
-  if (!el) { el = document.createElement("style"); el.id = "kova-branding"; document.head.appendChild(el); }
+  let el = document.getElementById(names.styleId) as HTMLStyleElement | null;
+  if (!el) { el = document.createElement("style"); el.id = names.styleId; document.head.appendChild(el); }
   el.textContent = brandingCss(branding);
 }
 
 /** Read the user's mode preference (falls back to tenant default, else dark). */
 export function resolveMode(tenantDefault?: ThemeMode | null): ThemeMode {
   if (typeof localStorage !== "undefined") {
-    const saved = localStorage.getItem("kova-theme");
+    const saved = localStorage.getItem(names.storageKey);
     if (saved === "light" || saved === "dark") return saved;
   }
   return tenantDefault ?? "dark";
@@ -319,7 +332,7 @@ export function applyMode(mode: ThemeMode): void {
   if (mode === "light") document.documentElement.dataset.theme = "light";
   else delete document.documentElement.dataset.theme;
   try {
-    localStorage.setItem("kova-theme", mode);
+    localStorage.setItem(names.storageKey, mode);
   } catch {
     /* ignore */
   }
@@ -380,7 +393,7 @@ export function oklchStringToHex(str: string): string {
 }
 
 /** WCAG relative luminance for an sRGB triple (0–255). */
-function relLuminance(r: number, g: number, b: number): number {
+export function relLuminance(r: number, g: number, b: number): number {
   return 0.2126 * srgbToLinear(r) + 0.7152 * srgbToLinear(g) + 0.0722 * srgbToLinear(b);
 }
 const contrastRatio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
@@ -454,24 +467,41 @@ function rgbToOklchHex(hex: string) {
 
 const ok = (l: number, c: number, h: number) => `oklch(${r2(clamp(l, 0, 1))} ${r2(Math.max(0, c))} ${r2(((h % 360) + 360) % 360)})`;
 
-// Canonical macro hues (see tokens.css) — nudged toward the brand so they feel
-// part of one palette while staying distinct from each other.
-const MACRO_SPEC: { name: string; hue: number; c: number; dL: number; lL: number }[] = [
-  // lL (light-mode lightness) is kept dark enough that macro-colored text/icons
-  // clear WCAG AA on their pale `-soft` tint; dL (dark mode) stays bright.
-  { name: "calories", hue: 45, c: 0.16, dL: 0.78, lL: 0.53 },
-  { name: "protein", hue: 350, c: 0.16, dL: 0.72, lL: 0.535 },
-  { name: "carbs", hue: 90, c: 0.15, dL: 0.82, lL: 0.53 },
-  { name: "fat", hue: 275, c: 0.14, dL: 0.7, lL: 0.53 },
-];
 const hueDelta = (a: number, b: number) => (((b - a + 540) % 360) - 180);
 
-/** Derive the macro tokens (+ soft) for both modes, tinted toward the brand. */
-function deriveMacros(brandHue: number, brandC: number): { light: Record<string, string>; dark: Record<string, string> } {
+/**
+ * One accent tone, described well enough to re-tint it toward any brand.
+ *
+ * `lL` (light-mode lightness) has to stay dark enough that text and icons in
+ * this colour clear WCAG AA on their own pale `-soft` tint; `dL` (dark mode)
+ * stays bright. That is the constraint the numbers encode, and it is why the
+ * two lightnesses are separate rather than derived.
+ */
+export interface AccentSpec {
+  name: string;
+  hue: number;
+  c: number;
+  dL: number;
+  lL: number;
+}
+
+/**
+ * Derive accent tokens (+ `-soft`) for both modes, nudged toward the brand so
+ * they read as one palette while staying distinct from each other.
+ *
+ * The SPEC is the app's — `calories`/`protein`/`carbs`/`fat` used to be
+ * hard-coded here, which made this function the design system's opinion about
+ * macronutrients.
+ */
+export function deriveAccents(
+  spec: readonly AccentSpec[],
+  brandHue: number,
+  brandC: number,
+): { light: Record<string, string>; dark: Record<string, string> } {
   const vivid = clamp(brandC / 0.15, 0.7, 1.15);
   const light: Record<string, string> = {};
   const dark: Record<string, string> = {};
-  for (const m of MACRO_SPEC) {
+  for (const m of spec) {
     const h = m.hue + hueDelta(m.hue, brandHue) * 0.12; // 12% pull toward brand
     const c = m.c * vivid;
     dark[`--${m.name}`] = ok(m.dL, c, h);
@@ -494,12 +524,12 @@ function neutralTint(kind: NeutralTint, brandHue: number): { hue: number; c: num
 }
 
 /**
- * Generate a full, coherent Kova token set (light + dark) from one brand color.
- * The neutrals track Kova's shipped lightness ramp, tinted toward the brand (or
- * a chosen neutral). The produced tokens are authoritative and stay editable —
+ * Generate a full, coherent token set (light + dark) from one brand colour.
+ * The neutrals track the shipped lightness ramp, tinted toward the brand (or a
+ * chosen neutral). The produced tokens are authoritative and stay editable —
  * this is a convenience generator, not a lock-in.
  */
-export function deriveTokens(input: { primary: string; neutral?: NeutralTint }): BrandTokens {
+export function deriveTokens(input: { primary: string; neutral?: NeutralTint; accents?: readonly AccentSpec[] }): BrandTokens {
   const p = parseColor(input.primary) ?? { l: 0.74, c: 0.15, h: 164 };
   const { hue: nH, c: nc } = neutralTint(input.neutral ?? "brand", p.h);
   const pC = Math.min(p.c, 0.22);
@@ -530,9 +560,11 @@ export function deriveTokens(input: { primary: string; neutral?: NeutralTint }):
     "--accent": ok(0.275, 0.008 * nc, nH), "--accent-foreground": ok(0.975, 0.003 * nc, nH),
     "--border": ok(0.3, 0.008 * nc, nH), "--input": ok(0.3, 0.008 * nc, nH), "--ring": pDark,
   };
-  const macros = deriveMacros(p.h, pC);
-  Object.assign(light, macros.light);
-  Object.assign(dark, macros.dark);
+  // The app's accents, if it has any. An app with none gets a complete,
+  // coherent token set anyway — which is the point of them being a parameter.
+  const accents = deriveAccents(input.accents ?? [], p.h, pC);
+  Object.assign(light, accents.light);
+  Object.assign(dark, accents.dark);
   return { light, dark };
 }
 

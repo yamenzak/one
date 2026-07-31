@@ -7,6 +7,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
+import { dispatchEvent } from "@4dl/billing-rail";
 import { resolveEntitlements, trialPeriodDays, buildBudgetsForPurchase, mergeAddOnBalances, type Budget, type AddOnBalance } from "@kova/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { getSubscription, listPacks, listPlans, seedBilling, getConfig, getPlan } from "./billing-store.js";
@@ -29,11 +30,66 @@ import {
   verifyWebhook,
   setConfig,
   STRIPE_CREDENTIALS,
+  STRIPE_BRANDING,
+  KOVA_APP,
   type StripeCredential,
   type StripeLane,
 } from "./stripe.js";
 import { newId, nowIso, nowMs, periodKey } from "./ids.js";
 import { parseJson, j } from "./db.js";
+/**
+ * The generic half of this listener now lives in `@4dl/billing`: payload
+ * readers, event idempotency, subscription-status reconciliation (including the
+ * `LADDER_OWNED` clamp that keeps a payment webhook from stalling the dunning
+ * ladder) and the refund→credit reversal maths. Everything left in this file
+ * either reads Kova's registries or answers an HTTP route.
+ */
+import {
+  creditsAlreadyReversed,
+  firstSeen,
+  hasPaymentMethod,
+  invoiceSubscriptionId,
+  resolveReversal,
+  stripeId,
+  supersedePlatformSub,
+  syncStripeSubscription,
+  tenantByCustomer,
+  unmarkSeen,
+} from "@4dl/billing";
+/** The Connect rail's own half — see `@4dl/commerce/connect.ts`. */
+import { cancelInstallmentSub as cancelInstallmentSubBase, hasPriorPurchase, purchaseBlocked as purchaseBlockedBase, scaleSpecs, syncConnectAccount, type CancelOnConnectedAccount } from "@4dl/commerce";
+
+/**
+ * Kova's stored value for "restricted to one subject".
+ *
+ * `@4dl/commerce` takes it as a parameter because it is DATA — these strings are
+ * in the `packages.visibility` column of a live database, and renaming one is a
+ * migration rather than an edit. The package's own default matches nothing, so
+ * an app that forgets to pass it gets grant-only (fails closed) instead of
+ * accidentally opening a package to everyone.
+ */
+const RESTRICTED_VISIBILITY = "client_specific";
+const purchaseBlocked = (pkg: { visibility: string; restricted_subject_id: string | null }, clientId: string) =>
+  purchaseBlockedBase(pkg, clientId, RESTRICTED_VISIBILITY);
+
+/**
+ * The connected-account canceller `@4dl/commerce` takes rather than imports.
+ *
+ * It sits BESIDE `@4dl/billing`, never on it — an app can sell access to its own
+ * customers without billing its tenants for the privilege — so the Stripe client
+ * is passed in from here, where both rails already meet.
+ */
+const cancelInstallmentSub = (db: D1Database, tenantId: string, stripeSubId: string, rowId: string) =>
+  cancelInstallmentSubBase(db, tenantId, stripeSubId, rowId, (acct, sub) => cancelOnConnectedFor(db)(acct, sub));
+
+/** Bound to the DB the caller already has — no ambient env. */
+const cancelOnConnectedFor = (db: D1Database): CancelOnConnectedAccount => async (accountId, stripeSubId) => {
+  const cfg = await stripeConfig(db);
+  if (!stripeEnabled(cfg)) return true;
+  return stripeCall(cfg.secretKey, `subscriptions/${stripeSubId}`, undefined, { connectedAccount: accountId, method: "DELETE" })
+    .then(() => true)
+    .catch(() => false);
+};
 import { resolveAndApplyPromo, bumpPromoRedemption, consumePromoRedemption, releasePromoRedemption } from "./promo-apply.js";
 import { updateSubscriptionRunway } from "./subscription-runway.js";
 
@@ -253,26 +309,50 @@ export const stripeRoutes = new Hono<AppEnv>()
   })
 
   // Platform webhook (public lane; signature-verified).
+  /**
+   * The platform webhook, on `@4dl/billing-rail`.
+   *
+   * The rail's job here is the case this handler used to get silently wrong. The
+   * switch inside `handlePlatformEvent` is guarded on `meta.kova_*`, so an event
+   * belonging to ANOTHER app on the same Stripe account matched no branch, fell
+   * out, and was answered `200 {received: true}` — with its id already claimed,
+   * so Stripe never retried. Money captured, nothing granted, no signal.
+   *
+   * That is harmless while Kova is the only app on the account, which is exactly
+   * why it would have survived until it wasn't. Now an unattributable event
+   * parks in `rail_parked_events` with its payload, and the operator console
+   * counts it.
+   *
+   * `claims` is what stops this being a regression: several event types here
+   * carry no Kova metadata at all and are resolved by Stripe customer id
+   * (`invoice.paid` → `tenantByCustomer`). Metadata-only routing would have
+   * parked events that work today.
+   */
   .post("/stripe/webhook", async (c) => {
     const cfg = await stripeConfig(c.env.DB);
     const payload = await c.req.text();
     const sig = c.req.header("stripe-signature") ?? "";
-    if (!cfg.webhookSecret || !(await verifyWebhook(payload, sig, cfg.webhookSecret))) {
-      return c.json({ error: "bad signature" }, 400);
-    }
-    const event = JSON.parse(payload) as { id?: string; type: string; data: { object: Record<string, unknown> } };
-    if (!(await firstSeen(c.env.DB, event.id))) return c.json({ received: true, duplicate: true });
-    try {
-      await handlePlatformEvent(c.env, event, cfg.secretKey);
-    } catch (err) {
-      // We claimed the event id before processing; a failure here (DO/D1
-      // transient) must NOT leave it marked seen, or Stripe's retry would be
-      // dropped as a duplicate — money captured, nothing granted. Release the
-      // claim and 500 so Stripe redelivers and we process it cleanly.
-      await unmarkSeen(c.env.DB, event.id);
-      throw err;
-    }
-    return c.json({ received: true });
+    const outcome = await dispatchEvent(
+      { DB: c.env.DB },
+      {
+        apps: [{
+          slug: KOVA_APP,
+          metadataPrefix: STRIPE_BRANDING.metadataPrefix,
+          claims: async (e) => !!(await tenantByCustomer(c.env.DB, (e.data.object as { customer?: unknown }).customer)),
+          handle: (e) => handlePlatformEvent(c.env, e, cfg.secretKey),
+        }],
+        firstSeen: (id) => firstSeen(c.env.DB, id),
+        // A failure inside the handler (DO/D1 transient) must NOT leave the id
+        // marked seen, or Stripe's retry is dropped as a duplicate. The rail
+        // releases the claim and rethrows, so the worker 500s and Stripe
+        // redelivers.
+        release: (id) => unmarkSeen(c.env.DB, id),
+      },
+      payload,
+      sig,
+      cfg.webhookSecret,
+    );
+    return c.json(outcome.body, outcome.status as 200);
   })
 
   // ── Connect rail (tenant ↔ client, no application fee) ─────────────────────
@@ -321,7 +401,7 @@ export const stripeRoutes = new Hono<AppEnv>()
     if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
     // The account must actually be able to accept charges (onboarding done).
     if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
-    const pkg = await c.env.DB.prepare("SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_client_id: string | null; once_per_customer: number | null }>();
+    const pkg = await c.env.DB.prepare("SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_subject_id: string | null; once_per_customer: number | null }>();
     if (!pkg || purchaseBlocked(pkg, access.client.id)) return c.json({ error: "package not found" }, 404);
     // The Packages editor offers a `once_per_customer` toggle, so it must actually
     // bind on the PAID paths too — until now only the free staff grant checked it,
@@ -400,7 +480,7 @@ export const stripeRoutes = new Hono<AppEnv>()
     const settings = await c.env.DB.prepare("SELECT stripe_account_id, charges_enabled FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null }>();
     if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
     if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
-    const pkg = await c.env.DB.prepare("SELECT id, name, one_time_price_cents, monthly_price_cents, installment_months, currency, visibility, restricted_client_id, once_per_customer FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_client_id: string | null; once_per_customer: number | null }>();
+    const pkg = await c.env.DB.prepare("SELECT id, name, one_time_price_cents, monthly_price_cents, installment_months, currency, visibility, restricted_subject_id, once_per_customer FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_subject_id: string | null; once_per_customer: number | null }>();
     if (!pkg || purchaseBlocked(pkg, access.client.id)) return c.json({ error: "package not found" }, 404);
     // Same once-per-customer rule as the hosted path (and re-checked in
     // grantClientPackage, the last gate before days are written).
@@ -483,8 +563,8 @@ export const stripeRoutes = new Hono<AppEnv>()
     // packages, so "cancel the newest" would silently cancel the wrong one),
     // else the most recent auto-renewing one.
     const sub = body.data.subscriptionId
-      ? await c.env.DB.prepare("SELECT id, stripe_sub_id FROM client_subscriptions WHERE id = ? AND client_id = ? AND status = 'active' AND stripe_sub_id IS NOT NULL").bind(body.data.subscriptionId, access.client.id).first<{ id: string; stripe_sub_id: string | null }>()
-      : await c.env.DB.prepare("SELECT id, stripe_sub_id FROM client_subscriptions WHERE client_id = ? AND status = 'active' AND stripe_sub_id IS NOT NULL ORDER BY started_at DESC LIMIT 1").bind(access.client.id).first<{ id: string; stripe_sub_id: string | null }>();
+      ? await c.env.DB.prepare("SELECT id, stripe_sub_id FROM subject_subscriptions WHERE id = ? AND subject_id = ? AND status = 'active' AND stripe_sub_id IS NOT NULL").bind(body.data.subscriptionId, access.client.id).first<{ id: string; stripe_sub_id: string | null }>()
+      : await c.env.DB.prepare("SELECT id, stripe_sub_id FROM subject_subscriptions WHERE subject_id = ? AND status = 'active' AND stripe_sub_id IS NOT NULL ORDER BY started_at DESC LIMIT 1").bind(access.client.id).first<{ id: string; stripe_sub_id: string | null }>();
     if (!sub?.stripe_sub_id) return c.json({ error: "no auto-renewing subscription" }, 404);
     const settings = await c.env.DB.prepare("SELECT stripe_account_id FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null }>();
     const cfg = await stripeConfig(c.env.DB);
@@ -501,7 +581,7 @@ export const stripeRoutes = new Hono<AppEnv>()
       if (!canceled) return c.json({ error: "could not cancel subscription — please try again" }, 502);
     }
     // Clear the renewal marker; access continues until the current budget lapses.
-    await c.env.DB.prepare("UPDATE client_subscriptions SET stripe_sub_id = NULL, payment_status = 'canceled', updated_at = ? WHERE id = ?").bind(nowIso(), sub.id).run();
+    await c.env.DB.prepare("UPDATE subject_subscriptions SET stripe_sub_id = NULL, payment_status = 'canceled', updated_at = ? WHERE id = ?").bind(nowIso(), sub.id).run();
     return c.json({ ok: true });
   })
 
@@ -585,10 +665,10 @@ export const stripeRoutes = new Hono<AppEnv>()
       // card. Access still runs until the current budget lapses (grace by design).
       const failedSubId = invoiceSubscriptionId(event.data.object);
       if (failedSubId) {
-        const row = await c.env.DB.prepare("SELECT id, tenant_id, client_id FROM client_subscriptions WHERE stripe_sub_id = ? LIMIT 1").bind(failedSubId).first<{ id: string; tenant_id: string; client_id: string }>();
+        const row = await c.env.DB.prepare("SELECT id, tenant_id, subject_id FROM subject_subscriptions WHERE stripe_sub_id = ? LIMIT 1").bind(failedSubId).first<{ id: string; tenant_id: string; subject_id: string }>();
         if (row) {
-          await c.env.DB.prepare("UPDATE client_subscriptions SET payment_status = 'past_due', updated_at = ? WHERE id = ?").bind(nowIso(), row.id).run();
-          const cl = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.client_id).first<{ user_id: string | null }>();
+          await c.env.DB.prepare("UPDATE subject_subscriptions SET payment_status = 'past_due', updated_at = ? WHERE id = ?").bind(nowIso(), row.id).run();
+          const cl = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.subject_id).first<{ user_id: string | null }>();
           if (cl?.user_id) await notify(c.env, { tenantId: row.tenant_id, userId: cl.user_id, type: "sub_payment_failed", message: "Update your card to keep your plan from pausing.", dedupeKey: `pf_${row.id}` });
         }
       }
@@ -596,7 +676,7 @@ export const stripeRoutes = new Hono<AppEnv>()
       // Auto-renew ended (client canceled or Stripe gave up). No more top-ups;
       // the current budget simply runs out. Clear the renewal marker.
       const subObj = event.data.object as { id?: string };
-      if (subObj.id) await c.env.DB.prepare("UPDATE client_subscriptions SET stripe_sub_id = NULL, payment_status = 'canceled', updated_at = ? WHERE stripe_sub_id = ?").bind(nowIso(), subObj.id).run();
+      if (subObj.id) await c.env.DB.prepare("UPDATE subject_subscriptions SET stripe_sub_id = NULL, payment_status = 'canceled', updated_at = ? WHERE stripe_sub_id = ?").bind(nowIso(), subObj.id).run();
     } else if (event.type === "account.updated") {
       // Onboarding / capability changes for a connected account.
       const a = event.data.object as { id?: string; charges_enabled?: boolean; payouts_enabled?: boolean; details_submitted?: boolean };
@@ -626,39 +706,9 @@ export const stripeRoutes = new Hono<AppEnv>()
     return c.json({ received: true });
   });
 
-/** Can this client purchase this package directly (self-checkout)? Marketplace
- *  packages are public; a client_specific package only its own client; `private`
- *  packages are grant-only (staff assigns them, never client-purchasable). A
- *  blocked package reads as "not found" at checkout — no oracle. */
-function purchaseBlocked(pkg: { visibility: string; restricted_client_id: string | null }, clientId: string): boolean {
-  if (pkg.visibility === "marketplace") return false;
-  if (pkg.visibility === "client_specific") return !(pkg.restricted_client_id && pkg.restricted_client_id === clientId);
-  return true;
-}
 
-/** Webhook idempotency: the first insert of a Stripe event id processes; a
- *  redelivery finds the row already present (changes = 0) and short-circuits. */
-async function firstSeen(db: D1Database, eventId: string | undefined): Promise<boolean> {
-  if (!eventId) return true; // no id (shouldn't happen) → process, don't drop
-  const r = await db.prepare("INSERT OR IGNORE INTO stripe_events (id, at) VALUES (?, ?)").bind(eventId, nowMs()).run();
-  return (r.meta?.changes ?? 0) > 0;
-}
 
-/** Release a claimed event id (see the webhook try/catch): a handler that threw
- *  after `firstSeen` claimed the id must delete the row so Stripe's redelivery
- *  is processed instead of short-circuited as a duplicate. Best-effort. */
-async function unmarkSeen(db: D1Database, eventId: string | undefined): Promise<void> {
-  if (!eventId) return;
-  await db.prepare("DELETE FROM stripe_events WHERE id = ?").bind(eventId).run().catch(() => undefined);
-}
 
-/** Mirror a connected account's capability flags onto tenant_settings. */
-async function syncConnectAccount(db: D1Database, a: { id?: string; charges_enabled?: boolean; payouts_enabled?: boolean; details_submitted?: boolean }): Promise<void> {
-  if (!a.id) return;
-  await db.prepare("UPDATE tenant_settings SET charges_enabled = ?, payouts_enabled = ?, details_submitted = ?, updated_at = ? WHERE stripe_account_id = ?")
-    .bind(a.charges_enabled ? 1 : 0, a.payouts_enabled ? 1 : 0, a.details_submitted ? 1 : 0, nowIso(), a.id)
-    .run();
-}
 
 /** Per-credential paste validation. The prefix rules are Stripe's own, so a
  *  wrong-slot paste (publishable key into the secret field, platform signing
@@ -1003,149 +1053,9 @@ async function handlePlatformEvent(
   }
 }
 
-/**
- * Adopt `newSubId` as the tenant's current platform subscription, cancelling any
- * DIFFERENT existing sub at Stripe first. A plan change creates a second Stripe
- * subscription; without this the old one keeps billing (double charge) and its
- * later deleted/past_due events would fight the live plan. Best-effort cancel
- * (a Stripe failure just leaves the old sub to be cleaned up later); the id swap
- * always lands so the lifecycle guards key off the current sub.
- */
-async function supersedePlatformSub(db: D1Database, secretKey: string, tenantId: string, newSubId: string): Promise<void> {
-  const row = await db.prepare("SELECT stripe_sub_id FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<{ stripe_sub_id: string | null }>();
-  const old = row?.stripe_sub_id ?? null;
-  if (old && old !== newSubId && secretKey) {
-    await stripeCall(secretKey, `subscriptions/${old}`, undefined, { method: "DELETE" }).catch(() => undefined);
-  }
-  await db.prepare("UPDATE subscriptions SET stripe_sub_id = ? WHERE tenant_id = ?").bind(newSubId, tenantId).run();
-}
 
-/**
- * Reconcile our subscription row against Stripe's authoritative subscription
- * object (fired on `customer.subscription.created|updated`). Stripe owns the raw
- * payment state (active / past_due / unpaid / canceled); our daily cron owns the
- * grace→suspend→delete escalation layered on `past_due_at`, so here we only seed
- * or clear those markers — never fight the cron's windows.
- */
-async function syncStripeSubscription(db: D1Database, obj: Record<string, unknown>): Promise<void> {
-  const tenantId = await tenantByCustomer(db, obj.customer);
-  if (!tenantId) return;
-  const subId = typeof obj.id === "string" ? obj.id : null;
-  // Reconcile ONLY the tenant's CURRENT subscription. A stale sub (an old one
-  // replaced on an upgrade, still emitting past_due/canceled/updated events)
-  // must not move the live plan's status or reclaim the stored sub id. When no
-  // sub is stored yet (a fresh inline sub), let it through so it gets adopted.
-  const cur = await db.prepare("SELECT stripe_sub_id FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<{ stripe_sub_id: string | null }>();
-  if (cur?.stripe_sub_id && subId && cur.stripe_sub_id !== subId) return;
-  // `current_period_end` moved OFF the Subscription root in Basil (2025-03-31+) and
-  // onto each item, and webhook payloads render at the ENDPOINT's dashboard API
-  // version — not the version this repo pins for its own requests. Verified against
-  // real events on an account defaulting to 2025-11-17.clover: the root field is
-  // absent and the value lives at `items.data[].current_period_end`. Reading only
-  // the root meant `cpe` was always null, the COALESCE wrote nothing, and the
-  // "renews on" date on Business stayed blank until an invoice.paid arrived (that
-  // branch reads `period_end`, which does still exist). No money impact — but every
-  // synthetic fixture in the suite hand-feeds the pre-Basil shape, so nothing caught
-  // it. Read both, newest-period-wins across items.
-  const items = (obj.items as { data?: { current_period_end?: unknown }[] } | undefined)?.data ?? [];
-  const itemEnd = items
-    .map((i) => (typeof i.current_period_end === "number" ? i.current_period_end : 0))
-    .reduce((a, b) => Math.max(a, b), 0);
-  const cpeEpoch = typeof obj.current_period_end === "number" ? obj.current_period_end : itemEnd;
-  const cpe = cpeEpoch > 0 ? new Date(cpeEpoch * 1000).toISOString() : null;
-  const now = nowIso();
-  await db.prepare("UPDATE subscriptions SET stripe_sub_id = COALESCE(?, stripe_sub_id), current_period_end = COALESCE(?, current_period_end), updated_at = ? WHERE tenant_id = ?").bind(subId, cpe, now, tenantId).run();
-  switch (obj.status as string) {
-    case "canceled":
-      await db.prepare("UPDATE subscriptions SET status = 'canceled', plan_id = 'free' WHERE tenant_id = ?").bind(tenantId).run();
-      break;
-    case "unpaid":
-      await db.prepare("UPDATE subscriptions SET status = 'unpaid' WHERE tenant_id = ?").bind(tenantId).run();
-      break;
-    case "past_due":
-      await db.prepare("UPDATE subscriptions SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?) WHERE tenant_id = ? AND status NOT IN ('suspended','blocked','canceled')").bind(now, tenantId).run();
-      break;
-    case "active":
-    case "trialing": {
-      // A card-less trial must not be stamped `trialing` either. `status` is read
-      // as "this studio has a live subscription" in two places that both cost
-      // money: the daily sweep grants the plan's monthly credits to every tenant
-      // whose status is `active` or `trialing` (index.ts), and `GET /billing`
-      // reports it to the owner. Leave it exactly where it was — like
-      // `incomplete` — until a payment method lands and Stripe re-fires
-      // `customer.subscription.updated`.
-      const st = obj.status as string;
-      if (st === "trialing" && !hasPaymentMethod(obj)) break;
-      await db.prepare("UPDATE subscriptions SET status = ?, past_due_at = NULL, suspend_at = NULL, delete_at = NULL WHERE tenant_id = ?").bind(st === "trialing" ? "trialing" : "active", tenantId).run();
-      break;
-    }
-    // incomplete / incomplete_expired / paused → leave status untouched.
-  }
-}
 
-/**
- * Does this Stripe **subscription** object carry a payment method Stripe can
- * actually charge? This is the whole answer to "is this trial paid for".
- *
- * VERIFIED against live Stripe test mode (not inferred from the docs — the bug
- * this closes shipped because the behaviour was assumed). For the exact request
- * `/billing/plan-intent` makes (`default_incomplete` + `trial_period_days` +
- * `save_default_payment_method: on_subscription`):
- *
- *   • at creation, with no card:      status trialing · default_payment_method
- *                                     null · pending_setup_intent "seti_…"
- *                                     (a bare STRING in the webhook payload)
- *   • after the SetupIntent is confirmed (what Stripe.js `confirmSetup` does),
- *     Stripe fires `setup_intent.succeeded` and then, ~1s later,
- *     **`customer.subscription.updated`** carrying
- *     `default_payment_method: "pm_…"` and `pending_setup_intent: null`.
- *
- * That second event is what re-drives activation, so NO new webhook event type
- * has to be subscribed — `customer.subscription.updated` was already handled.
- *
- * So the test is: a trial is paid for unless Stripe is still asking us for a
- * payment method. A SET `pending_setup_intent` is Stripe saying exactly that, and
- * it is the one field that reliably separates the two observed shapes; it clears
- * to `null` the moment a card attaches. An ABSENT `pending_setup_intent` reads as
- * "nothing left to collect" — the hosted-Checkout shape, where the card is taken
- * before the subscription exists. The field has been on Subscription since API
- * version 2019-03-14 and is present on the current one (verified), so absence
- * means "no setup pending", not "old payload". Because webhook payload shape does
- * follow the endpoint's dashboard API version and nothing in this repo sets it
- * (AGENTS.md §5), the shape is checked positively rather than by absence: only an
- * attached payment method counts. The theoretically ambiguous shape — `trialing`,
- * no payment method, no `pending_setup_intent` key at all — does not occur in
- * practice (real payloads carry both keys, verified), and because the check is
- * fail-closed it would be treated as "not payable" if it ever did.
- *
- * Note it is deliberately *not* enough that the customer has a card on file: for
- * a returning owner whose customer already carries a default payment method,
- * Stripe still mints a pending SetupIntent (verified — status
- * `requires_confirmation` rather than `requires_payment_method`) and still leaves
- * the subscription's own `default_payment_method` null. Such a trial only
- * activates once the owner completes the card sheet, which is the safe direction:
- * an unentitled studio with a one-click fix, not an entitled unpaid one.
- */
-function hasPaymentMethod(obj: Record<string, unknown>): boolean {
-  // FAIL CLOSED: a positive signal is required, never merely the absence of a
-  // negative one. This gates whether a `trialing` subscription is allowed to grant
-  // a paid plan and its whole monthly credit grant, and the bug it exists to stop
-  // was exactly a card-less trial being entitled — free Light plus 3,000 credits,
-  // repeatable once per studio. An earlier version treated "no pending_setup_intent
-  // field" as "nothing left to collect", which reads reasonably and is wrong for a
-  // money path: any payload shape we did not anticipate would grant.
-  //
-  // Verified against live Stripe test mode: a trial created the way
-  // /billing/plan-intent creates one carries `default_payment_method: null` and a
-  // set `pending_setup_intent`; ~1s after Stripe.js confirms the SetupIntent,
-  // `customer.subscription.updated` re-fires with `default_payment_method: "pm_…"`
-  // and `pending_setup_intent: null`. So the positive signal always arrives — the
-  // paid plan is granted a second later, not never.
-  //
-  // Note a non-trial subscription is unaffected: `status === "active"` activates on
-  // its own, and Stripe only reports `active` once money has actually moved.
-  return Boolean(stripeId(obj.default_payment_method) || stripeId(obj.default_source));
-}
+
 
 async function activatePlan(db: D1Database, billing: AppEnv["Bindings"]["BILLING"], tenantId: string, planId: string): Promise<void> {
   await getSubscription(db, tenantId);
@@ -1170,114 +1080,9 @@ async function activatePlan(db: D1Database, billing: AppEnv["Bindings"]["BILLING
   }
 }
 
-/** A Stripe id that may arrive as a bare string or an expanded object. */
-function stripeId(v: unknown): string | null {
-  if (typeof v === "string") return v;
-  if (v && typeof v === "object" && typeof (v as { id?: unknown }).id === "string") return (v as { id: string }).id;
-  return null;
-}
 
-/**
- * Resolve the Stripe SUBSCRIPTION id off an Invoice across API-version shapes.
- *
- * `stripe.ts` pins the version of requests WE make, but a webhook payload's
- * shape follows the version stored on the Stripe *endpoint* — which nothing in
- * this repo can set. On an account defaulting to 2025-03-31 ("Basil") or later,
- * `invoice.subscription` is GONE: it moved to
- * `invoice.parent.subscription_details.subscription` (and per-line under
- * `lines.data[].subscription`). Reading only the legacy field meant every
- * renewal invoice resolved to "no subscription", so `renewClientSubscription`
- * was never called — the client's card was charged monthly and their budget was
- * never topped up, with a 200 back to Stripe and no signal anywhere.
- */
-function invoiceSubscriptionId(inv: Record<string, unknown>): string | null {
-  const direct = stripeId(inv.subscription);
-  if (direct) return direct;
-  const parent = inv.parent as { subscription_details?: { subscription?: unknown } } | undefined;
-  const fromParent = stripeId(parent?.subscription_details?.subscription);
-  if (fromParent) return fromParent;
-  const lines = (inv.lines as { data?: Record<string, unknown>[] } | undefined)?.data ?? [];
-  for (const line of lines) {
-    const fromLine =
-      stripeId(line.subscription) ??
-      stripeId((line.parent as { subscription_item_details?: { subscription?: unknown } } | undefined)?.subscription_item_details?.subscription);
-    if (fromLine) return fromLine;
-  }
-  return null;
-}
 
-/**
- * The charge behind a refund/dispute event, plus how much of it has been
- * reversed so far (in cents).
- *
- * `charge.refunded` delivers the Charge itself. `charge.dispute.created`
- * delivers a **Dispute**: it carries `charge` / `payment_intent`, its own
- * `amount` (the disputed portion), an EMPTY `metadata` and **no `customer`** —
- * so reading `metadata.kova_tenant` / `obj.customer` off it (what this handler
- * used to do) always came up empty. The dispute branch was therefore dead code:
- * a tenant could charge back a credit pack, we'd lose the money, the credits
- * stayed spendable and nobody was told. Resolve the underlying charge first.
- */
-async function resolveReversal(
-  obj: Record<string, unknown>,
-  eventType: string,
-  secretKey: string,
-): Promise<{ chargeId: string | null; amountCents: number; reversedCents: number; meta: Record<string, string>; customer: unknown }> {
-  const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
-  if (eventType !== "charge.dispute.created") {
-    // Charge object: `amount_refunded` is CUMULATIVE across every refund so far.
-    return {
-      chargeId: typeof obj.id === "string" ? obj.id : null,
-      amountCents: num(obj.amount),
-      reversedCents: num(obj.amount_refunded),
-      meta: (obj.metadata as Record<string, string> | undefined) ?? {},
-      customer: obj.customer,
-    };
-  }
-  const disputed = num(obj.amount);
-  const chargeId = stripeId(obj.charge);
-  const piId = stripeId(obj.payment_intent);
-  // A failure here THROWS on purpose: the webhook's catch releases the event-id
-  // claim and 500s, so Stripe redelivers the dispute instead of us dropping a
-  // chargeback we couldn't attribute.
-  const src = chargeId
-    ? await stripeCall<Record<string, unknown>>(secretKey, `charges/${chargeId}`)
-    : piId
-      ? await stripeCall<Record<string, unknown>>(secretKey, `payment_intents/${piId}`)
-      : null;
-  if (!src) throw new Error("dispute carries neither charge nor payment_intent");
-  return {
-    // Key the reversal ledger off the CHARGE id either way, so a dispute and a
-    // partial refund on the same charge share one cumulative total.
-    chargeId: chargeId ?? stripeId(src.latest_charge) ?? piId,
-    amountCents: num(src.amount),
-    // A dispute can follow partial refunds; money reversed = both.
-    reversedCents: Math.min(num(src.amount), disputed + num(src.amount_refunded)),
-    meta: (src.metadata as Record<string, string> | undefined) ?? {},
-    customer: src.customer,
-  };
-}
 
-/**
- * Credits already clawed back for a charge, read off the append-only
- * `credit_ledger` by `ref` (= the charge id). This is what makes repeat
- * refund/dispute events INCREMENTAL: Stripe fires `charge.refunded` for every
- * partial refund and each event carries the CUMULATIVE `amount_refunded`, so
- * without this a second $5 refund on a $100 pack would reverse the whole
- * proportional total a second time. The ledger is the existing record of every
- * credit movement, so no new table is needed — a reversal that never landed
- * (the `purchased` bucket was already drained, so `revokePurchased` clamped to a
- * no-op) also leaves no row, which is correct: nothing was taken, so the next
- * event may still take up to the amount owed and never more.
- */
-async function creditsAlreadyReversed(db: D1Database, tenantId: string, chargeId: string | null): Promise<number> {
-  if (!chargeId) return 0;
-  const row = await db
-    .prepare("SELECT COALESCE(SUM(-delta), 0) AS reversed FROM credit_ledger WHERE tenant_id = ? AND ref = ? AND reason IN ('pack.refund','pack.dispute')")
-    .bind(tenantId, chargeId)
-    .first<{ reversed: number }>();
-  return Math.max(0, Math.floor(row?.reversed ?? 0));
-}
 
 /**
  * Money-safe reversal on the PLATFORM rail (the Connect rail only surfaces
@@ -1327,62 +1132,14 @@ async function reverseChargedCredits(
   });
 }
 
-/** Tenant behind a Stripe customer. Takes `unknown` on purpose: webhook objects
- *  that carry no customer (a Dispute) must read as "no tenant", never bind
- *  `undefined` into D1 (which throws and puts the handler into Stripe's retry
- *  loop forever). */
-async function tenantByCustomer(db: D1Database, customerId: unknown): Promise<string | null> {
-  const id = stripeId(customerId);
-  if (!id) return null;
-  const row = await db.prepare("SELECT tenant_id FROM subscriptions WHERE stripe_customer_id = ?").bind(id).first<{ tenant_id: string }>();
-  return row?.tenant_id ?? null;
-}
 async function planForTenant(db: D1Database, tenantId: string | null): Promise<string | null> {
   if (!tenantId) return null;
   const row = await db.prepare("SELECT plan_id FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<{ plan_id: string }>();
   return row?.plan_id ?? null;
 }
 
-/** Per-cycle share of a package's runway for an N-installment plan: each
- *  payment unlocks days/N (min 1). N<=1 leaves the specs untouched. */
-function scaleSpecs(specs: { feature: Budget["feature"]; days: number }[], n: number): { feature: Budget["feature"]; days: number }[] {
-  return n > 1 ? specs.map((s) => ({ ...s, days: Math.max(1, Math.round(s.days / n)) })) : specs;
-}
 
-/** Stop an installment plan after its final payment: cancel the Stripe
- *  subscription on the connected account, and only clear `stripe_sub_id` once
- *  the cancel actually succeeded. Cancel-before-unlink means a failed cancel
- *  leaves the row resolvable so a stray invoice hits the `alreadyDone` guard
- *  (no extra grant) and the cancel is retried, rather than billing on with a
- *  dangling, unresolvable subscription. */
-async function cancelInstallmentSub(db: D1Database, tenantId: string, stripeSubId: string, rowId: string): Promise<void> {
-  const settings = await db.prepare("SELECT stripe_account_id FROM tenant_settings WHERE tenant_id = ?").bind(tenantId).first<{ stripe_account_id: string | null }>();
-  const cfg = await stripeConfig(db);
-  let canceled = true;
-  if (settings?.stripe_account_id && stripeEnabled(cfg)) {
-    canceled = await stripeCall(cfg.secretKey, `subscriptions/${stripeSubId}`, undefined, { connectedAccount: settings.stripe_account_id, method: "DELETE" })
-      .then(() => true)
-      .catch(() => false);
-  }
-  if (canceled) await db.prepare("UPDATE client_subscriptions SET stripe_sub_id = NULL WHERE id = ?").bind(rowId).run();
-}
 
-/**
- * Has this client EVER held this package before? The `once_per_customer` test,
- * shared by both paid checkout paths and the webhook grant, with the same
- * semantics as the staff-grant check in `commerce-routes.ts` (any row, whatever
- * its status — an intro offer is once, not once-at-a-time).
- *
- * `excludeSubId` skips the row belonging to a Stripe subscription we're already
- * processing, so a webhook redelivery / renewal of that same subscription is not
- * mistaken for a second purchase.
- */
-async function hasPriorPurchase(db: D1Database, clientId: string, packageId: string, excludeSubId: string | null = null): Promise<boolean> {
-  const row = excludeSubId
-    ? await db.prepare("SELECT 1 AS x FROM client_subscriptions WHERE client_id = ? AND package_id = ? AND (stripe_sub_id IS NULL OR stripe_sub_id <> ?) LIMIT 1").bind(clientId, packageId, excludeSubId).first()
-    : await db.prepare("SELECT 1 AS x FROM client_subscriptions WHERE client_id = ? AND package_id = ? LIMIT 1").bind(clientId, packageId).first();
-  return !!row;
-}
 
 /** Shared with commerce: create/extend a client subscription from a package.
  *  `checkoutId`/`subId` are the Stripe Checkout Session / Subscription ids;
@@ -1415,7 +1172,7 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
   // pre-existing active row would drop the new sub id (COALESCE) and renew off
   // the wrong package — the client would be charged monthly with no top-up.
   if (subId) {
-    const bySub = await db.prepare("SELECT id FROM client_subscriptions WHERE stripe_sub_id = ? LIMIT 1").bind(subId).first<{ id: string }>();
+    const bySub = await db.prepare("SELECT id FROM subject_subscriptions WHERE stripe_sub_id = ? LIMIT 1").bind(subId).first<{ id: string }>();
     if (bySub) {
       // A redelivered checkout for this same sub (before firstSeen dedup) — top
       // up its own runway rather than create a duplicate. CAS so a concurrent
@@ -1431,7 +1188,7 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
       if (!ok) throw new Error(`grantClientPackage: runway CAS failed for ${bySub.id}`);
     } else {
       await db.prepare(
-        "INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, installments_total, installments_paid, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, 'stripe', ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO subject_subscriptions (id, tenant_id, subject_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, installments_total, installments_paid, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, 'stripe', ?, ?, ?, ?, ?, ?)",
       )
         .bind(newId("csub"), tenantId, clientId, packageId, n > 1 ? "installments" : "paid", j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, subId, n > 1 ? n : null, n > 1 ? 1 : null, now, now)
         .run();
@@ -1441,7 +1198,7 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
 
   // One-time purchase: fold into the client's active NON-recurring runway (never
   // a recurring row — that row belongs to its own Stripe subscription).
-  const current = await db.prepare("SELECT id FROM client_subscriptions WHERE client_id = ? AND status = 'active' AND stripe_sub_id IS NULL ORDER BY started_at DESC LIMIT 1").bind(clientId).first<{ id: string }>();
+  const current = await db.prepare("SELECT id FROM subject_subscriptions WHERE subject_id = ? AND status = 'active' AND stripe_sub_id IS NULL ORDER BY started_at DESC LIMIT 1").bind(clientId).first<{ id: string }>();
   if (current) {
     // CAS so a concurrent staff grant / redeem on the same row can't clobber
     // these paid-for days.
@@ -1453,7 +1210,7 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
     if (!ok) throw new Error(`grantClientPackage: runway CAS failed for ${current.id}`);
   } else {
     await db.prepare(
-      "INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, ?, 'stripe', ?, ?, ?, ?)",
+      "INSERT INTO subject_subscriptions (id, tenant_id, subject_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, ?, 'stripe', ?, ?, ?, ?)",
     )
       .bind(newId("csub"), tenantId, clientId, packageId, j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, null, now, now)
       .run();
@@ -1467,7 +1224,7 @@ async function renewClientSubscription(db: D1Database, stripeSubId: string, expe
   // Resolve the row scoped to the account's tenant (the webhook verified the
   // event's account → tenant), so a foreign connected account can't top up a
   // row it doesn't own.
-  const base = await db.prepare("SELECT id, tenant_id, package_id, installments_total FROM client_subscriptions WHERE stripe_sub_id = ? AND tenant_id = ? ORDER BY started_at DESC LIMIT 1").bind(stripeSubId, expectedTenantId).first<{ id: string; tenant_id: string; package_id: string | null; installments_total: number | null }>();
+  const base = await db.prepare("SELECT id, tenant_id, package_id, installments_total FROM subject_subscriptions WHERE stripe_sub_id = ? AND tenant_id = ? ORDER BY started_at DESC LIMIT 1").bind(stripeSubId, expectedTenantId).first<{ id: string; tenant_id: string; package_id: string | null; installments_total: number | null }>();
   if (!base?.package_id) return;
   const pkg = await db.prepare("SELECT budgets_json, addons_json FROM packages WHERE id = ? AND tenant_id = ?").bind(base.package_id, base.tenant_id).first<{ budgets_json: string | null; addons_json: string | null }>();
   if (!pkg) return;
@@ -1480,7 +1237,7 @@ async function renewClientSubscription(db: D1Database, stripeSubId: string, expe
   // so the counter is recomputed from the last committed value, never double-
   // counted). Guards against a concurrent writer losing a paid renewal period.
   for (let attempt = 1; attempt <= 5; attempt++) {
-    const row = await db.prepare("SELECT budgets_json, addons_json, installments_paid FROM client_subscriptions WHERE id = ?").bind(base.id).first<{ budgets_json: string | null; addons_json: string | null; installments_paid: number | null }>();
+    const row = await db.prepare("SELECT budgets_json, addons_json, installments_paid FROM subject_subscriptions WHERE id = ?").bind(base.id).first<{ budgets_json: string | null; addons_json: string | null; installments_paid: number | null }>();
     if (!row) return;
     const prevB = row.budgets_json ?? null;
     const prevA = row.addons_json ?? null;
@@ -1505,7 +1262,7 @@ async function renewClientSubscription(db: D1Database, stripeSubId: string, expe
       // `stripe_sub_id` is left intact here and only cleared once the Stripe
       // cancel is confirmed (below), so a post-completion stray invoice still
       // resolves this row and hits the `alreadyDone` guard.
-      const w = await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, status = 'active', payment_status = ?, installments_paid = ?, updated_at = ? WHERE id = ? AND budgets_json IS ? AND addons_json IS ?")
+      const w = await db.prepare("UPDATE subject_subscriptions SET budgets_json = ?, addons_json = ?, status = 'active', payment_status = ?, installments_paid = ?, updated_at = ? WHERE id = ? AND budgets_json IS ? AND addons_json IS ?")
         .bind(j(nextBudgets), j(nextAddons), done ? "completed" : "installments", paid, now, base.id, prevB, prevA)
         .run();
       if ((w.meta?.changes ?? 0) > 0) {
@@ -1514,7 +1271,7 @@ async function renewClientSubscription(db: D1Database, stripeSubId: string, expe
       }
       continue; // raced — re-read and retry
     }
-    const w = await db.prepare("UPDATE client_subscriptions SET budgets_json = ?, addons_json = ?, status = 'active', payment_status = 'paid', updated_at = ? WHERE id = ? AND budgets_json IS ? AND addons_json IS ?").bind(j(nextBudgets), j(nextAddons), now, base.id, prevB, prevA).run();
+    const w = await db.prepare("UPDATE subject_subscriptions SET budgets_json = ?, addons_json = ?, status = 'active', payment_status = 'paid', updated_at = ? WHERE id = ? AND budgets_json IS ? AND addons_json IS ?").bind(j(nextBudgets), j(nextAddons), now, base.id, prevB, prevA).run();
     if ((w.meta?.changes ?? 0) > 0) return;
   }
   // Every attempt raced out on a PAID renewal cycle: the client was charged and

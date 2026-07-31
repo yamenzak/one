@@ -1,5 +1,9 @@
 @import "tailwindcss";
 @import "@4dl/ui/tokens.css";
+/* Kova's own accent tones — see the header of that file for why they are not
+   in the design system. Must follow the base tokens: it extends the same
+   `:root` blocks. */
+@import "./tokens.accents.css";
 
 /* Tailwind v4: scan the workspace UI package for class names. */
 @source "../../../packages/ui/src";

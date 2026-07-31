@@ -1,5 +1,5 @@
 /**
- * Role-adaptive shell (DESIGN.md §5) — one app, nav by persona + mode, now
+ * Role-adaptive shell (KOVA.md Part II §5) — one app, nav by persona + mode, now
  * URL-routed (React Router). Tabs + overlays are real routes so refresh and
  * deep-links work: /today /train /eat /progress · /clients/:id/:tab · /library
  * /business · /settings /wellness /shop /explore /admin.
@@ -12,7 +12,7 @@ import {
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
   Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Hand, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, toneVar, type TabDef, type Tone,
 } from "@4dl/ui";
-import { resolveStanding, studioStandingOfGate } from "@4dl/platform";
+import { resolveStanding, tenantStandingOfGate } from "@4dl/tenancy/model";
 import { useSession, useActiveClientId, adminUrl } from "./session.js";
 import { useTheme } from "./theme.js";
 import { api } from "./api.js";
@@ -118,7 +118,7 @@ export function Shell() {
         // "ok" — here and in `requireClientAccess`, the only two callers — which
         // made the axis dead in practice: a client at a suspended studio was told
         // everything was fine right up until a save failed.
-        studio: studioStandingOfGate(host?.gate?.reason),
+        tenant: tenantStandingOfGate(host?.gate?.reason),
       })
     : null;
   if (active.role === "client" && active.clientId && standing?.lockedToStorefront) {

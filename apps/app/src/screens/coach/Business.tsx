@@ -71,7 +71,7 @@ function promoError(code: string): string {
     expired: "That promo code has expired.",
     exhausted: "That promo code has been fully used.",
     wrong_package: "That code doesn't apply to this item.",
-    wrong_client: "That code isn't available on your account.",
+    wrong_subject: "That code isn't available on your account.",
   }[reason] ?? "That promo code can't be applied.";
 }
 

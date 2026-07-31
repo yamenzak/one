@@ -59,7 +59,7 @@ export async function loadClientAccessRows(
 ): Promise<ClientAccessRow[]> {
   const ph = statuses.map(() => "?").join(",");
   const r = await db
-    .prepare(`SELECT status, package_id, budgets_json, flags_json FROM client_subscriptions WHERE client_id = ? AND tenant_id = ? AND status IN (${ph}) ORDER BY started_at DESC`)
+    .prepare(`SELECT status, package_id, budgets_json, flags_json FROM subject_subscriptions WHERE subject_id = ? AND tenant_id = ? AND status IN (${ph}) ORDER BY started_at DESC`)
     .bind(clientId, tenantId, ...statuses)
     .all<ClientAccessRow>();
   return r.results ?? [];

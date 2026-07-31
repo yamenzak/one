@@ -1,0 +1,100 @@
+/**
+ * KOVA'S ACCENT TOKENS — the colours this product codes information with.
+ *
+ * These were in `@4dl/ui`'s `tokens.css`, where they were the only tokens that
+ * knew what protein is. A design system may own surfaces, a brand primary and
+ * the four status colours; it may not own `nutrition` and `hydration`, because
+ * a warehouse app has neither.
+ *
+ * `@4dl/ui` resolves any tone it does not recognise by convention — `foo` →
+ * `text-foo` / `bg-foo-soft text-foo` / `var(--foo)` — so registering an accent
+ * is exactly: define the two variables for both modes, map them in `@theme`,
+ * and let the class literals in `registry/tones.ts` reach the Tailwind scan.
+ *
+ * Every value here is a studio-overridable default: `lib/theme.ts` regenerates
+ * them from a tenant's brand colour (`MACRO_SPEC` in `registry/tones.ts`), and
+ * the advanced editor can set any of them outright.
+ */
+
+@theme inline {
+  /* Metric coding (macros) */
+  --color-calories: var(--calories);
+  --color-calories-soft: var(--calories-soft);
+  --color-protein: var(--protein);
+  --color-protein-soft: var(--protein-soft);
+  --color-carbs: var(--carbs);
+  --color-carbs-soft: var(--carbs-soft);
+  --color-fat: var(--fat);
+  --color-fat-soft: var(--fat-soft);
+
+  /* Domain accents (fitness viz) */
+  --color-activity: var(--activity);
+  --color-activity-soft: var(--activity-soft);
+  --color-nutrition: var(--nutrition);
+  --color-nutrition-soft: var(--nutrition-soft);
+  --color-sleep: var(--sleep);
+  --color-sleep-soft: var(--sleep-soft);
+  --color-cardio: var(--cardio);
+  --color-cardio-soft: var(--cardio-soft);
+  --color-hydration: var(--hydration);
+  --color-hydration-soft: var(--hydration-soft);
+  --color-supplement: var(--supplement);
+  --color-supplement-soft: var(--supplement-soft);
+  --color-lab: var(--lab);
+  --color-lab-soft: var(--lab-soft);
+}
+
+:root {
+  --calories: oklch(0.78 0.16 45);
+  --calories-soft: oklch(0.35 0.07 45);
+  --protein: oklch(0.72 0.16 350);
+  --protein-soft: oklch(0.34 0.07 350);
+  --carbs: oklch(0.82 0.15 90);
+  --carbs-soft: oklch(0.36 0.06 90);
+  --fat: oklch(0.715 0.14 275);
+  --fat-soft: oklch(0.34 0.06 275);
+
+  --activity: oklch(0.78 0.13 164);
+  --activity-soft: oklch(0.34 0.06 164);
+  --nutrition: oklch(0.8 0.13 68);
+  --nutrition-soft: oklch(0.36 0.06 68);
+  --sleep: oklch(0.74 0.12 300);
+  --sleep-soft: oklch(0.34 0.06 300);
+  --cardio: oklch(0.74 0.13 250);
+  --cardio-soft: oklch(0.34 0.06 250);
+  --hydration: oklch(0.78 0.1 214);
+  --hydration-soft: oklch(0.34 0.05 214);
+  --supplement: oklch(0.77 0.11 190);
+  --supplement-soft: oklch(0.34 0.05 190);
+  --lab: oklch(0.74 0.14 322);
+  --lab-soft: oklch(0.34 0.06 322);
+}
+
+:root[data-theme="light"] {
+  /* Foreground tones are darkened for light mode so tone-colored text/icons on
+     their own pale `-soft` tint clear WCAG AA (>=4.5:1) — the bright dark-mode
+     values washed out on white. `-soft` backgrounds stay pale (unchanged). */
+  --calories: oklch(0.525 0.16 45);
+  --calories-soft: oklch(0.94 0.06 45);
+  --protein: oklch(0.535 0.17 350);
+  --protein-soft: oklch(0.94 0.05 350);
+  --carbs: oklch(0.53 0.15 90);
+  --carbs-soft: oklch(0.95 0.07 90);
+  --fat: oklch(0.53 0.17 275);
+  --fat-soft: oklch(0.94 0.05 275);
+
+  --activity: oklch(0.49 0.14 164);
+  --activity-soft: oklch(0.93 0.05 164);
+  --nutrition: oklch(0.525 0.15 62);
+  --nutrition-soft: oklch(0.94 0.06 68);
+  --sleep: oklch(0.535 0.16 300);
+  --sleep-soft: oklch(0.94 0.05 300);
+  --cardio: oklch(0.52 0.17 250);
+  --cardio-soft: oklch(0.94 0.05 250);
+  --hydration: oklch(0.5 0.13 214);
+  --hydration-soft: oklch(0.94 0.05 214);
+  --supplement: oklch(0.5 0.11 190);
+  --supplement-soft: oklch(0.93 0.05 190);
+  --lab: oklch(0.535 0.16 322);
+  --lab-soft: oklch(0.94 0.05 322);
+}

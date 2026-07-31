@@ -232,7 +232,7 @@ export function WeekDots({ days, todayIndex, tone = "activity", className, fill 
   // Seven duplicated single letters ("M T W T F S S") read out one by one are
   // noise, and the tick/blank dots convey nothing at all to a screen reader — so
   // the group speaks the week as one sentence and the glyphs are hidden. The
-  // letters themselves now sit at the 12px floor (DESIGN.md §2.2); they were
+  // letters themselves now sit at the 12px floor (UI-LANGUAGE.md §5 — the type scale's floor); they were
   // 8.8–10.4px, the smallest text in the app.
   const doneNames = DAY_NAMES.filter((_, i) => days[i]);
   const groupLabel = `Week: ${doneNames.length ? `${doneNames.join(", ")} complete` : "no days complete yet"}${todayIndex != null && DAY_NAMES[todayIndex] ? `. Today is ${DAY_NAMES[todayIndex]}` : ""}`;

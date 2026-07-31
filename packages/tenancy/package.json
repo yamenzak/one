@@ -1,0 +1,29 @@
+{
+  "name": "@4dl/tenancy",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Multi-tenant addressing: host classification (the five doors), host\u2192tenant resolution and caching, custom domains via Cloudflare for SaaS + DCV, and the standing/host-gate model. No product vocabulary \u2014 see README.md.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./model": "./src/model.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@4dl/core": "workspace:*",
+    "hono": "^4.9.10",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251001.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "@4dl/core": "workspace:*"
+  }
+}

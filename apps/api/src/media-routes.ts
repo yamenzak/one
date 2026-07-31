@@ -69,7 +69,7 @@ export const mediaRoutes = new Hono<AppEnv>()
     // gate on the tenant's storage quota before writing.
     const bytes = await file.arrayBuffer();
     try {
-      await putMedia(c.env, { tenantId: who.tenantId, key, bytes, contentType: file.type ?? "application/octet-stream", purpose, clientId, ownerUserId: who.userId });
+      await putMedia(c.env, { tenantId: who.tenantId, key, bytes, contentType: file.type ?? "application/octet-stream", purpose, subjectId: clientId, ownerUserId: who.userId });
     } catch (e) {
       if (e instanceof StorageQuotaError) {
         return c.json({ error: "storage_full", message: `Your studio's ${mb(e.limitBytes)} MB storage is full (${mb(e.usedBytes)} MB used). Delete some media or upgrade your plan.`, usedMb: mb(e.usedBytes), limitMb: mb(e.limitBytes) }, 413);

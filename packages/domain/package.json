@@ -19,6 +19,9 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@4dl/platform": "workspace:*"
+    "@4dl/auth": "workspace:*",
+    "@4dl/billing": "workspace:*",
+    "@4dl/commerce": "workspace:*",
+    "@4dl/tenancy": "workspace:*"
   }
 }

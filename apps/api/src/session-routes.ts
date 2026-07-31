@@ -133,7 +133,7 @@ export const sessionRoutes = new Hono<AppEnv>()
     // A client may legitimately hold several live rows (BILLING-PLAN §7 stacks
     // packages), so scan them newest-first rather than trusting LIMIT 1.
     const ph = LIVE_ACCESS_STATUSES.map(() => "?").join(",");
-    const subs = await c.env.DB.prepare(`SELECT id, addons_json FROM client_subscriptions WHERE client_id = ? AND tenant_id = ? AND status IN (${ph}) ORDER BY started_at DESC`)
+    const subs = await c.env.DB.prepare(`SELECT id, addons_json FROM subject_subscriptions WHERE subject_id = ? AND tenant_id = ? AND status IN (${ph}) ORDER BY started_at DESC`)
       .bind(access.client.id, who.tenantId, ...LIVE_ACCESS_STATUSES)
       .all<{ id: string; addons_json: string | null }>();
     let subscriptionId: string | null = null;
@@ -199,7 +199,7 @@ export const sessionRoutes = new Hono<AppEnv>()
     // an included consultation could be delivered for free, forever. Checked
     // BEFORE the status flip so there is nothing to compensate.
     if (willConsume && !wasConsumed && row.subscription_id) {
-      const sub = await c.env.DB.prepare("SELECT addons_json FROM client_subscriptions WHERE id = ? AND tenant_id = ?").bind(row.subscription_id, who.tenantId).first<{ addons_json: string | null }>();
+      const sub = await c.env.DB.prepare("SELECT addons_json FROM subject_subscriptions WHERE id = ? AND tenant_id = ?").bind(row.subscription_id, who.tenantId).first<{ addons_json: string | null }>();
       const balances = parseJson<AddOnBalance[]>(sub?.addons_json ?? null, []);
       if (!balances.some((x) => x.addOnTypeId === row.addon_type_id)) {
         return c.json({ error: "this session isn't attached to an add-on balance any more — re-book it against a package that includes this add-on", addOnTypeId: row.addon_type_id }, 409);
@@ -259,7 +259,7 @@ export const sessionRoutes = new Hono<AppEnv>()
 export const promoRoutes = new Hono<AppEnv>()
   .get("/promo-codes", async (c) => {
     const who = requireTenant(c)!;
-    const rows = await c.env.DB.prepare("SELECT id, code, discount_type, percent_off, amount_off_cents, restricted_package_id, restricted_client_id, max_redemptions, redemption_count, expires_at, active FROM promo_codes WHERE tenant_id = ? AND scope = 'tenant' ORDER BY created_at DESC").bind(who.tenantId).all();
+    const rows = await c.env.DB.prepare("SELECT id, code, discount_type, percent_off, amount_off_cents, restricted_package_id, restricted_subject_id, max_redemptions, redemption_count, expires_at, active FROM promo_codes WHERE tenant_id = ? AND scope = 'tenant' ORDER BY created_at DESC").bind(who.tenantId).all();
     return c.json({ codes: rows.results ?? [] });
   })
   .post("/promo-codes", async (c) => {
@@ -268,7 +268,7 @@ export const promoRoutes = new Hono<AppEnv>()
     if (!b.success) return c.json({ error: "invalid body" }, 400);
     const id = newId("promo");
     try {
-      await c.env.DB.prepare("INSERT INTO promo_codes (id, tenant_id, code, discount_type, percent_off, amount_off_cents, restricted_package_id, restricted_client_id, scope, max_redemptions, expires_at, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'tenant', ?, ?, ?, ?)")
+      await c.env.DB.prepare("INSERT INTO promo_codes (id, tenant_id, code, discount_type, percent_off, amount_off_cents, restricted_package_id, restricted_subject_id, scope, max_redemptions, expires_at, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'tenant', ?, ?, ?, ?)")
         .bind(id, who.tenantId, b.data.code.toUpperCase(), b.data.discountType, b.data.percentOff ?? null, b.data.amountOffCents ?? null, b.data.restrictedPackageId ?? null, b.data.restrictedClientId ?? null, b.data.maxRedemptions ?? null, b.data.expiresAt ?? null, who.userId, nowIso())
         .run();
     } catch { return c.json({ error: "code already exists" }, 409); }

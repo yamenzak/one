@@ -8,14 +8,14 @@ import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { WorkoutBody, MUSCLE_GROUPS, EQUIPMENT_TYPES, normalizeMuscle, normalizeEquipment } from "@kova/protocol";
 import { resolveUnits, activityByKey, estimateBurnedCalories } from "@kova/domain";
-import { mockModeSettable, shouldUseMockLane } from "@4dl/platform";
+import { mockModeSettable, shouldUseMockLane } from "./ai.js";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import type { Env } from "./env.js";
 import { requireClientAccess, clientForUser } from "./clients.js";
 import { gateFeature, resolveClientFlagsFor } from "./client-flags.js";
 import { tenantEntitlements, hasFeature, getConfig, setConfig } from "./billing-store.js";
 import {
-  generate, generateImage, extractJson, listModels, checkClientDailyBudget,
+  generate, generateImage, extractJson, listModels, checkActorDailyBudget,
   estimateRunCredits, modelSupportsTask, preferredModelForTask, modelForTask, modelById, seedAiModels, modelPricing,
   type AiModelRow,
 } from "./ai.js";
@@ -24,7 +24,7 @@ import { buildClientContext } from "./ai-context.js";
 // carries the same client-authored fields into far more AI surfaces).
 import { untrusted } from "./client-knowledge.js";
 import { featureDef } from "./ai-features.js";
-import { parseWorkersAiCatalog, parseGeminiCatalog, isRunnableTask, type SkippedModel } from "./ai-pricing.js";
+import { parseWorkersAiCatalog, parseGeminiCatalog, isRunnableTask, type SkippedModel } from "./ai.js";
 import { tenantIntegrations, type Integrations } from "./integrations.js";
 import { resolveFoodId, resolveExerciseId, type ResolveEnv } from "./library-resolve.js";
 import { parseJson } from "./db.js";
@@ -85,7 +85,7 @@ async function clientBudgetGate(c: Context<AppEnv>, actorUserId: string): Promis
   if (c.get("role") !== "client") return null;
   const tenantId = c.get("tenantId");
   if (!tenantId) return null;
-  const b = await checkClientDailyBudget(c.env, tenantId, actorUserId);
+  const b = await checkActorDailyBudget(c.env, tenantId, actorUserId);
   if (b.ok) return null;
   const error = b.reason === "rate_limited"
     ? "You've hit today's AI limit — try again later."
@@ -112,11 +112,11 @@ function safeLocalDate(input: string | undefined): string {
 async function clientMayUseMedia(c: Context<AppEnv>, r2Key: string, clientId: string | null, actorUserId: string): Promise<boolean> {
   if (c.get("role") !== "client") return true;
   const row = await c.env.DB
-    .prepare("SELECT client_id, owner_user_id FROM media_assets WHERE r2_key = ? AND deleted_at IS NULL")
+    .prepare("SELECT subject_id, owner_user_id FROM media_assets WHERE r2_key = ? AND deleted_at IS NULL")
     .bind(r2Key)
-    .first<{ client_id: string | null; owner_user_id: string | null }>();
+    .first<{ subject_id: string | null; owner_user_id: string | null }>();
   if (!row) return false;
-  return row.owner_user_id === actorUserId || (!!clientId && row.client_id === clientId);
+  return row.owner_user_id === actorUserId || (!!clientId && row.subject_id === clientId);
 }
 
 interface DraftFoodQuery { foodId?: string; query?: string; name?: string; quantity?: number; unit?: string; calories?: number; proteinG?: number; carbsG?: number; fatG?: number }
@@ -269,7 +269,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const result = await generate(c.env, {
       tenantId: who.tenantId,
       actorUserId: who.userId,
-      clientId: access.client.id,
+      subjectId: access.client.id,
       feature: "parse-food",
       task: "text-small",
       expectsJson: true,
@@ -334,7 +334,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const result = await generate(c.env, {
       tenantId: who.tenantId,
       actorUserId: who.userId,
-      clientId: access.client.id,
+      subjectId: access.client.id,
       feature: "draft-plan",
       task: "text",
       expectsJson: true,
@@ -451,7 +451,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const result = await generate(c.env, {
       tenantId: who.tenantId,
       actorUserId: who.userId,
-      clientId: access.client.id,
+      subjectId: access.client.id,
       feature: "snap-meal",
       task: "vision", // Gemini Flash (vision) — real photo → foods + macros
       image,
@@ -571,7 +571,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const result = await generate(c.env, {
       tenantId: who.tenantId,
       actorUserId: who.userId,
-      clientId: access.client.id,
+      subjectId: access.client.id,
       feature: "draft-meal",
       task: "text",
       expectsJson: true,
@@ -617,7 +617,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const result = await generate(c.env, {
       tenantId: who.tenantId,
       actorUserId: who.userId,
-      clientId: access.client.id,
+      subjectId: access.client.id,
       feature: "checkin-reply",
       task: "text-small",
       expectsJson: true,
@@ -648,7 +648,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const result = await generate(c.env, {
       tenantId: who.tenantId,
       actorUserId: who.userId,
-      clientId: access.client.id,
+      subjectId: access.client.id,
       feature: "narrative",
       task: "text-small",
       system: sys("narrative"),
@@ -679,7 +679,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const image = { data: toBase64(await obj.arrayBuffer()), mimeType: obj.httpMetadata?.contentType ?? "image/jpeg" };
 
     const result = await generate(c.env, {
-      tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
+      tenantId: who.tenantId, actorUserId: who.userId, subjectId: access.client.id,
       feature: "lab-extract", task: "vision", image, expectsJson: true, system: sys("lab-extract"),
       prompt: `Extract every marker value from this lab report (${lab.display_name}).`,
       maxOutputTokens: 800,
@@ -728,7 +728,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const prompt = [ctx.text, `CURRENT SUPPLEMENTS (incl paused): ${stackText}`, `FULL REVIEWED LAB PANEL:\n${labText || "none on file"}`, "Recommend supplements now — address any flagged lab markers and the client's goal, and don't re-suggest anything already in their stack."].join("\n\n");
 
     const result = await generate(c.env, {
-      tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
+      tenantId: who.tenantId, actorUserId: who.userId, subjectId: access.client.id,
       feature: "supplement-reco", task: "text", expectsJson: true, system: sys("supplement-reco"), prompt, maxOutputTokens: 700,
       mock: () => JSON.stringify({ recommendations: [
         { name: "Vitamin D3", dose: "2000 IU daily", rationale: "Serum 25-OH vitamin D is below range.", linkedMarker: "Vitamin D, 25-OH" },
@@ -768,7 +768,7 @@ export const aiRoutes = new Hono<AppEnv>()
     }).join("\n");
     const prompt = [ctx.text, `YOUR SUPPLEMENTS:\n${stack}`].join("\n");
     const result = await generate(c.env, {
-      tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
+      tenantId: who.tenantId, actorUserId: who.userId, subjectId: access.client.id,
       feature: "supplement-guide", task: "text-small", system: sys("supplement-guide"), prompt, maxOutputTokens: 500,
       mock: () => (supps.results ?? []).map((s) => `${s.name}: supports your training goal — take it consistently, ideally with a meal.`).join("\n") + "\n\nOverall: keep timing consistent and pair with food where it helps absorption. Ask your coach before changing anything.",
     });
@@ -934,7 +934,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const ctx = await buildClientContext(c.env, access.client, { today: new Date().toISOString().slice(0, 10), hour: 12, units: await unitsFor(c.env.DB, who.userId), sections: ["client", "body", "training"] });
     const detail = `ACTIVITY: ${activityLabel}${p.durationMin ? `, ${p.durationMin} min` : ""}${p.reps ? `, ${p.reps} reps` : ""}${p.distanceM ? `, ${(p.distanceM / 1000).toFixed(2)} km` : ""}${p.avgHrBpm ? `, avg HR ${p.avgHrBpm} bpm` : ""}.`;
     const result = await generate(c.env, {
-      tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
+      tenantId: who.tenantId, actorUserId: who.userId, subjectId: access.client.id,
       feature: "activity-estimate", task: "text-small", expectsJson: true, system: sys("activity-estimate"),
       prompt: [ctx.text, detail, "Estimate the calories burned and speak to them directly."].join("\n\n"), maxOutputTokens: 200,
       mock: () => {
@@ -966,7 +966,7 @@ export const aiRoutes = new Hono<AppEnv>()
     { const g = await clientBudgetGate(c, who.userId); if (g) return g; }
     const foodList = parsed.data.foods.map((f) => `- ${f.name}${f.quantity ? ` (${Math.round(f.quantity)}${f.unit ?? "g"})` : ""}`).join("\n");
     const result = await generate(c.env, {
-      tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
+      tenantId: who.tenantId, actorUserId: who.userId, subjectId: access.client.id,
       feature: "meal-recipe", task: "text", system: sys("meal-recipe"),
       prompt: `MEAL: ${parsed.data.mealName || "meal"}\nFOODS:\n${foodList}\n\nWrite the recipe now.`,
       maxOutputTokens: 700,
@@ -1039,7 +1039,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const ctx = await buildClientContext(c.env, access.client, { today: parsed.data.today ?? new Date().toISOString().slice(0, 10), hour: parsed.data.hour ?? 12, units });
 
     const result = await generate(c.env, {
-      tenantId: who.tenantId, actorUserId: who.userId, clientId: access.client.id,
+      tenantId: who.tenantId, actorUserId: who.userId, subjectId: access.client.id,
       feature: "client-summary", task: "text-small", system: sys("client-summary"),
       prompt: `${ctx.text}\n\nWrite the coach summary now.`, maxOutputTokens: 300,
       mock: () => `${access.client.display_name} is training consistently and logging most days. Adherence is solid and the trend is positive; sleep is the main lever. Next: nudge check-in consistency and confirm protein targets are being hit.`,
@@ -1092,7 +1092,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const result = await generate(c.env, {
       tenantId: who.tenantId,
       actorUserId: c.get("user")!.id,
-      clientId: access.client.id,
+      subjectId: access.client.id,
       feature: "coach-note",
       task: "text-small",
       system: featureDef("coach-note")!.defaultSystem,

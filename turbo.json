@@ -27,9 +27,20 @@
       // it reports "please run playwright install" and every spec fails.
       "passThroughEnv": ["PLAYWRIGHT_*", "CI", "E2E_SERVER_LOGS", "NODE_OPTIONS"]
     },
+    "@4dl/core#build": { "outputs": [] },
+    "@4dl/tenancy#build": { "outputs": [] },
+    "@4dl/auth#build": { "outputs": [] },
+    "@4dl/billing#build": { "outputs": [] },
+    "@4dl/commerce#build": { "outputs": [] },
+    "@4dl/storage#build": { "outputs": [] },
+    "@4dl/ai#build": { "outputs": [] },
+    "@4dl/email#build": { "outputs": [] },
+    "@4dl/notify#build": { "outputs": [] },
+    "@4dl/purge#build": { "outputs": [] },
     "@kova/domain#build": { "outputs": [] },
     "@kova/protocol#build": { "outputs": [] },
     "@4dl/ui#build": { "outputs": [] },
+    "@4dl/app-kit#build": { "outputs": [] },
     "lint": {},
     "dev": {
       "cache": false,

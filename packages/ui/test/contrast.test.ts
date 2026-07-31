@@ -23,75 +23,14 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { AA, AA_NON_TEXT, contrastRatio as ratio, cssTokens, luminance } from "../src/lib/contrast.js";
 
 const CSS = readFileSync(fileURLToPath(new URL("../src/tokens.css", import.meta.url)), "utf8");
-
-/** Pull one `:root` / `:root[data-theme="light"]` block's custom properties. */
-function block(selector: string): Record<string, string> {
-  const i = CSS.indexOf(selector + " {");
-  if (i === -1) throw new Error(`no ${selector} block in tokens.css`);
-  const body = CSS.slice(i + selector.length + 2, CSS.indexOf("\n}", i));
-  const out: Record<string, string> = {};
-  for (const m of body.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) out[m[1]!] = m[2]!.trim();
-  return out;
-}
-
-const DARK = block(":root");
-const LIGHT = { ...DARK, ...block(':root[data-theme="light"]') };
-
-// ── oklch → sRGB ────────────────────────────────────────────────────────────
-
-function oklchToRgb(css: string): [number, number, number] {
-  const m = /oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/.exec(css);
-  if (!m) throw new Error(`not an oklch() colour: ${css}`);
-  const [L, C, hDeg] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  const h = (hDeg * Math.PI) / 180;
-  const a = C * Math.cos(h);
-  const b = C * Math.sin(h);
-
-  // oklab → LMS
-  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
-  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
-  const s_ = L - 0.0894841775 * a - 1.291485548 * b;
-  const [l, mm, s] = [l_ ** 3, m_ ** 3, s_ ** 3];
-
-  // LMS → linear sRGB
-  const lin = [
-    +4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
-    -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
-    -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
-  ];
-  // Clamp out-of-gamut exactly as a browser does before display.
-  return lin.map((v) => Math.min(1, Math.max(0, v))) as [number, number, number];
-}
-
-/** Relative luminance from a colour that may be oklch or a plain hex. */
-function luminance(css: string): number {
-  const lin = css.startsWith("oklch")
-    ? oklchToRgb(css)
-    : (() => {
-        const h = css.replace("#", "");
-        const n = h.length === 3 ? [...h].map((c) => parseInt(c + c, 16)) : [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
-        return n.map((v) => {
-          const c = v / 255;
-          return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-        }) as [number, number, number];
-      })();
-  return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
-}
-
-function ratio(fg: string, bg: string): number {
-  const [hi, lo] = [luminance(fg), luminance(bg)].sort((a, b) => b - a);
-  return (hi + 0.05) / (lo + 0.05);
-}
+const DARK = cssTokens(CSS, ":root");
+const LIGHT = { ...DARK, ...cssTokens(CSS, ':root[data-theme="light"]') };
 
 // ── The pairs components actually render ────────────────────────────────────
 
-/** AA for normal text. `body-lg` is 17px/500 — under the 18.66px-bold threshold,
- *  so the large-text 3:1 allowance does NOT apply to buttons or rows. */
-const AA = 4.5;
-/** AA for non-text: focus rings, icon strokes, chart marks. */
-const AA_NON_TEXT = 3;
 
 const TEXT_PAIRS: [string, string, string][] = [
   ["body on canvas", "--foreground", "--background"],
@@ -105,8 +44,15 @@ const TEXT_PAIRS: [string, string, string][] = [
   ["popover text", "--popover-foreground", "--popover"],
 ];
 
-/** Status and domain tones are rendered as tone-on-`-soft`, never on canvas. */
-const TONES = ["success", "warning", "danger", "activity", "nutrition", "sleep", "cardio", "hydration", "supplement", "lab", "calories", "protein", "carbs", "fat"];
+/**
+ * Status tones are rendered as tone-on-`-soft`, never on canvas.
+ *
+ * The design system's own tones only. An app's ACCENT tones are measured by the
+ * app against the same bar, using the same exported helpers — Kova's are in
+ * `apps/app/src/tokens.accents.contrast.test.ts`. Neither half can be checked
+ * from the other: this file reads the stylesheet it ships.
+ */
+const TONES = ["success", "warning", "danger"];
 
 describe.each([
   ["dark", DARK],

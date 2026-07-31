@@ -241,7 +241,7 @@ async function digestForTenant(env: Env, tenantId: string, _brand: string, weekA
     db.prepare("SELECT COUNT(*) AS n FROM clients WHERE tenant_id = ? AND status = 'active'").bind(tenantId).first(),
     db.prepare("SELECT COUNT(DISTINCT client_id) AS n FROM (SELECT client_id FROM exercise_logs WHERE tenant_id = ? AND date_local >= ? UNION SELECT client_id FROM check_ins WHERE tenant_id = ? AND date_local >= ? UNION SELECT client_id FROM food_entries WHERE tenant_id = ? AND date_local >= ?)").bind(tenantId, weekAgoDate, tenantId, weekAgoDate, tenantId, weekAgoDate).first(),
     db.prepare("SELECT COUNT(*) AS n FROM check_ins WHERE tenant_id = ? AND date_local >= ?").bind(tenantId, weekAgoDate).first(),
-    db.prepare("SELECT COUNT(*) AS n FROM client_subscriptions WHERE tenant_id = ? AND source = 'stripe' AND started_at >= ?").bind(tenantId, weekAgoIso).first(),
+    db.prepare("SELECT COUNT(*) AS n FROM subject_subscriptions WHERE tenant_id = ? AND source = 'stripe' AND started_at >= ?").bind(tenantId, weekAgoIso).first(),
     db.prepare("SELECT status FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<{ status: string }>(),
   ]);
   const active = num(activeClients);

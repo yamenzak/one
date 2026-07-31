@@ -44,7 +44,7 @@ export function AiErrorBox({ error, className }: { error: unknown; className?: s
  * missing consumer. Deliberately NOT dismissable and NOT collapsible — the
  * whole point is that it stays visible for as long as the fabricated values are
  * on screen. `warning` tone from the design system, `role="status"` so it is
- * announced (DESIGN.md §2.2).
+ * announced (KOVA.md Part II §2.2).
  *
  * Renders nothing when `mocked` is false/undefined, so call sites can drop it in
  * unconditionally.

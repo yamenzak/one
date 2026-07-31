@@ -10,7 +10,7 @@
  *     the `addons_json` / `flags_json` / `visibility` / `once_per_customer`
  *     branches all write.
  *   - DELETE is an ARCHIVE (`active = 0`), not an erase. The package leaves the
- *     live catalogue and stops being grantable, but `client_subscriptions` rows
+ *     live catalogue and stops being grantable, but `subject_subscriptions` rows
  *     are untouched — an existing buyer keeps every day they paid for.
  *   - PATCH `{ active: true }` is the only way back on sale.
  *

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { FREE_ENTITLEMENTS, mergeOverrides, resolveEntitlements, checkDowngrade, RESERVED_FEATURES, FEATURE_KEYS } from "../src/entitlements.js";
 import { DEFAULT_CLIENT_FLAGS, resolveClientFlags, unionClientFlags, CLIENT_FLAG_META, CLIENT_FLAG_KEYS } from "../src/clientFlags.js";
 import { grantSatisfies, resolvePermissions, sanitizePermissions, ROLE_PRESETS } from "../src/perms.js";
-import type { Budget } from "../src/budgets.js";
+import type { Budget } from "@4dl/commerce/model";
 
 const NOW = "2026-07-10T12:00:00.000Z";
 const days = (n: number) => new Date(Date.parse(NOW) + n * 86_400_000).toISOString();

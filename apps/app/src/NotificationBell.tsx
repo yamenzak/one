@@ -1,10 +1,19 @@
-/** Notification bell — surface-aware unread badge + dropdown, click-through,
- *  mark-all-read. Real-time via InboxDO WS; a slow poll backstops. */
+/**
+ * Notification bell — surface-aware unread badge + dropdown, click-through,
+ * mark-all-read.
+ *
+ * The TRANSPORT is `@4dl/app-kit`'s `useInbox`: a live socket to `InboxDO` with
+ * a slow poll behind it, both torn down while offline. What stays here is
+ * everything that reads Kova's registry — which notifications belong to which
+ * SURFACE (a client sees client notifications; a coach in train mode does too),
+ * their icons and tones, and the mode-flip on click-through.
+ */
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, IconBadge } from "@4dl/ui";
 import { notifVisibleInSurface, unreadInSurface, type NotifType, type NotifSurface } from "@kova/domain";
+import { useInbox } from "@4dl/app-kit";
 import { api } from "./api.js";
 import { useSession } from "./session.js";
 import { notifCoding } from "./notif-ui.js";
@@ -14,53 +23,12 @@ interface Notification { id: string; type: NotifType; tenant_id: string | null; 
 export function NotificationBell() {
   const { ctx, mode, setMode, switchTenant, online } = useSession();
   const nav = useNavigate();
-  const [items, setItems] = useState<Notification[]>([]);
-  const [failed, setFailed] = useState(false);
+  const { items, failed, patch } = useInbox<Notification>({ online });
 
   // The surface you're currently in decides which notifications the bell shows:
   // a client (or a coach in train mode) sees client notifications; otherwise staff.
   const surface: NotifSurface = ctx?.active?.role === "client" || mode === "train" ? "client" : "staff";
   const activeTenantId = ctx?.active?.tenantId ?? null;
-
-  const load = useCallback(async () => {
-    try { setItems((await api.get<{ notifications: Notification[] }>("/api/notifications")).notifications); setFailed(false); } catch { setFailed(true); }
-  }, []);
-
-  // Real-time via the per-user InboxDO WebSocket; a slow poll stays as a
-  // backstop for missed pushes / dropped sockets (SPEC §8.10).
-  //
-  // Gated on connectivity: while offline the socket can only fail, so the
-  // backoff reconnect + the 90s poll used to grind against a dead radio for the
-  // whole session — draining battery in exactly the gym scenario the offline
-  // support exists for. Going back online re-runs this effect (the `online` dep),
-  // which reconnects and reloads immediately.
-  useEffect(() => {
-    if (!online) return;
-    void load();
-    const poll = setInterval(() => void load(), 90000);
-    let ws: WebSocket | null = null;
-    let closed = false;
-    let retry = 0;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const connect = () => {
-      if (closed) return;
-      try {
-        const proto = location.protocol === "https:" ? "wss" : "ws";
-        ws = new WebSocket(`${proto}://${location.host}/api/inbox/ws`);
-        ws.onopen = () => { retry = 0; };
-        ws.onmessage = () => void load();
-        ws.onclose = () => {
-          ws = null;
-          if (closed) return;
-          retry = Math.min(retry + 1, 6);
-          timer = setTimeout(connect, 1000 * 2 ** retry); // backoff, cap ~64s
-        };
-        ws.onerror = () => { try { ws?.close(); } catch { /* noop */ } };
-      } catch { /* fall back to the poll */ }
-    };
-    connect();
-    return () => { closed = true; clearInterval(poll); if (timer) clearTimeout(timer); try { ws?.close(); } catch { /* noop */ } };
-  }, [load, online]);
 
   // Only the current surface's notifications (train vs coach mode).
   const shown = items.filter((n) => notifVisibleInSurface(n.type, surface));
@@ -68,11 +36,11 @@ export function NotificationBell() {
 
   const markRead = async (id: string) => {
     await api.post(`/api/notifications/${id}/read`).catch(() => undefined);
-    setItems((p) => p.map((n) => (n.id === id ? { ...n, read: 1 } : n)));
+    patch((p) => p.map((n) => (n.id === id ? { ...n, read: 1 } : n)));
   };
   const markAll = async () => {
     await api.post("/api/notifications/read-all", { surface }).catch(() => undefined);
-    setItems((p) => p.map((n) => (notifVisibleInSurface(n.type, surface) ? { ...n, read: 1 } : n)));
+    patch((p) => p.map((n) => (notifVisibleInSurface(n.type, surface) ? { ...n, read: 1 } : n)));
   };
   const open = async (n: Notification) => {
     void markRead(n.id);

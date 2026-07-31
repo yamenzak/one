@@ -3,7 +3,7 @@
  * a thumbnail (real image when the exercise has one, muscle-tinted fallback
  * otherwise) plus muscle/equipment helpers. Reused by the player, the plan
  * builder's picker, and the swap drawer so exercises read consistently
- * everywhere (SPEC §8.3, DESIGN.md metric-coding).
+ * everywhere (SPEC §8.3, KOVA.md Part II metric-coding).
  */
 
 import { useEffect, useState, type ReactNode } from "react";

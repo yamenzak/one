@@ -5,11 +5,11 @@ Guidance for Claude Code working in this repository.
 ## Project
 
 **Kova** — a multi-tenant, multi-trainer platform for personal-training
-businesses. Product + technical spec in [SPEC.md](SPEC.md); the ByShujaa feature
-inventory Kova is modeled on is in
-[docs/BY-SHUJAA-FEATURES.md](docs/BY-SHUJAA-FEATURES.md).
+businesses, and the first app on this repo's shared platform. Everything Kova is
+lives in **[KOVA.md](KOVA.md)**: Part I the product + technical spec, Part II the
+design mapping, Part III the screen index, Part IV the body-scan design.
 
-**Looking for the file that draws a screen?** [docs/SCREENS.md](docs/SCREENS.md)
+**Looking for the file that draws a screen?** [KOVA.md](KOVA.md) **Part III**
 maps every surface — routes, sub-tabs, and the sheets/drawers that aren't routes
 — to `file:line`, per persona. Grepping for a screen's name usually fails: one
 path renders different files per persona, and most surfaces live inside their
@@ -18,17 +18,19 @@ parent's file. **Update it in the same commit as any screen you add or move.**
 **UI: two files, and the order matters.** [UI-LANGUAGE.md](UI-LANGUAGE.md) is the
 interface language — hierarchy, layout, tokens, motion, copy, component grammar —
 written product-agnostically because it is the extraction target for the shared
-UI package other 4DL apps will consume. [DESIGN.md](DESIGN.md) maps Kova's
-screens onto it. **When they disagree, UI-LANGUAGE.md wins.** DESIGN.md lists the
+UI package other 4DL apps will consume. [KOVA.md](KOVA.md) Part II maps Kova's
+screens onto it. **When they disagree, UI-LANGUAGE.md wins.** Part II lists the
 remaining deltas and UI-LANGUAGE.md §13 gives the order to close them.
 
 **The design system is `@4dl/ui`, not Kova's.** It is shared across 4DL apps, so
 it carries no product vocabulary: no clients, workouts, meals, or coaches, and no
 router. Kova's registries (`METRICS`, `MACRO_KEYS`, `FASTING_ZONES`, personas,
 `MetricChip`/`MacroBar`) live in `apps/app/src/registry/`, and
-`registry.conformance.test.ts` keeps them there. The boundary rule — plus the one
-documented leak (`Tone`) — is in [packages/ui/README.md](packages/ui/README.md).
-Read it before adding anything to that package.
+`registry.conformance.test.ts` keeps them there. `Tone` is now five STATUS tones
+plus anything the app registers by convention — Kova's eleven accents and their
+tokens live in `apps/app/src/registry/tones.ts` + `tokens.accents.css`. The
+package's boundary ALLOW list is EMPTY. Read
+[packages/ui/README.md](packages/ui/README.md) before adding anything to it.
 
 ## Stack
 
@@ -45,16 +47,64 @@ apps/
   app/   # ONE role-adaptive PWA (client / trainer / owner / platform admin)
   www/   # marketing site (dependency-free static generator)
   e2e/   # Playwright — the golden paths, in a browser against the real worker
+  _template/ # a NEW 4DL app: every shared package wired, no product vocabulary.
+             # Typechecks + tests in this workspace so it cannot rot. Copy it.
 packages/
-  platform/  # @4dl/platform — the SHARED multi-tenant substrate (pure, no I/O):
-             # hosts/tenancy, custom-domain DCV, AI credit metering, promo math,
-             # tenant standing, the AI mock-lane decision. See its README.
+  core/      # @4dl/core — the floor every 4DL package stands on: ids, defensive
+             # JSON columns, the STRUCTURAL BINDINGS CONTRACT (HasDb/HasMedia/…)
+             # and the COMPOSED SCHEMA RUNNER (SchemaModule/applySchema), plus
+             # the boundary checker at @4dl/core/boundary. See its README.
+  ai/        # @4dl/ai — the METERED generation path: model catalog, Workers AI +
+             # Gemini, reserve→run→settle against the credit DO, the dev-only
+             # mock lane, pricing parsers. Prompts are the app's. See its README.
+  auth/      # @4dl/auth — PASSWORDLESS identity + authorization: the Better Auth
+             # factory (email OTP + passkeys, org = tenant), the request identity,
+             # the five-gate route-guard ENGINE, the grant algebra, staff seats,
+             # step-up codes. Nothing here depends on billing. See its README.
+  commerce/  # @4dl/commerce — the ACCESS ECONOMY a tenant sells to its own
+             # customers: budgets (queue, never sum), the customer-lapse ladder,
+             # website-native discount codes. See its README.
+  billing/   # @4dl/billing — the entitlement ENGINE (quotas/gates/grants, keys
+             # injected), credit metering, the per-tenant credit Durable Object
+             # (CreditLedgerDO — the class NAME is load-bearing), the Stripe
+             # client, and the dunning ladder. See its README.
+  storage/   # @4dl/storage — R2 + the media ledger + the quota gate (resolver
+             # injected, so it does not depend on billing). See its README.
+  email/     # @4dl/email — transactional mail: the provider decision, the MIME
+             # builder, the tenant lane (platform | own Brevo key | off) and the
+             # HTML component kit. Brand injected; the credit METER is a
+             # parameter, not a global. `@4dl/email/model` is the pure half.
+  notify/    # @4dl/notify — the inbox: InboxDO (one DO per user, hibernating
+             # WebSockets, push = "refetch"), notifications + per-user prefs.
+             # The notification TYPES are the app's. See its README.
+  purge/     # @4dl/purge — ERASURE DERIVED from every module's `scoped`
+             # declaration, plus the two conformance checks that make a
+             # forgotten table and a renamed column test failures instead of
+             # silent no-ops. Pure. See its README.
+  tenancy/   # @4dl/tenancy — multi-tenant ADDRESSING: the five doors, host→tenant
+             # resolution + KV cache, custom domains (Cloudflare for SaaS + DCV),
+             # the standing/host-gate model. `@4dl/tenancy/model` is the pure half
+             # the browser may import. See its README.
   domain/    # @kova/domain — Kova's pure logic (no I/O): nutrition/TDEE, body-fat,
              # activity/workout math, progress, plus the product registries
              # (entitlements, perms, budgets, notifications, features). Tested.
   protocol/  # zod wire schemas shared api <-> app (plan bodies, log payloads, context)
   ui/        # @4dl/ui — the SHARED design system: tokens + product-agnostic
              # primitives. No product vocabulary, no router. See its README.
+  billing-rail/ # @4dl/billing-rail — ONE STRIPE ACCOUNT, MANY APPS: event→app
+             # attribution (metadata.app, legacy <prefix>_* keys, or an app's own
+             # `claims` lookup), the app-tagged catalog, and rail_parked_events —
+             # the dead letter an unattributable event lands in INSTEAD of being
+             # answered 200 and forgotten. See its README.
+  admin/     # @4dl/admin — the OPERATOR CONSOLE on every app's `admin.` door:
+             # the router-free section-registry shell, plus panels for config a
+             # shared package owns (email delivery). The SECTIONS are the app's.
+             # See its README.
+  app-kit/   # @4dl/app-kit — the BROWSER runtime: the typed fetch layer and its
+             # three-way offline outcome (queued | offline | HTTP error), host
+             # resolution across the five doors, prefixed storage, the passkey
+             # ceremony, Stripe.js + PaymentSheet, Turnstile, ErrorBoundary,
+             # hard-refresh. See its README.
   brand/     # (reserved) logos, illustrations
 ```
 
@@ -100,34 +150,59 @@ remote bindings without editing the config (this is what the E2E suite does).
 
 ## Architecture notes (read before changing these)
 
-- **Auth**: `apps/api/src/auth.ts` — Better Auth, org = tenant, OTP + passkey
-  plugins only (no password provider). `auth-context.ts` resolves the session;
-  `route-guard.ts` is the three-lane boundary (public / platform-admin / member).
+- **Auth**: the engine is `@4dl/auth`; `apps/api/src/auth.ts`, `auth-context.ts`,
+  `route-guard.ts`, `otp-guard.ts` and `action-otp.ts` are thin bindings that
+  supply Kova's RBAC registry, copy, seat quota and route tables. Org = tenant,
+  OTP + passkey only (no password provider). The route guard's STANDING gate is
+  injected (`gate: (c) => c.get("host").gate`), which is what keeps auth
+  independent of billing. Read `packages/auth/README.md` before changing any of
+  the five — particularly the three seat doors and the grant-bounding rule.
 - **Row-level scope**: every coaching route goes through
   `requireClientAccess(c, clientId)` in `clients.ts` — owner/assistant = tenant
   match, trainer = `client_trainers` assignment, client = own record. This is
   the security invariant; never bypass it.
+- **The Stripe rail is shared; the BALANCE is not.** `@4dl/billing-rail` sits in
+  front of `/api/stripe/webhook`: it verifies once, attributes the event to an
+  app, and parks what it cannot attribute in `rail_parked_events` — because the
+  old handler answered an unattributable event `200 {received: true}` with its id
+  already claimed, so Stripe never retried (money captured, nothing granted).
+  Attribution is `metadata.app` → a legacy `<prefix>_*` key → the app's own
+  `claims` lookup, and a claim resolves SILENCE, never a contradiction. Kova's
+  `claims` is `tenantByCustomer`, which is load-bearing: `invoice.paid` often
+  carries no Kova metadata at all. Credits stay in `TenantBillingDO` per app —
+  routing crosses workers, a metered reserve→settle must not.
 - **Credits**: `TenantBillingDO` (`billing-do.ts`) is the authoritative balance;
-  AI goes through `ai.ts` `generate()` = reserve → run (Workers AI | mock) →
-  settle. Metering math is pure in `@4dl/platform` credits.ts.
-- **Access economy**: `commerce-routes.ts` + `@kova/domain` budgets.ts —
+  AI goes through `@4dl/ai` `generate()` = reserve → run (Workers AI | Gemini |
+  the dev-only mock) → settle; `apps/api/src/ai.ts` binds Kova's feature registry
+  and its bucket. Metering math and the DO base class are `@4dl/billing`; Kova's
+  `TenantBillingDO` is a subclass and **its class name must never change** —
+  `wrangler.jsonc` migrations bind it to durable storage.
+- **Access economy**: `commerce-routes.ts` + `@4dl/commerce` (Kova's scopes are
+  bound in `@kova/domain` budgets.ts). The buyer is a `subject` there —
+  `subject_subscriptions.subject_id` — while Kova's own tables keep `client_id`.
+  Both are correct: one is a shared package's vocabulary, the other is Kova's. —
   budgets carry `expiresAt`, days derive at read time, purchases QUEUE not sum,
   status reconciles lazily on read. No domain cron.
 - **Two flag systems** (don't merge): platform entitlements (tenant bought from
   Kova, `entitlements.ts`) vs per-package client flags (client bought from the
   tenant, `clientFlags.ts`). Client capability = the intersection.
 - **The host IS the tenancy** (read this before touching routing or auth).
-  `@4dl/platform` `hosts.ts` classifies every hostname into five doors:
+  `@4dl/tenancy` `hosts.ts` classifies every hostname into five doors:
   `kova.4dl.app` = a signpost (not an app, refuses to send a sign-in code),
   `setup.` = the only place a studio is created, `admin.` = the operator console
   (`/api/admin/*` answers there and nowhere else), `<slug>.` = a studio, a tenant's
   own domain = the same studio. Anything else under the root 404s. `host-context.ts`
   turns that into a tenant; `auth-context.ts` pins the tenancy from it, so a session
   pointed at the wrong studio grants nothing. `/t/<slug>` is gone.
-  - Studio slugs are DNS LABELS: validated server-side in `org-guard.ts` against
-    `RESERVED_LABELS`, which is a security control (a studio at `admin.` or
-    `autodiscover.` would be a takeover). Adding a label is cheap; removing one
-    changes a live studio's URL.
+  - Studio slugs are DNS LABELS: validated server-side in `org-guard.ts`, which
+    is a security control (a studio at `admin.` or `autodiscover.` would be a
+    takeover). The list is in TWO halves and both are load-bearing:
+    `RESERVED_LABELS` in `@4dl/tenancy` (universal — other doors, mail
+    autoconfig, ACME, Workers plumbing, money words) plus `KOVA_RESERVED_LABELS`
+    in `host-context.ts` (our brand names, which mean nothing to another app).
+    `org-guard.ts` is the one place they meet; `apps/api/test/tenancy-adapter.test.ts`
+    keeps the brand half covered. Adding a label is cheap; removing one changes a
+    live studio's URL.
   - One passkey and one session across every door under the root (`rpIdFor`,
     `cookieDomainFor`). A custom domain gets its own — WebAuthn allows nothing else.
   - The console is reachable at `admin.` and NOWHERE else. There used to be an
@@ -140,7 +215,7 @@ remote bindings without editing the config (this is what the E2E suite does).
     every door onto the root. The two production routes are a dashboard step
     (DEPLOY.md §11). Read the header comment before adding them back.
 - **Two access ladders, and they must not be confused.**
-  - **Kova → tenant** (`@4dl/platform` standing.ts, `DUNNING_DAYS`): past_due →
+  - **Kova → tenant** (`@4dl/billing` dunning.ts + `@4dl/tenancy` standing.ts): past_due →
     **7d read-only** → **30d blocked** → **37d purged**, all anchored on
     `past_due_at` and driven by `dailySweep`. `resolveHostGate` turns the status
     into a gate that `route-guard.ts` enforces once for every route; `readOnly`
@@ -150,7 +225,8 @@ remote bindings without editing the config (this is what the E2E suite does).
     Stripe webhooks are exempt (blocking them would make suspension
     unrecoverable), and so are `/api/me/*` and `/api/tenant/close`: **leaving is
     always allowed.** Paying must be a way out, not the only one.
-  - **tenant → client** (`@kova/domain` lapse.ts): the STUDIO's own rule for a
+  - **tenant → client** (`@4dl/commerce` lapse.ts; Kova's copy in
+    `@kova/domain` lapse.ts): the STUDIO's own rule for a
     client whose package ran out — read_only / blocked / archive / delete after N
     days, in studio settings. `archive` KEEPS a client seat, `delete` FREES one.
     The destructive pair carries a 14-day floor, and the sweep **freezes this
@@ -175,15 +251,28 @@ remote bindings without editing the config (this is what the E2E suite does).
   logged from the log drawer never appeared on the Progress chart, the wellness
   score double-counted a day rated in both places, and `check_ins.sleep_quality`
   was read by Progress while nothing ever wrote it.
-- **Adding DDL means bumping `SCHEMA_VERSION` in `db.ts`.** The marker row
-  short-circuits the entire DDL block, so a new `CREATE TABLE IF NOT EXISTS`
+- **Adding DDL means bumping `KOVA_SCHEMA.version` in `db.ts`.** The marker row
+  short-circuits the entire module, so a new `CREATE TABLE IF NOT EXISTS`
   without a bump is invisible on a fresh database and fatal on every existing
-  one — the table is never created and every route touching it 500s.
+  one — the table is never created and every route touching it 500s. The schema
+  is now a `SchemaModule` in `@4dl/core`'s composed runner; the other rules its
+  statements must satisfy (terminate with `;`, no `--`, ALTERs are ADD COLUMN
+  only) are asserted by `apps/api/test/schema-module.test.ts` because every one
+  of them fails silently. Read `packages/core/README.md` before editing the DDL.
 - Store metric, convert at display (`@kova/domain` units.ts). Day-bucketed
   rows use the client's local date (`date_local`, YYYY-MM-DD) from the device.
 - Plan/meal bodies are JSON columns validated by `@kova/protocol` at the route.
 - Pure domain logic gets unit tests; API flows get Miniflare integration tests.
   Run tests with the `wrangler dev` server stopped (they share `.wrangler` state).
+- **A write that fails says so, where it failed.** Every mutating control on a
+  settings surface goes through `@4dl/ui`'s `useAction` (has a Save button) or
+  `useConfirmedState` (instant — it rolls back to the pre-apply snapshot). The
+  two shapes they replace are shorter than the correct code and both fail
+  silently: `try { await api.patch(…) } finally {}` with no catch rejects into
+  the app-wide "Something didn't load" toast, and
+  `setState(next); await write().catch(() => undefined)` leaves the control
+  showing a value the server refused. `apps/app/src/save-lifecycle.conformance.test.ts`
+  makes either one a test failure.
 - Prettier-ish: no semicolons aren't enforced here — match surrounding style.
 
 ## Status
@@ -191,10 +280,45 @@ remote bindings without editing the config (this is what the E2E suite does).
 Be conservative here: this section is read as ground truth by future agents, so
 an over-claim costs more than an under-claim. Verify before editing it.
 
+**The platform extraction is DONE.** All ten stages landed: the mechanisms,
+`@4dl/tenancy`, `@4dl/auth`, `@4dl/billing`, `@4dl/commerce`, `@4dl/ai` +
+`@4dl/storage`, `@4dl/email` + `@4dl/notify`, `@4dl/purge`, `@4dl/app-kit`,
+`apps/_template`, and Stage 10's four sweeps — the route seam
+(`domainRoutes`/`orgSlugGuards` in `@4dl/tenancy`, `turnstileAdminRoutes` in
+`@4dl/auth`; `RouteEnv`/`RouteGuards` is what broke the tenancy↔auth cycle), the
+frontend runtime (`createSession`, `ThemeProvider`, the notices, `useInbox` in
+`@4dl/app-kit`), the Stripe split (`@4dl/billing/webhook.ts` +
+`@4dl/commerce/connect.ts`), and the template's custom-domain routes +
+integration suite. `@4dl/platform` is gone. Since then: `@4dl/admin` (the
+operator console shell) and `@4dl/billing-rail` (one Stripe account, many apps).
+
+**[PLATFORM.md](PLATFORM.md) is the index** — the fourteen packages, the four
+mechanisms, the five invariants, and the CONTRIBUTION RULES for moving anything
+between an app and a package. Read it before you move code.
+**[docs/SHIPPING-AN-APP.md](docs/SHIPPING-AN-APP.md)** is the walkthrough for a
+new app. The staged extraction plan, the three pre-release audits and the
+billing/notifications/registry design plans are finished work and live in git
+history.
+
+Three things are still Kova's on purpose, and each README says why: `Shell.tsx`
+(role-adaptive nav is a product decision, extraction plan §3.2), the presentation
+halves of `StudioPausedBanner`/`NotificationBell`/`StudioSwitcher`/`FeatureLock`
+(a registry read wrapped around a few `@4dl/ui` primitives — injecting the
+registry leaves a `Card` with a parameter), and the Stripe **route trees**, whose
+handlers are woven through Kova's notification registry, entitlement gates and
+`requireClientAccess`. Only the reconciliation logic moved.
+
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured most recently, per package: **465 API + 206 domain + 98 platform +
-61 ui + 38 app + 7 protocol** (875 total, 38 skipped). Domain used to read 304;
-98 of those are now `@4dl/platform` — the split moved tests, it did not add any.
+moves. Measured most recently, per package: **508 API + 197 domain + 83 app +
+73 tenancy + 43 ui + 35 billing-rail + 25 commerce + 21 billing + 16 template +
+14 core + 14 purge + 12 ai + 12 auth + 7 protocol + 3 admin + 3 app-kit +
+3 storage + 3 email + 3 notify** (1,075 total, 38 skipped). The ui count DROPPED and the app count rose by the
+same shape: Stage 0b moved Kova's eleven accent tones — and the contrast tests
+that guard them — out of `@4dl/ui` and into the app. The template's 16 are 11
+conformance (plain Node, no fixtures) + 5 integration (the real worker through
+Miniflare, on the real `*.localhost` host topology).
+Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
+`@4dl/platform` to `@4dl/tenancy`; the split moves tests, it does not add any.
 The pricing and normalizer suites live
 in `apps/api/test` and are already *inside* the API count — the older
 "protocol/pricing/normalizer" phrasing double-counted them. **E2E is separate**
@@ -280,8 +404,12 @@ same-origin and unaffected.
 
 **Ops:** deployment is genuinely non-trivial — read DEPLOY.md before touching
 anything deploy-shaped. Notably: a fresh deploy **cannot send email** until
-`email.provider`/`email.from` are set directly in D1 (there is no admin email UI,
-and the mock provider fails closed outside dev), and the whole vision suite is
-dead until `google.gemini_key` is set.
+`email.provider`/`email.from` are seeded directly in D1 (the mock provider fails
+closed outside dev). There IS an operator screen for it now — Platform admin →
+**Email delivery**, `@4dl/admin`'s panel over `@4dl/email/admin-routes` — but it
+cannot break the BOOTSTRAP deadlock and no UI could: reaching it needs a
+platform-admin session, which needs an OTP, which needs email. The first seed is
+manual (DEPLOY.md §6); every change after it is a form. The vision suite is
+still dead until `google.gemini_key` is set (Platform admin → AI).
 
 See SPEC §13 for the phase map.

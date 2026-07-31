@@ -321,12 +321,12 @@ describe("connect rail — webhook idempotency + grant", () => {
 
     const r1 = await post();
     expect(r1.status).toBe(200);
-    const n1 = (await db.prepare("SELECT COUNT(*) AS n FROM client_subscriptions WHERE client_id = ? AND status = 'active'").bind(client.id).first<{ n: number }>())!.n;
+    const n1 = (await db.prepare("SELECT COUNT(*) AS n FROM subject_subscriptions WHERE subject_id = ? AND status = 'active'").bind(client.id).first<{ n: number }>())!.n;
     expect(n1).toBe(1); // granted
 
     const r2 = await post();
     expect((await r2.json() as { duplicate?: boolean }).duplicate).toBe(true); // dedup fired
-    const n2 = (await db.prepare("SELECT COUNT(*) AS n FROM client_subscriptions WHERE client_id = ? AND status = 'active'").bind(client.id).first<{ n: number }>())!.n;
+    const n2 = (await db.prepare("SELECT COUNT(*) AS n FROM subject_subscriptions WHERE subject_id = ? AND status = 'active'").bind(client.id).first<{ n: number }>())!.n;
     expect(n2).toBe(1); // no double grant
 
     // A bad signature is rejected outright.
@@ -2163,7 +2163,7 @@ describe("custom domains (SPEC §14.1) — Host pins the tenant", () => {
         body: JSON.stringify({ displayName: "During suspension" }),
       });
       expect(write.status).toBe(402);
-      expect(((await write.json()) as { error: string }).error).toBe("studio_read_only");
+      expect(((await write.json()) as { error: string }).error).toBe("tenant_read_only");
 
       // Reads are never gated: a person's own data is not collateral.
       const read = await SELF.fetch("http://studio-one.localhost:8787/api/clients", { headers: auth(ownerCookie) });
@@ -3192,7 +3192,7 @@ describe("promo codes — website-native discounts (tenant rail)", () => {
     await SELF.fetch(`${ORIGIN}/api/promo-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "ONLYME", discountType: "percent", percentOff: 100, restrictedClientId: buyer }) });
     const r3 = await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: other, packageId: pkgId, promoCode: "ONLYME" }) });
     expect(r3.status).toBe(400);
-    expect((await r3.json() as { error: string }).error).toBe("promo_wrong_client");
+    expect((await r3.json() as { error: string }).error).toBe("promo_wrong_subject");
 
     // A discount that lands the charge below Stripe's minimum → clean 400, not a 500.
     await SELF.fetch(`${ORIGIN}/api/promo-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "ALMOSTALL", discountType: "amount", amountOffCents: 4980 }) }); // 5000 → 20¢
@@ -3226,19 +3226,19 @@ describe("installments — limited-term subscription (per-cycle unlock)", () => 
 
     // Period one via installment-mode checkout (N=3).
     await post(JSON.stringify({ id: "evt_inst_create", account: "acct_install_1", type: "checkout.session.completed", data: { object: { id: "cs_inst_1", mode: "subscription", subscription: subId, metadata: { kova_tenant: tenantId, kova_client: "cl_install_1", kova_package: pkgId, kova_installments: "3" } } } }));
-    let row = (await db.prepare("SELECT installments_total, installments_paid, payment_status, stripe_sub_id, budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ installments_total: number; installments_paid: number; payment_status: string; stripe_sub_id: string | null; budgets_json: string }>())!;
+    let row = (await db.prepare("SELECT installments_total, installments_paid, payment_status, stripe_sub_id, budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ installments_total: number; installments_paid: number; payment_status: string; stripe_sub_id: string | null; budgets_json: string }>())!;
     expect([row.installments_total, row.installments_paid]).toEqual([3, 1]);
     const cycleBudgets = JSON.parse(row.budgets_json).length; // 'all' → workout+meal = 2 per cycle
 
     // Cycle two (still billing, so keyed by the Stripe sub id).
     await post(JSON.stringify({ id: "evt_inst_c2", account: "acct_install_1", type: "invoice.paid", data: { object: { subscription: subId, billing_reason: "subscription_cycle" } } }));
-    row = (await db.prepare("SELECT installments_total, installments_paid, payment_status, stripe_sub_id, budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first())!;
+    row = (await db.prepare("SELECT installments_total, installments_paid, payment_status, stripe_sub_id, budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first())!;
     expect(row.installments_paid).toBe(2);
     expect(JSON.parse(row.budgets_json).length).toBe(cycleBudgets * 2); // another period queued
 
     // Final cycle → completed, billing stopped (stripe_sub_id cleared).
     await post(JSON.stringify({ id: "evt_inst_c3", account: "acct_install_1", type: "invoice.paid", data: { object: { subscription: subId, billing_reason: "subscription_cycle" } } }));
-    row = (await db.prepare("SELECT installments_paid, payment_status, stripe_sub_id, budgets_json FROM client_subscriptions WHERE package_id = ? LIMIT 1").bind(pkgId).first())!;
+    row = (await db.prepare("SELECT installments_paid, payment_status, stripe_sub_id, budgets_json FROM subject_subscriptions WHERE package_id = ? LIMIT 1").bind(pkgId).first())!;
     expect(row.installments_paid).toBe(3);
     expect(row.payment_status).toBe("completed");
     expect(row.stripe_sub_id).toBeNull();
@@ -3332,7 +3332,7 @@ describe("package lifecycle + redemption scoping", () => {
     const a = await mk("LifeA");
     const b = await mk("LifeB");
     const mkPkg = async (id: string, visibility: string, restricted: string | null) =>
-      db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, visibility, restricted_client_id, active, created_at) VALUES (?, ?, ?, 4000, ?, 'usd', ?, ?, 1, ?)")
+      db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, visibility, restricted_subject_id, active, created_at) VALUES (?, ?, ?, 4000, ?, 'usd', ?, ?, 1, ?)")
         .bind(id, ctx.active.tenantId, id, JSON.stringify([{ feature: "all", days: 30 }]), visibility, restricted, new Date().toISOString()).run();
 
     // A `private` package is grant-only — not client-purchasable.
@@ -3341,6 +3341,13 @@ describe("package lifecycle + redemption scoping", () => {
     // A `client_specific` package is purchasable only by its own client.
     await mkPkg("pkg_cs", "client_specific", a);
     expect((await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: b, packageId: "pkg_cs" }) })).status).toBe(404);
+    // …and BOTH halves are asserted. Only checking that B is refused passes just
+    // as happily when the rule fails CLOSED and nobody can buy it at all — which
+    // is exactly what a wrong `restrictedVisibility` produces now that the value
+    // is a parameter. A is not expected to complete a charge here (no Stripe
+    // account is connected in this suite); what matters is that the visibility
+    // check let them THROUGH, so anything but the 404 is the pass.
+    expect((await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: a, packageId: "pkg_cs" }) })).status).not.toBe(404);
 
     // Redemption code locked to client A: B is rejected, A succeeds.
     await SELF.fetch(`${ORIGIN}/api/redemption-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "LOCKEDA", daysToAdd: 10, restrictedClientId: a }) });
@@ -3630,7 +3637,7 @@ describe("GDPR — action OTP + cascade purge", () => {
     expect((await db.prepare("SELECT COUNT(*) AS n FROM measurements WHERE client_id = ?").bind(client.id).first<{ n: number }>())!.n).toBe(0);
     // R2 object gone + ledger tombstoned.
     expect(await env.MEDIA.get(key)).toBeNull();
-    expect((await db.prepare("SELECT COUNT(*) AS n FROM media_assets WHERE client_id = ? AND deleted_at IS NULL").bind(client.id).first<{ n: number }>())!.n).toBe(0);
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM media_assets WHERE subject_id = ? AND deleted_at IS NULL").bind(client.id).first<{ n: number }>())!.n).toBe(0);
   });
 });
 
@@ -3939,7 +3946,7 @@ describe("row-level scope on client-owned rows (round-4 audit)", () => {
     });
     const addons = JSON.stringify([{ addOnTypeId: "aot_consult", quantity: 4, quantityUsed: 0 }]);
     const seed = async (id: string, clientId: string, subId: string) => {
-      await db.prepare("INSERT INTO client_subscriptions (id, tenant_id, client_id, status, addons_json, started_at) VALUES (?, ?, ?, 'active', ?, ?)")
+      await db.prepare("INSERT INTO subject_subscriptions (id, tenant_id, subject_id, status, addons_json, started_at) VALUES (?, ?, ?, 'active', ?, ?)")
         .bind(subId, tenantId, clientId, addons, new Date().toISOString()).run();
       await db.prepare("INSERT INTO trainer_sessions (id, tenant_id, client_id, subscription_id, addon_type_id, scheduled_at, duration_minutes, status, notes, created_at) VALUES (?, ?, ?, ?, 'aot_consult', '2026-08-01T10:00:00Z', 30, 'scheduled', 'coach-only note', ?)")
         .bind(id, tenantId, clientId, subId, new Date().toISOString()).run();
@@ -3952,14 +3959,14 @@ describe("row-level scope on client-owned rows (round-4 audit)", () => {
     // Completing burns one of the victim's paid units — must be refused outright.
     expect((await patch("sess_r4_b", "completed")).status).toBe(403);
     expect((await db.prepare("SELECT status FROM trainer_sessions WHERE id = 'sess_r4_b'").first<{ status: string }>())!.status).toBe("scheduled");
-    const bal = (await db.prepare("SELECT addons_json FROM client_subscriptions WHERE id = 'csub_r4_b'").first<{ addons_json: string }>())!;
+    const bal = (await db.prepare("SELECT addons_json FROM subject_subscriptions WHERE id = 'csub_r4_b'").first<{ addons_json: string }>())!;
     expect(JSON.parse(bal.addons_json)[0].quantityUsed).toBe(0); // no unit consumed
     // Cancelling would also fire a cancellation notification at them.
     expect((await patch("sess_r4_b", "cancelled")).status).toBe(403);
 
     // Assigned client: the transition works and consumes exactly one unit.
     expect((await patch("sess_r4_a", "completed")).status).toBe(200);
-    const okBal = (await db.prepare("SELECT addons_json FROM client_subscriptions WHERE id = 'csub_r4_a'").first<{ addons_json: string }>())!;
+    const okBal = (await db.prepare("SELECT addons_json FROM subject_subscriptions WHERE id = 'csub_r4_a'").first<{ addons_json: string }>())!;
     expect(JSON.parse(okBal.addons_json)[0].quantityUsed).toBe(1);
 
     // GET /api/sessions with no clientId (the front-desk schedule) is roster-scoped:
@@ -4181,7 +4188,7 @@ describe("client flags union across concurrent access rows", () => {
     // subscription owns its own row; the one-time purchase sits in the
     // non-recurring row and is NEWER (so "newest row wins" would pick it).
     const mk = (id: string, pkg: string, budgets: unknown, flags: string, subId: string | null, startedAt: string) =>
-      db.prepare("INSERT INTO client_subscriptions (id, tenant_id, client_id, package_id, status, payment_status, budgets_json, flags_json, source, stripe_sub_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, 'stripe', ?, ?, ?)")
+      db.prepare("INSERT INTO subject_subscriptions (id, tenant_id, subject_id, package_id, status, payment_status, budgets_json, flags_json, source, stripe_sub_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, 'stripe', ?, ?, ?)")
         .bind(id, tenantId, client.id, pkg, JSON.stringify(budgets), flags, subId, startedAt, startedAt).run();
     await mk("csub_union_memb", "pkg_union_memb", [{ feature: "all", daysTotal: 30, startedAt: iso(-10), expiresAt: iso(20) }], JSON.stringify({ canTrackFasting: true }), "sub_union_1", iso(-10));
     await mk("csub_union_ot", "pkg_union_ot", [{ feature: "workout", daysTotal: 30, startedAt: iso(-1), expiresAt: iso(29) }], JSON.stringify({ canTrackFasting: false }), null, iso(-1));
@@ -4224,7 +4231,7 @@ describe("connect rail — Basil-shaped invoices still renew", () => {
 
     // Period one (subscription-mode checkout).
     await post(JSON.stringify({ id: "evt_basil_create", account: "acct_basil_1", type: "checkout.session.completed", data: { object: { id: "cs_basil_1", mode: "subscription", subscription: subId, metadata: { kova_tenant: tenantId, kova_client: "cl_basil_1", kova_package: pkgId } } } }));
-    const budgetsAfterCreate = JSON.parse((await db.prepare("SELECT budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
+    const budgetsAfterCreate = JSON.parse((await db.prepare("SELECT budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
     expect(budgetsAfterCreate).toBeGreaterThan(0);
 
     // A Basil-shaped renewal: NO `subscription` at the invoice root.
@@ -4235,7 +4242,7 @@ describe("connect rail — Basil-shaped invoices still renew", () => {
       data: { object: { id: "in_basil_1", billing_reason: "subscription_cycle", parent: { type: "subscription_details", subscription_details: { subscription: subId } }, lines: { data: [{ id: "il_1" }] } } },
     });
     expect((await post(basil)).status).toBe(200);
-    const after = JSON.parse((await db.prepare("SELECT budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
+    const after = JSON.parse((await db.prepare("SELECT budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
     expect(after).toBeGreaterThan(budgetsAfterCreate); // another period queued
   });
 
@@ -4249,7 +4256,7 @@ describe("connect rail — Basil-shaped invoices still renew", () => {
       .bind(pkgId, tenantId, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
     await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_basil_2', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_basil_2'").bind(tenantId, new Date().toISOString()).run();
     await post(JSON.stringify({ id: "evt_basil2_create", account: "acct_basil_2", type: "checkout.session.completed", data: { object: { id: "cs_basil_2", mode: "subscription", subscription: subId, metadata: { kova_tenant: tenantId, kova_client: "cl_basil_2", kova_package: pkgId } } } }));
-    const before = JSON.parse((await db.prepare("SELECT budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
+    const before = JSON.parse((await db.prepare("SELECT budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
 
     const lineOnly = JSON.stringify({
       id: "evt_basil2_cycle",
@@ -4258,7 +4265,7 @@ describe("connect rail — Basil-shaped invoices still renew", () => {
       data: { object: { id: "in_basil_2", billing_reason: "subscription_cycle", lines: { data: [{ id: "il_2", parent: { subscription_item_details: { subscription: subId } } }] } } },
     });
     expect((await post(lineOnly)).status).toBe(200);
-    const after = JSON.parse((await db.prepare("SELECT budgets_json FROM client_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
+    const after = JSON.parse((await db.prepare("SELECT budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
     expect(after).toBeGreaterThan(before);
   });
 });
@@ -4825,5 +4832,170 @@ describe("a hostname with no studio serves nothing", () => {
       body: JSON.stringify({ name: "Ghost Studio", slug: "ghost-studio" }),
     });
     expect(org.status).toBe(404);
+  });
+});
+
+/**
+ * THE ONE SETTING A DEPLOYMENT CANNOT BOOT WITHOUT.
+ *
+ * `@4dl/email` fails closed: with no `email.provider` / `email.from`, nothing
+ * sends — including the sign-in code, which on a passwordless platform is the
+ * only way in. These endpoints existed for months with **no caller anywhere in
+ * the app**, so the only documented way to configure a fresh deploy was to open
+ * D1 and write the rows by hand (DEPLOY.md carried it as a step).
+ *
+ * They are `@4dl/email`'s routes now rather than Kova's billing module's, so an
+ * app that takes the package inherits the ability to configure it. The
+ * validation below is new with the move — the old handler accepted any string up
+ * to 200 characters as a sender, which D1 stores happily and the MIME builder
+ * then rejects on every single send: a deployment that looks configured and
+ * delivers nothing.
+ */
+describe("platform email configuration is reachable and validated", () => {
+  const H = (cookie: string) => ({ "content-type": "application/json", ...auth(cookie) });
+
+  it("reports the current delivery settings to an operator", async () => {
+    const r = await SELF.fetch(`${ADMIN}/api/admin/email`, { headers: auth(ownerCookie) });
+    expect(r.status).toBe(200);
+    const body = (await r.json()) as { provider: string; from: string; platformFrom: string; creditsPerEmail: number };
+    expect(typeof body.provider).toBe("string");
+    expect(body.from).toBeTruthy();
+    expect(typeof body.creditsPerEmail).toBe("number");
+  });
+
+  it("round-trips a change", async () => {
+    const before = (await (await SELF.fetch(`${ADMIN}/api/admin/email`, { headers: auth(ownerCookie) })).json()) as { creditsPerEmail: number };
+    const next = before.creditsPerEmail === 2 ? 3 : 2;
+    const w = await SELF.fetch(`${ADMIN}/api/admin/email`, { method: "POST", headers: H(ownerCookie), body: JSON.stringify({ creditsPerEmail: next }) });
+    expect(w.status).toBe(200);
+    const after = (await (await SELF.fetch(`${ADMIN}/api/admin/email`, { headers: auth(ownerCookie) })).json()) as { creditsPerEmail: number };
+    expect(after.creditsPerEmail).toBe(next);
+    await SELF.fetch(`${ADMIN}/api/admin/email`, { method: "POST", headers: H(ownerCookie), body: JSON.stringify({ creditsPerEmail: before.creditsPerEmail }) });
+  });
+
+  it("refuses a sender the MIME builder could not use", async () => {
+    // The failure this prevents is silent and total: stored fine, rejected on
+    // every send, with the console still showing it as configured.
+    for (const from of ["not an address", "a@b", "<@>", "Name <not-an-address>"]) {
+      const r = await SELF.fetch(`${ADMIN}/api/admin/email`, { method: "POST", headers: H(ownerCookie), body: JSON.stringify({ from }) });
+      expect(r.status, `accepted "${from}"`).toBe(400);
+    }
+    // …and accepts both legitimate spellings.
+    for (const from of ["noreply@kova.test", "Kova <noreply@kova.test>"]) {
+      const r = await SELF.fetch(`${ADMIN}/api/admin/email`, { method: "POST", headers: H(ownerCookie), body: JSON.stringify({ from }) });
+      expect(r.status, `refused "${from}"`).toBe(200);
+    }
+  });
+
+  it("refuses a provider outside the closed set, and an out-of-range price", async () => {
+    for (const body of [{ provider: "sendgrid" }, { provider: "" }, { creditsPerEmail: -1 }, { creditsPerEmail: 10_000 }]) {
+      const r = await SELF.fetch(`${ADMIN}/api/admin/email`, { method: "POST", headers: H(ownerCookie), body: JSON.stringify(body) });
+      expect(r.status, JSON.stringify(body)).toBe(400);
+    }
+  });
+
+  it("is closed to a caller with no session at all", async () => {
+    const r = await SELF.fetch(`${ADMIN}/api/admin/email`);
+    expect(r.status).toBeGreaterThanOrEqual(400);
+    expect(r.status).toBeLessThan(500);
+  });
+
+  /*
+   * NOT TESTED HERE, and it cannot be: "a signed-in studio owner who is not a
+   * platform admin is refused". This suite runs with `ADMIN_EMAILS` empty and
+   * `ENVIRONMENT=development`, and `isPlatformAdminFor` falls back to "everyone
+   * in development" — so every test user IS an operator and the guard can never
+   * be observed refusing one. Asserting it would pass for the wrong reason.
+   *
+   * The operator gate itself is covered where it is observable: `route-gate.conformance.test.ts`
+   * checks the route table, and the `admin.`-door restriction has its own tests.
+   */
+});
+
+/**
+ * ONE STRIPE ACCOUNT, MANY APPS — and the event that belongs to none of them.
+ *
+ * `handlePlatformEvent` is a switch whose branches are guarded on `meta.kova_*`.
+ * An event carrying another 4DL app's metadata matched nothing, fell out of the
+ * switch, and this endpoint answered `200 {received: true}` — with the event id
+ * ALREADY claimed in `stripe_events`, so Stripe never retried it. Money
+ * captured, nothing granted, and not one line of signal.
+ *
+ * That is harmless while Kova is the only app on the account, which is exactly
+ * why it would have survived until the day it wasn't. `@4dl/billing-rail` routes
+ * the delivery first and parks what it cannot attribute.
+ */
+describe("the platform webhook attributes before it handles", () => {
+  const SECRET = "whsec_rail_test";
+  async function sig(payload: string, secret: string): Promise<string> {
+    const t = Math.floor(Date.now() / 1000);
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${payload}`));
+    return `t=${t},v1=${[...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+  }
+  const post = async (payload: string) =>
+    SELF.fetch(`${ORIGIN}/api/stripe/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await sig(payload, SECRET) }, body: payload });
+
+  beforeAll(async () => {
+    await (env.DB as D1Database)
+      .prepare("INSERT INTO app_config (key, value) VALUES ('stripe.webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .bind(SECRET)
+      .run();
+  });
+
+  it("parks an event belonging to another app instead of silently accepting it", async () => {
+    const db = env.DB as D1Database;
+    const payload = JSON.stringify({
+      id: `evt_foreign_${crypto.randomUUID().slice(0, 8)}`,
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_foreign", metadata: { inventory_tenant: "t_other", inventory_pack: "p1" } } },
+    });
+    const r = await post(payload);
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ parked: true });
+
+    const row = await db.prepare("SELECT reason, payload FROM rail_parked_events WHERE event_id = ?").bind(JSON.parse(payload).id).first<{ reason: string; payload: string }>();
+    expect(row?.reason).toBe("no-app-marker");
+    // The payload is kept so the event can be replayed once the cause is fixed.
+    expect(row?.payload).toBe(payload);
+  });
+
+  it("does NOT claim a parked event's id, so the replay is not a duplicate", async () => {
+    const db = env.DB as D1Database;
+    const id = `evt_foreign_${crypto.randomUUID().slice(0, 8)}`;
+    await post(JSON.stringify({ id, type: "checkout.session.completed", data: { object: { metadata: { bocca_tenant: "t_x" } } } }));
+    const claimed = await db.prepare("SELECT id FROM stripe_events WHERE id = ?").bind(id).first();
+    expect(claimed, "an unroutable event must not be marked processed").toBeNull();
+  });
+
+  it("still handles Kova's own events, by metadata", async () => {
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const payload = JSON.stringify({
+      id: `evt_mine_${crypto.randomUUID().slice(0, 8)}`,
+      type: "invoice.payment_failed",
+      data: { object: { id: "in_mine", metadata: { kova_tenant: ctx.active.tenantId } } },
+    });
+    const r = await post(payload);
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ app: "kova", via: "prefix" });
+  });
+
+  it("still handles an event with NO metadata, by recognising the customer", async () => {
+    // The regression the `claims` hook exists to prevent: `invoice.paid` resolves
+    // the tenant with `tenantByCustomer` when metadata is absent, and it is a
+    // path that works today. Metadata-only routing would have parked it.
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    const customer = `cus_rail_${crypto.randomUUID().slice(0, 8)}`;
+    await db.prepare("UPDATE subscriptions SET stripe_customer_id = ? WHERE tenant_id = ?").bind(customer, ctx.active.tenantId).run();
+
+    const payload = JSON.stringify({
+      id: `evt_bycust_${crypto.randomUUID().slice(0, 8)}`,
+      type: "invoice.payment_failed",
+      data: { object: { id: "in_bycust", customer } },
+    });
+    const r = await post(payload);
+    expect(r.status).toBe(200);
+    expect(await r.json(), "an event resolvable by customer must not park").toMatchObject({ app: "kova", via: "claim" });
   });
 });

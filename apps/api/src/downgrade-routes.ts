@@ -134,7 +134,7 @@ async function measureUsage(db: D1Database, tenantId: string): Promise<TenantUsa
  *  the ones that would be stranded if `commerce` went away. */
 async function liveCommerceSubs(db: D1Database, tenantId: string): Promise<number> {
   const rows = await db
-    .prepare("SELECT budgets_json FROM client_subscriptions WHERE tenant_id = ? AND status = 'active' AND payment_status IN ('paid','installments')")
+    .prepare("SELECT budgets_json FROM subject_subscriptions WHERE tenant_id = ? AND status = 'active' AND payment_status IN ('paid','installments')")
     .bind(tenantId)
     .all<{ budgets_json: string | null }>()
     .catch(() => ({ results: [] as { budgets_json: string | null }[] }));

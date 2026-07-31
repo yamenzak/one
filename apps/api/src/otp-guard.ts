@@ -1,164 +1,49 @@
 /**
- * OTP-send policy wrapper (SPEC §4). The ONE gate in front of Better Auth's
- * `email-otp/send-verification-otp`, so every path to an emailed code — platform
- * or a tenant's branded login — runs the same checks before a code goes out:
+ * Kova's eligibility rule, on `@4dl/auth`'s OTP-send policy.
  *
- *   1. a short per-email cooldown (on top of Better Auth's hourly cap), so the
- *      button can show a countdown instead of silently dropping;
- *   2. (PR2) a Turnstile check when the platform has configured one;
- *   3. eligibility on a *tenant* login: an existing user or an invited client
- *      always gets in; a brand-new email only when the studio allows self
- *      sign-up (`marketplace.selfRegister`) — and then we pre-create their
- *      pending client row so the /api/context auto-link lands them as a client.
+ * The shared guard owns the order and the throttles: human check → per-address
+ * cooldown → per-source hourly ceiling → ELIGIBILITY → deliverability pre-flight
+ * → forward to Better Auth's own handler. All of that is the same for every app,
+ * and the deliverability pre-flight in particular is load-bearing (Better Auth
+ * swallows a send failure and returns 200, so without it a mis-configured deploy
+ * says "we sent you a code" forever and nobody can get in).
  *
- * On the neutral platform host with no tenant in play, sign-up is the
- * studio-creation path and stays open (just cooldown + Turnstile).
- *
- * Enforcing here (not in a separate precheck the client could skip) keeps the
- * gate on the real send path: we consume the body, run the checks, then forward
- * a clean `{ email, type }` request to Better Auth's own handler.
+ * What is Kova's is step 4, below: WHO may receive a code at this door.
  */
 
 import type { MiddlewareHandler } from "hono";
-import { type AppEnv } from "./auth-context.js";
-import { logAuthEvent } from "./auth.js";
+import { forwardJson, otpSendGuard as buildOtpGuard, verifyTurnstile, type EligibilityVerdict } from "@4dl/auth";
 import { withinQuota } from "./billing-store.js";
 import { countClientSeats, PENDING_SIGNUP } from "./clients.js";
-import { hostnameOf, type HostTenant } from "./host-context.js";
-import { newId, nowIso, nowMs } from "./ids.js";
+import { hostnameOf } from "./host-context.js";
+import { newId, nowIso } from "./ids.js";
 import { emailDeliverable } from "./mailer.js";
-import { verifyTurnstile } from "./turnstile.js";
+import type { AppEnv } from "./auth-context.js";
+import type { Auth } from "./auth.js";
+import type { Branding } from "./host-context.js";
+import type { Env } from "./env.js";
 
-/** The dev lane, derived exactly as createAuth does (ENVIRONMENT=development or a
- *  localhost serving origin) — a localhost origin cannot reach a deployed worker
- *  through Cloudflare's edge, so this stays closed in production. */
-function isDevLane(c: Parameters<MiddlewareHandler<AppEnv>>[0]): boolean {
-  const origin = c.req.header("origin") ?? "";
-  return c.env.ENVIRONMENT === "development" || /^http:\/\/(localhost|127\.0\.0\.1)/.test(origin);
+/** The dev lane, derived exactly as `createAuth` does — a localhost origin cannot
+ *  reach a deployed worker through Cloudflare's edge, so this stays closed in
+ *  production. */
+function isDevLane(env: Env, origin: string): boolean {
+  return env.ENVIRONMENT === "development" || /^http:\/\/(localhost|127\.0\.0\.1)/.test(origin);
 }
 
-/** Minimum gap between two codes to the same address. The hourly cap
- *  (Better Auth's callback) still applies on top of this. */
-const OTP_COOLDOWN_MS = 30_000;
-
-/** Per-IP hourly ceiling on OTP sends. The per-email cooldown/hourly cap only
- *  slows an attacker rotating addresses; this bounds a single source so an
- *  email-flood or roster-fill (self-register creates a pending client per new
- *  address) can't be driven from one host. Keyed on CF-Connecting-IP. */
-const OTP_MAX_PER_IP_PER_HOUR = 20;
-const OTP_IP_WINDOW_MS = 60 * 60 * 1000;
-
-/** `slug` used to select the studio on the shared platform host. The host now
- *  decides, so it is accepted and ignored rather than removed — an older cached
- *  SPA still posts it, and rejecting the body would break sign-in for exactly the
- *  users who have not reloaded yet. */
-interface SendBody { email?: unknown; type?: unknown; slug?: unknown; turnstileToken?: unknown }
-
-export const otpSendGuard: MiddlewareHandler<AppEnv> = async (c) => {
-  const raw = (await c.req.json().catch(() => ({}))) as SendBody;
-  const email = typeof raw.email === "string" ? raw.email.trim().toLowerCase() : "";
-  const type = typeof raw.type === "string" ? raw.type : "sign-in";
-  const slug = typeof raw.slug === "string" ? raw.slug : null;
-  const turnstileToken = typeof raw.turnstileToken === "string" ? raw.turnstileToken : null;
-  if (!email || !email.includes("@")) return c.json({ error: "enter a valid email" }, 400);
-  const ip = c.req.header("cf-connecting-ip") ?? undefined;
-
-  // 1) Human check (no-op until the platform configures Turnstile).
-  const hostname = hostnameOf(c.req.url);
-  const ts = await verifyTurnstile(c.env, turnstileToken, ip, hostname);
-  if (!ts.ok) {
-    await logAuthEvent(c.env.DB, "otp-turnstile-fail", email, false, ip);
-    return c.json({ error: "human_check_failed" }, 400);
-  }
-
-  // 2) Cooldown — reflect the most recent request to this address.
-  const last = await c.env.DB
-    .prepare("SELECT MAX(at) AS at FROM auth_logs WHERE event = 'otp-request' AND email = ?")
-    .bind(email)
-    .first<{ at: number | null }>()
-    .catch(() => null);
-  const sinceLast = last?.at ? nowMs() - last.at : Infinity;
-  if (sinceLast < OTP_COOLDOWN_MS) {
-    return c.json({ error: "cooldown", retryAfterSec: Math.ceil((OTP_COOLDOWN_MS - sinceLast) / 1000) }, 429);
-  }
-
-  // 2b) Per-IP flood/roster-fill limit. Count this source's recent attempts
-  // (across all addresses) and block past the hourly ceiling; log the attempt so
-  // it counts toward the window regardless of the eligibility outcome below —
-  // otherwise probing invite-only tenants would slip the limit.
-  if (ip) {
-    const seen = await c.env.DB
-      .prepare("SELECT COUNT(*) AS n FROM auth_logs WHERE event = 'otp-ip' AND ip = ? AND at > ?")
-      .bind(ip, nowMs() - OTP_IP_WINDOW_MS)
-      .first<{ n: number }>()
-      .catch(() => null);
-    if ((seen?.n ?? 0) >= OTP_MAX_PER_IP_PER_HOUR) {
-      await logAuthEvent(c.env.DB, "otp-ip-throttled", email, false, ip);
-      return c.json({ error: "too_many_requests", retryAfterSec: Math.ceil(OTP_IP_WINDOW_MS / 1000) }, 429);
-    }
-    await logAuthEvent(c.env.DB, "otp-ip", email, true, ip);
-  }
-
-  // 3) Eligibility — the host decides which studio this sign-in is for.
-  //
-  // Under the subdomain model there is no ambiguity left to resolve: a studio's
-  // door IS its hostname, so `hostTenant` is the answer and the old `/t/<slug>`
-  // query fallback is gone. The two hosts with no tenant behave differently on
-  // purpose:
-  //
-  //  • `setup.` — no studio yet, so no eligibility to check. Anyone may request a
-  //    code; that is how a new studio owner gets in.
-  //  • the root — a dead end. There is no studio to sign in TO, so sending a code
-  //    from here would be a code with no destination. Point them at their own
-  //    studio's address instead of quietly signing them in somewhere generic.
-  const tenant: HostTenant | null = c.get("hostTenant");
-  if (!tenant && c.get("host").shape.role === "root") {
-    return c.json({ error: "wrong_door", detail: "Sign in at your studio's own address." }, 400);
-  }
-
-  if (tenant) {
-    const known = await isExistingOrInvited(c.env.DB, tenant.tenantId, email);
-    if (!known) {
-      if (!tenant.allowSignup) {
-        await logAuthEvent(c.env.DB, "otp-signup-blocked", email, false, ip);
-        return c.json({ error: "invite_only" }, 403);
-      }
-      // Self sign-up allowed → reserve their client seat so the /api/context
-      // auto-link picks them up as a client the moment they verify.
-      const created = await createPendingClient(c.env.DB, tenant.tenantId, email);
-      if (!created) return c.json({ error: "studio_full" }, 403);
-    }
-  }
-
-  // 3b) Deliverability pre-flight. This MUST happen here rather than being left
-  // to the send itself: Better Auth runs `sendVerificationOTP` through
-  // `runInBackgroundOrAwait`, which catches and merely logs anything thrown, then
-  // returns 200 {"success":true} regardless — so a failure raised inside that
-  // callback is invisible to the client and the login UI happily advances to the
-  // code-entry screen. On a fresh production deploy `email.provider` defaults to
-  // `mock`, which fails closed outside dev, so without this check the very first
-  // sign-in shows "we sent you a code" forever and NOBODY — including the
-  // platform admin — can get in. Verified against the running worker.
-  const deliverable = await emailDeliverable(c.env.DB, c.env.EMAIL, isDevLane(c));
-  if (!deliverable.ok) {
-    await logAuthEvent(c.env.DB, "otp-send-unconfigured", email, false, ip);
-    console.error(`OTP not sent: email provider "${deliverable.provider}" cannot deliver — ${deliverable.reason}`);
-    return c.json({ error: "email_not_configured", detail: deliverable.reason }, 503);
-  }
-
-  // 4) Hand a clean request to Better Auth's own send handler. Preserve the
-  // Origin + cookies (Better Auth's CSRF), but drop the stale content-length so
-  // the rewritten body length is recomputed, and force JSON.
-  const headers = new Headers(c.req.raw.headers);
-  headers.delete("content-length");
-  headers.set("content-type", "application/json");
-  const fwd = new Request(new URL(c.req.url).toString(), {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ email, type }),
-  });
-  return c.get("auth").handler(fwd);
-};
+/**
+ * How many UNCLAIMED self-signup reservations a studio may hold at once.
+ *
+ * The row is created at OTP-SEND — before anyone has proved they own the address
+ * — and consumes an `activeClients` seat from that moment. Nothing reclaims them:
+ * every person who asked for a code at a `selfRegister` studio and never finished
+ * holds capacity indefinitely, and the owner's only recovery is deleting each row
+ * by hand.
+ *
+ * At worst that is a denial of capacity: request codes for made-up addresses at a
+ * studio's public door until its plan is full and real clients are refused. The
+ * IP throttle limits the rate, not the total — so the total is capped here.
+ */
+const MAX_UNCLAIMED_SIGNUPS = 5;
 
 /** An email already has an account, or is an invited (unlinked) client here. */
 async function isExistingOrInvited(db: D1Database, tenantId: string, email: string): Promise<boolean> {
@@ -174,28 +59,9 @@ async function isExistingOrInvited(db: D1Database, tenantId: string, email: stri
   return Boolean(client);
 }
 
-/**
- * How many UNCLAIMED self-signup reservations a studio may hold at once.
- *
- * This row is created at OTP-SEND — before anyone has proved they own the
- * address — and it consumes an `activeClients` seat from that moment. Archiving
- * no longer frees a seat, so nothing reclaims these: every person who asked for
- * a code at a `selfRegister` studio and never finished holds capacity
- * indefinitely, and the owner's only recovery is deleting each row by hand.
- *
- * At worst that is a denial-of-capacity: request codes for made-up addresses at
- * a studio's public door until its plan is full and real clients are refused.
- * The IP throttle above limits the rate, not the total.
- *
- * So reservations are capped. Genuine signups keep working (they claim their row
- * on first sign-in, which takes it out of this count), while unclaimed ones can
- * only ever occupy a bounded slice of the plan.
- */
-const MAX_UNCLAIMED_SIGNUPS = 5;
-
 /** Reserve a pending client row for a self-signing-up email (capacity-gated).
- *  Name is intentionally derived from the address — they set it themselves on
- *  the complete-your-profile screen. Returns false if the studio is at capacity. */
+ *  The name is derived from the address — they set their own on the
+ *  complete-your-profile screen. False when the studio is at capacity. */
 async function createPendingClient(db: D1Database, tenantId: string, email: string): Promise<boolean> {
   const cap = await withinQuota(db, tenantId, "activeClients", await countClientSeats(db, tenantId));
   if (!cap.ok) return false;
@@ -208,12 +74,58 @@ async function createPendingClient(db: D1Database, tenantId: string, email: stri
   const displayName = email.split("@")[0] ?? "New client";
   await db
     // `pending_signup`, not `active`: nobody has proved they own this address yet,
-    // so it costs no seat and stays off the roster until the first authenticated
-    // context read claims it. The capacity check below is still worth doing here —
-    // it stops us mailing a code to someone we would have to turn away.
+    // so it stays off the roster until the first authenticated context read claims
+    // it. The capacity check above is still worth doing — it stops us mailing a
+    // code to someone we would have to turn away.
     .prepare("INSERT INTO clients (id, tenant_id, display_name, email, status, created_at) VALUES (?, ?, ?, ?, ?, ?)")
     .bind(newId("cli"), tenantId, displayName, email, PENDING_SIGNUP, nowIso())
     .run()
     .catch(() => undefined);
   return true;
 }
+
+export const otpSendGuard: MiddlewareHandler<AppEnv> = buildOtpGuard<Env, Auth, Branding>({
+  db: (env) => env.DB,
+
+  humanCheck: async (c, token, ip) => (await verifyTurnstile(c.env, token, ip, hostnameOf(c.req.url))).ok,
+
+  /**
+   * The host decides which studio this sign-in is for.
+   *
+   * Under the subdomain model there is no ambiguity left to resolve: a studio's
+   * door IS its hostname. The two hosts with no tenant behave differently on
+   * purpose —
+   *
+   *  • `setup.` — no studio yet, so nothing to check. Anyone may request a code;
+   *    that is how a new owner gets in.
+   *  • the root — a dead end. There is no studio to sign in TO, so a code from
+   *    here would have no destination. Point them at their own address instead of
+   *    quietly signing them in somewhere generic.
+   */
+  eligibility: async (c, email): Promise<EligibilityVerdict> => {
+    const tenant = c.get("hostTenant");
+    if (!tenant) {
+      if (c.get("host").shape.role === "root") {
+        return { ok: false, status: 400, body: { error: "wrong_door", detail: "Sign in at your studio's own address." } };
+      }
+      return { ok: true };
+    }
+    if (await isExistingOrInvited(c.env.DB, tenant.tenantId, email)) return { ok: true };
+    if (!tenant.allowSignup) {
+      return { ok: false, status: 403, body: { error: "invite_only" }, logEvent: "otp-signup-blocked" };
+    }
+    // Self sign-up allowed → reserve their seat so the /api/context auto-link
+    // picks them up as a client the moment they verify.
+    if (!(await createPendingClient(c.env.DB, tenant.tenantId, email))) {
+      return { ok: false, status: 403, body: { error: "studio_full" } };
+    }
+    return { ok: true };
+  },
+
+  deliverable: async (c) => {
+    const r = await emailDeliverable(c.env.DB, c.env.EMAIL, isDevLane(c.env, c.req.header("origin") ?? ""));
+    return r.ok ? { ok: true } : { ok: false, reason: r.reason };
+  },
+
+  forward: (c, body) => c.get("auth").handler(forwardJson(c as never, body)),
+}) as unknown as MiddlewareHandler<AppEnv>;

@@ -1,5 +1,12 @@
 export * from "./entitlements.js";
 export * from "./perms.js";
+// The access-economy math moved to @4dl/commerce. `./budgets.js` binds Kova's
+// scopes to it AND re-exports the rest, so this is the only line needed — adding
+// `export * from "@4dl/commerce/model"` beside it makes `buildBudgetsForPurchase`
+// ambiguous (two star exports offering one name). TypeScript tolerates that by
+// silently dropping the name; esbuild refuses to bundle it, so the failure only
+// appears at `vite build` — which is how the E2E suite found it and `pnpm
+// typecheck` did not.
 export * from "./budgets.js";
 export * from "./clientFlags.js";
 export * from "./lapse.js";

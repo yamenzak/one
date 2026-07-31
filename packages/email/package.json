@@ -1,0 +1,29 @@
+{
+  "name": "@4dl/email",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Transactional email: the platform mailer, per-tenant providers, and an HTML component kit (bars, rings, sparklines, stat rows) that renders in mail clients. Brand and sender are injected.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./model": "./src/model.ts",
+    "./admin-routes": "./src/admin-routes.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@4dl/core": "workspace:*",
+    "hono": "^4.9.10"
+  },
+  "devDependencies": {
+    "@4dl/core": "workspace:*",
+    "@cloudflare/workers-types": "^4.20251001.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

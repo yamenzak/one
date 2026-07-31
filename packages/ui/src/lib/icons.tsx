@@ -1,7 +1,11 @@
 /**
  * Icon system — curated lucide icons, re-exported so screens import from one
- * place and never reach for emoji. `Icon` is a thin wrapper with sane defaults;
- * `domainIcon` maps fitness domains to their glyph.
+ * place and never reach for emoji. `Icon` is a thin wrapper with sane defaults.
+ *
+ * There used to be a `Domain` type and a `domainIcon` map here — `activity |
+ * nutrition | sleep | cardio | hydration`, five fitness surfaces named inside a
+ * design system. Nothing outside this file ever imported them. An app maps its
+ * own subjects to glyphs in its own registry (Kova: `registry/metrics.ts`).
  */
 
 import {
@@ -269,14 +273,4 @@ export {
   Snowflake,
   X,
   Zap,
-};
-
-export type Domain = "activity" | "nutrition" | "sleep" | "cardio" | "hydration";
-
-export const domainIcon: Record<Domain, LucideIcon> = {
-  activity: Dumbbell,
-  nutrition: Utensils,
-  sleep: Moon,
-  cardio: HeartPulse,
-  hydration: Droplet,
 };

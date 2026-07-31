@@ -1,5 +1,5 @@
 /**
- * Train tab (DESIGN.md §3) — the workout home, brought up to the Eat-diary bar:
+ * Train tab (KOVA.md Part II §3) — the workout home, brought up to the Eat-diary bar:
  * active-plan hero + day list, quick-start chips, a "this week" key-metrics
  * grid (Training Load vs target, tonnage, active days, PRs — all computed from
  * logged sessions + activities), and a recent-activity feed with WeekDots.

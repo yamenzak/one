@@ -22,27 +22,16 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  AlertTriangle, ArrowLeft, Badge, Building2, Button, Callout, Card, ChevronRight, Chip, CircleAlert, CircleCheck,
+  AlertTriangle, Badge, Building2, Button, Callout, Card, ChevronRight, Chip, CircleAlert, CircleCheck,
   ConfirmDialog, CreditCard, EmptyState, Eyebrow, Field, Gift, GlanceStrip, Globe, IconBadge, Info, Input, KeyRound, ThumbsUp,
-  Dumbbell, LayoutGrid, Page, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, SettingsIndex, SettingsPage, Sheet, ShieldCheck, Wand2, type LucideIcon,
+  Dumbbell, LayoutGrid, Mail, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, Sheet, ShieldCheck, Wand2,
   Skeleton, SkeletonLine, Play, Plug, Spinner, Stagger, Switch, Tag, Trash2, Wallet, cn, toneText, type Tone,
   ActionResult, ConfigRow, FieldGroup, LoadError, useLoad, useAction as useActionBase,
 } from "@4dl/ui";
+import { AdminConsole as Console, PlatformEmailSection, type ConsoleSection } from "@4dl/admin";
 import { SectionSplit } from "../SectionSplit.js";
 import { api, errorText } from "../../api.js";
 import { fmtPrice } from "../../money.js";
-
-type AdminTab = "tenants" | "plans" | "stripe" | "promos" | "domains" | "ai" | "content" | "security";
-
-const TABS: { value: AdminTab; label: string }[] = [
-  { value: "tenants", label: "Tenants" },
-  { value: "plans", label: "Plans" },
-  { value: "ai", label: "AI" },
-  { value: "stripe", label: "Stripe" },
-  { value: "promos", label: "Promos" },
-  { value: "domains", label: "Domains" },
-  { value: "security", label: "Security" },
-];
 
 /**
  * ── THE OPERATOR CONSOLE: AN INDEX AND A PAGE PER SECTION ──────────────────
@@ -55,10 +44,12 @@ const TABS: { value: AdminTab; label: string }[] = [
  * Same shape as the studio settings now: a table of contents, then one section
  * at a time. `?s=<key>` keeps it one component and makes Back step out of a
  * section before it leaves the console.
+ *
+ * The FRAME is `@4dl/admin`'s — it is the same on every 4DL app's operator door.
+ * What stays here is this list, because every entry names something Kova sells
+ * or runs, and the next app's console will name something else entirely.
  */
-const ADMIN_SECTIONS: {
-  key: AdminTab; label: string; blurb: string; icon: LucideIcon; tone: Tone; render: () => ReactNode;
-}[] = [
+const ADMIN_SECTIONS: ConsoleSection[] = [
   { key: "tenants", label: "Studios", blurb: "Every studio, its plan, credits and standing", icon: Building2, tone: "primary", render: () => <Tenants /> },
   { key: "plans", label: "Plans", blurb: "Price, limits and trials owners buy", icon: CreditCard, tone: "cardio", render: () => <PlansConfig /> },
   { key: "ai", label: "AI", blurb: "Models, pricing, markup, the self-test", icon: Wand2, tone: "nutrition", render: () => <AiConfig /> },
@@ -66,48 +57,38 @@ const ADMIN_SECTIONS: {
   { key: "promos", label: "Promo codes", blurb: "Platform-wide discounts on plans and packs", icon: Tag, tone: "activity", render: () => <PlatformPromos /> },
   { key: "domains", label: "Custom domains", blurb: "Tenant domains and their certificates", icon: Globe, tone: "sleep", render: () => <DomainsConfig /> },
   { key: "content", label: "Starter content", blurb: "The exercise library a fresh deployment starts without", icon: Dumbbell, tone: "supplement", render: () => <StarterLibraryCard /> },
+  /* The panel is `@4dl/admin`'s: who a deployment sends mail as is the shared
+     email package's subject, not Kova's. Before it existed the endpoints behind
+     it had no caller at all, and a fresh deploy could not send the sign-in code
+     that is the only way in — DEPLOY.md carried it as a hand-edit-D1 step. */
+  { key: "email", label: "Email delivery", blurb: "How this deployment sends mail, and what a tenant pays per send", icon: Mail, tone: "primary", render: () => <PlatformEmailSection api={api} errorText={errorText} /> },
   /* The blurb used to promise "sessions, admin access" — neither of which this
      section has ever had. A table of contents that lies is worse than none. */
   { key: "security", label: "Security", blurb: "The bot check on sign-in, and the platform reset", icon: ShieldCheck, tone: "danger", render: () => <SecurityConfig /> },
 ];
 
+/**
+ * The router binding, which is all that is left here.
+ *
+ * `@4dl/admin`'s shell is router-free by design — a shared package that imports
+ * one router cannot be consumed by an app using a different one — so the query
+ * param lives on this side. `replace: true` on close is what makes Back step out
+ * of a section rather than out of the console.
+ */
 export function AdminConsole({ onBack }: { onBack: () => void }) {
   const [params, setParams] = useSearchParams();
-  const open = ADMIN_SECTIONS.find((x) => x.key === params.get("s")) ?? null;
 
   return (
-    <Page className="column space-y-4 p-4 pb-28">
-      {open ? (
-        <SettingsPage
-          title={open.label}
-          description={open.blurb}
-          onBack={() => setParams((q: URLSearchParams) => { q.delete("s"); return q; }, { replace: true })}
-        >
-          {open.render()}
-        </SettingsPage>
-      ) : (
-        <>
-          <div className="flex items-center gap-3">
-            <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="size-5 shrink-0 text-primary" aria-hidden />
-                <h1 className="truncate text-title-3">Platform admin</h1>
-              </div>
-              <p className="truncate text-xs text-muted-foreground">Kova itself — every studio, plan, key and switch.</p>
-            </div>
-          </div>
-          <SettingsIndex
-            groups={[{
-              rows: ADMIN_SECTIONS.map((x) => ({
-                key: x.key, icon: x.icon, tone: x.tone, label: x.label, sub: x.blurb,
-                onClick: () => setParams((q: URLSearchParams) => { q.set("s", x.key); return q; }),
-              })),
-            }]}
-          />
-        </>
-      )}
-    </Page>
+    <Console
+      sections={ADMIN_SECTIONS}
+      openKey={params.get("s")}
+      onOpen={(key) =>
+        setParams((q: URLSearchParams) => { if (key) q.set("s", key); else q.delete("s"); return q; }, { replace: !key })
+      }
+      onBack={onBack}
+      title="Platform admin"
+      subtitle="Kova itself — every studio, plan, key and switch."
+    />
   );
 }
 

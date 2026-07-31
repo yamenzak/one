@@ -227,9 +227,15 @@ app, and **a fresh deploy cannot deliver email**:
 - Outside the dev lane the mock provider **fails closed**: it sends nothing and
   logs nothing (`apps/api/src/mailer.ts`). `wrangler tail` will show you no
   code — earlier versions of this document said it would; that was wrong.
-- The only UI for changing it (`POST /api/admin/email`) requires a
-  **platform-admin session**, which requires an OTP you cannot receive. There is
-  no admin email screen in the app yet. That is a bootstrap deadlock.
+- There **is** now an admin screen for it — the operator console's "Email
+  delivery" section, at `admin.<your-root>` — but it cannot help you here: it
+  requires a **platform-admin session**, which requires an OTP you cannot yet
+  receive. That is the bootstrap deadlock, and no amount of UI removes it. A
+  screen behind a login cannot configure the thing the login depends on.
+
+  What the screen does change is everything AFTER the first sign-in: switching
+  provider, correcting a sender, or repricing the shared lane is a form, not a
+  `wrangler d1 execute`. Only the initial seed below is manual.
 
 So configure it directly against remote D1 **before the first sign-in
 attempt**. `app_config` is created by `ensureSchema`, but the `CREATE TABLE IF
@@ -372,10 +378,10 @@ section 6.
 
 | Key | Default | If unset | Where to set it |
 | --- | --- | --- | --- |
-| `email.provider` | `mock` | **Nobody can sign in.** Mock fails closed outside dev: no send, no log | ⚠️ no UI — D1 (section 6) |
-| `email.from` | `Kova <noreply@kova.local>` | Sends from an invalid domain → bounces/rejects | ⚠️ no UI — D1 |
-| `email.platform_from` | `Kova <noreply@kova.4dl.app>` | Platform/billing email sends from this address — which bounces until the sender is verified in Email Sending, and is wrong outright on any other deployment | ⚠️ no UI — D1 |
-| `email.credits_per_email` | `1` | Tenants are charged 1 credit per metered email — fine, but set it deliberately | ⚠️ no UI — D1 |
+| `email.provider` | `mock` | **Nobody can sign in.** Mock fails closed outside dev: no send, no log | D1 to bootstrap (section 6), then Platform admin → **Email delivery** |
+| `email.from` | `Kova <noreply@kova.local>` | Sends from an invalid domain → bounces/rejects | D1 to bootstrap, then Platform admin → **Email delivery** |
+| `email.platform_from` | `Kova <noreply@kova.4dl.app>` | Platform/billing email sends from this address — which bounces until the sender is verified in Email Sending, and is wrong outright on any other deployment | D1 to bootstrap, then Platform admin → **Email delivery** |
+| `email.credits_per_email` | `1` | Tenants are charged 1 credit per metered email — fine, but set it deliberately | Platform admin → **Email delivery** |
 | `google.gemini_key` | *(empty)* | **The whole vision suite is unavailable**: Snap-a-Meal, Label Reader, lab-extract, image generation, body-scan voice. Every `task: "vision"` model in the seed catalog is provider `google` | Platform admin → **AI** |
 | `ai.mock` | `auto` | `auto` only falls back to the mock on the dev lane; `on` forces the mock (and bills for it) — never set `on` in production | Platform admin → **AI** |
 | `ai.markup` | `3` | **This is the multiplier tenants are billed at** for AI. Valid 1–100. Review before selling credits | Platform admin → **AI** |
@@ -896,11 +902,86 @@ What rollback does **not** undo:
 
 ---
 
+## 13b. The four workflows, and which one can delete
+
+Three of the four cannot destroy anything. Knowing which is which is the whole
+point of splitting them.
+
+| Workflow | Trigger | What it does | Can it delete? |
+|---|---|---|---|
+| `ci.yml` | pull request | typecheck, tests, E2E | no |
+| `deploy.yml` | push to `main`, manual | build + deploy both workers | **no** — ships code only. It deliberately never writes worker secrets: re-putting `BETTER_AUTH_SECRET` on every deploy would re-sign every cookie and log everyone out |
+| `provision.yml` | manual | creates the D1 / KV / R2 that are **missing**, mints `BETTER_AUTH_SECRET` if the worker has none | **no** — every action is guarded by an existence check |
+| `reset.yml` | manual | destroys and rebuilds everything | **YES** |
+
+So the steady state is: `deploy.yml` on every merge, `provision.yml` when a
+resource is missing. Neither can lose data, so neither needs ceremony.
+
+### `reset.yml` — for one moment, then delete it
+
+It wipes what earlier `mossa`/`kova` deploys left on the account and rebuilds
+from nothing, so a first real launch starts clean. **It is not a maintenance
+tool**, and it destroys, with no undo and no export:
+
+- both **workers** — and with them every **Durable Object** (`TenantBillingDO`,
+  every tenant's credit balance; `InboxDO`) and every worker secret;
+- the **D1 database** — accounts, tenants, clients, plans, logs, and all of
+  `app_config` (Gemini key, Stripe credentials, Turnstile keys, email settings);
+- the **R2 bucket** — progress photos, lab documents, avatars, media;
+- the **KV namespace** — the API cache, the only cheap loss;
+- **tenant custom hostnames** on the zones you name — orphans once the worker
+  they pointed at is gone.
+
+**Five guards, all of which must agree:**
+
+1. `workflow_dispatch` only. There is no push trigger and there must never be
+   one.
+2. `mode` defaults to **plan** — inventory what it *would* delete, then stop.
+   Always plan first; the plan is also how you find resources this repo no
+   longer declares.
+3. `confirm` must be typed exactly: `DESTROY AND REBUILD`. Not a checkbox — a
+   checkbox is one mis-click.
+4. The repository variable `ALLOW_DESTRUCTIVE_RESET` must be `true`. Set it,
+   run, **unset it**. That is the disarm switch, and it lives in Settings rather
+   than in code.
+5. Nothing is deleted whose name does not match `patterns` (default
+   `kova,mossa`), anchored at the start. A resource this workflow does not
+   recognise belongs to something else on the account.
+
+**Two things it needs that `deploy.yml` does not:**
+
+- **`contents: write`.** A recreated D1 and KV have *new ids*, and
+  `wrangler.jsonc` hardcodes the old ones. The workflow rewrites both and
+  commits. Without that step the deploy goes green and every request 500s at
+  runtime — bound to resources that no longer exist.
+- **`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`** (optional but usually
+  required). R2 will not delete a bucket that still holds objects, and wrangler
+  has no recursive delete — `wrangler r2 object` is get/put/delete for one key.
+  Emptying needs the S3-compatible API, and that needs an **R2 access key pair**
+  (dash → R2 → Manage API tokens), which is a *different credential* from
+  `CLOUDFLARE_API_TOKEN`. A Cloudflare API token cannot sign S3 requests.
+  Without them the workflow says so and stops rather than half-finishing.
+
+It also **seeds `email.provider` / `email.from`** at the end, which is the one
+thing that breaks the bootstrap deadlock in section 6: the console that edits
+those needs a sign-in, which needs an OTP, which needs email. A workflow with
+database access is the only actor that can cut that knot — but the sender still
+has to be **verified** in Cloudflare Email Sending or nothing delivers.
+
+**Afterwards: unset `ALLOW_DESTRUCTIVE_RESET`, then delete
+`.github/workflows/reset.yml`.** Keeping a destructive workflow around for a
+second use it was never designed for is how it eventually runs by accident.
+
+---
+
 ## 14. Known operational gaps
 
 Be aware of these before launch; none are fixable from this document:
 
-- **No email admin UI.** `email.*` config is D1-only (section 6).
+- **Email config has a UI now** (Platform admin → Email delivery), but it cannot
+  break the *bootstrap* deadlock — reaching it needs a sign-in, which needs an
+  OTP, which needs email. The first seed is still manual (section 6), or done
+  by `reset.yml` on a fresh install.
 - **The AI mock lane can be forced on in production** via `ai.mock = on` and
   will bill credits for fabricated output. Leave it on `auto`.
 - **`/health` is liveness-only** — it never touches D1, so it will report

@@ -70,7 +70,7 @@ export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activi
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        {/* Floor the ring's caption text at 12px (DESIGN.md §2.2). The pure
+        {/* Floor the ring's caption text at 12px (UI-LANGUAGE.md §5 — the type scale's floor). The pure
             proportional size rendered the label at 7.5px on the hero ring most
             screens use (size 116) — the inline style silently beat the `text-xs`
             class it sits next to, so the smallest, most-read text in the app was

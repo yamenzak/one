@@ -6,6 +6,7 @@
 
 import { resolveEntitlements, mergeOverrides, clampEntitlementsForStatus, type Entitlements } from "@kova/domain";
 import { newId, nowIso, nowMs } from "./ids.js";
+import { getConfig, setConfig } from "@4dl/core";
 import { j } from "./db.js";
 
 export interface PlanRow {
@@ -475,14 +476,7 @@ export async function appendLedger(
     .run();
 }
 
-export async function getConfig(db: D1Database): Promise<Record<string, string>> {
-  const r = await db.prepare("SELECT key, value FROM app_config").all<{ key: string; value: string }>();
-  return Object.fromEntries((r.results ?? []).map((row) => [row.key, row.value]));
-}
-
-export async function setConfig(db: D1Database, key: string, value: string): Promise<void> {
-  await db
-    .prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
-    .bind(key, value)
-    .run();
-}
+// `app_config` is core's table (the schema runner bootstraps it), so its
+// accessors live there. Re-exported from here because ~20 call sites import them
+// from this module and their subject is still "platform settings".
+export { getConfig, setConfig };

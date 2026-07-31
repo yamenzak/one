@@ -1,5 +1,5 @@
 /**
- * The feature spine (SPEC §5–7; docs/REGISTRY-PLAN.md Phase 1).
+ * The feature spine (SPEC §5–7; KOVA.md).
  *
  * One `FeatureSpec` per product feature — the record that rules everything about
  * it. Each spec references the deduplicated ATOMS by key (a platform entitlement,
