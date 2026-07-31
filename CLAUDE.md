@@ -45,6 +45,8 @@ apps/
   app/   # ONE role-adaptive PWA (client / trainer / owner / platform admin)
   www/   # marketing site (dependency-free static generator)
   e2e/   # Playwright — the golden paths, in a browser against the real worker
+  _template/ # a NEW 4DL app: every shared package wired, no product vocabulary.
+             # Typechecks + tests in this workspace so it cannot rot. Copy it.
 packages/
   core/      # @4dl/core — the floor every 4DL package stands on: ids, defensive
              # JSON columns, the STRUCTURAL BINDINGS CONTRACT (HasDb/HasMedia/…)
@@ -251,18 +253,25 @@ an over-claim costs more than an under-claim. Verify before editing it.
 **The platform extraction is under way** — [docs/PLATFORM-EXTRACTION.md](docs/PLATFORM-EXTRACTION.md)
 is the audit and the staged plan for turning this repo from "Kova with two shared
 packages" into "the 4DL platform, on which Kova is the first app". Three more apps
-are queued. **Stages 0–8 are done** — the mechanisms, `@4dl/tenancy`, `@4dl/auth`,
-`@4dl/billing`, `@4dl/commerce`, `@4dl/ai` + `@4dl/storage`,
-`@4dl/email` + `@4dl/notify`, `@4dl/purge`, and `@4dl/app-kit`. `@4dl/platform`
-is gone. Stage 9 (the template app, and the registry-injection seam the
-session/theme/shell layer still needs) is
-not. Read it
-before moving anything between `apps/api` and `packages/`.
+are queued. **All nine stages are done** — the mechanisms, `@4dl/tenancy`,
+`@4dl/auth`, `@4dl/billing`, `@4dl/commerce`, `@4dl/ai` + `@4dl/storage`,
+`@4dl/email` + `@4dl/notify`, `@4dl/purge`, `@4dl/app-kit`, and `apps/_template`
++ [PLATFORM.md](PLATFORM.md). `@4dl/platform` is gone. Read the extraction doc
+before moving anything between `apps/api` and `packages/`; **[PLATFORM.md](PLATFORM.md)
+is the index** — the four mechanisms and the five invariants, in one place.
+
+Two things Stage 9 deliberately did NOT do, so nobody reads "done" as "complete":
+the frontend session/theme/shell layer is still Kova's (each file is a generic
+mechanism welded to a product registry — `packages/app-kit/README.md` lists them
+and why), and the template ships no Stripe routes, no custom-domain routes and no
+integration suite (`apps/_template/README.md` §"What this template does NOT
+include").
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
 moves. Measured most recently, per package: **493 API + 197 domain + 73 tenancy +
 64 ui + 52 app + 25 commerce + 21 billing + 14 core + 14 purge + 12 ai +
-12 auth + 7 protocol + 3 storage + 3 email + 3 notify** (993 total, 38 skipped).
+12 auth + 11 template + 7 protocol + 3 app-kit + 3 storage + 3 email + 3 notify**
+(1,007 total, 38 skipped).
 Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
 `@4dl/platform` to `@4dl/tenancy`; the split moves tests, it does not add any.
 The pricing and normalizer suites live

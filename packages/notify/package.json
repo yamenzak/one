@@ -6,7 +6,8 @@
   "description": "In-app notifications: the WebSocket push Durable Object, per-user channel preferences, and template rendering. The notification TYPES are the app's registry.",
   "exports": {
     ".": "./src/index.ts",
-    "./model": "./src/model.ts"
+    "./model": "./src/model.ts",
+    "./schema": "./src/schema.ts"
   },
   "types": "./src/index.ts",
   "scripts": {

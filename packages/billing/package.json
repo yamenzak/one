@@ -6,7 +6,8 @@
   "description": "Platform billing: the entitlement engine (quotas, feature gates, credit grants), credit metering, the per-tenant credit Durable Object, the Stripe client, and the dunning ladder. No product vocabulary \u2014 see README.md.",
   "exports": {
     ".": "./src/index.ts",
-    "./model": "./src/model.ts"
+    "./model": "./src/model.ts",
+    "./schema": "./src/schema.ts"
   },
   "types": "./src/index.ts",
   "scripts": {

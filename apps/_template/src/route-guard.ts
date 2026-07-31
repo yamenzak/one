@@ -1,0 +1,83 @@
+/**
+ * THE ROUTE TABLE — the app's half of `@4dl/auth`'s five-gate guard.
+ *
+ * The ENGINE runs the gates in a fixed order and is not the app's to reorder:
+ *
+ *   1. the HOST gate      an unserved hostname 404s; the root is a signpost; a
+ *                         hostname owning no tenant answers almost nothing
+ *   2. the SESSION gate   authenticated, or on the public lane
+ *   3. the TENANT gate    a member OF THE HOST'S TENANT, not of any tenant
+ *   4. the STANDING gate  a lapsed tenant's writes refuse — reads NEVER do
+ *   5. the PERMISSION     the grant the route requires
+ *
+ * What this file supplies is which routes fall where. Five predicates, and the
+ * mistakes each one prevents are specific:
+ *
+ * `allowedOnRoot` vs `allowedWithoutTenant` are deliberately DIFFERENT and the
+ * second is much narrower. The root is ours and may serve identity and webhooks;
+ * a hostname owning no tenant is nobody's. Collapsing them re-opens a real hole:
+ * the auth lane is public, so on an unowned hostname — including the
+ * `*.workers.dev` name Cloudflare publishes for every worker, which anyone can
+ * guess — a stranger could request a sign-in code, verify it, and create a
+ * tenant from an address that appears nowhere and belongs to nobody.
+ *
+ * `allowedWhileReadOnly` is why LEAVING is always possible. Withholding the
+ * product is not the same as holding someone's data hostage over an invoice: the
+ * account-close and export paths must survive every rung of the ladder, and
+ * provider webhooks must too — blocking those makes suspension unrecoverable.
+ */
+
+import { routeGuard, type Grant } from "@4dl/auth";
+import type { Auth } from "./auth.js";
+import type { Branding } from "./host-context.js";
+import type { Env } from "./env.js";
+import { isPlatformAdmin } from "./auth-context.js";
+
+/** Reachable with no session at all. */
+const isPublic = (method: string, path: string): boolean =>
+  path.startsWith("/api/auth/") ||
+  path === "/api/host" ||
+  path === "/health" ||
+  (method === "POST" && path.startsWith("/api/webhooks/"));
+
+/**
+ * The permission a route requires. `null` = any authenticated member.
+ *
+ * Default-deny is the engine's job, not this table's — an unlisted route still
+ * needs a session and a tenant. What this decides is the ADDITIONAL grant.
+ */
+function permissionFor(method: string, path: string): Grant | null {
+  const write = method !== "GET" && method !== "HEAD";
+  if (path.startsWith("/api/records")) return write ? { record: ["create"] } : { record: ["read"] };
+  if (path.startsWith("/api/reports")) return { report: ["read"] };
+  if (path.startsWith("/api/billing")) return write ? { billing: ["manage"] } : { billing: ["read"] };
+  if (path.startsWith("/api/settings")) return write ? { settings: ["manage"] } : { settings: ["read"] };
+  if (path.startsWith("/api/ai/")) return { ai: ["use"] };
+  return null;
+}
+
+/** The root door is a signpost — it may still sign people in and take webhooks. */
+const allowedOnRoot = (path: string): boolean =>
+  path.startsWith("/api/auth/") || path === "/api/host" || path === "/health" || path.startsWith("/api/webhooks/");
+
+/** A well-formed hostname owning NO tenant: the host probe, and nothing else. */
+const allowedWithoutTenant = (path: string): boolean => path === "/api/host" || path === "/health";
+
+/** Writes that survive a read-only tenant. Leaving is always allowed. */
+const allowedWhileReadOnly = (path: string): boolean =>
+  path.startsWith("/api/webhooks/") || path.startsWith("/api/me/") || path === "/api/tenant/close";
+
+export const guard = routeGuard<Env, Auth, Branding>({
+  isPublic,
+  permissionFor,
+  allowedOnRoot,
+  allowedWithoutTenant,
+  allowedWhileReadOnly,
+  isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+  // The STANDING gate, injected — this is what keeps `@4dl/auth` independent of
+  // billing. An app that never bills returns `null` here and every route passes
+  // the gate untouched.
+  gate: (c) => c.get("host").gate,
+  isBillingWrite: (path) => path.startsWith("/api/billing"),
+  billingPermission: { billing: ["manage"] },
+});
