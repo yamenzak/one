@@ -6,8 +6,12 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
+import { adminUrl, appStorage, resolveHostInfo, tenantUrl, CONTEXT_CACHE, type HostInfo as KitHostInfo, type HostRole } from "@4dl/app-kit";
 import type { SessionContext, TenantBranding } from "@kova/protocol";
 import { api, ApiError, isOffline, setUnauthorizedHandler } from "./api.js";
+
+export { adminUrl };
+export type { HostRole };
 
 /**
  * ── The door is the hostname now ────────────────────────────────────────────
@@ -38,17 +42,8 @@ import { api, ApiError, isOffline, setUnauthorizedHandler } from "./api.js";
  * The remembered door used to be here too. It no longer exists: the hostname is
  * the door, so there is nothing for the device to remember.
  */
-const KEEP_ON_SIGN_OUT = new Set(["kova-theme"]);
-
-/** Remove the app's own localStorage keys (mode, cached session, per-plan
- *  shopping lists) — all `kova`-prefixed — so nothing leaks across accounts. */
-function clearAppStorage(): void {
-  try {
-    for (const k of Object.keys(localStorage)) {
-      if (k.startsWith("kova") && !KEEP_ON_SIGN_OUT.has(k)) localStorage.removeItem(k);
-    }
-  } catch { /* private mode */ }
-}
+const store = appStorage("kova", ["kova-theme"]);
+const clearAppStorage = () => store.clear();
 
 /**
  * Last successful /api/context payload. The PWA precaches the app shell so it
@@ -63,83 +58,21 @@ function clearAppStorage(): void {
  * cookie is HttpOnly and every read/write is still authorized server-side, so a
  * restored payload cannot grant access to anything. A real 401 clears it.
  */
-const CTX_CACHE_KEY = "kova:ctx-cache";
-function readCachedCtx(): SessionContext | null {
-  try {
-    const raw = localStorage.getItem(CTX_CACHE_KEY);
-    return raw ? (JSON.parse(raw) as SessionContext) : null;
-  } catch { return null; }
-}
-function writeCachedCtx(data: SessionContext | null): void {
-  try {
-    if (data) localStorage.setItem(CTX_CACHE_KEY, JSON.stringify(data));
-    else localStorage.removeItem(CTX_CACHE_KEY);
-  } catch { /* private mode / quota */ }
-}
+const readCachedCtx = (): SessionContext | null => store.read<SessionContext>(CONTEXT_CACHE);
+const writeCachedCtx = (data: SessionContext | null): void => store.write(CONTEXT_CACHE, data);
 
 type Mode = "coach" | "train";
 
-/** Which door the app is being served on — see `@kova/domain` `classifyHost`. */
-export type HostRole = "root" | "setup" | "admin" | "tenant" | "custom" | "invalid";
-
-/** Which door this is, and whose (SPEC §14.1). Resolved pre-auth from /api/host. */
-export interface HostInfo {
-  role: HostRole;
-  /** True on our own doors (root / setup / admin); false when a studio resolved. */
-  platform: boolean;
-  /** The apex studios live under, e.g. `kova.4dl.app`. Used to build the URL of
-   *  another studio when switching, so the switcher can cross hostnames. */
-  rootDomain: string;
-  /** Absolute URL of the setup door — the only place a studio is created. */
-  setupUrl: string;
-  /**
-   * The studio this host belongs to. `null` while `role === "tenant"` is
-   * meaningful and must not be treated as "platform": it is a well-formed studio
-   * address with no studio behind it, and the app renders "no studio here".
-   */
-  tenant: { tenantId: string; name: string; slug: string; branding: TenantBranding | null; allowSignup: boolean } | null;
-  /** The studio's billing gate. `readOnly` means every write on this host refuses,
-   *  so the app says so up front rather than on the first failed save. */
-  gate?: {
-    readOnly: boolean;
-    /** The app itself is withheld — see `StudioBlocked`. Reads still resolve so
-     *  export and delete keep working behind it. */
-    blocked: boolean;
-    reason: "ok" | "grace" | "suspended" | "blocked" | "closing";
-  } | null;
-  /** Cloudflare Turnstile — the login renders the widget when a site key is set
-   *  and `enabled` (a server secret is configured, so codes are gated on it). */
-  turnstile?: { siteKey: string | null; enabled: boolean } | null;
-}
-
-/** The URL of a studio, by slug, on the platform root.
- *
- *  Always the SUBDOMAIN, never the studio's custom domain — even when it has one.
- *  The session cookie is issued for the root, so a subdomain hop carries the
- *  session and switches instantly, while a custom domain is a separate origin with
- *  its own cookie jar and would demand a fresh sign-in. The custom domain is for
- *  that studio's own clients arriving cold, not for crossing between studios. */
 /**
- * The operator console's address. It has exactly one, and this is how you get
- * there from inside a studio.
- *
- * `/api/admin/*` answers on this door and nowhere else (route-guard.ts), which
- * is what stops a session valid across the whole root from carrying platform
- * powers onto a tenant's subdomain. The console used to ALSO be an in-app route
- * on every studio — it rendered fine and then 404'd on every call it made.
+ * Kova's host info — `@4dl/app-kit`'s `HostInfo`, with the branding type filled
+ * in. The five doors, the gate and the URL builders are the platform's
+ * (`packages/app-kit/src/host.ts` explains why the gate is spread whole and why
+ * a 404 from `/api/host` is an ANSWER rather than a network failure).
  */
-export function adminUrl(rootDomain: string): string {
-  return studioUrl("admin", rootDomain);
-}
+export type HostInfo = KitHostInfo<TenantBranding>;
 
-export function studioUrl(slug: string, rootDomain: string): string {
-  // The PORT has to come along. Dev serves on :8787, and a bare hostname points at
-  // :80 — where nothing is listening — so dropping it turns every studio hop into a
-  // blank page locally while working fine in production. Protocol likewise follows
-  // the current page rather than being hardcoded to https.
-  const port = location.port ? `:${location.port}` : "";
-  return `${location.protocol}//${slug}.${rootDomain}${port}/`;
-}
+/** A studio's URL, by slug, on the platform root. Kova's word for a tenant. */
+export const studioUrl = tenantUrl;
 
 interface Session {
   loading: boolean;
@@ -215,18 +148,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    * could not confirm exists.
    */
   useEffect(() => {
-    void api
-      .get<HostInfo>("/api/host")
-      .then(setHost)
-      .catch((e: unknown) =>
-        setHost({
-          role: e instanceof ApiError && e.status === 404 ? "invalid" : "root",
-          platform: true,
-          rootDomain: location.hostname,
-          setupUrl: "/",
-          tenant: null,
-        }),
-      );
+    void resolveHostInfo<TenantBranding>(
+      (path) => api.get<HostInfo>(path),
+      (e) => e instanceof ApiError && e.status === 404,
+    ).then(setHost);
   }, []);
 
   useEffect(() => {

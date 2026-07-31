@@ -87,6 +87,11 @@ packages/
   protocol/  # zod wire schemas shared api <-> app (plan bodies, log payloads, context)
   ui/        # @4dl/ui — the SHARED design system: tokens + product-agnostic
              # primitives. No product vocabulary, no router. See its README.
+  app-kit/   # @4dl/app-kit — the BROWSER runtime: the typed fetch layer and its
+             # three-way offline outcome (queued | offline | HTTP error), host
+             # resolution across the five doors, prefixed storage, the passkey
+             # ceremony, Stripe.js + PaymentSheet, Turnstile, ErrorBoundary,
+             # hard-refresh. See its README.
   brand/     # (reserved) logos, illustrations
 ```
 
@@ -246,10 +251,11 @@ an over-claim costs more than an under-claim. Verify before editing it.
 **The platform extraction is under way** — [docs/PLATFORM-EXTRACTION.md](docs/PLATFORM-EXTRACTION.md)
 is the audit and the staged plan for turning this repo from "Kova with two shared
 packages" into "the 4DL platform, on which Kova is the first app". Three more apps
-are queued. **Stages 0–7 are done** — the mechanisms, `@4dl/tenancy`, `@4dl/auth`,
+are queued. **Stages 0–8 are done** — the mechanisms, `@4dl/tenancy`, `@4dl/auth`,
 `@4dl/billing`, `@4dl/commerce`, `@4dl/ai` + `@4dl/storage`,
-`@4dl/email` + `@4dl/notify`, and `@4dl/purge`. `@4dl/platform`
-is gone. Stages 8–9 (the app kit, the template) are
+`@4dl/email` + `@4dl/notify`, `@4dl/purge`, and `@4dl/app-kit`. `@4dl/platform`
+is gone. Stage 9 (the template app, and the registry-injection seam the
+session/theme/shell layer still needs) is
 not. Read it
 before moving anything between `apps/api` and `packages/`.
 

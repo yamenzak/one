@@ -61,11 +61,20 @@ export const APP_SCOPES: readonly string[] = ["@kova/", "@scena/", "@bocca/"];
  * Stripe's `client_secret` is here for the same reason and ahead of need: it
  * arrives in Stage 3 with the billing extraction, and a false failure at that
  * moment would land in the middle of a money-path move.
+ *
+ * `clientExtensionResults` is WebAuthn's — `PublicKeyCredential`'s own field
+ * name, which the passkey ceremony destructures off every credential.
+ *
+ * ⚠️ Add to this list only for a name a SPEC or a vendor chose. A name the
+ * codebase chose is a boundary violation even when it feels incidental: the
+ * `WebSocketPair` halves in `@4dl/notify` are `browserSide`/`workerSide` rather
+ * than an exemption, because those were ours to rename.
  */
 const EXEMPT_IDENTIFIERS: readonly string[] = [
   "clientWidth", "clientHeight", "clientTop", "clientLeft", "clientX", "clientY",
   "getBoundingClientRect", "ClientRect", "clientInformation",
   "client_secret", "clientSecret",
+  "clientExtensionResults",
 ];
 
 const EXEMPT_RE = new RegExp(EXEMPT_IDENTIFIERS.join("|"), "g");

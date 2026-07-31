@@ -40,6 +40,7 @@
     "@kova/domain#build": { "outputs": [] },
     "@kova/protocol#build": { "outputs": [] },
     "@4dl/ui#build": { "outputs": [] },
+    "@4dl/app-kit#build": { "outputs": [] },
     "lint": {},
     "dev": {
       "cache": false,
