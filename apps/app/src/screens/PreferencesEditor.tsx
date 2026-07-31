@@ -11,8 +11,8 @@ import {
   PRIMARY_GOAL_LABELS, ACTIVITY_LEVEL_LABELS, DIETARY_APPROACH_LABELS, WORKOUT_LOCATION_LABELS,
   type ClientPreferences, type WorkoutLocation,
 } from "@kova/domain";
-import { Button, Card, Chip, Field, Select, Textarea, Reveal, Skeleton, SkeletonLine, FieldGroup, ActionResult, Target, Dumbbell, Utensils, MapPin, Activity } from "@4dl/ui";
-import { api } from "../api.js";
+import { Card, Chip, Field, Select, Textarea, Reveal, Skeleton, SkeletonLine, FieldGroup, SaveBar, useAction, Target, Dumbbell, Utensils, MapPin, Activity } from "@4dl/ui";
+import { api, errorText } from "../api.js";
 import { useSession } from "../session.js";
 import { useUnits } from "../units.js";
 
@@ -38,19 +38,19 @@ export function PreferencesEditorCard({ clientId, includeProfile = false, onSave
   const { ctx } = useSession();
   const self = ctx?.active?.clientId != null && ctx.active.clientId === clientId;
   const [c, setC] = useState<Editable | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const act = useAction(errorText);
   const units = useUnits();
   useEffect(() => { void api.get<{ client: Editable }>(`/api/clients/${clientId}`).then((r) => setC({ gender: r.client.gender, dateOfBirth: r.client.dateOfBirth, heightCm: r.client.heightCm, preferences: r.client.preferences ?? {} })).catch(() => undefined); }, [clientId]);
   const setP = (patch: Partial<ClientPreferences>) => setC((x) => (x ? { ...x, preferences: { ...x.preferences, ...patch } } : x));
   const set = (patch: Partial<Editable>) => setC((x) => (x ? { ...x, ...patch } : x));
   const num = (s: string): number | null => { const n = Number(s.replace(/[^\d.]/g, "")); return s && !isNaN(n) ? n : null; };
-  const save = async () => {
-    if (!c) return; setSaving(true); setMsg(null);
-    try {
+  const save = () => {
+    if (!c) return;
+    return act.run("save", async () => {
       await api.patch(`/api/clients/${clientId}`, { ...(includeProfile ? { gender: c.gender ?? undefined, dateOfBirth: c.dateOfBirth ?? undefined, heightCm: c.heightCm ?? undefined } : {}), preferences: c.preferences });
-      setMsg("Saved."); onSaved?.();
-    } finally { setSaving(false); }
+      onSaved?.();
+      return "Saved.";
+    }, "Couldn't save these preferences — they're unchanged.");
   };
   const p = c?.preferences ?? {};
   const tw = p.targetWeightKg != null ? kgToDisplay(p.targetWeightKg, units) : null;
@@ -122,10 +122,11 @@ export function PreferencesEditorCard({ clientId, includeProfile = false, onSave
         </div>
         </FieldGroup>
 
-        <Button size="lg" className="w-full" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save preferences"}</Button>
-        {/* Announced, not whispered: this used to be a muted <p> a screen reader
-            never saw and a thumb scrolled past. */}
-        <ActionResult msg={msg} err={null} />
+        {/* Announced, not whispered: the outcome used to be a muted <p> a screen
+            reader never saw and a thumb scrolled past — and a FAILED save had no
+            line at all, because the save had no catch. `SaveBar` puts the result
+            above the button, where the thumb already is. */}
+        <SaveBar label="Save preferences" saving={act.busy === "save"} msg={act.msg} err={act.err} onSave={() => void save()} />
       </Card>
       )}
     </Reveal>

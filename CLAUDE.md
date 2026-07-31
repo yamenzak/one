@@ -245,6 +245,15 @@ remote bindings without editing the config (this is what the E2E suite does).
 - Plan/meal bodies are JSON columns validated by `@kova/protocol` at the route.
 - Pure domain logic gets unit tests; API flows get Miniflare integration tests.
   Run tests with the `wrangler dev` server stopped (they share `.wrangler` state).
+- **A write that fails says so, where it failed.** Every mutating control on a
+  settings surface goes through `@4dl/ui`'s `useAction` (has a Save button) or
+  `useConfirmedState` (instant — it rolls back to the pre-apply snapshot). The
+  two shapes they replace are shorter than the correct code and both fail
+  silently: `try { await api.patch(…) } finally {}` with no catch rejects into
+  the app-wide "Something didn't load" toast, and
+  `setState(next); await write().catch(() => undefined)` leaves the control
+  showing a value the server refused. `apps/app/src/save-lifecycle.conformance.test.ts`
+  makes either one a test failure.
 - Prettier-ish: no semicolons aren't enforced here — match surrounding style.
 
 ## Status
@@ -281,10 +290,10 @@ handlers are woven through Kova's notification registry, entitlement gates and
 `requireClientAccess`. Only the reconciliation logic moved.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured most recently, per package: **499 API + 197 domain + 78 app +
+moves. Measured most recently, per package: **499 API + 197 domain + 83 app +
 73 tenancy + 43 ui + 25 commerce + 21 billing + 16 template + 14 core + 14 purge
 + 12 ai + 12 auth + 7 protocol + 3 app-kit + 3 storage + 3 email + 3 notify**
-(1,023 total, 38 skipped). The ui count DROPPED and the app count rose by the
+(1,028 total, 38 skipped). The ui count DROPPED and the app count rose by the
 same shape: Stage 0b moved Kova's eleven accent tones — and the contrast tests
 that guard them — out of `@4dl/ui` and into the app. The template's 16 are 11
 conformance (plain Node, no fixtures) + 5 integration (the real worker through

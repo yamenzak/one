@@ -7,9 +7,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { AiSettingsPayload, AiFeatureMeta, AiModelMeta, TenantAiConfig, AiFeatureConfig, AiTone } from "@kova/protocol";
-import { Card, Badge, Skeleton, Reveal, SkeletonLine, Switch, Button, Textarea, Chip, Field, IconBadge, cn, PencilLine, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, Play, Wallet, CircleCheck, CircleAlert, type Tone, type LucideIcon, Wand2, Sliders, ListChecks} from "@4dl/ui";
+import { Card, Badge, Skeleton, Reveal, SkeletonLine, Switch, Button, Textarea, Chip, Field, IconBadge, cn, PencilLine, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, Play, Wallet, CircleCheck, CircleAlert, type Tone, type LucideIcon, Wand2, Sliders, ListChecks, ActionResult, useConfirmedState} from "@4dl/ui";
 import { SectionSplit } from "./SectionSplit.js";
-import { api } from "../api.js";
+import { api, errorText } from "../api.js";
 import { AiAvatar, useAiIdentity } from "../AiAvatar.js";
 import { useCan } from "../FeatureLock.js";
 
@@ -132,7 +132,13 @@ function VoicePackStatus({ pack, selectedVoice, busy, note, onInstall, onRevoice
 export function AiConfigSection() {
   const ai = useAiIdentity();
   const [data, setData] = useState<AiSettingsPayload | null>(null);
-  const [config, setConfig] = useState<TenantAiConfig>({});
+  // Every control below is INSTANT — no Save button — so each write has to be
+  // confirmed by the server or visibly taken back. `useConfirmedState` is what
+  // makes that structural: before this, all five wrote through
+  // `.catch(() => undefined)`, so a refused PATCH left the picker showing a tone
+  // the studio did not have until the next reload silently reverted it.
+  const cfg = useConfirmedState<TenantAiConfig>({}, errorText);
+  const config = cfg.value;
   // The coach voice exists only to narrate BODY-SCAN cues, and every route behind
   // it (`/body-scan/voice-preview`, `/body-scan/voice-pack`) is gated on
   // `bfCamera`. Without the entitlement the card was a live control that 403'd —
@@ -140,23 +146,19 @@ export function AiConfigSection() {
   const canBodyScan = useCan("bodyScan");
 
   useEffect(() => {
-    void api.get<AiSettingsPayload>("/api/settings/ai").then((r) => { setData(r); setConfig(r.config ?? {}); }).catch(() => setData(null));
+    // `cfg.reset` seeds the value WITHOUT a write and without marking anything
+    // busy — the load is not a change the server needs to confirm.
+    void api.get<AiSettingsPayload>("/api/settings/ai").then((r) => { setData(r); cfg.reset(r.config ?? {}); }).catch(() => setData(null));
   }, []);
 
-  const saveHouseTone = async (tone: AiTone | null) => {
-    setConfig((c) => ({ ...c, tone }));
-    await api.patch("/api/settings/ai", { tone }).catch(() => undefined);
-  };
-  const saveTtsVoice = async (ttsVoice: string) => {
-    setConfig((c) => ({ ...c, ttsVoice }));
-    await api.patch("/api/settings/ai", { ttsVoice }).catch(() => undefined);
-  };
+  const saveHouseTone = (tone: AiTone | null) =>
+    cfg.commit("tone", (c) => ({ ...c, tone }), () => api.patch("/api/settings/ai", { tone }), "Couldn't set the house tone.");
+  const saveTtsVoice = (ttsVoice: string) =>
+    cfg.commit("voice", (c) => ({ ...c, ttsVoice }), () => api.patch("/api/settings/ai", { ttsVoice }), "Couldn't change the coach voice.");
   // Owner cap on AI credits a single client can spend per day (SPEC §6). Empty =
   // uncapped. Edited as free text, committed on blur so partial input never saves.
-  const saveCreditCap = async (cap: number | null) => {
-    setConfig((c) => ({ ...c, perActorDailyCreditCap: cap }));
-    await api.patch("/api/settings/ai", { perActorDailyCreditCap: cap }).catch(() => undefined);
-  };
+  const saveCreditCap = (cap: number | null) =>
+    cfg.commit("cap", (c) => ({ ...c, perActorDailyCreditCap: cap }), () => api.patch("/api/settings/ai", { perActorDailyCreditCap: cap }), "Couldn't set the daily credit cap.");
   const [capDraft, setCapDraft] = useState("");
   useEffect(() => { setCapDraft(config.perActorDailyCreditCap != null ? String(config.perActorDailyCreditCap) : ""); }, [config.perActorDailyCreditCap]);
   const commitCreditCap = () => {
@@ -204,15 +206,22 @@ export function AiConfigSection() {
       setGenNote(status === 402 ? "Not enough credits to generate the voice pack." : status === 403 ? "The body-scan add-on isn't in your plan." : "Couldn't generate the voice pack — try again.");
     } finally { setGenBusy(false); }
   };
-  const saveFeature = async (key: string, patch: AiFeatureConfig) => {
-    setConfig((c) => ({ ...c, features: { ...(c.features ?? {}), [key]: { ...(c.features?.[key] ?? {}), ...patch } } }));
-    await api.patch("/api/settings/ai", { features: { [key]: patch } }).catch(() => undefined);
-  };
+  const saveFeature = (key: string, patch: AiFeatureConfig) =>
+    cfg.commit(
+      `feature:${key}`,
+      (c) => ({ ...c, features: { ...(c.features ?? {}), [key]: { ...(c.features?.[key] ?? {}), ...patch } } }),
+      () => api.patch("/api/settings/ai", { features: { [key]: patch } }),
+      "Couldn't save that feature — it's unchanged.",
+    );
   /** Apply one patch to many features at once (used by the quick model picks). */
-  const saveFeatures = async (keys: string[], patch: AiFeatureConfig) => {
+  const saveFeatures = (keys: string[], patch: AiFeatureConfig) => {
     const patches = Object.fromEntries(keys.map((k) => [k, patch]));
-    setConfig((c) => { const features = { ...(c.features ?? {}) }; for (const k of keys) features[k] = { ...(features[k] ?? {}), ...patch }; return { ...c, features }; });
-    await api.patch("/api/settings/ai", { features: patches }).catch(() => undefined);
+    return cfg.commit(
+      "features",
+      (c) => { const features = { ...(c.features ?? {}) }; for (const k of keys) features[k] = { ...(features[k] ?? {}), ...patch }; return { ...c, features }; },
+      () => api.patch("/api/settings/ai", { features: patches }),
+      "Couldn't apply that to every feature — nothing was changed.",
+    );
   };
 
   const trainer = data?.features.filter((f) => f.audience === "trainer") ?? [];
@@ -220,6 +229,10 @@ export function AiConfigSection() {
 
   return (
     <section className="mb-6 space-y-4">
+      {/* Every control here writes instantly, so this is the only place a refused
+          write can be reported. Without it the rollback would be silent — the
+          value snapping back with nothing saying why. */}
+      <ActionResult msg={null} err={cfg.err} />
       <Reveal loading={!data} className="space-y-4" skeleton={
         <>
           <div>

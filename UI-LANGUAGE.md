@@ -403,7 +403,27 @@ say what to do.
 `Callout` (tone + icon + text; the only place a coloured block of text lives) ·
 `Toast` (transient, bottom, one line) · `EmptyState` (illustration/icon +
 one-line explanation + one action) · `Skeleton` (matches the real layout's
-geometry exactly — a skeleton that does not match is worse than a spinner).
+geometry exactly — a skeleton that does not match is worse than a spinner) ·
+`ActionResult` (the outcome of the last write in a section) · `SaveBar`
+(result + button, in that order).
+
+### A write that fails says so, in the place it failed
+
+Not a global toast, and never nothing. Two hooks make it structural, and which
+one applies depends on whether the control has a Save button:
+
+| The control | Use | Because |
+|---|---|---|
+| has a Save button | `useAction` | `try { await …} finally { setSaving(false) }` with no catch rejects into the app-wide error toast — generic words, wrong place, and identical to a failed *read*. `run` cannot leave a rejection unhandled or a button stuck busy. |
+| is instant (toggle, segmented picker) | `useConfirmedState` | `setState(next)` + a swallowed write leaves the control showing a value the server refused, until a reload silently reverts it. `commit` rolls back to the pre-apply snapshot and reports. |
+
+The result goes **above** the button, not below: below is where a phone keyboard
+covers it, and above is where the eye already is.
+
+**Enforced by a lint.** `apps/app/src/save-lifecycle.conformance.test.ts` fails on
+either hand-rolled shape in a settings surface. Escape with
+`save-lifecycle-exempt: <why>`. It was written against nine catch-less saves and
+five swallowed optimistic writes that were live at the time.
 
 ### Overlay
 `Sheet` (bottom, drag-to-dismiss, grabber, `radius-sheet` top — the default on
@@ -986,6 +1006,7 @@ shared component would be off by one for everyone outside UTC.
 | `SettingsIndex` | The table of contents for a configuration surface. Groups of rows; each row's sub-line says **what is inside**. | A list of data (that is `Group`/`Row`). An index's rows are doors, not records. | ✅ |
 | `SettingsPage` | The frame around one section: back, title, and **one** line of description. | A section that needs a paragraph — if it does, its rows are named wrong. | ✅ |
 | `SectionDetail` | A section that is itself several settings: an index of sub-pages, one open at a time, each row stating its **current value**. | Two or three controls that fit on one page. Splitting those buys a tap and costs a screen. | ✅ |
+| `SaveBar` | The bottom of an editable section: result, then a full-width button. Pass `dirty` and it disables itself when nothing changed. | A section with no explicit save. An instant control belongs on `useConfirmedState`, whose failure surface is `ActionResult`. | ✅ |
 
 `SectionDetail` is **controlled and router-free**: `openKey` + `onOpen` are
 props, because this package has no router dependency and must not gain one — a

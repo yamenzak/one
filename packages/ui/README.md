@@ -71,11 +71,42 @@ default" from the displayed value would have set a colour that fails AA. Nothing
 had checked, because both copies lived here. Kova's now
 (`apps/app/src/tokens.accents.test.ts`).
 
+## The write lifecycle lives here, not in each screen
+
+`patterns.tsx` carries the shapes a configuration surface owes its user, and two
+of them are about what happens when a write is REFUSED. They are here rather than
+in an app because there is nothing product-specific about failing to save, and
+because a copy of a pattern is a pattern that drifts — which is exactly what
+happened before they were adopted everywhere.
+
+| Hook | For | The failure it makes impossible |
+|---|---|---|
+| `useAction` | a control with a Save button | `try { await api.patch(…) } finally { setSaving(false) }` — no catch. The rejection escapes `void save()` into the runtime's generic "Something didn't load" toast: wrong words, wrong place, indistinguishable from a failed read. `run` cannot leave a rejection unhandled or a button stuck busy. |
+| `useConfirmedState` | an INSTANT control — a toggle, a segmented picker | `setState(next); await write().catch(() => undefined)`. The control now shows a value the server refused, and it survives every re-render until a reload silently reverts it. `commit` snapshots before the optimistic apply and puts it back on rejection, so the visible state is only ever one the server agreed to. |
+
+`useConfirmedState` owns the state rather than taking a setter, and that is
+forced: rolling back needs the value from *before* the apply, and only the
+state's owner has it. The snapshot is taken inside the updater, not read from the
+closure — a closure read captures whatever was current when the callback was
+built, which is a stale revert target the moment two controls are used in a row.
+
+`SaveBar` is the bottom of an editable section: result above, button below.
+Small, and it exists because the order and the disabled rule were being
+re-decided per screen. The result goes above because a confirmation rendered
+below the button lands under the keyboard on a phone.
+
+Both take the app's `errorText` as an argument rather than importing one, so this
+package keeps no opinion about an app's HTTP error shape.
+
+Kova enforces adoption in `apps/app/src/save-lifecycle.conformance.test.ts`,
+which is where the count comes from: nine catch-less saves and five swallowed
+optimistic writes were live when the check was written.
+
 ## Conformance
 
-Eight layers: contrast, design-tokens, type-scale, no-data, motion, focus,
-primitive-adoption, widget-coding. Each has an escape hatch that requires a
-written reason on the line. See UI-LANGUAGE.md §13.
+Nine layers: contrast, design-tokens, type-scale, no-data, motion, focus,
+primitive-adoption, widget-coding, save-lifecycle. Each has an escape hatch that
+requires a written reason on the line. See UI-LANGUAGE.md §13.
 
 The last one is worth understanding because it is not about tokens. Every tone
 it caught was a *legal* tone from this package — the defect was that the colour
