@@ -307,6 +307,9 @@ importers:
       hono:
         specifier: ^4.9.10
         version: 4.12.29
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20251001.0
@@ -469,6 +472,12 @@ importers:
       '@4dl/core':
         specifier: workspace:*
         version: link:../core
+      hono:
+        specifier: ^4.9.10
+        version: 4.12.29
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20251001.0

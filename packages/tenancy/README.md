@@ -84,3 +84,49 @@ hard-coded the first app's brand into a security control. Type names are the
 worst place for product vocabulary — every consuming app is forced to adopt the
 word. The rename rode along with the move, so this starts clean and the empty
 list is a load-bearing assertion.
+
+## Shipping routes without importing auth
+
+`domain-routes.ts` and `org-guard.ts` belong here by subject — they are entirely
+about hostnames, certificates and DNS labels. They stayed in the app for four
+stages anyway, because every route needs the request identity, and `@4dl/auth`
+already depends on THIS package. Importing it back is a cycle.
+
+`route-deps.ts` is the fix, and it is the same injection shape as everything
+else:
+
+```ts
+export type RouteEnv = { Bindings: RouteBindings; Variables: RouteVars }
+
+export interface RouteGuards {
+  requireTenant:      (c) => { tenantId; userId } | null
+  requirePermission:  (c, perms) => Response | null
+  isPlatformAdmin:    (c) => boolean
+  gateCustomDomain?:  (c) => Promise<Response | null>   // optional; permissive
+  turnstile?:         (db) => Promise<{ siteKey; enabled } | null>
+}
+
+domainRoutes(guards, { config, workerName })
+```
+
+`RouteVars` names only the two variables these routes READ — `host` and `user` —
+and Hono's context is structurally typed, so an app with twenty more satisfies it
+by shape. The guards are functions, so `@4dl/auth`'s implementations bind in one
+line and an app with no authorization passes stubs.
+
+Two things fell out of doing this:
+
+**Turnstile's admin endpoints moved to `@4dl/auth`.** They lived in the app's
+`domain-routes.ts` because they sat next to the Cloudflare-for-SaaS credentials
+and both are "Cloudflare things an operator configures". They are unrelated — a
+bot check on the sign-in path is auth's — and that accidental neighbouring was
+the *only* thing that would have forced tenancy to import auth.
+
+**`workerName` is a parameter, not a constant.** It must match `name` in the
+app's `wrangler.jsonc`, and it is the one value whose wrong setting fails
+silently: the route is created, the certificate issues, the domain reports
+ACTIVE, and every request reaches a script that is not there.
+
+`orgSlugGuards(config, noun)` needs no guards at all — Better Auth decides who
+may create or rename an organization; these only decide what a slug may BE. That
+is why they could move first.

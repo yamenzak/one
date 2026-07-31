@@ -20,7 +20,8 @@
     "@4dl/tenancy": "workspace:*",
     "@better-auth/passkey": "1.6.23",
     "better-auth": "^1.6.23",
-    "hono": "^4.9.10"
+    "hono": "^4.9.10",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251001.0",

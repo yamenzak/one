@@ -16,7 +16,9 @@
     "clean": "rm -rf .turbo *.tsbuildinfo"
   },
   "dependencies": {
-    "@4dl/core": "workspace:*"
+    "@4dl/core": "workspace:*",
+    "hono": "^4.9.10",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251001.0",
