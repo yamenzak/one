@@ -21,11 +21,12 @@
 
 import { Hono } from "hono";
 import { newId, nowIso } from "@4dl/core";
-import { sessionMiddleware, requirePermission, requireTenant, type AppEnv } from "./auth-context.js";
+import { sessionMiddleware, requirePermission, requireTenant, isPlatformAdmin, type AppEnv } from "./auth-context.js";
 import { createAuth } from "./auth.js";
 import { guard } from "./route-guard.js";
 import { domainAdminRoutes, domainRoutes } from "./domain-routes.js";
 import { orgCreateGuard, orgUpdateGuard } from "./org-guard.js";
+import { emailAdminRoutes } from "@4dl/email/admin-routes";
 
 export { TenantBillingDO } from "./billing-do.js";
 export { InboxDO } from "./inbox-do.js";
@@ -92,6 +93,24 @@ app.post("/api/records", async (c) => {
  */
 app.route("/api", domainRoutes);
 app.route("/api", domainAdminRoutes);
+
+/**
+ * Email configuration, on the operator door. Mounted from day one on purpose:
+ * `@4dl/email` fails closed until `email.provider` and `email.from` are set, so
+ * an app without these routes is an app whose first deploy cannot send the
+ * sign-in code that is the only way in. Kova learned this the expensive way —
+ * the endpoints existed but nothing called them, and the deploy guide carried
+ * "edit D1 by hand" as a step.
+ */
+// `c as never` is the house idiom for an injected guard: the seam is
+// structural, but Hono's `Context` is invariant enough that the app's fuller env
+// is not assignable to the package's narrower one. The alternative — threading a
+// type parameter through every handler — forces each call site to name the app's
+// full env, which is the coupling the seam exists to avoid.
+app.route("/api", emailAdminRoutes(
+  { isPlatformAdmin: (c) => isPlatformAdmin(c as never) },
+  { from: "Template <noreply@template.local>" },
+) as unknown as Hono<AppEnv>);
 
 app.notFound((c) => c.json({ error: "not_found" }, 404));
 

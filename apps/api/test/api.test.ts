@@ -4834,3 +4834,80 @@ describe("a hostname with no studio serves nothing", () => {
     expect(org.status).toBe(404);
   });
 });
+
+/**
+ * THE ONE SETTING A DEPLOYMENT CANNOT BOOT WITHOUT.
+ *
+ * `@4dl/email` fails closed: with no `email.provider` / `email.from`, nothing
+ * sends — including the sign-in code, which on a passwordless platform is the
+ * only way in. These endpoints existed for months with **no caller anywhere in
+ * the app**, so the only documented way to configure a fresh deploy was to open
+ * D1 and write the rows by hand (DEPLOY.md carried it as a step).
+ *
+ * They are `@4dl/email`'s routes now rather than Kova's billing module's, so an
+ * app that takes the package inherits the ability to configure it. The
+ * validation below is new with the move — the old handler accepted any string up
+ * to 200 characters as a sender, which D1 stores happily and the MIME builder
+ * then rejects on every single send: a deployment that looks configured and
+ * delivers nothing.
+ */
+describe("platform email configuration is reachable and validated", () => {
+  const H = (cookie: string) => ({ "content-type": "application/json", ...auth(cookie) });
+
+  it("reports the current delivery settings to an operator", async () => {
+    const r = await SELF.fetch(`${ADMIN}/api/admin/email`, { headers: auth(ownerCookie) });
+    expect(r.status).toBe(200);
+    const body = (await r.json()) as { provider: string; from: string; platformFrom: string; creditsPerEmail: number };
+    expect(typeof body.provider).toBe("string");
+    expect(body.from).toBeTruthy();
+    expect(typeof body.creditsPerEmail).toBe("number");
+  });
+
+  it("round-trips a change", async () => {
+    const before = (await (await SELF.fetch(`${ADMIN}/api/admin/email`, { headers: auth(ownerCookie) })).json()) as { creditsPerEmail: number };
+    const next = before.creditsPerEmail === 2 ? 3 : 2;
+    const w = await SELF.fetch(`${ADMIN}/api/admin/email`, { method: "POST", headers: H(ownerCookie), body: JSON.stringify({ creditsPerEmail: next }) });
+    expect(w.status).toBe(200);
+    const after = (await (await SELF.fetch(`${ADMIN}/api/admin/email`, { headers: auth(ownerCookie) })).json()) as { creditsPerEmail: number };
+    expect(after.creditsPerEmail).toBe(next);
+    await SELF.fetch(`${ADMIN}/api/admin/email`, { method: "POST", headers: H(ownerCookie), body: JSON.stringify({ creditsPerEmail: before.creditsPerEmail }) });
+  });
+
+  it("refuses a sender the MIME builder could not use", async () => {
+    // The failure this prevents is silent and total: stored fine, rejected on
+    // every send, with the console still showing it as configured.
+    for (const from of ["not an address", "a@b", "<@>", "Name <not-an-address>"]) {
+      const r = await SELF.fetch(`${ADMIN}/api/admin/email`, { method: "POST", headers: H(ownerCookie), body: JSON.stringify({ from }) });
+      expect(r.status, `accepted "${from}"`).toBe(400);
+    }
+    // …and accepts both legitimate spellings.
+    for (const from of ["noreply@kova.test", "Kova <noreply@kova.test>"]) {
+      const r = await SELF.fetch(`${ADMIN}/api/admin/email`, { method: "POST", headers: H(ownerCookie), body: JSON.stringify({ from }) });
+      expect(r.status, `refused "${from}"`).toBe(200);
+    }
+  });
+
+  it("refuses a provider outside the closed set, and an out-of-range price", async () => {
+    for (const body of [{ provider: "sendgrid" }, { provider: "" }, { creditsPerEmail: -1 }, { creditsPerEmail: 10_000 }]) {
+      const r = await SELF.fetch(`${ADMIN}/api/admin/email`, { method: "POST", headers: H(ownerCookie), body: JSON.stringify(body) });
+      expect(r.status, JSON.stringify(body)).toBe(400);
+    }
+  });
+
+  it("is closed to a caller with no session at all", async () => {
+    const r = await SELF.fetch(`${ADMIN}/api/admin/email`);
+    expect(r.status).toBeGreaterThanOrEqual(400);
+    expect(r.status).toBeLessThan(500);
+  });
+
+  /*
+   * NOT TESTED HERE, and it cannot be: "a signed-in studio owner who is not a
+   * platform admin is refused". This suite runs with `ADMIN_EMAILS` empty and
+   * `ENVIRONMENT=development`, and `isPlatformAdminFor` falls back to "everyone
+   * in development" — so every test user IS an operator and the guard can never
+   * be observed refusing one. Asserting it would pass for the wrong reason.
+   *
+   * The operator gate itself is covered where it is observable: `route-gate.conformance.test.ts`
+   * checks the route table, and the `admin.`-door restriction has its own tests.
+   */
+});

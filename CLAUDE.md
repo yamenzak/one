@@ -91,6 +91,10 @@ packages/
   protocol/  # zod wire schemas shared api <-> app (plan bodies, log payloads, context)
   ui/        # @4dl/ui — the SHARED design system: tokens + product-agnostic
              # primitives. No product vocabulary, no router. See its README.
+  admin/     # @4dl/admin — the OPERATOR CONSOLE on every app's `admin.` door:
+             # the router-free section-registry shell, plus panels for config a
+             # shared package owns (email delivery). The SECTIONS are the app's.
+             # See its README.
   app-kit/   # @4dl/app-kit — the BROWSER runtime: the typed fetch layer and its
              # three-way offline outcome (queued | offline | HTTP error), host
              # resolution across the five doors, prefixed storage, the passkey
@@ -290,10 +294,10 @@ handlers are woven through Kova's notification registry, entitlement gates and
 `requireClientAccess`. Only the reconciliation logic moved.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured most recently, per package: **499 API + 197 domain + 83 app +
+moves. Measured most recently, per package: **504 API + 197 domain + 83 app +
 73 tenancy + 43 ui + 25 commerce + 21 billing + 16 template + 14 core + 14 purge
-+ 12 ai + 12 auth + 7 protocol + 3 app-kit + 3 storage + 3 email + 3 notify**
-(1,028 total, 38 skipped). The ui count DROPPED and the app count rose by the
++ 12 ai + 12 auth + 7 protocol + 3 admin + 3 app-kit + 3 storage + 3 email +
+3 notify** (1,036 total, 38 skipped). The ui count DROPPED and the app count rose by the
 same shape: Stage 0b moved Kova's eleven accent tones — and the contrast tests
 that guard them — out of `@4dl/ui` and into the app. The template's 16 are 11
 conformance (plain Node, no fixtures) + 5 integration (the real worker through
@@ -385,8 +389,12 @@ same-origin and unaffected.
 
 **Ops:** deployment is genuinely non-trivial — read DEPLOY.md before touching
 anything deploy-shaped. Notably: a fresh deploy **cannot send email** until
-`email.provider`/`email.from` are set directly in D1 (there is no admin email UI,
-and the mock provider fails closed outside dev), and the whole vision suite is
-dead until `google.gemini_key` is set.
+`email.provider`/`email.from` are seeded directly in D1 (the mock provider fails
+closed outside dev). There IS an operator screen for it now — Platform admin →
+**Email delivery**, `@4dl/admin`'s panel over `@4dl/email/admin-routes` — but it
+cannot break the BOOTSTRAP deadlock and no UI could: reaching it needs a
+platform-admin session, which needs an OTP, which needs email. The first seed is
+manual (DEPLOY.md §6); every change after it is a form. The vision suite is
+still dead until `google.gemini_key` is set (Platform admin → AI).
 
 See SPEC §13 for the phase map.

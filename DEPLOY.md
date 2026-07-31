@@ -227,9 +227,15 @@ app, and **a fresh deploy cannot deliver email**:
 - Outside the dev lane the mock provider **fails closed**: it sends nothing and
   logs nothing (`apps/api/src/mailer.ts`). `wrangler tail` will show you no
   code — earlier versions of this document said it would; that was wrong.
-- The only UI for changing it (`POST /api/admin/email`) requires a
-  **platform-admin session**, which requires an OTP you cannot receive. There is
-  no admin email screen in the app yet. That is a bootstrap deadlock.
+- There **is** now an admin screen for it — the operator console's "Email
+  delivery" section, at `admin.<your-root>` — but it cannot help you here: it
+  requires a **platform-admin session**, which requires an OTP you cannot yet
+  receive. That is the bootstrap deadlock, and no amount of UI removes it. A
+  screen behind a login cannot configure the thing the login depends on.
+
+  What the screen does change is everything AFTER the first sign-in: switching
+  provider, correcting a sender, or repricing the shared lane is a form, not a
+  `wrangler d1 execute`. Only the initial seed below is manual.
 
 So configure it directly against remote D1 **before the first sign-in
 attempt**. `app_config` is created by `ensureSchema`, but the `CREATE TABLE IF
@@ -372,10 +378,10 @@ section 6.
 
 | Key | Default | If unset | Where to set it |
 | --- | --- | --- | --- |
-| `email.provider` | `mock` | **Nobody can sign in.** Mock fails closed outside dev: no send, no log | ⚠️ no UI — D1 (section 6) |
-| `email.from` | `Kova <noreply@kova.local>` | Sends from an invalid domain → bounces/rejects | ⚠️ no UI — D1 |
-| `email.platform_from` | `Kova <noreply@kova.4dl.app>` | Platform/billing email sends from this address — which bounces until the sender is verified in Email Sending, and is wrong outright on any other deployment | ⚠️ no UI — D1 |
-| `email.credits_per_email` | `1` | Tenants are charged 1 credit per metered email — fine, but set it deliberately | ⚠️ no UI — D1 |
+| `email.provider` | `mock` | **Nobody can sign in.** Mock fails closed outside dev: no send, no log | D1 to bootstrap (section 6), then Platform admin → **Email delivery** |
+| `email.from` | `Kova <noreply@kova.local>` | Sends from an invalid domain → bounces/rejects | D1 to bootstrap, then Platform admin → **Email delivery** |
+| `email.platform_from` | `Kova <noreply@kova.4dl.app>` | Platform/billing email sends from this address — which bounces until the sender is verified in Email Sending, and is wrong outright on any other deployment | D1 to bootstrap, then Platform admin → **Email delivery** |
+| `email.credits_per_email` | `1` | Tenants are charged 1 credit per metered email — fine, but set it deliberately | Platform admin → **Email delivery** |
 | `google.gemini_key` | *(empty)* | **The whole vision suite is unavailable**: Snap-a-Meal, Label Reader, lab-extract, image generation, body-scan voice. Every `task: "vision"` model in the seed catalog is provider `google` | Platform admin → **AI** |
 | `ai.mock` | `auto` | `auto` only falls back to the mock on the dev lane; `on` forces the mock (and bills for it) — never set `on` in production | Platform admin → **AI** |
 | `ai.markup` | `3` | **This is the multiplier tenants are billed at** for AI. Valid 1–100. Review before selling credits | Platform admin → **AI** |

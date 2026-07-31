@@ -145,6 +145,9 @@ importers:
 
   apps/app:
     dependencies:
+      '@4dl/admin':
+        specifier: workspace:*
+        version: link:../../packages/admin
       '@4dl/app-kit':
         specifier: workspace:*
         version: link:../../packages/app-kit
@@ -245,6 +248,28 @@ importers:
       wrangler:
         specifier: ^4.42.0
         version: 4.110.0(@cloudflare/workers-types@4.20260702.1)
+
+  packages/admin:
+    dependencies:
+      '@4dl/ui':
+        specifier: workspace:*
+        version: link:../ui
+    devDependencies:
+      '@4dl/core':
+        specifier: workspace:*
+        version: link:../core
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.17
+      react:
+        specifier: ^19.2.0
+        version: 19.2.7
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)
 
   packages/ai:
     dependencies:
@@ -395,6 +420,9 @@ importers:
       '@4dl/core':
         specifier: workspace:*
         version: link:../core
+      hono:
+        specifier: ^4.9.10
+        version: 4.12.29
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20251001.0

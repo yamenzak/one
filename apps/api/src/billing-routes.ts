@@ -5,6 +5,7 @@
  */
 
 import { Hono } from "hono";
+import { emailAdminRoutes } from "@4dl/email/admin-routes";
 import { z } from "zod";
 import {
   checkDowngrade, resolveEntitlements, mergeOverrides, snapshotDowngrade, raiseOverride,
@@ -378,33 +379,18 @@ export const adminRoutes = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
 
-  .get("/admin/whoami", (c) => c.json({ admin: isPlatformAdmin(c), email: c.get("user")?.email }))
+  .get("/admin/whoami", (c) => c.json({ admin: isPlatformAdmin(c), email: c.get("user")?.email }));
 
-  // Platform email config: the metered-sender address, delivery provider, and
-  // the per-email credit price charged to tenants on the platform rail.
-  .get("/admin/email", async (c) => {
-    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    const cfg = await getConfig(c.env.DB);
-    return c.json({
-      provider: cfg["email.provider"] ?? "mock",
-      from: cfg["email.from"] ?? "Kova <noreply@kova.local>",
-      platformFrom: cfg["email.platform_from"] ?? PLATFORM_FROM_DEFAULT,
-      creditsPerEmail: Number(cfg["email.credits_per_email"] ?? "1"),
-    });
-  })
-  .post("/admin/email", async (c) => {
-    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    const parsed = z.object({
-      provider: z.enum(["disabled", "mock", "cloudflare"]).optional(),
-      from: z.string().max(200).optional(),
-      platformFrom: z.string().max(200).optional(),
-      creditsPerEmail: z.number().min(0).max(1000).optional(),
-    }).safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
-    const d = parsed.data;
-    if (d.provider) await setConfig(c.env.DB, "email.provider", d.provider);
-    if (d.from) await setConfig(c.env.DB, "email.from", d.from);
-    if (d.platformFrom) await setConfig(c.env.DB, "email.platform_from", d.platformFrom);
-    if (d.creditsPerEmail !== undefined) await setConfig(c.env.DB, "email.credits_per_email", String(d.creditsPerEmail));
-    return c.json({ ok: true });
-  });
+/**
+ * Platform email configuration — `@4dl/email`'s own routes, bound to Kova's
+ * operator check and Kova's sender defaults.
+ *
+ * They used to be spelled out above, in the BILLING route module, which is how
+ * they ended up with no caller in the console and a hand-edit-D1 line in
+ * DEPLOY.md. They are the email package's keys; only it reads them.
+ */
+export const emailConfigRoutes = emailAdminRoutes(
+  { isPlatformAdmin: (c) => isPlatformAdmin(c as never) },
+  { from: "Kova <noreply@kova.local>", platformFrom: PLATFORM_FROM_DEFAULT },
+);
+

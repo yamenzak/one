@@ -1,0 +1,30 @@
+{
+  "name": "@4dl/admin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The operator console every 4DL app needs on its `admin.` door: the section-registry shell, and the panels for configuration that a shared package owns rather than the app. No product vocabulary — see README.md.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@4dl/ui": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@4dl/core": "workspace:*",
+    "@types/react": "^19.2.14",
+    "react": "^19.2.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

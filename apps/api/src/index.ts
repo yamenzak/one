@@ -19,7 +19,7 @@ import {
 import { DUNNING_DAYS } from "@4dl/billing";
 import { periodKey } from "./ids.js";
 import { contextRoutes } from "./context-routes.js";
-import { billingRoutes, adminRoutes } from "./billing-routes.js";
+import { billingRoutes, adminRoutes, emailConfigRoutes } from "./billing-routes.js";
 import { downgradeRoutes } from "./downgrade-routes.js";
 import { clientRoutes } from "./clients.js";
 import { memberRoutes } from "./member-routes.js";
@@ -118,6 +118,7 @@ app.route("/api", billingRoutes);
 // Mounted later, the Stripe handler would answer first and the gate would be dead.
 app.route("/api", downgradeRoutes);
 app.route("/api", adminRoutes);
+app.route("/api", emailConfigRoutes);
 app.route("/api", clientRoutes);
 app.route("/api", memberRoutes);
 app.route("/api", planRoutes);
