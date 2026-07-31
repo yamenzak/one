@@ -36,7 +36,9 @@
 import { schemaGate, type SchemaModule } from "@4dl/core";
 import { AUTH_SCHEMA } from "@4dl/auth";
 import { BILLING_SCHEMA } from "@4dl/billing";
+import { AI_SCHEMA } from "@4dl/ai";
 import { COMMERCE_SCHEMA } from "@4dl/commerce";
+import { STORAGE_SCHEMA } from "@4dl/storage";
 import { TENANCY_SCHEMA } from "@4dl/tenancy";
 
 export const KOVA_SCHEMA: SchemaModule = {
@@ -46,12 +48,6 @@ export const KOVA_SCHEMA: SchemaModule = {
 
     "CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT);",
 
-    // ── AI suite (SPEC §6) ─────────────────────────────────────────────
-    "CREATE TABLE IF NOT EXISTS ai_models (id TEXT PRIMARY KEY, task TEXT, label TEXT, provider TEXT, input_rate REAL, output_rate REAL, unit_rate REAL, unit_kind TEXT, markup REAL, enabled INTEGER DEFAULT 1, is_default INTEGER DEFAULT 0);",
-    "CREATE TABLE IF NOT EXISTS ai_generations (id TEXT PRIMARY KEY, tenant_id TEXT, actor_user_id TEXT, client_id TEXT, feature TEXT, model TEXT, neurons REAL, credits INTEGER, ok INTEGER, error TEXT, at INTEGER);",
-    "CREATE INDEX IF NOT EXISTS idx_aigen_tenant ON ai_generations(tenant_id, at);",
-    "CREATE TABLE IF NOT EXISTS ai_cache (prompt_hash TEXT PRIMARY KEY, feature TEXT, output_json TEXT, at INTEGER);",
-    "CREATE TABLE IF NOT EXISTS insight_feedback (id TEXT PRIMARY KEY, tenant_id TEXT, user_id TEXT, insight_type TEXT, insight_ref TEXT, vote INTEGER, at INTEGER);",
 
 
     // ── Tenancy domain: clients & staff scoping (SPEC §2) ──────────────
@@ -207,16 +203,6 @@ export const KOVA_SCHEMA: SchemaModule = {
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_offboard_one_pending ON offboard_requests(client_id) WHERE status = 'pending';",
     "CREATE INDEX IF NOT EXISTS idx_audit_client ON audit_log(client_id, at);",
 
-    // ── R2 media ledger (storage accounting + the media library) ────────
-    // The SSOT for every object stored in the MEDIA bucket: who owns it,
-    // which tenant/client it belongs to, its byte size, and — on removal —
-    // when + by whom it was deleted (soft tombstone). Live usage for the
-    // per-tenant storage quota is SUM(size_bytes) WHERE deleted_at IS NULL.
-    // Every MEDIA.put funnels through storage.ts putMedia to write a row.
-    "CREATE TABLE IF NOT EXISTS media_assets (id TEXT PRIMARY KEY, tenant_id TEXT, client_id TEXT, owner_user_id TEXT, r2_key TEXT UNIQUE, purpose TEXT, content_type TEXT, size_bytes INTEGER DEFAULT 0, created_at TEXT, deleted_at TEXT, deleted_by TEXT);",
-    "CREATE INDEX IF NOT EXISTS idx_media_tenant ON media_assets(tenant_id, deleted_at);",
-    "CREATE INDEX IF NOT EXISTS idx_media_client ON media_assets(client_id, deleted_at);",
-    "CREATE INDEX IF NOT EXISTS idx_media_owner ON media_assets(owner_user_id, deleted_at);",
 
     // Plan lanes (variants) — moved here from `alters`, where it had been
     // creating a TABLE through the ADD-COLUMN path: harmless (`IF NOT EXISTS`)
@@ -360,7 +346,7 @@ export const KOVA_SCHEMA: SchemaModule = {
 // Dependency order, and the app last. `tenant_settings` is created by tenancy;
 // the ALTERs that add billing's, AI's, email's and commerce's columns to it are
 // still in Kova's module below and move out with those packages.
-const gate = schemaGate([AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, COMMERCE_SCHEMA, KOVA_SCHEMA]);
+const gate = schemaGate([AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, COMMERCE_SCHEMA, STORAGE_SCHEMA, AI_SCHEMA, KOVA_SCHEMA]);
 export const ensureSchema = (db: D1Database): Promise<void> => gate({ DB: db });
 
 /** Small helpers shared by stores — re-exported so every existing call site

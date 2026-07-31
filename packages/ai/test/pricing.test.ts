@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseWorkersAiPricing, parseGeminiPricing, usdPerMToNeurons, usdToNeurons } from "../src/ai-pricing.js";
+import { parseWorkersAiPricing, parseGeminiPricing, usdPerMToNeurons, usdToNeurons } from "../src/pricing.js";
 
 // Real-format snippets from the Cloudflare Workers AI pricing markdown.
 const CF_MD = `

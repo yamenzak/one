@@ -20,6 +20,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@4dl/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@4dl/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -32,9 +35,9 @@ importers:
       '@4dl/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@4dl/platform':
+      '@4dl/storage':
         specifier: workspace:*
-        version: link:../../packages/platform
+        version: link:../../packages/storage
       '@4dl/tenancy':
         specifier: workspace:*
         version: link:../../packages/tenancy
@@ -176,6 +179,25 @@ importers:
         specifier: ^4.42.0
         version: 4.110.0(@cloudflare/workers-types@4.20260702.1)
 
+  packages/ai:
+    dependencies:
+      '@4dl/billing':
+        specifier: workspace:*
+        version: link:../billing
+      '@4dl/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20251001.0
+        version: 4.20260702.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)
+
   packages/auth:
     dependencies:
       '@4dl/core':
@@ -270,18 +292,6 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)
 
-  packages/platform:
-    devDependencies:
-      '@4dl/core':
-        specifier: workspace:*
-        version: link:../core
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)
-
   packages/protocol:
     dependencies:
       '@kova/domain':
@@ -291,6 +301,22 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)
+
+  packages/storage:
+    dependencies:
+      '@4dl/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20251001.0
+        version: 4.20260702.1
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

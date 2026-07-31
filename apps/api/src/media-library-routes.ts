@@ -25,7 +25,7 @@ interface AssetRow {
   content_type: string;
   size_bytes: number;
   created_at: string;
-  client_id: string | null;
+  subject_id: string | null;
   owner_user_id: string | null;
   client_name: string | null;
   owner_name: string | null;
@@ -43,10 +43,10 @@ export const mediaLibraryRoutes = new Hono<AppEnv>()
     const mine = role === "client" ? await clientForUser(c.env.DB, who.tenantId, who.userId) : null;
 
     const base =
-      `SELECT a.id, a.r2_key, a.purpose, a.content_type, a.size_bytes, a.created_at, a.client_id, a.owner_user_id,
+      `SELECT a.id, a.r2_key, a.purpose, a.content_type, a.size_bytes, a.created_at, a.subject_id, a.owner_user_id,
               cl.display_name AS client_name, u.name AS owner_name
        FROM media_assets a
-       LEFT JOIN clients cl ON cl.id = a.client_id
+       LEFT JOIN clients cl ON cl.id = a.subject_id
        LEFT JOIN "user" u ON u.id = a.owner_user_id
        WHERE a.tenant_id = ? AND a.deleted_at IS NULL`;
 
@@ -59,12 +59,12 @@ export const mediaLibraryRoutes = new Hono<AppEnv>()
       if (mine) clientIds.add(mine.id);
       const ids = [...clientIds];
       const ph = ids.map(() => "?").join(",");
-      const clientClause = ids.length ? ` OR a.client_id IN (${ph})` : "";
+      const clientClause = ids.length ? ` OR a.subject_id IN (${ph})` : "";
       rows = (await c.env.DB.prepare(`${base} AND (a.owner_user_id = ?${clientClause}) ORDER BY a.created_at DESC LIMIT 1000`).bind(who.tenantId, who.userId, ...ids).all<AssetRow>()).results ?? [];
     }
 
     const items = rows.map((r) => {
-      const ownedByMe = r.owner_user_id === who.userId || (!!mine && r.client_id === mine.id);
+      const ownedByMe = r.owner_user_id === who.userId || (!!mine && r.subject_id === mine.id);
       return {
         id: r.id,
         url: `/api/media/${r.r2_key}`,
@@ -73,7 +73,7 @@ export const mediaLibraryRoutes = new Hono<AppEnv>()
         isImage: IMAGE.test(r.content_type),
         sizeBytes: r.size_bytes,
         createdAt: r.created_at,
-        clientId: r.client_id,
+        clientId: r.subject_id,
         clientName: r.client_name,
         ownerName: r.owner_name,
         mine: ownedByMe,
@@ -89,13 +89,13 @@ export const mediaLibraryRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     const role = c.get("role") ?? "client";
     const asset = await c.env.DB
-      .prepare("SELECT id, r2_key, purpose, client_id, owner_user_id FROM media_assets WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL")
+      .prepare("SELECT id, r2_key, purpose, subject_id, owner_user_id FROM media_assets WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL")
       .bind(c.req.param("id"), who.tenantId)
-      .first<{ id: string; r2_key: string; purpose: string; client_id: string | null; owner_user_id: string | null }>();
+      .first<{ id: string; r2_key: string; purpose: string; subject_id: string | null; owner_user_id: string | null }>();
     if (!asset) return c.json({ error: "not found" }, 404);
 
     const mine = role === "client" ? await clientForUser(c.env.DB, who.tenantId, who.userId) : null;
-    const ownedByMe = asset.owner_user_id === who.userId || (!!mine && asset.client_id === mine.id);
+    const ownedByMe = asset.owner_user_id === who.userId || (!!mine && asset.subject_id === mine.id);
     const allowed = role === "owner" || (role === "client" && ownedByMe);
     if (!allowed) return c.json({ error: "forbidden" }, 403);
 

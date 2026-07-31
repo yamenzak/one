@@ -159,7 +159,7 @@ describe("client offboarding — archive keeps the seat, delete frees it and rec
     const aiKey = `t/${tenantId}/ai/lc_del_img.png`;
     await env.MEDIA.put(aiKey, new Uint8Array(1024), { httpMetadata: { contentType: "image/png" } });
     await db
-      .prepare("INSERT INTO media_assets (id, tenant_id, client_id, r2_key, purpose, content_type, size_bytes, created_at) VALUES ('mda_lc_del_ai', ?, ?, ?, 'ai', 'image/png', 1024, ?)")
+      .prepare("INSERT INTO media_assets (id, tenant_id, subject_id, r2_key, purpose, content_type, size_bytes, created_at) VALUES ('mda_lc_del_ai', ?, ?, ?, 'ai', 'image/png', 1024, ?)")
       .bind(tenantId, goner, aiKey, new Date().toISOString())
       .run();
 

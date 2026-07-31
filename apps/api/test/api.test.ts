@@ -3630,7 +3630,7 @@ describe("GDPR — action OTP + cascade purge", () => {
     expect((await db.prepare("SELECT COUNT(*) AS n FROM measurements WHERE client_id = ?").bind(client.id).first<{ n: number }>())!.n).toBe(0);
     // R2 object gone + ledger tombstoned.
     expect(await env.MEDIA.get(key)).toBeNull();
-    expect((await db.prepare("SELECT COUNT(*) AS n FROM media_assets WHERE client_id = ? AND deleted_at IS NULL").bind(client.id).first<{ n: number }>())!.n).toBe(0);
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM media_assets WHERE subject_id = ? AND deleted_at IS NULL").bind(client.id).first<{ n: number }>())!.n).toBe(0);
   });
 });
 

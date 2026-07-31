@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { schemaStatements } from "@4dl/core";
 import { AUTH_SCHEMA } from "@4dl/auth";
 import { BILLING_SCHEMA } from "@4dl/billing";
+import { AI_SCHEMA } from "@4dl/ai";
 import { COMMERCE_SCHEMA } from "@4dl/commerce";
+import { STORAGE_SCHEMA } from "@4dl/storage";
 import { TENANCY_SCHEMA } from "@4dl/tenancy";
 import { KOVA_SCHEMA } from "../src/db.js";
 
@@ -62,10 +64,12 @@ describe("the Kova schema module", () => {
     // credit_packs, credit_ledger and stripe_events (5 tables, 3 indexes) into
     // @4dl/billing; Stage 4 took packages, subject_subscriptions, redemption_codes,
     // redemption_uses, promo_codes and addon_types (6 tables, 6 indexes,
-    // 4 ALTERs) into @4dl/commerce.
+    // 4 ALTERs) into @4dl/commerce; Stage 5 took media_assets (1 table,
+    // 3 indexes) into @4dl/storage and ai_models, ai_generations, ai_cache and
+    // insight_feedback (4 tables, 1 index) into @4dl/ai.
     const ddl = schemaStatements(KOVA_SCHEMA);
-    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(43);
-    expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(30);
+    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(38);
+    expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(26);
     expect(ddl.filter((s) => s.startsWith("CREATE UNIQUE INDEX"))).toHaveLength(6);
     expect(ddl.filter((s) => s.startsWith("DROP INDEX"))).toHaveLength(1);
     expect(KOVA_SCHEMA.alters ?? []).toHaveLength(44);
@@ -85,7 +89,7 @@ describe("the composed schema", () => {
     // the moment one is edited. Ownership has to be exclusive.
     const tableOf = (s: string) => /CREATE TABLE IF NOT EXISTS "?(\w+)"?/.exec(s)?.[1];
     const owned = new Map<string, string>();
-    for (const m of [AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, COMMERCE_SCHEMA, KOVA_SCHEMA]) {
+    for (const m of [AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, COMMERCE_SCHEMA, STORAGE_SCHEMA, AI_SCHEMA, KOVA_SCHEMA]) {
       for (const sql of schemaStatements(m)) {
         const t = tableOf(sql);
         if (!t) continue;
@@ -102,6 +106,8 @@ describe("the composed schema", () => {
     expect(owned.get("credit_ledger")).toBe("billing");
     expect(owned.get("packages")).toBe("commerce");
     expect(owned.get("subject_subscriptions")).toBe("commerce");
+    expect(owned.get("media_assets")).toBe("storage");
+    expect(owned.get("ai_models")).toBe("ai");
     expect(owned.get("clients")).toBe("kova");
   });
 
@@ -145,6 +151,14 @@ describe("the composed schema", () => {
     expect(COMMERCE_SCHEMA.scoped?.subjectColumn).toBe("subject_id");
     expect(COMMERCE_SCHEMA.scoped?.subjectTables).toContain("redemption_uses");
     expect(COMMERCE_SCHEMA.scoped?.tenantTables).not.toContain("redemption_uses");
+  });
+
+  it("keeps the model CATALOG out of the tenant cascade", () => {
+    // `ai_models` and `ai_cache` are the platform's, not a tenant's. Purging one
+    // tenant must not empty the catalog every other tenant is metered against —
+    // the same shape of mistake as sweeping the plan list with a subscription.
+    const t = AI_SCHEMA.scoped?.tenantTables ?? [];
+    expect(t).toEqual(["ai_generations", "insight_feedback"]);
   });
 
   it("declares what a tenant purge must clear", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mockModeSettable, shouldUseMockLane } from "../src/ai-mock.js";
+import { mockModeSettable, shouldUseMockLane } from "../src/mock-lane.js";
 
 // AGENTS §6: "the mock lane may never activate in production". The bug this
 // guards: `ai.mock = "on"` short-circuited the environment check, so one click in

@@ -85,7 +85,7 @@ export interface TenantAiConfig {
   ttsVoice?: string | null;
   /** Owner cap on AI credits a single client may spend per local day (SPEC §6);
    *  null/absent = uncapped. Enforced server-side in ai.ts. */
-  perClientDailyCreditCap?: number | null;
+  perActorDailyCreditCap?: number | null;
   features?: Record<string, AiFeatureConfig>;
 }
 

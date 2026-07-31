@@ -332,7 +332,7 @@ export const settingsRoutes = new Hono<AppEnv>()
       tone: z.string().max(40).nullish(),
     });
     const parsed = z
-      .object({ tone: z.string().max(40).nullish(), ttsVoice: z.enum(TTS_VOICE_IDS as [string, ...string[]]).nullish(), perClientDailyCreditCap: z.number().int().min(0).max(1_000_000).nullish(), features: z.record(z.string(), featurePatch).optional() })
+      .object({ tone: z.string().max(40).nullish(), ttsVoice: z.enum(TTS_VOICE_IDS as [string, ...string[]]).nullish(), perActorDailyCreditCap: z.number().int().min(0).max(1_000_000).nullish(), features: z.record(z.string(), featurePatch).optional() })
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const d = parsed.data;
@@ -340,11 +340,11 @@ export const settingsRoutes = new Hono<AppEnv>()
     const row = await c.env.DB.prepare("SELECT ai_config_json FROM tenant_settings WHERE tenant_id = ?")
       .bind(who.tenantId)
       .first<{ ai_config_json: string | null }>();
-    const existing = parseJson<{ tone?: string | null; ttsVoice?: string | null; perClientDailyCreditCap?: number | null; features?: Record<string, Record<string, unknown>> }>(row?.ai_config_json, {});
-    const merged: { tone?: string | null; ttsVoice?: string | null; perClientDailyCreditCap?: number | null; features: Record<string, Record<string, unknown>> } = {
+    const existing = parseJson<{ tone?: string | null; ttsVoice?: string | null; perActorDailyCreditCap?: number | null; features?: Record<string, Record<string, unknown>> }>(row?.ai_config_json, {});
+    const merged: { tone?: string | null; ttsVoice?: string | null; perActorDailyCreditCap?: number | null; features: Record<string, Record<string, unknown>> } = {
       tone: d.tone !== undefined ? d.tone : existing.tone ?? null,
       ttsVoice: d.ttsVoice !== undefined ? d.ttsVoice : existing.ttsVoice ?? null,
-      perClientDailyCreditCap: d.perClientDailyCreditCap !== undefined ? d.perClientDailyCreditCap : existing.perClientDailyCreditCap ?? null,
+      perActorDailyCreditCap: d.perActorDailyCreditCap !== undefined ? d.perActorDailyCreditCap : existing.perActorDailyCreditCap ?? null,
       features: { ...(existing.features ?? {}) },
     };
     for (const [key, patch] of Object.entries(d.features ?? {})) {

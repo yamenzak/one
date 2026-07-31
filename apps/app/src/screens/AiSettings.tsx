@@ -154,17 +154,17 @@ export function AiConfigSection() {
   // Owner cap on AI credits a single client can spend per day (SPEC §6). Empty =
   // uncapped. Edited as free text, committed on blur so partial input never saves.
   const saveCreditCap = async (cap: number | null) => {
-    setConfig((c) => ({ ...c, perClientDailyCreditCap: cap }));
-    await api.patch("/api/settings/ai", { perClientDailyCreditCap: cap }).catch(() => undefined);
+    setConfig((c) => ({ ...c, perActorDailyCreditCap: cap }));
+    await api.patch("/api/settings/ai", { perActorDailyCreditCap: cap }).catch(() => undefined);
   };
   const [capDraft, setCapDraft] = useState("");
-  useEffect(() => { setCapDraft(config.perClientDailyCreditCap != null ? String(config.perClientDailyCreditCap) : ""); }, [config.perClientDailyCreditCap]);
+  useEffect(() => { setCapDraft(config.perActorDailyCreditCap != null ? String(config.perActorDailyCreditCap) : ""); }, [config.perActorDailyCreditCap]);
   const commitCreditCap = () => {
     const t = capDraft.trim();
     if (t === "") { void saveCreditCap(null); return; }
     const n = Math.round(Number(t));
     if (Number.isFinite(n) && n >= 0) void saveCreditCap(n);
-    else setCapDraft(config.perClientDailyCreditCap != null ? String(config.perClientDailyCreditCap) : "");
+    else setCapDraft(config.perActorDailyCreditCap != null ? String(config.perActorDailyCreditCap) : "");
   };
   const [previewing, setPreviewing] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -275,7 +275,7 @@ export function AiConfigSection() {
             subs={[
               {
                 key: "voice", label: "Voice & limits", icon: Wand2, tone: "primary",
-                value: `${config.tone ? String(config.tone) : "Default"} tone${config.perClientDailyCreditCap ? ` · ${config.perClientDailyCreditCap} credits/day per client` : " · no per-client cap"}`,
+                value: `${config.tone ? String(config.tone) : "Default"} tone${config.perActorDailyCreditCap ? ` · ${config.perActorDailyCreditCap} credits/day per client` : " · no per-client cap"}`,
                 render: () => (
             <div>
               <div className="mb-2 flex items-center justify-between gap-2 px-1">

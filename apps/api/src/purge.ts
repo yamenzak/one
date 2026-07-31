@@ -119,7 +119,7 @@ function mediaKeyFromUrl(url: string | null | undefined, tenantId: string): stri
  *     `DELETE … WHERE client_id = ?` missed it, so the object *and* its billed
  *     bytes outlived the client. Resolved from `clients.avatar_url` below.
  *   • **AI images generated for them** — `ai.ts` stores at `t/<tenant>/ai/…`
- *     while stamping `media_assets.client_id`. The row was hard-deleted (so the
+ *     while stamping `media_assets.subject_id`. The row was hard-deleted (so the
  *     meter dropped) but the R2 object was orphaned with nothing left pointing
  *     at it. Now swept via the ledger, by key, wherever it lives.
  */
@@ -140,7 +140,7 @@ export async function purgeClient(env: Env, tenantId: string, clientId: string):
   const live = (
     await env.DB
       .prepare(
-        `SELECT r2_key, size_bytes FROM media_assets WHERE deleted_at IS NULL AND (client_id = ? OR ${PREFIX_MATCH} OR r2_key = ?)`,
+        `SELECT r2_key, size_bytes FROM media_assets WHERE deleted_at IS NULL AND (subject_id = ? OR ${PREFIX_MATCH} OR r2_key = ?)`,
       )
       .bind(clientId, prefix.length, prefix, avatarKey ?? "")
       .all<{ r2_key: string; size_bytes: number | null }>()

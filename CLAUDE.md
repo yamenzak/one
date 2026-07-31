@@ -50,6 +50,9 @@ packages/
              # JSON columns, the STRUCTURAL BINDINGS CONTRACT (HasDb/HasMedia/…)
              # and the COMPOSED SCHEMA RUNNER (SchemaModule/applySchema), plus
              # the boundary checker at @4dl/core/boundary. See its README.
+  ai/        # @4dl/ai — the METERED generation path: model catalog, Workers AI +
+             # Gemini, reserve→run→settle against the credit DO, the dev-only
+             # mock lane, pricing parsers. Prompts are the app's. See its README.
   auth/      # @4dl/auth — PASSWORDLESS identity + authorization: the Better Auth
              # factory (email OTP + passkeys, org = tenant), the request identity,
              # the five-gate route-guard ENGINE, the grant algebra, staff seats,
@@ -61,12 +64,12 @@ packages/
              # injected), credit metering, the per-tenant credit Durable Object
              # (CreditLedgerDO — the class NAME is load-bearing), the Stripe
              # client, and the dunning ladder. See its README.
+  storage/   # @4dl/storage — R2 + the media ledger + the quota gate (resolver
+             # injected, so it does not depend on billing). See its README.
   tenancy/   # @4dl/tenancy — multi-tenant ADDRESSING: the five doors, host→tenant
              # resolution + KV cache, custom domains (Cloudflare for SaaS + DCV),
              # the standing/host-gate model. `@4dl/tenancy/model` is the pure half
              # the browser may import. See its README.
-  platform/  # @4dl/platform — ONE MODULE LEFT (ai-mock → @4dl/ai in Stage 5),
-             # then it is deleted. Do not add to it.
   domain/    # @kova/domain — Kova's pure logic (no I/O): nutrition/TDEE, body-fat,
              # activity/workout math, progress, plus the product registries
              # (entitlements, perms, budgets, notifications, features). Tested.
@@ -130,8 +133,9 @@ remote bindings without editing the config (this is what the E2E suite does).
   match, trainer = `client_trainers` assignment, client = own record. This is
   the security invariant; never bypass it.
 - **Credits**: `TenantBillingDO` (`billing-do.ts`) is the authoritative balance;
-  AI goes through `ai.ts` `generate()` = reserve → run (Workers AI | mock) →
-  settle. Metering math and the DO base class are `@4dl/billing`; Kova's
+  AI goes through `@4dl/ai` `generate()` = reserve → run (Workers AI | Gemini |
+  the dev-only mock) → settle; `apps/api/src/ai.ts` binds Kova's feature registry
+  and its bucket. Metering math and the DO base class are `@4dl/billing`; Kova's
   `TenantBillingDO` is a subclass and **its class name must never change** —
   `wrangler.jsonc` migrations bind it to durable storage.
 - **Access economy**: `commerce-routes.ts` + `@4dl/commerce` (Kova's scopes are
@@ -231,14 +235,16 @@ an over-claim costs more than an under-claim. Verify before editing it.
 **The platform extraction is under way** — [docs/PLATFORM-EXTRACTION.md](docs/PLATFORM-EXTRACTION.md)
 is the audit and the staged plan for turning this repo from "Kova with two shared
 packages" into "the 4DL platform, on which Kova is the first app". Three more apps
-are queued. **Stages 0 (the mechanisms), 1 (`@4dl/tenancy`), 2 (`@4dl/auth`), 3
-(`@4dl/billing`) and 4 (`@4dl/commerce`) are done**; stages 5–9 are not. Read it
+are queued. **Stages 0–5 are done** — the mechanisms, `@4dl/tenancy`, `@4dl/auth`,
+`@4dl/billing`, `@4dl/commerce`, and `@4dl/ai` + `@4dl/storage`. `@4dl/platform`
+is gone. Stages 6–9 (email, notifications, purge, the app kit, the template) are
+not. Read it
 before moving anything between `apps/api` and `packages/`.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured most recently, per package: **488 API + 197 domain + 73 tenancy +
-64 ui + 52 app + 25 commerce + 21 billing + 14 core + 12 auth + 9 platform +
-7 protocol** (962 total, 38 skipped).
+moves. Measured most recently, per package: **486 API + 197 domain + 73 tenancy +
+64 ui + 52 app + 25 commerce + 21 billing + 14 core + 12 ai + 12 auth +
+7 protocol + 3 storage** (966 total, 38 skipped).
 Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
 `@4dl/platform` to `@4dl/tenancy`; the split moves tests, it does not add any.
 The pricing and normalizer suites live

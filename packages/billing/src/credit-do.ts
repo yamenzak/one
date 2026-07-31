@@ -35,28 +35,12 @@
 
 import { DurableObject } from "cloudflare:workers";
 import type { HasDb } from "@4dl/core";
+import type { BalanceView, CreditLedgerMirror, LedgerEntry } from "./ledger-types.js";
+
+export type { BalanceView, CreditLedgerMirror, LedgerEntry };
 
 interface Hold {
   credits: number;
-  at: number;
-}
-
-export interface BalanceView {
-  /** purchased + granted — the total the tenant can spend (pre-holds). */
-  balance: number;
-  /** Credit-pack / promo / admin credits. Persist forever. */
-  purchased: number;
-  /** The current period's plan grant. Lapses (does not roll over) on reset. */
-  granted: number;
-  held: number;
-  available: number;
-}
-
-export interface LedgerEntry {
-  delta: number;
-  balance: number;
-  reason: string;
-  ref?: string;
   at: number;
 }
 
@@ -66,14 +50,6 @@ const LEDGER_CAP = 50; // rolling window kept in the DO; full history in D1
 // stuck hold can't permanently subtract from the tenant's available balance. The
 // longest AI run is ~180s, so 10 min is comfortably past any live generation.
 const HOLD_TTL_MS = 600_000;
-
-export interface CreditLedgerMirror {
-  tenant_id: string;
-  delta: number;
-  balance: number;
-  reason: string;
-  ref: string | null;
-}
 
 export abstract class CreditLedgerDO<E extends HasDb = HasDb> extends DurableObject<E> {
   /**
