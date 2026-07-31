@@ -1,0 +1,428 @@
+name: DANGER — reset Cloudflare resources and rebuild
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THIS WORKFLOW DESTROYS DATA. Read this header before running it.
+#
+# It exists for exactly one moment: wiping what earlier `mossa`/`kova` deploys
+# left on the Cloudflare account and rebuilding from nothing, so the first real
+# launch starts clean. It is not a maintenance tool.
+#
+# What `destroy` mode permanently deletes, with no undo and no export:
+#
+#   the WORKERS          `kova` and `kova-www`, which also deletes every
+#                        DURABLE OBJECT they own — `TenantBillingDO` (every
+#                        tenant's credit balance) and `InboxDO` — plus the
+#                        workers' secrets, including BETTER_AUTH_SECRET.
+#   the D1 DATABASE      everything relational: accounts, tenants, clients,
+#                        plans, logs, and the platform config (Gemini key,
+#                        Stripe credentials, Turnstile keys, email settings).
+#   the R2 BUCKET        every uploaded object: progress photos, lab documents,
+#                        avatars, exercise media, AI assets.
+#   the KV NAMESPACE     the external-API cache. The only genuinely cheap loss.
+#   CUSTOM HOSTNAMES     tenants' own domains registered through Cloudflare for
+#                        SaaS, on the zones you name. Deleting the worker
+#                        orphans them anyway; leaving them behind means a zone
+#                        full of hostnames pointing at a script that is gone.
+#
+# ─── Why the REST API and not wrangler, for the deletions ────────────────────
+#
+# `wrangler delete` takes the worker name as a POSITIONAL and has no
+# "skip confirmation" flag, so its behaviour on a non-interactive runner is not
+# something to bet a production account on. Every destructive call below is a
+# direct `DELETE` against api.cloudflare.com: no prompts, no stdout banner to
+# parse, and a structured `.success` to check. Creation and deploy still go
+# through wrangler, where it is unambiguous.
+#
+# ─── The guards, and why each is here ────────────────────────────────────────
+#
+#   1. `workflow_dispatch` ONLY. There is no push trigger and there must never
+#      be one. A destructive job on a push trigger is one bad merge away from
+#      deleting production.
+#   2. `mode` defaults to **plan**. A run with no arguments inventories what it
+#      WOULD delete and stops. Always plan first — the plan is also how you
+#      discover resources this repo no longer declares.
+#   3. `confirm` must be typed EXACTLY. Not a checkbox: a checkbox is one
+#      mis-click, typing a phrase is a decision.
+#   4. The repository variable `ALLOW_DESTRUCTIVE_RESET` must be `true`. Set it
+#      before the run, unset it after, and this workflow is inert without a
+#      deliberate visit to Settings.
+#   5. Nothing is deleted whose name does not match `patterns`. A resource this
+#      workflow does not recognise belongs to something else on the account.
+#
+# ─── After the rebuild ───────────────────────────────────────────────────────
+#
+# **Unset `ALLOW_DESTRUCTIVE_RESET`, then delete this file.** Routine deploys
+# are `deploy.yml` (ships code, never touches data) and `provision.yml` (creates
+# only what is MISSING, never deletes). Both are safe to run forever; this one
+# is not meant to run twice.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "plan = inventory only (safe). destroy = delete, recreate, redeploy."
+        type: choice
+        options: [plan, destroy]
+        default: plan
+      confirm:
+        description: "For destroy, type exactly: DESTROY AND REBUILD"
+        type: string
+        default: ""
+      patterns:
+        description: "Comma-separated name prefixes to treat as ours. Anything not matching is never touched."
+        type: string
+        default: "kova,mossa"
+      zones:
+        description: "Zones to sweep for orphaned tenant custom hostnames, comma-separated. Blank = skip."
+        type: string
+        default: "4dl.app"
+      seed_email:
+        description: "Seed email delivery so the fresh install can send its first sign-in code."
+        type: boolean
+        default: true
+      email_from:
+        description: "Platform sender, e.g. Kova <noreply@4dl.app>. Must be VERIFIED in Cloudflare Email Sending."
+        type: string
+        default: ""
+      email_platform_from:
+        description: "Sender for tenants on the shared lane. Defaults to email_from when blank."
+        type: string
+        default: ""
+
+concurrency:
+  group: cloudflare-reset
+  cancel-in-progress: false
+
+permissions:
+  contents: write # recreating D1/KV mints NEW ids that must land in wrangler.jsonc
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      MODE: ${{ inputs.mode }}
+      PATTERNS: ${{ inputs.patterns }}
+      ZONES: ${{ inputs.zones }}
+      API_WORKER: kova
+      WWW_WORKER: kova-www
+      D1_NAME: kova
+      KV_TITLE: CACHE
+      R2_BUCKET: kova-media
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the guards
+        run: |
+          set -euo pipefail
+          if [ "$MODE" = "plan" ]; then
+            echo "Mode: PLAN. Nothing will be deleted."
+            exit 0
+          fi
+          if [ "${{ inputs.confirm }}" != "DESTROY AND REBUILD" ]; then
+            echo "::error::Confirmation phrase does not match. Type exactly: DESTROY AND REBUILD"
+            exit 1
+          fi
+          if [ "${{ vars.ALLOW_DESTRUCTIVE_RESET }}" != "true" ]; then
+            echo "::error::Repository variable ALLOW_DESTRUCTIVE_RESET is not 'true'."
+            echo "Set it in Settings → Secrets and variables → Actions → Variables, run this, then UNSET it."
+            exit 1
+          fi
+          # An empty or wildcard pattern list would make the "is this ours"
+          # filter match every resource on the account.
+          case ",$PATTERNS," in
+            ,,|*,,*|*"*"*) echo "::error::Refusing an empty or wildcard pattern list."; exit 1 ;;
+          esac
+          echo "Mode: DESTROY. All guards passed."
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # ── Inventory ──────────────────────────────────────────────────────────
+      # The entire output of a plan run, and the input to every deletion below.
+      # Written to files so the destroy steps act on exactly what was shown.
+      - name: Inventory what is on the account
+        run: |
+          set -uo pipefail
+          . .github/scripts/cf.sh
+
+          cf_get "accounts/$CF_ACCOUNT/workers/scripts"          | jq -r '.result[]?.id'                       > /tmp/workers.all
+          cf_get "accounts/$CF_ACCOUNT/d1/database?per_page=100" | jq -r '.result[]? | "\(.name)\t\(.uuid)"'   > /tmp/d1.all
+          cf_get "accounts/$CF_ACCOUNT/storage/kv/namespaces?per_page=100" | jq -r '.result[]? | "\(.title)\t\(.id)"' > /tmp/kv.all
+          cf_get "accounts/$CF_ACCOUNT/r2/buckets"               | jq -r '.result.buckets[]?.name'             > /tmp/r2.all
+          # This repo declares no queues, but an earlier deploy may have left
+          # some. Listing is how you find out instead of assuming. Soft-failed:
+          # an account with no Queues entitlement answers 403, and that is an
+          # answer ("there are none"), not a problem worth an error annotation.
+          cf_get "accounts/$CF_ACCOUNT/queues" 2>/dev/null | jq -r '.result[]? | "\(.queue_name)\t\(.queue_id)"' > /tmp/queues.all || : > /tmp/queues.all
+
+          # Only what matches the patterns is ever a deletion candidate.
+          mine /tmp/workers.all > /tmp/workers
+          mine /tmp/d1.all      > /tmp/d1
+          mine /tmp/r2.all      > /tmp/r2
+          mine /tmp/queues.all  > /tmp/queues
+          # KV goes through the SAME name filter as everything else, and nothing
+          # else. Wrangler titles a namespace `<worker>-<binding>`, so ours are
+          # already `kova-CACHE` and match. An earlier draft also swept anything
+          # *ending* in the binding name — which would have deleted a namespace
+          # called `someone-elses-CACHE`, breaking the one guarantee this
+          # workflow makes. A binding name is not an ownership claim.
+          mine /tmp/kv.all      > /tmp/kv
+
+          : > /tmp/hostnames
+          for z in $(printf '%s' "$ZONES" | tr ',' ' '); do
+            [ -n "$z" ] || continue
+            zid=$(cf_get "zones?name=$z" | jq -r '.result[0].id // empty')
+            if [ -z "$zid" ]; then echo "::warning::Zone '$z' not visible to this token — skipping."; continue; fi
+            cf_get "zones/$zid/custom_hostnames?per_page=50" \
+              | jq -r --arg z "$zid" '.result[]? | "\($z)\t\(.id)\t\(.hostname)"' >> /tmp/hostnames
+          done
+
+          {
+            echo "## Inventory"
+            echo ""
+            echo "Patterns treated as ours: \`$PATTERNS\` — anything else is never touched."
+            echo ""
+            for f in workers d1 kv r2 queues hostnames; do
+              n=$(wc -l < "/tmp/$f" 2>/dev/null || echo 0)
+              echo "### $f ($n matching)"
+              echo '```'
+              if [ -s "/tmp/$f" ]; then cat "/tmp/$f"; else echo "(none)"; fi
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop here (plan mode)
+        if: inputs.mode == 'plan'
+        run: |
+          echo "::notice::PLAN complete. Nothing was deleted. Review the job summary."
+          echo "To proceed: set ALLOW_DESTRUCTIVE_RESET=true, re-run with mode=destroy and the confirmation phrase."
+
+      # ── Destroy ────────────────────────────────────────────────────────────
+      # Workers go FIRST: deleting a script releases its Durable Object
+      # namespaces and its routes. Leaving them until last means every
+      # intermediate state has a live worker bound to a database being deleted
+      # underneath it — a 500 storm rather than a clean outage.
+      - name: Delete the workers, and with them every Durable Object
+        if: inputs.mode == 'destroy'
+        run: |
+          set -uo pipefail
+          . .github/scripts/cf.sh
+          while read -r w; do
+            [ -n "${w:-}" ] || continue
+            echo "Deleting worker '$w'…"
+            cf_delete "accounts/$CF_ACCOUNT/workers/scripts/$w?force=true" \
+              && echo "✓ $w gone (DO namespaces and secrets went with it)" \
+              || echo "::warning::worker '$w' did not delete"
+          done < /tmp/workers
+
+      - name: Empty and delete the R2 buckets
+        if: inputs.mode == 'destroy'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          set -uo pipefail
+          . .github/scripts/cf.sh
+          # R2 refuses to delete a bucket that still holds objects, and wrangler
+          # has no recursive delete — `wrangler r2 object` is get/put/delete for
+          # ONE key. Emptying therefore needs the S3-compatible API, which needs
+          # an R2 access key pair (dash → R2 → Manage API tokens). That is a
+          # DIFFERENT credential from the Cloudflare API token; a CF token cannot
+          # sign S3 requests.
+          fail=0
+          while read -r b; do
+            [ -n "${b:-}" ] || continue
+            if [ -n "${AWS_ACCESS_KEY_ID:-}" ] && [ -n "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+              echo "Emptying '$b' over the S3 API…"
+              aws s3 rm "s3://$b" --recursive --region auto \
+                --endpoint-url "https://${CF_ACCOUNT}.r2.cloudflarestorage.com" || true
+            else
+              echo "::warning::No R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY — cannot empty '$b'."
+            fi
+            if cf_delete "accounts/$CF_ACCOUNT/r2/buckets/$b"; then
+              echo "✓ deleted bucket '$b'"
+            else
+              echo "::error::Could not delete '$b' — it is almost certainly not empty."
+              echo "Add R2_ACCESS_KEY_ID + R2_SECRET_ACCESS_KEY as repo secrets and re-run,"
+              echo "or empty it from the dashboard (R2 → $b → select all → Delete)."
+              fail=1
+            fi
+          done < /tmp/r2
+          exit $fail
+
+      - name: Delete D1, KV, queues and orphaned custom hostnames
+        if: inputs.mode == 'destroy'
+        run: |
+          set -uo pipefail
+          . .github/scripts/cf.sh
+
+          while IFS=$'\t' read -r name id; do
+            [ -n "${id:-}" ] || continue
+            echo "Deleting D1 '$name' ($id)…"
+            cf_delete "accounts/$CF_ACCOUNT/d1/database/$id" || echo "::warning::D1 '$name' did not delete"
+          done < /tmp/d1
+
+          while IFS=$'\t' read -r title id; do
+            [ -n "${id:-}" ] || continue
+            echo "Deleting KV '$title' ($id)…"
+            cf_delete "accounts/$CF_ACCOUNT/storage/kv/namespaces/$id" || echo "::warning::KV '$title' did not delete"
+          done < /tmp/kv
+
+          while IFS=$'\t' read -r qname qid; do
+            [ -n "${qid:-}" ] || continue
+            echo "Deleting queue '$qname'…"
+            cf_delete "accounts/$CF_ACCOUNT/queues/$qid" || echo "::warning::queue '$qname' did not delete"
+          done < /tmp/queues
+
+          # Tenant custom domains (Cloudflare for SaaS). The worker they pointed
+          # at is already gone, so these are orphans by now.
+          while IFS=$'\t' read -r zid hid host; do
+            [ -n "${hid:-}" ] || continue
+            echo "Deleting custom hostname '$host'…"
+            cf_delete "zones/$zid/custom_hostnames/$hid" || echo "::warning::hostname '$host' did not delete"
+          done < /tmp/hostnames
+
+      # ── Rebuild ────────────────────────────────────────────────────────────
+      - name: Create the resources fresh
+        if: inputs.mode == 'destroy'
+        id: create
+        run: |
+          set -euo pipefail
+          . .github/scripts/cf.sh
+
+          d1_id=$(cf_post "accounts/$CF_ACCOUNT/d1/database" "{\"name\":\"$D1_NAME\"}" | jq -r '.result.uuid')
+          [ -n "$d1_id" ] && [ "$d1_id" != "null" ] || { echo "::error::D1 create returned no uuid."; exit 1; }
+
+          kv_id=$(cf_post "accounts/$CF_ACCOUNT/storage/kv/namespaces" "{\"title\":\"$API_WORKER-$KV_TITLE\"}" | jq -r '.result.id')
+          [ -n "$kv_id" ] && [ "$kv_id" != "null" ] || { echo "::error::KV create returned no id."; exit 1; }
+
+          cf_post "accounts/$CF_ACCOUNT/r2/buckets" "{\"name\":\"$R2_BUCKET\"}" >/dev/null
+
+          echo "d1_id=$d1_id" >> "$GITHUB_OUTPUT"
+          echo "kv_id=$kv_id" >> "$GITHUB_OUTPUT"
+          echo "✓ D1 $d1_id · KV $kv_id · R2 $R2_BUCKET"
+
+      # A recreated database and namespace have NEW ids, and `wrangler.jsonc`
+      # hardcodes the old ones. Deploying without this step binds the worker to
+      # resources that no longer exist — which fails at RUNTIME, not at deploy,
+      # so the deploy goes green and every request 500s.
+      - name: Write the new ids into wrangler.jsonc and commit
+        if: inputs.mode == 'destroy'
+        run: |
+          set -euo pipefail
+          f=apps/api/wrangler.jsonc
+          d1='${{ steps.create.outputs.d1_id }}'
+          kv='${{ steps.create.outputs.kv_id }}'
+
+          # Anchored on the KEY so the substitution cannot wander into another
+          # id-shaped string elsewhere in the file.
+          perl -0pi -e "s/(\"database_id\"\s*:\s*\")[^\"]*(\")/\${1}$d1\${2}/" "$f"
+          perl -0pi -e "s/(\"binding\"\s*:\s*\"CACHE\"\s*,\s*\"id\"\s*:\s*\")[^\"]*(\")/\${1}$kv\${2}/" "$f"
+          grep -q "$d1" "$f" || { echo "::error::database_id was not rewritten — check the key spelling in $f."; exit 1; }
+          grep -q "$kv" "$f" || { echo "::error::CACHE id was not rewritten — check the key spelling in $f."; exit 1; }
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$f"
+          # [skip ci] so this push does not also trigger deploy.yml — this job
+          # deploys below, and two concurrent deploys race for the same worker.
+          git commit -m "chore: repoint D1 + KV at the resources created by the reset [skip ci]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: Deploy the api worker
+        if: inputs.mode == 'destroy'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/api
+          command: deploy
+          preCommands: cd ../.. && pnpm --filter @kova/app build
+
+      # AFTER the deploy: `wrangler secret put` needs the script to exist. The
+      # worker deleted above took BETTER_AUTH_SECRET with it, and without one the
+      # auth layer falls back to a value that is public in this repository —
+      # forgeable sessions. Secrets apply immediately, so no redeploy is needed.
+      - name: Mint a new BETTER_AUTH_SECRET
+        if: inputs.mode == 'destroy'
+        working-directory: apps/api
+        run: |
+          set -euo pipefail
+          openssl rand -base64 32 | pnpm exec wrangler secret put BETTER_AUTH_SECRET
+          echo "✓ Set. Random, never printed, and read by nothing but the worker."
+
+      - name: Deploy www
+        if: inputs.mode == 'destroy'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/www
+          command: deploy
+          preCommands: node build.mjs
+
+      # ── The one thing a fresh deploy cannot do for itself ──────────────────
+      # `@4dl/email` fails closed until `email.provider` and `email.from` are
+      # set, and the console that edits them needs a platform-admin session,
+      # which needs an OTP, which needs email. That is a real bootstrap deadlock
+      # (DEPLOY.md §6) that no UI can break — but a workflow with database
+      # access can, which is the whole reason this step exists.
+      - name: Seed email delivery, breaking the bootstrap deadlock
+        if: inputs.mode == 'destroy' && inputs.seed_email
+        working-directory: apps/api
+        run: |
+          set -euo pipefail
+          from='${{ inputs.email_from }}'
+          plat='${{ inputs.email_platform_from }}'
+          if [ -z "$from" ]; then
+            echo "::warning::email_from was blank — skipped. Nobody can sign in until you set it (DEPLOY.md §6)."
+            exit 0
+          fi
+          [ -n "$plat" ] || plat="$from"
+          esc() { printf '%s' "$1" | sed "s/'/''/g"; }
+
+          # `app_config` is normally created by the worker's lazy schema runner
+          # on its first request, which may not have happened yet. IF NOT EXISTS
+          # makes this correct either way.
+          pnpm exec wrangler d1 execute DB --remote --yes --command "
+            CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT);
+            INSERT INTO app_config (key, value) VALUES
+              ('email.provider', 'cloudflare'),
+              ('email.from', '$(esc "$from")'),
+              ('email.platform_from', '$(esc "$plat")')
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+          "
+          echo "::notice::Both senders must be VERIFIED in Cloudflare → Email → Email Sending, or nothing delivers."
+
+      - name: What to do next
+        if: inputs.mode == 'destroy'
+        run: |
+          {
+            echo "## Rebuild complete"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| D1 / KV / R2 recreated | ✅ new ids committed to \`${GITHUB_REF_NAME}\` |"
+            echo "| Workers deployed | ✅ |"
+            echo "| BETTER_AUTH_SECRET | ✅ freshly minted |"
+            echo "| Email delivery seeded | ${{ inputs.seed_email && '✅' || 'skipped' }} |"
+            echo ""
+            echo "### Still manual — none of these can be done from here"
+            echo ""
+            echo "1. **Verify the sender** in Cloudflare → Email → Email Sending. Until it is verified, nothing delivers and nobody can sign in."
+            echo "2. **The two worker routes** — \`<root>/*\` and \`*.<root>/*\` — are a dashboard step."
+            echo "   \`wrangler.jsonc\` declares none deliberately: declaring them makes \`wrangler dev\` rewrite the incoming Host and collapse every door onto the root."
+            echo "   The wildcard is second-level, so Universal SSL does **not** cover it — it needs an ACM certificate and a proxied wildcard DNS record, or every tenant subdomain fails the TLS handshake on a green deploy. DEPLOY.md §11."
+            echo "3. **Stripe + Gemini keys** — Platform admin → Stripe / AI, once you can sign in."
+            echo "4. **UNSET \`ALLOW_DESTRUCTIVE_RESET\`**, then delete this workflow file."
+          } >> "$GITHUB_STEP_SUMMARY"
