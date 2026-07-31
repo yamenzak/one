@@ -15,15 +15,57 @@ import { Dumbbell, Info, cn } from "@4dl/ui";
 // spawning dozens of timers.
 const tickers = new Set<() => void>();
 let tickTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * ⚠️ This ticker re-renders EVERY animated thumbnail on screen, so its cost is
+ * `mounted thumbnails × renders/second` and both halves get large fast: the
+ * exercise picker fetches up to 100 rows, and a library grid mounts all of
+ * them. At 1.1s that was ~90 component renders a second, forever, on a phone —
+ * continuing while the app sat in the background, and never stopping as long as
+ * one thumbnail stayed mounted. Coaches reported the exercise screens lagging
+ * and needing a refresh.
+ *
+ * Two bounds, both cheap:
+ *
+ *   VISIBILITY — a backgrounded tab animates nothing anyone can see. The
+ *                interval is torn down on `hidden` and restarted on `visible`,
+ *                so a phone with the app in the background does no work at all.
+ *   MOTION     — `prefers-reduced-motion` means don't animate. The frames still
+ *                render; they just stop cross-fading, which is the correct
+ *                reading of the preference and free performance besides.
+ *
+ * The frame index is module-level rather than per-component state so every
+ * thumbnail stays in sync (that was always the point) — but a subscriber that
+ * is already showing the current frame does not re-render.
+ */
+let frame = 0;
+
+function startTicker() {
+  if (tickTimer || tickers.size === 0) return;
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+  tickTimer = setInterval(() => { frame++; tickers.forEach((f) => f()); }, 1100);
+}
+function stopTicker() {
+  if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+}
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") stopTicker();
+    else startTicker();
+  });
+}
+
 function useFrameTick(): number {
-  const [i, setI] = useState(0);
+  const [i, setI] = useState(frame);
   useEffect(() => {
-    const bump = () => setI((n) => n + 1);
+    // Respect the OS setting: no animation, no timer, no re-renders.
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const bump = () => setI(frame);
     tickers.add(bump);
-    if (!tickTimer) tickTimer = setInterval(() => tickers.forEach((f) => f()), 1100);
+    startTicker();
     return () => {
       tickers.delete(bump);
-      if (tickers.size === 0 && tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+      if (tickers.size === 0) stopTicker();
     };
   }, []);
   return i;

@@ -499,6 +499,66 @@ function withTimeout<T>(p: Promise<T>): Promise<T> {
   return Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), RUN_TIMEOUT_MS))]);
 }
 
+/**
+ * TRANSIENT PROVIDER FAILURES, RETRIED — and the ones that must not be.
+ *
+ * Both providers fail in ways that succeed on the next call a second later: an
+ * overloaded pool answers 503, a rate limiter answers 429, and Gemini in
+ * particular returns a well-formed response with an EMPTY candidate under load.
+ * That last one is why "AI failed — google/gemini-2.5-pro: empty model response"
+ * reached users: it is not a bad prompt, it is the model shrugging, and the only
+ * correct answer is to ask again.
+ *
+ * ── What is NOT retried, and why each would be worse ────────────────────────
+ *
+ * **A timeout.** `RUN_TIMEOUT_MS` is two minutes. Retrying means the person has
+ * now waited four, then six. A slow failure is the one case where trying again
+ * costs more than it can possibly win — so elapsed time, not just the error
+ * text, decides. `RETRY_WINDOW_MS` also refuses to *start* a retry late: a first
+ * attempt that burned 50 seconds before failing gets no second chance.
+ *
+ * **A refusal.** A safety block (`finishReason=SAFETY`), a 400, a 401/403 — the
+ * model will answer identically every time. Retrying burns the user's wait and
+ * the worker's CPU to arrive at the same place.
+ *
+ * ── Credits ─────────────────────────────────────────────────────────────────
+ *
+ * Retries sit INSIDE the caller's existing `try`, which means inside one
+ * reserve→settle cycle. The hold is taken once and covers the whole sequence;
+ * only a successful attempt settles, and any escape lands in the same `catch`
+ * that releases it. A retry therefore cannot double-charge — verified by the
+ * metering tests, which count settlements rather than attempts.
+ */
+const RETRY_ATTEMPTS = 3;
+/** Never START a retry after this much has already elapsed. */
+const RETRY_WINDOW_MS = 45_000;
+const RETRY_BACKOFF_MS = [500, 1500];
+
+/** Worth asking again. Deliberately a allow-list of KNOWN-transient shapes: an
+ *  unrecognised error is treated as permanent, because retrying an unknown
+ *  failure is how a broken prompt becomes three broken prompts. */
+const TRANSIENT =
+  /empty model response|no candidates|HTTP (429|500|502|503|504)|overload|unavailable|capacity|rate.?limit|too many requests|internal error|ECONNRESET|network|fetch failed/i;
+
+export function isTransientAiError(message: string): boolean {
+  return !/timeout/i.test(message) && TRANSIENT.test(message);
+}
+
+async function withRetry<T>(run: () => Promise<T>, onRetry?: (attempt: number, detail: string) => void): Promise<T> {
+  const started = Date.now();
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run();
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      const spent = Date.now() - started;
+      if (attempt >= RETRY_ATTEMPTS || !isTransientAiError(detail) || spent > RETRY_WINDOW_MS) throw err;
+      onRetry?.(attempt, detail);
+      await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS[attempt - 1] ?? 1500));
+    }
+  }
+}
+
 interface GeminiPart { text?: string }
 interface GeminiUsage {
   promptTokenCount?: number;
@@ -814,13 +874,24 @@ export async function generate(env: AiBindings, input: GenerateInput): Promise<G
   let output: string;
   let usage: Usage;
   let mocked = false;
+  /** Transient attempts that failed before one succeeded. Recorded in the audit
+   *  so an operator can SEE provider flakiness instead of inferring it from a
+   *  latency graph — a feature that quietly needs two tries every time is a
+   *  model worth changing, and nothing else would show that. */
+  const retries: string[] = [];
   try {
     if (useMock) {
       output = input.mock();
       usage = { inputTokens: estUsage.inputTokens, outputTokens: Math.ceil(output.length / 4) };
       mocked = true;
     } else if (isGoogle) {
-      const g = await withTimeout(runGemini(geminiKey!, model.id, runInput));
+      // `runGemini` already throws on an empty candidate and on a non-STOP
+      // finishReason, so wrapping the whole call is what makes "empty model
+      // response" retryable — it is the single most common transient failure.
+      const g = await withRetry(
+        () => withTimeout(runGemini(geminiKey!, model.id, runInput)),
+        (n, why) => { retries.push(`${n}:${why.slice(0, 60)}`); },
+      );
       output = g.output;
       usage = billedUsage(g.usage, estUsage, output, model);
     } else {
@@ -838,22 +909,34 @@ export async function generate(env: AiBindings, input: GenerateInput): Promise<G
       if (input.expectsJson && input.jsonSchema) {
         args.response_format = { type: "json_schema", json_schema: input.jsonSchema };
       }
-      const run = env.AI!.run(model.id as Parameters<Ai["run"]>[0], args as Parameters<Ai["run"]>[1]) as Promise<WorkersAiResult>;
-      const result = await withTimeout(run);
-      output = readWorkersAiOutput(result);
-      // An empty body is a FAILURE, not a free success. Gemini has always thrown
-      // here (finishReason/empty check above); Workers AI did not, so a model that
-      // answered in an envelope we didn't read returned `ok: true` with "" — and
-      // still settled credits, because the estimate covers the input tokens. The
-      // self-test caught exactly that: three checks "succeeded" against
-      // gemma-4-26b for 1-3 credits each with nothing to show. Throwing releases
-      // the hold, so nothing is charged.
-      if (!output.trim()) throw new Error("empty model response");
+      // The binding call is built INSIDE the closure: a promise can only be
+      // awaited once, so retrying a hoisted `run` would re-await the same
+      // settled rejection forever.
+      const attempt = async () => {
+        const result = await withTimeout(
+          env.AI!.run(model.id as Parameters<Ai["run"]>[0], args as Parameters<Ai["run"]>[1]) as Promise<WorkersAiResult>,
+        );
+        const text = readWorkersAiOutput(result);
+        // Checked in here, not after, so an empty body is a RETRYABLE failure
+        // rather than a permanent one — same treatment Gemini already got.
+        if (!text.trim()) throw new Error("empty model response");
+        return { result, text };
+      };
+      const { result, text } = await withRetry(attempt, (n, why) => { retries.push(`${n}:${why.slice(0, 60)}`); });
+      // An empty body is a FAILURE, not a free success — checked inside
+      // `attempt` above so it is retried first, and if every attempt comes back
+      // empty the throw escapes to the catch below, which releases the hold.
+      // Workers AI used to return `ok: true` with "" for a model answering in an
+      // envelope we did not read, and still settled credits because the estimate
+      // covers the input tokens: the self-test caught three checks "succeeding"
+      // against gemma-4-26b for 1-3 credits each with nothing to show.
+      output = text;
       usage = billedUsage({ inputTokens: result.usage?.prompt_tokens, outputTokens: result.usage?.completion_tokens }, estUsage, output, model);
     }
   } catch (err) {
     await dobj.release(hold.hold);
-    const detail = `${model.provider}/${model.id}: ${err instanceof Error ? err.message : String(err)}`;
+    const tried = retries.length ? ` (after ${retries.length} retr${retries.length === 1 ? "y" : "ies"}: ${retries.join("; ")})` : "";
+    const detail = `${model.provider}/${model.id}: ${err instanceof Error ? err.message : String(err)}${tried}`;
     await audit(env, input, model.id, 0, 0, false, detail);
     return { ok: false, error: "unavailable", detail };
   }
@@ -864,7 +947,7 @@ export async function generate(env: AiBindings, input: GenerateInput): Promise<G
   try {
     await dobj.settle(hold.hold, credits, `ai.${input.feature}`, model.id);
   } catch { /* DO transient — hold reaps on TTL; return the successful output */ }
-  await audit(env, input, model.id, credits, usage.outputTokens ?? 0, true, null);
+  await audit(env, input, model.id, credits, usage.outputTokens ?? 0, true, retries.length ? `recovered after ${retries.length} transient failure(s): ${retries.join("; ")}` : null);
   return { ok: true, output, credits, mocked };
 }
 

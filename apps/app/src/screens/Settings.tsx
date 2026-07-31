@@ -5,7 +5,7 @@
 
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, SaveBar, useAction as useActionBase, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
 import { personaLabel, personaTone } from "../registry/index.js";
 import { KOVA_TOKEN_GROUPS, DEFAULT_ACCENT_TOKENS, MACRO_SPEC } from "../registry/tones.js";
@@ -70,6 +70,29 @@ function SectionHead({ title, icon: Icon, tone = "primary" }: { title: string; i
  * or a button stuck busy.
  */
 const useAction = () => useActionBase(errorText);
+
+/**
+ * Closing a section POPS the entry that opening it pushed.
+ *
+ * It used to `replace` instead. That looks equivalent — the URL ends up the
+ * same — but it is not: `replace` swaps the current entry rather than removing
+ * it, so every open/close cycle left the history one deeper than it started.
+ * Explore five sections and leaving settings took five Back presses, which is
+ * the bug a client reported almost word for word.
+ *
+ * `idx > 0` is the guard for a DEEP LINK: someone who landed directly on
+ * `?s=email` has nothing of ours to pop back to, and `navigate(-1)` would take
+ * them out of the app entirely. There, replacing is right.
+ */
+function useCloseSection() {
+  const navigate = useNavigate();
+  const [, setParams] = useSearchParams();
+  return (param: string) => {
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+    if (idx > 0) navigate(-1);
+    else setParams((q: URLSearchParams) => { q.delete(param); return q; }, { replace: true });
+  };
+}
 
 /**
  * A section whose read failed. Every settings section loads independently, and a
@@ -213,6 +236,7 @@ function PersonalSettings({ clientId, initialTab, onBack, onSaved }: {
 }) {
   const { ctx } = useSession();
   const [params, setParams] = useSearchParams();
+  const closeSection = useCloseSection();
   const openKey = (params.get("s") ?? initialTab ?? null) as PersonalTab | null;
   const role = ctx?.active?.role ?? "member";
 
@@ -240,7 +264,7 @@ function PersonalSettings({ clientId, initialTab, onBack, onSaved }: {
 
   if (open) {
     return (
-      <SettingsPage title={open.label} description={open.intro} onBack={() => setParams((q: URLSearchParams) => { q.delete("s"); return q; }, { replace: true })}>
+      <SettingsPage title={open.label} description={open.intro} onBack={() => closeSection("s")}>
         <motion.div key={open.value} variants={stagger} initial="hidden" animate="show" className="space-y-6">
           {open.body()}
         </motion.div>
@@ -303,6 +327,7 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
   const { ctx, refresh } = useSession();
   const { preview } = useTheme();
   const [params, setParams] = useSearchParams();
+  const closeSection = useCloseSection();
   const render: Record<string, () => ReactNode> = {
     brand: () => <BrandingEditor initial={(ctx?.branding ?? null) as Branding | null} onPreview={preview} onSaved={() => void refresh()} />,
     signin: () => <SignInSettings canBrand={canBrand} branding={ctx?.branding ?? null} slug={ctx?.active?.tenantSlug ?? null} onSaved={() => void refresh()} />,
@@ -339,7 +364,7 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
       <SettingsPage
         title={open.label}
         description={INTRO[open.key]}
-        onBack={() => setParams((q: URLSearchParams) => { q.delete("s"); return q; }, { replace: true })}
+        onBack={() => closeSection("s")}
       >
         <motion.div key={open.key} variants={stagger} initial="hidden" animate="show" className="space-y-6">
           {render[open.key]!()}
@@ -1914,6 +1939,7 @@ function BrandingEditor(props: { initial: Branding | null; onPreview: (b: Brandi
 
 function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding | null; onPreview: (b: Branding | null) => void; onSaved: () => void }) {
   const [params, setParams] = useSearchParams();
+  const closeSection = useCloseSection();
   const { ctx } = useSession();
   const [tokens, setTokens] = useState<BrandTokens>(() => (initial?.tokens && hasTokens(initial.tokens) ? initial.tokens : deriveTokens({ primary: seedFrom(initial), accents: MACRO_SPEC })));
   const [seed, setSeed] = useState<string>(seedFrom(initial));
@@ -2230,7 +2256,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   const sub = params.get("b");
   const openSub = SUBS.find((x) => x.key === sub) ?? null;
   const goSub = (k: string | null) =>
-    setParams((q: URLSearchParams) => { if (k) q.set("b", k); else q.delete("b"); return q; }, { replace: !k });
+    k ? setParams((q: URLSearchParams) => { q.set("b", k); return q; }) : closeSection("b");
 
   const saveBar = (
     <div className="space-y-3">

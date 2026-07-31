@@ -506,7 +506,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
                     <Switch checked={p.consentToFeature} onCheckedChange={(v) => setPhotos((arr) => arr.map((x, j) => (j === i ? { ...x, consentToFeature: v } : x)))} />
                   </div>
                 ))}
-                <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3 text-xs [&_svg]:size-3.5"><Camera /> Add<input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadPhoto(e.target.files[0])} /></label>
+                <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3 text-xs [&_svg]:size-3.5"><Camera /> Add<input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadPhoto(e.target.files[0])} /></label>
               </div>
               {photoErr && <p className="mt-1.5 text-xs text-warning">{photoErr}</p>}
               {photos.length > 0 && <p className="mt-1.5 text-xs text-muted-foreground">Photos are private. Toggle to allow featuring as a before/after.</p>}

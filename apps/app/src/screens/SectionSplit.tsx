@@ -14,7 +14,7 @@
  */
 
 import type { ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { SectionDetail, type SettingsEntry } from "@4dl/ui";
 
 /**
@@ -37,20 +37,25 @@ export function SectionSplit({
   footer?: ReactNode;
 }) {
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  /**
+   * Opening a sub-page PUSHES; closing it POPS that same entry.
+   *
+   * Closing used to `replace`, which swaps the current entry instead of
+   * removing it — so every open/close cycle left the history one deeper than it
+   * started and Back never caught up. `idx > 0` guards the deep-link case,
+   * where there is nothing of ours to pop back to.
+   */
+  const close = () => {
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+    if (idx > 0) navigate(-1);
+    else setParams((q: URLSearchParams) => { q.delete(param); return q; }, { replace: true });
+  };
   return (
     <SectionDetail
       subs={subs.map(({ value, ...rest }) => ({ ...rest, sub: value }))}
       openKey={params.get(param)}
-      onOpen={(k) =>
-        setParams(
-          (q: URLSearchParams) => {
-            if (k) q.set(param, k);
-            else q.delete(param);
-            return q;
-          },
-          { replace: !k },
-        )
-      }
+      onOpen={(k) => (k ? setParams((q: URLSearchParams) => { q.set(param, k); return q; }) : close())}
       footer={footer}
     />
   );
