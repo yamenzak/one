@@ -160,10 +160,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add apps/tessa/wrangler.jsonc
-          git commit -m "Tessa: bind the real Cloudflare resource ids
-
-Written by the provisioning workflow, which just created or adopted them.
-Replaces the placeholders that let \`wrangler dev\` run with no account."
+          # Two -m flags rather than one multi-line string: inside a YAML block
+          # scalar every line must stay indented, and a message body at column 0
+          # silently ends the block — which makes the whole workflow file
+          # unparseable and GitHub list it by filename instead of by name.
+          git commit \
+            -m "Tessa: bind the real Cloudflare resource ids" \
+            -m "Written by the provisioning workflow, which created or adopted them. Replaces the placeholders that let wrangler dev run with no Cloudflare account."
           # Pushing to main triggers Deploy, which now ships Tessa — see the
           # placeholder guard in deploy.yml.
           git push

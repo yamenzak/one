@@ -30,6 +30,12 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # A workflow with broken YAML does not FAIL — it does not RUN. GitHub
+      # lists it by filename, its Run-workflow button never appears, and nothing
+      # says why. That is how provision-tessa.yml shipped dead. Needs no deps,
+      # so it goes before install.
+      - run: node .github/workflows/workflows-parse.test.mjs
+
       - run: pnpm install --frozen-lockfile
 
       # Build BOTH SPAs. Each worker serves its app through an `assets`
