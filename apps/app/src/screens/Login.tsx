@@ -39,6 +39,7 @@ import {
   TierContent,
   motion,
 } from "@4dl/ui";
+import { RefreshNote } from "@4dl/app-kit";
 import { api, ApiError } from "../api.js";
 import { useSession } from "../session.js";
 import { passkeySupported, signInWithPasskey, conditionalPasskeyAvailable } from "../passkey.js";
@@ -265,6 +266,14 @@ export function Login() {
           </p>
         </TierContent>
       )}
+
+      {/* The last resort, and the reason it is on the LOGIN specifically: this is
+          the screen a signed-out visitor sits on, and until now the only route to
+          `hardRefresh` was the avatar menu inside the shell — which needs a
+          session. Someone held on a stale bundle could not reach the one control
+          that would free them. Only on step one: mid-code is not the moment to
+          offer someone a reload that discards the code they are typing. */}
+      {step === "email" && <RefreshNote className="pt-6" />}
     </Screen>
   );
 }

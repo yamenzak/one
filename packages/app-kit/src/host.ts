@@ -14,7 +14,7 @@
  * reintroduces the entire class of bug where the brand and the tenancy disagree.
  */
 
-import type { HostGate } from "@4dl/tenancy/model";
+import type { HostGate, Maintenance } from "@4dl/tenancy/model";
 
 export type HostRole = "root" | "setup" | "admin" | "tenant" | "custom" | "invalid";
 
@@ -60,6 +60,18 @@ export interface HostInfo<B = unknown> {
    * tenant whose access was withheld.
    */
   gate?: HostGate | null;
+  /**
+   * The DEPLOYMENT-wide maintenance switch — every tenant at once, from an
+   * operator's console rather than from anyone's subscription.
+   *
+   * Read pre-auth, alongside the gate, because at `full` this endpoint is one of
+   * the few that still answers: it is how the app knows to render the closed sign
+   * instead of a login it could never complete.
+   *
+   * Optional only for the server that is too old to send it — treat an absent
+   * value as `off`, never as unknown-so-block.
+   */
+  maintenance?: Maintenance | null;
   /** Cloudflare Turnstile — render the widget when a site key is set AND
    *  `enabled` (a server secret is configured, so codes are gated on it). */
   turnstile?: { siteKey: string | null; enabled: boolean } | null;

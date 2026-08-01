@@ -16,7 +16,8 @@ import { routeGuard as buildRouteGuard } from "@4dl/auth";
 import type { Env } from "./env.js";
 import type { Auth } from "./auth.js";
 import type { Branding } from "./host-context.js";
-import { type AppEnv, isPlatformAdmin } from "./auth-context.js";
+import { type AppContext, type AppEnv, isPlatformAdmin } from "./auth-context.js";
+import { maintenanceExempt } from "./maintenance.js";
 
 /** Routes reachable without a tenant session. */
 function isPublic(method: string, path: string): boolean {
@@ -277,4 +278,11 @@ export const routeGuard: MiddlewareHandler<AppEnv> = buildRouteGuard<Env, Auth, 
   billingPermission: { billing: ["manage"] },
   isPlatformAdmin: (c) => isPlatformAdmin(c as never),
   gate: (c) => c.get("host").gate,
+  // The DEPLOYMENT-wide switch, resolved once per request by
+  // `maintenanceMiddleware` (index.ts). Injected the same way the tenant gate is,
+  // so `@4dl/auth` still knows nothing about where either state is stored.
+  // Cast for the same reason `isPlatformAdmin` above takes one: the engine is
+  // generic over `@4dl/auth`'s own variables, and `maintenance` is Kova's.
+  maintenance: (c) => (c as unknown as AppContext).get("maintenance"),
+  maintenanceExempt,
 }) as unknown as MiddlewareHandler<AppEnv>;

@@ -13,4 +13,8 @@
  */
 export * from "./dcv.js";
 export * from "./hosts.js";
+// The maintenance MODEL only — `maintenance-routes.ts` holds the D1 and Hono
+// halves and stays off this path, so the app can render the notice without
+// pulling a database client into its bundle.
+export * from "./maintenance.js";
 export * from "./standing.js";

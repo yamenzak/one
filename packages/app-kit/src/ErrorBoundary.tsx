@@ -8,6 +8,7 @@
 
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Button } from "@4dl/ui";
+import { RefreshNote } from "./RefreshNote.js";
 
 interface Props {
   children: ReactNode;
@@ -50,6 +51,9 @@ export class ErrorBoundary extends Component<Props, State> {
               <Button variant="secondary" onClick={() => this.setState({ error: null })}>Try again</Button>
               <Button onClick={() => { window.location.href = this.props.homePath ?? "/" }}>Go home</Button>
             </div>
+            {/* Neither button helps when the crash is a stale precached bundle
+                talking to a newer API — both re-run the same broken build. */}
+            <RefreshNote className="mt-6" label="Still broken after a reload?" />
           </div>
         </div>
       );

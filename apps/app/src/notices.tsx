@@ -13,7 +13,7 @@ import { Lock } from "@4dl/ui";
 import { DUNNING_DAYS } from "@4dl/billing/model";
 import { useSession } from "./session.js";
 
-import { OfflinePill as KitOfflinePill, PwaUpdatePrompt as KitPwaUpdatePrompt } from "@4dl/app-kit";
+import { MaintenanceBanner as KitMaintenanceBanner, OfflinePill as KitOfflinePill, PwaUpdatePrompt as KitPwaUpdatePrompt } from "@4dl/app-kit";
 
 export { QueuedNotice, UnhandledErrorToast } from "@4dl/app-kit";
 
@@ -30,6 +30,19 @@ export function OfflinePill() {
  */
 export function PwaUpdatePrompt() {
   return <KitPwaUpdatePrompt enabled={import.meta.env.PROD} />;
+}
+
+/**
+ * The kit's maintenance strip, given this app's host probe.
+ *
+ * Nothing here is Kova's — a platform-wide read-only window says the same thing
+ * on every app — so only the wiring lives on this side. Renders for the
+ * `readonly` level only; `full` never reaches the Shell (main.tsx swaps the whole
+ * screen before it).
+ */
+export function MaintenanceBanner() {
+  const { host } = useSession();
+  return <KitMaintenanceBanner state={host?.maintenance} />;
 }
 
 /**

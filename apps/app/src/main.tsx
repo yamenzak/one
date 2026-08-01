@@ -11,6 +11,7 @@ import { Start } from "./screens/Start.js";
 import { Shell } from "./Shell.js";
 import { AcceptInvite } from "./screens/AcceptInvite.js";
 import { NoStudio, RootSignpost, WrongDoor } from "./screens/Doors.js";
+import { Maintenance } from "./screens/Maintenance.js";
 import { AdminDoor } from "./screens/AdminDoor.js";
 import { ONBOARDING_PATH } from "./screens/onboarding/paths.js";
 import { PasskeyProvider } from "./PasskeyPrompt.js";
@@ -61,7 +62,7 @@ function BootSplash() {
   );
 }
 
-export type Screen = "boot" | "login" | "signpost" | "nostudio" | "wrongdoor" | "start" | "shell" | "admin";
+export type Screen = "boot" | "maintenance" | "login" | "signpost" | "nostudio" | "wrongdoor" | "start" | "shell" | "admin";
 
 /**
  * Which top-level screen this request gets — decided by WHICH DOOR the app is
@@ -91,13 +92,27 @@ export type Screen = "boot" | "login" | "signpost" | "nostudio" | "wrongdoor" | 
 export function pickScreen(
   loading: boolean,
   ctx: { active: unknown } | null,
-  host: { role: string; tenant: unknown } | null,
+  host: { role: string; tenant: unknown; maintenance?: { level?: string } | null } | null,
   path: string,
 ): Screen {
   // Both are needed before anything can be chosen, and guessing flashes the wrong
   // screen — which on this set of doors means flashing a login at someone who has
   // no studio to log in to.
   if (loading || !host) return "boot";
+
+  /**
+   * The deployment is closed — outranks every door but the operator's.
+   *
+   * Above the role switch because at `full` the server refuses `/api/context`
+   * and the auth lane, so `ctx` is null and every branch below would land on a
+   * login whose "Continue" can only ever return 503. Showing someone a form that
+   * cannot work is worse than showing them the closed sign.
+   *
+   * `admin` is excluded for the same reason the route guard exempts that door:
+   * it is where the switch is turned back off. `readonly` is NOT handled here —
+   * the app still works at that level, and the Shell announces it in a banner.
+   */
+  if (host.maintenance?.level === "full" && host.role !== "admin") return "maintenance";
 
   switch (host.role) {
     case "invalid":
@@ -141,6 +156,7 @@ function App() {
       <AnimatePresence mode="wait">
         <motion.div key={screen} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: DUR.base }}>
           {screen === "boot" && <BootSplash />}
+          {screen === "maintenance" && <Maintenance state={host!.maintenance!} brandName={host?.tenant?.name ?? null} />}
           {screen === "signpost" && <RootSignpost />}
           {screen === "nostudio" && <NoStudio />}
           {screen === "wrongdoor" && <WrongDoor />}

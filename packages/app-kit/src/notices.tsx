@@ -10,7 +10,8 @@
  */
 
 import { useEffect, useState } from "react";
-import { CloudOff, RefreshCw, WifiOff, X, cn } from "@4dl/ui";
+import { CloudOff, RefreshCw, WifiOff, Wrench, X, cn } from "@4dl/ui";
+import type { Maintenance } from "@4dl/tenancy/model";
 
 /**
  * Persistent app-bar indicator. Before this the app had no `navigator.onLine`
@@ -52,6 +53,41 @@ export function QueuedNotice({ text, className }: { text?: string; className?: s
     <p role="status" className={cn("flex items-center gap-1.5 text-sm text-muted-foreground [&_svg]:size-4", className)}>
       <CloudOff /> {text ?? "Saved on your phone — it'll sync when you're back online."}
     </p>
+  );
+}
+
+/**
+ * The deployment is READ-ONLY for maintenance, said out loud.
+ *
+ * The `full` level replaces the app with its own screen; this level does not —
+ * the app works, reads are served, and only writes are refused. Which is exactly
+ * the situation that needs a banner: without one the app looks entirely normal
+ * and each save fails on its own with a 503, so the user's model becomes "this is
+ * broken" rather than "this is briefly paused". That is the same reasoning behind
+ * a lapsed tenant's banner, and it holds for the same reason.
+ *
+ * Product-agnostic on purpose: there is nothing here but the operator's own
+ * message and the fact of the state. An app wires it to wherever it keeps the
+ * host probe's answer.
+ *
+ * Not dismissible. It is not a notification, it is the state of the whole
+ * surface, and it stops being true when the operator says so.
+ */
+export function MaintenanceBanner({ state }: { state: Maintenance | null | undefined }) {
+  if (state?.level !== "readonly") return null;
+  return (
+    <div
+      role="status"
+      className="border-b border-warning/25 bg-warning/12 px-4 py-2.5 text-xs leading-relaxed text-warning"
+    >
+      <div className="column flex items-start gap-2">
+        <Wrench aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+        <span>
+          <span className="font-semibold">Maintenance in progress.</span>{" "}
+          {state.message || "Everything is readable, but changes can't be saved for a little while."}
+        </span>
+      </div>
+    </div>
   );
 }
 

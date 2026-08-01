@@ -1135,13 +1135,14 @@ the tenancy".
 | Trigger | Who | File | What it is |
 | --- | --- | --- | --- |
 | session resolving | all | `main.tsx:35` `BootSplash` | Branded boot splash |
-| host = root | anon | `screens/Doors.tsx:73` `RootSignpost` | Signpost to setup / admin / a studio |
-| host = tenant, no such tenant | anon | `screens/Doors.tsx:164` `NoStudio` | "No studio at this address" |
-| host = invalid | anon | `screens/Doors.tsx:192` `WrongDoor` | Unrecognised hostname |
-| no session | all | `screens/Login.tsx:47` | OTP + passkey sign-in, tenant-branded |
+| platform maintenance = `full` | all | `screens/Maintenance.tsx:42` | Deployment closed; outranks every door but `admin.` |
+| host = root | anon | `screens/Doors.tsx:74` `RootSignpost` | Signpost to setup / admin / a studio |
+| host = tenant, no such tenant | anon | `screens/Doors.tsx:172` `NoStudio` | "No studio at this address" |
+| host = invalid | anon | `screens/Doors.tsx:207` `WrongDoor` | Unrecognised hostname |
+| no session | all | `screens/Login.tsx:48` | OTP + passkey sign-in, tenant-branded |
 | host = admin, signed in | A | `screens/AdminDoor.tsx:25` | Operator console door |
 | `/studio/setup` | O | `screens/Start.tsx:18` → `onboarding/StudioOnboarding.tsx:88` | 3-step studio creation |
-| `/studio/sign-in` | O | `screens/Login.tsx:47` | Owner sign-in on the setup door |
+| `/studio/sign-in` | O | `screens/Login.tsx:48` | Owner sign-in on the setup door |
 | `/accept-invitation/:id` | T O | `main.tsx:134` → `screens/AcceptInvite.tsx:25` | Staff invite + OTP (pre-session) |
 | client not onboarded | C | `Shell.tsx:82` → `client/Onboarding.tsx:13` | 5-step intake wizard |
 | `lockedToStorefront` | C | `Shell.tsx:107` → `client/Shop.tsx:30` | Must buy access before entering |
@@ -1324,9 +1325,11 @@ each section's gate — so a section can't drift from what the tenant bought.
 independently. Only `brand` has one save, because only there do the sub-pages
 share state.
 
-#### G3. Admin console — `ADMIN_SECTIONS`, `admin/AdminConsole.tsx:60-73`
+#### G3. Admin console — `ADMIN_SECTIONS`, `admin/AdminConsole.tsx:52-74`
 
-Reachable at the `admin.` door and nowhere else.
+Reachable at the `admin.` door and nowhere else. Two sections are **not** in this
+file: their panels belong to the shared package that owns the configuration, and
+only the row registering them lives here.
 
 | `?s=` | File:line | Nested |
 | --- | --- | --- |
@@ -1337,6 +1340,8 @@ Reachable at the `admin.` door and nowhere else.
 | `promos` | `:2546` | `:2641`, `:2675` |
 | `domains` | `:1663` | — |
 | `content` | `:1976` | — |
+| `email` | `packages/admin/src/sections/email.tsx:60` | — |
+| `maintenance` | `packages/admin/src/sections/maintenance.tsx:57` | — |
 | `security` | `:1826` | `:2032` nuclear reset |
 
 ---

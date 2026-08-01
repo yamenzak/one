@@ -1,7 +1,8 @@
 /**
- * THE OUTER WALL — one middleware, five gates, in this order:
+ * THE OUTER WALL — one middleware, six gates, in this order:
  *
  *   1. HOST      is this door allowed to answer this route at all?
+ *   1b. MAINTENANCE  is the whole DEPLOYMENT withheld right now?
  *   2. PUBLIC    pass through (the route carries its own auth, or needs none)
  *   3. ADMIN     platform operator, on the operator door only
  *   4. MEMBER    an authenticated member of the HOST's tenant, gated by the
@@ -26,8 +27,8 @@
  */
 
 import type { Context, MiddlewareHandler } from "hono";
-import type { HostGate, HostRole } from "@4dl/tenancy";
-import { isDevRoot } from "@4dl/tenancy";
+import type { HostGate, HostRole, Maintenance } from "@4dl/tenancy/model";
+import { isDevRoot, maintenanceRefuses } from "@4dl/tenancy/model";
 import { can, type AuthEnv } from "./context.js";
 import type { Grant } from "./grants.js";
 
@@ -51,6 +52,11 @@ export interface GuardConfig<E extends object, A, B> {
   allowedWhileReadOnly: (path: string) => boolean;
   /** Prefix under which the operator console answers. */
   adminPrefix?: string;
+  /**
+   * Prefix under which the sign-in lane answers. Read only by the maintenance
+   * gate, which has to spare it at `readonly` and refuse it at `full`.
+   */
+  authPrefix?: string;
   /** Personal, non-tenant-scoped routes usable before a tenant is chosen. */
   isPersonal?: (path: string) => boolean;
   /** Is this caller a platform operator? */
@@ -64,12 +70,31 @@ export interface GuardConfig<E extends object, A, B> {
   isBillingWrite?: (path: string) => boolean;
   /** The permission that identifies someone who can settle the bill. */
   billingPermission?: Grant;
+  /**
+   * The deployment-wide maintenance switch, or null for "no switch" — which is
+   * what an app that never mounts `maintenanceMiddleware` returns, and what
+   * keeps this gate free.
+   */
+  maintenance?: (c: Context<AuthEnv<E, A, B>>) => Maintenance | null | undefined;
+  /**
+   * Paths that answer even while the deployment is closed.
+   *
+   * `/health` and the operator door are exempted by the engine itself; this is
+   * for the app's own additions, and there is essentially one class of them: SIGNATURE-VERIFIED
+   * PROVIDER CALLBACKS. A payment webhook dropped during a maintenance window is
+   * not retried forever — the provider gives up and disables the endpoint — so a
+   * closed sign that also refuses them turns a planned twenty minutes into
+   * silently lost money. The host probe belongs here too, because it is how the
+   * app learns to render the notice at all.
+   */
+  maintenanceExempt?: (path: string) => boolean;
 }
 
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export function routeGuard<E extends object, A, B>(cfg: GuardConfig<E, A, B>): MiddlewareHandler<AuthEnv<E, A, B>> {
   const adminPrefix = cfg.adminPrefix ?? "/api/admin/";
+  const authPrefix = cfg.authPrefix ?? "/api/auth/";
   return async (c, next) => {
     const path = c.req.path;
     if (!path.startsWith("/api/") && path !== "/health") return next();
@@ -114,6 +139,65 @@ export function routeGuard<E extends object, A, B>(cfg: GuardConfig<E, A, B>): M
      */
     if ((role === "tenant" || role === "custom") && !host.tenant && !cfg.allowedWithoutTenant(path) && path !== "/health") {
       return c.json({ error: "no_tenant" }, 404);
+    }
+
+    /**
+     * ── 1b. MAINTENANCE ─────────────────────────────────────────────────────
+     *
+     * The deployment-wide switch, and it sits ABOVE the public gate on purpose:
+     * `full` means sign-in is disabled, and the auth lane is public. Enforcing it
+     * after `isPublic` would leave open the one door that lets people back into
+     * an app the operator just closed.
+     *
+     * 503 with `Retry-After`, not 402 or 403: this is neither a billing state nor
+     * an authorization failure. It is "come back shortly", and it is the one
+     * status a client, a CDN and an uptime check all already understand.
+     *
+     * ── The exemptions, and why removing any of them is a trap ───────────────
+     *
+     *   the OPERATOR DOOR   `admin.<root>` is never closed. It is where the
+     *                       switch is turned back OFF, so closing it would
+     *                       otherwise be a one-way trip out of the product,
+     *                       recoverable only by hand-editing D1.
+     *
+     *                       Note this does NOT stand down on `isDevRoot`, unlike
+     *                       the console gate below. That gate relaxes because dev
+     *                       has one root and no separate door to be strict about;
+     *                       relaxing HERE would spare every request in dev and in
+     *                       the integration suite, so the switch would appear to
+     *                       work and withhold nothing. `admin.localhost` is a real
+     *                       door locally, and a signed-in dev user is a platform
+     *                       admin anyway, so nothing is lost by being strict.
+     *   a PLATFORM ADMIN    exempt on every door, so an operator can check the
+     *                       thing they are maintaining from a tenant's address
+     *                       rather than inferring it from the console.
+     *   `/health`           dependency-free, reveals nothing, and it is what the
+     *                       uptime check and `wrangler dev`'s readiness probe
+     *                       use. A maintenance window should not page anyone.
+     *   the app's own list  the host probe and the signature-verified provider
+     *                       webhooks — see `maintenanceExempt`.
+     *   the AUTH LANE       **at `readonly` only.** Signing in is a POST, so
+     *                       without this a "read-only" window would refuse the
+     *                       one act that lets someone read anything — which is
+     *                       not read-only, it is closed with extra steps. At
+     *                       `full` the same lane is deliberately refused: that IS
+     *                       what "signing in is disabled" means.
+     */
+    const maintenance = cfg.maintenance?.(c) ?? null;
+    if (maintenance && maintenanceRefuses(maintenance.level, method)) {
+      const spared =
+        role === "admin" ||
+        path === "/health" ||
+        Boolean(cfg.maintenanceExempt?.(path)) ||
+        (maintenance.level === "readonly" && path.startsWith(authPrefix)) ||
+        cfg.isPlatformAdmin(c);
+      if (!spared) {
+        return c.json(
+          { error: "maintenance", level: maintenance.level, message: maintenance.message, since: maintenance.since },
+          503,
+          { "Retry-After": "300" },
+        );
+      }
     }
 
     if (cfg.isPublic(method, path)) return next();

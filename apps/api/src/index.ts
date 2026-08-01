@@ -8,6 +8,8 @@
  */
 
 import { Hono } from "hono";
+import type { MiddlewareHandler } from "hono";
+import { maintenanceMiddleware } from "@4dl/tenancy";
 import { sessionMiddleware, type AppEnv } from "./auth-context.js";
 import { routeGuard } from "./route-guard.js";
 import { ensureSchema, parseJson } from "./db.js";
@@ -20,6 +22,7 @@ import { DUNNING_DAYS } from "@4dl/billing";
 import { periodKey } from "./ids.js";
 import { contextRoutes } from "./context-routes.js";
 import { billingRoutes, adminRoutes, emailConfigRoutes } from "./billing-routes.js";
+import { maintenanceRoutes } from "./maintenance.js";
 import { downgradeRoutes } from "./downgrade-routes.js";
 import { clientRoutes } from "./clients.js";
 import { memberRoutes } from "./member-routes.js";
@@ -83,6 +86,11 @@ app.get("/ready", async (c) => {
 });
 
 app.use("*", sessionMiddleware);
+// Resolve the deployment-wide maintenance switch once per request, BETWEEN the
+// session and the guard: the guard refuses on it, `/api/host` reports it, and
+// both must see the same read. Only `/api/*` and `/health` pay for it — the
+// static SPA is never withheld, because the SPA is what renders the notice.
+app.use("*", maintenanceMiddleware() as unknown as MiddlewareHandler<AppEnv>);
 app.use("*", routeGuard);
 
 // OTP send runs our policy gate first (cooldown, Turnstile, tenant sign-up
@@ -119,6 +127,7 @@ app.route("/api", billingRoutes);
 app.route("/api", downgradeRoutes);
 app.route("/api", adminRoutes);
 app.route("/api", emailConfigRoutes);
+app.route("/api", maintenanceRoutes as unknown as Hono<AppEnv>);
 app.route("/api", clientRoutes);
 app.route("/api", memberRoutes);
 app.route("/api", planRoutes);

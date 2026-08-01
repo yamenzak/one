@@ -42,6 +42,7 @@ import {
   Store,
   TierContent,
 } from "@4dl/ui";
+import { RefreshNote } from "@4dl/app-kit";
 import { studioUrl, useSession } from "../session.js";
 
 /**
@@ -147,6 +148,13 @@ export function RootSignpost() {
           </a>
         </TierContent>
       )}
+      {/* The signpost is where a stale shell LANDS. `resolveHostInfo` falls back
+          to `root` whenever the host probe fails for a reason that is not a 404 —
+          offline, a 5xx, an edge that never reached the worker — so a visitor
+          whose precached bundle is talking to an unreachable origin sees exactly
+          this screen, on their own studio's address, with no way to shed the
+          worker holding it. */}
+      <RefreshNote className="pt-6" />
     </Screen>
   );
 }
@@ -178,6 +186,9 @@ export function NoStudio() {
         </Group>
         <GroupNote>If you run this studio, your clients need the new link.</GroupNote>
       </Section>
+      {/* Same reason as the signpost, one door along: a cached shell that thinks
+          this slug is unclaimed keeps saying so until the worker is asked again. */}
+      <RefreshNote className="pt-6" />
     </Screen>
   );
 }
@@ -188,6 +199,10 @@ export function NoStudio() {
  * No atmosphere at all — the one screen in the product with a bare canvas. This
  * host is not ours to brand and the visitor should get no signal from it either
  * way.
+ *
+ * The only screen of the four with no `RefreshNote`, deliberately: this one is
+ * reached by an ANSWER — the worker returned 404 for the host — so the shell is
+ * demonstrably fresh enough to have asked, and reloading it would change nothing.
  */
 export function WrongDoor() {
   return (

@@ -39,7 +39,7 @@ import { Shop } from "./screens/client/Shop.js";
 import { Explore } from "./screens/client/Explore.js";
 import { AcceptInvite } from "./screens/AcceptInvite.js";
 import { NotificationBell } from "./NotificationBell.js";
-import { OfflinePill, StudioPausedBanner } from "./notices.js";
+import { MaintenanceBanner, OfflinePill, StudioPausedBanner } from "./notices.js";
 import { StudioSwitcher } from "./StudioSwitcher.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { TourProvider, useTour, type TourId } from "./tour.js";
@@ -274,7 +274,11 @@ function TabLayout() {
       )}
       <div className="relative z-10 transition-colors duration-500" style={pageVars}>
       {/* Above the bar, not inside it: a read-only studio is the state of the whole
-          surface, not one more indicator competing for space in the trailing row. */}
+          surface, not one more indicator competing for space in the trailing row.
+          The maintenance strip sits FIRST because it is the wider truth — a
+          deployment-wide window outranks one studio's standing, and when both are
+          true the platform's window is the one that explains the refused save. */}
+      <MaintenanceBanner />
       <StudioPausedBanner />
       <AppBar
         bare={ambient}

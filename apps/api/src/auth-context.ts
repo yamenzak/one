@@ -22,6 +22,7 @@ import {
   type AuthUser,
   type AuthVars,
 } from "@4dl/auth";
+import type { Maintenance } from "@4dl/tenancy";
 import { resolvePermissions } from "@kova/domain";
 import type { Env } from "./env.js";
 import type { RoleName } from "./access.js";
@@ -31,8 +32,14 @@ import { hostnameOf, resolveHost, shapeOf, type Branding, type HostContext, type
 
 export type { AuthUser, HostContext, HostTenant };
 
-/** Kova's request variables — the package's, with the role narrowed to ours. */
-export type KovaAuthVars = Omit<AuthVars<Auth, Branding>, "role"> & { role: RoleName | null };
+/**
+ * Kova's request variables — the package's, with the role narrowed to ours, plus
+ * the deployment-wide maintenance switch `maintenanceMiddleware` resolves.
+ */
+export type KovaAuthVars = Omit<AuthVars<Auth, Branding>, "role"> & {
+  role: RoleName | null;
+  maintenance: Maintenance;
+};
 export type AppEnv = { Bindings: Env; Variables: KovaAuthVars };
 export type AppContext = Context<AppEnv>;
 

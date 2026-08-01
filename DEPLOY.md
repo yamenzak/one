@@ -399,10 +399,47 @@ section 6.
 | `cf.saas.zone_id` | *(empty)* | Same | Platform admin → **Domains** |
 | `cf.saas.cname_target` | *(empty)* | Tenants get no CNAME to point at | Platform admin → **Domains** |
 | `cf.saas.worker_name` | `kova` | Per-hostname routes point at a missing script — **silently**: the certificate issues, the domain reports active, and every request serves nothing | Platform admin → **Domains** (blank = the default) |
+| `platform.maintenance` | `off` | Nothing is withheld. `readonly` refuses every write; `full` withholds the app and disables sign-in | Platform admin → **Maintenance** |
+| `platform.maintenance.message` | *(empty)* | The app shows its own wording instead of yours. Max 300 chars | Platform admin → **Maintenance** |
+| `platform.maintenance.since` | *(empty)* | Written by the product when the level changes; the notice reports it | — |
 
 Worker-level config that is **not** in `app_config`: `BETTER_AUTH_SECRET`
 (wrangler secret, step 5b), `ADMIN_EMAILS` and `BETTER_AUTH_URL`
 (`wrangler.jsonc` `vars`, step 2).
+
+---
+
+### 9b. Maintenance mode
+
+`Platform admin → Maintenance` closes the deployment for a migration, a schema
+change, or an incident. Two levels:
+
+| Level | What people get | Sessions |
+| --- | --- | --- |
+| `readonly` | The whole app, readable. Every write refused with **503**. Sign-in still works — a read-only window that refuses sign-in refuses reading | Untouched |
+| `full` | One notice screen carrying your message. Sign-in disabled | **All ended**, except platform admins' |
+
+**It cannot lock you out**, and that is by construction rather than by luck:
+`admin.<root>` is never closed, a platform admin is exempt on every door,
+`/health` keeps answering (so a planned window does not page anyone), and the two
+signature-verified Stripe webhooks keep answering (a dropped webhook is not
+retried forever — Stripe disables the endpoint, and money is captured with
+nothing granted).
+
+Two consequences worth planning for:
+
+- **`/ready` is not exempt** — it is registered ahead of the guard entirely, so it
+  keeps answering; but an uptime check pointed at any other path will see 503s.
+- **The switch is read on every request, uncached.** Turning it off takes effect
+  on the next request, not after a TTL. That is deliberate: a cached kill switch
+  is not a kill switch.
+
+If you ever need to clear it without a console — a lost operator address, say:
+
+```sh
+cd apps/api && pnpm exec wrangler d1 execute DB --remote \
+  --command "UPDATE app_config SET value='off' WHERE key='platform.maintenance'"
+```
 
 ---
 

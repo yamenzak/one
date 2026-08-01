@@ -24,11 +24,11 @@ import { useSearchParams } from "react-router-dom";
 import {
   AlertTriangle, Badge, Building2, Button, Callout, Card, ChevronRight, Chip, CircleAlert, CircleCheck,
   ConfirmDialog, CreditCard, EmptyState, Eyebrow, Field, Gift, GlanceStrip, Globe, IconBadge, Info, Input, KeyRound, ThumbsUp,
-  Dumbbell, LayoutGrid, Mail, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, Sheet, ShieldCheck, Wand2,
-  Skeleton, SkeletonLine, Play, Plug, Spinner, Stagger, Switch, Tag, Trash2, Wallet, cn, toneText, type Tone,
+  Dumbbell, LayoutGrid, Mail, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, Select, Sheet, ShieldCheck, Wand2,
+  Skeleton, SkeletonLine, Play, Plug, Spinner, Stagger, Switch, Tag, Trash2, Wallet, Wrench, cn, toneText, type Tone,
   ActionResult, ConfigRow, FieldGroup, LoadError, useLoad, useAction as useActionBase,
 } from "@4dl/ui";
-import { AdminConsole as Console, PlatformEmailSection, type ConsoleSection } from "@4dl/admin";
+import { AdminConsole as Console, PlatformEmailSection, PlatformMaintenanceSection, type ConsoleSection } from "@4dl/admin";
 import { SectionSplit } from "../SectionSplit.js";
 import { api, errorText } from "../../api.js";
 import { fmtPrice } from "../../money.js";
@@ -62,6 +62,11 @@ const ADMIN_SECTIONS: ConsoleSection[] = [
      it had no caller at all, and a fresh deploy could not send the sign-in code
      that is the only way in — DEPLOY.md carried it as a hand-edit-D1 step. */
   { key: "email", label: "Email delivery", blurb: "How this deployment sends mail, and what a tenant pays per send", icon: Mail, tone: "primary", render: () => <PlatformEmailSection api={api} errorText={errorText} /> },
+  /* Also `@4dl/admin`'s: closing a deployment for a migration is not a thing
+     Kova does differently from any other app on the platform. Last but one, next
+     to Security, because both are switches you arrive at deliberately rather
+     than surfaces you browse. */
+  { key: "maintenance", label: "Maintenance", blurb: "Put the whole platform in read-only, or close it entirely", icon: Wrench, tone: "danger", render: () => <PlatformMaintenanceSection api={api} errorText={errorText} /> },
   /* The blurb used to promise "sessions, admin access" — neither of which this
      section has ever had. A table of contents that lies is worse than none. */
   { key: "security", label: "Security", blurb: "The bot check on sign-in, and the platform reset", icon: ShieldCheck, tone: "danger", render: () => <SecurityConfig /> },
@@ -935,10 +940,11 @@ function AiConfig() {
       return `${m.label}: ${what}`;
     }, `Couldn't update ${m.label}.`);
 
-  /** Make `m` the default for its lane. `enabled: true` rides along on purpose:
-   *  `modelForTask` only ever selects `enabled = 1`, so a disabled default is
-   *  silently ignored and some other model of that lane answers instead — a
-   *  default you set and the engine quietly overrules is worse than none. */
+  /** Make `m` the default for its lane. The picker now only offers models that
+   *  are already switched on, so `enabled: true` is belt and braces rather than
+   *  the feature it used to be — it closes the window where a model is switched
+   *  off between the catalog loading and this click. `modelForTask` selects on
+   *  `enabled = 1`, so a disabled default is one the engine quietly overrules. */
   const setDefaultModel = (m: ModelRow) =>
     catalog.run(`lane:${m.task}`, async () => {
       await api.patch(`/api/admin/ai/models/${encodeURIComponent(m.id)}`, { isDefault: true, enabled: true });
@@ -1238,6 +1244,19 @@ function AiFeedbackPanel() {
  * every provider group for a filled dot, and the answer to "one default per
  * task" was nowhere on screen. A selector per lane states the question and the
  * answer in one line — and prices the options while it asks.
+ *
+ * ── Only SWITCHED-ON models are offered ─────────────────────────────────────
+ *
+ * This list used to carry every row of the lane, disabled ones included, marked
+ * "(off)" — and picking one switched it on as a side effect. The convenience
+ * was not worth what it cost: the catalog above is where an operator decides
+ * which models this deployment may use, and a picker that then offers the ones
+ * they just refused makes those switches look advisory. Worse, it is a hidden
+ * write — "set the text default" also meant "and re-enable a model you turned
+ * off", which is not what the control says it does.
+ *
+ * Switching a model on is one tap in the catalog directly above. That is the
+ * right order: allow it, then default to it.
  */
 function DefaultModelPicker({ models, busy, onPick }: { models: ModelRow[]; busy: string | null; onPick: (m: ModelRow) => void }) {
   // Vision is served by ANY Gemini model (they are all multimodal), but
@@ -1251,15 +1270,19 @@ function DefaultModelPicker({ models, busy, onPick }: { models: ModelRow[]; busy
     ?? null;
 
   const lanes = TASK_LANES.map((lane) => {
-    const options = models.filter((m) => m.task === lane.task);
-    if (!options.length) return null;
-    const pinned = options.find((m) => m.is_default === 1 && m.enabled === 1) ?? null;
-    const current = pinned
-      ?? options.find((m) => m.is_default === 1)
-      // What the engine falls back to: first enabled row of the lane.
-      ?? options.find((m) => m.enabled === 1)
-      ?? null;
-    return { lane, options, current, pinned, fallback: lane.task === "vision" ? visionFallback : null };
+    const inLane = models.filter((m) => m.task === lane.task);
+    if (!inLane.length) return null;
+    // What may be CHOSEN: switched on, and nothing else.
+    const options = inLane.filter((m) => m.enabled === 1);
+    const pinned = options.find((m) => m.is_default === 1) ?? null;
+    // What the engine falls back to when nothing is pinned: the first enabled
+    // row of the lane (`modelForTask` orders by `is_default DESC`).
+    const current = pinned ?? options[0] ?? null;
+    // A row still flagged `is_default` that the operator has since switched OFF.
+    // The engine ignores it — `modelForTask` filters on `enabled = 1` — so it is
+    // a setting that exists and does nothing. Named rather than hidden.
+    const staleDefault = !pinned ? inLane.find((m) => m.is_default === 1) ?? null : null;
+    return { lane, options, current, pinned, staleDefault, fallback: lane.task === "vision" ? visionFallback : null };
   }).filter((l): l is NonNullable<typeof l> => !!l);
   if (!lanes.length) return null;
 
@@ -1267,38 +1290,52 @@ function DefaultModelPicker({ models, busy, onPick }: { models: ModelRow[]; busy
     <Card className="space-y-3">
       <SectionHeader icon={CircleCheck} title="Default models" />
       <p className="text-sm text-muted-foreground">
-        What answers each kind of call when a studio hasn&apos;t chosen its own model — which is most of them. Picking
-        one here switches it on too, since the engine only ever serves an enabled model.
+        What answers each kind of call when a studio hasn&apos;t chosen its own model — which is most of them. Only
+        models switched on in the catalog above are offered, because those are the only ones the engine will serve.
       </p>
       <div className="space-y-2.5">
-        {lanes.map(({ lane, options, current, pinned, fallback }) => (
+        {lanes.map(({ lane, options, current, pinned, staleDefault, fallback }) => (
           <div key={lane.task} className="space-y-1">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-sm font-medium">{lane.label}</div>
                 <div className="truncate text-xs text-muted-foreground">{lane.desc}</div>
               </div>
-              {busy === `lane:${lane.task}` ? <Spinner className="size-4 shrink-0" /> : (
-                <select
+              {busy === `lane:${lane.task}` ? <Spinner className="size-4 shrink-0" /> : options.length ? (
+                <Select
                   aria-label={`Default model for ${lane.label}`}
                   value={current?.id ?? ""}
                   disabled={busy !== null}
-                  onChange={(e) => { const m = options.find((x) => x.id === e.target.value); if (m) onPick(m); }}
-                  className="max-w-[52%] shrink-0 truncate rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70 disabled:opacity-60"
-                >
-                  {!current && <option value="">Choose a model…</option>}
-                  {options.map((m) => {
+                  placeholder="Choose a model…"
+                  className="h-9 w-auto max-w-[52%]"
+                  onChange={(id) => { const m = options.find((x) => x.id === id); if (m) onPick(m); }}
+                  options={options.map((m) => {
                     const cost = requestCost(m);
-                    return (
-                      <option key={m.id} value={m.id}>
-                        {m.label}{cost !== null ? ` — ~${nf.format(cost)} cr` : ""}{m.enabled === 1 ? "" : " (off)"}
-                      </option>
-                    );
+                    return { value: m.id, label: `${m.label}${cost !== null ? ` — ~${nf.format(cost)} cr` : ""}` };
                   })}
-                </select>
+                />
+              ) : (
+                <span className="shrink-0 text-xs font-medium text-warning">Nothing to pick</span>
               )}
             </div>
-            {!pinned && (
+            {/* One line per lane, and only the one that is true. The order is
+                worst-first: a lane with nothing switched on cannot answer at
+                all, which outranks a stale pin, which outranks an unpinned but
+                working fallback. */}
+            {!options.length ? (
+              // The consequence of trading the old "picking one switches it on"
+              // shortcut for an honest picker: when a lane is empty there is
+              // nothing to choose, so the row has to say where the fix is.
+              <p className="text-xs text-warning">
+                No {lane.label.toLowerCase()} is switched on, so this kind of call will fail. Switch one on in the
+                catalog below{fallback ? <>, or rely on <b className="text-foreground">{fallback.label}</b> (every Gemini model reads images)</> : null}.
+              </p>
+            ) : staleDefault ? (
+              <p className="text-xs text-warning">
+                <b className="text-foreground">{staleDefault.label}</b> is still marked as this lane&rsquo;s default but is
+                switched off, so the engine ignores it. Switch it back on below, or pin one of the models offered here.
+              </p>
+            ) : !pinned ? (
               fallback ? (
                 // Vision with nothing pinned: any Gemini model reads images, so
                 // this is a working configuration, not a fault.
@@ -1308,11 +1345,11 @@ function DefaultModelPicker({ models, busy, onPick }: { models: ModelRow[]; busy
                 </p>
               ) : (
                 <p className="text-xs text-warning">
-                  No enabled default — the engine is falling back to{" "}
+                  No pinned default — the engine is falling back to{" "}
                   {current ? <b>{current.label}</b> : <>nothing, and this lane will fail</>}. Pick one to pin it.
                 </p>
               )
-            )}
+            ) : null}
           </div>
         ))}
       </div>
@@ -1522,16 +1559,16 @@ function AiSelfTest({ models }: { models: ModelRow[] }) {
         {scope === "model" && (
           <label className="block space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground">Model</span>
-            <select
-              className="min-h-12 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm"
+            <Select
+              aria-label="Model"
               value={pickedModel}
-              onChange={(e) => setPickedModel(e.target.value)}
-            >
-              <option value="">Choose a model…</option>
-              {models.filter((m) => m.enabled === 1).map((m) => (
-                <option key={m.id} value={m.id}>{providerLabel(m.provider)} — {m.label} ({m.task})</option>
-              ))}
-            </select>
+              placeholder="Choose a model…"
+              onChange={setPickedModel}
+              options={models.filter((m) => m.enabled === 1).map((m) => ({
+                value: m.id,
+                label: `${providerLabel(m.provider)} — ${m.label} (${m.task})`,
+              }))}
+            />
           </label>
         )}
       </FieldGroup>

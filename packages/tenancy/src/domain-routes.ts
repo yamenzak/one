@@ -33,6 +33,7 @@ import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostna
 import { canonicalHost, invalidateHostCache, isPlatformDoor, shapeOf, type RootDomainEnv, type TenancyConfig } from "./host-context.js";
 import { caaFixFromErrors } from "./dcv.js";
 import { setupHostname } from "./hosts.js";
+import { MAINTENANCE_OFF } from "./maintenance.js";
 import type { RouteEnv, RouteGuards } from "./route-deps.js";
 
 /**
@@ -157,6 +158,16 @@ export function domainRoutes(deps: RouteGuards, opts: DomainRouteConfig) {
       // rendered the read-only app for a tenant whose access was withheld. There
       // is nothing private in a HostGate; spread it.
       gate: host.gate ? { ...host.gate } : null,
+      /**
+       * The DEPLOYMENT-wide switch, alongside the tenant's own gate.
+       *
+       * This endpoint is the one read that answers during `full` maintenance,
+       * and it has to be: it is how the app learns to render the closed sign
+       * rather than a login it cannot complete or a generic "something didn't
+       * load". `off` is reported as `off` rather than omitted, so a client can
+       * tell "not in maintenance" from "this server is too old to say".
+       */
+      maintenance: c.get("maintenance") ?? MAINTENANCE_OFF,
       turnstile: (await deps.turnstile?.(c.env.DB)) ?? null,
     });
   })

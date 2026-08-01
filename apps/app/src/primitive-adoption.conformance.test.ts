@@ -22,6 +22,14 @@
  *    Use `<Anchor>`; it renders exactly this, and it takes `word` for the case
  *    where the value is words rather than a number (§5).
  *  • The anchor's own layout class string on a `TierAnchor`.
+ *  • A native `<select>`. `Select` (Radix) has existed and been adopted in a
+ *    dozen screens, but the AI model pickers were still native — and one of
+ *    them was actively lying. A native `<select>` given a `value` that none of
+ *    its `<option>`s carry renders the FIRST option instead, silently: when an
+ *    operator withdrew a model, every studio that had picked it saw "Default
+ *    (auto)" while the database still held the withdrawn id. `Select` renders
+ *    its placeholder in that case, which forces the caller to decide what to
+ *    say. Native `<select>` also ignores nearly every style on iOS.
  *
  * ── What it deliberately allows ──
  * `TierAnchor` itself, used for a T1 that is NOT a value: the sign-in screen's
@@ -55,6 +63,10 @@ const BANNED: { re: RegExp; why: string }[] = [
     re: /<TierAnchor[^>]*className="flex flex-col items-center gap-1 /,
     why: "a hand-rolled anchor — use `<Anchor eyebrow sub>`",
   },
+  {
+    re: /<select[\s>]/,
+    why: "a native <select> — use `<Select>`, which cannot silently render a value that is not in its options",
+  },
 ];
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -77,6 +89,10 @@ function scan(): Hit[] {
       if (EXEMPT_FILES.includes(rel)) continue;
       const lines = readFileSync(file, "utf8").split("\n");
       lines.forEach((text, i) => {
+        // A banned spelling QUOTED IN PROSE is documentation, not code — and
+        // these rules are explained in comments that necessarily name the thing
+        // they ban. Without this the lint flags its own rationale.
+        if (/^\s*(\*|\/\/)/.test(text)) return;
         for (const { re, why } of BANNED) {
           if (!re.test(text)) continue;
           const window = lines.slice(Math.max(0, i - EXEMPT_WINDOW), i + 1).join("\n");
@@ -101,6 +117,8 @@ describe("screens use the primitives that exist (UI-LANGUAGE §1, §13)", () => 
     const samples = [
       '<p className="numeral text-display"><CountUp value={n} /></p>',
       '<TierAnchor className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">',
+      '<select value={v.flag} onChange={onChange}>',
+      "<select>",
     ];
     for (const s of samples) expect(BANNED.some((b) => b.re.test(s)), s).toBe(true);
 
@@ -110,6 +128,10 @@ describe("screens use the primitives that exist (UI-LANGUAGE §1, §13)", () => 
       "<Anchor eyebrow=\"Clients\" sub={sub}><CountUp value={n} /></Anchor>",
       '<TierAnchor className="flex flex-col items-center gap-3 pb-8 text-center">',
       '<p className="numeral text-title-1">{n}</p>',
+      // Not a native select: the component, and a word that merely starts the
+      // same way.
+      '<Select value={v} onChange={set} options={opts} />',
+      "const selected = rows.filter(Boolean);",
     ];
     for (const s of ok) expect(BANNED.some((b) => b.re.test(s)), s).toBe(false);
   });
