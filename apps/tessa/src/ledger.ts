@@ -54,6 +54,14 @@ export interface EventInput {
   toLocationId?: string | null;
   caseId?: string | null;
   cycleId?: string | null;
+  /**
+   * Only meaningful for `released` on a pack: the date printed on its label.
+   *
+   * Passed IN rather than derived here because it comes from the pack's recipe,
+   * and this module deliberately knows nothing about recipes. See the release
+   * route for why a pack's expiry is materialised while a lot's is not.
+   */
+  expiresAt?: string | null;
   note?: string | null;
   meta?: Record<string, unknown> | null;
 }
@@ -177,6 +185,53 @@ function projection(
 
   if (input.event === "cleaned" && kind === "unit") set("status", "clean", row.status);
 
+  // Into the machine. The cycle id lands on the pack so "what was in load 47"
+  // is answerable while the load is still running, not only once it ends.
+  if (input.event === "loaded" && kind === "pack") {
+    set("status", "in_cycle", row.status);
+    set("cycle_id", input.cycleId ?? null, null);
+  }
+
+  // Out of the machine, evidence not yet signed for. `awaiting_release` and
+  // `sterile` are different states because the gap between them is where a
+  // qualified person looks at the indicators — see @tessa/domain's releaseCheck.
+  if (input.event === "sterilised" && kind === "pack") {
+    set("status", "awaiting_release", row.status);
+    set("sterilised_at", at, null);
+  }
+
+  /**
+   * FREIGABE. The pack becomes usable and gets the date that will be printed on
+   * its label.
+   *
+   * `released_by` is the named person, never a system actor: TESSA.md Rule 2 and
+   * §2.2. The app records that somebody released this load; it does not release
+   * it.
+   */
+  if (input.event === "released" && kind === "pack") {
+    set("status", "sterile", row.status);
+    set("released_at", at, null);
+    set("released_by", input.actorUserId, null);
+    set("expiry", input.expiresAt ?? null, null);
+  }
+
+  /**
+   * A quarantine lifted — and never into a READY state.
+   *
+   * A tray from a failed load goes back to `packed` so it must be reprocessed,
+   * an instrument to `dirty`, a lot to `active`. Clearing straight back to
+   * `sterile` would put a failed load on a shelf with one click, which is the
+   * accident the quarantine existed to prevent.
+   *
+   * `quarantine_reason` is deliberately LEFT IN PLACE. "This was quarantined for
+   * cycle 47" is history worth keeping after the freeze is lifted, and keeping
+   * it also happens to make this projection exactly undoable, which is what lets
+   * a recall clear many packs in one act.
+   */
+  if (input.event === "cleared") {
+    set("status", kind === "pack" ? "packed" : kind === "unit" ? "dirty" : "active", row.status);
+  }
+
   if (input.event === "opened") {
     if (kind === "lot") {
       /**
@@ -271,7 +326,9 @@ async function prepare(db: D1Database, input: EventInput, at: string): Promise<P
   // Frozen is reversible and therefore a different refusal — except for the
   // events that exist to resolve it. Quarantining twice is harmless; moving a
   // quarantined pack onto a shelf is the thing being prevented.
-  if (isFrozen(row.status) && input.event !== "quarantined") return { ok: false, reason: "frozen" };
+  if (isFrozen(row.status) && input.event !== "quarantined" && input.event !== "cleared") {
+    return { ok: false, reason: "frozen" };
+  }
 
   let nextQty: number | null = null;
   if (spec.quantity !== "none") {
@@ -356,7 +413,17 @@ export async function applyEvent(db: D1Database, input: EventInput): Promise<Eve
  * claim that its projection is exactly undoable, and `projection` returning a
  * null `revert` is the backstop that catches the claim being wrong.
  */
-const PLURAL_SAFE: ReadonlySet<EventName> = new Set(["packed", "returned", "opened", "quarantined", "issued", "sterilised", "released"]);
+const PLURAL_SAFE: ReadonlySet<EventName> = new Set([
+  "packed",
+  "returned",
+  "opened",
+  "quarantined",
+  "cleared",
+  "issued",
+  "loaded",
+  "sterilised",
+  "released",
+]);
 
 export type PluralOutcome =
   | { ok: true; ledgerIds: string[] }

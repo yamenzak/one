@@ -405,6 +405,20 @@ editing it.
   state change in a single `db.batch()`, guards the state update with a
   compare-and-set, and refuses rather than clamps. Tessa's equivalent of Kova's
   `requireClientAccess` — the value is entirely in it never being bypassed.
+- **The sterilisation loop and the RECALL** (`apps/tessa/src/cycle-routes.ts`,
+  `packages/tessa-domain/src/sterilisation.ts`). A load runs, ends with its two
+  fast indicators recorded, and is RELEASED by a named person — `ended` and
+  `released` are separate states because the gap between them is where a
+  qualified person weighs the evidence, and collapsing them would make the
+  autoclave the releaser. The biological indicator arrives a day or two later,
+  and when it fails on a load already released, the recall freezes every tray it
+  can still reach and NAMES the ones it cannot: the opened ones, with the case
+  reference the clinic typed. That second list is the point — a report showing
+  only what it froze would read as a finished job. `releaseCheck` reports what
+  the evidence permits and never releases anything; a second biological reading
+  that disagrees with the first is REFUSED rather than applied, because
+  overwriting it rewrites the evidence a release was justified by. A quarantine
+  can be lifted, always into "needs work" and never into "ready".
 - **The stock routes** (`apps/tessa/src/stock-routes.ts`) — locations, the
   two-scan receive, move/use/discard/quarantine/open, the shelf read and one
   lot's history. The receive takes product, expiry and lot code from a real GS1
@@ -412,11 +426,21 @@ editing it.
   everything it *did* read, so the next screen is a pre-filled confirmation
   rather than a blank form. The shelf computes `effectiveExpiry` per row and
   returns the winning clock alongside the date.
-- 40 app tests (12 conformance, 6 integration, 13 ledger, 9 stock) + 63 in
-  `@tessa/domain`.
+- **The CSSD loop** (`apps/tessa/src/pack-routes.ts`): instruments, pack recipes,
+  tray build, and the open transition that returns every member to the DIRTY
+  pool. Building a tray goes through `applyEvents`, the plural chokepoint — one
+  act over N+1 rows, all of it or none of it, with an unwind when a member loses
+  its compare-and-set.
+- 72 app tests (12 conformance, 6 integration, 17 ledger, 9 stock, 13 packs,
+  15 cycles) + 78 in `@tessa/domain`. The recall's three load-bearing
+  behaviours — unreachable packs named rather than dropped, a contradicting
+  indicator refused, a cleared quarantine landing in `packed` — are verified by
+  mutation, not assumed.
 
-**Not built:** units, packs, cycles and cases exist as tables with no routes over
-them. There is no SPA.
+**Not built:** cases have a table and are referenced by an opened pack, but there
+are no case routes: no open-a-case, no close, no per-case picking list. Label
+PRINTING does not exist (§7.4). There is no SPA at all — every surface above is
+an API.
 
-Next: the sterilisation cycle, which is where the recall query finally becomes
-real.
+Next: cases as a first-class surface (open → scan into → close), which is what
+turns the trace into the two-way one §1.1 describes.
