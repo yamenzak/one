@@ -11,7 +11,7 @@
  * managed from an optional nested drawer once the exercise exists.
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Globe, PencilLine, ArrowLeft, ArrowRight, Search, Plus, Trash2, Check, toneSoft, cn, type Tone, SPRING_SNAP} from "@4dl/ui";
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@kova/protocol";
@@ -339,11 +339,30 @@ function AlternativesSheet({ exerciseId, exerciseName, onClose }: { exerciseId: 
   const [alts, setAlts] = useState<ExerciseInfo[] | null>(null);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<ExerciseInfo[]>([]);
-  const load = async () => setAlts((await api.get<{ alternatives: ExerciseInfo[] }>(`/api/exercises/${exerciseId}/alternatives`)).alternatives);
-  const search = async (v: string) => { setQ(v); if (v.trim().length < 2) { setResults([]); return; } setResults((await api.get<{ exercises: ExerciseInfo[] }>(`/api/exercises?q=${encodeURIComponent(v)}`)).exercises.filter((e) => e.id !== exerciseId)); };
-  const add = async (id: string) => { await api.post(`/api/exercises/${exerciseId}/alternatives`, { exerciseId: id }); setQ(""); setResults([]); await load(); };
-  const remove = async (id: string) => { await api.del(`/api/exercises/${exerciseId}/alternatives/${id}`); await load(); };
-  if (alts === null) void load();
+  const load = useCallback(async () => setAlts((await api.get<{ alternatives: ExerciseInfo[] }>(`/api/exercises/${exerciseId}/alternatives`)).alternatives), [exerciseId]);
+  /**
+   * Browse, don't interrogate.
+   *
+   * This used to require two typed characters before it fetched anything, so
+   * opening "Manage alternatives" showed an EMPTY list under a search box — and
+   * a coach with a full library reasonably read that as "my exercises aren't
+   * showing". `GET /api/exercises` with no `q` already returns the studio's
+   * library plus the platform seed, so the empty query is the useful one.
+   */
+  const search = useCallback(async (v: string) => {
+    const qs = v.trim() ? `?q=${encodeURIComponent(v.trim())}` : "";
+    setResults((await api.get<{ exercises: ExerciseInfo[] }>(`/api/exercises${qs}`)).exercises.filter((e) => e.id !== exerciseId));
+  }, [exerciseId]);
+  const onQuery = (v: string) => { setQ(v); void search(v); };
+  const add = async (id: string) => { await api.post(`/api/exercises/${exerciseId}/alternatives`, { exerciseId: id }); setQ(""); await load(); await search(""); };
+  const remove = async (id: string) => { await api.del(`/api/exercises/${exerciseId}/alternatives/${id}`); await load(); await search(""); };
+  /**
+   * `void load()` used to sit in the RENDER BODY, guarded by `alts === null`.
+   * A fetch during render is not just a style violation: every render while the
+   * request was in flight fired another one, so opening the sheet issued a burst
+   * of identical requests and the component re-rendered against each reply.
+   */
+  useEffect(() => { void load(); void search(""); }, [load, search]);
   const altIds = new Set((alts ?? []).map((a) => a.id));
   return (
     <Sheet open onClose={onClose} title={`Alternatives · ${exerciseName}`}>
@@ -359,7 +378,7 @@ function AlternativesSheet({ exerciseId, exerciseName, onClose }: { exerciseId: 
           ))}</div>
         )}
         <div className="border-t border-border/50 pt-3">
-          <Field label="Add an alternative" icon={Search} value={q} onChange={(e) => void search(e.target.value)} />
+          <Field label="Add an alternative" icon={Search} value={q} onChange={(e) => onQuery(e.target.value)} placeholder="Search your library" />
           <div className="mt-1 max-h-56 space-y-1 overflow-y-auto">
             {results.filter((e) => !altIds.has(e.id)).map((e) => (
               <button key={e.id} onClick={() => void add(e.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-secondary">
