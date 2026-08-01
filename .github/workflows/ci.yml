@@ -32,9 +32,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Build the SPA first: the api worker's assets dir is apps/app/dist, and
-      # the Miniflare integration suite reports "no tests" without it.
+      # Build BOTH SPAs. Each worker serves its app through an `assets`
+      # binding, and the Miniflare integration suites report "no tests" — a
+      # PASS-shaped result — when the directory is missing. Kova's has been here
+      # since it was written; Tessa's absence is what turned the merge that
+      # added `apps/tessa-app` red, because turbo cannot infer the dependency: an
+      # `assets.directory` is a filesystem path, not a package dependency, so
+      # nothing in the graph connects @4dl/tessa's tests to @tessa/app's build.
       - run: pnpm --filter @kova/app build
+      - run: pnpm --filter @tessa/app build
 
       - run: pnpm turbo run typecheck test
 
@@ -78,4 +84,32 @@ jobs:
           path: |
             apps/e2e/playwright-report/
             apps/e2e/test-results/
+          retention-days: 7
+
+  # Tessa's golden paths — the recall in both directions, and the scan-first
+  # path. Separate from Kova's job rather than appended to it: they boot
+  # different workers on different ports (8788 vs 8787) and a shared job would
+  # make "which product is broken" a question you answer by reading a log.
+  tessa-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tessa/e2e exec playwright install --with-deps chromium
+      # The worker serves the built SPA, so it has to exist before the suite
+      # boots it — same reason as the validate job above.
+      - run: pnpm --filter @tessa/app build
+      - run: pnpm --filter @tessa/e2e e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tessa-e2e-report
+          path: |
+            apps/tessa-e2e/playwright-report/
+            apps/tessa-e2e/test-results/
           retention-days: 7

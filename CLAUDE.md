@@ -124,7 +124,12 @@ packages/
 - `pnpm typecheck` / `pnpm test` — across the workspace
 - `pnpm --filter @kova/api test` — the Miniflare integration suite. **Build the
   SPA first** (`pnpm --filter @kova/app build`) — the worker's `assets` dir is
-  `apps/app/dist`, and Miniflare aborts (reporting "no tests") without it. The
+  `apps/app/dist`, and Miniflare aborts (reporting "no tests") without it.
+  ⚠️ **The same is true of `@4dl/tessa` and `@tessa/app`**, and turbo cannot
+  infer either: an `assets.directory` is a filesystem path, not a package
+  dependency, so nothing in the graph connects a worker's tests to its app's
+  build. Both CI workflows build both SPAs explicitly for exactly this reason —
+  forgetting Tessa's is what turned the merge that added `apps/tessa-app` red. The
   root `pnpm test` handles this automatically (turbo builds the app first).
   ⚠️ Under a *parallel* root `pnpm test` this suite can fail with
   `Isolated storage failed` — Miniflare storage contention with the sibling

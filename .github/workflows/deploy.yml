@@ -42,9 +42,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Build the SPA first — the api worker serves apps/app/dist, and the
-      # integration tests need it present for the assets binding.
+      # Build BOTH SPAs. Each worker serves its app through an `assets`
+      # binding, and the Miniflare integration suites report "no tests" — a
+      # PASS-shaped result — when the directory is missing. Kova's has been here
+      # since it was written; Tessa's absence is what turned the merge that
+      # added `apps/tessa-app` red, because turbo cannot infer the dependency: an
+      # `assets.directory` is a filesystem path, not a package dependency, so
+      # nothing in the graph connects @4dl/tessa's tests to @tessa/app's build.
       - run: pnpm --filter @kova/app build
+      - run: pnpm --filter @tessa/app build
 
       - run: pnpm turbo run typecheck test
 
@@ -69,3 +75,18 @@ jobs:
           workingDirectory: apps/www
           command: deploy
           preCommands: node build.mjs
+
+      # ── TESSA IS DELIBERATELY NOT DEPLOYED HERE ─────────────────────────
+      #
+      # Its tests and typecheck run above (they are part of `turbo run`), and
+      # its SPA is built above, so this workflow fully GATES Tessa. What it does
+      # not do is ship it, because it cannot yet: every resource id in
+      # `apps/tessa/wrangler.jsonc` is still a placeholder
+      # (`…cafe`, `…00d1`) so that `wrangler dev` works with no Cloudflare
+      # account at all.
+      #
+      # Adding the deploy step before those are real would not fail loudly —
+      # wrangler would bind or create *something* against ids that mean nothing
+      # — which is a worse outcome than not deploying. Add the step in the same
+      # commit that replaces the ids; `apps/tessa/DEPLOY.md` §0.1 is the
+      # checklist.
