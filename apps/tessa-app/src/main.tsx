@@ -27,9 +27,11 @@ import { Screen, Spinner } from "@4dl/ui";
 import { ErrorBoundary, ThemeProvider } from "@4dl/app-kit";
 import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
+import { I18nProvider } from "./i18n.js";
 import { Shell } from "./Shell.js";
 import { Login } from "./screens/Login.js";
 import { NoStudio, RootSignpost, Start, WrongDoor } from "./screens/Doors.js";
+import { Labels } from "./screens/Labels.js";
 import { Recall } from "./screens/Recall.js";
 
 export type ScreenName = "boot" | "login" | "signpost" | "nostudio" | "wrongdoor" | "start" | "shell";
@@ -96,6 +98,9 @@ function App() {
   return (
     <Routes location={location}>
       <Route path="/recall/:cycleId" element={<Recall />} />
+      {/* Also a route rather than a sheet: printing is a full-page act, and the
+          print stylesheet needs the sheet to be the whole document. */}
+      <Route path="/labels" element={<Labels />} />
       <Route path="*" element={<Shell />} />
     </Routes>
   );
@@ -107,9 +112,15 @@ createRoot(document.getElementById("root")!).render(
       <BrowserRouter>
         <SessionProvider>
           <ThemeProvider branding={null}>
-            <ErrorBoundary>
-              <App />
-            </ErrorBoundary>
+            {/* Inside the session so a future per-centre default locale can read
+                it, and outside the app so every screen has `t` from first paint
+                — a screen that renders once in English and then swaps is worse
+                than one that waits. */}
+            <I18nProvider>
+              <ErrorBoundary>
+                <App />
+              </ErrorBoundary>
+            </I18nProvider>
           </ThemeProvider>
         </SessionProvider>
       </BrowserRouter>

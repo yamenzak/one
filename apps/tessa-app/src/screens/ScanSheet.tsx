@@ -28,6 +28,7 @@ import { parseGs1 } from "@tessa/domain";
 import { Archive, Button, Callout, CircleAlert, Field, Group, ListChecks, RotateCcw, Row, ScanLine, Sheet, Spinner } from "@4dl/ui";
 import { makeDebouncer, startScan, type ScanError } from "../scan.js";
 import { cssd, stock, type Instrument, type Pack } from "../data.js";
+import { useT } from "../i18n.js";
 import { ReceiveSheet } from "./ReceiveSheet.js";
 
 type Found =
@@ -36,15 +37,9 @@ type Found =
   | { kind: "instrument"; instrument: Instrument }
   | { kind: "unknown"; raw: string };
 
-const CAMERA_TEXT: Record<ScanError, string> = {
-  denied: "Camera access was refused. Type or scan the code below instead.",
-  no_camera: "No camera here — type or scan the code below.",
-  unavailable: "This browser can't read barcodes. Type or scan the code below.",
-  timeout: "The camera didn't start. Type or scan the code below.",
-};
-
 export function ScanSheet({ onClose }: { onClose: () => void }) {
   const nav = useNavigate();
+  const t = useT();
   /**
    * A callback ref held in STATE, not a `useRef`.
    *
@@ -139,7 +134,7 @@ export function ScanSheet({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Sheet open onClose={onClose} title={found ? "What is it" : "Scan"} size="tall">
+    <Sheet open onClose={onClose} title={found ? t("scan.found") : t("scan.title")} size="tall">
       {!found && (
         <div className="space-y-4">
           <div className="relative overflow-hidden rounded-2xl bg-surface-2">
@@ -152,7 +147,7 @@ export function ScanSheet({ onClose }: { onClose: () => void }) {
               <div className="absolute inset-0 grid place-items-center bg-surface-2 p-6 text-center">
                 <div className="space-y-2">
                   <Spinner />
-                  <p className="text-caption text-muted-foreground">Starting the camera…</p>
+                  <p className="text-caption text-muted-foreground">{t("scan.starting")}</p>
                 </div>
               </div>
             )}
@@ -160,7 +155,7 @@ export function ScanSheet({ onClose }: { onClose: () => void }) {
               <div className="absolute inset-0 grid place-items-center bg-surface-2 p-6 text-center">
                 <div className="space-y-2">
                   <CircleAlert aria-hidden className="mx-auto size-6 text-muted-foreground" />
-                  <p className="text-caption text-muted-foreground">{CAMERA_TEXT[camera]}</p>
+                  <p className="text-caption text-muted-foreground">{t(`scan.camera.${camera}`)}</p>
                 </div>
               </div>
             )}
@@ -175,15 +170,15 @@ export function ScanSheet({ onClose }: { onClose: () => void }) {
             className="space-y-3"
           >
             <Field
-              label="Or type the code"
+              label={t("scan.typeCode")}
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
-              placeholder="Scan with a handheld, or type it"
+              placeholder={t("scan.typePlaceholder")}
               autoFocus
               /* A hand-held scanner "types" then presses Enter — the form submit
                  is what makes that hardware work with no configuration at all. */
             />
-            <Button type="submit" className="w-full" disabled={!typed.trim()}>Find it</Button>
+            <Button type="submit" className="w-full" disabled={!typed.trim()}>{t("scan.find")}</Button>
           </form>
         </div>
       )}
@@ -192,7 +187,7 @@ export function ScanSheet({ onClose }: { onClose: () => void }) {
         <div className="space-y-4">
           <Callout tone="primary" icon={Archive}>
             <div className="space-y-1">
-              <div>A product barcode.</div>
+              <div>{t("scan.product")}</div>
               {/* Everything the scan gave us, shown before any action — the
                   person can see the app read the same thing they did. */}
               <div className="text-caption text-muted-foreground">
@@ -203,11 +198,11 @@ export function ScanSheet({ onClose }: { onClose: () => void }) {
             </div>
           </Callout>
           <Group>
-            <Row icon={Archive} sub="Add stock to a location" onClick={() => setReceiving({ barcode: found.barcode })}>
-              Receive
+            <Row icon={Archive} sub={t("scan.receive.sub")} onClick={() => setReceiving({ barcode: found.barcode })}>
+              {t("scan.receive")}
             </Row>
-            <Row icon={ScanLine} sub="Find it on the shelf" divider={false} onClick={() => { onClose(); nav("/stock"); }}>
-              Look it up
+            <Row icon={ScanLine} sub={t("scan.lookUp.sub")} divider={false} onClick={() => { onClose(); nav("/stock"); }}>
+              {t("scan.lookUp")}
             </Row>
           </Group>
         </div>
@@ -216,12 +211,12 @@ export function ScanSheet({ onClose }: { onClose: () => void }) {
       {found?.kind === "pack" && (
         <div className="space-y-4">
           <Callout tone="primary" icon={ListChecks}>
-            <div>{found.pack.recipe_name ?? "Tray"} — {found.pack.label_code}</div>
+            <div>{found.pack.recipe_name ?? t("cssd.tray")} — {found.pack.label_code}</div>
             <div className="text-caption text-muted-foreground">{found.pack.status.replace(/_/g, " ")}</div>
           </Callout>
           <Group>
-            <Row icon={ListChecks} sub="Go to the tray" divider={false} onClick={() => { onClose(); nav(`/cssd/tray/${found.pack.id}`); }}>
-              Open the tray record
+            <Row icon={ListChecks} sub={t("scan.goToTray")} divider={false} onClick={() => { onClose(); nav(`/cssd/tray/${found.pack.id}`); }}>
+              {t("scan.openTray")}
             </Row>
           </Group>
         </div>
@@ -230,14 +225,14 @@ export function ScanSheet({ onClose }: { onClose: () => void }) {
       {found?.kind === "instrument" && (
         <div className="space-y-4">
           <Callout tone="primary" icon={RotateCcw}>
-            <div>{found.instrument.item_name ?? "Instrument"} — {found.instrument.label_code}</div>
+            <div>{found.instrument.item_name ?? t("labels.instruments")} — {found.instrument.label_code}</div>
             <div className="text-caption text-muted-foreground">
-              {found.instrument.status} · {found.instrument.cycle_count} cycles
+              {found.instrument.status} · {t("common.cycles", { count: found.instrument.cycle_count })}
             </div>
           </Callout>
           <Group>
-            <Row icon={RotateCcw} sub="Go to the instrument" divider={false} onClick={() => { onClose(); nav("/cssd"); }}>
-              Open the instrument record
+            <Row icon={RotateCcw} sub={t("scan.goToInstrument")} divider={false} onClick={() => { onClose(); nav("/cssd"); }}>
+              {t("scan.openInstrument")}
             </Row>
           </Group>
         </div>
@@ -246,7 +241,7 @@ export function ScanSheet({ onClose }: { onClose: () => void }) {
       {found?.kind === "unknown" && (
         <Callout tone="warning">
           <div className="space-y-2">
-            <div>Nothing here answers to that code.</div>
+            <div>{t("scan.unknown")}</div>
             <div className="break-all text-caption text-muted-foreground">{found.raw}</div>
           </div>
         </Callout>
@@ -254,7 +249,7 @@ export function ScanSheet({ onClose }: { onClose: () => void }) {
 
       {found && (
         <Button variant="ghost" className="mt-4 w-full" onClick={() => setFound(null)}>
-          Scan something else
+          {t("scan.again")}
         </Button>
       )}
     </Sheet>

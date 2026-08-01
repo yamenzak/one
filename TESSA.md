@@ -456,19 +456,40 @@ editing it.
   not; the typed field beside it is not a fallback but the path a hand-held USB
   scanner takes, since those present as a keyboard.
 
-**Not built:** label PRINTING does not exist (§7.4), so a pack's label code is
-typed rather than produced. No AI surfaces — the vision paths of §5 Phase 4 are
-untouched, and Rule 3's `suggested_*` shape has nothing writing into it. No par
-levels, no expiry sweep, no reorder. **No German** (§2.4 / §7.2) — every string
-is English and hard-coded. No offline lane (Phase 3): the app has no service
+- **German** (§2.4 answered). `@4dl/i18n` is the platform's answer — typed
+  dictionaries, one plural rule, a locale from the browser the person can
+  override — and Tessa ships `en` + `de`. `Freigabe` and `Charge` are used as
+  the regulatory terms of art rather than translated literally.
+  `i18n.conformance.test.ts` makes an untranslated string a test failure, not a
+  discovery. ⚠️ The German is an engineer's, reviewed for meaning and NOT
+  certified; a native CSSD reader should see it before a customer does.
+- **Label printing** (§7.4 closed). A pure Code 128 B encoder in
+  `@tessa/domain`, checksum pinned against a published vector, rendered as SVG
+  onto a print sheet sized in millimetres. Code 128 rather than DataMatrix
+  because these labels only ever carry Tessa's own short ASCII identifiers, and
+  the app's scanner already accepts the format — so a label it prints is read by
+  the same camera that reads the manufacturer's box.
+- **E2E** (`apps/tessa-e2e`, `pnpm e2e`): 6 Playwright specs on port 8788,
+  covering the recall in both directions and the scan-first path. Verified by
+  mutation — reverting the `isPersonal` fix or dropping the unreachable tray each
+  fails a spec.
+
+**Not built:** no AI surfaces — the vision paths of §5 Phase 4 are untouched, and
+Rule 3's `suggested_*` shape has nothing writing into it. No par levels, no
+expiry sweep, no reorder. No offline lane (Phase 3): the app has no service
 worker, deliberately, because caching a shell before the offline WRITE path
-exists would fail every mutation the moment it was used without signal.
+exists would fail every mutation the moment it was used without signal. **No
+billing** — Tessa has no Stripe rail at all; every centre sits on the default
+entitlements (see `apps/tessa/DEPLOY.md` §4).
 
-**The app has NO automated test beyond a Tailwind conformance check.** It was
-driven end to end in a real browser — sign in, create a centre, all four tabs,
-the scan sheet, a GS1 element string parsed through the UI — and three bugs that
-only a browser could find were fixed there. That is not the same as coverage. A
-Playwright golden path is the next thing this needs.
+**Two honest gaps in the translation.** `@4dl/ui`'s own strings — "Couldn't load
+…", "Try again", the date formats — are English and are NOT covered: translating
+the design system is a separate piece of work that affects Kova too. And nothing
+yet sets a centre's DEFAULT locale; the browser decides, and a person overrides.
 
-Next: label printing, or German. Both are gating for a real German customer, and
-neither is started.
+**Never deployed.** `apps/tessa/DEPLOY.md` is written and every resource id in
+`wrangler.jsonc` is still a placeholder. Data residency (§7.1) is unanswered and
+is the one open item that could change the architecture rather than the config.
+
+Next: a native reader over the German, then either the AI vision surfaces or the
+offline lane.

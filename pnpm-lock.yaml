@@ -303,6 +303,9 @@ importers:
       '@4dl/app-kit':
         specifier: workspace:*
         version: link:../../packages/app-kit
+      '@4dl/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@4dl/tenancy':
         specifier: workspace:*
         version: link:../../packages/tenancy
@@ -361,6 +364,18 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)
+
+  apps/tessa-e2e:
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.56.1
+        version: 1.56.1
+      '@types/node':
+        specifier: ^22.20.1
+        version: 22.20.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   apps/www:
     devDependencies:
@@ -577,6 +592,21 @@ importers:
       '@cloudflare/workers-types':
         specifier: ^4.20251001.0
         version: 4.20260702.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)
+
+  packages/i18n:
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.17
+      react:
+        specifier: ^19.2.0
+        version: 19.2.7
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

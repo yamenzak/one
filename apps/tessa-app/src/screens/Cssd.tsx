@@ -23,21 +23,10 @@
 
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Badge, Button, Callout, CircleCheck, ConfirmDialog, Group, ListChecks, LoadError, Play, RotateCcw, Row, Screen, Section, SegmentedControl, Sheet, Skeleton, Timer, useAction, useLoad } from "@4dl/ui";
-import { cssd, expiryText, expiryTone, fmt, type Cycle, type Pack } from "../data.js";
+import { AlertTriangle, Badge, Button, Callout, CircleCheck, ConfirmDialog, Group, ListChecks, LoadError, Play, RotateCcw, Row, Screen, Section, SegmentedControl, Sheet, Skeleton, Tag, Timer, useAction, useLoad } from "@4dl/ui";
+import { cssd, expiryTone, fmt, type Cycle, type Pack } from "../data.js";
+import { useExpiryText, useT } from "../i18n.js";
 import { useCan } from "../session.js";
-
-/** The refusal codes `releaseCheck` can return, as sentences. Mirrors the
- *  server's own copy — see `BLOCK_TEXT` in cycle-routes.ts. */
-const BLOCK_TEXT: Record<string, string> = {
-  not_ended: "This load hasn't finished yet.",
-  already_released: "Already released.",
-  cycle_failed: "This load failed and can't be released.",
-  missing_physical: "Record the machine's printout first.",
-  missing_chemical: "Record the chemical indicator first.",
-  indicator_failed: "An indicator failed — this load can't be released.",
-  biological_pending: "Waiting on the biological indicator.",
-};
 
 const STATUS_TONE: Record<string, "success" | "warning" | "danger" | "neutral" | "primary"> = {
   running: "primary",
@@ -47,16 +36,18 @@ const STATUS_TONE: Record<string, "success" | "warning" | "danger" | "neutral" |
 };
 
 export function Cssd() {
+  const t = useT();
   const [view, setView] = useState<"trays" | "loads">("trays");
+  const nav = useNavigate();
   return (
     <Screen>
-      <Section>
+      <Section action={<Button size="sm" variant="secondary" onClick={() => nav("/labels")}><Tag className="size-4" /> {t("cssd.labels")}</Button>}>
         <SegmentedControl
           value={view}
           onChange={setView}
           options={[
-            { value: "trays", label: "Trays" },
-            { value: "loads", label: "Loads" },
+            { value: "trays", label: t("cssd.trays") },
+            { value: "loads", label: t("cssd.loads") },
           ]}
         />
       </Section>
@@ -66,6 +57,8 @@ export function Cssd() {
 }
 
 function Trays() {
+  const t = useT();
+  const expiryText = useExpiryText();
   const load = useCallback(() => cssd.packs(), []);
   const { data, error, loading, reload } = useLoad(load, "trays", fmt);
   const [selected, setSelected] = useState<Pack | null>(null);
@@ -75,16 +68,16 @@ function Trays() {
 
   return (
     <>
-      <Section title="Trays">
+      <Section title={t("cssd.trays")}>
         {data.packs.length === 0 ? (
-          <Callout tone="neutral" icon={ListChecks}>No trays built yet.</Callout>
+          <Callout tone="neutral" icon={ListChecks}>{t("cssd.trays.empty")}</Callout>
         ) : (
           <Group>
             {data.packs.map((p, i) => (
               <Row
                 key={p.id}
                 icon={ListChecks}
-                sub={p.recipe_name ?? "Tray"}
+                sub={p.recipe_name ?? t("cssd.tray")}
                 value={<Badge tone={p.status === "sterile" ? "success" : p.status === "quarantined" ? "danger" : "neutral"}>{p.status.replace(/_/g, " ")}</Badge>}
                 valueSub={p.expiry ? expiryText(p) : undefined}
                 onClick={() => setSelected(p)}
@@ -103,6 +96,8 @@ function Trays() {
 }
 
 function TraySheet({ pack, onClose, onChanged }: { pack: Pack; onClose: () => void; onChanged: () => void }) {
+  const t = useT();
+  const expiryText = useExpiryText();
   const act = useAction(fmt);
   const can = useCan();
   const [confirmExpired, setConfirmExpired] = useState(false);
@@ -118,7 +113,7 @@ function TraySheet({ pack, onClose, onChanged }: { pack: Pack; onClose: () => vo
     <Sheet open onClose={onClose} title={pack.label_code}>
       <div className="space-y-4">
         <Callout tone={pack.expiry ? expiryTone(pack.expiryStatus) : "neutral"}>
-          <div>{pack.recipe_name ?? "Tray"} — {pack.status.replace(/_/g, " ")}</div>
+          <div>{pack.recipe_name ?? t("cssd.tray")} — {pack.status.replace(/_/g, " ")}</div>
           {pack.expiry && <div className="text-caption text-muted-foreground">{expiryText(pack)}</div>}
         </Callout>
 
@@ -129,22 +124,16 @@ function TraySheet({ pack, onClose, onChanged }: { pack: Pack; onClose: () => vo
          * impossible to do by accident, and the server records that it was
          * opened knowingly.
          */}
-        {expired && <Callout tone="danger" icon={AlertTriangle}>This tray is past its date.</Callout>}
+        {expired && <Callout tone="danger" icon={AlertTriangle}>{t("cssd.trayExpired")}</Callout>}
 
         {pack.status === "sterile" && can("pack", "open") && (
           <Button className="w-full" onClick={() => (expired ? setConfirmExpired(true) : open())} disabled={act.busy !== null}>
-            Open this tray
+            {t("cssd.openTray")}
           </Button>
         )}
         {pack.status !== "sterile" && (
           <Callout tone="neutral">
-            {pack.status === "awaiting_release"
-              ? "This tray is out of the machine but hasn't been released yet."
-              : pack.status === "in_cycle"
-                ? "This tray is in a machine."
-                : pack.status === "quarantined"
-                  ? "This tray is quarantined."
-                  : "This tray hasn't been sterilised yet."}
+{t(`cssd.state.${pack.status === "awaiting_release" || pack.status === "in_cycle" || pack.status === "quarantined" ? pack.status : "packed"}`)}
           </Callout>
         )}
 
@@ -154,9 +143,9 @@ function TraySheet({ pack, onClose, onChanged }: { pack: Pack; onClose: () => vo
       <ConfirmDialog
         open={confirmExpired}
         onOpenChange={setConfirmExpired}
-        title="Open a tray that's past its date?"
-        description="Tessa will record that it was opened knowingly, with your name and the time."
-        confirmLabel="Open it anyway"
+        title={t("cssd.confirmExpired.title")}
+        description={t("cssd.confirmExpired.body")}
+        confirmLabel={t("cssd.confirmExpired.ok")}
         destructive
         onConfirm={open}
       />
@@ -165,6 +154,7 @@ function TraySheet({ pack, onClose, onChanged }: { pack: Pack; onClose: () => vo
 }
 
 function Loads() {
+  const t = useT();
   const load = useCallback(() => cssd.cycles(), []);
   const { data, error, loading, reload } = useLoad(load, "loads", fmt);
   const [selected, setSelected] = useState<Cycle | null>(null);
@@ -174,22 +164,22 @@ function Loads() {
 
   return (
     <>
-      <Section title="Loads">
+      <Section title={t("cssd.loads")}>
         {data.cycles.length === 0 ? (
-          <Callout tone="neutral" icon={RotateCcw}>No loads run yet.</Callout>
+          <Callout tone="neutral" icon={RotateCcw}>{t("cssd.loads.empty")}</Callout>
         ) : (
           <Group>
             {data.cycles.map((c, i) => (
               <Row
                 key={c.id}
                 icon={c.status === "failed" ? AlertTriangle : c.status === "released" ? CircleCheck : c.status === "running" ? Play : Timer}
-                sub={`${c.machine} · ${c.pack_count ?? 0} tray${c.pack_count === 1 ? "" : "s"}`}
+                sub={`${c.machine} · ${t("today.trays.count", { count: c.pack_count ?? 0 })}`}
                 value={<Badge tone={STATUS_TONE[c.status] ?? "neutral"}>{c.status}</Badge>}
                 onClick={() => setSelected(c)}
                 divider={i < data.cycles.length - 1}
                 tone={c.status === "failed" ? "danger" : "default"}
               >
-                Load {c.cycle_number ?? c.id.slice(-6)}
+                {t("recall.load", { load: c.cycle_number ?? c.id.slice(-6) })}
               </Row>
             ))}
           </Group>
@@ -202,6 +192,7 @@ function Loads() {
 
 function LoadSheet({ cycle, onClose, onChanged }: { cycle: Cycle; onClose: () => void; onChanged: () => void }) {
   const nav = useNavigate();
+  const t = useT();
   const act = useAction(fmt);
   const can = useCan();
   const [confirmFail, setConfirmFail] = useState(false);
@@ -211,7 +202,7 @@ function LoadSheet({ cycle, onClose, onChanged }: { cycle: Cycle; onClose: () =>
   const released = cycle.status === "released";
 
   return (
-    <Sheet open onClose={onClose} title={`Load ${cycle.cycle_number ?? cycle.id.slice(-6)}`} size="tall">
+    <Sheet open onClose={onClose} title={t("recall.load", { load: cycle.cycle_number ?? cycle.id.slice(-6) })} size="tall">
       <div className="space-y-4">
         <Callout tone={STATUS_TONE[cycle.status] ?? "neutral"}>
           <div>{cycle.machine} — {cycle.status}</div>
@@ -224,9 +215,9 @@ function LoadSheet({ cycle, onClose, onChanged }: { cycle: Cycle; onClose: () =>
          * released on Tuesday's evidence, failed on Thursday's.
          */}
         <Group>
-          <Indicator label="Machine printout" value={cycle.physical_ok} />
-          <Indicator label="Chemical indicator" value={cycle.chemical_ok} />
-          <Indicator label="Biological indicator" value={cycle.biological_ok} divider={false} />
+          <Indicator label={t("cssd.machine.printout")} value={cycle.physical_ok} />
+          <Indicator label={t("cssd.indicator.chemical")} value={cycle.chemical_ok} />
+          <Indicator label={t("cssd.indicator.biological")} value={cycle.biological_ok} divider={false} />
         </Group>
 
         {cycle.status === "running" && can("sterilisation", "run") && (
@@ -240,31 +231,31 @@ function LoadSheet({ cycle, onClose, onChanged }: { cycle: Cycle; onClose: () =>
               disabled={!verdict?.ok || act.busy !== null || !can("sterilisation", "release")}
               onClick={() => void act.run("release", async () => { await cssd.release(cycle.id); onChanged(); })}
             >
-              Release this load
+              {t("cssd.release")}
             </Button>
             {/* The button explains itself rather than being silently grey. */}
             {verdict && !verdict.ok && (
-              <p className="px-1 text-caption text-muted-foreground">{BLOCK_TEXT[verdict.reason] ?? "This load can't be released yet."}</p>
+              <p className="px-1 text-caption text-muted-foreground">{t(`block.${verdict.reason}` as never)}</p>
             )}
             {verdict?.ok && verdict.biologicalPending && (
-              <p className="px-1 text-caption text-muted-foreground">The biological indicator is still out. Record it when it comes back.</p>
+              <p className="px-1 text-caption text-muted-foreground">{t("cssd.bioPending")}</p>
             )}
           </div>
         )}
 
         {(cycle.status === "ended" || released) && cycle.biological_ok == null && can("sterilisation", "release") && (
           <div className="space-y-2">
-            <p className="px-1 text-caption text-muted-foreground">Biological indicator result</p>
+            <p className="px-1 text-caption text-muted-foreground">{t("cssd.bioResult")}</p>
             <div className="grid grid-cols-2 gap-3">
               <Button
                 variant="secondary"
                 disabled={act.busy !== null}
                 onClick={() => void act.run("bio-pass", async () => { await cssd.biological(cycle.id, true); onChanged(); })}
               >
-                Passed
+{t("cssd.indicator.passed")}
               </Button>
               <Button variant="secondary" disabled={act.busy !== null} onClick={() => setConfirmFail(true)}>
-                Failed
+{t("cssd.indicator.failed")}
               </Button>
             </div>
           </div>
@@ -272,7 +263,7 @@ function LoadSheet({ cycle, onClose, onChanged }: { cycle: Cycle; onClose: () =>
 
         {cycle.status === "failed" && (
           <Button className="w-full" variant="secondary" onClick={() => { onClose(); nav(`/recall/${cycle.id}`); }}>
-            Open the recall report
+            {t("cssd.openReport")}
           </Button>
         )}
 
@@ -282,13 +273,11 @@ function LoadSheet({ cycle, onClose, onChanged }: { cycle: Cycle; onClose: () =>
       <ConfirmDialog
         open={confirmFail}
         onOpenChange={setConfirmFail}
-        title={released ? "Record a failed biological on a RELEASED load?" : "Record a failed biological?"}
+        title={released ? t("cssd.confirmFail.released") : t("cssd.confirmFail.title")}
         description={
-          released
-            ? "This starts a recall. Every tray from this load still on a shelf will be quarantined, and any that were already opened will be listed — Tessa cannot reach those."
-            : "This load will be marked failed and every tray in it quarantined."
+          released ? t("cssd.confirmFail.releasedBody") : t("cssd.confirmFail.body")
         }
-        confirmLabel="Record the failure"
+        confirmLabel={t("cssd.confirmFail.ok")}
         destructive
         onConfirm={() => void act.run("bio-fail", async () => { await cssd.biological(cycle.id, false); onChanged(); })}
       />
@@ -299,16 +288,17 @@ function LoadSheet({ cycle, onClose, onChanged }: { cycle: Cycle; onClose: () =>
 /** One indicator. `null` is "not read yet", which is NOT a failure — see
  *  `releaseCheck`'s missing-vs-failed distinction. */
 function Indicator({ label, value, divider = true }: { label: string; value: number | null; divider?: boolean }) {
+  const t = useT();
   return (
     <Row
       divider={divider}
       value={
         value == null ? (
-          <Badge tone="neutral">Not read</Badge>
+          <Badge tone="neutral">{t("cssd.indicator.notRead")}</Badge>
         ) : value === 1 ? (
-          <Badge tone="success">Passed</Badge>
+          <Badge tone="success">{t("cssd.indicator.passed")}</Badge>
         ) : (
-          <Badge tone="danger">Failed</Badge>
+          <Badge tone="danger">{t("cssd.indicator.failed")}</Badge>
         )
       }
     >
@@ -318,14 +308,15 @@ function Indicator({ label, value, divider = true }: { label: string; value: num
 }
 
 function EndLoad({ cycleId, onDone }: { cycleId: string; onDone: () => void }) {
+  const t = useT();
   const act = useAction(fmt);
   const [physical, setPhysical] = useState<boolean | null>(null);
   const [chemical, setChemical] = useState<boolean | null>(null);
   return (
     <div className="space-y-3">
-      <p className="px-1 text-caption text-muted-foreground">Take it out and record what you can see now.</p>
-      <YesNo label="Machine printout" value={physical} onChange={setPhysical} />
-      <YesNo label="Chemical indicator" value={chemical} onChange={setChemical} />
+      <p className="px-1 text-caption text-muted-foreground">{t("cssd.endHint")}</p>
+      <YesNo label={t("cssd.machine.printout")} value={physical} onChange={setPhysical} />
+      <YesNo label={t("cssd.indicator.chemical")} value={chemical} onChange={setChemical} />
       <Button
         className="w-full"
         disabled={physical === null || chemical === null || act.busy !== null}
@@ -336,7 +327,7 @@ function EndLoad({ cycleId, onDone }: { cycleId: string; onDone: () => void }) {
           })
         }
       >
-        End the load
+        {t("cssd.endLoad")}
       </Button>
       {act.err && <Callout tone="danger" live="alert">{act.err}</Callout>}
     </div>
@@ -344,12 +335,13 @@ function EndLoad({ cycleId, onDone }: { cycleId: string; onDone: () => void }) {
 }
 
 function YesNo({ label, value, onChange }: { label: string; value: boolean | null; onChange: (v: boolean) => void }) {
+  const t = useT();
   return (
     <div className="flex items-center justify-between gap-3 rounded-2xl bg-card px-4 py-3">
       <span className="text-body">{label}</span>
       <div className="flex gap-2">
-        <Button size="sm" variant={value === true ? "default" : "secondary"} onClick={() => onChange(true)}>Passed</Button>
-        <Button size="sm" variant={value === false ? "destructive" : "secondary"} onClick={() => onChange(false)}>Failed</Button>
+        <Button size="sm" variant={value === true ? "default" : "secondary"} onClick={() => onChange(true)}>{t("cssd.indicator.passed")}</Button>
+        <Button size="sm" variant={value === false ? "destructive" : "secondary"} onClick={() => onChange(false)}>{t("cssd.indicator.failed")}</Button>
       </div>
     </div>
   );

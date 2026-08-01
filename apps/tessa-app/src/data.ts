@@ -227,13 +227,21 @@ export const cases = {
 export const expiryTone = (s: Lot["expiryStatus"] | undefined): "success" | "warning" | "danger" | "neutral" =>
   s === "expired" ? "danger" : s === "soon" ? "warning" : s === "ok" ? "success" : "neutral";
 
-/** "in 12 days" · "expired 3 days ago" · "no expiry". Signed on purpose — see
- *  `daysUntilExpiry` in `@tessa/domain`. */
-export function expiryText(lot: { expiry: string | null; daysLeft?: number | null }): string {
-  if (!lot.expiry) return "No expiry";
+/**
+ * "12d left" · "expired 3 days ago" · "no expiry", in the reader's language.
+ *
+ * Takes `t` rather than importing it: this module is data, not React, and a
+ * hook here would make every caller a component. Signed on purpose — see
+ * `daysUntilExpiry` in `@tessa/domain`.
+ */
+export function expiryTextWith(
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  lot: { expiry: string | null; daysLeft?: number | null },
+): string {
+  if (!lot.expiry) return t("expiry.none");
   const d = lot.daysLeft;
   if (d == null) return lot.expiry;
-  if (d < 0) return `Expired ${Math.abs(d)}d ago`;
-  if (d === 0) return "Expires today";
-  return `${d}d left`;
+  if (d < 0) return t("expiry.expired", { days: Math.abs(d) });
+  if (d === 0) return t("expiry.today");
+  return t("expiry.left", { days: d });
 }

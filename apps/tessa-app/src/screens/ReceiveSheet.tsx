@@ -19,8 +19,10 @@ import { ApiError } from "@4dl/app-kit";
 import { Archive, Button, Callout, Check, Field, Label, Select, Sheet, Spinner, useAction } from "@4dl/ui";
 import { api } from "@4dl/app-kit";
 import { fmt, stock, type Location, type UnknownProduct } from "../data.js";
+import { useT } from "../i18n.js";
 
 export function ReceiveSheet({ barcode, onClose, onDone }: { barcode: string; onClose: () => void; onDone: () => void }) {
+  const t = useT();
   const [locations, setLocations] = useState<Location[] | null>(null);
   const [locationId, setLocationId] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -42,7 +44,7 @@ export function ReceiveSheet({ barcode, onClose, onDone }: { barcode: string; on
     (catalogItemId?: string) =>
       act.run("receive", async () => {
         const qty = Number(quantity);
-        if (!Number.isFinite(qty) || qty <= 0) throw new Error("How many?");
+        if (!Number.isFinite(qty) || qty <= 0) throw new Error(t("stock.howMany"));
         try {
           const r = await stock.receive({
             barcode,
@@ -70,15 +72,15 @@ export function ReceiveSheet({ barcode, onClose, onDone }: { barcode: string; on
   );
 
   if (!locations) {
-    return <Sheet open onClose={onClose} title="Receive"><div className="grid place-items-center py-10"><Spinner /></div></Sheet>;
+    return <Sheet open onClose={onClose} title={t("receive.title")}><div className="grid place-items-center py-10"><Spinner /></div></Sheet>;
   }
 
   if (done) {
     return (
-      <Sheet open onClose={onDone} title="Received" footer={<Button className="w-full" onClick={onDone}>Done</Button>}>
+      <Sheet open onClose={onDone} title={t("receive.done")} footer={<Button className="w-full" onClick={onDone}>{t("common.done")}</Button>}>
         <Callout tone="success" icon={Check}>
-          <div>{done.quantity} on the shelf.</div>
-          {done.expiry && <div className="text-caption text-muted-foreground">Expires {done.expiry}</div>}
+          <div>{t("receive.onShelf", { count: done.quantity })}</div>
+          {done.expiry && <div className="text-caption text-muted-foreground">{t("receive.expires", { date: done.expiry })}</div>}
         </Callout>
       </Sheet>
     );
@@ -88,7 +90,7 @@ export function ReceiveSheet({ barcode, onClose, onDone }: { barcode: string; on
     <Sheet
       open
       onClose={onClose}
-      title={unknown ? "New product" : "Receive"}
+      title={unknown ? t("receive.newProduct") : t("receive.title")}
       footer={
         unknown ? (
           <Button
@@ -112,11 +114,11 @@ export function ReceiveSheet({ barcode, onClose, onDone }: { barcode: string; on
               })
             }
           >
-            Add it and receive
+{t("receive.addAndReceive")}
           </Button>
         ) : (
           <Button className="w-full" disabled={!locationId || act.busy !== null} onClick={() => void receive()}>
-            {act.busy ? "Receiving…" : "Receive"}
+            {act.busy ? t("receive.receiving") : t("receive.title")}
           </Button>
         )
       }
@@ -125,7 +127,7 @@ export function ReceiveSheet({ barcode, onClose, onDone }: { barcode: string; on
         {unknown && (
           <Callout tone="warning" icon={Archive}>
             <div className="space-y-1">
-              <div>This barcode isn't in the catalog yet.</div>
+              <div>{t("receive.notInCatalog")}</div>
               <div className="text-caption text-muted-foreground">
                 {unknown.gtin && `GTIN ${unknown.gtin}`}
                 {unknown.lot && ` · lot ${unknown.lot}`}
@@ -141,22 +143,22 @@ export function ReceiveSheet({ barcode, onClose, onDone }: { barcode: string; on
         )}
 
         {unknown && (
-          <Field label="What is it called?" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Sterile gauze 10×10" autoFocus />
+          <Field label={t("receive.whatIsIt")} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t("receive.namePlaceholder")} autoFocus />
         )}
 
         <div>
-          <Label htmlFor="receive-location" className="mb-1.5 block">Where is it going?</Label>
+          <Label htmlFor="receive-location" className="mb-1.5 block">{t("receive.where")}</Label>
           <Select
             value={locationId}
             onChange={setLocationId}
             options={locations.map((l) => ({ value: l.id, label: l.name }))}
-            placeholder="Scan or pick a location"
-            aria-label="Where is it going?"
+            placeholder={t("receive.wherePlaceholder")}
+            aria-label={t("receive.where")}
           />
         </div>
 
         <Field
-          label="How many?"
+          label={t("stock.howMany")}
           type="number"
           inputMode="numeric"
           value={quantity}

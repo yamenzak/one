@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@4dl/app-kit": "workspace:*",
+    "@4dl/i18n": "workspace:*",
     "@4dl/tenancy": "workspace:*",
     "@4dl/ui": "workspace:*",
     "@fontsource/figtree": "^5.2.8",

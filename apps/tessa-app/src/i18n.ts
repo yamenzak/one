@@ -1,0 +1,493 @@
+/**
+ * TESSA IN ENGLISH AND GERMAN.
+ *
+ * German is not a nice-to-have here (TESSA.md §2.4): the first customers are
+ * German clinics, and a CSSD nurse reading "Awaiting release" is being asked to
+ * work in a second language while making a decision that has a patient at the
+ * end of it.
+ *
+ * ── Two translation notes that are not cosmetic ─────────────────────────────
+ *
+ * **Freigabe** is used for release, not a literal translation of "release". It
+ * is the regulatory term of art — the RKI/BfArM reprocessing recommendation and
+ * German CSSD practice both name it — so a nurse reading `Freigabe` knows
+ * exactly which act is meant, and reading `Freigeben` or `Veröffentlichen`
+ * would not.
+ *
+ * **Charge** is the lot. `Los` and `Partie` both exist in German and neither is
+ * what a pharmaceutical label says; `Ch.-B.` (Chargenbezeichnung) is what is
+ * actually printed on the box a person is holding.
+ *
+ * Every string the app shows lives here. The conformance test in
+ * `i18n.conformance.test.ts` keeps German complete rather than trusting that it
+ * stayed that way.
+ */
+
+import { createI18n, type Translation } from "@4dl/i18n";
+import { expiryTextWith } from "./data.js";
+import { storage } from "./session.js";
+
+/** English is the reference: it defines the key set and is the fallback. */
+export const en = {
+  // ── Doors and identity ───────────────────────────────────────────────────
+  "app.name": "Tessa",
+  "app.tagline": "Scan it, count it, prove it. Sterile-supply and consumable traceability for medical centres.",
+  "door.root.hint": "Your centre has its own address. Open the link your centre gave you.",
+  "door.none.title": "Nothing here",
+  "door.none.body": "No centre uses this address. Check the link — a mistyped subdomain looks exactly like this.",
+  "door.wrong.title": "Wrong address",
+  "door.wrong.body": "This isn't a Tessa address.",
+
+  "login.subtitle": "Sign in with your work email.",
+  "login.sent": "We sent a code to {email}.",
+  "login.email": "Email",
+  "login.continue": "Continue",
+  "login.sending": "Sending…",
+  "login.code": "Code",
+  "login.signIn": "Sign in",
+  "login.checking": "Checking…",
+  "login.otherEmail": "Use a different email",
+  "login.sendFailed": "Couldn't send a code.",
+  "login.codeFailed": "That code didn't work. Check it, or send a new one.",
+
+  "setup.title": "Set up your centre",
+  "setup.subtitle": "Two things, then you can start scanning.",
+  "setup.name": "Centre name",
+  "setup.address": "Address",
+  "setup.addressHint": "Letters, numbers and hyphens. This becomes your web address and can't be changed easily.",
+  "setup.create": "Create it",
+  "setup.creating": "Creating…",
+  "setup.failed": "Couldn't create it.",
+
+  // ── Shell ────────────────────────────────────────────────────────────────
+  "nav.today": "Today",
+  "nav.stock": "Stock",
+  "nav.cssd": "CSSD",
+  "nav.cases": "Cases",
+  "nav.scan": "Scan",
+  "shell.readOnly": "Read-only",
+  "shell.account": "Account",
+  "shell.settings": "Settings",
+  "shell.signOut": "Sign out",
+
+  // ── Today ────────────────────────────────────────────────────────────────
+  "today.scan.sub": "Receive, use, open",
+  "today.awaiting": "Awaiting release",
+  "today.awaiting.count": "{count} load|{count} loads",
+  "today.shelf": "On the shelf",
+  "today.shelf.count": "{count} lots",
+  "today.openCases": "Open cases",
+  "today.waiting": "Waiting for release",
+  "today.trays.count": "{count} tray|{count} trays",
+  "today.expiring": "Expiring",
+  "today.expiring.none": "Nothing expiring in the next month.",
+  "today.failed": "Load {load} failed",
+  "today.failed.reason": "Load {load} failed — {reason}.",
+  "today.openRecall": "Open the recall",
+
+  // ── Stock ────────────────────────────────────────────────────────────────
+  "stock.title": "On the shelf",
+  "stock.empty": "Nothing received yet. Scan a box to start.",
+  "stock.lot": "Lot {code}",
+  "stock.noLot": "No lot code",
+  "stock.howMany": "How many?",
+  "stock.use": "Use",
+  "stock.discard": "Discard",
+  "stock.markOpened": "Mark opened",
+  "stock.quarantine": "Quarantine",
+  "expiry.printed": "Printed expiry",
+  "expiry.opened": "Opened — shortened",
+  "expiry.sterile": "Sterile shelf life",
+  "expiry.none": "No expiry",
+  "expiry.expired": "Expired {days}d ago",
+  "expiry.today": "Expires today",
+  "expiry.left": "{days}d left",
+
+  // ── Scanning ─────────────────────────────────────────────────────────────
+  "scan.title": "Scan",
+  "scan.found": "What is it",
+  "scan.starting": "Starting the camera…",
+  "scan.typeCode": "Or type the code",
+  "scan.typePlaceholder": "Scan with a handheld, or type it",
+  "scan.find": "Find it",
+  "scan.again": "Scan something else",
+  "scan.camera.denied": "Camera access was refused. Type or scan the code below instead.",
+  "scan.camera.no_camera": "No camera here — type or scan the code below.",
+  "scan.camera.unavailable": "This browser can't read barcodes. Type or scan the code below.",
+  "scan.camera.timeout": "The camera didn't start. Type or scan the code below.",
+  "scan.product": "A product barcode.",
+  "scan.receive": "Receive",
+  "scan.receive.sub": "Add stock to a location",
+  "scan.lookUp": "Look it up",
+  "scan.lookUp.sub": "Find it on the shelf",
+  "scan.openTray": "Open the tray record",
+  "scan.goToTray": "Go to the tray",
+  "scan.openInstrument": "Open the instrument record",
+  "scan.goToInstrument": "Go to the instrument",
+  "scan.unknown": "Nothing here answers to that code.",
+
+  // ── Receiving ────────────────────────────────────────────────────────────
+  "receive.title": "Receive",
+  "receive.newProduct": "New product",
+  "receive.notInCatalog": "This barcode isn't in the catalog yet.",
+  "receive.whatIsIt": "What is it called?",
+  "receive.namePlaceholder": "Sterile gauze 10×10",
+  "receive.where": "Where is it going?",
+  "receive.wherePlaceholder": "Scan or pick a location",
+  "receive.addAndReceive": "Add it and receive",
+  "receive.receiving": "Receiving…",
+  "receive.done": "Received",
+  "receive.onShelf": "{count} on the shelf.",
+  "receive.expires": "Expires {date}",
+  "common.done": "Done",
+
+  // ── CSSD ─────────────────────────────────────────────────────────────────
+  "cssd.trays": "Trays",
+  "cssd.loads": "Loads",
+  "cssd.labels": "Labels",
+  "cssd.trays.empty": "No trays built yet.",
+  "cssd.loads.empty": "No loads run yet.",
+  "cssd.tray": "Tray",
+  "cssd.openTray": "Open this tray",
+  "cssd.trayExpired": "This tray is past its date.",
+  "cssd.confirmExpired.title": "Open a tray that's past its date?",
+  "cssd.confirmExpired.body": "Tessa will record that it was opened knowingly, with your name and the time.",
+  "cssd.confirmExpired.ok": "Open it anyway",
+  "cssd.state.awaiting_release": "This tray is out of the machine but hasn't been released yet.",
+  "cssd.state.in_cycle": "This tray is in a machine.",
+  "cssd.state.quarantined": "This tray is quarantined.",
+  "cssd.state.packed": "This tray hasn't been sterilised yet.",
+  "cssd.machine.printout": "Machine printout",
+  "cssd.indicator.chemical": "Chemical indicator",
+  "cssd.indicator.biological": "Biological indicator",
+  "cssd.indicator.notRead": "Not read",
+  "cssd.indicator.passed": "Passed",
+  "cssd.indicator.failed": "Failed",
+  "cssd.endHint": "Take it out and record what you can see now.",
+  "cssd.endLoad": "End the load",
+  "cssd.release": "Release this load",
+  "cssd.bioPending": "The biological indicator is still out. Record it when it comes back.",
+  "cssd.bioResult": "Biological indicator result",
+  "cssd.openReport": "Open the recall report",
+  "cssd.confirmFail.released": "Record a failed biological on a RELEASED load?",
+  "cssd.confirmFail.title": "Record a failed biological?",
+  "cssd.confirmFail.releasedBody":
+    "This starts a recall. Every tray from this load still on a shelf will be quarantined, and any that were already opened will be listed — Tessa cannot reach those.",
+  "cssd.confirmFail.body": "This load will be marked failed and every tray in it quarantined.",
+  "cssd.confirmFail.ok": "Record the failure",
+  "block.not_ended": "This load hasn't finished yet.",
+  "block.already_released": "Already released.",
+  "block.cycle_failed": "This load failed and can't be released.",
+  "block.missing_physical": "Record the machine's printout first.",
+  "block.missing_chemical": "Record the chemical indicator first.",
+  "block.indicator_failed": "An indicator failed — this load can't be released.",
+  "block.biological_pending": "Waiting on the biological indicator.",
+  "block.default": "This load can't be released yet.",
+
+  // ── Cases ────────────────────────────────────────────────────────────────
+  "cases.title": "Cases",
+  "cases.open": "Open a case",
+  "cases.empty": "No cases yet.",
+  "cases.items": "{count} item|{count} items",
+  "cases.amended": "amended",
+  "cases.ref": "Case reference",
+  "cases.refHint": "Your own reference. Tessa stores nothing else about the patient.",
+  "cases.code": "Procedure code",
+  "cases.codeHint": "Optional — your centre's own code.",
+  "cases.openIt": "Open it",
+  "cases.whatUsed": "What was used",
+  "cases.nothingLogged": "Nothing logged against this case yet. Scan an item while it's open.",
+  "cases.close": "Close this case",
+  "cases.reopen": "Reopen it",
+  "cases.reopened": "This record was reopened after it was closed on {date}.",
+  "cases.reopenedNoDate": "This record was reopened after it was closed.",
+  "cases.confirmReopen.title": "Reopen this case?",
+  "cases.confirmReopen.body":
+    "It will be marked as amended, with your name and the time, and the original closing time is kept.",
+  "cases.concern.one": "A tray used in this case came from a load that has since FAILED.",
+  "cases.concern.many": "{count} trays used in this case came from a load that has since FAILED.",
+  "cases.concern.line": "{code} — load {load}",
+
+  // ── The recall ───────────────────────────────────────────────────────────
+  "recall.load": "Load {load}",
+  "recall.failed": "{machine} — failed.",
+  "recall.failedOn": "{machine} — failed on the {reason}.",
+  "recall.started": "Started {at}",
+  "recall.couldntReach": "Couldn't reach",
+  "recall.quarantined": "Quarantined",
+  "recall.alreadyFrozen": "Already frozen",
+  "recall.unreachable.title": "Tessa could not reach these",
+  "recall.unreachable.none": "Every tray from this load was still on a shelf. Nothing from it reached a patient.",
+  "recall.unreachable.body":
+    "These were opened. No action in Tessa can undo that — this list is the one to work through outside the app.",
+  "recall.unreachable.rule1":
+    "Tessa holds the case reference and nothing else about the patient. Your own records are the next step.",
+  "recall.opened": "Opened {at}",
+  "recall.caseRecorded": "case recorded",
+  "recall.noCase": "no case",
+  "recall.frozen.none": "Nothing from this load was still on a shelf.",
+  "recall.instruments": "Instruments in this load",
+  "recall.instruments.none": "No instrument trays in this load.",
+
+  // ── Labels ───────────────────────────────────────────────────────────────
+  "labels.title": "Print labels",
+  "labels.instruments": "Instruments",
+  "labels.empty": "Nothing to label yet.",
+  "labels.all": "All",
+  "labels.none": "None",
+  "labels.print": "Print {count} label|Print {count} labels",
+  "labels.hint":
+    "Prints onto a sheet of adhesive labels. Set your printer to 100% scale — “fit to page” resizes the barcode and readers decode the module ratios, not the size.",
+  "labels.cantPrint": "Can't print a barcode for “{code}”.",
+  "labels.printOne": "Print {code}",
+
+  // ── Shared ───────────────────────────────────────────────────────────────
+  "common.back": "Back",
+  "common.serial": "Serial {serial}",
+  "common.cycles": "{count} cycles",
+} as const;
+
+/**
+ * `typeof en` would make every VALUE a literal type (`"Tassa"` rather than
+ * `string`), because the dictionary is `as const` — which is what gives us the
+ * exact key union. Widening the values back to `string` keeps the keys precise
+ * and lets a translation say something different from the English.
+ */
+export type TessaDict = Record<keyof typeof en, string>;
+
+/**
+ * German. See the header for `Freigabe` and `Charge`.
+ *
+ * ⚠️ Reviewed for meaning, not certified. These are an engineer's translations
+ * of clinical vocabulary; before a German customer they want a native CSSD
+ * reader's eye, and the two regulatory terms above especially. Getting
+ * `Freigabe` wrong would be a comprehension failure at the exact moment a
+ * qualified person is making a documented decision.
+ */
+export const de: Translation<TessaDict> = {
+  "app.name": "Tessa",
+  "app.tagline": "Scannen, zählen, nachweisen. Rückverfolgbarkeit für Sterilgut und Verbrauchsmaterial.",
+  "door.root.hint": "Ihr Zentrum hat eine eigene Adresse. Öffnen Sie den Link, den Ihr Zentrum Ihnen gegeben hat.",
+  "door.none.title": "Nichts hier",
+  "door.none.body": "Kein Zentrum nutzt diese Adresse. Prüfen Sie den Link — eine vertippte Subdomain sieht genau so aus.",
+  "door.wrong.title": "Falsche Adresse",
+  "door.wrong.body": "Das ist keine Tessa-Adresse.",
+
+  "login.subtitle": "Melden Sie sich mit Ihrer dienstlichen E-Mail-Adresse an.",
+  "login.sent": "Wir haben einen Code an {email} gesendet.",
+  "login.email": "E-Mail",
+  "login.continue": "Weiter",
+  "login.sending": "Wird gesendet…",
+  "login.code": "Code",
+  "login.signIn": "Anmelden",
+  "login.checking": "Wird geprüft…",
+  "login.otherEmail": "Andere E-Mail-Adresse verwenden",
+  "login.sendFailed": "Code konnte nicht gesendet werden.",
+  "login.codeFailed": "Der Code hat nicht funktioniert. Prüfen Sie ihn oder fordern Sie einen neuen an.",
+
+  "setup.title": "Zentrum einrichten",
+  "setup.subtitle": "Zwei Angaben, dann können Sie loslegen.",
+  "setup.name": "Name des Zentrums",
+  "setup.address": "Adresse",
+  "setup.addressHint": "Buchstaben, Zahlen und Bindestriche. Das wird Ihre Web-Adresse und lässt sich später kaum ändern.",
+  "setup.create": "Anlegen",
+  "setup.creating": "Wird angelegt…",
+  "setup.failed": "Konnte nicht angelegt werden.",
+
+  "nav.today": "Heute",
+  "nav.stock": "Bestand",
+  "nav.cssd": "AEMP",
+  "nav.cases": "Fälle",
+  "nav.scan": "Scannen",
+  "shell.readOnly": "Nur Lesen",
+  "shell.account": "Konto",
+  "shell.settings": "Einstellungen",
+  "shell.signOut": "Abmelden",
+
+  "today.scan.sub": "Annehmen, entnehmen, öffnen",
+  "today.awaiting": "Warten auf Freigabe",
+  "today.awaiting.count": "{count} Charge|{count} Chargen",
+  "today.shelf": "Im Bestand",
+  "today.shelf.count": "{count} Chargen",
+  "today.openCases": "Offene Fälle",
+  "today.waiting": "Warten auf Freigabe",
+  "today.trays.count": "{count} Sieb|{count} Siebe",
+  "today.expiring": "Läuft ab",
+  "today.expiring.none": "Im nächsten Monat läuft nichts ab.",
+  "today.failed": "Charge {load} fehlgeschlagen",
+  "today.failed.reason": "Charge {load} fehlgeschlagen — {reason}.",
+  "today.openRecall": "Rückruf öffnen",
+
+  "stock.title": "Im Bestand",
+  "stock.empty": "Noch nichts angenommen. Scannen Sie eine Packung, um zu beginnen.",
+  "stock.lot": "Ch.-B. {code}",
+  "stock.noLot": "Keine Chargenbezeichnung",
+  "stock.howMany": "Wie viele?",
+  "stock.use": "Entnehmen",
+  "stock.discard": "Verwerfen",
+  "stock.markOpened": "Als geöffnet erfassen",
+  "stock.quarantine": "Sperren",
+  "expiry.printed": "Aufgedrucktes Verfallsdatum",
+  "expiry.opened": "Geöffnet — verkürzt",
+  "expiry.sterile": "Sterillagerfrist",
+  "expiry.none": "Kein Verfallsdatum",
+  "expiry.expired": "Vor {days} Tagen abgelaufen",
+  "expiry.today": "Läuft heute ab",
+  "expiry.left": "Noch {days} Tage",
+
+  "scan.title": "Scannen",
+  "scan.found": "Was ist das",
+  "scan.starting": "Kamera wird gestartet…",
+  "scan.typeCode": "Oder Code eingeben",
+  "scan.typePlaceholder": "Mit Handscanner scannen oder eingeben",
+  "scan.find": "Suchen",
+  "scan.again": "Etwas anderes scannen",
+  "scan.camera.denied": "Kamerazugriff wurde verweigert. Geben Sie den Code unten ein oder scannen Sie ihn.",
+  "scan.camera.no_camera": "Keine Kamera vorhanden — Code unten eingeben oder scannen.",
+  "scan.camera.unavailable": "Dieser Browser kann keine Barcodes lesen. Code unten eingeben oder scannen.",
+  "scan.camera.timeout": "Die Kamera ist nicht gestartet. Code unten eingeben oder scannen.",
+  "scan.product": "Ein Produkt-Barcode.",
+  "scan.receive": "Annehmen",
+  "scan.receive.sub": "Bestand einem Lagerort zubuchen",
+  "scan.lookUp": "Nachschlagen",
+  "scan.lookUp.sub": "Im Bestand suchen",
+  "scan.openTray": "Siebdatensatz öffnen",
+  "scan.goToTray": "Zum Sieb",
+  "scan.openInstrument": "Instrumentendatensatz öffnen",
+  "scan.goToInstrument": "Zum Instrument",
+  "scan.unknown": "Zu diesem Code gehört hier nichts.",
+
+  "receive.title": "Annehmen",
+  "receive.newProduct": "Neues Produkt",
+  "receive.notInCatalog": "Dieser Barcode ist noch nicht im Katalog.",
+  "receive.whatIsIt": "Wie heißt es?",
+  "receive.namePlaceholder": "Sterile Kompresse 10×10",
+  "receive.where": "Wohin kommt es?",
+  "receive.wherePlaceholder": "Lagerort scannen oder wählen",
+  "receive.addAndReceive": "Anlegen und annehmen",
+  "receive.receiving": "Wird angenommen…",
+  "receive.done": "Angenommen",
+  "receive.onShelf": "{count} im Bestand.",
+  "receive.expires": "Läuft ab am {date}",
+  "common.done": "Fertig",
+
+  "cssd.trays": "Siebe",
+  "cssd.loads": "Chargen",
+  "cssd.labels": "Etiketten",
+  "cssd.trays.empty": "Noch keine Siebe gepackt.",
+  "cssd.loads.empty": "Noch keine Chargen gefahren.",
+  "cssd.tray": "Sieb",
+  "cssd.openTray": "Dieses Sieb öffnen",
+  "cssd.trayExpired": "Die Sterillagerfrist dieses Siebs ist abgelaufen.",
+  "cssd.confirmExpired.title": "Sieb mit abgelaufener Frist öffnen?",
+  "cssd.confirmExpired.body": "Tessa erfasst, dass es wissentlich geöffnet wurde — mit Ihrem Namen und der Uhrzeit.",
+  "cssd.confirmExpired.ok": "Trotzdem öffnen",
+  "cssd.state.awaiting_release": "Dieses Sieb ist aus dem Gerät, aber noch nicht freigegeben.",
+  "cssd.state.in_cycle": "Dieses Sieb ist in einem Gerät.",
+  "cssd.state.quarantined": "Dieses Sieb ist gesperrt.",
+  "cssd.state.packed": "Dieses Sieb wurde noch nicht sterilisiert.",
+  "cssd.machine.printout": "Geräteprotokoll",
+  "cssd.indicator.chemical": "Chemoindikator",
+  "cssd.indicator.biological": "Bioindikator",
+  "cssd.indicator.notRead": "Nicht abgelesen",
+  "cssd.indicator.passed": "Bestanden",
+  "cssd.indicator.failed": "Nicht bestanden",
+  "cssd.endHint": "Entnehmen Sie die Charge und erfassen Sie, was jetzt sichtbar ist.",
+  "cssd.endLoad": "Charge beenden",
+  "cssd.release": "Charge freigeben",
+  "cssd.bioPending": "Der Bioindikator steht noch aus. Erfassen Sie ihn, sobald er vorliegt.",
+  "cssd.bioResult": "Ergebnis des Bioindikators",
+  "cssd.openReport": "Rückrufbericht öffnen",
+  "cssd.confirmFail.released": "Nicht bestandenen Bioindikator für eine FREIGEGEBENE Charge erfassen?",
+  "cssd.confirmFail.title": "Nicht bestandenen Bioindikator erfassen?",
+  "cssd.confirmFail.releasedBody":
+    "Damit beginnt ein Rückruf. Jedes Sieb dieser Charge, das noch im Bestand ist, wird gesperrt; bereits geöffnete werden aufgelistet — diese kann Tessa nicht mehr erreichen.",
+  "cssd.confirmFail.body": "Die Charge wird als fehlgeschlagen erfasst und alle Siebe darin werden gesperrt.",
+  "cssd.confirmFail.ok": "Fehlschlag erfassen",
+  "block.not_ended": "Diese Charge ist noch nicht beendet.",
+  "block.already_released": "Bereits freigegeben.",
+  "block.cycle_failed": "Diese Charge ist fehlgeschlagen und kann nicht freigegeben werden.",
+  "block.missing_physical": "Erfassen Sie zuerst das Geräteprotokoll.",
+  "block.missing_chemical": "Erfassen Sie zuerst den Chemoindikator.",
+  "block.indicator_failed": "Ein Indikator ist nicht bestanden — diese Charge kann nicht freigegeben werden.",
+  "block.biological_pending": "Der Bioindikator steht noch aus.",
+  "block.default": "Diese Charge kann noch nicht freigegeben werden.",
+
+  "cases.title": "Fälle",
+  "cases.open": "Fall anlegen",
+  "cases.empty": "Noch keine Fälle.",
+  "cases.items": "{count} Position|{count} Positionen",
+  "cases.amended": "nachträglich geändert",
+  "cases.ref": "Fallnummer",
+  "cases.refHint": "Ihre eigene Fallnummer. Tessa speichert nichts weiter über die Patientin oder den Patienten.",
+  "cases.code": "Eingriffscode",
+  "cases.codeHint": "Optional — der eigene Code Ihres Zentrums.",
+  "cases.openIt": "Anlegen",
+  "cases.whatUsed": "Verwendet",
+  "cases.nothingLogged": "Für diesen Fall ist noch nichts erfasst. Scannen Sie etwas, solange er offen ist.",
+  "cases.close": "Fall abschließen",
+  "cases.reopen": "Wieder öffnen",
+  "cases.reopened": "Dieser Datensatz wurde nach dem Abschluss am {date} wieder geöffnet.",
+  "cases.reopenedNoDate": "Dieser Datensatz wurde nach dem Abschluss wieder geöffnet.",
+  "cases.confirmReopen.title": "Diesen Fall wieder öffnen?",
+  "cases.confirmReopen.body":
+    "Er wird als nachträglich geändert gekennzeichnet — mit Ihrem Namen und der Uhrzeit. Der ursprüngliche Abschlusszeitpunkt bleibt erhalten.",
+  "cases.concern.one": "Ein in diesem Fall verwendetes Sieb stammt aus einer Charge, die inzwischen FEHLGESCHLAGEN ist.",
+  "cases.concern.many":
+    "{count} in diesem Fall verwendete Siebe stammen aus einer Charge, die inzwischen FEHLGESCHLAGEN ist.",
+  "cases.concern.line": "{code} — Charge {load}",
+
+  "recall.load": "Charge {load}",
+  "recall.failed": "{machine} — fehlgeschlagen.",
+  "recall.failedOn": "{machine} — fehlgeschlagen: {reason}.",
+  "recall.started": "Gestartet {at}",
+  "recall.couldntReach": "Nicht erreichbar",
+  "recall.quarantined": "Gesperrt",
+  "recall.alreadyFrozen": "Bereits gesperrt",
+  "recall.unreachable.title": "Diese konnte Tessa nicht mehr erreichen",
+  "recall.unreachable.none": "Alle Siebe dieser Charge waren noch im Bestand. Nichts davon hat eine Patientin oder einen Patienten erreicht.",
+  "recall.unreachable.body":
+    "Diese wurden geöffnet. Keine Aktion in Tessa kann das rückgängig machen — diese Liste arbeiten Sie außerhalb der App ab.",
+  "recall.unreachable.rule1":
+    "Tessa speichert nur die Fallnummer und nichts weiter über die Patientin oder den Patienten. Ihre eigenen Unterlagen sind der nächste Schritt.",
+  "recall.opened": "Geöffnet {at}",
+  "recall.caseRecorded": "Fall erfasst",
+  "recall.noCase": "kein Fall",
+  "recall.frozen.none": "Von dieser Charge war nichts mehr im Bestand.",
+  "recall.instruments": "Instrumente in dieser Charge",
+  "recall.instruments.none": "Keine Instrumentensiebe in dieser Charge.",
+
+  "labels.title": "Etiketten drucken",
+  "labels.instruments": "Instrumente",
+  "labels.empty": "Noch nichts zu etikettieren.",
+  "labels.all": "Alle",
+  "labels.none": "Keine",
+  "labels.print": "{count} Etikett drucken|{count} Etiketten drucken",
+  "labels.hint":
+    "Druckt auf einen Bogen Haftetiketten. Stellen Sie den Drucker auf 100 % — „an Seite anpassen“ skaliert den Barcode, und Lesegeräte werten die Modulverhältnisse aus, nicht die Größe.",
+  "labels.cantPrint": "Für „{code}“ lässt sich kein Barcode drucken.",
+  "labels.printOne": "{code} drucken",
+
+  "common.back": "Zurück",
+  "common.serial": "Serien-Nr. {serial}",
+  "common.cycles": "{count} Zyklen",
+};
+
+export const { I18nProvider, useI18n, useT } = createI18n<TessaDict>({
+  reference: { code: "en", label: "English", dict: en },
+  locales: [{ code: "de", label: "Deutsch", dict: de }],
+  storage: { read: () => storage.read<string>("locale"), write: (code) => storage.write("locale", code) },
+});
+
+/**
+ * The expiry sentence, in the reader's language.
+ *
+ * A hook rather than a bare function because it needs `t`, and a hook here means
+ * each screen writes `const expiryText = useExpiryText()` once instead of
+ * threading `t` through every call. `data.ts` keeps the pure half so the logic
+ * itself stays testable without React.
+ */
+export function useExpiryText(): (lot: { expiry: string | null; daysLeft?: number | null }) => string {
+  const t = useT();
+  return (lot) => expiryTextWith(t as (k: string, v?: Record<string, string | number>) => string, lot);
+}

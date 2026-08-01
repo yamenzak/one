@@ -20,18 +20,20 @@
 import { useState } from "react";
 import { api, ApiError } from "@4dl/app-kit";
 import { Building2, Button, Callout, Field, Screen } from "@4dl/ui";
+import { useT } from "../i18n.js";
 import { useSession } from "../session.js";
 
 export function RootSignpost() {
+  const t = useT();
   return (
     <Screen center width="narrow">
       <div className="space-y-4 py-16 text-center">
-        <h1 className="text-title-1">Tessa</h1>
+        <h1 className="text-title-1">{t("app.name")}</h1>
         <p className="text-body text-muted-foreground">
-          Scan it, count it, prove it. Sterile-supply and consumable traceability for medical centres.
+{t("app.tagline")}
         </p>
         <p className="text-caption text-muted-foreground">
-          Your centre has its own address. Open the link your centre gave you.
+{t("door.root.hint")}
         </p>
       </div>
     </Screen>
@@ -39,12 +41,13 @@ export function RootSignpost() {
 }
 
 export function NoStudio() {
+  const t = useT();
   return (
     <Screen center width="narrow">
       <div className="space-y-3 py-16 text-center">
-        <h1 className="text-title-2">Nothing here</h1>
+        <h1 className="text-title-2">{t("door.none.title")}</h1>
         <p className="text-body text-muted-foreground">
-          No centre uses this address. Check the link — a mistyped subdomain looks exactly like this.
+{t("door.none.body")}
         </p>
       </div>
     </Screen>
@@ -52,11 +55,12 @@ export function NoStudio() {
 }
 
 export function WrongDoor() {
+  const t = useT();
   return (
     <Screen center width="narrow">
       <div className="space-y-3 py-16 text-center">
-        <h1 className="text-title-2">Wrong address</h1>
-        <p className="text-body text-muted-foreground">This isn't a Tessa address.</p>
+        <h1 className="text-title-2">{t("door.wrong.title")}</h1>
+        <p className="text-body text-muted-foreground">{t("door.wrong.body")}</p>
       </div>
     </Screen>
   );
@@ -77,6 +81,7 @@ export function WrongDoor() {
  */
 export function Start() {
   const { refresh } = useSession();
+  const t = useT();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [busy, setBusy] = useState(false);
@@ -90,8 +95,8 @@ export function Start() {
       <div className="w-full space-y-8 py-12">
         <div className="space-y-2 text-center">
           <Building2 aria-hidden className="mx-auto size-8 text-primary" />
-          <h1 className="text-title-2">Set up your centre</h1>
-          <p className="text-body text-muted-foreground">Two things, then you can start scanning.</p>
+          <h1 className="text-title-2">{t("setup.title")}</h1>
+          <p className="text-body text-muted-foreground">{t("setup.subtitle")}</p>
         </div>
 
         <form
@@ -109,12 +114,12 @@ export function Start() {
                 // a navigation to a different origin rather than a route change.
                 window.location.href = `${window.location.protocol}//${slug.trim()}.${window.location.host.split(".").slice(1).join(".")}`;
               })
-              .catch((e2) => setError(e2 instanceof ApiError ? (e2.message || "Couldn't create it.") : "Couldn't create it."))
+              .catch((e2) => setError(e2 instanceof ApiError ? (e2.message || t("setup.failed")) : t("setup.failed")))
               .finally(() => setBusy(false));
           }}
         >
           <Field
-            label="Centre name"
+            label={t("setup.name")}
             value={name}
             onChange={(e) => {
               setName(e.target.value);
@@ -124,13 +129,13 @@ export function Start() {
             autoFocus
           />
           <Field
-            label="Address"
+            label={t("setup.address")}
             value={slug}
             onChange={(e) => setSlug(suggest(e.target.value))}
-            hint="Letters, numbers and hyphens. This becomes your web address and can't be changed easily."
+            hint={t("setup.addressHint")}
           />
           <Button type="submit" className="w-full" disabled={!name.trim() || !slug.trim() || busy}>
-            {busy ? "Creating…" : "Create it"}
+            {busy ? t("setup.creating") : t("setup.create")}
           </Button>
         </form>
 

@@ -27,28 +27,34 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AppBar, Archive, Avatar, Badge, BottomTabs, Button, ClipboardList, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Home, RotateCcw, ScanLine, type TabDef } from "@4dl/ui";
 import { useSession } from "./session.js";
+import { useI18n, useT } from "./i18n.js";
 import { ScanSheet } from "./screens/ScanSheet.js";
 import { Today } from "./screens/Today.js";
 import { Stock } from "./screens/Stock.js";
 import { Cssd } from "./screens/Cssd.js";
 import { Cases } from "./screens/Cases.js";
 
-const TABS: TabDef[] = [
-  { key: "today", label: "Today", icon: Home },
-  { key: "stock", label: "Stock", icon: Archive },
-  { key: "cssd", label: "CSSD", icon: RotateCcw },
-  { key: "cases", label: "Cases", icon: ClipboardList },
-];
+
 
 export function Shell() {
   const { ctx, signOut } = useSession();
+  const t = useT();
+  const { locale, locales, setLocale } = useI18n();
   const nav = useNavigate();
   const location = useLocation();
   const [scanning, setScanning] = useState(false);
 
+  // Built per render rather than at module scope: the labels are translated,
+  // and a module-level constant would freeze whichever locale loaded first.
+  const TABS: TabDef[] = [
+    { key: "today", label: t("nav.today"), icon: Home },
+    { key: "stock", label: t("nav.stock"), icon: Archive },
+    { key: "cssd", label: t("nav.cssd"), icon: RotateCcw },
+    { key: "cases", label: t("nav.cases"), icon: ClipboardList },
+  ];
   const tab = location.pathname.split("/")[1] || "today";
   const gate = ctx?.active?.gate;
-  const name = ctx?.active?.name ?? "Tessa";
+  const name = ctx?.active?.name ?? t("app.name");
 
   return (
     <div className="min-h-dvh pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
@@ -64,18 +70,27 @@ export function Shell() {
              * true rather than replacing the screen. `blocked` is a different
              * matter and is handled before the Shell ever mounts.
              */}
-            {gate?.readOnly && <Badge tone="warning">Read-only</Badge>}
+            {gate?.readOnly && <Badge tone="warning">{t("shell.readOnly")}</Badge>}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="rounded-full" aria-label="Account">
+                <button className="rounded-full" aria-label={t("shell.account")}>
                   <Avatar name={ctx?.user?.name ?? ctx?.user?.email ?? "?"} src={ctx?.user?.image ?? undefined} className="size-8" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>{ctx?.user?.email}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => nav("/settings")}>Settings</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void signOut()}>Sign out</DropdownMenuItem>
+                {/* The language switcher lives here rather than in a settings
+                    screen: a person who has landed in the wrong language cannot
+                    read the path to a settings screen. */}
+                {locales.map((l) => (
+                  <DropdownMenuItem key={l.code} onSelect={() => setLocale(l.code)}>
+                    {l.code === locale ? `✓ ${l.label}` : l.label}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => nav("/settings")}>{t("shell.settings")}</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void signOut()}>{t("shell.signOut")}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </>
@@ -96,7 +111,7 @@ export function Shell() {
         <Button
           size="lg"
           className="pointer-events-auto size-14 rounded-full p-0 shadow-glow"
-          aria-label="Scan"
+          aria-label={t("nav.scan")}
           onClick={() => setScanning(true)}
         >
           <ScanLine className="size-6" />

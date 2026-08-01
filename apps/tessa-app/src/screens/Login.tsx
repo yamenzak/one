@@ -18,12 +18,14 @@
 import { useState } from "react";
 import { api, ApiError, RefreshNote } from "@4dl/app-kit";
 import { Button, Callout, Field, KeyRound, Mail, Screen } from "@4dl/ui";
+import { useT } from "../i18n.js";
 import { useSession } from "../session.js";
 
 export function Login() {
   const { refresh, host } = useSession();
+  const t = useT();
   const tenant = host?.tenant ?? null;
-  const brandName = tenant?.name ?? "Tessa";
+  const brandName = tenant?.name ?? t("app.name");
 
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
@@ -41,7 +43,7 @@ export function Login() {
       // The server's own sentence where it has one — a centre that does not take
       // new members says so, and replacing that with "something went wrong"
       // would leave someone retyping a correct address forever.
-      setError(e instanceof ApiError ? (e.message || "Couldn't send a code.") : "Couldn't send a code.");
+      setError(e instanceof ApiError ? (e.message || t("login.sendFailed")) : t("login.sendFailed"));
     } finally {
       setBusy(false);
     }
@@ -54,7 +56,7 @@ export function Login() {
       await api.post("/api/auth/sign-in/email-otp", { email: email.trim(), otp: otp.trim() });
       await refresh();
     } catch {
-      setError("That code didn't work. Check it, or send a new one.");
+      setError(t("login.codeFailed"));
     } finally {
       setBusy(false);
     }
@@ -68,7 +70,7 @@ export function Login() {
               arriving here has is "am I in the right place?". */}
           <h1 className="text-title-1">{brandName}</h1>
           <p className="text-body text-muted-foreground">
-            {step === "email" ? "Sign in with your work email." : `We sent a code to ${email}.`}
+            {step === "email" ? t("login.subtitle") : t("login.sent", { email })}
           </p>
         </div>
 
@@ -81,7 +83,7 @@ export function Login() {
             }}
           >
             <Field
-              label="Email"
+              label={t("login.email")}
               type="email"
               icon={Mail}
               value={email}
@@ -91,7 +93,7 @@ export function Login() {
               autoFocus
             />
             <Button type="submit" className="w-full" disabled={!email.trim() || busy}>
-              {busy ? "Sending…" : "Continue"}
+              {busy ? t("login.sending") : t("login.continue")}
             </Button>
           </form>
         ) : (
@@ -103,7 +105,7 @@ export function Login() {
             }}
           >
             <Field
-              label="Code"
+              label={t("login.code")}
               icon={KeyRound}
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
@@ -113,10 +115,10 @@ export function Login() {
               autoFocus
             />
             <Button type="submit" className="w-full" disabled={!otp.trim() || busy}>
-              {busy ? "Checking…" : "Sign in"}
+              {busy ? t("login.checking") : t("login.signIn")}
             </Button>
             <Button type="button" variant="ghost" className="w-full" onClick={() => setStep("email")}>
-              Use a different email
+              {t("login.otherEmail")}
             </Button>
           </form>
         )}

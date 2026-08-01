@@ -27,10 +27,12 @@ import { useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, Badge, Button, Callout, Group, ListChecks, LoadError, RotateCcw, Row, Screen, Section, ShieldCheck, Skeleton, Tile, TileGrid, useLoad } from "@4dl/ui";
 import { fmt, trace } from "../data.js";
+import { useT } from "../i18n.js";
 
 export function Recall() {
   const { cycleId = "" } = useParams();
   const nav = useNavigate();
+  const t = useT();
   const { data, error, loading, reload } = useLoad(useCallback(() => trace.cycle(cycleId), [cycleId]), "the recall", fmt);
 
   if (error) return <Screen><LoadError what="the recall" error={error} onRetry={reload} /></Screen>;
@@ -44,14 +46,14 @@ export function Recall() {
     <Screen>
       <Section>
         <Button variant="ghost" size="sm" onClick={() => nav(-1)}>
-          <ArrowLeft className="size-4" /> Back
+          <ArrowLeft className="size-4" /> {t("common.back")}
         </Button>
       </Section>
 
-      <Section title={`Load ${cycle.cycle_number ?? cycle.id.slice(-6)}`}>
+      <Section title={t("recall.load", { load: cycle.cycle_number ?? cycle.id.slice(-6) })}>
         <Callout tone="danger" icon={AlertTriangle} live="alert">
-          <div>{cycle.machine} — failed{cycle.failure_reason ? ` on the ${cycle.failure_reason}` : ""}.</div>
-          <div className="text-caption text-muted-foreground">Started {cycle.started_at.slice(0, 16).replace("T", " ")}</div>
+          <div>{cycle.failure_reason ? t("recall.failedOn", { machine: cycle.machine, reason: cycle.failure_reason }) : t("recall.failed", { machine: cycle.machine })}</div>
+          <div className="text-caption text-muted-foreground">{t("recall.started", { at: cycle.started_at.slice(0, 16).replace("T", " ") })}</div>
         </Callout>
       </Section>
 
@@ -59,21 +61,21 @@ export function Recall() {
         <TileGrid>
           {/* Drawn even at zero. A summary that omits the number when it is
               nothing teaches people to read its absence as "not applicable". */}
-          <Tile icon={AlertTriangle} label="Couldn't reach" value={`${summary.unreachable} tray${summary.unreachable === 1 ? "" : "s"}`} />
-          <Tile icon={ShieldCheck} label="Quarantined" value={`${summary.quarantined}`} />
-          <Tile icon={RotateCcw} label="Already frozen" value={`${summary.alreadyQuarantined}`} />
+          <Tile icon={AlertTriangle} label={t("recall.couldntReach")} value={t("today.trays.count", { count: summary.unreachable })} />
+          <Tile icon={ShieldCheck} label={t("recall.quarantined")} value={`${summary.quarantined}`} />
+          <Tile icon={RotateCcw} label={t("recall.alreadyFrozen")} value={`${summary.alreadyQuarantined}`} />
         </TileGrid>
       </Section>
 
-      <Section title="Tessa could not reach these">
+      <Section title={t("recall.unreachable.title")}>
         {unreachable.length === 0 ? (
           <Callout tone="success" icon={ShieldCheck}>
-            Every tray from this load was still on a shelf. Nothing from it reached a patient.
+{t("recall.unreachable.none")}
           </Callout>
         ) : (
           <>
             <Callout tone="danger" className="mb-3">
-              These were opened. No action in Tessa can undo that — this list is the one to work through outside the app.
+{t("recall.unreachable.body")}
             </Callout>
             <Group>
               {unreachable.map((p, i) => (
@@ -81,9 +83,9 @@ export function Recall() {
                   key={p.id}
                   icon={AlertTriangle}
                   tone="danger"
-                  sub={p.opened_at ? `Opened ${p.opened_at.slice(0, 16).replace("T", " ")}` : "Opened"}
+                  sub={t("recall.opened", { at: p.opened_at ? p.opened_at.slice(0, 16).replace("T", " ") : "" })}
                   /* A reference, never a name — TESSA.md Rule 1. */
-                  value={p.case_id ? <Badge tone="danger">case recorded</Badge> : <Badge tone="warning">no case</Badge>}
+                  value={p.case_id ? <Badge tone="danger">{t("recall.caseRecorded")}</Badge> : <Badge tone="warning">{t("recall.noCase")}</Badge>}
                   divider={i < unreachable.length - 1}
                   onClick={p.case_id ? () => nav("/cases") : undefined}
                 >
@@ -92,23 +94,23 @@ export function Recall() {
               ))}
             </Group>
             <p className="px-4 pt-3 text-center text-caption text-muted-foreground">
-              Tessa holds the case reference and nothing else about the patient. Your own records are the next step.
+{t("recall.unreachable.rule1")}
             </p>
           </>
         )}
       </Section>
 
-      <Section title="Quarantined">
+      <Section title={t("recall.quarantined")}>
         {frozen.length === 0 ? (
-          <Callout tone="neutral">Nothing from this load was still on a shelf.</Callout>
+          <Callout tone="neutral">{t("recall.frozen.none")}</Callout>
         ) : (
           <Group>
             {frozen.map((p, i) => (
               <Row
                 key={p.id}
                 icon={ListChecks}
-                sub={p.recipe_name ?? "Tray"}
-                value={<Badge tone="warning">{p.disposition === "already_quarantined" ? "already frozen" : "quarantined"}</Badge>}
+                sub={p.recipe_name ?? t("cssd.tray")}
+                value={<Badge tone="warning">{p.disposition === "already_quarantined" ? t("recall.alreadyFrozen") : t("recall.quarantined")}</Badge>}
                 divider={i < frozen.length - 1}
               >
                 {p.label_code}
@@ -124,13 +126,13 @@ export function Recall() {
        * dissolved — but they are reference material for an inspection rather
        * than something to act on today.
        */}
-      <Section title="Instruments in this load">
+      <Section title={t("recall.instruments")}>
         {instruments.length === 0 ? (
-          <Callout tone="neutral">No instrument trays in this load.</Callout>
+          <Callout tone="neutral">{t("recall.instruments.none")}</Callout>
         ) : (
           <Group>
             {instruments.map((u, i) => (
-              <Row key={u.unit_id} icon={RotateCcw} sub={u.item_name ?? "Instrument"} divider={i < instruments.length - 1}>
+              <Row key={u.unit_id} icon={RotateCcw} sub={u.item_name ?? t("labels.instruments")} divider={i < instruments.length - 1}>
                 {u.label_code}
               </Row>
             ))}

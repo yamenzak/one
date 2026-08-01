@@ -17,16 +17,12 @@
 
 import { useCallback, useState } from "react";
 import { Archive, Badge, Button, Callout, Field, FlaskConical, Group, LoadError, Row, Screen, Section, Sheet, Skeleton, Timer, toneText, Trash2, useAction, useLoad } from "@4dl/ui";
-import { expiryText, expiryTone, fmt, stock, type Lot } from "../data.js";
-
-/** The clock that won, in words a person can act on. */
-const REASON_TEXT: Record<string, string> = {
-  printed: "Printed expiry",
-  opened: "Opened — shortened",
-  sterile: "Sterile shelf life",
-};
+import { expiryTone, fmt, stock, type Lot } from "../data.js";
+import { useExpiryText, useT } from "../i18n.js";
 
 export function Stock() {
+  const t = useT();
+  const expiryText = useExpiryText();
   const load = useCallback(() => stock.shelf(), []);
   const { data, error, loading, reload } = useLoad(load, "the shelf", fmt);
   const [selected, setSelected] = useState<Lot | null>(null);
@@ -38,9 +34,9 @@ export function Stock() {
 
   return (
     <Screen>
-      <Section title="On the shelf">
+      <Section title={t("stock.title")}>
         {lots.length === 0 ? (
-          <Callout tone="neutral" icon={Archive}>Nothing received yet. Scan a box to start.</Callout>
+          <Callout tone="neutral" icon={Archive}>{t("stock.empty")}</Callout>
         ) : (
           <Group>
             {lots.map((lot, i) => (
@@ -49,9 +45,9 @@ export function Stock() {
                 icon={Archive}
                 sub={
                   <span className="flex items-center gap-1.5">
-                    {lot.lot_code ? `Lot ${lot.lot_code}` : "No lot code"}
+                    {lot.lot_code ? t("stock.lot", { code: lot.lot_code }) : t("stock.noLot")}
                     {lot.expiryReason && lot.expiryReason !== "printed" && (
-                      <Badge tone="warning">{REASON_TEXT[lot.expiryReason]}</Badge>
+                      <Badge tone="warning">{t(`expiry.${lot.expiryReason}`)}</Badge>
                     )}
                   </span>
                 }
@@ -86,6 +82,8 @@ export function Stock() {
  * anybody knows which it was.
  */
 function LotSheet({ lot, onClose, onChanged }: { lot: Lot; onClose: () => void; onChanged: () => void }) {
+  const t = useT();
+  const expiryText = useExpiryText();
   const [quantity, setQuantity] = useState("1");
   const act = useAction(fmt);
 
@@ -101,15 +99,15 @@ function LotSheet({ lot, onClose, onChanged }: { lot: Lot; onClose: () => void; 
       <div className="space-y-4">
         <Callout tone={expiryTone(lot.expiryStatus)}>
           <div>{expiryText(lot)}</div>
-          {lot.expiryReason && <div className="text-caption text-muted-foreground">{REASON_TEXT[lot.expiryReason]}</div>}
+          {lot.expiryReason && <div className="text-caption text-muted-foreground">{t(`expiry.${lot.expiryReason}`)}</div>}
         </Callout>
 
-        <Field label="How many?" type="number" inputMode="numeric" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+        <Field label={t("stock.howMany")} type="number" inputMode="numeric" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
 
         <div className="grid grid-cols-2 gap-3">
-          <Button onClick={() => run("use")} disabled={act.busy !== null}>Use</Button>
+          <Button onClick={() => run("use")} disabled={act.busy !== null}>{t("stock.use")}</Button>
           <Button variant="secondary" onClick={() => run("discard")} disabled={act.busy !== null}>
-            <Trash2 className="size-4" /> Discard
+            <Trash2 className="size-4" /> {t("stock.discard")}
           </Button>
           {/**
            * Opening starts the post-opening clock (TESSA.md §3.4) — the one that
@@ -117,10 +115,10 @@ function LotSheet({ lot, onClose, onChanged }: { lot: Lot; onClose: () => void; 
            * quantity, because opening a container is not consuming from it.
            */}
           <Button variant="secondary" onClick={() => run("open")} disabled={act.busy !== null}>
-            <Timer className="size-4" /> Mark opened
+            <Timer className="size-4" /> {t("stock.markOpened")}
           </Button>
           <Button variant="secondary" onClick={() => run("quarantine")} disabled={act.busy !== null}>
-            <FlaskConical className="size-4" /> Quarantine
+            <FlaskConical className="size-4" /> {t("stock.quarantine")}
           </Button>
         </div>
 

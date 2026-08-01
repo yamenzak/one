@@ -21,9 +21,11 @@
 import { useCallback, useState } from "react";
 import { AlertTriangle, Archive, Badge, Button, Callout, ClipboardList, ConfirmDialog, Field, Group, ListChecks, LoadError, Plus, Row, Screen, Section, Sheet, Skeleton, useAction, useLoad } from "@4dl/ui";
 import { cases, fmt, trace, type CaseRow } from "../data.js";
+import { useT } from "../i18n.js";
 import { useCan } from "../session.js";
 
 export function Cases() {
+  const t = useT();
   const load = useCallback(() => cases.list(), []);
   const { data, error, loading, reload } = useLoad(load, "cases", fmt);
   const [opening, setOpening] = useState(false);
@@ -36,28 +38,28 @@ export function Cases() {
   return (
     <Screen>
       <Section
-        title="Cases"
+        title={t("cases.title")}
         action={
           can("case", "create") && (
             <Button size="sm" onClick={() => setOpening(true)}>
-              <Plus className="size-4" /> Open a case
+              <Plus className="size-4" /> {t("cases.open")}
             </Button>
           )
         }
       >
         {data.cases.length === 0 ? (
-          <Callout tone="neutral" icon={ClipboardList}>No cases yet.</Callout>
+          <Callout tone="neutral" icon={ClipboardList}>{t("cases.empty")}</Callout>
         ) : (
           <Group>
             {data.cases.map((c, i) => (
               <Row
                 key={c.id}
                 icon={ClipboardList}
-                sub={`${c.line_count ?? 0} item${c.line_count === 1 ? "" : "s"}${c.procedure_code ? ` · ${c.procedure_code}` : ""}`}
+                sub={`${t("cases.items", { count: c.line_count ?? 0 })}${c.procedure_code ? ` · ${c.procedure_code}` : ""}`}
                 value={<Badge tone={c.status === "open" ? "primary" : "neutral"}>{c.status}</Badge>}
                 /* An amended record is a different kind of document from one
                    written once. Visible in the list, not buried in the detail. */
-                valueSub={(c.reopen_count ?? 0) > 0 ? "amended" : undefined}
+                valueSub={(c.reopen_count ?? 0) > 0 ? t("cases.amended") : undefined}
                 onClick={() => setSelected(c)}
                 divider={i < data.cases.length - 1}
               >
@@ -75,6 +77,7 @@ export function Cases() {
 }
 
 function OpenCase({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const t = useT();
   const [ref, setRef] = useState("");
   const [code, setCode] = useState("");
   const act = useAction(fmt);
@@ -82,27 +85,27 @@ function OpenCase({ onClose, onDone }: { onClose: () => void; onDone: () => void
     <Sheet
       open
       onClose={onClose}
-      title="Open a case"
+      title={t("cases.open")}
       footer={
         <Button
           className="w-full"
           disabled={!ref.trim() || act.busy !== null}
           onClick={() => void act.run("open", async () => { await cases.open({ caseRef: ref.trim(), procedureCode: code.trim() || undefined }); onDone(); })}
         >
-          Open it
+{t("cases.openIt")}
         </Button>
       }
     >
       <div className="space-y-4">
         <Field
-          label="Case reference"
+          label={t("cases.ref")}
           value={ref}
           onChange={(e) => setRef(e.target.value)}
           placeholder="OP-2026-114"
-          hint="Your own reference. Tessa stores nothing else about the patient."
+          hint={t("cases.refHint")}
           autoFocus
         />
-        <Field label="Procedure code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="EXT-3" hint="Optional — your centre's own code." />
+        <Field label={t("cases.code")} value={code} onChange={(e) => setCode(e.target.value)} placeholder="EXT-3" hint={t("cases.codeHint")} />
         {act.err && <Callout tone="danger" live="alert">{act.err}</Callout>}
       </div>
     </Sheet>
@@ -110,6 +113,7 @@ function OpenCase({ onClose, onDone }: { onClose: () => void; onDone: () => void
 }
 
 function CaseSheet({ row, onClose, onChanged }: { row: CaseRow; onClose: () => void; onChanged: () => void }) {
+  const t = useT();
   const act = useAction(fmt);
   const can = useCan();
   const [confirmReopen, setConfirmReopen] = useState(false);
@@ -133,11 +137,11 @@ function CaseSheet({ row, onClose, onChanged }: { row: CaseRow; onClose: () => v
             <Callout tone="danger" icon={AlertTriangle} live="alert">
               <div className="space-y-1">
                 <div>
-                  {data.concerns.length === 1 ? "A tray" : `${data.concerns.length} trays`} used in this case came from a load that has since FAILED.
+                  {data.concerns.length === 1 ? t("cases.concern.one") : t("cases.concern.many", { count: data.concerns.length })}
                 </div>
                 {data.concerns.map((c) => (
                   <div key={c.packId} className="text-caption text-muted-foreground">
-                    {c.labelCode} — load {c.cycleNumber ?? c.cycleId?.slice(-6)}
+                    {t("cases.concern.line", { code: c.labelCode ?? "", load: c.cycleNumber ?? c.cycleId?.slice(-6) ?? "" })}
                   </div>
                 ))}
               </div>
@@ -146,13 +150,13 @@ function CaseSheet({ row, onClose, onChanged }: { row: CaseRow; onClose: () => v
 
           {data.amended && (
             <Callout tone="warning">
-              This record was reopened after it was closed{row.closed_at ? ` on ${row.closed_at.slice(0, 10)}` : ""}.
+              {row.closed_at ? t("cases.reopened", { date: row.closed_at.slice(0, 10) }) : t("cases.reopenedNoDate")}
             </Callout>
           )}
 
-          <Section title="What was used">
+          <Section title={t("cases.whatUsed")}>
             {data.lines.length === 0 ? (
-              <Callout tone="neutral">Nothing logged against this case yet. Scan an item while it's open.</Callout>
+              <Callout tone="neutral">{t("cases.nothingLogged")}</Callout>
             ) : (
               <Group>
                 {data.lines.map((l, i) => (
@@ -182,7 +186,7 @@ function CaseSheet({ row, onClose, onChanged }: { row: CaseRow; onClose: () => v
                   : setConfirmReopen(true)
               }
             >
-              {row.status === "open" ? "Close this case" : "Reopen it"}
+              {row.status === "open" ? t("cases.close") : t("cases.reopen")}
             </Button>
           )}
 
@@ -193,9 +197,9 @@ function CaseSheet({ row, onClose, onChanged }: { row: CaseRow; onClose: () => v
       <ConfirmDialog
         open={confirmReopen}
         onOpenChange={setConfirmReopen}
-        title="Reopen this case?"
-        description="It will be marked as amended, with your name and the time, and the original closing time is kept."
-        confirmLabel="Reopen it"
+        title={t("cases.confirmReopen.title")}
+        description={t("cases.confirmReopen.body")}
+        confirmLabel={t("cases.reopen")}
         onConfirm={() => void act.run("reopen", async () => { await cases.act(row.id, "reopen"); onChanged(); })}
       />
     </Sheet>
