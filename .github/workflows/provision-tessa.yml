@@ -167,9 +167,30 @@ jobs:
           git commit \
             -m "Tessa: bind the real Cloudflare resource ids" \
             -m "Written by the provisioning workflow, which created or adopted them. Replaces the placeholders that let wrangler dev run with no Cloudflare account."
-          # Pushing to main triggers Deploy, which now ships Tessa — see the
-          # placeholder guard in deploy.yml.
+          # ⚠️ This push does NOT trigger the Deploy workflow.
+          #
+          # GitHub deliberately suppresses workflow runs for pushes made with the
+          # built-in GITHUB_TOKEN — it is loop prevention, and it is silent: the
+          # commit lands, no run appears, and nothing says why. The first version
+          # of this file claimed the opposite in a comment, so provisioning
+          # "succeeded" and no worker was ever created.
+          #
+          # Hence the deploy step below. It does not rely on the push at all.
           git push
+
+      # The worker itself. Must come BEFORE minting the secret: `wrangler secret
+      # list` has nothing to read until the worker exists, and on a first run
+      # that read failing is exactly the "leave it alone" branch below.
+      - name: Build Tessa's SPA
+        run: pnpm --filter @tessa/app build
+
+      - name: Deploy the Tessa worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/tessa
+          command: deploy
 
       - name: Mint BETTER_AUTH_SECRET if the worker has none
         working-directory: apps/tessa
@@ -201,8 +222,8 @@ jobs:
           {
             echo "## Tessa provisioning"
             echo ""
-            echo "Resources are created and \`apps/tessa/wrangler.jsonc\` is committed with"
-            echo "the real ids, so the next Deploy run ships Tessa automatically."
+            echo "Resources created, \`apps/tessa/wrangler.jsonc\` committed with the real"
+            echo "ids, and the worker deployed. Every later push to main redeploys it."
             echo ""
             echo "Still manual, and neither can be automated:"
             echo ""
