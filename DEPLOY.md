@@ -1009,6 +1009,73 @@ has to be **verified** in Cloudflare Email Sending or nothing delivers.
 `.github/workflows/reset.yml`.** Keeping a destructive workflow around for a
 second use it was never designed for is how it eventually runs by accident.
 
+### After a reset: what has to be put back, in this order
+
+The workflow rebuilt the Cloudflare side. It touched **nothing outside your
+Cloudflare account** — so every third-party object you had (Stripe endpoints and
+products, the Gemini key in Google's console, your Turnstile widget) still
+exists, unchanged. What was lost is the row in `app_config` that pointed at each
+of them.
+
+**The distinction that saves the most time: DO NOT recreate your Stripe
+webhooks.** The endpoint URL is derived from your host, and the host did not
+change — `https://<root>/api/stripe/webhook` still resolves to a live worker.
+Both endpoints, their event selections, their pinned API version and their
+signing secrets are exactly as you left them. You are re-entering secrets, not
+re-issuing them.
+
+1. **Email.** The workflow seeds `email.provider` / `email.from` (that is the
+   whole reason it writes to D1 at the end). Confirm the sender is still
+   **verified** in Cloudflare Email Sending — verification lives on the zone,
+   not in D1, so it survived.
+2. **Sign in** at `setup.<root>` and reach the console at `admin.<root>`. Your
+   address must be in `ADMIN_EMAILS` (`wrangler.jsonc` vars — unchanged by the
+   reset).
+3. **Gemini** → Platform admin → AI. Paste the same key; the whole vision suite
+   is dead until you do. Then **Sync catalog** to repopulate `ai_models`, and
+   switch on the models you want (a fresh sync arrives with runnable lanes
+   enabled, everything else off).
+4. **Stripe** → Platform admin → Stripe. For each lane you use, paste the four
+   values back:
+   - secret key and publishable key — from Stripe → Developers → API keys;
+   - platform webhook secret — **reveal** it on your existing
+     `/api/stripe/webhook` endpoint, do not add a new endpoint;
+   - Connect webhook secret — likewise on `/api/connect/webhook`.
+
+   Then set `stripe.mode` to the lane. Re-check both endpoints are still pinned
+   to the API version in section 10b — that pin is on the Stripe object and
+   survived, but it is the setting whose drift fails silently.
+5. **Turnstile** → Platform admin → Security, if you had it on.
+6. **Custom domains** → Platform admin → Domains: `cf.saas.api_token`,
+   `zone_id`, `cname_target`, `worker_name`. Note the reset **deleted tenant
+   custom hostnames**, so each tenant re-adds its domain and re-does DCV.
+
+**The one trap in step 4: think before pressing Sync catalog.** `syncCatalog`
+creates a Stripe product + price for every plan and credit pack whose row has no
+`stripe_price_id`, and a fresh database has none — so it will mint a **second**
+set and orphan the first. Neither outcome is dangerous (an existing subscription
+keeps billing on the price it was created with, which is what you want), but pick
+deliberately:
+
+- **Let it create new ones** — simplest, and correct for a test lane or a launch
+  with no live subscribers. The old products sit unused; archive them in Stripe
+  to keep the dashboard readable.
+- **Reuse the old ones** — paste the ids back before syncing, and the sync skips
+  those rows:
+
+  ```sh
+  cd apps/api && pnpm exec wrangler d1 execute DB --remote \
+    --command "UPDATE plans SET stripe_product_id='prod_…', stripe_price_id='price_…' WHERE id='pro'"
+  ```
+
+**If you had live subscribers**, their Stripe customers and subscriptions still
+exist and now point at tenant ids this database has never seen. The next renewal
+arrives as an `invoice.paid` that `tenantByCustomer` cannot resolve — and it will
+land in `rail_parked_events` rather than being answered 200 and forgotten (that
+dead letter is `@4dl/billing-rail`'s entire purpose). Check that table after the
+first billing cycle. If the old data was disposable, cancel those subscriptions
+in Stripe instead.
+
 ---
 
 ## 14. Known operational gaps
