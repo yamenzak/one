@@ -31,10 +31,17 @@ out of a section before it leaves the console.
 
 ## What a panel may live here
 
-Only configuration a **shared package already owns**. Email delivery qualifies:
-`email.provider`, `email.from`, `email.platform_from` and
-`email.credits_per_email` are `@4dl/email`'s keys, read by nothing else, and its
-provider fails closed when they are unset. Nothing about them is Kova's.
+Only configuration a **shared package already owns**. Two qualify today:
+
+- **Email delivery** — `email.provider`, `email.from`, `email.platform_from` and
+  `email.credits_per_email` are `@4dl/email`'s keys, read by nothing else, and
+  its provider fails closed when they are unset. Nothing about them is Kova's.
+- **Maintenance** — `@4dl/tenancy`'s deployment-wide switch (`off` / `readonly` /
+  `full`). Closing a deployment for a migration is not something one app does
+  differently from another, and the panel's real job is the same everywhere:
+  spell out what the selected level does *before* it is pressed, say out loud
+  which doors stay open, and make the step that ends every session take a second
+  press.
 
 Kova's own sections — studios, plans, Stripe, promo codes, the starter exercise
 library — stay in the app, and always will.

@@ -83,8 +83,9 @@ packages/
              # silent no-ops. Pure. See its README.
   tenancy/   # @4dl/tenancy — multi-tenant ADDRESSING: the five doors, host→tenant
              # resolution + KV cache, custom domains (Cloudflare for SaaS + DCV),
-             # the standing/host-gate model. `@4dl/tenancy/model` is the pure half
-             # the browser may import. See its README.
+             # the standing/host-gate model, and the deployment-wide MAINTENANCE
+             # switch. `@4dl/tenancy/model` is the pure half the browser may
+             # import. See its README.
   domain/    # @kova/domain — Kova's pure logic (no I/O): nutrition/TDEE, body-fat,
              # activity/workout math, progress, plus the product registries
              # (entitlements, perms, budgets, notifications, features). Tested.
@@ -98,7 +99,8 @@ packages/
              # answered 200 and forgotten. See its README.
   admin/     # @4dl/admin — the OPERATOR CONSOLE on every app's `admin.` door:
              # the router-free section-registry shell, plus panels for config a
-             # shared package owns (email delivery). The SECTIONS are the app's.
+             # shared package owns (email delivery, maintenance). The SECTIONS
+             # are the app's.
              # See its README.
   app-kit/   # @4dl/app-kit — the BROWSER runtime: the typed fetch layer and its
              # three-way offline outcome (queued | offline | HTTP error), host
@@ -214,6 +216,18 @@ remote bindings without editing the config (this is what the E2E suite does).
     `wrangler dev` rewrite the incoming Host to the route's hostname, which collapses
     every door onto the root. The two production routes are a dashboard step
     (DEPLOY.md §11). Read the header comment before adding them back.
+- **Maintenance is the host gate one level up** (`@4dl/tenancy` maintenance.ts).
+  `resolveHostGate` closes ONE tenant's origin over ONE tenant's bill;
+  `platform.maintenance` closes EVERY door because an operator said so —
+  `readonly` (writes refused, reads served, nobody signed out) or `full` (the app
+  withheld, sign-in disabled, every non-operator session ended). Read once per
+  request by `maintenanceMiddleware`, reported on `/api/host`, enforced as gate 1b
+  in the route guard — **above** the public gate, because "sign-in is disabled" is
+  a claim about a public lane. The exemptions are the feature and none of them is
+  optional: the `admin.` door, a platform admin anywhere, `/health`, the host
+  probe and the Stripe webhooks. Unlike the console gate below it, this one does
+  NOT stand down on `isDevRoot` — that would spare every request in dev and in the
+  integration suite, so the switch would appear to work and withhold nothing.
 - **Two access ladders, and they must not be confused.**
   - **Kova → tenant** (`@4dl/billing` dunning.ts + `@4dl/tenancy` standing.ts): past_due →
     **7d read-only** → **30d blocked** → **37d purged**, all anchored on
@@ -309,13 +323,13 @@ handlers are woven through Kova's notification registry, entitlement gates and
 `requireClientAccess`. Only the reconciliation logic moved.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured most recently, per package: **508 API + 197 domain + 83 app +
-73 tenancy + 43 ui + 35 billing-rail + 25 commerce + 21 billing + 16 template +
-14 core + 14 purge + 12 ai + 12 auth + 7 protocol + 3 admin + 3 app-kit +
-3 storage + 3 email + 3 notify** (1,075 total, 38 skipped). The ui count DROPPED and the app count rose by the
+moves. Measured most recently, per package: **519 API + 197 domain + 84 tenancy +
+83 app + 43 ui + 35 billing-rail + 32 ai + 25 commerce + 21 billing + 17 template +
+14 core + 14 purge + 12 auth + 7 protocol + 3 admin + 3 app-kit +
+3 storage + 3 email + 3 notify** (1,118 total, 38 skipped). The ui count DROPPED and the app count rose by the
 same shape: Stage 0b moved Kova's eleven accent tones — and the contrast tests
-that guard them — out of `@4dl/ui` and into the app. The template's 16 are 11
-conformance (plain Node, no fixtures) + 5 integration (the real worker through
+that guard them — out of `@4dl/ui` and into the app. The template's 17 are 11
+conformance (plain Node, no fixtures) + 6 integration (the real worker through
 Miniflare, on the real `*.localhost` host topology).
 Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
 `@4dl/platform` to `@4dl/tenancy`; the split moves tests, it does not add any.

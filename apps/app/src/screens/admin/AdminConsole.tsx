@@ -25,10 +25,10 @@ import {
   AlertTriangle, Badge, Building2, Button, Callout, Card, ChevronRight, Chip, CircleAlert, CircleCheck,
   ConfirmDialog, CreditCard, EmptyState, Eyebrow, Field, Gift, GlanceStrip, Globe, IconBadge, Info, Input, KeyRound, ThumbsUp,
   Dumbbell, LayoutGrid, Mail, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, Sheet, ShieldCheck, Wand2,
-  Skeleton, SkeletonLine, Play, Plug, Spinner, Stagger, Switch, Tag, Trash2, Wallet, cn, toneText, type Tone,
+  Skeleton, SkeletonLine, Play, Plug, Spinner, Stagger, Switch, Tag, Trash2, Wallet, Wrench, cn, toneText, type Tone,
   ActionResult, ConfigRow, FieldGroup, LoadError, useLoad, useAction as useActionBase,
 } from "@4dl/ui";
-import { AdminConsole as Console, PlatformEmailSection, type ConsoleSection } from "@4dl/admin";
+import { AdminConsole as Console, PlatformEmailSection, PlatformMaintenanceSection, type ConsoleSection } from "@4dl/admin";
 import { SectionSplit } from "../SectionSplit.js";
 import { api, errorText } from "../../api.js";
 import { fmtPrice } from "../../money.js";
@@ -62,6 +62,11 @@ const ADMIN_SECTIONS: ConsoleSection[] = [
      it had no caller at all, and a fresh deploy could not send the sign-in code
      that is the only way in — DEPLOY.md carried it as a hand-edit-D1 step. */
   { key: "email", label: "Email delivery", blurb: "How this deployment sends mail, and what a tenant pays per send", icon: Mail, tone: "primary", render: () => <PlatformEmailSection api={api} errorText={errorText} /> },
+  /* Also `@4dl/admin`'s: closing a deployment for a migration is not a thing
+     Kova does differently from any other app on the platform. Last but one, next
+     to Security, because both are switches you arrive at deliberately rather
+     than surfaces you browse. */
+  { key: "maintenance", label: "Maintenance", blurb: "Put the whole platform in read-only, or close it entirely", icon: Wrench, tone: "danger", render: () => <PlatformMaintenanceSection api={api} errorText={errorText} /> },
   /* The blurb used to promise "sessions, admin access" — neither of which this
      section has ever had. A table of contents that lies is worse than none. */
   { key: "security", label: "Security", blurb: "The bot check on sign-in, and the platform reset", icon: ShieldCheck, tone: "danger", render: () => <SecurityConfig /> },

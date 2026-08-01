@@ -24,6 +24,7 @@ import {
   type AuthUser,
   type AuthVars,
 } from "@4dl/auth";
+import type { Maintenance } from "@4dl/tenancy";
 import { CUSTOMER_ROLE, statement } from "./access.js";
 import { createAuth, type Auth } from "./auth.js";
 import { ensureSchema } from "./db.js";
@@ -32,7 +33,8 @@ import type { Env } from "./env.js";
 
 export type { AuthUser, HostContext };
 
-export type AppVars = AuthVars<Auth, Branding>;
+/** The package's variables, plus the maintenance switch the middleware resolves. */
+export type AppVars = AuthVars<Auth, Branding> & { maintenance: Maintenance };
 export type AppEnv = { Bindings: Env; Variables: AppVars };
 export type AppContext = Context<AppEnv>;
 type PkgEnv = AuthEnv<Env, Auth, Branding>;

@@ -254,6 +254,9 @@ importers:
 
   packages/admin:
     dependencies:
+      '@4dl/tenancy':
+        specifier: workspace:*
+        version: link:../tenancy
       '@4dl/ui':
         specifier: workspace:*
         version: link:../ui

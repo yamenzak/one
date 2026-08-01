@@ -28,6 +28,7 @@
  */
 
 import { routeGuard, type Grant } from "@4dl/auth";
+import type { AppContext } from "./auth-context.js";
 import type { Auth } from "./auth.js";
 import type { Branding } from "./host-context.js";
 import type { Env } from "./env.js";
@@ -67,6 +68,22 @@ const allowedWithoutTenant = (path: string): boolean => path === "/api/host" || 
 const allowedWhileReadOnly = (path: string): boolean =>
   path.startsWith("/api/webhooks/") || path.startsWith("/api/me/") || path === "/api/tenant/close";
 
+/**
+ * Paths that answer even while the DEPLOYMENT is closed for maintenance.
+ *
+ * `/health` and the `admin.` door are exempt inside the engine. This is the
+ * app's own short list, and it is short on purpose:
+ *
+ *   `/api/host`         carries the maintenance state, so it is how the app
+ *                       learns to render the notice instead of a broken login.
+ *   `/api/webhooks/*`   signature-verified provider callbacks. A payment webhook
+ *                       dropped during a window is not retried forever — the
+ *                       provider disables the endpoint, and money is captured
+ *                       with nothing granted.
+ */
+const maintenanceExempt = (path: string): boolean =>
+  path === "/api/host" || path.startsWith("/api/webhooks/");
+
 export const guard = routeGuard<Env, Auth, Branding>({
   isPublic,
   permissionFor,
@@ -80,4 +97,9 @@ export const guard = routeGuard<Env, Auth, Branding>({
   gate: (c) => c.get("host").gate,
   isBillingWrite: (path) => path.startsWith("/api/billing"),
   billingPermission: { billing: ["manage"] },
+  // The DEPLOYMENT-wide switch, resolved once per request by
+  // `maintenanceMiddleware` (index.ts). Same injection shape as `gate` above,
+  // for the same reason: `@4dl/auth` learns nothing about where it is stored.
+  maintenance: (c) => (c as unknown as AppContext).get("maintenance"),
+  maintenanceExempt,
 });

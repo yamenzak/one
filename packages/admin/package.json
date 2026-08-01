@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The operator console every 4DL app needs on its `admin.` door: the section-registry shell, and the panels for configuration that a shared package owns rather than the app. No product vocabulary — see README.md.",
+  "description": "The operator console every 4DL app needs on its `admin.` door: the section-registry shell, and the panels for configuration that a shared package owns rather than the app. No product vocabulary \u2014 see README.md.",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -15,6 +15,7 @@
     "clean": "rm -rf .turbo *.tsbuildinfo"
   },
   "dependencies": {
+    "@4dl/tenancy": "workspace:*",
     "@4dl/ui": "workspace:*"
   },
   "peerDependencies": {

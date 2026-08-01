@@ -22,11 +22,14 @@
 import { Hono } from "hono";
 import { newId, nowIso } from "@4dl/core";
 import { sessionMiddleware, requirePermission, requireTenant, isPlatformAdmin, type AppEnv } from "./auth-context.js";
+import type { Env } from "./env.js";
 import { createAuth } from "./auth.js";
 import { guard } from "./route-guard.js";
 import { domainAdminRoutes, domainRoutes } from "./domain-routes.js";
 import { orgCreateGuard, orgUpdateGuard } from "./org-guard.js";
 import { emailAdminRoutes } from "@4dl/email/admin-routes";
+import { maintenanceAdminRoutes, maintenanceMiddleware } from "@4dl/tenancy";
+import type { MiddlewareHandler } from "hono";
 
 export { TenantBillingDO } from "./billing-do.js";
 export { InboxDO } from "./inbox-do.js";
@@ -34,6 +37,10 @@ export { InboxDO } from "./inbox-do.js";
 const app = new Hono<AppEnv>();
 
 app.use("*", sessionMiddleware);
+// Resolve the deployment-wide maintenance switch once per request, between the
+// session and the guard: the guard refuses on it and `/api/host` reports it, and
+// both must see the same read.
+app.use("*", maintenanceMiddleware() as unknown as MiddlewareHandler<AppEnv>);
 app.use("*", guard);
 
 app.get("/health", (c) => c.json({ ok: true }));
@@ -110,6 +117,27 @@ app.route("/api", domainAdminRoutes);
 app.route("/api", emailAdminRoutes(
   { isPlatformAdmin: (c) => isPlatformAdmin(c as never) },
   { from: "Template <noreply@template.local>" },
+) as unknown as Hono<AppEnv>);
+
+/**
+ * The maintenance switch, on the operator door.
+ *
+ * `signOutEveryone` is injected because the session table is `@4dl/auth`'s and
+ * because WHO counts as an operator is this app's answer — sign the operator out
+ * along with everyone else and they lose the console they are standing in.
+ */
+app.route("/api", maintenanceAdminRoutes(
+  { isPlatformAdmin: (c) => isPlatformAdmin(c as never) },
+  {
+    signOutEveryone: async (c) => {
+      const res = await (c.env as Env).DB
+        .prepare('DELETE FROM "session" WHERE userId NOT IN (SELECT id FROM "user" WHERE LOWER(email) IN (SELECT value FROM json_each(?)))')
+        .bind(JSON.stringify(((c.env as Env).ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean)))
+        .run()
+        .catch(() => null);
+      return res?.meta?.changes ?? 0;
+    },
+  },
 ) as unknown as Hono<AppEnv>);
 
 app.notFound((c) => c.json({ error: "not_found" }, 404));

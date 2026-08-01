@@ -8,6 +8,7 @@ export * from "./inbox.js";
 export * from "./passkey.js";
 export * from "./stripe.js";
 export * from "./hard-refresh.js";
+export * from "./RefreshNote.js";
 export * from "./Turnstile.js";
 export * from "./ErrorBoundary.js";
 export * from "./PaymentSheet.js";

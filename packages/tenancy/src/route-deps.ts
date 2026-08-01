@@ -26,6 +26,7 @@
 
 import type { Context } from "hono";
 import type { HostContext, RootDomainEnv, TenancyBindings } from "./host-context.js";
+import type { Maintenance } from "./maintenance.js";
 
 /** The bindings any tenancy route needs. */
 export type RouteBindings = TenancyBindings & RootDomainEnv;
@@ -39,6 +40,14 @@ export type RouteBindings = TenancyBindings & RootDomainEnv;
 export interface RouteVars {
   host: HostContext<unknown>;
   user?: { id: string } | null;
+  /**
+   * The deployment-wide maintenance switch, resolved once per request by
+   * `maintenanceMiddleware`.
+   *
+   * Optional so an app that never mounts the middleware still satisfies this
+   * structurally — the host probe reports `off` and nothing is withheld.
+   */
+  maintenance?: Maintenance | null;
 }
 
 export type RouteEnv = { Bindings: RouteBindings; Variables: RouteVars };

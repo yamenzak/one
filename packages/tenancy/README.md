@@ -7,6 +7,8 @@ that tenant's whole origin is currently writable.
 |---|---|
 | `hosts.ts` | The five doors, slug rules, `rpIdFor`, `cookieDomainFor`. Pure. |
 | `standing.ts` | `resolveStanding` (what a person may do in one tenancy) and `resolveHostGate` (does this tenant's host serve a working app), plus the dunning ladder. Pure. |
+| `maintenance.ts` | The same question for the WHOLE deployment, from an operator's switch rather than anyone's subscription: `off` / `readonly` / `full`. Pure. |
+| `maintenance-routes.ts` | That switch over `app_config` — the per-request middleware and the two operator routes. D1 + Hono. |
 | `dcv.ts` | Turning Cloudflare's certificate errors into a record an owner can add. Pure. |
 | `host-context.ts` | Host → tenant resolution, the KV identity cache, subdomain provisioning, `canonicalHost`. D1. |
 | `cloudflare.ts` | The Cloudflare for SaaS custom-hostname + worker-route client. |
@@ -15,7 +17,8 @@ Two entry points, and the split is load-bearing:
 
 - **`@4dl/tenancy`** — everything, including the D1 and Cloudflare halves. For the
   worker.
-- **`@4dl/tenancy/model`** — `hosts` + `standing` + `dcv` only. No bindings, no
+- **`@4dl/tenancy/model`** — `hosts` + `standing` + `dcv` + the maintenance MODEL
+  only. No bindings, no
   Workers types, safe in a browser build. The app needs `tenantStandingOfGate` to
   render a suspended tenant and `checkSlug` to validate an address as it is typed;
   it must never reach the resolver. Importing the root from a browser build is a
@@ -37,6 +40,36 @@ root that we do not serve must NOT fall through to the custom-domain lookup —
 that lookup is keyed on a column an owner can write to, so treating
 `api.<root>` as a candidate would let a tenant claim an infrastructure host by
 typing it into a form.
+
+## Maintenance — the host gate, one level up
+
+`resolveHostGate` closes ONE tenant's origin because of that tenant's bill.
+`maintenance.ts` closes EVERY door at once because an operator said so: a
+migration, a schema change, an incident.
+
+```
+off        nothing is withheld
+readonly   reads served, every write refused, nobody signed out
+full       the app is withheld, signing in is disabled, every session ends
+```
+
+The state lives in three `app_config` rows, is read once per request by
+`maintenanceMiddleware`, reported on `/api/host` (so the app can render the
+notice rather than a broken login), and enforced in `@4dl/auth`'s route guard as
+gate 1b — **above** the public gate, because "signing in is disabled" is a claim
+about a public lane.
+
+**The exemptions are the feature.** A switch that can lock out the person who has
+to turn it off is a trap, not a control, so four things always answer: the
+`admin.` door, a platform admin on any door, `/health`, and whatever the app
+lists in `maintenanceExempt` (its host probe and its signature-verified payment
+webhooks — a dropped webhook is money no retry recovers). At `readonly` the
+sign-in lane answers too, or "read-only" would refuse the one act that lets
+anyone read anything.
+
+An unparseable level resolves to `off`, deliberately: the row is free text, and
+failing closed on a typo would take the deployment down for a reason nobody chose
+— with the fix being to edit the very row causing the lockout.
 
 ## What the app supplies
 

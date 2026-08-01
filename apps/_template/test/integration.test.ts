@@ -175,3 +175,33 @@ describe("what an unauthenticated caller can reach", () => {
     expect(res.status).toBeLessThan(500);
   });
 });
+
+/**
+ * The maintenance switch, wired.
+ *
+ * One test, because the LEVELS are `@4dl/tenancy`'s and are covered by its own
+ * suite. What can only fail here is the wiring: the middleware mounted after the
+ * guard instead of before it (the switch resolves to nothing and withholds
+ * nothing), or `maintenanceExempt` forgetting the host probe (the app can no
+ * longer tell "closed" from "broken"). Both typecheck perfectly.
+ *
+ * Signed out on purpose — every test user here is a platform admin, and a
+ * platform admin is exempt from this gate by design.
+ */
+describe("maintenance", () => {
+  it("closes the deployment while still answering the host probe", async () => {
+    const put = "INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value";
+    await db().prepare(put).bind("platform.maintenance", "full").run();
+    try {
+      const closed = await SELF.fetch(`${SETUP}/api/records`);
+      expect(closed.status).toBe(503);
+      expect(await closed.json()).toMatchObject({ error: "maintenance", level: "full" });
+
+      const probe = await SELF.fetch(`${SETUP}/api/host`);
+      expect(probe.status).toBe(200);
+      expect(await probe.json()).toMatchObject({ maintenance: { level: "full" } });
+    } finally {
+      await db().prepare(put).bind("platform.maintenance", "off").run();
+    }
+  });
+});

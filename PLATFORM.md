@@ -21,7 +21,7 @@ It typechecks and its tests pass in this workspace, so it cannot rot.
 | Package | What it owns | What the APP supplies |
 |---|---|---|
 | [`@4dl/core`](packages/core/README.md) | ids, defensive JSON, the **bindings contract**, the **composed schema runner**, the boundary checker | its `SchemaModule`s |
-| [`@4dl/tenancy`](packages/tenancy/README.md) | the five doors, host→tenant + KV cache, custom domains (CF for SaaS + DCV), the standing/gate model | root domain, reserved labels, `statusOf` |
+| [`@4dl/tenancy`](packages/tenancy/README.md) | the five doors, host→tenant + KV cache, custom domains (CF for SaaS + DCV), the standing/gate model, the deployment-wide maintenance switch | root domain, reserved labels, `statusOf` |
 | [`@4dl/auth`](packages/auth/README.md) | passwordless identity (OTP + passkeys), the request identity, the **five-gate route guard**, the grant algebra, staff seats, step-up codes | the RBAC registry, the route table, brand, seat quota |
 | [`@4dl/billing`](packages/billing/README.md) | the entitlement engine, credit metering, `CreditLedgerDO`, the Stripe client, the dunning ladder | quota + feature keys, the plan catalog |
 | [`@4dl/commerce`](packages/commerce/README.md) | what a tenant sells its own customers: budgets (queue, never sum), the customer-lapse ladder, discount codes | the scope list, the lapse copy |
@@ -32,7 +32,7 @@ It typechecks and its tests pass in this workspace, so it cannot rot.
 | [`@4dl/purge`](packages/purge/README.md) | **erasure derived** from every module's `scoped` declaration, plus two conformance checks | the non-D1 side effects |
 | [`@4dl/ui`](packages/ui/README.md) | the design system: tokens + product-agnostic primitives | its own registries and router |
 | [`@4dl/app-kit`](packages/app-kit/README.md) | the browser runtime: fetch + the three-way offline outcome, host resolution, prefixed storage, passkeys, Stripe.js, Turnstile | the queued-write pattern, the shell |
-| [`@4dl/admin`](packages/admin/README.md) | the operator console on the `admin.` door: the router-free section-registry shell, and panels for config a shared package owns (email delivery) | the SECTION LIST — every section names something the app manages |
+| [`@4dl/admin`](packages/admin/README.md) | the operator console on the `admin.` door: the router-free section-registry shell, and panels for config a shared package owns (email delivery, maintenance mode) | the SECTION LIST — every section names something the app manages |
 | [`@4dl/billing-rail`](packages/billing-rail/README.md) | one Stripe account, many apps: event→app attribution, the app-tagged catalog, and a dead-letter queue for what it cannot attribute | the app list, and a `claims` lookup for events its own metadata does not name |
 
 Kova keeps [`@kova/domain`](packages/domain/README.md) (its math and its
