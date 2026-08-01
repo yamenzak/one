@@ -272,7 +272,7 @@ function allowedWhileReadOnly(path: string): boolean {
 /** Billing surfaces the owner of a lapsed studio may still write to, so the one
  *  action that fixes the situation is reachable from inside the lock. */
 function isBillingWrite(path: string): boolean {
-  return path.startsWith("/api/billing") || path.startsWith("/api/stripe/") || path === "/api/connect/onboard";
+  return path.startsWith("/api/billing") || path.startsWith("/api/stripe/");
 }
 
 

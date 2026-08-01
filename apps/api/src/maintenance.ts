@@ -34,7 +34,17 @@ import type { Env } from "./env.js";
  *                       like an omission.
  */
 export function maintenanceExempt(path: string): boolean {
-  return path === "/api/host" || path === "/api/stripe/webhook" || path === "/api/connect/webhook";
+  return (
+    path === "/api/host" ||
+    path === "/api/stripe/webhook" ||
+    // The TENANT rail's provider callback. Same reasoning as the platform
+    // webhook and, if anything, sharper: this one carries a payment a studio's
+    // customer already made on the studio's own account. Refusing it during a
+    // maintenance window means money left the customer, the notification was
+    // dropped, and the access was never granted — with the studio's provider
+    // eventually disabling the endpoint for repeated failures.
+    /^\/api\/pay\/webhook\/[^/]+$/.test(path)
+  );
 }
 
 /**

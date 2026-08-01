@@ -838,156 +838,16 @@ describe.skipIf(!IS_TEST_KEY)("real Stripe", () => {
   });
 
   // ══ 7. Connect rail ══════════════════════════════════════════════════════
-  describe("Connect rail", () => {
-    let acctId = "";
-    /** A connected account can only be charged in a currency it supports, and
-     *  that follows the PLATFORM's country — so read it rather than hard-coding
-     *  usd, or this suite only passes on a US sandbox. */
-    let acctCurrency = "usd";
-
-    beforeAll(async () => {
-      // Exactly what `/connect/onboard` creates.
-      const acct = await stripeCall<{ id: string; default_currency?: string }>(LIVE_KEY, "accounts", { type: "standard", "metadata[kova_tenant]": "t_live_connect" });
-      acctId = acct.id;
-      acctCurrency = acct.default_currency ?? "usd";
-      trackJunk({ kind: "account", id: acctId });
-    }, 120_000);
-
-    it("creates a `standard` account that cannot sell yet — the three flags /connect/checkout gates on", async () => {
-      const a = await must<{ type: string; charges_enabled: boolean; payouts_enabled: boolean; details_submitted: boolean; metadata: Record<string, string> }>(`accounts/${acctId}`);
-      expect(a.type).toBe("standard");
-      expect(a.metadata.kova_tenant).toBe("t_live_connect");
-      // `syncConnectAccount` mirrors these three; all false until onboarding.
-      expect(a.charges_enabled).toBe(false);
-      expect(a.payouts_enabled).toBe(false);
-      expect(a.details_submitted).toBe(false);
-    }, 60_000);
-
-    it("mints an account-onboarding link", async () => {
-      const link = await stripeCall<{ url: string }>(LIVE_KEY, "account_links", {
-        account: acctId,
-        refresh_url: `${ORIGIN}/settings`,
-        return_url: `${ORIGIN}/settings`,
-        type: "account_onboarding",
-      });
-      expect(link.url).toMatch(/^https:\/\/connect\.stripe\.com\//);
-    }, 60_000);
-
-    it("scopes every object to the account named by the `Stripe-Account` header", async () => {
-      const onAcct = await must<{ id: string }>("customers", { body: { email: `kova-live-scoped-${Date.now()}@example.com` }, account: acctId });
-      // Without the header the platform cannot even see it. This is why every
-      // Connect-rail call in stripe-routes.ts passes `connectedAccount`.
-      expect((await rawStripe(`customers/${onAcct.id}`)).status).toBe(404);
-      expect((await rawStripe(`customers/${onAcct.id}`, { account: acctId })).status).toBe(200);
-    }, 90_000);
-
-    it("delivers `account.updated` carrying the id + the three capability flags + our metadata", async () => {
-      // Nudge the account so Stripe emits the event. `metadata` is the one field
-      // a platform can always write on a `standard` account it created — a
-      // `business_profile` write is the account owner's and can 403 ("this
-      // application does not have the required permissions for the parameter
-      // 'business_profile'"), which is itself worth knowing: nothing in
-      // stripe-routes.ts writes a connected account's profile, and it must not.
-      const nudge = await rawStripe(`accounts/${acctId}`, { body: { "metadata[kova_probe]": String(Date.now()) } });
-      expect(nudge.status, nudge.json.error?.message).toBe(200);
-      // Connect events are NOT in the platform's own /v1/events list — they are
-      // account-scoped over the API, and carry `event.account` on delivery.
-      const ev = await waitForEvent((e) => e.data.object.id === acctId, { types: ["account.updated"], account: acctId, timeoutMs: 120_000 });
-      expect(ev.account, "the connected account the event fired for").toBe(acctId);
-      const a = ev.data.object;
-      expect(a.object).toBe("account");
-      expect(a.id).toBe(acctId);
-      // Every field `syncConnectAccount` binds, present and boolean.
-      for (const k of ["charges_enabled", "payouts_enabled", "details_submitted"]) {
-        expect(a, `account.updated must carry ${k}`).toHaveProperty(k);
-        expect(typeof a[k]).toBe("boolean");
-      }
-      expect((a.metadata as Record<string, string>).kova_tenant).toBe("t_live_connect");
-    }, 240_000);
-
-    it("takes a direct charge with an application_fee_amount, routed by Stripe-Account", async () => {
-      const pm = await testCardPm("tok_visa", acctId);
-      // The `/connect/pay-intent` shape: direct charge on the connected account,
-      // application fee to the platform, kova ids on the metadata.
-      const pi = await stripeCall<{ id: string; status: string; application_fee_amount: number; latest_charge: string; metadata: Record<string, string> }>(
-        LIVE_KEY,
-        "payment_intents",
-        {
-          amount: 20_000,
-          currency: acctCurrency,
-          payment_method: pm,
-          confirm: "true",
-          "automatic_payment_methods[enabled]": "true",
-          "automatic_payment_methods[allow_redirects]": "never",
-          application_fee_amount: 1_000,
-          "metadata[kova_tenant]": "t_live_connect",
-          "metadata[kova_client]": "cl_live_1",
-          "metadata[kova_package]": "pkg_live_1",
-        },
-        { connectedAccount: acctId },
-      );
-      expect(pi.status).toBe("succeeded");
-      expect(pi.application_fee_amount).toBe(1_000);
-      expect(pi.metadata.kova_client).toBe("cl_live_1");
-
-      const ch = await must<{ amount: number; application_fee_amount: number; metadata: Record<string, string>; captured: boolean }>(`charges/${pi.latest_charge}`, { account: acctId });
-      expect(ch.amount).toBe(20_000);
-      expect(ch.application_fee_amount).toBe(1_000);
-      expect(ch.captured).toBe(true);
-      // The Connect webhook's `payment_intent.succeeded` branch reads these.
-      expect(ch.metadata.kova_tenant).toBe("t_live_connect");
-      expect(ch.metadata.kova_package).toBe("pkg_live_1");
-      // Invisible to the platform without the header, on the charge too.
-      expect((await rawStripe(`charges/${pi.latest_charge}`)).status).toBe(404);
-
-      // A partial refund on the connected account reports the same cumulative
-      // shape as the platform rail (the Connect handler only notifies, but the
-      // payload it notifies from is this one).
-      await must("refunds", { body: { charge: pi.latest_charge, amount: 5_000 }, account: acctId });
-      const refunded = await waitForEvent((e) => e.data.object.id === pi.latest_charge && e.data.object.amount_refunded === 5_000, { types: ["charge.refunded"], account: acctId, timeoutMs: 180_000 });
-      expect(refunded.data.object.object).toBe("charge");
-      expect(refunded.data.object.amount).toBe(20_000);
-      expect(refunded.data.object.amount_refunded).toBe(5_000);
-    }, 300_000);
-
-    it("does NOT reject an application_fee_amount >= the charge amount (the clamp's stated reason does not hold)", async () => {
-      // `/connect/pay-intent` clamps the fee to `amount - 1` "because Stripe
-      // rejects a fee >= amount on a direct charge". Stripe test mode does not:
-      // both of these are accepted AND succeed, i.e. the platform can take the
-      // entire charge (or more). The clamp is still worth keeping — it is the
-      // only thing protecting the tenant — but it is OUR rule, not Stripe's.
-      const eq = await rawStripe<{ status?: string }>("payment_intents", {
-        body: { amount: 1_000, currency: acctCurrency, payment_method: await testCardPm("tok_visa", acctId), confirm: "true", "automatic_payment_methods[enabled]": "true", "automatic_payment_methods[allow_redirects]": "never", application_fee_amount: 1_000 },
-        account: acctId,
-      });
-      expect(eq.status).toBe(200);
-      expect(eq.json.status).toBe("succeeded");
-
-      const over = await rawStripe<{ status?: string }>("payment_intents", {
-        body: { amount: 1_000, currency: acctCurrency, payment_method: await testCardPm("tok_visa", acctId), confirm: "true", "automatic_payment_methods[enabled]": "true", "automatic_payment_methods[allow_redirects]": "never", application_fee_amount: 1_500 },
-        account: acctId,
-      });
-      expect(over.status).toBe(200);
-      expect(over.json.status).toBe("succeeded");
-    }, 240_000);
-
-    it("documents where headless Connect onboarding stops on this sandbox", async () => {
-      // `charges_enabled` never flips without the interactive onboarding form,
-      // and every account type that could be enabled from the API is refused
-      // outright for this platform's country. So `/connect/status` reaching
-      // chargesEnabled: true is NOT reachable from a test.
-      const custom = await rawStripe("accounts", { body: { type: "custom", country: "US", "capabilities[card_payments][requested]": "true" } });
-      expect(custom.status).toBe(400);
-      const express = await rawStripe("accounts", { body: { type: "express", "capabilities[card_payments][requested]": "true", "capabilities[transfers][requested]": "true" } });
-      expect(express.status).toBe(400);
-      console.log(`[stripe-live] Connect onboarding stops here — custom: ${custom.json.error?.message} | express: ${express.json.error?.message}`);
-      // Charges still succeed above despite charges_enabled === false, so the
-      // `charges_enabled` gate in /connect/checkout is OUR product rule; test
-      // mode does not enforce it.
-      const a = await must<{ charges_enabled: boolean }>(`accounts/${acctId}`);
-      expect(a.charges_enabled).toBe(false);
-    }, 180_000);
-  });
+  /**
+   * The Connect rail suite lived here and is gone with the rail.
+   *
+   * It exercised account creation, the three capability flags and the
+   * application-fee clamp against real Stripe. None of that is reachable any
+   * more: a studio is paid on its OWN provider, and Kova holds no connected
+   * account to create, inspect or take a fee from. Deleted rather than skipped,
+   * because a skipped suite reads as "temporarily off" and this one is not
+   * coming back — see payments-routes.ts and CLAUDE.md.
+   */
 
   // ══ 8. Version drift: what the pin buys and what it cannot ═══════════════
   describe("API-version drift, observed on real objects", () => {

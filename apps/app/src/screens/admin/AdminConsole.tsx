@@ -2503,7 +2503,7 @@ function StripeConfig() {
                         <div className="text-[13px] font-medium">Webhook signing secrets ({lane})</div>
                         <p className="text-[13px] text-muted-foreground">
                           Two endpoints, two secrets, <b>and a separate pair per lane</b>. <span className="font-medium text-foreground">Platform</span> is <code>/api/stripe/webhook</code> (studios paying Kova).
-                          {" "}<span className="font-medium text-foreground">Connect</span> is <code>/api/connect/webhook</code> (clients paying their coach) and needs “Listen to events on connected accounts” enabled.
+                          {" "}There is no second endpoint: studios are paid on their own provider, and each registers its own webhook from Business → Getting paid.
                           Without the Connect secret, a client&apos;s payment succeeds and no access is granted.
                         </p>
                         <Field

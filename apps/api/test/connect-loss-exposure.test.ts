@@ -185,7 +185,10 @@ describe("the charge is capped independently of the editor", () => {
     // the money; if only the zod schema existed, this purchase would go through.
     await db()
       .prepare(
-        "INSERT INTO packages (id, tenant_id, name, one_time_price_cents, currency, visibility, active, created_at) VALUES (?, ?, ?, ?, 'usd', 'private', 1, ?)",
+        // `marketplace`, NOT `private`. A grant-only package is refused by the
+        // visibility rule before the price is ever looked at, so this test would
+        // have passed without a ceiling existing at all.
+        "INSERT INTO packages (id, tenant_id, name, one_time_price_cents, currency, visibility, active, created_at) VALUES (?, ?, ?, ?, 'usd', 'marketplace', 1, ?)",
       )
       .bind("pkg_overcap", tenantId, "Legacy Overpriced", MAX_PACKAGE_PRICE_CENTS + 500_000, new Date().toISOString())
       .run();
@@ -195,18 +198,18 @@ describe("the charge is capped independently of the editor", () => {
       headers: H(owner),
       body: JSON.stringify({ displayName: "Buyer" }),
     });
-    const clientId = ((await client.json()) as { id: string }).id;
+    const clientId = ((await client.json()) as { client: { id: string } }).client.id;
 
-    const res = await SELF.fetch(`${ORIGIN}/api/connect/checkout`, {
+    const res = await SELF.fetch(`${ORIGIN}/api/purchases`, {
       method: "POST",
       headers: H(owner),
-      body: JSON.stringify({ clientId, packageId: "pkg_overcap", returnUrl: "https://example.test/back" }),
+      body: JSON.stringify({ clientId, packageId: "pkg_overcap" }),
     });
-    // It must NOT be a 2xx. Which non-2xx depends on how far the request gets
-    // before the cap (Stripe unconfigured / no connected account also refuse
-    // here), so assert the invariant that matters — no charge is created —
-    // rather than pinning an order of guards that is allowed to change.
-    expect(res.ok).toBe(false);
+    // Pinned precisely, not just "not 2xx". A loose assertion here is how this
+    // test previously kept passing after the route it called stopped existing:
+    // a 404 is also "not ok". The cap must be the reason.
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ maxCents: MAX_PACKAGE_PRICE_CENTS });
   });
 });
 

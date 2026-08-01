@@ -255,7 +255,7 @@ export const sessionRoutes = new Hono<AppEnv>()
 /** Promo codes (website-native discounts on a tenant's client purchases) —
  *  distinct from redemption day top-ups. Percentage or fixed; optionally
  *  exclusive to a specific package and/or a specific client. Applied at checkout
- *  by the tenant rail (connect/pay-intent); never a Stripe coupon. */
+ *  by the tenant's own payment rail; never a Stripe coupon. */
 export const promoRoutes = new Hono<AppEnv>()
   .get("/promo-codes", async (c) => {
     const who = requireTenant(c)!;

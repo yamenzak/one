@@ -1,8 +1,13 @@
 /**
- * Stripe routes (SPEC §7) — platform rail (plan checkout, pack checkout,
- * webhook) + Connect rail (account onboarding, client-package checkout with
- * no application fee, connect webhook). Admin config endpoints under
+ * Stripe routes (SPEC §7) — KOVA'S OWN rail only: plan checkout, credit-pack
+ * checkout, the platform webhook, and the admin config endpoints under
  * /api/admin/stripe/*.
+ *
+ * The Connect rail that used to live here is gone. A tenant is paid by its own
+ * customers on its OWN provider — see `payments-routes.ts`. The only reason this
+ * file still exports `grantClientPackage` / `renewClientSubscription` is that
+ * they are the runway maths, and having one implementation of those is worth
+ * more than having them in a tidier place.
  */
 
 import { Hono } from "hono";
@@ -87,8 +92,7 @@ import { MAX_PACKAGE_PRICE_CENTS } from "./commerce-routes.js";
  * are the good kind: "Only Stripe Connect platforms can create accounts", "No
  * such price", "Please activate Connect". Eight of the call sites in this file
  * had no try/catch, so all of that became a bare 500 and the owner was left with
- * a browser console line and nothing to act on. `POST /connect/onboard` on a
- * Stripe account without Connect enabled is the case that surfaced it.
+ * a browser console line and nothing to act on.
  *
  * One handler on the router rather than a try/catch per route: the correct
  * response is the same everywhere, and per-route wrapping is exactly the thing
