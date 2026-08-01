@@ -25,6 +25,16 @@
  *              rather than a gate bug.
  *
  * Reads are never gated at any rung, so those are asserted too.
+ *
+ * ── The precondition, which is itself a rule ────────────────────────────────
+ *
+ * The gate only fires on a deployment that can actually TAKE a payment. Gating
+ * "has not paid" with no payment rail configured would strand every studio with
+ * no way out — our misconfiguration charged to their account — so `statusOf`
+ * fails open there, and `apps/e2e` depends on it (its wizard runs against a
+ * worker with no Stripe keys). This suite therefore CONFIGURES Stripe first;
+ * without that step every assertion below would silently pass for the wrong
+ * reason.
  */
 
 import { env, SELF } from "cloudflare:test";
@@ -93,9 +103,18 @@ let owner = "";
 let tenantId = "";
 let studio = "";
 
+/** Enough config for `stripeEnabled` to be true. No network call is made — the
+ *  key is only ever inspected for its prefix on the paths this suite touches. */
+async function configureStripe(): Promise<void> {
+  const put = "INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value";
+  await db().prepare(put).bind("stripe.mode", "test").run();
+  await db().prepare(put).bind("stripe.test.secret_key", "sk_test_unconfigured_studio_suite").run();
+}
+
 beforeAll(async () => {
   await ensureSchema(db());
   await seedBilling(db());
+  await configureStripe();
   const s = await signUpOnly("unconfigured-owner@test.dev", "Unconfigured Studio");
   owner = s.cookie;
   tenantId = s.tenantId;
@@ -157,15 +176,27 @@ describe("…and the way out is open, which is the half that is easy to break", 
   });
 
   it("lets the owner reach the billing lane — the only action that resolves this", async () => {
-    // `billingWritable` + `billing:manage`. Stripe is not configured in the test
-    // environment, so the handler's own answer is a 4xx about configuration —
-    // what matters is that the GATE did not answer 402 first.
-    const res = await SELF.fetch(`${studio}/api/billing/plan-intent`, {
+    // `billingWritable` + `billing:manage` together. Deliberately
+    // `check-downgrade`: it is a POST under `/api/billing` (so `isBillingWrite`
+    // covers it, exactly as `plan-intent` is) and it answers from D1 alone, so
+    // this asserts the GATE without making a network call to Stripe.
+    const res = await SELF.fetch(`${studio}/api/billing/check-downgrade`, {
       method: "POST",
       headers: sH(owner, studio),
-      body: JSON.stringify({ planId: "solo" }),
+      body: JSON.stringify({ planId: "light" }),
     });
-    expect(res.status).not.toBe(402);
+    expect(res.status).toBe(200);
+  });
+
+  it("…and a non-billing write from the same owner is still refused", async () => {
+    // The pair is what makes the previous assertion mean something: without it,
+    // a gate that had stopped firing entirely would pass both.
+    const res = await SELF.fetch(`${studio}/api/settings`, {
+      method: "PATCH",
+      headers: sH(owner, studio),
+      body: JSON.stringify({ name: "Nope" }),
+    });
+    expect(res.status).toBe(402);
   });
 
   it("leaving is still allowed, whatever the studio owes", async () => {

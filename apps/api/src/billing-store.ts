@@ -220,32 +220,35 @@ export const GRANDFATHERED_PLANS: Omit<PlanRow, "stripe_product_id" | "stripe_pr
      * It is unpurchasable (`active: 0`) but every new tenant is stamped onto it
      * by `getSubscription`, and `customer.subscription.deleted` falls back to it.
      * That made it the most-used row in the table and, until now, a genuinely
-     * usable free product: three clients, indefinitely, fully writable, because
-     * the row also carried `status: 'active'`.
+     * usable free product: three clients, indefinitely, fully writable, on a row
+     * that also carried `status: 'active'` — and MORE clients than the cheapest
+     * paid tier, so not paying was the better deal.
      *
-     * Two things fixed that, and they are deliberately separate:
+     * ── The fix is the GATE, and only the gate ──────────────────────────────
      *
-     *   the GATE   `statusOf` now reports `incomplete` for a tenant with no paid
-     *              plan, so the host serves reads and refuses writes. That is the
-     *              real enforcement and it is enforced once, in the route guard.
-     *   these QUOTAS are the belt. Zero clients and zero templates mean that even
-     *              if the gate were ever bypassed there is nothing to create.
-     *              Storage stays at 250 MB because data already uploaded must
-     *              remain readable — withholding the product is not the same as
-     *              holding someone's photos.
+     * `statusOf` reports `incomplete` for a tenant with no paid plan, and the
+     * route guard turns that into read-only. These quotas are deliberately NOT a
+     * second enforcement of the same rule.
      *
-     * `activeClients: 0` cannot strand an existing roster: `withinQuota` blocks
-     * only NEW rows (`currentCount < max`), and an over-quota tenant keeps every
-     * client fully readable — the same rule that covers a downgrade.
+     * They were, briefly, and it was wrong: zeroing them bricks the one
+     * configuration where the gate correctly stands down. A deployment with no
+     * Stripe keys — a self-hosted install, anything before DEPLOY.md §10, the
+     * whole E2E suite — cannot take a payment, so gating "has not paid" there
+     * would strand every studio; `statusOf` fails open. Crippled quotas would
+     * then brick it anyway, one layer further down, for a deployment that had
+     * deliberately chosen not to charge.
+     *
+     * So this row is what a NON-CHARGING deployment serves. On a charging one it
+     * is unreachable: the gate fires first, every time.
      */
     id: "free",
-    name: "No plan",
+    name: "Free",
     price_usd_month: 0,
     ord: 0,
     active: 0,
     entitlements_json: j({
-      quotas: { staffSeats: 1, activeClients: 0, templates: 0, storageMb: 250 },
-      features: {},
+      quotas: { staffSeats: 1, activeClients: 3, templates: 5, storageMb: 250 },
+      features: { externalSearch: true },
       aiCredits: { monthlyGrant: 0 },
       trialDays: 0,
     }),
@@ -314,10 +317,12 @@ export const DEFAULT_PACKS: PackRow[] = [
  *
  *   v1 → the original free/solo/studio/team ladder (unstamped)
  *   v2 → solo/light/pro/max + trials; free/studio/team grandfathered inactive
- *   v3 → PURE B2B: `solo` becomes "Starter" at 3 clients (it was 1, which is not
- *        a trainer plan), and `free` is cut to a zero-quota parking state — it
- *        carried MORE clients than the cheapest paid tier, so not paying was the
- *        better deal.
+ *   v3 → PURE B2B: `solo` becomes "Starter" at 3 clients. One client is not a
+ *        trainer plan, and the free baseline carried three — so the cheapest
+ *        paid tier bought you LESS than not paying. The unpaid state is now
+ *        gated (`statusOf` → `incomplete`) rather than re-priced; `free`'s own
+ *        entitlements are untouched, because they are what a deployment with no
+ *        payment rail serves.
  */
 export const PLAN_CATALOG_VERSION = "3";
 const PLAN_CATALOG_KEY = "plans.catalog_version";
@@ -341,13 +346,6 @@ const PLAN_CATALOG_KEY = "plans.catalog_version";
  * 3. **Retired plans are only deactivated.** `active = 0` + `ord`, never their
  *    entitlements or price — grandfathered tenants must keep exactly what they
  *    have. Nobody is migrated off a retired tier by this code.
- * 4. **`free` is the exception to (3), and only `free`.** It is not a tier
- *    anybody was ever sold; it is the row `getSubscription` stamps on every new
- *    tenant and the one `customer.subscription.deleted` falls back to, so it is
- *    the most-used row in the table. Freezing its entitlements would leave every
- *    existing deployment serving the old three-client free product forever.
- *    Reconciling it takes nothing away that anyone paid for — and it stays
- *    `active = 0`, so it remains unpurchasable.
  */
 async function applyPlanCatalog(db: D1Database): Promise<void> {
   const stmts: D1PreparedStatement[] = [];
@@ -379,16 +377,6 @@ async function applyPlanCatalog(db: D1Database): Promise<void> {
     stmts.push(insert(p));
     // (3) retire it — nothing else. Entitlements and price stay as found.
     stmts.push(db.prepare("UPDATE plans SET active = 0, ord = ? WHERE id = ?").bind(p.ord, p.id));
-    // (4) …except `free`, whose entitlements ARE reconciled. See the header:
-    // it is the unsubscribed parking state, not a tier somebody bought, and
-    // leaving it frozen keeps the old three-client free product alive on every
-    // deployment that already exists. Still `active = 0` above.
-    if (p.id === "free") {
-      stmts.push(
-        db.prepare("UPDATE plans SET name = ?, price_usd_month = ?, entitlements_json = ? WHERE id = ?")
-          .bind(p.name, p.price_usd_month, p.entitlements_json, p.id),
-      );
-    }
   }
   stmts.push(
     ...DEFAULT_PACKS.map((p) =>

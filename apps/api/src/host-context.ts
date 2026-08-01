@@ -21,6 +21,7 @@
  * config exists.
  */
 
+import { stripeConfig, stripeEnabled } from "@4dl/billing";
 import type { SessionContext } from "@kova/protocol";
 import {
   canonicalHost as tCanonicalHost,
@@ -103,15 +104,34 @@ async function statusOf(db: D1Database, tenantId: string): Promise<string | null
     .bind(tenantId)
     .first<{ status: string | null; comp: number | null; price_usd_month: number | null }>()
     .catch(() => null);
-  // No row at all: the tenant predates its subscription row (it is written
-  // lazily). Treat as unconfigured — it is, and the alternative is the old
-  // fully-served default.
-  if (!row) return "incomplete";
-  if (row.comp) return row.status ?? null;
-  // A missing plan row (a deleted or renamed id) counts as unpaid too: an
-  // entitlement set nobody can name is not one to serve an app on.
-  if (!(Number(row.price_usd_month) > 0)) return "incomplete";
-  return row.status ?? null;
+  if (row?.comp) return row.status ?? null;
+  // A paid plan on the row: nothing to decide, and this is the steady state, so
+  // it costs one query and stops here.
+  if (Number(row?.price_usd_month) > 0) return row?.status ?? null;
+  // No row at all counts as unpaid too — the row is written lazily, and a
+  // missing plan id (deleted, renamed) is an entitlement set nobody can name.
+
+  /**
+   * …but only if this deployment can actually TAKE a payment.
+   *
+   * Gating on "has not paid" when there is no payment rail configured would
+   * strand every studio on the platform with no way out — our misconfiguration
+   * charged to their account. It is the same trap as a deployment that cannot
+   * send the sign-in code needed to configure its own mailer, and the house rule
+   * is the one used everywhere else here: fail CLOSED on their non-payment, fail
+   * OPEN on ours.
+   *
+   * That is not hypothetical. `apps/e2e/src/app.ts` drives the real wizard
+   * against a worker with no Stripe keys and documents the outcome — "the owner
+   * is let through with the plan recorded and billing pending" — and a
+   * self-hosted install before DEPLOY.md §10 is in exactly that state.
+   *
+   * Read LAST and only on this branch: a healthy deployment has a paid plan and
+   * returned above, so the extra config read never touches the hot path.
+   */
+  const cfg = await stripeConfig(db).catch(() => null);
+  if (!cfg || !stripeEnabled(cfg)) return row?.status ?? null;
+  return "incomplete";
 }
 
 /** The apex we serve studios under, with Kova's shipped fallback. */

@@ -243,23 +243,21 @@ describe("retired tiers — inactive, still resolvable, never offered", () => {
     expect((await setPlan(tenantId, "nope-not-a-plan")).status).toBe(404);
   });
 
-  it("free is the unsubscribed PARKING state — nothing can be created on it", async () => {
-    // v3. `free` used to be a usable free product: three clients, indefinitely,
-    // fully writable — MORE clients than the cheapest paid tier, so not paying
-    // was the better deal. It is now a zero-quota holding pen, and the host gate
-    // (`statusOf` → `incomplete`) is what actually enforces it; these ceilings
-    // are the belt behind that brace.
+  it("free is the unsubscribed parking state — reached by every new tenant", async () => {
+    // What it means is decided by the GATE, not by these numbers: `statusOf`
+    // reports `incomplete` for a tenant with no paid plan and the route guard
+    // makes the host read-only. These entitlements are what a deployment with no
+    // payment rail configured serves — see DEFAULT/GRANDFATHERED_PLANS. On a
+    // charging deployment they are unreachable, because the gate fires first.
     const fresh = await signInFlow("catalog-fresh@test.dev", "Fresh Studio");
     const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(fresh) })).json()) as { active: { tenantId: string } };
     const row = await db().prepare("SELECT plan_id FROM subscriptions WHERE tenant_id = ?").bind(ctx.active.tenantId).first<{ plan_id: string }>();
     expect(row?.plan_id).toBe("free");
     const ent = await tenantEntitlements(db(), ctx.active.tenantId);
-    expect(ent.quotas.activeClients).toBe(0);
-    expect(ent.quotas.templates).toBe(0);
+    expect(ent.quotas.activeClients).toBe(3);
+    // No paid feature is ever inherited from it.
     expect(ent.features.aiSuite).toBe(false);
-    // Storage is NOT zeroed: anything already uploaded stays readable. Withholding
-    // the product is not the same as holding someone's photos.
-    expect(ent.quotas.storageMb).toBe(250);
+    expect(ent.aiCredits.monthlyGrant).toBe(0);
   });
 
   it("free is never purchasable, however the catalog is reseeded", async () => {
@@ -322,9 +320,8 @@ describe("quota enforcement uses the new ceilings, and never retroactively", () 
     expect(blocked.status).toBe(403);
     expect(await withinQuota(db(), tid, "activeClients", 4)).toMatchObject({ ok: false, max: 3 });
     expect(await withinQuota(db(), tid, "activeClients", 0)).toMatchObject({ ok: true, max: 3 });
-    // And on the parking plan zero means ZERO, not unlimited — only -1 is that.
-    await setPlan(tid, "free");
-    expect(await withinQuota(db(), tid, "activeClients", 0)).toMatchObject({ ok: false, max: 0 });
+    // …and -1 is the ONLY unlimited; a finite ceiling always bites.
+    expect(await withinQuota(db(), tid, "activeClients", 3)).toMatchObject({ ok: false, max: 3 });
   });
 
   it("max's -1 ceilings are unlimited, not zero", async () => {

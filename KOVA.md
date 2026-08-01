@@ -270,6 +270,11 @@ cheapest tier did. A studio that never chooses a plan now sits read-only on that
 row (gate reason `setup`) until it does; it is a parking state, not a product.
 Its plan id is still `solo`, because Stripe metadata carries it.
 
+The gate stands down where **Stripe is not configured** — a deployment that
+cannot take a payment must not withhold the product over one. There, `free`'s
+entitlements are what is actually served, which is why they are left usable
+rather than zeroed.
+
 | | **Starter** $4.99/mo | **Light** $24.99/mo | **Pro** $49.99/mo | **Max** $119.99/mo |
 |---|---|---|---|---|
 | Free trial | 30 days | 30 days | — | — |
