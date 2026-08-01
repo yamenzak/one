@@ -16,7 +16,7 @@ import { gateFeature, resolveClientFlagsFor } from "./client-flags.js";
 import { tenantEntitlements, hasFeature, getConfig, setConfig } from "./billing-store.js";
 import {
   generate, generateImage, extractJson, listModels, checkActorDailyBudget,
-  estimateRunCredits, modelSupportsTask, preferredModelForTask, modelForTask, modelById, seedAiModels, modelPricing,
+  estimateRunCredits, modelSupportsTask, modelTasks, preferredModelForTask, modelForTask, modelById, seedAiModels, modelPricing,
   type AiModelRow,
 } from "./ai.js";
 import { buildClientContext } from "./ai-context.js";
@@ -1209,7 +1209,12 @@ export const aiAdminRoutes = new Hono<AppEnv>()
     // they are not the currency anyone spends — without the credit conversion
     // the catalog cannot answer "is this model expensive?", which is the only
     // question being asked of it.
-    const models = (rows.results ?? []).map((m) => ({ ...m, pricing: modelPricing(m) }));
+    // `supports` is what the LANE PICKERS filter on. Filtering on `task` alone
+    // put every Gemini model out of the Vision lane (no Gemini row is ever
+    // tagged `vision`) while letting a Gemini text model into the Image lane,
+    // which is exactly backwards: they all read images, only the image family
+    // makes them.
+    const models = (rows.results ?? []).map((m) => ({ ...m, pricing: modelPricing(m), supports: modelTasks(m) }));
     return c.json({ models });
   })
 

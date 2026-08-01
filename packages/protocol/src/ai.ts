@@ -50,7 +50,24 @@ export interface AiFeatureMeta {
 export interface AiModelMeta {
   id: string;
   label: string;
+  /**
+   * The model's PRIMARY lane, as the provider's pricing page classifies it.
+   * Useful for grouping and labelling; useless for "may I pick this here?" —
+   * see `tasks`.
+   */
   task: string;
+  /**
+   * Every generation lane this model can actually serve, computed server-side by
+   * `modelSupportsTask`.
+   *
+   * Sent because the client kept getting it wrong in the same direction. Reading
+   * an image and MAKING one are different capabilities — every Gemini model is
+   * multimodal on input, but only Google's image family can return an image —
+   * and a UI that filters on `provider === "google"` offers a text model for a
+   * cover image, which fails on every call. The server owns the rule; the client
+   * asks whether the lane is in this list.
+   */
+  tasks: string[];
   provider: string;
   /**
    * Credits a TYPICAL request costs on this model, keyed by lane ("text",

@@ -291,25 +291,62 @@ export async function visionFallbackModel(db: D1Database): Promise<AiModelRow | 
 }
 
 /**
- * Can this catalog row serve `task`? The catalog now also carries lanes nothing
- * here can execute (embedding / transcribe / tts / classify — discovered and
- * priced by the admin sync so the catalog is honest about what the providers
- * sell, but inert), so this is a WHITELIST of the generation lanes rather than
- * a blacklist of the ones we happened to know about: a blacklist quietly let a
- * Gemini embedding model satisfy a vision request. Gemini models are multimodal,
- * so any Google text model also reads images and can generate them.
+ * Can this catalog row serve `task`?
+ *
+ * The catalog also carries lanes nothing here can execute (embedding /
+ * transcribe / tts / classify — discovered and priced by the admin sync so the
+ * catalog is honest about what the providers sell, but inert), so this is a
+ * WHITELIST of the generation lanes rather than a blacklist of the ones we
+ * happened to know about: a blacklist quietly let a Gemini embedding model
+ * satisfy a vision request.
+ *
+ * ── READING an image and MAKING one are not the same capability ─────────────
+ *
+ * This conflated them, and the Gemini docs are unambiguous that they differ:
+ *
+ *   image INPUT   "All Gemini model versions are multimodal and can be utilized
+ *                 in a wide range of image processing and computer vision
+ *                 tasks." (ai.google.dev/gemini-api/docs/image-understanding)
+ *                 So any Gemini text model reads a meal photo. That half was
+ *                 right, and it is why Snap-a-Meal works without a
+ *                 `vision`-tagged row in the catalog.
+ *   image OUTPUT  four models, all of them the "Nano Banana" family
+ *                 (ai.google.dev/gemini-api/docs/image-generation). A Gemini
+ *                 TEXT model cannot return an image at all: `runGeminiImage`
+ *                 asks for `responseModalities: ["IMAGE"]` and the API rejects
+ *                 it on a model that has no image modality.
+ *
+ * The old rule allowed `text` for BOTH, so a studio could pick "Gemini 2.5
+ * Flash Lite" as its cover-image model and every generation failed. The hold was
+ * released so nothing was overbilled, but the feature was configured broken and
+ * the picker had offered the configuration.
+ *
+ * The image test is `unit_kind === "image"` rather than an id pattern, because
+ * that is what the SYNC already derives from Google's own pricing page: a model
+ * only gets `task: "image"` when the page prices its output "$X per image"
+ * (`parseGeminiCatalog`). Deriving the capability from the same document that
+ * prices it means a new model in the family works the day it is synced, and a
+ * rename cannot silently reclassify anything.
  */
 export function modelSupportsTask(m: AiModelRow, task: "text" | "text-small" | "vision" | "image"): boolean {
   const text = m.task === "text" || m.task === "text-small";
-  // Image generation and vision are GOOGLE-ONLY, and that is a property of this
-  // codebase, not of the models. The Workers AI branch of `generate()` never
-  // attaches `input.image` and the guard above it refuses the call outright, so
-  // a Workers-AI row is unusable for vision however its id reads — trusting the
-  // tag made `@cf/meta/llama-3.2-11b-vision-instruct` a pickable Snap-a-Meal
-  // model that failed every call with "model cannot read images".
-  if (task === "image") return m.provider === "google" && (m.task === "image" || text);
+  // Vision and image generation are GOOGLE-ONLY here, and that is a property of
+  // this codebase, not of the models. The Workers AI branch of `generate()`
+  // never attaches `input.image` and the guard above it refuses the call
+  // outright, so a Workers-AI row is unusable for vision however its id reads —
+  // trusting the tag made `@cf/meta/llama-3.2-11b-vision-instruct` a pickable
+  // Snap-a-Meal model that failed every call with "model cannot read images".
+  if (task === "image") return m.provider === "google" && m.task === "image" && m.unit_kind === "image";
   if (task === "vision") return m.provider === "google" && (m.task === "vision" || text || m.task === "image");
   return text;
+}
+
+/** Every generation lane this row can serve — `modelSupportsTask` inverted, so a
+ *  client can be told a model's capabilities instead of re-deriving them from
+ *  `task` and getting the image/vision distinction wrong. */
+export const GENERATION_TASKS = ["text", "text-small", "vision", "image"] as const;
+export function modelTasks(m: AiModelRow): string[] {
+  return GENERATION_TASKS.filter((t) => modelSupportsTask(m, t));
 }
 
 /** An enabled model by id — for a tenant's per-feature model override. */
@@ -1001,15 +1038,24 @@ export async function generateImage(env: AiBindings, input: GenerateImageInput):
   const fcfg = config.features?.[input.feature] ?? {};
   if ((fcfg.enabled ?? toggles[input.feature] ?? true) === false) return { ok: false, error: "unavailable", detail: `feature "${input.feature}" is turned off in AI settings` };
 
-  // Any Gemini model can generate images; prefer a dedicated image-priced model
-  // (per-image billing), else fall back to any enabled Gemini model.
+  // Only a model that actually GENERATES images. There is no fallback to a
+  // Gemini text model, and there was: `visionFallbackModel` returns one, which
+  // reads images and cannot make them, so the fallback guaranteed a failed call
+  // dressed up as a working configuration. Refusing here says the true thing —
+  // no image model is switched on — instead of surfacing whatever the provider
+  // replies when asked for a modality the model does not have.
   let model: AiModelRow | null = null;
   // One shared compatibility rule, so the per-feature override here cannot
   // accept a model `generate()`/`modelSupportsTask` would reject.
   if (fcfg.model) { const m = await modelById(env.DB, fcfg.model); if (m && modelSupportsTask(m, "image")) model = m; }
-  if (!model) model = await modelForTask(env.DB, "image");
-  if (!model) model = await visionFallbackModel(env.DB);
-  if (!model || model.provider !== "google") return { ok: false, error: "unavailable", detail: "no enabled Gemini image model — add a Gemini key and sync the catalog" };
+  if (!model) { const m = await modelForTask(env.DB, "image"); if (m && modelSupportsTask(m, "image")) model = m; }
+  if (!model) {
+    return {
+      ok: false,
+      error: "unavailable",
+      detail: "no image-generating model is switched on — sync the catalog and enable one of Google's image models (the Nano Banana family; ordinary Gemini text models read images but cannot make them)",
+    };
+  }
   const rate = rateOf(model);
 
   // The studio's custom style instructions append to the built-in image prompt
