@@ -448,12 +448,27 @@ editing it.
   dropped, a contradicting indicator refused, a cleared quarantine landing in
   `packed`, the case guard, the preserved close time, and the concerns join.
 
-**Not built:** label PRINTING does not exist (§7.4), so a pack's label code is
-typed rather than produced. No AI surfaces yet — the vision paths of §5 Phase 4
-are untouched, and Rule 3's `suggested_*` shape has nothing writing into it. No
-par levels, no expiry sweep, no reorder. **There is no SPA at all** — every
-surface above is an API, which is the largest single gap between what is built
-and what a clinic could use.
+- **The app** (`apps/tessa-app`) — a scan-first PWA the worker serves at the same
+  origin. Five surfaces: Today (what needs attention), Stock, CSSD (trays and
+  loads), Cases, and the Recall report, which is a ROUTE rather than a sheet
+  because it is a document a centre works through over days. Scanning uses the
+  native `BarcodeDetector` where it exists and lazily imports ZXing where it does
+  not; the typed field beside it is not a fallback but the path a hand-held USB
+  scanner takes, since those present as a keyboard.
 
-Next: the app. Everything above is reachable only by HTTP, and the product is a
-phone in a stock room.
+**Not built:** label PRINTING does not exist (§7.4), so a pack's label code is
+typed rather than produced. No AI surfaces — the vision paths of §5 Phase 4 are
+untouched, and Rule 3's `suggested_*` shape has nothing writing into it. No par
+levels, no expiry sweep, no reorder. **No German** (§2.4 / §7.2) — every string
+is English and hard-coded. No offline lane (Phase 3): the app has no service
+worker, deliberately, because caching a shell before the offline WRITE path
+exists would fail every mutation the moment it was used without signal.
+
+**The app has NO automated test beyond a Tailwind conformance check.** It was
+driven end to end in a real browser — sign in, create a centre, all four tabs,
+the scan sheet, a GS1 element string parsed through the UI — and three bugs that
+only a browser could find were fixed there. That is not the same as coverage. A
+Playwright golden path is the next thing this needs.
+
+Next: label printing, or German. Both are gating for a real German customer, and
+neither is started.

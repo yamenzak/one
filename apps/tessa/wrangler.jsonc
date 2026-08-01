@@ -7,6 +7,23 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-07-01",
   "compatibility_flags": ["nodejs_compat"],
+
+  /**
+   * The worker serves the SPA and the API at the SAME ORIGIN, which is what
+   * keeps the Better Auth session cookie same-origin with no CORS juggling.
+   *
+   * `html_handling: "none"` rather than the default: "auto-trailing-slash"
+   * answers `/index.html` with a 307 to `/`, and a redirected response cannot
+   * answer a navigation from a service worker's fallback — which took out every
+   * deep link in Kova while `/` kept working. This app has one HTML file and
+   * routes itself, so there is nothing for that logic to help with.
+   */
+  "assets": {
+    "directory": "../tessa-app/dist",
+    "not_found_handling": "single-page-application",
+    "html_handling": "none",
+    "run_worker_first": ["/api/*", "/health"]
+  },
   "observability": { "enabled": true },
 
   /**
