@@ -179,6 +179,7 @@ jobs:
           mine /tmp/kv.all      > /tmp/kv
 
           : > /tmp/hostnames
+          : > /tmp/hostnames.all
           for z in $(printf '%s' "$ZONES" | tr ',' ' '); do
             [ -n "$z" ] || continue
             zid=$(cf_get "zones?name=$z" | jq -r '.result[0].id // empty')
@@ -186,6 +187,20 @@ jobs:
             cf_get "zones/$zid/custom_hostnames?per_page=50" \
               | jq -r --arg z "$zid" '.result[]? | "\($z)\t\(.id)\t\(.hostname)"' >> /tmp/hostnames
           done
+
+          # Printed to the STEP LOG as well as the job summary. The summary is
+          # the nicer render, but it is several taps away on the GitHub mobile
+          # app — and a plan run whose whole output you cannot find reads as a
+          # run that did nothing, which is how this was first reported.
+          echo "──────────── INVENTORY (patterns: $PATTERNS) ────────────"
+          for f in workers d1 kv r2 queues hostnames; do
+            n=$(wc -l < "/tmp/$f" 2>/dev/null || echo 0)
+            echo ""
+            echo "── $f ($n matching, of $(wc -l < "/tmp/$f.all" 2>/dev/null || echo 0) on the account)"
+            if [ -s "/tmp/$f" ]; then sed 's/^/   /' "/tmp/$f"; else echo "   (none)"; fi
+          done
+          echo ""
+          echo "─────────────────────────────────────────────────────────"
 
           {
             echo "## Inventory"
