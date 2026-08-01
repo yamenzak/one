@@ -1145,10 +1145,24 @@ function AiConfig() {
                         const rateLine = creditRateLine(m);
                         return (
                           <div key={m.id} className="flex items-center gap-2.5 py-2">
-                            <div className="min-w-0 flex-1">
+                            {/* A switched-off row READS switched off. The only
+                                signal used to be the toggle at the far right of
+                                a thirty-row list, so a model missing from the
+                                default picker looked like it had vanished rather
+                                than like something the operator had turned off. */}
+                            <div className={cn("min-w-0 flex-1", m.enabled !== 1 && "opacity-55")}>
                               <div className="flex flex-wrap items-center gap-1.5">
                                 <span className="min-w-0 truncate text-sm font-medium">{m.label}</span>
-                                {m.is_default === 1 && <Badge tone="primary">default · {laneLabel(m.task)}</Badge>}
+                                {m.enabled !== 1 && <Badge tone="neutral">off</Badge>}
+                                {/* A default that is switched off is a setting the
+                                    engine ignores — `modelForTask` filters on
+                                    `enabled = 1`. Say so rather than showing a
+                                    badge that claims it is in force. */}
+                                {m.is_default === 1 && (
+                                  m.enabled === 1
+                                    ? <Badge tone="primary">default · {laneLabel(m.task)}</Badge>
+                                    : <Badge tone="warning">default, but off</Badge>
+                                )}
                               </div>
                               <div className="numeral truncate text-xs text-foreground/80">
                                 {m.task}
@@ -1282,7 +1296,12 @@ function DefaultModelPicker({ models, busy, onPick }: { models: ModelRow[]; busy
     // The engine ignores it — `modelForTask` filters on `enabled = 1` — so it is
     // a setting that exists and does nothing. Named rather than hidden.
     const staleDefault = !pinned ? inLane.find((m) => m.is_default === 1) ?? null : null;
-    return { lane, options, current, pinned, staleDefault, fallback: lane.task === "vision" ? visionFallback : null };
+    // How many of this lane the picker is NOT offering. Counted so the row can
+    // SAY it: a filtered list that does not admit it is filtered reads as a bug
+    // ("where did those five go?"), and the answer — they are switched off — is
+    // one the screen already knows.
+    const off = inLane.length - options.length;
+    return { lane, options, off, current, pinned, staleDefault, fallback: lane.task === "vision" ? visionFallback : null };
   }).filter((l): l is NonNullable<typeof l> => !!l);
   if (!lanes.length) return null;
 
@@ -1294,7 +1313,7 @@ function DefaultModelPicker({ models, busy, onPick }: { models: ModelRow[]; busy
         models switched on in the catalog above are offered, because those are the only ones the engine will serve.
       </p>
       <div className="space-y-2.5">
-        {lanes.map(({ lane, options, current, pinned, staleDefault, fallback }) => (
+        {lanes.map(({ lane, options, off, current, pinned, staleDefault, fallback }) => (
           <div key={lane.task} className="space-y-1">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -1350,6 +1369,15 @@ function DefaultModelPicker({ models, busy, onPick }: { models: ModelRow[]; busy
                 </p>
               )
             ) : null}
+            {/* Always, whatever else the row is saying: the picker is a FILTERED
+                view of the catalog, and a filtered view that hides its own
+                filter is indistinguishable from a missing model. */}
+            {off > 0 && options.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {off} more in this lane {off === 1 ? "is" : "are"} switched off and not offered here. Switch{" "}
+                {off === 1 ? "it" : "one"} on in the catalog below to make {off === 1 ? "it" : "it"} selectable.
+              </p>
+            )}
           </div>
         ))}
       </div>
