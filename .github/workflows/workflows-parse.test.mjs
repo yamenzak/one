@@ -59,15 +59,41 @@ for (const f of readdirSync(DIR).filter((n) => n.endsWith(".yml") || n.endsWith(
 // The parse itself, via GitHub's own reading of it: `on:` must survive as a key.
 // `js-yaml` is not a dependency here on purpose, so this is a structural check
 // rather than a full parse — the column-0 rule above is what actually bit.
+const names = new Map();
 for (const f of readdirSync(DIR).filter((n) => n.endsWith(".yml"))) {
   const text = readFileSync(join(DIR, f), "utf8");
   if (!/^on:/m.test(text)) {
     console.error(`BAD  ${f} — no top-level \`on:\` trigger survived parsing.`);
     bad++;
   }
-  if (!/^name:/m.test(text)) {
+  const name = /^name:\s*(.+?)\s*$/m.exec(text)?.[1];
+  if (!name) {
     console.error(`BAD  ${f} — no top-level \`name:\`. GitHub will list it by filename.`);
     bad++;
+  } else {
+    if (names.has(name)) {
+      console.error(`BAD  ${f} and ${names.get(name)} are both named "${name}". The Actions list becomes ambiguous.`);
+      bad++;
+    }
+    names.set(name, f);
+  }
+}
+
+/**
+ * A workflow that tells you to go run another one must NAME one that exists.
+ *
+ * `deploy.yml` skips an unprovisioned app with "Run 'Provision an app on
+ * Cloudflare'". That string is the only pointer from the failure to the fix, and
+ * renaming the target workflow would leave it pointing at nothing — silently,
+ * because it is a log line, not a reference.
+ */
+for (const [f] of [...names].map(([n, file]) => [file, n])) {
+  const text = readFileSync(join(DIR, f), "utf8");
+  for (const m of text.matchAll(/Run '([^']+)'/g)) {
+    if (!names.has(m[1])) {
+      console.error(`BAD  ${f} points at a workflow named "${m[1]}", which does not exist. Known: ${[...names.keys()].join(", ")}`);
+      bad++;
+    }
   }
 }
 

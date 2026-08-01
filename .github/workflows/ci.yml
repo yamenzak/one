@@ -1,10 +1,15 @@
 name: CI
 
-# Pre-merge validation. Deploy.yml only runs on push to main, which means
+# Pre-merge validation. `deploy.yml` only runs on push to main, which means
 # nothing used to be checked BEFORE a merge — a PR could go green on nothing and
 # break main on the way in. This runs the same install → build → typecheck →
-# test chain as the deploy job, but touches no Cloudflare credentials and
+# test chain as the deploy gate, but touches no Cloudflare credentials and
 # deploys nothing.
+#
+# Adding an app is a `apps.json` ENTRY, not an edit here. Both jobs derive their
+# work from the registry, because the last two CI failures on main were a per-app
+# step somebody forgot to duplicate: Tessa's SPA build was missing, so its whole
+# Miniflare suite reported "no tests" — a PASS-shaped result.
 on:
   pull_request:
     branches: [main]
@@ -19,10 +24,24 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    outputs:
+      e2e: ${{ steps.registry.outputs.e2e }}
     steps:
       - uses: actions/checkout@v4
 
-      # No version — read from package.json's packageManager (pnpm@10.33.0).
+      # Both guards go BEFORE install: a check that needs the workspace
+      # installed cannot guard the workspace's own install, and both of these
+      # catch failures that are SILENT rather than loud.
+      #
+      # A workflow with broken YAML does not FAIL — it does not RUN. GitHub
+      # lists it by filename, its Run-workflow button never appears, and nothing
+      # says why. That is how provision-tessa.yml shipped dead.
+      - run: node .github/workflows/workflows-parse.test.mjs
+      # An app that is not in the registry is not built and not deployed, and
+      # nothing reports it — see the header.
+      - run: node scripts/apps-manifest.test.mjs
+
+      # No version — read from package.json's packageManager.
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
@@ -30,92 +49,78 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      # A workflow with broken YAML does not FAIL — it does not RUN. GitHub
-      # lists it by filename, its Run-workflow button never appears, and nothing
-      # says why. That is how provision-tessa.yml shipped dead. Needs no deps,
-      # so it goes before install.
-      - run: node .github/workflows/workflows-parse.test.mjs
-
       - run: pnpm install --frozen-lockfile
 
-      # Build BOTH SPAs. Each worker serves its app through an `assets`
-      # binding, and the Miniflare integration suites report "no tests" — a
-      # PASS-shaped result — when the directory is missing. Kova's has been here
-      # since it was written; Tessa's absence is what turned the merge that
-      # added `apps/tessa-app` red, because turbo cannot infer the dependency: an
-      # `assets.directory` is a filesystem path, not a package dependency, so
-      # nothing in the graph connects @4dl/tessa's tests to @tessa/app's build.
-      - run: pnpm --filter @kova/app build
-      - run: pnpm --filter @tessa/app build
+      # EVERY SPA, from the registry. Each worker serves its app through an
+      # `assets` binding, and the Miniflare integration suites report "no tests"
+      # — a PASS-shaped result — when the directory is missing. Turbo cannot
+      # infer this: an `assets.directory` is a filesystem path, not a package
+      # dependency, so nothing in the graph connects a worker's tests to its
+      # app's build. Deriving the list from `apps.json` is what stops it being
+      # explicit-and-stale, which is exactly how Tessa's went missing.
+      - name: Build every SPA
+        run: |
+          set -euo pipefail
+          for pkg in $(node scripts/apps.mjs spas); do
+            echo "::group::build $pkg"
+            pnpm --filter "$pkg" build
+            echo "::endgroup::"
+          done
 
       - run: pnpm turbo run typecheck test
 
-  # The three golden paths (SPEC §12), in a real browser against the real worker.
+      - id: registry
+        run: echo "e2e=$(node scripts/apps.mjs e2e-matrix)" >> "$GITHUB_OUTPUT"
+
+  # One job per registered Playwright suite — Kova's three golden paths
+  # (SPEC §12), Tessa's recall and scan paths — in a real browser against the
+  # real worker.
   #
-  # A separate job on purpose: it needs a Chromium download the unit lanes don't,
-  # and keeping it apart means "E2E is red" and "unit tests are red" are distinct
-  # signals rather than one long log to bisect.
+  # Separate jobs on purpose, rather than one appended run: each boots its own
+  # worker on its own port (8787 / 8788), and a shared job would make "which
+  # product is broken" a question you answer by reading a log. They also need a
+  # Chromium download the unit lanes don't.
   #
   # Credential-free and network-free, like `validate`: Playwright boots
-  # `wrangler dev --local` (D1/KV/R2 simulated by Miniflare), the suite creates its
-  # own tenants and users through the app's own sign-in, and nothing calls Workers
-  # AI, Stripe, or an external food/exercise provider.
+  # `wrangler dev --local` (D1/KV/R2 simulated by Miniflare), each suite creates
+  # its own tenants and users through the app's own sign-in, and nothing calls
+  # Workers AI, Stripe, or an external provider.
   e2e:
+    needs: validate
     runs-on: ubuntu-latest
+    strategy:
+      # One product's flake must not hide the other's real failure.
+      fail-fast: false
+      matrix: ${{ fromJson(needs.validate.outputs.e2e) }}
+    name: e2e ${{ matrix.id }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-
       - run: pnpm install --frozen-lockfile
 
-      # Chromium only — the suite runs one project, and --with-deps pulls the
+      # Chromium only — every suite runs one project, and --with-deps pulls the
       # system libraries headless Chromium needs on a bare ubuntu runner.
-      - run: pnpm --filter @kova/e2e exec playwright install --with-deps chromium
+      - run: pnpm --filter ${{ matrix.e2e }} exec playwright install --with-deps chromium
 
-      # Boots the worker itself (webServer) after turbo builds the SPA it serves.
-      - run: pnpm e2e
+      # The worker under test serves the built SPA through its `assets` binding,
+      # so the directory has to exist before Playwright's webServer boots it.
+      - name: Build its SPA
+        if: matrix.spa != ''
+        run: pnpm --filter ${{ matrix.spa }} build
+
+      - run: pnpm --filter ${{ matrix.e2e }} e2e
 
       # Traces + screenshots for the paths that failed. Nothing is attached on a
       # green run, so this stays cheap.
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-report
+          name: e2e-report-${{ matrix.id }}
           path: |
-            apps/e2e/playwright-report/
-            apps/e2e/test-results/
-          retention-days: 7
-
-  # Tessa's golden paths — the recall in both directions, and the scan-first
-  # path. Separate from Kova's job rather than appended to it: they boot
-  # different workers on different ports (8788 vs 8787) and a shared job would
-  # make "which product is broken" a question you answer by reading a log.
-  tessa-e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @tessa/e2e exec playwright install --with-deps chromium
-      # The worker serves the built SPA, so it has to exist before the suite
-      # boots it — same reason as the validate job above.
-      - run: pnpm --filter @tessa/app build
-      - run: pnpm --filter @tessa/e2e e2e
-      - if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: tessa-e2e-report
-          path: |
-            apps/tessa-e2e/playwright-report/
-            apps/tessa-e2e/test-results/
+            ${{ matrix.dir }}/playwright-report/
+            ${{ matrix.dir }}/test-results/
           retention-days: 7

@@ -125,8 +125,17 @@ super-admin account still fails.
 > the same reason. (KV binds by id too; R2 binds by NAME, which is why the bucket
 > had to be created fresh as `kova-media`.)
 
-GitHub → **Actions → "Provision Cloudflare resources" → Run workflow** (or run
-the same three commands locally):
+GitHub → **Actions → "Provision an app on Cloudflare" → Run workflow**, and type
+the app id from [`apps.json`](apps.json) — `kova` here, `tessa` for the other
+app, and whatever a future app registers as.
+
+That one run does everything in this section and the four that follow it: it
+creates the D1 / KV / R2 that are missing, **writes the ids into
+`wrangler.jsonc` and commits them**, builds the SPA, deploys the worker, mints
+`BETTER_AUTH_SECRET` if there is none, and seeds email delivery (section 6). It
+is idempotent — a re-run on a provisioned account is a no-op.
+
+The equivalent by hand, if you would rather watch it happen:
 
 ```sh
 cd apps/api
@@ -135,7 +144,12 @@ pnpm exec wrangler kv namespace create CACHE
 pnpm exec wrangler r2 bucket create kova-media
 ```
 
-Paste `database_id` and the KV `id` into `apps/api/wrangler.jsonc`, commit, push.
+…then paste `database_id` and the KV `id` into `apps/api/wrangler.jsonc`, commit,
+push. The workflow exists because that paste is the one step where a typo is
+worst: a wrong id does not error, it binds the worker to an empty database.
+`deploy.yml` refuses to ship an app whose config still holds placeholder ids for
+exactly that reason — it **skips** it with a notice rather than deploying it
+against nothing.
 
 > **There is no `wrangler d1 migrations apply` step.** The schema is applied
 > lazily and idempotently by the worker itself (`apps/api/src/db.ts`,
@@ -218,10 +232,29 @@ touch D1, so a 200 here does not prove the database binding works).
 
 ---
 
-## 6. Bootstrap email delivery — REQUIRED, and manual
+## 6. Bootstrap email delivery — REQUIRED
 
-Read this before trying to sign in. Passwordless OTP is the only way into the
-app, and **a fresh deploy cannot deliver email**:
+> **The provisioning workflow already did this.** If you ran
+> Actions → "Provision an app on Cloudflare", it seeded `email.provider`,
+> `email.from` and `email.platform_from` with the platform sender
+> **`noreply@4dl.app`** and the app's display name (`Kova <noreply@4dl.app>`).
+> It seeds with `ON CONFLICT DO NOTHING`, so re-running it never overwrites a
+> sender you have since changed. Skip to the verification query below, then to
+> section 7 — but read the paragraph on **verification** first, because seeding
+> the row is not the same as being able to send.
+>
+> One address for the whole platform is deliberate: onboarding a sender in
+> Cloudflare Email Sending is per-zone manual work, so sharing it means the
+> second app inherits a sender that already works instead of a plausible-looking
+> one that bounces. `apps.json` is where that address lives, and
+> `scripts/apps-manifest.test.mjs` fails the build if an app tries to use
+> another.
+
+The rest of this section is the manual path — what to do if you are deploying by
+hand, or if the seed needs correcting before you can sign in.
+
+Passwordless OTP is the only way into the app, and **a fresh deploy cannot
+deliver email**:
 
 - `email.provider` defaults to `mock`.
 - Outside the dev lane the mock provider **fails closed**: it sends nothing and
@@ -942,13 +975,25 @@ point of splitting them.
 
 | Workflow | Trigger | What it does | Can it delete? |
 |---|---|---|---|
-| `ci.yml` | pull request | typecheck, tests, E2E | no |
-| `deploy.yml` | push to `main`, manual | build + deploy both workers | **no** — ships code only. It deliberately never writes worker secrets: re-putting `BETTER_AUTH_SECRET` on every deploy would re-sign every cookie and log everyone out |
-| `provision.yml` | manual | creates the D1 / KV / R2 that are **missing**, mints `BETTER_AUTH_SECRET` if the worker has none | **no** — every action is guarded by an existence check |
+| `ci.yml` | pull request | typecheck, tests, and one E2E job per registered suite | no |
+| `deploy.yml` | push to `main`, manual | builds every SPA, then deploys every app the registry marks deployable | **no** — ships code only. It deliberately never writes worker secrets: re-putting `BETTER_AUTH_SECRET` on every deploy would re-sign every cookie and log everyone out |
+| `provision.yml` | manual, takes an app id | creates the D1 / KV / R2 that are **missing**, commits the ids, deploys, mints `BETTER_AUTH_SECRET` if the worker has none, seeds email | **no** — every action is guarded by an existence check |
 | `reset.yml` | manual | destroys and rebuilds everything | **YES** |
 
-So the steady state is: `deploy.yml` on every merge, `provision.yml` when a
-resource is missing. Neither can lose data, so neither needs ceremony.
+So the steady state is: `deploy.yml` on every merge, `provision.yml` once per new
+app. Neither can lose data, so neither needs ceremony.
+
+**None of the three names an app.** All of them read [`apps.json`](apps.json), so
+shipping a second product is a registry entry, not four workflow edits. That is
+not tidiness — every deployment failure this repo has had was a per-app step
+somebody forgot to duplicate. Tessa's SPA build was missing from CI, so its whole
+Miniflare suite reported "no tests" (a **pass**-shaped result) and the merge that
+added it went red on main; a second provisioning workflow was copied from the
+first and drifted; and that copy shipped with broken YAML, which does not fail,
+it does not *run*. Two dependency-free guards run before `pnpm install` in every
+workflow — `scripts/apps-manifest.test.mjs` fails on an unregistered app,
+`.github/workflows/workflows-parse.test.mjs` on a workflow that would not parse.
+Both are in `pnpm test` too, so you find out locally.
 
 ### `reset.yml` — for one moment, then delete it
 

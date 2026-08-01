@@ -1,67 +1,70 @@
 # Deploying Tessa
 
 Kova's `DEPLOY.md` is the long version and most of it transfers, because both
-apps sit on the same platform. This is what is *different*, plus the two things
-that are genuinely blocking.
-
-**Tessa has never been deployed.** Nothing below has been executed against a real
-Cloudflare account — it is derived from Kova's deployment, which has, and from
-`wrangler.jsonc`. Treat the ordering as sound and every id as unverified.
+apps sit on the same platform. This is what is *different*.
 
 ---
 
-## 0. The two blockers, up front
+## 1. Deploying is one workflow run
 
-### 0.1 Every resource id is a placeholder
+**Actions → "Provision an app on Cloudflare" → `tessa`.**
 
-`apps/tessa/wrangler.jsonc` ships ids that are deliberately fake so
-`wrangler dev` works with no account at all:
+That is the whole first deploy. The workflow is generic — it reads
+[`apps.json`](../../apps.json), so nothing in it is Tessa-specific — and it does
+everything the by-hand checklist used to list:
 
-```
-"kv_namespaces":  [{ "binding": "CACHE", "id": "0000000000000000000000000000cafe" }]
-"d1_databases":   [{ "binding": "DB",    "database_id": "00000000-0000-0000-0000-0000000000d1" }]
-"r2_buckets":     [{ "binding": "MEDIA", "bucket_name": "tessa-media" }]
-```
+1. creates the D1 database, KV namespace and R2 bucket, if they are missing
+2. writes the real ids into `apps/tessa/wrangler.jsonc` and commits them
+3. builds the SPA and deploys the worker
+4. mints `BETTER_AUTH_SECRET`, but **only** if the worker has none
+5. seeds email delivery with the platform sender, `Tessa <noreply@4dl.app>`
 
-Miniflare simulates all three locally and ignores the ids entirely, which is why
-the whole test suite and `pnpm dev` run on a machine that has never seen
-`wrangler login`. A real deploy needs real ones:
+It is idempotent — every step is guarded by an existence check — so a re-run on a
+provisioned account is a no-op. After it, every push to `main` redeploys Tessa
+through `deploy.yml`.
+
+Two things still have to happen outside it, and neither can be automated: §2's
+dashboard routes, and verifying `noreply@4dl.app` in Cloudflare → Email → Email
+Sending. Verification lives on the zone, and it is done once for the *platform* —
+every app shares the address, so if Kova can already send, Tessa can too.
+
+### Why the workflow rather than the three commands
+
+The three creates are easy. The paste afterwards is not: **a deploy against a
+placeholder id does not fail loudly** — wrangler binds or creates *something*, and
+the worker comes up pointing at an empty database. `deploy.yml` refuses to ship an
+app whose config still holds placeholders for exactly that reason, and skips it
+with a notice instead.
+
+Those placeholders are deliberate, and worth knowing about: Miniflare simulates
+D1/KV/R2 locally and ignores ids entirely, which is why the whole test suite and
+`pnpm dev` run on a machine that has never seen `wrangler login`.
+
+### The email deadlock the workflow breaks
+
+The mock mailer fails closed outside development, so the first sign-in needs
+`email.provider` and `email.from` seeded **directly in D1**. No UI can fix that,
+because reaching the operator console needs a session, which needs an OTP, which
+needs email. A workflow with database access can, which is why step 5 exists. It
+seeds with `ON CONFLICT DO NOTHING`, so it never overwrites a sender you have
+since changed; everything after the first seed is a form (`@4dl/admin` → Email
+delivery).
+
+### By hand, if you must
 
 ```sh
-wrangler kv namespace create tessa-cache
 wrangler d1 create tessa
+wrangler kv namespace create CACHE
 wrangler r2 bucket create tessa-media
+# paste the ids into apps/tessa/wrangler.jsonc, then:
+wrangler secret put BETTER_AUTH_SECRET   # openssl rand -base64 32
+pnpm --filter @tessa/app build           # the worker serves apps/tessa-app/dist
+pnpm --filter @4dl/tessa exec wrangler deploy
 ```
 
-Paste the returned ids over the placeholders. ⚠️ **A deploy with the placeholders
-in place does not fail loudly** — wrangler will create or bind *something* — so
-check the ids before the first `wrangler deploy`, not after.
-
-### 0.2 A fresh deployment cannot send email
-
-Identical to Kova, and it is a genuine bootstrap deadlock rather than an
-oversight: the mock mailer fails closed outside development, so the first sign-in
-needs `email.provider` and `email.from` seeded **directly in D1**. No UI can fix
-this, because reaching the operator console needs a session, which needs an OTP,
-which needs email.
-
-See Kova's DEPLOY.md §6 for the exact rows. Everything after the first seed is a
-form (`@4dl/admin` → Email delivery).
-
----
-
-## 1. Order
-
-1. Create the three resources above and paste the ids in.
-2. `wrangler secret put BETTER_AUTH_SECRET` — `openssl rand -base64 32`.
-   ⚠️ Without it the app falls back to a **repo-public** default, and a forgeable
-   session is a total compromise of every centre on the deployment.
-3. Build the SPA: `pnpm --filter @tessa/app build`. The worker serves
-   `apps/tessa-app/dist` through its `assets` binding, so **a deploy without this
-   ships the previous build, or none**.
-4. `pnpm --filter @4dl/tessa exec wrangler deploy`.
-5. Seed the email rows (§0.2), then sign in on `setup.<root>`.
-6. Add the two routes in the dashboard — see §2.
+⚠️ Without `BETTER_AUTH_SECRET` the app falls back to a **repo-public** default,
+and a forgeable session is a total compromise of every centre on the deployment.
+⚠️ Without the SPA build, the deploy ships the previous build, or none.
 
 ## 2. Routes are a dashboard step, not a config one
 

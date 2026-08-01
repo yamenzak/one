@@ -204,11 +204,33 @@ cannot rot. Its README is the file-by-file guide;
 [`docs/SHIPPING-AN-APP.md`](docs/SHIPPING-AN-APP.md) is the walkthrough from
 nothing to deployed.
 
+**Then add it to [`apps.json`](apps.json).** CI, deploys and provisioning are one
+set of workflows that read that registry — none of them names an app — so a
+second product costs a JSON entry and a workflow run, not four YAML edits.
+
+- `.github/workflows/ci.yml` builds every registered SPA before the unit lanes,
+  and gives every registered Playwright suite its own job.
+- `.github/workflows/deploy.yml` deploys every app marked `deploy`, and **skips**
+  one whose `wrangler.jsonc` still holds placeholder ids.
+- `.github/workflows/provision.yml` takes an app id and does the whole first
+  deploy: creates the missing D1/KV/R2, commits the real ids, ships the worker,
+  mints `BETTER_AUTH_SECRET` if absent, seeds email with the platform sender.
+
+This is a mechanism, not housekeeping. Every deployment failure here has been a
+per-app step somebody forgot to duplicate, and each failed **silently**: a
+missing SPA build made a Miniflare suite report "no tests" (which reads as a
+pass); a copied provisioning workflow drifted from its original; that copy
+shipped with broken YAML, and a broken workflow does not fail, it does not *run*.
+Two dependency-free guards close those — `scripts/apps-manifest.test.mjs` fails
+on an app under `apps/` that has a `wrangler.jsonc` and no registry entry, and
+`.github/workflows/workflows-parse.test.mjs` on a workflow that would not parse.
+Both run before `pnpm install` in every workflow, and both are in `pnpm test`.
+
 ### Before you push
 
 `pnpm typecheck && pnpm test` across the workspace, and `pnpm e2e` if you touched
 a golden path. The Miniflare suite needs the SPA built first — the root `pnpm test`
-handles it.
+handles it, and also runs the two registry/workflow guards above.
 
 ---
 

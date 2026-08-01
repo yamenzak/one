@@ -118,6 +118,44 @@ packages/
   brand/     # (reserved) logos, illustrations
 ```
 
+## The app registry — `apps.json`
+
+**Every deployable thing in this monorepo is declared once, in
+[`apps.json`](apps.json), and no workflow names an app.** CI, deploys and
+provisioning all derive their app list from it, so shipping a second product is a
+registry entry and a workflow run — not four YAML edits.
+
+| Workflow | Reads the registry for |
+|---|---|
+| `ci.yml` | every SPA to build before the unit lanes; one E2E job per registered Playwright suite |
+| `deploy.yml` | every app to deploy — and it **skips** one whose `wrangler.jsonc` still holds placeholder ids |
+| `provision.yml` | the app id you type: creates missing D1/KV/R2, commits the real ids, deploys, mints `BETTER_AUTH_SECRET` if absent, seeds email |
+
+`scripts/apps.mjs` is the reader (plain Node, no dependencies — the workflows
+call it *before* `pnpm install`). `scripts/bind-resource-ids.mjs` is what writes
+a resource id into a JSONC config, structurally and verified.
+
+**`spa` is the field that bites.** The worker serves its app through an `assets`
+binding, and turbo **cannot** infer that dependency — an `assets.directory` is a
+filesystem path, not a package dependency. A missing build makes the worker's
+Miniflare suite abort reporting **"no tests"**, which reads as a pass. That is
+what turned the merge adding `apps/tessa-app` red; naming the SPA here is the fix.
+
+**Email is one address for the whole platform: `noreply@4dl.app`**, with a per-app
+display name (`Kova <noreply@4dl.app>`). Onboarding a sender in Cloudflare Email
+Sending is per-zone manual work, so sharing the address means a new app inherits
+one that already works instead of a plausible-looking one that bounces.
+Provisioning seeds it with `ON CONFLICT DO NOTHING` — an automation that upserted
+would reset a live deployment's configured sender on every re-run.
+
+**Two dependency-free guards, and both are in `pnpm test`:**
+`scripts/apps-manifest.test.mjs` fails on anything under `apps/` with a
+`wrangler.jsonc` and no registry entry (`_template` exempt), and
+`.github/workflows/workflows-parse.test.mjs` on a workflow that would not parse —
+a broken workflow does not *fail*, it does not *run*, and GitHub lists it by
+filename with nothing saying why. Both guard failures that are silent rather than
+loud, which is the only kind this repo has actually had.
+
 ## Commands
 
 - `pnpm dev` — turbo: api (`wrangler dev` on :8787) + app (vite on :5173, proxies /api)
@@ -482,14 +520,21 @@ same-origin and unaffected.
   favourites.
 - "Training Load vs target" doesn't reach the client in production.
 
-**Ops:** deployment is genuinely non-trivial — read DEPLOY.md before touching
-anything deploy-shaped. Notably: a fresh deploy **cannot send email** until
-`email.provider`/`email.from` are seeded directly in D1 (the mock provider fails
-closed outside dev). There IS an operator screen for it now — Platform admin →
-**Email delivery**, `@4dl/admin`'s panel over `@4dl/email/admin-routes` — but it
-cannot break the BOOTSTRAP deadlock and no UI could: reaching it needs a
-platform-admin session, which needs an OTP, which needs email. The first seed is
-manual (DEPLOY.md §6); every change after it is a form. The vision suite is
-still dead until `google.gemini_key` is set (Platform admin → AI).
+**Ops:** the first deploy of any app is **Actions → "Provision an app on
+Cloudflare" → its id** (see the app-registry section above). DEPLOY.md is the
+long form and still worth reading before touching anything deploy-shaped.
+
+A fresh deploy **cannot send email** until `email.provider`/`email.from` exist in
+D1 — the mock provider fails closed outside dev. There IS an operator screen for
+it (Platform admin → **Email delivery**, `@4dl/admin`'s panel over
+`@4dl/email/admin-routes`), but it cannot break the BOOTSTRAP deadlock and no UI
+could: reaching it needs a platform-admin session, which needs an OTP, which
+needs email. **Provisioning now seeds those rows** (`ON CONFLICT DO NOTHING`,
+sender `noreply@4dl.app`), which is what breaks it — a workflow with database
+access can do what a screen behind a login cannot. Seeding the row is not the
+same as being able to send: the address still has to be **verified** in
+Cloudflare → Email → Email Sending, which is per-zone and done once for the whole
+platform. The vision suite is still dead until `google.gemini_key` is set
+(Platform admin → AI).
 
 See SPEC §13 for the phase map.

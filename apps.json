@@ -1,0 +1,66 @@
+{
+  "$comment": [
+    "THE APP REGISTRY — every deployable thing in this monorepo, declared once.",
+    "",
+    "CI, deploys and provisioning all read this file instead of hard-coding app",
+    "names. That is not tidiness: every deployment problem in this repo so far",
+    "was a per-app step somebody forgot to duplicate. Tessa's SPA build was",
+    "missing from CI, so its whole test suite reported 'no tests' — a PASS-shaped",
+    "result — and the merge that added it went red on main. A second provisioning",
+    "workflow was copied from the first and drifted. Neither could happen if the",
+    "workflows derived the app list rather than repeating it.",
+    "",
+    "`apps-manifest.test.mjs` fails if any directory under apps/ has a",
+    "wrangler.jsonc and is not listed here, so a NEW app cannot be forgotten —",
+    "which is the actual failure mode, since nobody forgets the app they are",
+    "currently working on.",
+    "",
+    "Fields:",
+    "  id         short name, used in workflow inputs and job names",
+    "  dir        the worker's directory (holds wrangler.jsonc)",
+    "  spa        workspace package whose `build` must run BEFORE tests and",
+    "             deploy — the worker serves it through an `assets` binding, and",
+    "             Miniflare aborts the suite when the directory is missing.",
+    "             null for a worker that serves no SPA.",
+    "  deploy     whether `deploy.yml` ships it",
+    "  provision  the Cloudflare resources it binds. Omit for an app with none.",
+    "  email      the display name for its transactional sender. The ADDRESS is",
+    "             always noreply@4dl.app — one verified sender for the platform,",
+    "             so a new app inherits a working one instead of a plausible-",
+    "             looking dead one.",
+    "  e2e        workspace package running its Playwright suite, or null"
+  ],
+  "defaultEmailAddress": "noreply@4dl.app",
+  "apps": [
+    {
+      "id": "kova",
+      "name": "Kova",
+      "dir": "apps/api",
+      "spa": "@kova/app",
+      "e2e": "@kova/e2e",
+      "deploy": true,
+      "provision": { "d1": "kova", "kv": "CACHE", "r2": "kova-media" },
+      "email": { "name": "Kova" }
+    },
+    {
+      "id": "tessa",
+      "name": "Tessa",
+      "dir": "apps/tessa",
+      "spa": "@tessa/app",
+      "e2e": "@tessa/e2e",
+      "deploy": true,
+      "provision": { "d1": "tessa", "kv": "CACHE", "r2": "tessa-media" },
+      "email": { "name": "Tessa" }
+    },
+    {
+      "id": "www",
+      "name": "Kova marketing",
+      "dir": "apps/www",
+      "spa": null,
+      "e2e": null,
+      "deploy": true,
+      "preCommands": "node build.mjs",
+      "email": null
+    }
+  ]
+}

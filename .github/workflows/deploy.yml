@@ -1,17 +1,18 @@
 name: Deploy
 
-# Every push to main (and manual runs) typechecks, tests, builds the app, and
-# deploys the api worker + www to Cloudflare.
+# Every push to main typechecks, tests, builds every SPA, and deploys every app
+# that `apps.json` says is deployable. Adding an app is a REGISTRY ENTRY, not an
+# edit here — every deployment problem this repo has had was a per-app step
+# somebody forgot to duplicate.
 #
 # Requires exactly TWO repo secrets:
-#   CLOUDFLARE_API_TOKEN   — token with Workers/D1/KV/R2 edit permissions
-#   CLOUDFLARE_ACCOUNT_ID  — your Cloudflare account id
+#   CLOUDFLARE_API_TOKEN   — Workers/D1/KV/R2 edit permissions
+#   CLOUDFLARE_ACCOUNT_ID  — the account id
 #
-# BETTER_AUTH_SECRET is deliberately NOT a repo secret and is never written by
-# this workflow — see the note on the deploy step below. It is a *worker* secret
-# set once by hand (`wrangler secret put`, DEPLOY.md §5b). Adding it as a third
-# GitHub secret has no effect, and skipping the manual step makes every
-# authenticated request throw in production.
+# BETTER_AUTH_SECRET is deliberately NOT a repo secret and is never written
+# here. It is a WORKER secret, set once by the provisioning workflow: re-putting
+# it on every deploy would rewrite Better Auth's cookie-signing key and sign
+# every user out.
 on:
   push:
     branches: [main]
@@ -19,97 +20,103 @@ on:
 
 concurrency:
   group: deploy-${{ github.ref }}
-  # NOT cancel-in-progress. This job deploys TWO workers in sequence (api, then
-  # www). Cancelling mid-run can land between them, leaving the api worker on
-  # commit N and www on commit N-1 with no signal that it happened. Queueing
-  # instead costs a little CI time and always converges on the newest commit.
+  # NOT cancel-in-progress. Several workers deploy from one run; cancelling
+  # mid-flight can land between them, leaving one app on commit N and another on
+  # N-1 with no signal. Queueing costs CI time and converges on the newest commit.
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  # ── The gate. Nothing deploys unless this passes. ────────────────────────
+  #
+  # It also computes the deploy matrix, so the tests and the deploys can never
+  # disagree about which apps exist.
+  gate:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.registry.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
 
-      # No version here — action-setup reads it from package.json's
-      # packageManager field (pnpm@10.33.0). Specifying both errors out.
-      - uses: pnpm/action-setup@v4
+      # Before install: a check that needs the workspace installed cannot guard
+      # the workspace. Both are dependency-free Node, and both guard failures
+      # that are SILENT rather than loud — a broken workflow does not fail, it
+      # does not run; an unregistered app is not built, so its Miniflare suite
+      # reports "no tests", which reads as a pass. Both have happened here.
+      - run: node .github/workflows/workflows-parse.test.mjs
+      - run: node scripts/apps-manifest.test.mjs
 
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-
-      # A workflow with broken YAML does not FAIL — it does not RUN. GitHub
-      # lists it by filename, its Run-workflow button never appears, and nothing
-      # says why. That is how provision-tessa.yml shipped dead. Needs no deps,
-      # so it goes before install.
-      - run: node .github/workflows/workflows-parse.test.mjs
-
       - run: pnpm install --frozen-lockfile
 
-      # Build BOTH SPAs. Each worker serves its app through an `assets`
-      # binding, and the Miniflare integration suites report "no tests" — a
-      # PASS-shaped result — when the directory is missing. Kova's has been here
-      # since it was written; Tessa's absence is what turned the merge that
-      # added `apps/tessa-app` red, because turbo cannot infer the dependency: an
-      # `assets.directory` is a filesystem path, not a package dependency, so
-      # nothing in the graph connects @4dl/tessa's tests to @tessa/app's build.
-      - run: pnpm --filter @kova/app build
-      - run: pnpm --filter @tessa/app build
+      # EVERY SPA, from the registry. Each worker serves its app through an
+      # `assets` binding. Turbo cannot infer this — an `assets.directory` is a
+      # filesystem path, not a package dependency — so it must be explicit, and
+      # deriving it from the registry is what stops it being explicit-and-stale.
+      - name: Build every SPA
+        run: |
+          set -euo pipefail
+          for pkg in $(node scripts/apps.mjs spas); do
+            echo "::group::build $pkg"
+            pnpm --filter "$pkg" build
+            echo "::endgroup::"
+          done
 
       - run: pnpm turbo run typecheck test
 
-      # NOTE: we deliberately do NOT set secrets here. Worker secrets persist
-      # across `wrangler deploy`, so re-putting BETTER_AUTH_SECRET every deploy
-      # would rewrite Better Auth's cookie-signing key and invalidate all
-      # sessions (forced re-auth). It's set once with `wrangler secret put`
-      # (see DEPLOY.md §5b). Deploys only ship code — sessions + passkeys survive.
-      - name: Deploy api worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/api
-          command: deploy
+      - id: registry
+        run: echo "matrix=$(node scripts/apps.mjs matrix)" >> "$GITHUB_OUTPUT"
 
-      - name: Build + deploy www
-        uses: cloudflare/wrangler-action@v3
+  # ── One job per deployable app. ──────────────────────────────────────────
+  #
+  # `fail-fast: false` so one app's failure does not strand the others.
+  deploy:
+    needs: gate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.gate.outputs.matrix) }}
+    name: deploy ${{ matrix.id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/www
-          command: deploy
-          preCommands: node build.mjs
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
 
-      # ── Tessa ────────────────────────────────────────────────────────────
-      #
-      # Guarded rather than absent. Tessa's wrangler.jsonc ships PLACEHOLDER
-      # resource ids so `wrangler dev` needs no Cloudflare account at all, and
-      # deploying against those would not fail loudly — wrangler would bind or
-      # create something against ids that mean nothing, which is worse than not
-      # deploying.
-      #
-      # So the deploy is conditional on the ids being real. Run the
-      # "Provision Tessa on Cloudflare" workflow once: it creates the resources,
-      # commits the real ids, and that push turns this step on by itself. No
-      # second commit, and no window where this ships against placeholders.
-      - name: Is Tessa provisioned?
-        id: tessa
+      # An app still binding PLACEHOLDER ids is SKIPPED, not failed. Deploying
+      # against them does not error — wrangler binds or creates *something* —
+      # and the worker comes up pointing at nothing. Provisioning replaces the
+      # ids and turns this on by itself.
+      - id: ready
         run: |
-          set -euo pipefail
-          if grep -q '0000000000000000000000000000cafe\|00000000-0000-0000-0000-0000000000d1' apps/tessa/wrangler.jsonc; then
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Tessa still has placeholder resource ids — skipping its deploy. Run the 'Provision Tessa on Cloudflare' workflow to create them."
+          set -uo pipefail
+          if node scripts/apps.mjs ready "${{ matrix.id }}"; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
           else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::${{ matrix.id }} is not provisioned — skipping its deploy. Run 'Provision an app on Cloudflare'."
           fi
 
-      - name: Deploy tessa worker
-        if: steps.tessa.outputs.ready == 'true'
+      - name: Build its SPA
+        if: steps.ready.outputs.go == 'true'
+        run: |
+          set -euo pipefail
+          spa=$(node --input-type=module -e "import {app} from './scripts/apps.mjs'; process.stdout.write(app('${{ matrix.id }}').spa ?? '')")
+          if [ -n "$spa" ]; then pnpm --filter "$spa" build; fi
+
+      # No secrets are set here — see the header.
+      - name: Deploy
+        if: steps.ready.outputs.go == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/tessa
+          workingDirectory: ${{ matrix.dir }}
           command: deploy
+          preCommands: ${{ matrix.pre }}

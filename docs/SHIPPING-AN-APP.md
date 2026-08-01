@@ -132,14 +132,48 @@ carries its own signature and no session.
 `email.provider` and `email.from` are set, and an app that cannot configure its
 mailer cannot send the sign-in code that is the only way in.
 
-## 8. Deploy
+## 8. Register the app, then deploy
 
-Follow [`DEPLOY.md`](../DEPLOY.md) — it is written against Kova, so substitute
-your worker, bucket and root domain. The parts that are the same for every app:
+**Add an entry to [`apps.json`](../apps.json).** That is the whole wiring: CI,
+the deploy, and provisioning all read the registry rather than repeating an app
+list, so a new app needs no workflow edit. `scripts/apps-manifest.test.mjs` fails
+the build if anything under `apps/` has a `wrangler.jsonc` and is not listed —
+because the failure mode is silent, not loud. Tessa's SPA build was missing from
+CI, so its Miniflare suite reported "no tests", which reads as a pass, and the
+merge that added it went red on main.
+
+```jsonc
+{
+  "id": "tessa",              // used in workflow inputs and job names
+  "name": "Tessa",
+  "dir": "apps/tessa",        // holds wrangler.jsonc
+  "spa": "@tessa/app",        // built BEFORE tests and deploy — see below
+  "e2e": "@tessa/e2e",        // gets its own Playwright job, or null
+  "deploy": true,
+  "provision": { "d1": "tessa", "kv": "CACHE", "r2": "tessa-media" },
+  "email": { "name": "Tessa" } // display name only; the ADDRESS is the platform's
+}
+```
+
+`spa` is the field that bit. The worker serves your app through an `assets`
+binding, and turbo **cannot** infer the dependency — an `assets.directory` is a
+filesystem path, not a package dependency, so nothing in the graph connects a
+worker's tests to its app's build. Naming it here is what makes CI build it.
+
+Then run **Actions → "Provision an app on Cloudflare" → your id.** One run takes
+the app from nothing on the account to reachable and able to send its first
+sign-in code: it creates the D1/KV/R2 it binds, writes the real ids into your
+`wrangler.jsonc` and commits them, builds the SPA, deploys the worker, mints
+`BETTER_AUTH_SECRET` if there is none, and seeds email delivery. Until it has
+run, `deploy.yml` **skips** your app rather than deploying it against placeholder
+ids — which does not error, it just binds the worker to nothing.
+
+[`DEPLOY.md`](../DEPLOY.md) is the long form. It is written against Kova, so
+substitute your worker, bucket and root domain. The parts that are the same for
+every app:
 
 - the API token scopes, and the fact that a missing scope surfaces on the
   *create* rather than the read;
-- provisioning D1 / KV / R2 and pasting the ids;
 - **the two worker routes are a dashboard step.** `wrangler.jsonc` declares none
   deliberately: declaring them makes `wrangler dev` rewrite the incoming Host and
   collapse every door onto the root. And `*.<root>` is a second-level wildcard
