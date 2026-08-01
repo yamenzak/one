@@ -131,11 +131,34 @@ describe("every AI action is a studio's to configure", () => {
       id: "m", task: "text", label: "M", provider: "workers-ai", input_rate: 1, output_rate: 1,
       unit_rate: null, unit_kind: null, markup: 3, enabled: 1, is_default: 0, ...over,
     });
+    // A REAL image model carries the per-image rate. `parseGeminiCatalog` only
+    // tags a row `image` when Google's page gives a single "$X per image"
+    // figure, and the seed's Nano Banana row is written the same way — so this
+    // is what an image model looks like everywhere it is actually produced.
+    const imageModel = { task: "image", provider: "google", unit_rate: 3_545, unit_kind: "image" } as const;
+
     for (const task of ["text", "text-small"] as const) {
       expect(modelSupportsTask(row({ task: "text" }), task)).toBe(true);
-      expect(modelSupportsTask(row({ task: "image", provider: "google" }), task)).toBe(false);
+      expect(modelSupportsTask(row(imageModel), task)).toBe(false);
     }
-    expect(modelSupportsTask(row({ task: "image", provider: "google" }), "image")).toBe(true);
-    expect(modelSupportsTask(row({ task: "image" }), "image")).toBe(false);
+    expect(modelSupportsTask(row(imageModel), "image")).toBe(true);
+    // Not Google → nothing here can drive it.
+    expect(modelSupportsTask(row({ ...imageModel, provider: "workers-ai" }), "image")).toBe(false);
+
+    // An `image` row with NO per-image rate is refused, and this is a MONEY
+    // rule as much as a capability one: `neuronsForUsage` only charges for an
+    // image when `unitRate` is set, so such a row would generate images for the
+    // cost of the prompt alone. It also cannot come from the parser, which
+    // refuses to create the row without that figure — so it only exists via a
+    // hand-edit or a restored backup, which is exactly when a silent free lane
+    // would go unnoticed.
+    expect(modelSupportsTask(row({ task: "image", provider: "google" }), "image")).toBe(false);
+
+    // A Gemini TEXT model reads images and cannot make them, so it is valid for
+    // vision and refused for image generation. Offering it for the latter is
+    // what produced cover-image features that failed on every call.
+    const geminiText = row({ task: "text", provider: "google" });
+    expect(modelSupportsTask(geminiText, "vision")).toBe(true);
+    expect(modelSupportsTask(geminiText, "image")).toBe(false);
   });
 });

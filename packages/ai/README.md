@@ -40,6 +40,13 @@ is what the sync already derives from the same pricing page (a row only becomes
 family therefore works the day it is synced, and a rename cannot reclassify
 anything by accident.
 
+It is also a **money** rule. `neuronsForUsage` charges for a generated image only
+`if (rate.unitRate)`, so an `image`-tagged row without one bills the prompt and
+gives the image away. The parser cannot produce such a row — it refuses the model
+rather than guess a price — so it only arrives by hand-edit or restored backup,
+which is exactly when a silently free lane goes unnoticed. Requiring the unit
+rate closes the capability hole and the billing hole with the same condition.
+
 `modelTasks()` inverts the rule into a list, and both `/api/settings/ai` and
 `/api/admin/ai/models` send it. Clients filter their pickers on that rather than
 on `task` — two frontends previously guessed with `provider === "google"` and
