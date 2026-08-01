@@ -37,7 +37,8 @@ package's boundary ALLOW list is EMPTY. Read
 Cloudflare Workers + Hono + Durable Objects + D1 + KV + R2 + Workers AI ·
 Better Auth (**100% passwordless: email OTP + passkeys**) · Vite + React 19 PWA
 (**one app for all roles**) · shadcn-style UI + Tailwind v4 · Stripe (platform
-rail + Connect tenant rail). Package manager: **pnpm** (Node ≥22).
+rail only — tenants pay Kova). **Tenants are paid by their OWN customers on their
+OWN provider**; Stripe Connect is gone. Package manager: **pnpm** (Node ≥22).
 
 ## Layout
 
@@ -185,6 +186,36 @@ remote bindings without editing the config (this is what the E2E suite does).
   Both are correct: one is a shared package's vocabulary, the other is Kova's. —
   budgets carry `expiresAt`, days derive at read time, purchases QUEUE not sum,
   status reconciles lazily on read. No domain cron.
+- **The tenant is paid on their OWN provider — Kova is not in the money path.**
+  `payments-routes.ts` + `@4dl/commerce` providers.ts. Stripe Connect was removed
+  in full, for three reasons that are not going to change: a Connect platform
+  signs up for **losses from seller fraud and negative balances**; it may only
+  onboard sellers its own platform country allows (the UAE is absent from
+  Stripe's platform-country lists, so a German coach was unreachable); and half
+  the world does not use Stripe. Kova now: opens a `purchase_intents` row, sends
+  the customer to a URL the studio owns, and learns the outcome from a signed
+  notification **or** from the studio confirming by hand. Both settle through the
+  same path, so `manual` is not a second-class lane — it is the DEFAULT, it works
+  in every country on day one, and every automated provider degrades to it.
+  - The abstraction survives because it never CHARGES. Tokenization, 3DS, SCA and
+    retries stay the provider's; only `checkoutUrl` + `verify` are ours. A new
+    gateway (Tap, Telr, PayTabs, Ziina…) is one file and a registry entry.
+  - **A stored credential may VERIFY, never ACT** — `assertSafeConfig` rejects any
+    config key naming a secret key / API key / token. Storing one would make this
+    database a vault of live merchant credentials, which is a strictly worse
+    liability than the Connect exposure this design exists to avoid.
+  - The webhook is PUBLIC by construction, so a provider that cannot verify must
+    not accept: `manual`, or any tenant with no stored secret, is REFUSED. It
+    answered 200 once, which made the endpoint an open door for every studio that
+    had not configured anything — i.e. most of them.
+  - **Not supported here, deliberately**: instalment plans (nothing can count to
+    N and cancel on a link we do not own), cancelling a client's recurring charge
+    (the studio does it in their own provider), and tenant-scope promo codes (a
+    discount must be applied by whoever owns the checkout page). Kova's OWN
+    platform-scope promos on plans and credit packs are unaffected, and so are
+    access/redemption codes, which grant days rather than reduce a price.
+  - Everything downstream was already decoupled and needed no change: the lapse
+    ladder (`lapse.ts` has zero imports), client feature flags, budgets, expiry.
 - **Two flag systems** (don't merge): platform entitlements (tenant bought from
   Kova, `entitlements.ts`) vs per-package client flags (client bought from the
   tenant, `clientFlags.ts`). Client capability = the intersection.
@@ -231,7 +262,7 @@ remote bindings without editing the config (this is what the E2E suite does).
 - **Kova is B2B, and the catalog says so.** The floor is `solo` (shown as
   **"Starter"** — the id is stamped in Stripe metadata and must never change),
   3 clients at $4.99. It was 1 client, which is not a trainer plan at all; it was
-  a self-coaching tier inside a product built out of staff seats, a Connect rail
+  a self-coaching tier inside a product built out of staff seats, a client
   and client packages. There is **no free tier**: `free` is the PARKING STATE of
   a tenant that never chose a plan, and it used to carry THREE clients against
   Solo's one — so not paying bought you more than the cheapest tier did.
@@ -363,7 +394,7 @@ in `apps/api/test` and are already *inside* the API count — the older
 
 **Built and tested:** foundation, auth (OTP + passkeys, incl. autofill /
 conditional UI), tenancy + row-level scope, the AI suite (credits reserve →
-run → settle), commerce (platform rail + Connect rail), content, reports, media,
+run → settle), commerce (Kova's platform rail + the tenant's own payment rail), content, reports, media,
 tenant custom domains (Cloudflare for SaaS, per-domain WebAuthn RP — SPEC §14.1),
 the vision suite (Snap-a-Meal + Label Reader) on a real Gemini path, InboxDO
 real-time notification push (WebSocket DO; the bell keeps a slow poll as a

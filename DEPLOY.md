@@ -389,7 +389,6 @@ section 6.
 | `stripe.<lane>.secret_key` | *(empty)* | No payments in that lane (`<lane>` = `test` or `live`) | Platform admin → **Stripe** |
 | `stripe.<lane>.publishable_key` | *(empty)* | Payment Element can't mount | Platform admin → **Stripe** |
 | `stripe.<lane>.webhook_secret` | *(empty)* | **Platform-rail webhooks rejected 400** → subscriptions and credit packs are paid for and never granted | Platform admin → **Stripe** |
-| `stripe.<lane>.connect_webhook_secret` | *(empty)* | Falls back to that lane's `webhook_secret`; if that's also unset, **Connect webhooks rejected** → clients pay and get nothing | Platform admin → **Stripe** |
 | `stripe.secret_key`, `stripe.publishable_key`, `stripe.webhook_secret`, `stripe.connect_webhook_secret` | *(empty)* | **Legacy, pre-lane slots.** Still read as a per-credential fallback when the active lane has no value, so an existing deployment keeps working; a lane-scoped write takes precedence | Platform admin → **Stripe** (writes go to a lane) |
 | `stripe.<lane>.catalog_ids` | *(empty)* | Written by the product, not by hand: the Stripe product/price ids parked for a lane across a mode flip (section 10a) | — |
 | `stripe.platform_fee_bps` | `0` | Zero application fee on tenant→client payments (the advertised "zero markup") | Platform admin → **Stripe** |
@@ -463,7 +462,7 @@ which every webhook fails signature verification and clients pay for nothing.
 Platform admin → **Stripe**:
 
 1. Fill in the **Test lane** and the **Live lane** independently (four fields
-   each: secret key, publishable key, platform webhook secret, Connect webhook
+   each: secret key, publishable key, platform webhook
    secret). Both can be stored before either is active. Fields are write-only —
    blank keeps what is saved.
 2. **Switch to test / Switch to live** is one action and changes nothing but the
@@ -494,7 +493,7 @@ alert until it is resolved.
 customer ids (`subscriptions.stripe_customer_id`), platform/client subscription
 ids, and connected-account ids (`tenant_settings.stripe_account_id`) are also
 per-lane objects in Stripe, and they are deliberately left alone — clearing a
-live connected-account mapping would break the Connect webhook's account→tenant
+live connected-account mapping would break the account→tenant
 resolution for real, paying tenants. So a flip into a lane those ids were not
 created in produces loud API failures ("No such customer") on the affected paths,
 not silent damage. Treat lane flips as a setup/staging action, not a routine
@@ -520,17 +519,17 @@ Stripe Dashboard → Developers → Webhooks → **Add endpoint**, twice.
 - Copy the signing secret (`whsec_…`) → platform admin → Stripe → the **platform
   webhook secret of the lane this endpoint belongs to** (`stripe.<lane>.webhook_secret`).
 
-**2. Connect rail** — your tenants' revenue (clients buying packages on the
-tenant's own connected account).
+**There is no second endpoint to configure.** Stripe Connect was removed: your
+tenants are paid by their own customers on their OWN provider, and Kova is not in
+that money path. Each studio registers its own webhook — in its own Stripe (or
+whatever it uses) — pointing at `https://<their studio host>/api/pay/webhook/<their
+tenant id>`, and pastes that endpoint's signing secret into **Business → Getting
+paid**. The app shows them the URL with a copy button and walks them through it.
 
-- URL: `https://<your host>/api/connect/webhook`
-- **You must enable "Listen to events on connected accounts"** on this
-  endpoint. Without it the endpoint receives nothing and every client package
-  purchase is paid-but-ungranted.
-- Events: the same nine as above, **plus `account.updated`** (this is what
-  flips a tenant's onboarding status to charges-enabled).
-- Copy that endpoint's signing secret → platform admin → Stripe → the **Connect
-  webhook secret of that lane** (`stripe.<lane>.connect_webhook_secret`).
+Nothing about that is your job as the operator, and deliberately so: you hold no
+credential that can move a studio's money, and you carry no liability for their
+customers' chargebacks. A studio that configures nothing still sells — the default
+is off-platform, where they take payment their own way and tap to confirm.
 
 **Pin the API version on BOTH endpoints to `2025-02-24.acacia`** (the value of
 `STRIPE_API_VERSION` in `apps/api/src/stripe.ts`). This is not cosmetic, and it is
@@ -544,7 +543,7 @@ of it against real Stripe:
 - At that default, `invoice.subscription` **does not exist**. The id lives under
   `parent.subscription_details.subscription`. `invoiceSubscriptionId` reads both,
   so renewals still work — but that fallback is the only thing keeping a Connect
-  renewal from being "card charged, budget never topped up, HTTP 200".
+  renewal from being "card charged, credits never granted, HTTP 200".
 - At that default a Subscription payload has **no root `current_period_end`**
   either (it moved onto `items.data[].current_period_end`), which the handlers do
   NOT read — see AGENTS.md §5 for the consequence.
@@ -552,12 +551,9 @@ of it against real Stripe:
 Pinning the endpoints is the cheap fix; leaving them unpinned means the payload
 shape changes under you whenever Stripe's default moves.
 
-The two endpoints have **different** signing secrets, and **so does each lane** —
-test-mode and live-mode webhook endpoints are separate objects in Stripe. That is
-four signing secrets in total if you run both lanes. If you leave a lane's Connect
-secret empty the code falls back to that same lane's platform secret, which will
-fail signature verification for Connect events — a silent 400 per event. The
-admin screen flags a missing Connect secret in red for exactly this reason.
+**Each lane has its own signing secret** — test-mode and live-mode webhook
+endpoints are separate objects in Stripe, so that is two secrets if you run both
+lanes (it used to be four; the Connect pair is gone with the rail).
 
 ### 10c. Verify
 
@@ -572,7 +568,7 @@ The only suite in the repo that leaves the machine. It drives a real Stripe
 **test-mode** account and asserts our assumptions against what Stripe actually
 returns and emits — catalog prices, the trial SetupIntent transition, trial end
 under a test clock, credit-pack PaymentIntents, refund/dispute payload shapes, the
-Connect rail, the API-version drift above, and real event bodies replayed through
+the API-version drift above, and real event bodies replayed through
 our own `/api/stripe/webhook`. Everything else that touches Stripe uses payloads
 we wrote ourselves, which is how the two trial bugs shipped.
 

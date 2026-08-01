@@ -2,7 +2,7 @@
 
 Kova is a multi-tenant platform for personal-training businesses: studios, gyms
 and independent coaches manage clients, run staff trainers on scoped rosters,
-sell training packages through their own Stripe account (Connect, no markup),
+sell training packages through their own payment provider (no markup, no middleman),
 and use an AI suite metered against tenant credits.
 
 It is **one app on the One platform** — the shared `@4dl/*` packages in this
@@ -50,7 +50,7 @@ surface lives, and the one feature with a design of its own.
   roster), and **clients** (train, eat, log, check in — mobile-first PWA).
 - **How money flows:**
   1. **Platform rail** — tenants pay Kova a plan subscription + buy AI credit packs.
-  2. **Tenant rail** — tenants sell packages to *their* clients via **Stripe Connect** on
+  2. **Tenant rail** — tenants sell packages to *their* clients on their OWN provider, via
      the tenant's own Stripe account. **Kova takes no markup/application fee** on this rail.
   3. **AI rail** — AI usage by anyone inside a tenancy (trainer or client) consumes the
      **tenancy's credit balance**. Billing relationship is strictly Kova ↔ tenant.
@@ -181,7 +181,7 @@ navigation adapts to the active persona (DESIGN.md §5):
 - **Client**: Today · Train · Eat · Progress.
 - **Trainer**: Today (triage inbox — same feed pattern, events are check-ins/swaps/
   at-risk clients) · Clients (roster) · Library.
-- **Owner**: + Business tab (packages, subscriptions, credits/AI usage, Connect, staff).
+- **Owner**: + Business tab (packages, subscriptions, credits/AI usage, getting paid, staff).
 - **Platform admin**: hidden section gated by `ADMIN_EMAILS`.
 
 **Keystone rule**: the trainer's client-detail page *is* the client app — the same
@@ -407,9 +407,9 @@ post-launch with on-device pose only.)
 
 ---
 
-### 7. Tenant Commerce (Stripe Connect + Access Economy)
+### 7. Tenant Commerce (the tenant's own payment rail + Access Economy)
 
-#### Two Stripe rails, cleanly separated
+#### Two rails, cleanly separated — and only ONE of them is Kova's Stripe
 
 - **Platform rail** (Kova ↔ tenant): Scena's SDK-less `stripe.ts` — raw fetch + Web
   Crypto webhook verification; config in `app_config` (mode/keys, admin UI); catalog sync
@@ -417,14 +417,25 @@ post-launch with on-device pose only.)
   changes and packs; webhooks drive activation, monthly grants, and the **dunning
   lifecycle** `active → past_due (7d grace) → suspended → data-wipe (30d)` via daily cron.
   Comped tenants exempt. Suspension gates the coaching surfaces, never the billing page.
-- **Tenant rail** (tenant ↔ client): **Stripe Connect, Standard accounts** — the tenant
-  owns the Stripe relationship, their statement descriptor, their payouts, their tax.
-  Kova creates Checkout sessions **on the connected account** with **no
-  application_fee** (zero markup, as promised). Onboarding = Connect account link from
-  tenant settings; `stripe_account_id` on the tenant row. Per-account webhooks
-  (`/api/connect/webhook`) with the same event set ByShujaa handled: checkout completed,
-  invoice paid (final-installment cancel), payment failed (pause + notify + PaymentBlocker),
-  subscription deleted.
+- **Tenant rail** (tenant ↔ client): **the tenant's OWN provider. Kova is not in the
+  money path at all.** Stripe Connect was removed in full — a Connect platform accepts
+  liability for seller fraud and negative balances, may only onboard sellers its own
+  platform country allows (the UAE is absent from Stripe's platform-country lists, so
+  EEA coaches were unreachable), and forces one processor on a world that does not all
+  use it.
+
+  Kova instead: writes a `purchase_intents` row, sends the customer to a URL the studio
+  owns (`packages.pay_link`), and learns the outcome from a **signed notification** at
+  `/api/pay/webhook/:tenantId` **or** from the studio confirming by hand. Both settle
+  through one path, so `manual` is the DEFAULT rather than a fallback: it needs no
+  setup, works in every country immediately, and every automated provider degrades to
+  it. `stripe_link` is the first adapter (the studio's own Payment Link + the webhook
+  SIGNING SECRET — a credential that can verify a message and nothing else).
+
+  **Not supported on this rail, deliberately**: instalment plans (nothing can count to N
+  and cancel on a link we do not own), cancelling a client's recurring charge (the
+  studio does it in their provider), tenant-scope promo codes (the discount belongs to
+  whoever owns the checkout page).
 
 #### Packages & the access economy (ByShujaa's best idea, kept intact)
 
@@ -438,9 +449,10 @@ client_specific`), once-per-customer, per-package client feature flags.
   expired states (+ best-effort Stripe cancel).
 - **Repeat purchases queue, never sum** (`computeBudgetStart` = current expiry).
 - **$0 packages bypass Stripe** entirely.
-- **Redemption codes** (day top-ups, feature-targeted, max-uses) separate from **promo
-  codes** (Stripe coupons/promotion codes on the connected account, synced via deferred
-  hooks with `syncStatus` observability).
+- **Redemption codes** (day top-ups, feature-targeted, max-uses) are unaffected by the
+  rail change — they grant DAYS rather than reduce a price, so they need no processor.
+  Tenant-scope **promo codes** are retired; Kova's own platform-scope promos on plans
+  and credit packs still work, on Kova's own Stripe.
 - **Client flags resolved through one function** — `resolveClientFlags()`: package
   defaults → subscription overrides → budget-gating → **∩ tenant plan entitlements**.
   UI and API only ever consume the resolved shape.
@@ -634,7 +646,7 @@ referenced entities; `source`/`source_id` on imported library rows.
 - `clients`, `clients/:id/{goals,plans,checkins,reports,supplements,labs,sessions}`
 - `plans`, `templates`, `exercises` (+`/search-external`), `foods` (+`/search-external`,
   `/barcode`), `logs/{workout,food,water,sleep,mood,fasting}`, `arrangements`, `swaps`
-- `packages`, `marketplace/:slug`, `subscriptions`, `redeem`, `connect/{onboard,checkout,
+- `packages`, `marketplace/:slug`, `subscriptions`, `redeem`, `purchases`, `payments/settings`, `pay/webhook/:tenantId`, `connect/{onboard,checkout,
   webhook,portal}`
 - `billing` (platform: plan/entitlements/balance/packs/ledger), `billing/{change-plan,
   pack-checkout}`, `stripe/webhook` (platform rail)
@@ -1061,7 +1073,7 @@ role-adaptive PWA:
 |---|---|---|
 | **Client** | Today · Train · Eat · Progress | as §3 |
 | **Trainer** | Today · Clients · Library · (Business*) | **Today = triage inbox**: same TimelineFeed pattern, but events are "Sara checked in" (with ✦ AI summary sub-card + quick-reply), "2 swap requests", "lab uploaded — review", ✦ Retention Radar cards ("Omar at risk: no logs 6 days — suggest a check-in nudge"), "Ali's meal budget expires Friday". Hero = roster rings (clients on-track ring + pills: pending check-ins, swaps, expiring subs). **Clients** = roster list (search + WeekDots per row) → client detail. **Library** = LibraryCard grid: Exercises, Foods, Workout templates, Meal templates, Content hub (blog/articles/recipes). |
-| **Owner** | + **Business** tab | Packages & marketplace, client subscriptions, Stripe Connect status, **AI credits** (balance ring + usage-by-feature StatCards + ledger feed), staff & roles, tenant settings/branding. Same StatCard/feed grammar — a credits balance is just another big number with a sparkline. |
+| **Owner** | + **Business** tab | Packages & marketplace, client subscriptions, the studio's own payment setup, **AI credits** (balance ring + usage-by-feature StatCards + ledger feed), staff & roles, tenant settings/branding. Same StatCard/feed grammar — a credits balance is just another big number with a sparkline. |
 | **Platform admin** | hidden section (`ADMIN_EMAILS`) | Tenants, plans, AI models, app config — SettingsList + StatCards again. |
 
 **The keystone: the trainer's client-detail page IS the client app.** Opening a client
@@ -1194,7 +1206,9 @@ Routes declared in `Shell.tsx:123-142`.
 | `/clients/:id`, `/clients/:id/:subtab` | T O | `coach/Clients.tsx:380` | Client detail → §D |
 | `/library`, `/library/:tab` | T O | `coach/Library.tsx:21` | Exercises, foods, templates, content |
 | `/sessions` | T O (feature `frontDesk`) | `coach/Sessions.tsx:38` | Scheduling + add-on types |
-| `/business` | O (tab); T by deep link | `coach/Business.tsx:78` | Revenue, packages, staff |
+| `/business` | O (tab); T by deep link | `coach/Business.tsx:80` | Revenue, packages, getting paid, staff |
+| `/business` → Getting paid | O (write), T (read) | `coach/PaymentSetup.tsx:96` | Choose provider; guided setup for the studio's OWN checkout |
+| `/business` → Getting paid | O, T | `coach/PendingPayments.tsx:47` | Purchases waiting on money; "mark as paid" confirms into access |
 | `*` | all | `Shell.tsx:161` | Redirect → `/today` |
 
 ### D. Sub-tabs

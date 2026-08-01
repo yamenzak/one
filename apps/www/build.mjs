@@ -37,7 +37,7 @@ const FEATURES = [
   ["🏋️", "Plans clients actually follow", "Build workouts block by block or let AI draft from a client's intake. Publish, and they train against it with PR tracking and rest timers."],
   ["🍽️", "Nutrition without the friction", "Barcode, web food search, quick entry, and coach-set macro targets from a proper TDEE calculator."],
   ["✨", "An AI suite that pays its way", "Plan drafts, food parsing, check-in summaries — metered against your credits, transparently, at cost-plus."],
-  ["💳", "Your Stripe, your money", "Sell packages on your own connected Stripe account. We take zero markup on what your clients pay you."],
+  ["💳", "Your money, your account", "Your clients pay you directly, through whichever payment provider you already use. We never hold your money, never take a cut, and never ask for keys to your payment account."],
   // No "retention radar": the per-client AI retention line isn't shipped. What
   // the coach dashboard actually shows is an at-risk count derived from
   // adherence/check-in recency. Describe that.
@@ -60,10 +60,10 @@ const FEATURES = [
 const PLANS = [
   // "Starter", not "Solo", and three clients rather than one. Kova sells to
   // coaching BUSINESSES: a one-client tier read as a self-coaching plan, which is
-  // not what any of this product's machinery — staff seats, the Connect rail,
-  // client packages — is for. Keep this table in step with `DEFAULT_PLANS`.
+  // not what any of this product's machinery — staff seats, client packages —
+  // is for. Keep this table in step with `DEFAULT_PLANS`.
   ["Starter", "$4.99/mo", ["1 coach", "3 clients", "Core coaching + AI suite", "500 AI credits / month", "250 MB media"], "30 days free"],
-  ["Light", "$24.99/mo", ["1 coach", "30 clients", "Sell packages on your Stripe", "3,000 AI credits / month", "1 GB media"], "30 days free"],
+  ["Light", "$24.99/mo", ["1 coach", "30 clients", "Sell packages — paid straight to you", "3,000 AI credits / month", "1 GB media"], "30 days free"],
   ["Pro", "$49.99/mo", ["5 coaches", "100 clients", "Supplements + labs", "Branding + front desk", "6,000 AI credits / month", "10 GB media"]],
   ["Max", "$119.99/mo", ["Unlimited coaches", "Unlimited clients", "Everything in Pro", "15,000 AI credits / month", "100 GB media"]],
 ];
@@ -158,14 +158,14 @@ ${footer}
 const html = page({
   title: "Kova — coaching software for personal trainers &amp; studios",
   description:
-    "Kova is the all-in-one platform for personal trainers and studios: build workout &amp; meal plans, track clients, sell packages on your own Stripe, and use an AI coaching suite. Multi-trainer, multi-tenant, mobile-first.",
+    "Kova is the all-in-one platform for personal trainers and studios: build workout &amp; meal plans, track clients, sell packages with your clients paying you directly, and use an AI coaching suite. Multi-trainer, multi-tenant, mobile-first.",
   ogTitle: "Kova — coaching, organized",
   ogDescription:
     "Build plans, track clients, sell packages, and use AI — all in one clean app your clients will actually use.",
   body: `<main>
 <div class="hero wrap">
   <h1>Coaching, <span class="grad">organized</span>.</h1>
-  <p>The all-in-one platform for personal trainers and studios. Build plans, track clients, sell packages on your own Stripe, and let AI do the busywork — in an app a 70-year-old can use.</p>
+  <p>The all-in-one platform for personal trainers and studios. Build plans, track clients, sell packages your clients pay you for directly, and let AI do the busywork — in an app a 70-year-old can use.</p>
   <a class="btn" href="${APP_SIGNIN_URL}">Start free for 30 days</a>
 </div>
 
