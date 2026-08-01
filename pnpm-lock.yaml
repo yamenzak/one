@@ -251,6 +251,9 @@ importers:
       '@4dl/billing':
         specifier: workspace:*
         version: link:../../packages/billing
+      '@4dl/billing-rail':
+        specifier: workspace:*
+        version: link:../../packages/billing-rail
       '@4dl/commerce':
         specifier: workspace:*
         version: link:../../packages/commerce
@@ -281,6 +284,9 @@ importers:
       hono:
         specifier: ^4.9.10
         version: 4.12.29
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 0.8.55

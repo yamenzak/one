@@ -23,6 +23,7 @@ import { schemaGate, type SchemaModule } from "@4dl/core";
 import { AI_SCHEMA } from "@4dl/ai";
 import { AUTH_SCHEMA } from "@4dl/auth";
 import { BILLING_SCHEMA } from "@4dl/billing/schema";
+import { BILLING_RAIL_SCHEMA } from "@4dl/billing-rail";
 import { COMMERCE_SCHEMA } from "@4dl/commerce";
 import { EMAIL_SCHEMA } from "@4dl/email";
 import { NOTIFY_SCHEMA } from "@4dl/notify/schema";
@@ -44,7 +45,7 @@ import { TESSA_SCHEMA } from "./schema.js";
  * delete error.
  */
 export const SCHEMA_MODULES: readonly SchemaModule[] = [
-  AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, COMMERCE_SCHEMA,
+  AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, BILLING_RAIL_SCHEMA, COMMERCE_SCHEMA,
   STORAGE_SCHEMA, AI_SCHEMA, EMAIL_SCHEMA, NOTIFY_SCHEMA, TESSA_SCHEMA,
 ];
 

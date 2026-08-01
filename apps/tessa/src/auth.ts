@@ -28,7 +28,7 @@ import {
 import { emailShell, emailButton, escapeHtml, sendEmail } from "@4dl/email";
 import type { HostShape } from "@4dl/tenancy";
 import { ac, roles, CREATOR_ROLE, CUSTOMER_ROLE } from "./access.js";
-import { withinQuota } from "./entitlements.js";
+import { withinQuota } from "./billing-store.js";
 import { sendTenantEmail } from "./email-provider.js";
 import { APP_BRAND } from "./mailer.js";
 import type { Env } from "./env.js";

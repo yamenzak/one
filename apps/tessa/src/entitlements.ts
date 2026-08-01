@@ -4,9 +4,9 @@
  *
  * The engine owns the resolution: merge a stored blob onto the free baseline,
  * apply grants (which RAISE a ceiling and never lower one), and zero everything
- * out for a suspended tenant. It cannot own the KEYS — `staffSeats` and
- * `subjects` mean nothing to it, and a warehouse app would have `locations` and
- * `skus`.
+ * out for a suspended tenant. It cannot own the KEYS — `catalogItems` and
+ * `locations` mean nothing to it, and a coaching app would have `clients` and
+ * `staffSeats`.
  *
  * Two rules the shape enforces:
  *
@@ -20,11 +20,16 @@ import { bindEntitlements, type EntitlementShape } from "@4dl/billing";
 
 export interface AppEntitlements extends EntitlementShape {
   quotas: {
-    /** Owner + staff. The customer role does not consume one. */
+    /**
+     * Everyone who works in the centre. Tessa has no customer role — nobody
+     * outside the centre signs in — so unlike Kova, EVERY member consumes one.
+     */
     staffSeats: number;
-    /** The individuals a tenant may have on its books. */
-    subjects: number;
-    /** Megabytes in the media bucket. `-1` = unlimited. */
+    /** Rooms, stores and theatres (the `locations` tree). */
+    locations: number;
+    /** Distinct catalog items — the TYPES of thing, not the stock on hand. */
+    catalogItems: number;
+    /** Megabytes in the media bucket: cycle evidence, label photos. `-1` = unlimited. */
     storageMb: number;
   };
   features: {
@@ -42,9 +47,17 @@ export interface AppEntitlements extends EntitlementShape {
  *
  * Every key must appear. The engine merges a stored blob ONTO this, key by key,
  * so a key missing here can never be set by a plan.
+ *
+ * ⚠️ These numbers are NOT a tier anybody is sold. `free` is the PARKING STATE
+ * of a centre that has not chosen a plan, and the route guard reports
+ * `incomplete` for it on a deployment where Stripe is configured — so on a
+ * charging deployment they are unreachable. They are left usable on purpose:
+ * they are what a deployment with NO payment rail serves (a self-host, the
+ * integration suite), and crippling them bricks exactly the configuration where
+ * the gate correctly stands down.
  */
 export const FREE: AppEntitlements = {
-  quotas: { staffSeats: 1, subjects: 5, storageMb: 100 },
+  quotas: { staffSeats: 2, locations: 2, catalogItems: 50, storageMb: 200 },
   features: { customDomain: false, ai: false },
   aiCredits: { monthlyGrant: 0 },
   trialDays: 0,
@@ -54,46 +67,7 @@ export const FREE: AppEntitlements = {
 export const entitlements = bindEntitlements<AppEntitlements>(FREE);
 
 /**
- * The D1 lookups. Thin on purpose — the engine is shared, the QUERY is the
- * app's, because which table holds a tenant's plan is a schema decision.
- *
- * `clamp` is the one place delinquency bites: every feature gate and every quota
- * check resolves through here, so a suspended tenant falls back to FREE
- * everywhere at once rather than in each gate separately.
+ * The D1 lookups live in `billing-store.ts`, next to the catalog whose shape
+ * they read — `tenantEntitlements`, `hasFeature`, `withinQuota`. This file is
+ * the REGISTRY only: the keys, and what a tenant gets with no plan at all.
  */
-export async function tenantEntitlements(db: D1Database, tenantId: string): Promise<AppEntitlements> {
-  const sub = await db
-    .prepare("SELECT plan_id, status, overrides_json FROM subscriptions WHERE tenant_id = ?")
-    .bind(tenantId)
-    .first<{ plan_id: string | null; status: string | null; overrides_json: string | null }>()
-    .catch(() => null);
-  const plan = sub?.plan_id
-    ? await db.prepare("SELECT entitlements_json FROM plans WHERE id = ?").bind(sub.plan_id).first<{ entitlements_json: string | null }>().catch(() => null)
-    : null;
-  const resolved = entitlements.merge(entitlements.resolve(plan?.entitlements_json), sub?.overrides_json);
-  return entitlements.clamp(resolved, sub?.status ?? "active");
-}
-
-/** True when the tenant's plan (or a grant) includes `feature`. */
-export async function hasFeature(db: D1Database, tenantId: string, feature: keyof AppEntitlements["features"]): Promise<boolean> {
-  return (await tenantEntitlements(db, tenantId)).features[feature];
-}
-
-/**
- * Is ONE MORE of `quota` allowed? `-1` is unlimited.
- *
- * Note what this deliberately does NOT do: it never looks at rows that already
- * exist. Call it only on a CREATE. A tenant left over a lowered ceiling keeps
- * every existing row fully readable and writable; they simply cannot add
- * another. Nothing should ever archive, hide or brick an over-quota row.
- */
-export async function withinQuota(
-  db: D1Database,
-  tenantId: string,
-  quota: keyof AppEntitlements["quotas"],
-  currentCount: number,
-): Promise<{ ok: boolean; max: number }> {
-  const max = (await tenantEntitlements(db, tenantId)).quotas[quota];
-  if (max < 0) return { ok: true, max };
-  return { ok: currentCount < max, max };
-}

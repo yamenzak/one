@@ -33,6 +33,14 @@ import { cycleRoutes } from "./cycle-routes.js";
 import { packRoutes } from "./pack-routes.js";
 import { stockRoutes } from "./stock-routes.js";
 import { emailAdminRoutes } from "@4dl/email/admin-routes";
+import { PLATFORM_FROM_DEFAULT } from "./mailer.js";
+import { DUNNING_DAYS } from "@4dl/billing";
+import { periodKey } from "@4dl/core";
+import { billingAdminRoutes, billingRoutes, stripeWebhookRoutes } from "./billing-routes.js";
+import { entitlements } from "./entitlements.js";
+import { listPlans, seedBilling } from "./billing-store.js";
+import { ensureSchema } from "./db.js";
+import { purgeTenant } from "./purge.js";
 import { maintenanceAdminRoutes, maintenanceMiddleware } from "@4dl/tenancy";
 import type { MiddlewareHandler } from "hono";
 
@@ -138,6 +146,18 @@ app.post("/api/catalog", async (c) => {
  * already made correctly.
  */
 app.route("/api", contextRoutes);
+/**
+ * Billing: the picker, the two checkouts, the portal — and the webhook.
+ *
+ * The webhook sits UNDER the guard here rather than before it, which is safe
+ * only because `/api/webhooks/*` is in the guard's `isPublic` list. Mounting it
+ * above the middleware would work too, and would silently opt it out of the
+ * maintenance switch and the read-only gate — both of which it needs to pass
+ * *deliberately*, not by accident of mount order.
+ */
+app.route("/api", billingRoutes);
+app.route("/api", stripeWebhookRoutes);
+app.route("/api", billingAdminRoutes);
 app.route("/api", stockRoutes);
 app.route("/api", packRoutes);
 app.route("/api", cycleRoutes);
@@ -160,7 +180,10 @@ app.route("/api", domainAdminRoutes);
 // full env, which is the coupling the seam exists to avoid.
 app.route("/api", emailAdminRoutes(
   { isPlatformAdmin: (c) => isPlatformAdmin(c as never) },
-  { from: "Template <noreply@template.local>" },
+  // The value the console SHOWS when nothing is stored. It must match what
+  // provisioning seeds, or the screen advertises a sender the deployment does
+  // not use — this said `Template <noreply@template.local>` until now.
+  { from: PLATFORM_FROM_DEFAULT },
 ) as unknown as Hono<AppEnv>);
 
 /**
@@ -190,20 +213,113 @@ export default {
   fetch: app.fetch,
 
   /**
-   * The scheduled lane. Two things belong here and nothing else:
+   * The scheduled lane.
    *
-   *   the DUNNING sweep    `@4dl/billing`'s ladder, anchored on `past_due_at`,
-   *                        driven daily. Without a cron the ladder never
-   *                        advances and a lapsed tenant stays fully served.
-   *   the tenant LAPSE     `@4dl/commerce`'s customer-side ladder, which must
-   *                        FREEZE unless the tenant is itself in good standing:
-   *                        a tenant the platform suspended must not be shredding
-   *                        a roster it can no longer see.
+   * Only ONE thing belongs here: `@4dl/billing`'s dunning ladder, anchored on
+   * `past_due_at`. Without a cron the ladder never advances and a lapsed centre
+   * stays fully served forever.
    *
-   * `@4dl/commerce` budgets need NO cron — status reconciles lazily on read.
+   * Tessa has no second ladder. Kova runs `@4dl/commerce`'s customer-side lapse
+   * because a studio sells packages to its clients; a sterile-supply centre
+   * sells nothing to anybody, so there is no customer standing to sweep.
+   *
+   * The 15-minute trigger is deliberately a no-op — the cron list in
+   * `wrangler.jsonc` carries it for future work, and doing the daily ladder on
+   * every tick would advance it 96× too fast.
    */
-  async scheduled(_event: ScheduledController, _env: unknown, _ctx: ExecutionContext): Promise<void> {
-    // Wire `dailySweep` here once the app bills. Left empty rather than stubbed
-    // so it fails as "nothing happens" instead of "something happened wrongly".
+  async scheduled(event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    if (event.cron !== DAILY_CRON) return;
+    await dailySweep(env);
   },
 };
+
+/** Must match `wrangler.jsonc`'s `triggers.crons` entry exactly. */
+const DAILY_CRON = "10 0 * * *";
+
+const dunningCutoff = (nowMs: number, days: number) => new Date(nowMs - days * 86_400_000).toISOString();
+
+/**
+ * THE LADDER, once a day: past_due → 7d read-only → 30d blocked → 37d purged.
+ *
+ * Every phase is isolated. This sweep is the only thing that grants monthly
+ * credits and the only thing that advances the lifecycle, and it runs once a
+ * day — so a single transient D1 error aborting the whole run from the first
+ * statement would mean paying centres silently received no credits that month.
+ * Kova had exactly that bug; `step` is the fix.
+ *
+ * **Reads are never gated, at any rung.** `readOnly` still serves the whole app.
+ * Withholding a centre's sterilisation records over an invoice would put a
+ * recall out of reach of the people who need to run it — the ledger is a legal
+ * document under MPBetreibV, not leverage.
+ */
+async function dailySweep(env: Env): Promise<void> {
+  const step = async (name: string, fn: () => Promise<void>) => {
+    try {
+      await fn();
+    } catch (e) {
+      console.error(`[dailySweep] phase "${name}" failed:`, e);
+    }
+  };
+
+  await step("schema+seed", async () => {
+    await ensureSchema(env.DB);
+    await seedBilling(env.DB);
+  });
+
+  const nowMs = Date.now();
+  const nowStamp = new Date(nowMs).toISOString();
+
+  // 1) Monthly credit grants. `grantMonthly` is keyed by period, so a centre
+  //    that already received this month's grant at checkout is not granted twice.
+  await step("monthly-grants", async () => {
+    const plans = await listPlans(env.DB);
+    const grants = new Map(plans.map((p) => [p.id, entitlements.resolve(p.entitlements_json).aiCredits.monthlyGrant]));
+    const active = await env.DB
+      .prepare("SELECT tenant_id, plan_id FROM subscriptions WHERE status IN ('active','trialing')")
+      .all<{ tenant_id: string; plan_id: string }>();
+    const key = periodKey();
+    for (const sub of active.results ?? []) {
+      const grant = grants.get(sub.plan_id) ?? 0;
+      if (grant <= 0) continue;
+      const stub = env.BILLING.get(env.BILLING.idFromName(sub.tenant_id));
+      await stub.bind(sub.tenant_id);
+      // Money path: a swallowed failure means a paying centre silently never
+      // receives its credits. Surface it.
+      await stub.grantMonthly(grant, key).catch((e) => console.error(`[dailySweep] grantMonthly ${sub.tenant_id}:`, e));
+    }
+  });
+
+  // 2) Rung one — read-only. The centre keeps the whole app and loses the
+  //    ability to write to it. `comp = 0` excludes centres the operator comped.
+  await step("dunning-read-only", async () => {
+    await env.DB
+      .prepare("UPDATE subscriptions SET status = 'suspended', suspend_at = ?, updated_at = ? WHERE status = 'past_due' AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?")
+      .bind(nowStamp, nowStamp, dunningCutoff(nowMs, DUNNING_DAYS.readOnly))
+      .run();
+  });
+
+  // 3) Rung two — blocked. The app itself is withheld, and the purge clock is
+  //    stamped so the centre (and this sweep) can both see the deadline.
+  await step("dunning-blocked", async () => {
+    await env.DB
+      .prepare("UPDATE subscriptions SET status = 'blocked', delete_at = ?, updated_at = ? WHERE status = 'suspended' AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?")
+      .bind(
+        new Date(nowMs + (DUNNING_DAYS.purge - DUNNING_DAYS.blocked) * 86_400_000).toISOString(),
+        nowStamp,
+        dunningCutoff(nowMs, DUNNING_DAYS.blocked),
+      )
+      .run();
+  });
+
+  // 4) Rung three — PURGE, 37 days after the first missed payment.
+  await step("dunning-purge", async () => {
+    const rows = await env.DB
+      .prepare("SELECT tenant_id FROM subscriptions WHERE status = 'blocked' AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?")
+      .bind(dunningCutoff(nowMs, DUNNING_DAYS.purge))
+      .all<{ tenant_id: string }>()
+      .catch(() => ({ results: [] as { tenant_id: string }[] }));
+    for (const s of rows.results ?? []) {
+      await purgeTenant(env, s.tenant_id).catch((e) => console.error(`[dailySweep] purge ${s.tenant_id}:`, e));
+    }
+  });
+}

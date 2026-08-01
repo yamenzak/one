@@ -15,7 +15,7 @@ import {
   type StorageBindings,
   type StorageQuota,
 } from "@4dl/storage";
-import { tenantEntitlements } from "./entitlements.js";
+import { tenantEntitlements } from "./billing-store.js";
 
 export { StorageQuotaError, deleteMedia, purgePrefix, tenantStorageBytes } from "@4dl/storage";
 export type { PutMediaInput };

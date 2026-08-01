@@ -24,7 +24,7 @@ import {
 } from "@4dl/tenancy";
 import { turnstileAdminRoutes, turnstileConfig } from "@4dl/auth";
 import { type AppEnv, requireTenant, requirePermission, isPlatformAdmin } from "./auth-context.js";
-import { hasFeature } from "./entitlements.js";
+import { hasFeature } from "./billing-store.js";
 import { tenancyConfig } from "./host-context.js";
 
 /** Must match `name` in wrangler.jsonc. */

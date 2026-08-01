@@ -16,6 +16,7 @@
     "@4dl/ai": "workspace:*",
     "@4dl/auth": "workspace:*",
     "@4dl/billing": "workspace:*",
+    "@4dl/billing-rail": "workspace:*",
     "@4dl/commerce": "workspace:*",
     "@4dl/core": "workspace:*",
     "@4dl/email": "workspace:*",
@@ -25,7 +26,8 @@
     "@4dl/tenancy": "workspace:*",
     "@tessa/domain": "workspace:*",
     "better-auth": "^1.6.23",
-    "hono": "^4.9.10"
+    "hono": "^4.9.10",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.8.55",
