@@ -182,9 +182,18 @@ export function resolveStanding(f: StandingFacts): Standing {
 
 /** A tenant's subscription state, as the billing tables record it. */
 export type SubscriptionStatus =
-  | "active" | "trialing" | "past_due" | "suspended" | "blocked" | "unpaid" | "canceled" | "closing";
+  | "active" | "trialing" | "past_due" | "suspended" | "blocked" | "unpaid" | "canceled" | "closing"
+  /**
+   * NEVER CONFIGURED — a tenant that exists and has never had a plan.
+   *
+   * Distinct from every status above, all of which describe a subscription that
+   * once worked. This one describes the absence of one: an owner who abandoned
+   * the wizard, whose card was declined at the first attempt, or who reloaded
+   * mid-checkout. It is not a lapse and must not be spoken of as one.
+   */
+  | "incomplete";
 
-export type HostGateReason = "ok" | "grace" | "suspended" | "blocked" | "closing";
+export type HostGateReason = "ok" | "grace" | "suspended" | "blocked" | "closing" | "setup";
 
 /**
  * The dunning ladder itself lives in `@4dl/billing` (`DUNNING_DAYS`,
@@ -237,6 +246,12 @@ export function tenantStandingOf(status: SubscriptionStatus | string | null | un
     case "unpaid":
     case "canceled":
     case "closing":
+    // A tenant that never configured a plan is read-only for the same reason a
+    // lapsed one is: the product does not run indefinitely for nothing. What
+    // differs is only the copy, which the GATE carries (`reason: "setup"`) —
+    // this axis exists to tell a CLIENT what they may do, and to a client the
+    // two are identical.
+    case "incomplete":
       return "suspended";
     default:
       // active, trialing, missing, or anything a future Stripe status introduces.
@@ -254,6 +269,22 @@ export function tenantStandingOf(status: SubscriptionStatus | string | null | un
  * distinction — `tenantStandingOf` folds them together, and this must not.
  */
 export function resolveHostGate(status: SubscriptionStatus | string | null | undefined): HostGate {
+  /**
+   * Never configured. Read-only, and the billing lane stays open — which is the
+   * whole point: the one action that resolves this state has to be reachable
+   * from inside it.
+   *
+   * Reported as its own reason rather than folded into `suspended` for the same
+   * reason `closing` is: the copy cannot be shared. "Your studio is paused, pay
+   * to restore" is wrong in both directions for someone who never started —
+   * nothing was taken away, and there is no arrears to settle. They are told to
+   * finish setting up.
+   *
+   * Checked FIRST so it cannot be mistaken for a lapse by a later branch.
+   */
+  if (status === "incomplete") {
+    return { readOnly: true, blocked: false, billingWritable: true, reason: "setup" };
+  }
   if (status === "closing") {
     return { readOnly: true, blocked: false, billingWritable: true, reason: "closing" };
   }
@@ -283,7 +314,7 @@ export function resolveHostGate(status: SubscriptionStatus | string | null | und
  */
 export function tenantStandingOfGate(reason: HostGateReason | null | undefined): TenantStanding {
   if (reason === "blocked") return "blocked";
-  if (reason === "suspended" || reason === "closing") return "suspended";
+  if (reason === "suspended" || reason === "closing" || reason === "setup") return "suspended";
   if (reason === "grace") return "grace";
   return "ok";
 }

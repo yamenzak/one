@@ -228,6 +228,26 @@ remote bindings without editing the config (this is what the E2E suite does).
   probe and the Stripe webhooks. Unlike the console gate below it, this one does
   NOT stand down on `isDevRoot` — that would spare every request in dev and in the
   integration suite, so the switch would appear to work and withhold nothing.
+- **Kova is B2B, and the catalog says so.** The floor is `solo` (shown as
+  **"Starter"** — the id is stamped in Stripe metadata and must never change),
+  3 clients at $4.99. It was 1 client, which is not a trainer plan at all; it was
+  a self-coaching tier inside a product built out of staff seats, a Connect rail
+  and client packages. There is **no free tier**: `free` is the PARKING STATE of
+  a tenant that never chose a plan (0 clients, 0 templates, `active = 0`), and it
+  used to carry THREE clients — more than the cheapest paid tier — so not paying
+  was the better deal. Two mechanisms enforce that and they are separate on
+  purpose: `statusOf` reports `incomplete` for any un-comped tenant with no paid
+  plan (the gate, enforced once in the route guard), and the zero quotas are the
+  belt behind it. `applyPlanCatalog` reconciles `free`'s entitlements even though
+  it is retired — rule 4, and the only exception to "retired plans are frozen",
+  because nobody was ever *sold* free.
+- **A studio that never finished signing up is `readOnly`, not blocked.** Gate
+  reason `"setup"`, distinct from `suspended` because the copy cannot be shared —
+  nothing was taken from them and there is no arrears to settle. The wizard's
+  three writes (`/api/auth/*`, `/api/me/*`, `/api/billing/*`) all survive the
+  gate, which is what makes the state escapable; `apps/api/test/unconfigured-studio.test.ts`
+  asserts both halves, because a gate that is merely closed strands every
+  interrupted signup.
 - **Two access ladders, and they must not be confused.**
   - **Kova → tenant** (`@4dl/billing` dunning.ts + `@4dl/tenancy` standing.ts): past_due →
     **7d read-only** → **30d blocked** → **37d purged**, all anchored on

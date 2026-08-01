@@ -74,14 +74,44 @@ export const KOVA_RESERVED_LABELS: ReadonlySet<string> = new Set([
  * This is the injected half of the host gate, and it is why `@4dl/tenancy` can be
  * used by an app that never takes a payment. A primary-key point lookup, run on
  * every request — never cached. The reasoning is in `resolveHost`'s header.
+ *
+ * ── Why this reads the PLAN and not just the status ─────────────────────────
+ *
+ * `getSubscription` stamps every brand-new tenant `plan_id = 'free', status =
+ * 'active'`, and `customer.subscription.deleted` falls back to the same pair. So
+ * `status` alone said "active" for a studio that had never paid a cent — an
+ * owner who abandoned the wizard, was declined at the first attempt, or reloaded
+ * mid-checkout got a fully-writable app on the free row's quotas, indefinitely,
+ * with nothing but a soft notice on the billing screen.
+ *
+ * That was the whole "we take them to a free base plan, which is weird" problem,
+ * and it was worse than weird: the free row carried MORE clients than the
+ * cheapest paid tier, so not paying was the better deal.
+ *
+ * A tenant with no PAID plan therefore reports `incomplete`, which
+ * `resolveHostGate` turns into read-only + billing-writable. `comp` is exempt —
+ * an operator granting a studio access is precisely the case where the absence
+ * of a payment is intentional.
  */
 async function statusOf(db: D1Database, tenantId: string): Promise<string | null> {
   const row = await db
-    .prepare("SELECT status FROM subscriptions WHERE tenant_id = ?")
+    .prepare(
+      `SELECT s.status, s.comp, p.price_usd_month
+       FROM subscriptions s LEFT JOIN plans p ON p.id = s.plan_id
+       WHERE s.tenant_id = ?`,
+    )
     .bind(tenantId)
-    .first<{ status: string | null }>()
+    .first<{ status: string | null; comp: number | null; price_usd_month: number | null }>()
     .catch(() => null);
-  return row?.status ?? null;
+  // No row at all: the tenant predates its subscription row (it is written
+  // lazily). Treat as unconfigured — it is, and the alternative is the old
+  // fully-served default.
+  if (!row) return "incomplete";
+  if (row.comp) return row.status ?? null;
+  // A missing plan row (a deleted or renamed id) counts as unpaid too: an
+  // entitlement set nobody can name is not one to serve an app on.
+  if (!(Number(row.price_usd_month) > 0)) return "incomplete";
+  return row.status ?? null;
 }
 
 /** The apex we serve studios under, with Kova's shipped fallback. */

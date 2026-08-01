@@ -260,16 +260,32 @@ describe("host gate — a suspended studio's subdomain is read-only", () => {
     expect(resolveHostGate("blocked")).toEqual({ readOnly: true, blocked: true, billingWritable: true, reason: "blocked" });
   });
 
+  it("`incomplete` is read-only with its OWN reason — a studio that never started", () => {
+    // Reached by an owner who abandoned the wizard, was declined at the first
+    // attempt, or reloaded mid-checkout. It lands on the same read-only gate as a
+    // lapse and must NOT borrow its copy: nothing was taken away and there is no
+    // arrears to settle, so "paused, pay to restore" is wrong in both directions.
+    expect(resolveHostGate("incomplete")).toEqual({ readOnly: true, blocked: false, billingWritable: true, reason: "setup" });
+    // Never `blocked`: withholding the app from someone mid-signup is how you
+    // lose them at the last step.
+    expect(resolveHostGate("incomplete").blocked).toBe(false);
+    // To a CLIENT of that studio it is indistinguishable from a lapse — they can
+    // read and cannot write — so the coarse axis folds them together on purpose.
+    expect(tenantStandingOf("incomplete")).toBe("suspended");
+  });
+
   it("always leaves billing writable, so a lapsed studio can pay its way out", () => {
-    // Without this, suspension is unrecoverable from inside the app.
-    for (const s of ["suspended", "closing", "unpaid", "canceled"]) {
+    // Without this, suspension is unrecoverable from inside the app — and for
+    // `incomplete` it is stronger still: the billing lane is the ONLY way the
+    // state is ever resolved.
+    for (const s of ["suspended", "closing", "unpaid", "canceled", "incomplete"]) {
       expect(resolveHostGate(s).billingWritable, s).toBe(true);
     }
   });
 
   it("never gates reads — the gate only ever concerns writes", () => {
     // Asserted structurally: `HostGate` has no read flag to get wrong.
-    for (const s of ["active", "past_due", "suspended", "blocked", "closing", null]) {
+    for (const s of ["active", "past_due", "suspended", "blocked", "closing", "incomplete", null]) {
       expect(Object.keys(resolveHostGate(s)).sort()).toEqual(["billingWritable", "blocked", "readOnly", "reason"]);
     }
   });

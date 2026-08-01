@@ -58,7 +58,11 @@ const FEATURES = [
 // DOES collect a card (Stripe `trial_period_days` on a Checkout subscription), so
 // no copy on this page may promise "no card".
 const PLANS = [
-  ["Solo", "$4.99/mo", ["1 coach", "1 client", "Core coaching + AI suite", "500 AI credits / month", "250 MB media"], "30 days free"],
+  // "Starter", not "Solo", and three clients rather than one. Kova sells to
+  // coaching BUSINESSES: a one-client tier read as a self-coaching plan, which is
+  // not what any of this product's machinery — staff seats, the Connect rail,
+  // client packages — is for. Keep this table in step with `DEFAULT_PLANS`.
+  ["Starter", "$4.99/mo", ["1 coach", "3 clients", "Core coaching + AI suite", "500 AI credits / month", "250 MB media"], "30 days free"],
   ["Light", "$24.99/mo", ["1 coach", "30 clients", "Sell packages on your Stripe", "3,000 AI credits / month", "1 GB media"], "30 days free"],
   ["Pro", "$49.99/mo", ["5 coaches", "100 clients", "Supplements + labs", "Branding + front desk", "6,000 AI credits / month", "10 GB media"]],
   ["Max", "$119.99/mo", ["Unlimited coaches", "Unlimited clients", "Everything in Pro", "15,000 AI credits / month", "100 GB media"]],

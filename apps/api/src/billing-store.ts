@@ -101,14 +101,32 @@ export interface PackRow {
  */
 export const DEFAULT_PLANS: Omit<PlanRow, "stripe_product_id" | "stripe_price_id">[] = [
   {
+    /**
+     * The id stays `solo` on purpose — it is stamped into Stripe metadata
+     * (`kova_plan`) on every product and subscription ever created, and renaming
+     * it would orphan all of them. Only the NAME and the shape change.
+     *
+     * It used to be "Solo", one coach and **one client**, which is not a trainer
+     * plan at all — no trainer has one client. It was a self-coaching plan
+     * wearing trainer clothes, and it was the only tier that did not fit a
+     * product built out of staff seats, a Connect rail and client packages.
+     * Worse, the free baseline carried THREE clients, so the cheapest paid tier
+     * bought you less than not paying.
+     *
+     * Three clients at the same price makes it the first rung of a B2B ladder: a
+     * trainer's first few clients, priced so the step up to Light is a real
+     * business decision rather than a correction of ours.
+     */
     id: "solo",
-    name: "Solo",
+    name: "Starter",
     price_usd_month: 4.99,
     ord: 1,
     active: 1,
     entitlements_json: j({
-      quotas: { staffSeats: 1, activeClients: 1, templates: 25, storageMb: 250 },
+      quotas: { staffSeats: 1, activeClients: 3, templates: 25, storageMb: 250 },
       features: { externalSearch: true, aiSuite: true },
+      // 3 clients x 91 credits = 273 of a standard month against a 500 grant, so
+      // the ceiling still holds the 10% rule ($0.50 of $4.99) with headroom.
       aiCredits: { monthlyGrant: 500 },
       trialDays: 30,
     }),
@@ -196,14 +214,38 @@ export const DEFAULT_PLANS: Omit<PlanRow, "stripe_product_id" | "stripe_price_id
  */
 export const GRANDFATHERED_PLANS: Omit<PlanRow, "stripe_product_id" | "stripe_price_id">[] = [
   {
+    /**
+     * NOT A TIER — the parking state of a tenant that has never chosen a plan.
+     *
+     * It is unpurchasable (`active: 0`) but every new tenant is stamped onto it
+     * by `getSubscription`, and `customer.subscription.deleted` falls back to it.
+     * That made it the most-used row in the table and, until now, a genuinely
+     * usable free product: three clients, indefinitely, fully writable, because
+     * the row also carried `status: 'active'`.
+     *
+     * Two things fixed that, and they are deliberately separate:
+     *
+     *   the GATE   `statusOf` now reports `incomplete` for a tenant with no paid
+     *              plan, so the host serves reads and refuses writes. That is the
+     *              real enforcement and it is enforced once, in the route guard.
+     *   these QUOTAS are the belt. Zero clients and zero templates mean that even
+     *              if the gate were ever bypassed there is nothing to create.
+     *              Storage stays at 250 MB because data already uploaded must
+     *              remain readable — withholding the product is not the same as
+     *              holding someone's photos.
+     *
+     * `activeClients: 0` cannot strand an existing roster: `withinQuota` blocks
+     * only NEW rows (`currentCount < max`), and an over-quota tenant keeps every
+     * client fully readable — the same rule that covers a downgrade.
+     */
     id: "free",
-    name: "Free",
+    name: "No plan",
     price_usd_month: 0,
     ord: 0,
     active: 0,
     entitlements_json: j({
-      quotas: { staffSeats: 1, activeClients: 3, templates: 5, storageMb: 250 },
-      features: { externalSearch: true },
+      quotas: { staffSeats: 1, activeClients: 0, templates: 0, storageMb: 250 },
+      features: {},
       aiCredits: { monthlyGrant: 0 },
       trialDays: 0,
     }),
@@ -272,8 +314,12 @@ export const DEFAULT_PACKS: PackRow[] = [
  *
  *   v1 → the original free/solo/studio/team ladder (unstamped)
  *   v2 → solo/light/pro/max + trials; free/studio/team grandfathered inactive
+ *   v3 → PURE B2B: `solo` becomes "Starter" at 3 clients (it was 1, which is not
+ *        a trainer plan), and `free` is cut to a zero-quota parking state — it
+ *        carried MORE clients than the cheapest paid tier, so not paying was the
+ *        better deal.
  */
-export const PLAN_CATALOG_VERSION = "2";
+export const PLAN_CATALOG_VERSION = "3";
 const PLAN_CATALOG_KEY = "plans.catalog_version";
 
 /**
@@ -295,6 +341,13 @@ const PLAN_CATALOG_KEY = "plans.catalog_version";
  * 3. **Retired plans are only deactivated.** `active = 0` + `ord`, never their
  *    entitlements or price — grandfathered tenants must keep exactly what they
  *    have. Nobody is migrated off a retired tier by this code.
+ * 4. **`free` is the exception to (3), and only `free`.** It is not a tier
+ *    anybody was ever sold; it is the row `getSubscription` stamps on every new
+ *    tenant and the one `customer.subscription.deleted` falls back to, so it is
+ *    the most-used row in the table. Freezing its entitlements would leave every
+ *    existing deployment serving the old three-client free product forever.
+ *    Reconciling it takes nothing away that anyone paid for — and it stays
+ *    `active = 0`, so it remains unpurchasable.
  */
 async function applyPlanCatalog(db: D1Database): Promise<void> {
   const stmts: D1PreparedStatement[] = [];
@@ -326,6 +379,16 @@ async function applyPlanCatalog(db: D1Database): Promise<void> {
     stmts.push(insert(p));
     // (3) retire it — nothing else. Entitlements and price stay as found.
     stmts.push(db.prepare("UPDATE plans SET active = 0, ord = ? WHERE id = ?").bind(p.ord, p.id));
+    // (4) …except `free`, whose entitlements ARE reconciled. See the header:
+    // it is the unsubscribed parking state, not a tier somebody bought, and
+    // leaving it frozen keeps the old three-client free product alive on every
+    // deployment that already exists. Still `active = 0` above.
+    if (p.id === "free") {
+      stmts.push(
+        db.prepare("UPDATE plans SET name = ?, price_usd_month = ?, entitlements_json = ? WHERE id = ?")
+          .bind(p.name, p.price_usd_month, p.entitlements_json, p.id),
+      );
+    }
   }
   stmts.push(
     ...DEFAULT_PACKS.map((p) =>

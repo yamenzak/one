@@ -96,7 +96,9 @@ beforeAll(async () => {
 describe("catalog v2 — the four active plans seed exactly as specified", () => {
   it("seeds solo/light/pro/max with the right price, quotas, grant and trial", async () => {
     const expected = [
-      { id: "solo", name: "Solo", price: 4.99, seats: 1, clients: 1, storageMb: 250, grant: 500, trial: 30 },
+      // v3: "Starter", 3 clients. One client was never a trainer plan — see
+      // DEFAULT_PLANS. The id stays `solo` because Stripe metadata carries it.
+      { id: "solo", name: "Starter", price: 4.99, seats: 1, clients: 3, storageMb: 250, grant: 500, trial: 30 },
       { id: "light", name: "Light", price: 24.99, seats: 1, clients: 30, storageMb: 1_000, grant: 3_000, trial: 30 },
       { id: "pro", name: "Pro", price: 49.99, seats: 5, clients: 100, storageMb: 10_000, grant: 6_000, trial: 0 },
       { id: "max", name: "Max", price: 119.99, seats: -1, clients: -1, storageMb: 100_000, grant: 15_000, trial: 0 },
@@ -241,32 +243,46 @@ describe("retired tiers — inactive, still resolvable, never offered", () => {
     expect((await setPlan(tenantId, "nope-not-a-plan")).status).toBe(404);
   });
 
-  it("free stays the implicit unsubscribed baseline for a brand-new tenant", async () => {
+  it("free is the unsubscribed PARKING state — nothing can be created on it", async () => {
+    // v3. `free` used to be a usable free product: three clients, indefinitely,
+    // fully writable — MORE clients than the cheapest paid tier, so not paying
+    // was the better deal. It is now a zero-quota holding pen, and the host gate
+    // (`statusOf` → `incomplete`) is what actually enforces it; these ceilings
+    // are the belt behind that brace.
     const fresh = await signInFlow("catalog-fresh@test.dev", "Fresh Studio");
     const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(fresh) })).json()) as { active: { tenantId: string } };
     const row = await db().prepare("SELECT plan_id FROM subscriptions WHERE tenant_id = ?").bind(ctx.active.tenantId).first<{ plan_id: string }>();
     expect(row?.plan_id).toBe("free");
-    // Retired ≠ unresolvable: the free ceilings still bite (3 clients, no AI).
     const ent = await tenantEntitlements(db(), ctx.active.tenantId);
-    expect(ent.quotas.activeClients).toBe(3);
+    expect(ent.quotas.activeClients).toBe(0);
+    expect(ent.quotas.templates).toBe(0);
     expect(ent.features.aiSuite).toBe(false);
+    // Storage is NOT zeroed: anything already uploaded stays readable. Withholding
+    // the product is not the same as holding someone's photos.
+    expect(ent.quotas.storageMb).toBe(250);
+  });
+
+  it("free is never purchasable, however the catalog is reseeded", async () => {
+    const row = (await getPlan(db(), "free"))!;
+    expect(row.active).toBe(0);
+    expect((await listPlans(db())).some((p) => p.id === "free")).toBe(false);
   });
 });
 
 // ── Quota enforcement on the new (lower) ceilings ─────────────────────────────
 
 describe("quota enforcement uses the new ceilings, and never retroactively", () => {
-  it("solo's activeClients = 1 blocks the SECOND client, with the new limit in the error", async () => {
+  it("Starter's activeClients = 3 blocks the FOURTH client, with the new limit in the error", async () => {
     const cookie = await signInFlow("catalog-solo@test.dev", "Solo Studio");
     const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(cookie) })).json()) as { active: { tenantId: string } };
     await setPlan(ctx.active.tenantId, "solo");
 
     const mk = (name: string) =>
       SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H(cookie), body: JSON.stringify({ displayName: name }) });
-    expect((await mk("Only Client")).status).toBe(201);
+    for (const n of ["First", "Second", "Third"]) expect((await mk(n)).status, n).toBe(201);
     const blocked = await mk("One Too Many");
     expect(blocked.status).toBe(403);
-    expect(await blocked.json()).toMatchObject({ error: "active client limit reached", limit: 1 });
+    expect(await blocked.json()).toMatchObject({ error: "active client limit reached", limit: 3 });
 
     // Light's 30 is the same gate with a bigger number — the ceiling is read from
     // the plan, not hard-coded anywhere.
@@ -275,25 +291,27 @@ describe("quota enforcement uses the new ceilings, and never retroactively", () 
   });
 
   it("an EXISTING tenant left over a lowered ceiling keeps every client — only new writes are blocked", async () => {
-    // The one real reduction in v2: solo.activeClients 25 → 1. A tenant who was
-    // already holding several clients must not be bricked, hidden or archived.
+    // Deliberately a PAID ceiling (pro 100 → Starter 3), not the drop to `free`:
+    // `free` now also trips the host gate (`statusOf` → `incomplete` → read-only),
+    // and this test is about `withinQuota` alone. Conflating the two would let a
+    // gate regression pass as a quota success.
     const cookie = await signInFlow("catalog-overquota@test.dev", "Over Quota Studio");
     const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(cookie) })).json()) as { active: { tenantId: string } };
     const tid = ctx.active.tenantId;
     await setPlan(tid, "pro"); // roomy, so they can build up a roster
     const ids: string[] = [];
-    for (const n of ["A", "B", "C"]) {
+    for (const n of ["A", "B", "C", "D"]) {
       const r = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H(cookie), body: JSON.stringify({ displayName: `OverQuota ${n}` }) })).json()) as { client: { id: string } };
       ids.push(r.client.id);
     }
-    // …now they're on solo, 3 clients against a ceiling of 1.
+    // …now they're on Starter, 4 clients against a ceiling of 3.
     await setPlan(tid, "solo");
     const ent = await tenantEntitlements(db(), tid);
-    expect(ent.quotas.activeClients).toBe(1);
+    expect(ent.quotas.activeClients).toBe(3);
 
     // The roster is intact and every client is still readable AND writable.
     const roster = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { headers: auth(cookie) })).json()) as { clients: { id: string }[] };
-    expect(roster.clients.length).toBeGreaterThanOrEqual(3);
+    expect(roster.clients.length).toBeGreaterThanOrEqual(4);
     for (const id of ids) {
       expect((await SELF.fetch(`${ORIGIN}/api/clients/${id}`, { headers: auth(cookie) })).status, id).toBe(200);
       const patch = await SELF.fetch(`${ORIGIN}/api/clients/${id}`, { method: "PATCH", headers: H(cookie), body: JSON.stringify({ heightCm: 175 }) });
@@ -302,8 +320,11 @@ describe("quota enforcement uses the new ceilings, and never retroactively", () 
     // Only ADDING is refused. `withinQuota` never re-examines existing rows.
     const blocked = await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H(cookie), body: JSON.stringify({ displayName: "Nope" }) });
     expect(blocked.status).toBe(403);
-    expect(await withinQuota(db(), tid, "activeClients", 3)).toMatchObject({ ok: false, max: 1 });
-    expect(await withinQuota(db(), tid, "activeClients", 0)).toMatchObject({ ok: true, max: 1 });
+    expect(await withinQuota(db(), tid, "activeClients", 4)).toMatchObject({ ok: false, max: 3 });
+    expect(await withinQuota(db(), tid, "activeClients", 0)).toMatchObject({ ok: true, max: 3 });
+    // And on the parking plan zero means ZERO, not unlimited — only -1 is that.
+    await setPlan(tid, "free");
+    expect(await withinQuota(db(), tid, "activeClients", 0)).toMatchObject({ ok: false, max: 0 });
   });
 
   it("max's -1 ceilings are unlimited, not zero", async () => {
