@@ -34,7 +34,7 @@ function isPublic(method: string, path: string): boolean {
   if (isGet && /^\/api\/media\/t\/[^/]+\/brand\//.test(path)) return true;
   // Health + Stripe webhooks (signature-verified in their handlers).
   if (path === "/health") return true;
-  if (path === "/api/stripe/webhook" || path === "/api/connect/webhook") return true;
+  if (isProviderWebhook(path)) return true;
   // Tenant marketplace page data + headless public article API (storefront,
   // branded sign-in skin, and /posts index + /posts/:slug full body).
   if (isGet && /^\/api\/marketplace\/[^/]+(\/posts(\/[^/]+)?)?$/.test(path)) return true;
@@ -203,9 +203,29 @@ function allowedOnRoot(path: string): boolean {
   );
 }
 
-/** The two signature-verified Stripe callbacks: platform rail and Connect rail. */
+/**
+ * Every signature-verified payment callback.
+ *
+ * `/api/stripe/webhook` is the PLATFORM rail — studios paying Kova, on Kova's
+ * own Stripe. `/api/pay/webhook/:tenantId` is the TENANT rail — a studio's own
+ * customers paying the studio, on whatever provider that studio uses.
+ *
+ * Both carry no session by construction (the caller is a payment provider), and
+ * both verify a signature before acting. They are exempt from the standing gate
+ * for the same reason the Stripe one always was: blocking the message that says
+ * "they paid" is how a suspension becomes unrecoverable.
+ */
 function isStripeWebhook(path: string): boolean {
-  return path === "/api/stripe/webhook" || path === "/api/connect/webhook";
+  return isProviderWebhook(path);
+}
+
+function isProviderWebhook(path: string): boolean {
+  if (path === "/api/stripe/webhook") return true;
+  // TODO(connect-removal): goes with the Connect rail itself.
+  if (path === "/api/connect/webhook") return true;
+  // The tenant id is a path segment, so this is a prefix match rather than an
+  // equality check — and it is anchored so `/api/pay/webhookXYZ` cannot slip in.
+  return /^\/api\/pay\/webhook\/[^/]+$/.test(path);
 }
 
 /**

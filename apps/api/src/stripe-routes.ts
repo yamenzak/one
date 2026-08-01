@@ -1184,8 +1184,17 @@ async function planForTenant(db: D1Database, tenantId: string | null): Promise<s
  *  `checkoutId`/`subId` are the Stripe Checkout Session / Subscription ids;
  *  event-level idempotency (firstSeen) already prevents a redelivery twice.
  *  `installmentsTotal` (>1) marks a limited-term installment plan: period one
- *  unlocks the first 1/N of the term and pins the count on the row. */
-async function grantClientPackage(db: D1Database, tenantId: string, clientId: string, packageId: string, checkoutId: string | null = null, subId: string | null = null, installmentsTotal: number | null = null): Promise<void> {
+ *  unlocks the first 1/N of the term and pins the count on the row.
+ *
+ *  ── Also the grant path for TENANT-OWNED providers ────────────────────────
+ *  `payments-routes.ts` calls this with the purchase intent's id in place of the
+ *  Stripe ids. For a recurring package the intent REFERENCE is passed as `subId`,
+ *  which makes the reference the row's recurring key — so a later `renewed`
+ *  event carrying the same reference resolves through `renewClientSubscription`
+ *  with no second implementation of the runway maths. The column is still named
+ *  `stripe_sub_id`; renaming a live D1 column is a migration we deliberately do
+ *  not take for cosmetics. Read it as "the recurring key, whoever issued it". */
+export async function grantClientPackage(db: D1Database, tenantId: string, clientId: string, packageId: string, checkoutId: string | null = null, subId: string | null = null, installmentsTotal: number | null = null): Promise<void> {
   // Scope the package to the granting tenant: an unscoped lookup would let a
   // (verified) event carrying another tenant's package id grant that package's
   // budgets/add-ons/flags into this tenant's row. Paired with the webhook's
@@ -1259,7 +1268,7 @@ async function grantClientPackage(db: D1Database, tenantId: string, clientId: st
 /** Renew an auto-renewing client subscription on each paid cycle: top the same
  *  row's budget up by another period. Resolved by the Stripe subscription id so
  *  it always hits the right row. Budgets stay the source of truth. */
-async function renewClientSubscription(db: D1Database, stripeSubId: string, expectedTenantId: string): Promise<void> {
+export async function renewClientSubscription(db: D1Database, stripeSubId: string, expectedTenantId: string): Promise<void> {
   // Resolve the row scoped to the account's tenant (the webhook verified the
   // event's account → tenant), so a foreign connected account can't top up a
   // row it doesn't own.

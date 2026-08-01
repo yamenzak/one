@@ -24,7 +24,22 @@ import { findBoundaryViolations, formatViolations, violationKeys } from "@4dl/co
  *              window was open exactly once and the debt was paid instead of
  *              documented.
  */
-const ALLOW: readonly string[] = [];
+/**
+ * `client_reference_id` is STRIPE'S FIELD NAME, not our vocabulary.
+ *
+ * The boundary checker flags the substring "client", and it is right to: in this
+ * package a buyer is a `subject`, never a client. But this identifier is fixed
+ * by an external API — it is the URL parameter Stripe accepts and the property
+ * name it sends back — so it cannot be renamed without breaking the
+ * integration, and paraphrasing it in the adapter would only hide which wire
+ * field is meant.
+ *
+ * The exemption is keyed file+token, which is the finest grain the checker
+ * offers. It therefore pardons "client" in the STRIPE ADAPTER ONLY — one file
+ * that exists solely to speak Stripe's wire format. Every other file in the
+ * package, including providers.ts next door, still fails on it.
+ */
+const ALLOW: readonly string[] = ["src/providers.stripe-link.ts:client"];
 
 const dir = new URL("..", import.meta.url).pathname;
 

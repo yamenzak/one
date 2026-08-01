@@ -47,6 +47,9 @@ const CODING: Record<NotifType, NotifCoding> = {
   billing_trial_ending: { icon: CreditCard, tone: "warning" },
   payment_disputed: { icon: AlertTriangle, tone: "danger" },
   payment_refunded: { icon: CreditCard, tone: "warning" },
+  // Warning, not danger: the client's access started normally and no money was
+  // lost — the studio's payment link and package price just disagree.
+  payment_mismatch: { icon: CreditCard, tone: "warning" },
 };
 
 // An unknown type is still a notification — say that, rather than decorating it.

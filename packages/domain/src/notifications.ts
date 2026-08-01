@@ -99,7 +99,7 @@ export type NotifType =
   // studio billing (owner)
   | "billing_suspended" | "billing_canceled" | "billing_past_due" | "billing_trial_ending"
   // sales (owner)
-  | "payment_disputed" | "payment_refunded";
+  | "payment_disputed" | "payment_refunded" | "payment_mismatch";
 
 /** A default email template for a type. `subject` + `body` are plain strings
  *  with `{{variable}}` placeholders; `body` is inner HTML wrapped by the branded
@@ -205,6 +205,17 @@ export const NOTIF_TYPES: Record<NotifType, NotifTypeMeta> = {
     template: { subject: "A payment was disputed", body: "<p>A client payment has been disputed and the funds are on hold.</p><p>{{message}}</p><p>Respond through your Stripe dashboard — disputes have a deadline.</p>" }, vars: ["message"] },
   payment_refunded: { category: "sales", to: "owner", title: "A client payment was refunded", link: "/clients",
     template: { subject: "A payment was refunded", body: "<p>A client payment has been refunded.</p><p>{{message}}</p><p>Their access has been adjusted to match — open {{studioName}} to check.</p>" }, vars: ["message", "studioName"] },
+  /**
+   * The amount a client actually paid does not match the package price.
+   *
+   * Only reachable on the tenant's OWN payment rail, where the studio owns both
+   * the payment link and the package and the two can drift apart — most often a
+   * link pasted onto the wrong package. Access is granted anyway (the client did
+   * pay), so without this the studio would undercharge or overcharge silently
+   * and indefinitely. Nobody else can fix it: we cannot edit their payment link.
+   */
+  payment_mismatch: { category: "sales", to: "owner", title: "A payment didn't match the package price", link: "/business",
+    template: { subject: "A payment didn't match the package price", body: "<p>{{message}}</p><p>Your client's access has started as normal. Check the payment link on that package — it may be pointing at the wrong price.</p>" }, vars: ["message"] },
 };
 
 /** The category that governs a notification type's delivery preferences. */

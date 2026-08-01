@@ -36,6 +36,29 @@ export const COMMERCE_SCHEMA: SchemaModule = {
     "CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, tenant_id TEXT, name TEXT, description TEXT, one_time_price_cents INTEGER, monthly_price_cents INTEGER, installment_months INTEGER, currency TEXT DEFAULT 'usd', budgets_json TEXT, addons_json TEXT, flags_json TEXT, visibility TEXT DEFAULT 'private', restricted_subject_id TEXT, once_per_customer INTEGER DEFAULT 0, stripe_product_id TEXT, stripe_price_id TEXT, stripe_monthly_price_id TEXT, active INTEGER DEFAULT 1, created_at TEXT);",
     "CREATE INDEX IF NOT EXISTS idx_packages_tenant ON packages(tenant_id, active);",
     "CREATE TABLE IF NOT EXISTS subject_subscriptions (id TEXT PRIMARY KEY, tenant_id TEXT, subject_id TEXT, package_id TEXT, status TEXT DEFAULT 'active', payment_status TEXT DEFAULT 'none', budgets_json TEXT, addons_json TEXT, flags_json TEXT, source TEXT DEFAULT 'admin', installments_paid INTEGER, installments_total INTEGER, stripe_sub_id TEXT, stripe_checkout_id TEXT, started_at TEXT, updated_at TEXT, notes TEXT);",
+
+    /**
+     * A purchase the customer STARTED, before anyone knows whether it was paid.
+     *
+     * The tenant is paid on their own merchant account by their own provider, so
+     * the platform is never in the money path and cannot ask "did this settle?".
+     * It learns either from a signed notification or from the tenant saying so.
+     * Both need somewhere to land, and that is this table.
+     *
+     * `id` IS the reference handed to the provider, which is why it is generated
+     * to the narrowest shape any provider accepts (see `isValidReference`) — a
+     * provider that dislikes it may drop it SILENTLY, leaving a customer who
+     * paid with nothing connecting them to the payment. When that happens the
+     * row simply stays `pending` and shows up on the tenant's reconciliation
+     * list, which is the whole reason a pending row is written up front rather
+     * than conjured when a webhook arrives.
+     *
+     * `external_id` is the provider's own id, and the idempotency key: a
+     * provider that retries a delivery must not grant the package twice.
+     */
+    "CREATE TABLE IF NOT EXISTS purchase_intents (id TEXT PRIMARY KEY, tenant_id TEXT, subject_id TEXT, package_id TEXT, provider TEXT, status TEXT DEFAULT 'pending', amount_cents INTEGER, currency TEXT DEFAULT 'usd', external_id TEXT, checkout_url TEXT, created_at TEXT, settled_at TEXT, settled_by TEXT, note TEXT);",
+    "CREATE INDEX IF NOT EXISTS idx_purchase_intents_tenant ON purchase_intents(tenant_id, status, created_at);",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_purchase_intents_external ON purchase_intents(tenant_id, external_id);",
     "CREATE INDEX IF NOT EXISTS idx_subject_subs ON subject_subscriptions(subject_id, status);",
     "CREATE INDEX IF NOT EXISTS idx_subject_subs_status ON subject_subscriptions(status);",
     "CREATE INDEX IF NOT EXISTS idx_subject_subs_stripe ON subject_subscriptions(stripe_sub_id);",
@@ -45,20 +68,38 @@ export const COMMERCE_SCHEMA: SchemaModule = {
     "CREATE TABLE IF NOT EXISTS promo_codes (id TEXT PRIMARY KEY, tenant_id TEXT, code TEXT, discount_type TEXT DEFAULT 'percent', percent_off INTEGER, amount_off_cents INTEGER, restricted_package_id TEXT, restricted_subject_id TEXT, scope TEXT DEFAULT 'tenant', max_redemptions INTEGER, redemption_count INTEGER DEFAULT 0, expires_at TEXT, active INTEGER DEFAULT 1, stripe_coupon_id TEXT, stripe_promo_id TEXT, created_by TEXT, created_at TEXT);",
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_promo_code ON promo_codes(tenant_id, code);",
     "CREATE TABLE IF NOT EXISTS addon_types (id TEXT PRIMARY KEY, tenant_id TEXT, slug TEXT, label TEXT, kind TEXT DEFAULT 'consultation', duration_minutes INTEGER, standalone_price_cents INTEGER, active INTEGER DEFAULT 1);",
+
+    /**
+     * How ONE tenant gets paid by its own customers.
+     *
+     * Its own table rather than columns on `tenant_settings`, because that table
+     * belongs to `@4dl/tenancy` and this is commerce's concern — a deployment
+     * that never sells anything should not carry the columns.
+     *
+     * `config_json` holds ONLY verification-grade credentials. `assertSafeConfig`
+     * refuses anything whose key names a credential that can act on the tenant's
+     * merchant account, and that rule is what keeps this table from becoming a
+     * vault of live payment keys. See providers.ts.
+     */
+    "CREATE TABLE IF NOT EXISTS tenant_payment_settings (tenant_id TEXT PRIMARY KEY, provider TEXT DEFAULT 'manual', config_json TEXT, updated_at TEXT);",
   ],
   alters: [
     "ALTER TABLE promo_codes ADD COLUMN restricted_subject_id TEXT",
     "ALTER TABLE promo_codes ADD COLUMN scope TEXT DEFAULT 'tenant'",
     "ALTER TABLE redemption_codes ADD COLUMN restricted_package_id TEXT",
     "ALTER TABLE redemption_codes ADD COLUMN restricted_subject_id TEXT",
+    // The tenant's own checkout URL for THIS package, on their own provider.
+    // Per-package because a hosted payment link is fixed-price, so one link
+    // cannot serve a catalogue.
+    "ALTER TABLE packages ADD COLUMN pay_link TEXT",
   ],
   scoped: {
     tenantColumn: "tenant_id",
-    tenantTables: ["packages", "subject_subscriptions", "redemption_codes", "promo_codes", "addon_types"],
+    tenantTables: ["packages", "subject_subscriptions", "redemption_codes", "promo_codes", "addon_types", "purchase_intents", "tenant_payment_settings"],
     // `redemption_uses` has no tenant column — it is keyed on (code_id,
     // subject_id) — so a tenant purge clears it through its codes, and a
     // subject purge through this one.
     subjectColumn: "subject_id",
-    subjectTables: ["subject_subscriptions", "redemption_uses"],
+    subjectTables: ["subject_subscriptions", "redemption_uses", "purchase_intents"],
   },
 };

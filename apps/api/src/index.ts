@@ -33,6 +33,7 @@ import { logRoutes } from "./log-routes.js";
 import { libraryRoutes } from "./library-routes.js";
 import { goalRoutes } from "./goal-routes.js";
 import { commerceRoutes } from "./commerce-routes.js";
+import { paymentsRoutes, paymentsWebhook } from "./payments-routes.js";
 import { aiRoutes, aiAdminRoutes } from "./ai-routes.js";
 import { healthRoutes } from "./health-routes.js";
 import { bodyScanRoutes } from "./body-scan-routes.js";
@@ -137,6 +138,10 @@ app.route("/api", logRoutes);
 app.route("/api", libraryRoutes);
 app.route("/api", goalRoutes);
 app.route("/api", commerceRoutes);
+app.route("/api", paymentsRoutes);
+// The tenant payment rail's provider callback. Public and session-less by
+// construction — see `isProviderWebhook` in route-guard.ts.
+app.route("/api", paymentsWebhook);
 app.route("/api", aiRoutes);
 app.route("/api", aiAdminRoutes);
 app.route("/api", healthRoutes);

@@ -206,6 +206,6 @@ export const manualProvider: PaymentProvider = {
   verify: async () => [],
   setupSteps: [
     "Take payment however you normally do — cash, bank transfer, your own card machine.",
-    "Mark the purchase as paid here, and your client's access starts immediately.",
+    "Mark the purchase as paid here, and their access starts immediately.",
   ],
 };
