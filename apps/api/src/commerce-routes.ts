@@ -62,6 +62,15 @@ const PackageBody = z.object({
   description: z.string().max(2000).nullish(),
   oneTimePriceCents: z.number().int().min(0).max(MAX_PACKAGE_PRICE_CENTS).nullish(),
   monthlyPriceCents: z.number().int().min(0).max(MAX_PACKAGE_PRICE_CENTS).nullish(),
+  /**
+   * Instalment plans are no longer offered — the editor has two price modes.
+   *
+   * The field is still ACCEPTED so that an existing row's PATCH does not 400 on
+   * a value it is merely echoing back, but nothing sends it and `/api/purchases`
+   * refuses any package carrying it. "Charge N times then stop" needs someone to
+   * count and then cancel, and on a checkout page the studio owns there is
+   * nothing we can call to do that.
+   */
   installmentMonths: z.number().int().min(2).max(24).nullish(),
   budgets: BudgetSpecs.default([]),
   flags: z.record(z.string(), z.boolean()).nullish(),

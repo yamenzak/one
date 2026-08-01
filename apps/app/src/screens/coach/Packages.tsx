@@ -126,7 +126,7 @@ export function Packages() {
 
       <SectionHeader icon={CreditCard} tone="primary" title="Packages" action={<Button size="sm" onClick={() => setPkgOpen(true)}><Plus /> New</Button>} />
       {packages.length === 0 ? (
-        <EmptyState icon={CreditCard} title="No packages yet" description="Build a package — feature budgets (workout/meal/all) sold once or as installments. $0 packages are comps you grant directly." />
+        <EmptyState icon={CreditCard} title="No packages yet" description="Build a package — feature budgets (workout/meal/all) sold once or monthly. $0 packages are comps you grant directly." />
       ) : (
         <Stagger className="space-y-2">
           {packages.map((p) => (
@@ -281,11 +281,20 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
   const editing = !!pkg;
   const [name, setName] = useState(pkg?.name ?? "");
   const [description, setDescription] = useState(pkg?.description ?? "");
-  const [priceMode, setPriceMode] = useState<"one_time" | "monthly" | "installment">(
-    pkg?.monthly_price_cents ? "monthly" : pkg?.installment_months && pkg.installment_months > 1 ? "installment" : "one_time",
+  /**
+   * TWO price modes, not three. "Pay in N months" is gone with Stripe Connect:
+   * it needs someone to count the payments and then CANCEL the charge, and on a
+   * checkout page the studio owns there is nothing we can call to do that. A
+   * best-effort attempt would keep billing a client who had finished paying.
+   *
+   * A studio that wants the same shape prices the package MONTHLY and stops it
+   * in their own provider when the term ends — same outcome, same manual step,
+   * minus a promise of automation we cannot keep.
+   */
+  const [priceMode, setPriceMode] = useState<"one_time" | "monthly">(
+    pkg?.monthly_price_cents ? "monthly" : "one_time",
   );
   const [price, setPrice] = useState(centsToInput(pkg?.monthly_price_cents ?? pkg?.one_time_price_cents ?? null));
-  const [installmentMonths, setInstallmentMonths] = useState(String(pkg?.installment_months && pkg.installment_months > 1 ? pkg.installment_months : 3));
   const [payLink, setPayLink] = useState(pkg?.pay_link ?? "");
   const [budgets, setBudgets] = useState<{ feature: BudgetFeature; days: number }[]>(() => {
     const initial = (pkg?.budgets ?? [])
@@ -319,15 +328,13 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
   }, [entFeatures.frontDesk]);
 
   const parsed = parsePrice(price);
-  const months = Number(installmentMonths);
-  const monthsError = priceMode === "installment" && !(Number.isInteger(months) && months >= 2 && months <= 24) ? "Between 2 and 24 months." : null;
-  // A recurring or installment package with no real amount is nonsense — and the
+  // A recurring package with no real amount is nonsense — and the
   // one-time lane is the only place "blank = free comp" is meaningful.
   const priceError = parsed.error
     ?? (priceMode === "monthly" && !parsed.cents ? "A monthly package needs a price."
-      : priceMode === "installment" && !parsed.cents ? "An installment plan needs a total price." : null);
+      : null);
   const badDays = budgets.some((b) => !Number.isInteger(b.days) || b.days < 1);
-  const canSave = name.trim().length >= 2 && budgets.length > 0 && !badDays && !priceError && !monthsError
+  const canSave = name.trim().length >= 2 && budgets.length > 0 && !badDays && !priceError
     && !(visibility === "client_specific" && !restrictedClientId);
 
   const save = async () => {
@@ -340,7 +347,6 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
         description: description.trim() || null,
         oneTimePriceCents: priceMode === "monthly" ? null : parsed.cents,
         monthlyPriceCents: priceMode === "monthly" ? parsed.cents : null,
-        installmentMonths: priceMode === "installment" ? months : null,
         budgets,
         // On an edit always send the array — PATCH leaves omitted keys alone, so
         // `undefined` here would make "I removed every add-on" a silent no-op.
@@ -370,16 +376,15 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
           <span className="mb-1.5 block text-sm font-medium text-muted-foreground">Description</span>
           <Textarea rows={2} maxLength={2000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="One line clients see on the Shop card." />
         </div>
-        <div className="flex gap-2">{(["one_time", "monthly", "installment"] as const).map((m) => <Chip key={m} selected={priceMode === m} onClick={() => setPriceMode(m)}>{m.replace("_", " ")}</Chip>)}</div>
+        <div className="flex gap-2">{(["one_time", "monthly"] as const).map((m) => <Chip key={m} selected={priceMode === m} onClick={() => setPriceMode(m)}>{m.replace("_", " ")}</Chip>)}</div>
         <Field
-          label={priceMode === "monthly" ? "Price per month (USD)" : priceMode === "installment" ? "Total price (USD)" : "Price (USD, blank = free comp)"}
+          label={priceMode === "monthly" ? "Price per month (USD)" : "Price (USD, blank = free comp)"}
           value={price}
           inputMode="decimal"
           onChange={(e) => setPrice(e.target.value)}
           error={priceError ?? undefined}
           hint={priceError ? undefined : parsed.cents != null ? `Clients see ${fmtPrice(parsed.cents)}${priceMode === "monthly" ? " per month" : ""}.` : undefined}
         />
-        {priceMode === "installment" && <Field label="Installment months" value={installmentMonths} inputMode="numeric" onChange={(e) => setInstallmentMonths(e.target.value.replace(/\D/g, ""))} error={monthsError ?? undefined} />}
 
         {/* The checkout page for THIS package, on the coach's own provider.
             Per-package because a hosted payment link is fixed-price — one link

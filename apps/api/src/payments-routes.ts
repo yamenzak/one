@@ -227,7 +227,7 @@ export const paymentsRoutes = new Hono<AppEnv>()
       // Refused rather than sold: a recurring package on a link-only provider
       // takes one payment and then silently never renews, which reads to the
       // customer as being cut off and to the studio as a lost sale.
-      return c.json({ error: "this package renews monthly, but your payment method can't take recurring payments" }, 409);
+      return c.json({ error: "This package renews monthly, but you're set to take payment yourself. Either connect an online payment method, or price it as a one-off package and sell it again each month." }, 409);
     }
 
     const id = newId("pi").replace(/[^A-Za-z0-9_-]/g, "");
