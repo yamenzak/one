@@ -103,8 +103,8 @@
   // invalid bucket name means `pnpm test` cannot even boot, and a template whose
   // tests do not run is a template that rots. Local dev and the test suite
   // simulate all three and never look at the values.
-  "kv_namespaces": [{ "binding": "CACHE", "id": "0000000000000000000000000000cafe" }],
-  "d1_databases": [{ "binding": "DB", "database_id": "00000000-0000-0000-0000-0000000000d1" }],
+  "kv_namespaces": [{ "binding": "CACHE", "id": "d45cc2d0725d4d9aab13c247f2a27e1a" }],
+  "d1_databases": [{ "binding": "DB", "database_id": "160a72f4-fef9-476d-a069-66bd0234471f" }],
   "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "tessa-media" }],
   "send_email": [{ "name": "EMAIL" }]
 }
