@@ -367,6 +367,16 @@ does not pay for CSSD.
    evidence. Revisit only if a customer's machine makes it cheap.
 6. **AVV / DPA template** — a sales blocker, not an engineering one, but it
    blocks all the same.
+7. **The day boundary is UTC, and a shelf life is counted in local days.**
+   `opened_at` and `sterilised_at` are written server-side as UTC instants and
+   truncated to the UTC calendar day by `effectiveExpiry`; `/api/stock` compares
+   against the server's UTC "today". For Germany and the rest of the EU — every
+   offset positive — truncation lands the expiry a day EARLY at worst, which is
+   the safe direction. West of Greenwich it can land a day LATE, which is not.
+   The fix is Kova's: take the device's local date (`date_local`) at the moment
+   of the act and count from that. Cheap to do, but it touches the write path,
+   the projection and every read, so it is recorded here rather than half-done.
+   Close it before the first customer outside Europe.
 
 ---
 
@@ -377,8 +387,9 @@ editing it.
 
 **Built:**
 
-- `@tessa/domain` — GS1/UDI element-string parsing and three-clock expiry
-  composition. 49 tests, verified by mutation rather than assumed.
+- `@tessa/domain` — GS1/UDI element-string parsing, three-clock expiry
+  composition and the event registry. 63 tests, verified by mutation rather than
+  assumed.
 - The schema: 11 tables covering catalog, locations, the three instance
   granularities, pack recipes, sterilisation cycles, cases and the ledger. Every
   table carries `tenant_id` so the erasure cascade is complete; there is
@@ -394,11 +405,18 @@ editing it.
   state change in a single `db.batch()`, guards the state update with a
   compare-and-set, and refuses rather than clamps. Tessa's equivalent of Kova's
   `requireClientAccess` — the value is entirely in it never being bypassed.
-- 31 app tests (12 conformance, 6 integration, 13 ledger) + 62 in
+- **The stock routes** (`apps/tessa/src/stock-routes.ts`) — locations, the
+  two-scan receive, move/use/discard/quarantine/open, the shelf read and one
+  lot's history. The receive takes product, expiry and lot code from a real GS1
+  element string and types only the count; an unrecognised GTIN answers 409 with
+  everything it *did* read, so the next screen is a pre-filled confirmation
+  rather than a blank form. The shelf computes `effectiveExpiry` per row and
+  returns the winning clock alongside the date.
+- 40 app tests (12 conformance, 6 integration, 13 ledger, 9 stock) + 63 in
   `@tessa/domain`.
 
-**Not built:** everything else. Locations, lots, units, packs, cycles, cases and
-the ledger exist as tables with no routes over them. There is no SPA.
+**Not built:** units, packs, cycles and cases exist as tables with no routes over
+them. There is no SPA.
 
-Next: routes over the ledger — receive, move, consume — and then the
-sterilisation cycle, which is where the recall query finally becomes real.
+Next: the sterilisation cycle, which is where the recall query finally becomes
+real.

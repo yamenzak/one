@@ -50,6 +50,16 @@ const isPublic = (method: string, path: string): boolean =>
 function permissionFor(method: string, path: string): Grant | null {
   const write = method !== "GET" && method !== "HEAD";
   if (path.startsWith("/api/catalog")) return write ? { catalog: ["create"] } : { catalog: ["read"] };
+  /**
+   * Stock and locations.
+   *
+   * Reads pass for anyone who may see the shelf; every WRITE re-checks its own
+   * specific grant in the handler (`stock:receive` vs `stock:consume` vs
+   * `stock:quarantine`), because they are genuinely different acts and the outer
+   * wall cannot tell them apart from the path alone.
+   */
+  if (path.startsWith("/api/locations")) return write ? { settings: ["manage"] } : { catalog: ["read"] };
+  if (path.startsWith("/api/stock")) return write ? { stock: ["read"] } : { stock: ["read"] };
   if (path.startsWith("/api/reports")) return { report: ["read"] };
   if (path.startsWith("/api/billing")) return write ? { billing: ["manage"] } : { billing: ["read"] };
   if (path.startsWith("/api/settings")) return write ? { settings: ["manage"] } : { settings: ["read"] };

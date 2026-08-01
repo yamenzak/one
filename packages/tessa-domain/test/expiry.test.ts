@@ -89,6 +89,21 @@ describe("a missing input is a clock that is NOT running", () => {
     expect(effectiveExpiry({ printed: "" }).at).toBeNull();
     expect(effectiveExpiry({ printed: null }).at).toBeNull();
   });
+
+  it("runs the opened clock from a TIMESTAMP, not only a bare date", () => {
+    // The regression that made this block's own rule bite the wrong way. The
+    // ledger writes `opened_at` as a full ISO instant, because an audit trail
+    // needs the time of day; a date-only parser silently dropped it, and a
+    // dropped input here does not read as "unknown" — it reads as "not opened",
+    // so the shelf showed the printed 2027 date for a vial with seven days left.
+    const r = effectiveExpiry({ printed: "2027-01-31", openedAt: "2026-08-01T15:54:51.198Z", postOpeningDays: 7 });
+    expect(r).toMatchObject({ at: "2026-08-08", reason: "opened" });
+    // Space-separated (SQLite's own datetime()) parses identically.
+    expect(effectiveExpiry({ openedAt: "2026-08-01 15:54:51", postOpeningDays: 7 }).at).toBe("2026-08-08");
+    // Tolerating a timestamp must not tolerate a truncated or malformed one.
+    expect(effectiveExpiry({ openedAt: "2026-8-1T15:54:51Z", postOpeningDays: 7 }).at).toBeNull();
+    expect(effectiveExpiry({ openedAt: "2026-08-01X15:54", postOpeningDays: 7 }).at).toBeNull();
+  });
 });
 
 describe("the status boundary", () => {
