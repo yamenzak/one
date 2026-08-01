@@ -27,6 +27,7 @@ import { createAuth } from "./auth.js";
 import { guard } from "./route-guard.js";
 import { domainAdminRoutes, domainRoutes } from "./domain-routes.js";
 import { orgCreateGuard, orgUpdateGuard } from "./org-guard.js";
+import { packRoutes } from "./pack-routes.js";
 import { stockRoutes } from "./stock-routes.js";
 import { emailAdminRoutes } from "@4dl/email/admin-routes";
 import { maintenanceAdminRoutes, maintenanceMiddleware } from "@4dl/tenancy";
@@ -134,6 +135,7 @@ app.post("/api/catalog", async (c) => {
  * already made correctly.
  */
 app.route("/api", stockRoutes);
+app.route("/api", packRoutes);
 app.route("/api", domainRoutes);
 app.route("/api", domainAdminRoutes);
 

@@ -60,6 +60,12 @@ function permissionFor(method: string, path: string): Grant | null {
    */
   if (path.startsWith("/api/locations")) return write ? { settings: ["manage"] } : { catalog: ["read"] };
   if (path.startsWith("/api/stock")) return write ? { stock: ["read"] } : { stock: ["read"] };
+  // Same arrangement for the CSSD surfaces: the outer wall proves you may see
+  // them at all, and each handler proves the specific act — `instrument:manage`
+  // is not `instrument:retire`, and `pack:build` is not `pack:open`.
+  if (path.startsWith("/api/instruments")) return { instrument: ["read"] };
+  if (path.startsWith("/api/packs")) return { pack: ["read"] };
+  if (path.startsWith("/api/recipes")) return { pack: ["read"] };
   if (path.startsWith("/api/reports")) return { report: ["read"] };
   if (path.startsWith("/api/billing")) return write ? { billing: ["manage"] } : { billing: ["read"] };
   if (path.startsWith("/api/settings")) return write ? { settings: ["manage"] } : { settings: ["read"] };

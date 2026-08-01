@@ -20,6 +20,7 @@ export type EventName =
   | "opened"
   | "consumed"
   | "wasted"
+  | "cleaned"
   | "packed"
   | "sterilised"
   | "released"
@@ -56,7 +57,21 @@ export const EVENTS: Record<EventName, EventSpec> = {
   opened: { kinds: ["lot", "pack"], quantity: "none", label: "Opened" },
   consumed: { kinds: ["lot"], quantity: "decrease", label: "Used" },
   wasted: { kinds: ["lot"], quantity: "decrease", label: "Discarded" },
-  packed: { kinds: ["pack"], quantity: "none", label: "Packed" },
+  /**
+   * The step that closes the CSSD loop: a dirty instrument becomes available
+   * again.
+   *
+   * It has to be an event somebody performs, not a status a route may set,
+   * because without it an instrument that came out of an opened tray is stuck in
+   * `dirty` forever — and the pressure to "just set it back to clean" is exactly
+   * how an instrument gets from a patient into the next tray unreprocessed.
+   */
+  cleaned: { kinds: ["unit"], quantity: "none", label: "Reprocessed" },
+  // Applies to a UNIT as well as the pack, and both halves are needed. The pack
+  // gets "this tray was assembled"; each instrument gets "I went into tray T on
+  // Tuesday", which is the half a recall reads backwards — from a failed load to
+  // the instruments that were in it.
+  packed: { kinds: ["unit", "pack"], quantity: "none", label: "Packed" },
   sterilised: { kinds: ["pack"], quantity: "none", label: "Sterilised" },
   released: { kinds: ["pack"], quantity: "none", label: "Released" },
   quarantined: { kinds: ["lot", "unit", "pack"], quantity: "none", label: "Quarantined" },
