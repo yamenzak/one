@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { schemaStatements } from "@4dl/core";
 import { formatGaps, impossibleSteps, subjectCascade, tenantCascade, undeclaredScopes } from "@4dl/purge";
-import { APP_SCHEMA, SCHEMA_MODULES } from "../src/db.js";
+import { SCHEMA_MODULES } from "../src/db.js";
+import { TESSA_SCHEMA } from "../src/schema.js";
 
 /**
  * THE GUARDRAILS A NEW APP INHERITS ON DAY ONE. Keep them.
@@ -20,7 +21,7 @@ describe("the app's schema module", () => {
   it("declares only idempotent DDL", () => {
     // The module re-applies from scratch on any version bump, so a statement that
     // is not `IF NOT EXISTS` throws on the second run and aborts the batch.
-    for (const sql of schemaStatements(APP_SCHEMA)) {
+    for (const sql of schemaStatements(TESSA_SCHEMA)) {
       expect(sql, sql.slice(0, 70)).toMatch(/^(CREATE (TABLE|INDEX|UNIQUE INDEX) IF NOT EXISTS|DROP INDEX IF EXISTS)/);
     }
   });
@@ -31,7 +32,7 @@ describe("the app's schema module", () => {
     // a missing `;` fuses two statements into a syntax error that takes the
     // whole batch down. None of the three raises anything you would notice —
     // the tables simply never appear.
-    for (const sql of schemaStatements(APP_SCHEMA)) {
+    for (const sql of schemaStatements(TESSA_SCHEMA)) {
       expect(sql, sql.slice(0, 70)).not.toMatch(/--/);
       expect(sql, sql.slice(0, 70)).not.toMatch(/\n/);
       expect(sql, sql.slice(0, 70)).toMatch(/;$/);
@@ -42,7 +43,7 @@ describe("the app's schema module", () => {
     // The runner swallows exactly one error — "duplicate column" — because that
     // is what a re-applied ADD COLUMN raises. Any other ALTER shape (RENAME,
     // DROP) fails differently and aborts the module every single run.
-    for (const sql of APP_SCHEMA.alters ?? []) {
+    for (const sql of TESSA_SCHEMA.alters ?? []) {
       expect(sql, sql.slice(0, 70)).toMatch(/^ALTER TABLE \w+ ADD COLUMN /);
     }
   });
@@ -50,7 +51,7 @@ describe("the app's schema module", () => {
   it("names every backfill", () => {
     // Backfills are best-effort and surface only in a log line, so an unnamed
     // one is unattributable when it fails.
-    for (const b of APP_SCHEMA.backfills ?? []) expect(b.name).toBeTruthy();
+    for (const b of TESSA_SCHEMA.backfills ?? []) expect(b.name).toBeTruthy();
   });
 });
 
@@ -71,7 +72,8 @@ describe("the composed schema", () => {
     }
     expect(owned.get("user")).toBe("auth");
     expect(owned.get("tenant_settings")).toBe("tenancy");
-    expect(owned.get("records")).toBe("app");
+    expect(owned.get("ledger")).toBe("tessa");
+    expect(owned.get("packs")).toBe("tessa");
   });
 
   it("applies tenancy before the modules that extend its table", () => {
@@ -81,7 +83,7 @@ describe("the composed schema", () => {
     const idx = (id: string) => SCHEMA_MODULES.findIndex((m) => m.id === id);
     expect(idx("tenancy")).toBeLessThan(idx("email"));
     expect(idx("tenancy")).toBeLessThan(idx("notify"));
-    expect(idx("app")).toBe(SCHEMA_MODULES.length - 1); // the app is always last
+    expect(idx("tessa")).toBe(SCHEMA_MODULES.length - 1); // the app is always last
   });
 });
 
@@ -120,9 +122,27 @@ describe("the erasure cascade", () => {
     expect(EXEMPT.filter((e) => !all.includes(e))).toEqual([]);
   });
 
-  it("sweeps the app's own tables, under both scopes", () => {
-    expect(tenantCascade(SCHEMA_MODULES).find((s) => s.table === "records")).toMatchObject({ column: "tenant_id" });
-    expect(subjectCascade(SCHEMA_MODULES).find((s) => s.table === "records")).toMatchObject({ column: "subject_id" });
+  it("sweeps EVERY one of the app's tables, including the join tables", () => {
+    // The template checked one demo table; Tessa checks all eleven, because the
+    // decision that every table carries `tenant_id` — even `pack_members` and
+    // `pack_recipe_items`, which could reach their tenant through a parent — is
+    // only worth anything if it is enforced. `SchemaScope` has no cascade, so a
+    // table without the column cannot be declared, is never purged, and survives
+    // an erasure that reported success.
+    const steps = tenantCascade(SCHEMA_MODULES);
+    for (const table of TESSA_SCHEMA.scoped?.tenantTables ?? []) {
+      expect(steps.find((s) => s.table === table), table).toMatchObject({ column: "tenant_id" });
+    }
+    expect(TESSA_SCHEMA.scoped?.tenantTables ?? []).toHaveLength(11);
+  });
+
+  it("declares NO subject scope, on purpose", () => {
+    // Kova erases a client; Tessa has nobody to erase. The only thing it holds
+    // about a person is an opaque `case_ref` it cannot resolve (TESSA.md Rule 1),
+    // so there is no subject to scope to. Declaring one anyway would invite a
+    // future table to key on it, which is precisely how Rule 1 would erode.
+    expect(TESSA_SCHEMA.scoped?.subjectColumn).toBeUndefined();
+    expect(subjectCascade(SCHEMA_MODULES).some((s) => (TESSA_SCHEMA.scoped?.tenantTables ?? []).includes(s.table))).toBe(false);
   });
 
   it("carries each module's OWN column, not one assumed for all", () => {

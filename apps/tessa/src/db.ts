@@ -28,30 +28,8 @@ import { EMAIL_SCHEMA } from "@4dl/email";
 import { NOTIFY_SCHEMA } from "@4dl/notify/schema";
 import { STORAGE_SCHEMA } from "@4dl/storage";
 import { TENANCY_SCHEMA } from "@4dl/tenancy";
-
-/**
- * One demo table, kept only to show the shape. Delete it and put the app's own
- * tables here — but keep `scoped`, which is not decoration: `@4dl/purge` derives
- * the erasure cascade from it, and the conformance test refuses a table that
- * carries a scope column without one.
- */
-export const APP_SCHEMA: SchemaModule = {
-  id: "app",
-  version: "1",
-  ddl: [
-    "CREATE TABLE IF NOT EXISTS records (id TEXT PRIMARY KEY, tenant_id TEXT, subject_id TEXT, title TEXT, body_json TEXT, created_by TEXT, created_at TEXT);",
-    "CREATE INDEX IF NOT EXISTS idx_records_tenant ON records(tenant_id, created_at);",
-  ],
-  scoped: {
-    tenantColumn: "tenant_id",
-    tenantTables: ["records"],
-    // The app's word for the individual inside a tenant. Kova says `client_id`;
-    // a clinic would say `patient_id`. `@4dl/purge` derives the columns it
-    // checks from whatever is declared here, so it follows a rename.
-    subjectColumn: "subject_id",
-    subjectTables: ["records"],
-  },
-};
+// The app's own tables. Kept in its own file because it is the part that grows.
+import { TESSA_SCHEMA } from "./schema.js";
 
 /**
  * DEPENDENCY ORDER, and the app last.
@@ -67,7 +45,7 @@ export const APP_SCHEMA: SchemaModule = {
  */
 export const SCHEMA_MODULES: readonly SchemaModule[] = [
   AUTH_SCHEMA, TENANCY_SCHEMA, BILLING_SCHEMA, COMMERCE_SCHEMA,
-  STORAGE_SCHEMA, AI_SCHEMA, EMAIL_SCHEMA, NOTIFY_SCHEMA, APP_SCHEMA,
+  STORAGE_SCHEMA, AI_SCHEMA, EMAIL_SCHEMA, NOTIFY_SCHEMA, TESSA_SCHEMA,
 ];
 
 const gate = schemaGate(SCHEMA_MODULES);

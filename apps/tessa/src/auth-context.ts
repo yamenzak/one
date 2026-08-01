@@ -50,7 +50,8 @@ const grants = bindGrants({
   catalog: statement as unknown as Record<string, readonly string[]>,
   presets: {
     owner: Object.fromEntries(Object.entries(statement).map(([k, v]) => [k, [...v]])),
-    [CUSTOMER_ROLE]: { record: ["create", "read", "update"], ai: ["use"] },
+    // Least-privileged fallback: read-only, no AI. See access.ts.
+    [CUSTOMER_ROLE]: { catalog: ["read"], stock: ["read"], instrument: ["read"], pack: ["read"], sterilisation: ["read"], case: ["read"], trace: ["read"], report: ["read"] },
   },
   fallbackRole: CUSTOMER_ROLE,
   unboundedRoles: ["owner"],

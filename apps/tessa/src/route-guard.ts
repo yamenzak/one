@@ -49,7 +49,7 @@ const isPublic = (method: string, path: string): boolean =>
  */
 function permissionFor(method: string, path: string): Grant | null {
   const write = method !== "GET" && method !== "HEAD";
-  if (path.startsWith("/api/records")) return write ? { record: ["create"] } : { record: ["read"] };
+  if (path.startsWith("/api/catalog")) return write ? { catalog: ["create"] } : { catalog: ["read"] };
   if (path.startsWith("/api/reports")) return { report: ["read"] };
   if (path.startsWith("/api/billing")) return write ? { billing: ["manage"] } : { billing: ["read"] };
   if (path.startsWith("/api/settings")) return write ? { settings: ["manage"] } : { settings: ["read"] };

@@ -97,7 +97,7 @@ describe("the doors", () => {
     // unowned hostname that answered it would let a stranger request a code,
     // verify it, and mint a tenant from an address belonging to nobody — which
     // includes the `*.workers.dev` name Cloudflare publishes for every worker.
-    const res = await SELF.fetch(`${nowhere}/api/records`);
+    const res = await SELF.fetch(`${nowhere}/api/catalog`);
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 });
@@ -133,17 +133,25 @@ describe("sign-up, then the app", () => {
     expect(probe.tenant?.slug).toBe(slug);
 
     // A write on the tenant door lands, scoped to that tenant.
-    const post = await SELF.fetch(`${origin}/api/records`, {
+    const post = await SELF.fetch(`${origin}/api/catalog`, {
       method: "POST",
       headers: { "content-type": "application/json", origin, ...auth },
-      body: JSON.stringify({ title: "first" }),
+      body: JSON.stringify({ name: "Sterile gauze 10x10", tracking: "lot", consumption: "discrete" }),
     });
     expect(post.status, await post.text().catch(() => "")).toBe(201);
 
-    const list = (await (await SELF.fetch(`${origin}/api/records`, { headers: auth })).json()) as {
-      records: { title: string }[];
+    const list = (await (await SELF.fetch(`${origin}/api/catalog`, { headers: auth })).json()) as {
+      items: { name: string; tracking: string }[];
     };
-    expect(list.records.map((r) => r.title)).toContain("first");
+    expect(list.items.map((r) => r.name)).toContain("Sterile gauze 10x10");
+    // The vocabulary is validated, not trusted: a typo in `tracking` would put a
+    // physical thing in the wrong instance table and give it the wrong lifecycle.
+    const rejected = await SELF.fetch(`${origin}/api/catalog`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin, ...auth },
+      body: JSON.stringify({ name: "Nonsense", tracking: "batch" }),
+    });
+    expect(rejected.status).toBe(400);
   });
 
   it("refuses a slug that would take over one of the platform's own doors", async () => {
@@ -170,7 +178,7 @@ describe("what an unauthenticated caller can reach", () => {
     // No session ⇒ no tenant ⇒ refused. The guard runs before any handler, so
     // this also proves the middleware ORDER is right: were it reversed, the
     // handler would run first and throw on a null identity instead.
-    const res = await SELF.fetch(`${SETUP}/api/records`);
+    const res = await SELF.fetch(`${SETUP}/api/catalog`);
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(res.status).toBeLessThan(500);
   });
@@ -193,7 +201,7 @@ describe("maintenance", () => {
     const put = "INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value";
     await db().prepare(put).bind("platform.maintenance", "full").run();
     try {
-      const closed = await SELF.fetch(`${SETUP}/api/records`);
+      const closed = await SELF.fetch(`${SETUP}/api/catalog`);
       expect(closed.status).toBe(503);
       expect(await closed.json()).toMatchObject({ error: "maintenance", level: "full" });
 

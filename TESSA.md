@@ -372,10 +372,29 @@ does not pay for CSSD.
 
 ## Status
 
-**Scaffolded, nothing built.** `apps/tessa` is a copy of `apps/_template` with
-the name, root domain and reserved labels changed. Its 17 template tests pass
-(11 conformance, 6 integration against the real worker through Miniflare), which
-is the proof that every shared package is wired correctly.
+Be conservative here — this section is read as ground truth. Verify before
+editing it.
 
-Next: the two pure modules — GS1 parsing and expiry composition — because they
-are self-contained, exhaustively testable, and everything else leans on them.
+**Built:**
+
+- `@tessa/domain` — GS1/UDI element-string parsing and three-clock expiry
+  composition. 49 tests, verified by mutation rather than assumed.
+- The schema: 11 tables covering catalog, locations, the three instance
+  granularities, pack recipes, sterilisation cycles, cases and the ledger. Every
+  table carries `tenant_id` so the erasure cascade is complete; there is
+  deliberately no subject scope.
+- Roles: owner · stock keeper · CSSD · clinical · auditor. `sterilisation:run`
+  and `sterilisation:release` are separate permissions, because Freigabe is a
+  qualified act and frequently not the person who ran the machine. **No customer
+  role** — everyone who touches Tessa works at the centre, so every member
+  consumes a staff seat.
+- `/api/catalog` — the first real routes, and the shape later ones copy.
+- 18 app tests (12 conformance, 6 integration through the real worker).
+
+**Not built:** everything else. Locations, lots, units, packs, cycles, cases and
+the ledger exist as tables with no routes over them. There is no SPA.
+
+Next: the ledger write path, because it is the invariant everything else depends
+on — no route may change a state column without writing the ledger row that
+justifies it, and that is far easier to establish now than to retrofit across a
+dozen routes.

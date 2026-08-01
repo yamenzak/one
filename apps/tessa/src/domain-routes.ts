@@ -28,7 +28,7 @@ import { hasFeature } from "./entitlements.js";
 import { tenancyConfig } from "./host-context.js";
 
 /** Must match `name` in wrangler.jsonc. */
-export const WORKER_NAME = "template";
+export const WORKER_NAME = "tessa";
 
 const GUARDS: RouteGuards = {
   requireTenant: (c) => requireTenant(c as never),

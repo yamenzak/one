@@ -59,34 +59,68 @@ app.on(["GET", "POST"], "/api/auth/*", (c) => {
 });
 
 /**
- * One example route, showing the two gates that are NOT the guard's job.
+ * THE CATALOG — Tessa's first real routes, and the shape every later one copies.
  *
- * The guard already checked that the caller is a member of this host's tenant
- * and holds `record:create`. What it cannot check is ROW-LEVEL scope — that a
- * row belongs to this tenant, and that a customer may only reach their own.
- * That is the invariant every real route needs and no framework can supply.
+ * The guard has already established that the caller is a member of THIS host's
+ * tenant and holds the right grant. What it cannot establish is ROW-LEVEL scope:
+ * that row 47 belongs to them. `WHERE tenant_id = ?` on every read and write is
+ * that scope here, and it is not optional on any route that follows.
+ *
+ * A catalog item is the TYPE of a thing (TESSA.md §3.1) — "Sterile gauze 10x10",
+ * "Kelly forceps 14cm" — never a physical object. The physical ones are lots,
+ * units and packs, and each has its own lifecycle.
  */
-app.get("/api/records", async (c) => {
+app.get("/api/catalog", async (c) => {
   const who = requireTenant(c);
   if (!who) return c.json({ error: "unauthenticated" }, 401);
   const rows = await c.env.DB
-    .prepare("SELECT id, title, subject_id, created_at FROM records WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 100")
+    .prepare("SELECT id, name, code, kind, tracking, gtin, consumption, post_opening_days, sterile_shelf_days, reprocessing_class, par_level, created_at FROM catalog_items WHERE tenant_id = ? AND active = 1 ORDER BY name LIMIT 500")
     .bind(who.tenantId)
     .all();
-  return c.json({ records: rows.results ?? [] });
+  return c.json({ items: rows.results ?? [] });
 });
 
-app.post("/api/records", async (c) => {
-  const denied = requirePermission(c, { record: ["create"] });
+app.post("/api/catalog", async (c) => {
+  const denied = requirePermission(c, { catalog: ["create"] });
   if (denied) return denied;
   const who = requireTenant(c)!;
-  type Body = { title?: string; subjectId?: string };
+  type Body = {
+    name?: string;
+    code?: string;
+    kind?: string;
+    tracking?: string;
+    gtin?: string;
+    consumption?: string;
+    postOpeningDays?: number;
+    sterileShelfDays?: number;
+    reprocessingClass?: string;
+  };
   const body: Body = await c.req.json<Body>().catch(() => ({}) as Body);
-  if (!body.title) return c.json({ error: "title is required" }, 400);
-  const id = newId("rec");
+  if (!body.name) return c.json({ error: "name is required" }, 400);
+
+  /**
+   * Closed vocabularies, validated here rather than trusted.
+   *
+   * `tracking` decides which instance table a physical thing lands in, and
+   * `consumption` decides whether opening commits the whole thing. A typo in
+   * either does not fail loudly — it produces an item whose lifecycle silently
+   * does not match the object on the shelf.
+   */
+  const kind = body.kind ?? "consumable";
+  const tracking = body.tracking ?? "lot";
+  const consumption = body.consumption ?? "discrete";
+  if (!["consumable", "instrument", "equipment"].includes(kind)) return c.json({ error: "unknown kind" }, 400);
+  if (!["lot", "unit", "none"].includes(tracking)) return c.json({ error: "unknown tracking" }, 400);
+  if (!["divisible", "discrete", "single_use_on_open"].includes(consumption)) return c.json({ error: "unknown consumption" }, 400);
+
+  const id = newId("cat");
   await c.env.DB
-    .prepare("INSERT INTO records (id, tenant_id, subject_id, title, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-    .bind(id, who.tenantId, body.subjectId ?? null, body.title, who.userId, nowIso())
+    .prepare("INSERT INTO catalog_items (id, tenant_id, name, code, kind, tracking, gtin, consumption, post_opening_days, sterile_shelf_days, reprocessing_class, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)")
+    .bind(
+      id, who.tenantId, body.name, body.code ?? null, kind, tracking, body.gtin ?? null, consumption,
+      body.postOpeningDays ?? null, body.sterileShelfDays ?? null, body.reprocessingClass ?? null,
+      nowIso(), nowIso(),
+    )
     .run();
   return c.json({ id }, 201);
 });
