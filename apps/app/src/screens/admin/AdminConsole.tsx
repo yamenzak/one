@@ -2265,7 +2265,7 @@ function StripeConfig() {
   const [editLane, setEditLane] = useState<StripeLane>("test");
   const [creds, setCreds] = useState<Record<StripeLane, LaneCreds>>({ test: { ...EMPTY_CREDS }, live: { ...EMPTY_CREDS } });
   const [feeBps, setFeeBps] = useState("");
-  const [busy, setBusy] = useState<"save" | "sync" | "flip" | null>(null);
+  const [busy, setBusy] = useState<"save" | "sync" | "resync" | "flip" | null>(null);
   const [flipping, setFlipping] = useState<StripeMode | null>(null);
   const [flipTo, setFlipTo] = useState<StripeMode | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -2346,12 +2346,30 @@ function StripeConfig() {
     }
   };
 
-  const sync = async () => {
-    setBusy("sync");
+  /**
+   * `resync` REBUILDS rather than reconciles.
+   *
+   * It nulls the stored Stripe ids on every active plan and credit pack, so the
+   * sync that follows recreates the products and prices from scratch in the
+   * active lane. That is the repair for the one state the ordinary sync cannot
+   * fix by itself: a row whose `stripe_price_id` points at something that no
+   * longer exists — a product deleted by hand in the Stripe dashboard, or ids
+   * belonging to the other lane. Sync SKIPS any row that already holds a price
+   * id, so it reports "0 plans, 0 packs" and every checkout fails with "No such
+   * price" — the catalog looks synced and is not.
+   *
+   * The cost, and why it is behind a confirmation: it mints NEW prices. Anyone
+   * already subscribed on an old price keeps that price until they re-subscribe,
+   * so this is a repair tool, not a refresh button.
+   */
+  const [confirmRebuild, setConfirmRebuild] = useState(false);
+
+  const sync = async (resyncPrices = false) => {
+    setBusy(resyncPrices ? "resync" : "sync");
     setErr(null);
     setMsg(null);
     try {
-      const r = await api.post<{ plans: number; packs: number; renamed?: number; renameFailed?: number }>("/api/admin/stripe/sync");
+      const r = await api.post<{ plans: number; packs: number; renamed?: number; renameFailed?: number; cleared?: number; clearedPacks?: number }>("/api/admin/stripe/sync", resyncPrices ? { resyncPrices: true } : {});
       // `renamed` is reported separately because "0 created" is the NORMAL
       // outcome of a rename-only sync, and without this line it reads as "the
       // button did nothing".
@@ -2362,9 +2380,12 @@ function StripeConfig() {
       // so: it is the single most useful diagnostic here, and it used to abort
       // the whole sync with an unexplained 500 instead of being reported.
       const failedLine = r.renameFailed
-        ? ` ${r.renameFailed} product${r.renameFailed === 1 ? " could" : "s could"} not be renamed — those rows point at Stripe products that don't exist in the ${status?.activeLane ?? "active"} lane. Use “Re-sync prices” to rebuild them.`
+        ? ` ${r.renameFailed} product${r.renameFailed === 1 ? " could" : "s could"} not be renamed — those rows point at Stripe products that don't exist in the ${status?.activeLane ?? "active"} lane. Use “Rebuild prices” below to recreate them.`
         : "";
-      setMsg(`${created}${renamedLine}${failedLine}`);
+      const rebuiltLine = (r.cleared ?? 0) + (r.clearedPacks ?? 0) > 0
+        ? ` Rebuilt ${r.cleared} plan${r.cleared === 1 ? "" : "s"} and ${r.clearedPacks} credit pack${r.clearedPacks === 1 ? "" : "s"} from scratch.`
+        : "";
+      setMsg(`${created}${renamedLine}${failedLine}${rebuiltLine}`);
     } catch (e) {
       setErr(errorText(e, "Catalog sync failed"));
     } finally {
@@ -2573,6 +2594,32 @@ function StripeConfig() {
                     {busy === "sync" ? <><Spinner className="size-4" /> Syncing…</> : "Sync catalog"}
                   </Button>
                 </div>
+
+                {/* The repair, deliberately below the ordinary sync and behind a
+                    confirmation: it is the right answer to "0 synced but nothing
+                    works", and the wrong answer to almost everything else. */}
+                <Button
+                  variant="ghost"
+                  className="min-h-12 w-full"
+                  disabled={busy !== null || !status.enabled}
+                  onClick={() => setConfirmRebuild(true)}
+                >
+                  {busy === "resync" ? <><Spinner className="size-4" /> Rebuilding…</> : "Rebuild prices from scratch"}
+                </Button>
+                <p className="-mt-1 text-xs text-muted-foreground">
+                  Use this when Sync reports products it can&rsquo;t find — after deleting them in Stripe, or
+                  switching lanes. It recreates every plan and pack, and mints new prices.
+                </p>
+                <ConfirmDialog
+                  open={confirmRebuild}
+                  onOpenChange={setConfirmRebuild}
+                  title="Rebuild every price?"
+                  description={`This clears the stored Stripe ids for all active plans and credit packs and recreates them in the ${status?.activeLane ?? "active"} lane. Anyone already subscribed keeps the price they signed up on until they re-subscribe — new sign-ups use the new prices.`}
+                  confirmLabel="Rebuild prices"
+                  cancelLabel="Cancel"
+                  destructive
+                  onConfirm={() => { setConfirmRebuild(false); void sync(true); }}
+                />
                 {err && <Callout tone="danger" icon={AlertTriangle} live="alert">{err}</Callout>}
                 {msg && !err && <Callout tone="success" icon={CircleCheck} live="status">{msg}</Callout>}
               </Card>
