@@ -9,7 +9,8 @@
  * in the copy. There is nothing left to share once the words are removed.
  */
 
-import { Lock } from "@4dl/ui";
+import { Link } from "react-router-dom";
+import { ArrowRight, Lock } from "@4dl/ui";
 import { DUNNING_DAYS } from "@4dl/billing/model";
 import { useSession } from "./session.js";
 
@@ -75,6 +76,16 @@ export function StudioPausedBanner() {
   const reason = host?.gate?.reason;
   if (!host?.gate?.readOnly) return null;
   const closing = reason === "closing";
+  /**
+   * NEVER CONFIGURED — the owner abandoned the wizard, was declined, or reloaded
+   * mid-checkout, so the studio has no plan and has never had one.
+   *
+   * It reaches the same read-only gate as a lapse and must not borrow its words.
+   * "This studio is paused… until it renews" is wrong twice over for someone who
+   * never started: nothing was taken away, and there is no arrears to settle.
+   * They are one step from finished, and the banner's job is to say which step.
+   */
+  const setup = reason === "setup";
   // The OWNER gets the next rung's deadline. Every step of the platform ladder is
   // announced before it lands — a single cliff is how you lose a customer who was
   // on holiday — and read-only is the rung where saying so still changes the
@@ -92,11 +103,25 @@ export function StudioPausedBanner() {
       <div className="column flex items-start gap-2">
       <Lock aria-hidden className="mt-0.5 size-3.5 shrink-0" />
       <span>
-        <span className="font-semibold">{closing ? "This studio is closing." : "This studio is paused."}</span>{" "}
-        {closing
-          ? "Everything is readable, but nothing new can be saved. The owner can still cancel the closure from Billing."
-          : "Everything is readable, but nothing new can be saved until the studio renews."}
-        {!closing && owner && (
+        <span className="font-semibold">
+          {setup ? "This studio isn't set up yet." : closing ? "This studio is closing." : "This studio is paused."}
+        </span>{" "}
+        {setup
+          ? owner
+            ? <>
+                Choose a plan to start adding clients. Everything you&rsquo;ve entered is saved and waiting.{" "}
+                {/* The way out, in the banner. A read-only app with no route to
+                    the one action that unlocks it is a dead end, and this state
+                    is reached by people who were ALREADY interrupted once. */}
+                <Link to="/business" className="inline-flex items-center gap-1 font-semibold underline underline-offset-4">
+                  Finish setting up <ArrowRight aria-hidden className="size-3" />
+                </Link>
+              </>
+            : "Your coach hasn't finished setting it up. Nothing you've done is lost — it'll all be here."
+          : closing
+            ? "Everything is readable, but nothing new can be saved. The owner can still cancel the closure from Billing."
+            : "Everything is readable, but nothing new can be saved until the studio renews."}
+        {!closing && !setup && owner && (
           <>
             {" "}
             <span className="font-semibold">

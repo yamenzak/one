@@ -101,14 +101,32 @@ export interface PackRow {
  */
 export const DEFAULT_PLANS: Omit<PlanRow, "stripe_product_id" | "stripe_price_id">[] = [
   {
+    /**
+     * The id stays `solo` on purpose — it is stamped into Stripe metadata
+     * (`kova_plan`) on every product and subscription ever created, and renaming
+     * it would orphan all of them. Only the NAME and the shape change.
+     *
+     * It used to be "Solo", one coach and **one client**, which is not a trainer
+     * plan at all — no trainer has one client. It was a self-coaching plan
+     * wearing trainer clothes, and it was the only tier that did not fit a
+     * product built out of staff seats, a Connect rail and client packages.
+     * Worse, the free baseline carried THREE clients, so the cheapest paid tier
+     * bought you less than not paying.
+     *
+     * Three clients at the same price makes it the first rung of a B2B ladder: a
+     * trainer's first few clients, priced so the step up to Light is a real
+     * business decision rather than a correction of ours.
+     */
     id: "solo",
-    name: "Solo",
+    name: "Starter",
     price_usd_month: 4.99,
     ord: 1,
     active: 1,
     entitlements_json: j({
-      quotas: { staffSeats: 1, activeClients: 1, templates: 25, storageMb: 250 },
+      quotas: { staffSeats: 1, activeClients: 3, templates: 25, storageMb: 250 },
       features: { externalSearch: true, aiSuite: true },
+      // 3 clients x 91 credits = 273 of a standard month against a 500 grant, so
+      // the ceiling still holds the 10% rule ($0.50 of $4.99) with headroom.
       aiCredits: { monthlyGrant: 500 },
       trialDays: 30,
     }),
@@ -196,6 +214,33 @@ export const DEFAULT_PLANS: Omit<PlanRow, "stripe_product_id" | "stripe_price_id
  */
 export const GRANDFATHERED_PLANS: Omit<PlanRow, "stripe_product_id" | "stripe_price_id">[] = [
   {
+    /**
+     * NOT A TIER — the parking state of a tenant that has never chosen a plan.
+     *
+     * It is unpurchasable (`active: 0`) but every new tenant is stamped onto it
+     * by `getSubscription`, and `customer.subscription.deleted` falls back to it.
+     * That made it the most-used row in the table and, until now, a genuinely
+     * usable free product: three clients, indefinitely, fully writable, on a row
+     * that also carried `status: 'active'` — and MORE clients than the cheapest
+     * paid tier, so not paying was the better deal.
+     *
+     * ── The fix is the GATE, and only the gate ──────────────────────────────
+     *
+     * `statusOf` reports `incomplete` for a tenant with no paid plan, and the
+     * route guard turns that into read-only. These quotas are deliberately NOT a
+     * second enforcement of the same rule.
+     *
+     * They were, briefly, and it was wrong: zeroing them bricks the one
+     * configuration where the gate correctly stands down. A deployment with no
+     * Stripe keys — a self-hosted install, anything before DEPLOY.md §10, the
+     * whole E2E suite — cannot take a payment, so gating "has not paid" there
+     * would strand every studio; `statusOf` fails open. Crippled quotas would
+     * then brick it anyway, one layer further down, for a deployment that had
+     * deliberately chosen not to charge.
+     *
+     * So this row is what a NON-CHARGING deployment serves. On a charging one it
+     * is unreachable: the gate fires first, every time.
+     */
     id: "free",
     name: "Free",
     price_usd_month: 0,
@@ -272,8 +317,14 @@ export const DEFAULT_PACKS: PackRow[] = [
  *
  *   v1 → the original free/solo/studio/team ladder (unstamped)
  *   v2 → solo/light/pro/max + trials; free/studio/team grandfathered inactive
+ *   v3 → PURE B2B: `solo` becomes "Starter" at 3 clients. One client is not a
+ *        trainer plan, and the free baseline carried three — so the cheapest
+ *        paid tier bought you LESS than not paying. The unpaid state is now
+ *        gated (`statusOf` → `incomplete`) rather than re-priced; `free`'s own
+ *        entitlements are untouched, because they are what a deployment with no
+ *        payment rail serves.
  */
-export const PLAN_CATALOG_VERSION = "2";
+export const PLAN_CATALOG_VERSION = "3";
 const PLAN_CATALOG_KEY = "plans.catalog_version";
 
 /**

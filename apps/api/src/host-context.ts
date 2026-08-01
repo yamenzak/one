@@ -21,6 +21,7 @@
  * config exists.
  */
 
+import { stripeConfig, stripeEnabled } from "@4dl/billing";
 import type { SessionContext } from "@kova/protocol";
 import {
   canonicalHost as tCanonicalHost,
@@ -74,14 +75,63 @@ export const KOVA_RESERVED_LABELS: ReadonlySet<string> = new Set([
  * This is the injected half of the host gate, and it is why `@4dl/tenancy` can be
  * used by an app that never takes a payment. A primary-key point lookup, run on
  * every request — never cached. The reasoning is in `resolveHost`'s header.
+ *
+ * ── Why this reads the PLAN and not just the status ─────────────────────────
+ *
+ * `getSubscription` stamps every brand-new tenant `plan_id = 'free', status =
+ * 'active'`, and `customer.subscription.deleted` falls back to the same pair. So
+ * `status` alone said "active" for a studio that had never paid a cent — an
+ * owner who abandoned the wizard, was declined at the first attempt, or reloaded
+ * mid-checkout got a fully-writable app on the free row's quotas, indefinitely,
+ * with nothing but a soft notice on the billing screen.
+ *
+ * That was the whole "we take them to a free base plan, which is weird" problem,
+ * and it was worse than weird: the free row carried MORE clients than the
+ * cheapest paid tier, so not paying was the better deal.
+ *
+ * A tenant with no PAID plan therefore reports `incomplete`, which
+ * `resolveHostGate` turns into read-only + billing-writable. `comp` is exempt —
+ * an operator granting a studio access is precisely the case where the absence
+ * of a payment is intentional.
  */
 async function statusOf(db: D1Database, tenantId: string): Promise<string | null> {
   const row = await db
-    .prepare("SELECT status FROM subscriptions WHERE tenant_id = ?")
+    .prepare(
+      `SELECT s.status, s.comp, p.price_usd_month
+       FROM subscriptions s LEFT JOIN plans p ON p.id = s.plan_id
+       WHERE s.tenant_id = ?`,
+    )
     .bind(tenantId)
-    .first<{ status: string | null }>()
+    .first<{ status: string | null; comp: number | null; price_usd_month: number | null }>()
     .catch(() => null);
-  return row?.status ?? null;
+  if (row?.comp) return row.status ?? null;
+  // A paid plan on the row: nothing to decide, and this is the steady state, so
+  // it costs one query and stops here.
+  if (Number(row?.price_usd_month) > 0) return row?.status ?? null;
+  // No row at all counts as unpaid too — the row is written lazily, and a
+  // missing plan id (deleted, renamed) is an entitlement set nobody can name.
+
+  /**
+   * …but only if this deployment can actually TAKE a payment.
+   *
+   * Gating on "has not paid" when there is no payment rail configured would
+   * strand every studio on the platform with no way out — our misconfiguration
+   * charged to their account. It is the same trap as a deployment that cannot
+   * send the sign-in code needed to configure its own mailer, and the house rule
+   * is the one used everywhere else here: fail CLOSED on their non-payment, fail
+   * OPEN on ours.
+   *
+   * That is not hypothetical. `apps/e2e/src/app.ts` drives the real wizard
+   * against a worker with no Stripe keys and documents the outcome — "the owner
+   * is let through with the plan recorded and billing pending" — and a
+   * self-hosted install before DEPLOY.md §10 is in exactly that state.
+   *
+   * Read LAST and only on this branch: a healthy deployment has a paid plan and
+   * returned above, so the extra config read never touches the hot path.
+   */
+  const cfg = await stripeConfig(db).catch(() => null);
+  if (!cfg || !stripeEnabled(cfg)) return row?.status ?? null;
+  return "incomplete";
 }
 
 /** The apex we serve studios under, with Kova's shipped fallback. */

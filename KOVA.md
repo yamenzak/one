@@ -259,15 +259,27 @@ stored as `entitlements_json` per plan row (admin-editable at runtime), deep-mer
 FREE baseline, per-tenant `overrides_json` for comps/gifts, `checkDowngrade()` compliance
 gate on downgrades.
 
-**Kova ships 4 paid plans.** Tier names are generic on purpose — "Studio" is
-business-side vocabulary for a tenant, never a plan name. There is no free tier; the two
-30-day trials replaced it.
+**Kova ships 4 paid plans, and it is a B2B product.** Tier names are generic on
+purpose — "Studio" is business-side vocabulary for a tenant, never a plan name.
+There is **no free tier**; the two 30-day trials replaced it.
 
-| | **Solo** $4.99/mo | **Light** $24.99/mo | **Pro** $49.99/mo | **Max** $119.99/mo |
+Starter is deliberately a *trainer's first few clients*, not a self-coaching
+plan. It carried one client until v3, which no real trainer has — and the
+unsubscribed `free` row carried three, so not paying bought you more than the
+cheapest tier did. A studio that never chooses a plan now sits read-only on that
+row (gate reason `setup`) until it does; it is a parking state, not a product.
+Its plan id is still `solo`, because Stripe metadata carries it.
+
+The gate stands down where **Stripe is not configured** — a deployment that
+cannot take a payment must not withhold the product over one. There, `free`'s
+entitlements are what is actually served, which is why they are left usable
+rather than zeroed.
+
+| | **Starter** $4.99/mo | **Light** $24.99/mo | **Pro** $49.99/mo | **Max** $119.99/mo |
 |---|---|---|---|---|
 | Free trial | 30 days | 30 days | — | — |
 | Coaches (`staffSeats`, incl. owner) | 1 | 1 | 5 | unlimited |
-| Active clients | 1 | 30 | 100 | unlimited |
+| Active clients | 3 | 30 | 100 | unlimited |
 | AI monthly credit grant | 500 | 3,000 | 6,000 | 15,000 |
 | Workout/meal templates | 25 | 200 | unlimited | unlimited |
 | Media storage | 250 MB | 1 GB | 10 GB | 100 GB |
@@ -1441,7 +1453,7 @@ wide band. Circumferences come from front+side silhouette widths via
 
 `bfCamera` platform entitlement (tenant bought from Kova) ∩ the per-package
 `canUseBodyScan` client flag (`requiresFeature: "bfCamera"`, enforced by the
-`resolveClientFlags` intersection). Free plan has no `bfCamera`; Solo/Studio/Team
+`resolveClientFlags` intersection). Starter has no `bfCamera`; Light/Pro/Max
 do.
 
 ### Data model
