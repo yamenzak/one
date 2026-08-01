@@ -108,6 +108,13 @@ packages/
              # resolution across the five doors, prefixed storage, the passkey
              # ceremony, Stripe.js + PaymentSheet, Turnstile, ErrorBoundary,
              # hard-refresh. See its README.
+  i18n/      # @4dl/i18n — TRANSLATION, and deliberately small: typed dictionaries,
+             # `{name}` interpolation, one plural rule (en/de share it), a locale
+             # from the browser that the person can override. No ICU, no lazy
+             # bundles, no RTL — each is real work a real requirement would
+             # justify, and none is justified by "English and German". Raised as a
+             # PLATFORM question by Tessa (TESSA.md §2.4), not a Tessa one.
+             # ⚠️ `@4dl/ui`'s own strings are NOT translated — see its README.
   brand/     # (reserved) logos, illustrations
 ```
 

@@ -1,0 +1,22 @@
+{
+  "name": "@4dl/i18n",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Translation for 4DL apps: typed dictionaries, {name} interpolation, one plural rule, a locale resolved from the browser and overridable. Deliberately minimal — see the header of src/index.ts for what is left out and why.",
+  "exports": { ".": "./src/index.ts" },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "peerDependencies": { "react": "^19.0.0" },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "react": "^19.2.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

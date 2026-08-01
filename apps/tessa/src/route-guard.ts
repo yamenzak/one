@@ -50,6 +50,28 @@ const isPublic = (method: string, path: string): boolean =>
 function permissionFor(method: string, path: string): Grant | null {
   const write = method !== "GET" && method !== "HEAD";
   if (path.startsWith("/api/catalog")) return write ? { catalog: ["create"] } : { catalog: ["read"] };
+  /**
+   * Stock and locations.
+   *
+   * Reads pass for anyone who may see the shelf; every WRITE re-checks its own
+   * specific grant in the handler (`stock:receive` vs `stock:consume` vs
+   * `stock:quarantine`), because they are genuinely different acts and the outer
+   * wall cannot tell them apart from the path alone.
+   */
+  if (path.startsWith("/api/locations")) return write ? { settings: ["manage"] } : { catalog: ["read"] };
+  if (path.startsWith("/api/stock")) return write ? { stock: ["read"] } : { stock: ["read"] };
+  // Same arrangement for the CSSD surfaces: the outer wall proves you may see
+  // them at all, and each handler proves the specific act — `instrument:manage`
+  // is not `instrument:retire`, and `pack:build` is not `pack:open`.
+  if (path.startsWith("/api/instruments")) return { instrument: ["read"] };
+  if (path.startsWith("/api/packs")) return { pack: ["read"] };
+  if (path.startsWith("/api/recipes")) return { pack: ["read"] };
+  if (path.startsWith("/api/cycles")) return { sterilisation: ["read"] };
+  if (path.startsWith("/api/cases")) return { case: ["read"] };
+  // The recall report is READ-ONLY by nature, and `trace:read` is the one grant
+  // an auditor holds — see access.ts. Keeping it off `sterilisation:read` is
+  // what lets an inspection account see the recall and nothing else.
+  if (path.startsWith("/api/trace")) return { trace: ["read"] };
   if (path.startsWith("/api/reports")) return { report: ["read"] };
   if (path.startsWith("/api/billing")) return write ? { billing: ["manage"] } : { billing: ["read"] };
   if (path.startsWith("/api/settings")) return write ? { settings: ["manage"] } : { settings: ["read"] };
@@ -64,9 +86,27 @@ const allowedOnRoot = (path: string): boolean =>
 /** A well-formed hostname owning NO tenant: the host probe, and nothing else. */
 const allowedWithoutTenant = (path: string): boolean => path === "/api/host" || path === "/health";
 
+/**
+ * PERSONAL surfaces — a person's own identity, which no tenant owns.
+ *
+ * The engine's gate 3 requires a tenant, and on the `setup.` door there is no
+ * tenant by definition: somebody who has just proved they own an email has not
+ * created a centre yet. Without this the app cannot tell a signed-in owner from
+ * a signed-out stranger, so it re-renders the sign-in form they just completed,
+ * forever — which is exactly what it did until the flow was driven in a browser.
+ * Neither the typecheck nor the integration suite could see it, because both
+ * stop at the HTTP boundary and 401 is a perfectly ordinary answer there.
+ *
+ * Deliberately two paths and no prefix: identity and the list of workspaces this
+ * person belongs to. `/api/context` reports `active: null` when there is no
+ * tenant, which is the signal the app needs and the whole of what it may learn
+ * here. Every route that touches a centre's DATA stays behind the tenant gate.
+ */
+const isPersonal = (path: string): boolean => path === "/api/context" || path === "/api/me";
+
 /** Writes that survive a read-only tenant. Leaving is always allowed. */
 const allowedWhileReadOnly = (path: string): boolean =>
-  path.startsWith("/api/webhooks/") || path.startsWith("/api/me/") || path === "/api/tenant/close";
+  path.startsWith("/api/webhooks/") || path.startsWith("/api/me") || path === "/api/tenant/close";
 
 /**
  * Paths that answer even while the DEPLOYMENT is closed for maintenance.
@@ -89,6 +129,7 @@ export const guard = routeGuard<Env, Auth, Branding>({
   permissionFor,
   allowedOnRoot,
   allowedWithoutTenant,
+  isPersonal,
   allowedWhileReadOnly,
   isPlatformAdmin: (c) => isPlatformAdmin(c as never),
   // The STANDING gate, injected — this is what keeps `@4dl/auth` independent of

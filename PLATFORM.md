@@ -34,6 +34,7 @@ It typechecks and its tests pass in this workspace, so it cannot rot.
 | [`@4dl/app-kit`](packages/app-kit/README.md) | the browser runtime: fetch + the three-way offline outcome, host resolution, prefixed storage, passkeys, Stripe.js, Turnstile | the queued-write pattern, the shell |
 | [`@4dl/admin`](packages/admin/README.md) | the operator console on the `admin.` door: the router-free section-registry shell, and panels for config a shared package owns (email delivery, maintenance mode) | the SECTION LIST — every section names something the app manages |
 | [`@4dl/billing-rail`](packages/billing-rail/README.md) | one Stripe account, many apps: event→app attribution, the app-tagged catalog, and a dead-letter queue for what it cannot attribute | the app list, and a `claims` lookup for events its own metadata does not name |
+| [`@4dl/i18n`](packages/i18n/src/index.ts) | translation: typed dictionaries, `{name}` interpolation, one plural rule, a locale resolved from the browser and overridable. Deliberately minimal — no ICU, no lazy bundles | the DICTIONARIES, and which locale is the reference |
 
 Kova keeps [`@kova/domain`](packages/domain/README.md) (its math and its
 registries) and [`@kova/protocol`](packages/protocol/README.md) (its wire

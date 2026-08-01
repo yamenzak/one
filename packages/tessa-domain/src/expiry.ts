@@ -35,11 +35,11 @@ export type ExpiryReason = "printed" | "opened" | "sterile";
 export interface ExpiryInputs {
   /** Manufacturer's printed expiry, ISO `YYYY-MM-DD`. */
   printed?: string | null;
-  /** When the seal was broken, ISO `YYYY-MM-DD`. */
+  /** When the seal was broken. ISO date or timestamp — see `isoToMs`. */
   openedAt?: string | null;
   /** Shelf life after opening. Absent or 0 ⇒ opening does not shorten it. */
   postOpeningDays?: number | null;
-  /** When the pack came out of the autoclave, ISO `YYYY-MM-DD`. */
+  /** When the pack came out of the autoclave. ISO date or timestamp. */
   sterilisedAt?: string | null;
   /** Sterile shelf life in days. Absent or 0 ⇒ no sterile clock. */
   sterileShelfDays?: number | null;
@@ -62,10 +62,30 @@ export interface EffectiveExpiry {
 
 const DAY_MS = 86_400_000;
 
-/** ISO date → UTC ms. Null for anything unparseable, never a throw or a NaN. */
+/**
+ * ISO date → UTC ms. Null for anything unparseable, never a throw or a NaN.
+ *
+ * Accepts a full timestamp as well as a bare date, and truncates to the calendar
+ * day. That is not laxity, it is the shape of the data: `printed` is copied off
+ * a label and is genuinely a date, while `openedAt` and `sterilisedAt` are
+ * MOMENTS — the ledger records the time of day because an audit trail that says
+ * only "Tuesday" cannot be reconciled against a case list, and discarding the
+ * time at the source to please this function would cost more than it gains.
+ *
+ * A date-only parser was the first version, and it failed silently in the worst
+ * possible way: `opened_at` arrived as `2026-08-01T15:54:51.198Z`, was rejected,
+ * the opened clock never started, and the shelf confidently showed the printed
+ * 2027 date for a vial that was unusable in seven days. Strictness that drops an
+ * input is not safety.
+ *
+ * ⚠️ The truncation is to the UTC day, while shelf life is counted in a clinic's
+ * local days — see TESSA.md §7 for why that is recorded as a known limit rather
+ * than papered over here.
+ */
 function isoToMs(iso: string | null | undefined): number | null {
-  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
-  const ms = Date.parse(`${iso}T00:00:00Z`);
+  const day = iso ? /^(\d{4}-\d{2}-\d{2})(?:[T ]|$)/.exec(iso)?.[1] : undefined;
+  if (!day) return null;
+  const ms = Date.parse(`${day}T00:00:00Z`);
   return Number.isNaN(ms) ? null : ms;
 }
 

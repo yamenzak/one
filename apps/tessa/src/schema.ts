@@ -36,7 +36,7 @@ import type { SchemaModule } from "@4dl/core";
 
 export const TESSA_SCHEMA: SchemaModule = {
   id: "tessa",
-  version: "1",
+  version: "3",
   ddl: [
     // ── Catalog: the TYPE of a thing ────────────────────────────────────────
     //
@@ -122,7 +122,7 @@ export const TESSA_SCHEMA: SchemaModule = {
     //
     // A single `passed` boolean would erase that, and with it the ability to say
     // "released on Tuesday's evidence, failed on Thursday's".
-    "CREATE TABLE IF NOT EXISTS sterilisation_cycles (id TEXT PRIMARY KEY, tenant_id TEXT, machine TEXT, program TEXT, cycle_number TEXT, started_at TEXT, ended_at TEXT, operator TEXT, status TEXT DEFAULT 'running', physical_ok INTEGER, chemical_ok INTEGER, biological_ok INTEGER, biological_read_at TEXT, biological_read_by TEXT, released_at TEXT, released_by TEXT, failed_at TEXT, failure_reason TEXT, evidence_key TEXT, notes TEXT, created_at TEXT, updated_at TEXT);",
+    "CREATE TABLE IF NOT EXISTS sterilisation_cycles (id TEXT PRIMARY KEY, tenant_id TEXT, machine TEXT, program TEXT, cycle_number TEXT, started_at TEXT, ended_at TEXT, operator TEXT, status TEXT DEFAULT 'running', require_biological INTEGER DEFAULT 0, physical_ok INTEGER, chemical_ok INTEGER, biological_ok INTEGER, biological_read_at TEXT, biological_read_by TEXT, released_at TEXT, released_by TEXT, failed_at TEXT, failure_reason TEXT, evidence_key TEXT, notes TEXT, created_at TEXT, updated_at TEXT);",
     "CREATE INDEX IF NOT EXISTS idx_cycles_tenant ON sterilisation_cycles(tenant_id, started_at);",
     "CREATE INDEX IF NOT EXISTS idx_cycles_status ON sterilisation_cycles(tenant_id, status);",
 
@@ -132,7 +132,7 @@ export const TESSA_SCHEMA: SchemaModule = {
     // nothing else about a person is stored here — no name, no date of birth, no
     // diagnosis. `procedure_code` is the centre's own code, not a description.
     // The app's conformance test enforces the absence of the rest.
-    "CREATE TABLE IF NOT EXISTS cases (id TEXT PRIMARY KEY, tenant_id TEXT, case_ref TEXT, procedure_code TEXT, location_id TEXT, status TEXT DEFAULT 'open', opened_at TEXT, opened_by TEXT, closed_at TEXT, closed_by TEXT, notes TEXT, created_at TEXT);",
+    "CREATE TABLE IF NOT EXISTS cases (id TEXT PRIMARY KEY, tenant_id TEXT, case_ref TEXT, procedure_code TEXT, location_id TEXT, status TEXT DEFAULT 'open', opened_at TEXT, opened_by TEXT, closed_at TEXT, closed_by TEXT, reopened_at TEXT, reopened_by TEXT, reopen_count INTEGER DEFAULT 0, notes TEXT, created_at TEXT, updated_at TEXT);",
     "CREATE INDEX IF NOT EXISTS idx_cases_ref ON cases(tenant_id, case_ref);",
     "CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(tenant_id, status, opened_at);",
 
@@ -155,6 +155,30 @@ export const TESSA_SCHEMA: SchemaModule = {
     "CREATE INDEX IF NOT EXISTS idx_ledger_case ON ledger(tenant_id, case_id, at);",
     "CREATE INDEX IF NOT EXISTS idx_ledger_cycle ON ledger(tenant_id, cycle_id, at);",
     "CREATE INDEX IF NOT EXISTS idx_ledger_at ON ledger(tenant_id, at);",
+  ],
+  /**
+   * Ran against a database that already has the table. Duplicate-column errors
+   * are tolerated by the runner, so the same statement is safe on a fresh one.
+   */
+  alters: [
+    // Some loads — implants, and some houses' own rules — may not be released
+    // until the biological indicator is back. Per CYCLE rather than per tenant,
+    // because a centre runs both kinds of load through the same machine.
+    "ALTER TABLE sterilisation_cycles ADD COLUMN require_biological INTEGER DEFAULT 0",
+    /**
+     * A closed case that gets amended.
+     *
+     * Somebody remembers a gauze pack twenty minutes after closing, and that is
+     * a real Tuesday. The alternative designs are both worse: refusing outright
+     * makes the record wrong, and letting a closed case absorb writes silently
+     * makes "closed" mean nothing. Reopening is a person's act, it is counted,
+     * and `reopen_count > 0` is what tells an auditor this record was amended
+     * rather than written once.
+     */
+    "ALTER TABLE cases ADD COLUMN reopened_at TEXT",
+    "ALTER TABLE cases ADD COLUMN reopened_by TEXT",
+    "ALTER TABLE cases ADD COLUMN reopen_count INTEGER DEFAULT 0",
+    "ALTER TABLE cases ADD COLUMN updated_at TEXT",
   ],
   scoped: {
     tenantColumn: "tenant_id",

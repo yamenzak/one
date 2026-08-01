@@ -27,6 +27,11 @@ describe("the vocabulary", () => {
     // which is why the projection is per-kind rather than per-event.
     expect(eventAppliesTo("opened", "lot")).toBe(true);
     expect(eventAppliesTo("opened", "pack")).toBe(true);
+    // `packed` likewise records on both sides. Without the unit half, a recall
+    // can name the trays in a failed load but not the instruments inside them.
+    expect(eventAppliesTo("packed", "pack")).toBe(true);
+    expect(eventAppliesTo("packed", "unit")).toBe(true);
+    expect(eventAppliesTo("packed", "lot")).toBe(false);
   });
 
   it("marks retirement as the only one-way door", () => {

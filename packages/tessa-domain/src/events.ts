@@ -20,12 +20,15 @@ export type EventName =
   | "opened"
   | "consumed"
   | "wasted"
+  | "cleaned"
   | "packed"
+  | "loaded"
   | "sterilised"
   | "released"
   | "quarantined"
   | "issued"
   | "returned"
+  | "cleared"
   | "retired";
 
 /** How an event moves a lot's quantity. `none` ⇒ the event does not touch it. */
@@ -56,12 +59,46 @@ export const EVENTS: Record<EventName, EventSpec> = {
   opened: { kinds: ["lot", "pack"], quantity: "none", label: "Opened" },
   consumed: { kinds: ["lot"], quantity: "decrease", label: "Used" },
   wasted: { kinds: ["lot"], quantity: "decrease", label: "Discarded" },
-  packed: { kinds: ["pack"], quantity: "none", label: "Packed" },
+  /**
+   * The step that closes the CSSD loop: a dirty instrument becomes available
+   * again.
+   *
+   * It has to be an event somebody performs, not a status a route may set,
+   * because without it an instrument that came out of an opened tray is stuck in
+   * `dirty` forever — and the pressure to "just set it back to clean" is exactly
+   * how an instrument gets from a patient into the next tray unreprocessed.
+   */
+  cleaned: { kinds: ["unit"], quantity: "none", label: "Reprocessed" },
+  // Applies to a UNIT as well as the pack, and both halves are needed. The pack
+  // gets "this tray was assembled"; each instrument gets "I went into tray T on
+  // Tuesday", which is the half a recall reads backwards — from a failed load to
+  // the instruments that were in it.
+  packed: { kinds: ["unit", "pack"], quantity: "none", label: "Packed" },
+  // Into the machine. A separate event from `sterilised` because a load that is
+  // still running has trays committed to it that nothing else may touch, and
+  // "which trays were in cycle 47" has to be answerable before the cycle ends —
+  // otherwise a load that fails mid-run has no recoverable membership.
+  loaded: { kinds: ["pack"], quantity: "none", label: "Loaded" },
   sterilised: { kinds: ["pack"], quantity: "none", label: "Sterilised" },
   released: { kinds: ["pack"], quantity: "none", label: "Released" },
   quarantined: { kinds: ["lot", "unit", "pack"], quantity: "none", label: "Quarantined" },
   issued: { kinds: ["unit", "pack"], quantity: "none", label: "Issued" },
   returned: { kinds: ["unit", "pack"], quantity: "none", label: "Returned" },
+  /**
+   * A quarantine lifted, by a person.
+   *
+   * Its counterpart matters more than it does: without a way back, quarantine is
+   * a one-way door, and a one-way door is one people stop walking through. See
+   * `isFrozen` — freezing is reversible precisely so that freezing stays cheap.
+   *
+   * ⚠️ What it must NEVER do is return something to a READY state. A tray from a
+   * failed load goes back to `packed` (reprocess it), an instrument to `dirty`,
+   * a lot to `active` — the app's projection decides, and every one of those
+   * lands in "needs work" rather than "good to go". Clearing a quarantine
+   * straight back to `sterile` would let a failed load onto a shelf with one
+   * click, which is the exact accident the quarantine was for.
+   */
+  cleared: { kinds: ["lot", "unit", "pack"], quantity: "none", label: "Quarantine lifted" },
   retired: { kinds: ["unit"], quantity: "none", terminal: true, label: "Retired" },
 };
 

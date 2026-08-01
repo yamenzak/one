@@ -367,6 +367,16 @@ does not pay for CSSD.
    evidence. Revisit only if a customer's machine makes it cheap.
 6. **AVV / DPA template** — a sales blocker, not an engineering one, but it
    blocks all the same.
+7. **The day boundary is UTC, and a shelf life is counted in local days.**
+   `opened_at` and `sterilised_at` are written server-side as UTC instants and
+   truncated to the UTC calendar day by `effectiveExpiry`; `/api/stock` compares
+   against the server's UTC "today". For Germany and the rest of the EU — every
+   offset positive — truncation lands the expiry a day EARLY at worst, which is
+   the safe direction. West of Greenwich it can land a day LATE, which is not.
+   The fix is Kova's: take the device's local date (`date_local`) at the moment
+   of the act and count from that. Cheap to do, but it touches the write path,
+   the projection and every read, so it is recorded here rather than half-done.
+   Close it before the first customer outside Europe.
 
 ---
 
@@ -377,8 +387,9 @@ editing it.
 
 **Built:**
 
-- `@tessa/domain` — GS1/UDI element-string parsing and three-clock expiry
-  composition. 49 tests, verified by mutation rather than assumed.
+- `@tessa/domain` — GS1/UDI element-string parsing, three-clock expiry
+  composition and the event registry. 63 tests, verified by mutation rather than
+  assumed.
 - The schema: 11 tables covering catalog, locations, the three instance
   granularities, pack recipes, sterilisation cycles, cases and the ledger. Every
   table carries `tenant_id` so the erasure cascade is complete; there is
@@ -394,11 +405,91 @@ editing it.
   state change in a single `db.batch()`, guards the state update with a
   compare-and-set, and refuses rather than clamps. Tessa's equivalent of Kova's
   `requireClientAccess` — the value is entirely in it never being bypassed.
-- 31 app tests (12 conformance, 6 integration, 13 ledger) + 62 in
-  `@tessa/domain`.
+- **The sterilisation loop and the RECALL** (`apps/tessa/src/cycle-routes.ts`,
+  `packages/tessa-domain/src/sterilisation.ts`). A load runs, ends with its two
+  fast indicators recorded, and is RELEASED by a named person — `ended` and
+  `released` are separate states because the gap between them is where a
+  qualified person weighs the evidence, and collapsing them would make the
+  autoclave the releaser. The biological indicator arrives a day or two later,
+  and when it fails on a load already released, the recall freezes every tray it
+  can still reach and NAMES the ones it cannot: the opened ones, with the case
+  reference the clinic typed. That second list is the point — a report showing
+  only what it froze would read as a finished job. `releaseCheck` reports what
+  the evidence permits and never releases anything; a second biological reading
+  that disagrees with the first is REFUSED rather than applied, because
+  overwriting it rewrites the evidence a release was justified by. A quarantine
+  can be lifted, always into "needs work" and never into "ready".
+- **The stock routes** (`apps/tessa/src/stock-routes.ts`) — locations, the
+  two-scan receive, move/use/discard/quarantine/open, the shelf read and one
+  lot's history. The receive takes product, expiry and lot code from a real GS1
+  element string and types only the count; an unrecognised GTIN answers 409 with
+  everything it *did* read, so the next screen is a pre-filled confirmation
+  rather than a blank form. The shelf computes `effectiveExpiry` per row and
+  returns the winning clock alongside the date.
+- **Cases, and the trace read BACKWARDS** (`apps/tessa/src/case-routes.ts`,
+  `cases.ts`). A case is opened, consumed and opened into, and closed. Its
+  `/api/trace/case/:id` answers the reverse of the recall: what did this
+  procedure use, and — the reason it exists — is any of it from a load that has
+  since failed. A case correct on Tuesday can acquire a concern on Thursday
+  without anything about the case changing, so the query joins the trays to the
+  cycles rather than trusting a status stored at close time. A closed case
+  REFUSES new lines and can be reopened by a person; `reopen_count > 0` is what
+  marks an amended record as amended. `resolveCase` is the one guard both
+  writing routes run — an unchecked case id resolves to nothing and leaves the
+  trace quietly incomplete forever.
+- **The CSSD loop** (`apps/tessa/src/pack-routes.ts`): instruments, pack recipes,
+  tray build, and the open transition that returns every member to the DIRTY
+  pool. Building a tray goes through `applyEvents`, the plural chokepoint — one
+  act over N+1 rows, all of it or none of it, with an unwind when a member loses
+  its compare-and-set.
+- 84 app tests (12 conformance, 6 integration, 17 ledger, 9 stock, 13 packs,
+  15 cycles, 12 cases) + 78 in `@tessa/domain`. The load-bearing behaviours are
+  verified by MUTATION rather than assumed: unreachable packs named rather than
+  dropped, a contradicting indicator refused, a cleared quarantine landing in
+  `packed`, the case guard, the preserved close time, and the concerns join.
 
-**Not built:** everything else. Locations, lots, units, packs, cycles, cases and
-the ledger exist as tables with no routes over them. There is no SPA.
+- **The app** (`apps/tessa-app`) — a scan-first PWA the worker serves at the same
+  origin. Five surfaces: Today (what needs attention), Stock, CSSD (trays and
+  loads), Cases, and the Recall report, which is a ROUTE rather than a sheet
+  because it is a document a centre works through over days. Scanning uses the
+  native `BarcodeDetector` where it exists and lazily imports ZXing where it does
+  not; the typed field beside it is not a fallback but the path a hand-held USB
+  scanner takes, since those present as a keyboard.
 
-Next: routes over the ledger — receive, move, consume — and then the
-sterilisation cycle, which is where the recall query finally becomes real.
+- **German** (§2.4 answered). `@4dl/i18n` is the platform's answer — typed
+  dictionaries, one plural rule, a locale from the browser the person can
+  override — and Tessa ships `en` + `de`. `Freigabe` and `Charge` are used as
+  the regulatory terms of art rather than translated literally.
+  `i18n.conformance.test.ts` makes an untranslated string a test failure, not a
+  discovery. ⚠️ The German is an engineer's, reviewed for meaning and NOT
+  certified; a native CSSD reader should see it before a customer does.
+- **Label printing** (§7.4 closed). A pure Code 128 B encoder in
+  `@tessa/domain`, checksum pinned against a published vector, rendered as SVG
+  onto a print sheet sized in millimetres. Code 128 rather than DataMatrix
+  because these labels only ever carry Tessa's own short ASCII identifiers, and
+  the app's scanner already accepts the format — so a label it prints is read by
+  the same camera that reads the manufacturer's box.
+- **E2E** (`apps/tessa-e2e`, `pnpm e2e`): 6 Playwright specs on port 8788,
+  covering the recall in both directions and the scan-first path. Verified by
+  mutation — reverting the `isPersonal` fix or dropping the unreachable tray each
+  fails a spec.
+
+**Not built:** no AI surfaces — the vision paths of §5 Phase 4 are untouched, and
+Rule 3's `suggested_*` shape has nothing writing into it. No par levels, no
+expiry sweep, no reorder. No offline lane (Phase 3): the app has no service
+worker, deliberately, because caching a shell before the offline WRITE path
+exists would fail every mutation the moment it was used without signal. **No
+billing** — Tessa has no Stripe rail at all; every centre sits on the default
+entitlements (see `apps/tessa/DEPLOY.md` §4).
+
+**Two honest gaps in the translation.** `@4dl/ui`'s own strings — "Couldn't load
+…", "Try again", the date formats — are English and are NOT covered: translating
+the design system is a separate piece of work that affects Kova too. And nothing
+yet sets a centre's DEFAULT locale; the browser decides, and a person overrides.
+
+**Never deployed.** `apps/tessa/DEPLOY.md` is written and every resource id in
+`wrangler.jsonc` is still a placeholder. Data residency (§7.1) is unanswered and
+is the one open item that could change the architecture rather than the config.
+
+Next: a native reader over the German, then either the AI vision surfaces or the
+offline lane.

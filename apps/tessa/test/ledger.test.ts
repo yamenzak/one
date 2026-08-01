@@ -21,7 +21,7 @@
 import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import { ensureSchema } from "../src/db.js";
-import { applyEvent, historyOf } from "../src/ledger.js";
+import { applyEvent, applyEvents, historyOf } from "../src/ledger.js";
 
 const db = () => env.DB as D1Database;
 const TENANT = "tnt_ledger";
@@ -182,6 +182,90 @@ describe("concurrency", () => {
     expect((await qtyOf("lot_race"))?.quantity).toBe(0);
     // The loser leaves no ledger row either — see the CAS unwind in ledger.ts.
     expect(await ledgerCount("lot_race")).toBe(1);
+  });
+});
+
+describe("one act that touches several things", () => {
+  // Building a tray is not five adjacent events. Either the pack exists with
+  // four instruments inside it, or nothing happened — because the half-done
+  // version is invisible stock and a recall that names the wrong instruments.
+
+  async function seedUnit(id: string, status = "clean", tenant = TENANT) {
+    await db()
+      .prepare("INSERT OR REPLACE INTO units (id, tenant_id, catalog_item_id, location_id, label_code, status, cycle_count, created_at) VALUES (?, ?, 'cat_discrete', 'loc_a', ?, ?, 0, ?)")
+      .bind(id, tenant, id, status, new Date().toISOString())
+      .run();
+  }
+  const statusOf = async (id: string): Promise<string | undefined> =>
+    (await db().prepare("SELECT status FROM units WHERE id = ?").bind(id).first<{ status: string }>())?.status;
+
+  const pack = (id: string, unitIds: string[]): Parameters<typeof applyEvents>[1] => [
+    { tenantId: TENANT, actorUserId: USER, event: "packed" as const, trackedKind: "pack" as const, trackedId: id },
+    ...unitIds.map((u) => ({ tenantId: TENANT, actorUserId: USER, event: "packed" as const, trackedKind: "unit" as const, trackedId: u })),
+  ];
+
+  async function seedPack(id: string) {
+    await db()
+      .prepare("INSERT OR REPLACE INTO packs (id, tenant_id, recipe_id, location_id, label_code, status, created_at) VALUES (?, ?, 'rec_1', 'loc_a', ?, 'packed', ?)")
+      .bind(id, TENANT, id, new Date().toISOString())
+      .run();
+  }
+
+  it("packs a tray and every instrument in it, in one act", async () => {
+    await seedPack("pk_ok");
+    await seedUnit("u_a");
+    await seedUnit("u_b");
+    const r = await applyEvents(db(), pack("pk_ok", ["u_a", "u_b"]));
+    expect(r).toMatchObject({ ok: true });
+    expect(await statusOf("u_a")).toBe("packed");
+    expect(await statusOf("u_b")).toBe("packed");
+    expect(await ledgerCount("u_a")).toBe(1);
+  });
+
+  it("refuses the WHOLE act when one member is unusable, writing nothing", async () => {
+    // The third instrument turning out to be retired must not leave the first
+    // two marked packed. Refused during prepare, so no statement ever runs.
+    await seedPack("pk_bad");
+    await seedUnit("u_ok");
+    await seedUnit("u_dead", "retired");
+    const r = await applyEvents(db(), pack("pk_bad", ["u_ok", "u_dead"]));
+    expect(r).toEqual({ ok: false, reason: "finished", index: 2 });
+    expect(await statusOf("u_ok")).toBe("clean");
+    expect(await ledgerCount("u_ok")).toBe(0);
+    expect(await ledgerCount("pk_bad")).toBe(0);
+  });
+
+  it("UNWINDS what already landed when a member loses its compare-and-set", async () => {
+    /**
+     * The same instrument twice. Both updates were prepared against `clean`, so
+     * the first flips it to `packed` and the second matches zero rows — a
+     * deterministic stand-in for the real race (someone else claiming that
+     * instrument in the microseconds between prepare and batch), and a real bug
+     * in its own right: an instrument cannot be in a tray twice.
+     *
+     * What matters is the state AFTER: not the pack half-built, not the unit
+     * stranded in `packed` inside a tray nobody assembled, and above all not a
+     * ledger row saying it was packed.
+     */
+    await seedPack("pk_race");
+    await seedUnit("u_twice");
+    const r = await applyEvents(db(), pack("pk_race", ["u_twice", "u_twice"]));
+    expect(r).toMatchObject({ ok: false, reason: "conflict" });
+    expect(await statusOf("u_twice")).toBe("clean");
+    expect(await ledgerCount("u_twice")).toBe(0);
+    expect(await ledgerCount("pk_race")).toBe(0);
+  });
+
+  it("refuses an event whose projection cannot describe its own undo", async () => {
+    // `opened` on a LOT writes through COALESCE, so it may write nothing at all
+    // and an unwind would have to guess whether it did. The plural path says no
+    // rather than guessing — see PLURAL_SAFE.
+    await seedLot("lot_plural", "cat_discrete", 5);
+    const r = await applyEvents(db(), [
+      { tenantId: TENANT, actorUserId: USER, event: "consumed", trackedKind: "lot", trackedId: "lot_plural", quantity: 1 },
+    ]);
+    expect(r).toEqual({ ok: false, reason: "not_undoable", index: 0 });
+    expect((await qtyOf("lot_plural"))?.quantity).toBe(5);
   });
 });
 
