@@ -2353,8 +2353,12 @@ function StripeConfig() {
     setErr(null);
     setMsg(null);
     try {
-      const r = await api.post<{ plans: number; packs: number }>("/api/admin/stripe/sync");
-      setMsg(`Synced ${r.plans} plans + ${r.packs} credit packs into the ${status?.activeLane ?? "active"} lane.`);
+      const r = await api.post<{ plans: number; packs: number; renamed?: number }>("/api/admin/stripe/sync");
+      // `renamed` is reported separately because "0 created" is the NORMAL
+      // outcome of a rename-only sync, and without this line it reads as "the
+      // button did nothing".
+      const created = `Synced ${r.plans} plans + ${r.packs} credit packs into the ${status?.activeLane ?? "active"} lane.`;
+      setMsg(r.renamed ? `${created} Renamed ${r.renamed} existing product${r.renamed === 1 ? "" : "s"} in Stripe to match the catalog.` : created);
     } catch (e) {
       setErr(errorText(e, "Catalog sync failed"));
     } finally {

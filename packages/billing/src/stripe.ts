@@ -402,15 +402,48 @@ export async function swapCatalogLane(db: D1Database, from: StripeLane, to: Stri
   await restoreCatalogIds(db, to);
 }
 
-/** Push plans + packs to Stripe as products + prices; store the ids back. The
- *  ids are LANE-SPECIFIC — see `stripeCatalogStashKey` for what happens on a
- *  mode flip. */
-export async function syncCatalog(db: D1Database, secretKey: string, branding: StripeBranding): Promise<{ plans: number; packs: number }> {
+/**
+ * Push plans + packs to Stripe as products + prices; store the ids back.
+ *
+ * Two jobs, and the second one is easy to forget it has: it CREATES what is
+ * missing, and it RECONCILES the name of what already exists. Without the
+ * second, a plan renamed in the catalog keeps its old name on every checkout
+ * page and invoice forever, because a rename does not move the price and so
+ * never invalidates the stored ids.
+ *
+ * The ids are LANE-SPECIFIC — see `stripeCatalogStashKey` for what happens on a
+ * mode flip.
+ */
+export async function syncCatalog(db: D1Database, secretKey: string, branding: StripeBranding): Promise<{ plans: number; packs: number; renamed: number }> {
   const meta = stripeMetaKeys(branding);
-  const plans = await db.prepare("SELECT id, name, price_usd_month, stripe_price_id FROM plans WHERE active = 1 AND price_usd_month > 0").all<{ id: string; name: string; price_usd_month: number; stripe_price_id: string | null }>();
+  const plans = await db.prepare("SELECT id, name, price_usd_month, stripe_product_id, stripe_price_id FROM plans WHERE active = 1 AND price_usd_month > 0").all<{ id: string; name: string; price_usd_month: number; stripe_product_id: string | null; stripe_price_id: string | null }>();
   let planCount = 0;
+  let renamed = 0;
   for (const p of plans.results ?? []) {
-    if (p.stripe_price_id) continue;
+    if (p.stripe_price_id) {
+      /**
+       * Already in Stripe — so the PRICE is settled, but the NAME may not be.
+       *
+       * A rename does not move the price, so `applyPlanCatalog`'s "a price change
+       * invalidates the Stripe ids" rule does not fire, and this loop used to
+       * `continue` straight past. The plan was then called one thing in D1 and
+       * another on the customer's checkout page, their invoice and their card
+       * statement — permanently, with no way to fix it from the admin console.
+       * Renaming Solo to Starter is exactly that case.
+       *
+       * Pushed unconditionally rather than after a GET-and-compare: it is one
+       * idempotent call on a button an operator presses by hand, and reading
+       * first would double the round-trips to save nothing.
+       *
+       * Only the name. A Stripe Price is immutable by design, so anything about
+       * the AMOUNT still has to go through the null-the-ids path.
+       */
+      if (p.stripe_product_id) {
+        await stripeCall(secretKey, `products/${p.stripe_product_id}`, { name: `${branding.productPrefix} ${p.name}` });
+        renamed++;
+      }
+      continue;
+    }
     const product = await stripeCall<{ id: string }>(secretKey, "products", { name: `${branding.productPrefix} ${p.name}`, [meta.plan]: p.id });
     const price = await stripeCall<{ id: string }>(secretKey, "prices", {
       product: product.id,
@@ -421,16 +454,24 @@ export async function syncCatalog(db: D1Database, secretKey: string, branding: S
     await db.prepare("UPDATE plans SET stripe_product_id = ?, stripe_price_id = ? WHERE id = ?").bind(product.id, price.id, p.id).run();
     planCount++;
   }
-  const packs = await db.prepare("SELECT id, name, price_usd, stripe_price_id FROM credit_packs WHERE active = 1").all<{ id: string; name: string; price_usd: number; stripe_price_id: string | null }>();
+  const packs = await db.prepare("SELECT id, name, price_usd, stripe_product_id, stripe_price_id FROM credit_packs WHERE active = 1").all<{ id: string; name: string; price_usd: number; stripe_product_id: string | null; stripe_price_id: string | null }>();
   let packCount = 0;
   for (const p of packs.results ?? []) {
-    if (p.stripe_price_id) continue;
+    if (p.stripe_price_id) {
+      // Same reconcile as the plans above — a pack renamed in the admin console
+      // must not keep its old name on the buyer's receipt.
+      if (p.stripe_product_id) {
+        await stripeCall(secretKey, `products/${p.stripe_product_id}`, { name: `${branding.productPrefix} — ${p.name}` });
+        renamed++;
+      }
+      continue;
+    }
     const product = await stripeCall<{ id: string }>(secretKey, "products", { name: `${branding.productPrefix} — ${p.name}`, [meta.pack]: p.id });
     const price = await stripeCall<{ id: string }>(secretKey, "prices", { product: product.id, unit_amount: Math.round(p.price_usd * 100), currency: "usd" });
     await db.prepare("UPDATE credit_packs SET stripe_product_id = ?, stripe_price_id = ? WHERE id = ?").bind(product.id, price.id, p.id).run();
     packCount++;
   }
-  return { plans: planCount, packs: packCount };
+  return { plans: planCount, packs: packCount, renamed };
 }
 
 export { setConfig };

@@ -824,9 +824,14 @@ export const stripeAdminRoutes = new Hono<AppEnv>()
 
   // Push plans + packs to Stripe as products + prices.
   //
-  // `syncCatalog` SKIPS any row that already carries a `stripe_price_id`, so a
-  // repriced plan would otherwise never reach Stripe and checkout would keep
-  // charging the old amount. The catalog migration and the plan editor both null
+  // `syncCatalog` creates what is missing and RECONCILES the name of what is
+  // already there. The second half matters because a rename does not move the
+  // price, so it never invalidates the stored ids — without it a plan renamed in
+  // the catalog keeps its old name on every checkout page and invoice.
+  //
+  // The PRICE is the other half: `syncCatalog` skips any row that already carries
+  // a `stripe_price_id`, so a repriced plan would otherwise never reach Stripe
+  // and checkout would keep charging the old amount. The catalog migration and the plan editor both null
   // the id pair when a price moves; `{ resyncPrices: true }` is the manual escape
   // hatch for a row whose Stripe price drifted some other way (a price edited in
   // the Stripe dashboard, a half-finished sync). It drops the stored ids for the
