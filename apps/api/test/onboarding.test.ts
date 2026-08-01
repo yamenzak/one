@@ -119,9 +119,11 @@ describe("onboarding plan picker", () => {
   it("exposes the picker's fields — price, headline limits, trial — and nothing else", async () => {
     const res = await SELF.fetch(`${ORIGIN}/api/me/onboarding/plans`, { headers: auth(tenantlessCookie) });
     const { plans } = (await res.json()) as PlansPayload;
-    const solo = plans.find((p) => p.id === "solo")!;
-    expect(solo).toMatchObject({ name: "Solo", priceUsdMonth: 4.99, trialDays: 30 });
-    expect(solo.limits).toMatchObject({ staffSeats: 1, activeClients: 1, monthlyCredits: 500 });
+    // v3: the id is still `solo` (Stripe metadata carries it on every product and
+    // subscription ever created) but the plan is "Starter" and holds 3 clients.
+    const starter = plans.find((p) => p.id === "solo")!;
+    expect(starter).toMatchObject({ name: "Starter", priceUsdMonth: 4.99, trialDays: 30 });
+    expect(starter.limits).toMatchObject({ staffSeats: 1, activeClients: 3, monthlyCredits: 500 });
     // Trials are prominent on exactly two plans; the other two have none.
     expect(plans.find((p) => p.id === "light")!.trialDays).toBe(30);
     expect(plans.find((p) => p.id === "pro")!.trialDays).toBe(0);
